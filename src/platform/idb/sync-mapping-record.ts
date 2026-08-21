@@ -82,6 +82,39 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
   return next;
 }
 
+export function mergeSyncMappingForIdentityMove(
+  target: unknown,
+  legacy: unknown,
+  identity: { source: unknown; conversationKey: unknown; fallbackNotionPageId?: unknown },
+): SyncMappingRecord {
+  const current = asRecord(target);
+  const previous = asRecord(legacy);
+  const hasTarget = Object.keys(current).length > 0;
+  const next: SyncMappingRecord = hasTarget ? { ...previous, ...current } : { ...previous };
+
+  const targetNotionPageId = safeString(current.notionPageId);
+  const legacyNotionPageId = safeString(previous.notionPageId);
+  const notionSource = targetNotionPageId ? current : legacyNotionPageId ? previous : hasTarget ? current : previous;
+  replaceGroup(next, notionSource, NOTION_CONTINUITY_FIELDS);
+  if (!safeString(next.notionPageId)) {
+    const fallbackNotionPageId = safeString(identity?.fallbackNotionPageId);
+    if (fallbackNotionPageId) next.notionPageId = fallbackNotionPageId;
+  }
+
+  const targetFeishuDocId = safeString(current.feishuDocId);
+  const legacyFeishuDocId = safeString(previous.feishuDocId);
+  const feishuSource = targetFeishuDocId ? current : legacyFeishuDocId ? previous : hasTarget ? current : previous;
+  replaceGroup(next, feishuSource, FEISHU_CONTINUITY_FIELDS);
+
+  next.source = safeString(identity?.source);
+  next.conversationKey = safeString(identity?.conversationKey);
+  if (hasTarget && Object.prototype.hasOwnProperty.call(current, 'id')) next.id = current.id;
+  else if (Object.prototype.hasOwnProperty.call(previous, 'id')) next.id = previous.id;
+  else delete next.id;
+
+  return next;
+}
+
 export function mergeSyncMappingForImport(existing: unknown, incoming: unknown): SyncMappingRecord {
   const local = stripSyncMappingLocalId(existing);
   const imported = stripSyncMappingLocalId(incoming);

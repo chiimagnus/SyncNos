@@ -15,7 +15,7 @@ import type {
   ConversationListSummary,
 } from '@services/conversations/domain/list-pagination';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
-import { mergeSyncMappingPatch } from '@platform/idb/sync-mapping-record';
+import { mergeSyncMappingForIdentityMove, mergeSyncMappingPatch } from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 
 let cachedDb: IDBDatabase | null = null;
@@ -332,31 +332,6 @@ function mergeWarningFlags(preferred: unknown, fallback: unknown): string[] {
   return out;
 }
 
-function mergeSyncMappingRecord(base: any, incoming: any, fallbackNotionPageId: string): any {
-  const current = base && typeof base === 'object' ? { ...base } : {};
-  const next = incoming && typeof incoming === 'object' ? incoming : {};
-  const notionPageId =
-    safeString(current.notionPageId) || safeString(next.notionPageId) || safeString(fallbackNotionPageId);
-  const lastSyncedMessageKey = safeString(current.lastSyncedMessageKey) || safeString(next.lastSyncedMessageKey);
-  const lastSyncedSequence = pickMaxFiniteNumber(current.lastSyncedSequence, next.lastSyncedSequence);
-  const lastSyncedAt = pickMaxFiniteNumber(current.lastSyncedAt, next.lastSyncedAt);
-  const lastSyncedMessageUpdatedAt = pickMaxFiniteNumber(
-    current.lastSyncedMessageUpdatedAt,
-    next.lastSyncedMessageUpdatedAt,
-  );
-  const updatedAt = pickMaxFiniteNumber(current.updatedAt, next.updatedAt, Date.now()) || Date.now();
-
-  return {
-    ...current,
-    notionPageId,
-    lastSyncedMessageKey,
-    lastSyncedSequence,
-    lastSyncedAt,
-    lastSyncedMessageUpdatedAt,
-    updatedAt,
-  };
-}
-
 async function migrateSyncMappingKey(
   syncMappingsStore: IDBObjectStore,
   input: {
@@ -377,43 +352,38 @@ async function migrateSyncMappingKey(
   const idx = syncMappingsStore.index('by_source_conversationKey');
 
   const target = (await reqToPromise(idx.get([nextSource, nextConversationKey]) as any)) as any;
-  if (legacySource === nextSource && legacyConversationKey === nextConversationKey) {
+  const identity = { source: nextSource, conversationKey: nextConversationKey, fallbackNotionPageId };
+  const persistTargetFallback = async () => {
     if (!target) return;
-    const merged = mergeSyncMappingRecord(target, null, fallbackNotionPageId);
+    const merged = mergeSyncMappingForIdentityMove(target, null, identity) as any;
     if (JSON.stringify(merged) !== JSON.stringify(target)) {
       await reqToPromise(syncMappingsStore.put(merged));
     }
+  };
+
+  if (legacySource === nextSource && legacyConversationKey === nextConversationKey) {
+    await persistTargetFallback();
     return;
   }
 
   if (!legacySource || !legacyConversationKey) {
-    if (!target) return;
-    const merged = mergeSyncMappingRecord(target, null, fallbackNotionPageId);
-    if (JSON.stringify(merged) !== JSON.stringify(target)) {
-      await reqToPromise(syncMappingsStore.put(merged));
-    }
+    await persistTargetFallback();
     return;
   }
 
   const legacy = (await reqToPromise(idx.get([legacySource, legacyConversationKey]) as any)) as any;
   if (!legacy) {
-    if (!target) return;
-    const merged = mergeSyncMappingRecord(target, null, fallbackNotionPageId);
-    if (JSON.stringify(merged) !== JSON.stringify(target)) {
-      await reqToPromise(syncMappingsStore.put(merged));
-    }
+    await persistTargetFallback();
     return;
   }
 
   if (!target) {
-    legacy.source = nextSource;
-    legacy.conversationKey = nextConversationKey;
-    const merged = mergeSyncMappingRecord(legacy, null, fallbackNotionPageId);
-    await reqToPromise(syncMappingsStore.put(merged));
+    const moved = mergeSyncMappingForIdentityMove(null, legacy, identity) as any;
+    await reqToPromise(syncMappingsStore.put(moved));
     return;
   }
 
-  const merged = mergeSyncMappingRecord(target, legacy, fallbackNotionPageId);
+  const merged = mergeSyncMappingForIdentityMove(target, legacy, identity) as any;
   await reqToPromise(syncMappingsStore.put(merged));
 
   const legacyId = Number(legacy.id);

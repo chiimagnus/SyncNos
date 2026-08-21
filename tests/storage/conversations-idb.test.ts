@@ -886,6 +886,18 @@ describe('conversations storage-idb', () => {
         source: 'article',
         conversationKey: 'article_https://example.com/post',
         notionPageId: 'page_old',
+        notionPageUrl: 'https://notion.so/page_old',
+        notionWorkspaceSlug: 'legacy-ws',
+        lastSyncedMessageKey: 'article_body',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 10,
+        lastSyncedMessageUpdatedAt: 9,
+        notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'article_body', lastSyncedSequence: 1 } },
+        notionSectionDigests: { article: { digest: 'd-article', lastSyncedAt: 10 } },
+        feishuDocId: 'doc-old',
+        feishuLastContentHash: 'hash-old',
+        futureMetadata: { keep: true },
         updatedAt: 1,
       }),
     );
@@ -926,6 +938,15 @@ describe('conversations storage-idb', () => {
       source: 'web',
       conversationKey: 'article:https://example.com/post',
       notionPageId: 'page_old',
+      notionPageUrl: 'https://notion.so/page_old',
+      notionWorkspaceSlug: 'legacy-ws',
+      lastSyncedMessageKey: 'article_body',
+      notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'article_body', lastSyncedSequence: 1 } },
+      notionSectionDigests: { article: { digest: 'd-article', lastSyncedAt: 10 } },
+      feishuDocId: 'doc-old',
+      feishuLastContentHash: 'hash-old',
+      futureMetadata: { keep: true },
     });
   });
 
@@ -968,7 +989,14 @@ describe('conversations storage-idb', () => {
         source: 'web',
         conversationKey: removeKey,
         notionPageId: 'page_remove',
+        notionPageUrl: 'https://notion.so/page_remove',
         lastSyncedMessageKey: 'x',
+        lastSyncedSequence: 2,
+        notionSections: { conversations: { headingBlockId: 'h-remove' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'x', lastSyncedSequence: 2 } },
+        feishuDocId: 'doc-remove',
+        feishuLastContentHash: 'hash-remove',
+        legacyOnly: true,
         updatedAt: 1,
       }),
     );
@@ -1004,7 +1032,103 @@ describe('conversations storage-idb', () => {
       source: 'web',
       conversationKey: keepKey,
       notionPageId: 'page_remove',
+      notionPageUrl: 'https://notion.so/page_remove',
       lastSyncedMessageKey: 'x',
+      lastSyncedSequence: 2,
+      notionSections: { conversations: { headingBlockId: 'h-remove' } },
+      feishuDocId: 'doc-remove',
+      feishuLastContentHash: 'hash-remove',
+      legacyOnly: true,
+    });
+  });
+
+  it('keeps canonical provider targets atomic when merging conversations with conflicting mappings', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'keep-conflict',
+      title: 'keep',
+      url: 'https://example.com/keep',
+      notionPageId: '',
+      feishuDocId: '',
+      lastCapturedAt: 10,
+    });
+    const remove = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'remove-conflict',
+      title: 'remove',
+      url: 'https://example.com/remove',
+      notionPageId: 'page-remove-conversation',
+      feishuDocId: 'doc-remove-conversation',
+      lastCapturedAt: 20,
+    });
+    const keepId = Number(keep.id);
+    const removeId = Number(remove.id);
+    const keepKey = String(keep.conversationKey || '');
+    const removeKey = String(remove.conversationKey || '');
+
+    const db = await openDb();
+    const tx = db.transaction(['sync_mappings'], 'readwrite');
+    const store = tx.objectStore('sync_mappings');
+    await reqToPromise(
+      store.add({
+        source: 'web',
+        conversationKey: keepKey,
+        notionPageId: 'page-keep',
+        notionPageUrl: 'https://notion.so/page-keep',
+        lastSyncedMessageKey: 'keep-m1',
+        lastSyncedSequence: 1,
+        notionSections: { conversations: { headingBlockId: 'h-keep' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'keep-m1', lastSyncedSequence: 1 } },
+        feishuDocId: 'doc-keep',
+        feishuLastContentHash: 'hash-keep',
+        sharedMetadata: 'target',
+        updatedAt: 10,
+      }),
+    );
+    await reqToPromise(
+      store.add({
+        source: 'web',
+        conversationKey: removeKey,
+        notionPageId: 'page-remove',
+        notionPageUrl: 'https://notion.so/page-remove',
+        lastSyncedMessageKey: 'remove-m9',
+        lastSyncedSequence: 9,
+        notionSections: { conversations: { headingBlockId: 'h-remove' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'remove-m9', lastSyncedSequence: 9 } },
+        feishuDocId: 'doc-remove',
+        feishuLastContentHash: 'hash-remove',
+        sharedMetadata: 'legacy',
+        legacyOnly: true,
+        updatedAt: 99,
+      }),
+    );
+    await txDone(tx);
+    db.close();
+
+    await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    const reopened = await openDb();
+    const verifyTx = reopened.transaction(['sync_mappings'], 'readonly');
+    const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
+    await txDone(verifyTx);
+    reopened.close();
+
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0]).toMatchObject({
+      source: 'web',
+      conversationKey: keepKey,
+      notionPageId: 'page-keep',
+      notionPageUrl: 'https://notion.so/page-keep',
+      lastSyncedMessageKey: 'keep-m1',
+      lastSyncedSequence: 1,
+      notionSections: { conversations: { headingBlockId: 'h-keep' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'keep-m1', lastSyncedSequence: 1 } },
+      feishuDocId: 'doc-keep',
+      feishuLastContentHash: 'hash-keep',
+      sharedMetadata: 'target',
+      legacyOnly: true,
     });
   });
 

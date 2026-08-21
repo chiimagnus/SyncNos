@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  mergeSyncMappingForIdentityMove,
   mergeSyncMappingForImport,
   mergeSyncMappingPatch,
   stripSyncMappingLocalId,
@@ -92,6 +93,110 @@ describe('sync mapping persistence record', () => {
     expect(merged).toMatchObject(existing);
     expect(existing).toEqual(existingBefore);
     expect(patch).toEqual(patchBefore);
+  });
+
+  it('moves a legacy mapping wholesale when the canonical target does not exist', () => {
+    const legacy = {
+      id: 11,
+      source: 'article',
+      conversationKey: 'legacy-key',
+      ...notionState({ pageId: 'page-legacy', syncedAt: 50, key: 'm5', sequence: 5, heading: 'h5', digest: 'd5' }),
+      feishuDocId: 'doc-legacy',
+      feishuLastContentHash: 'hash-legacy',
+      unknownLegacy: { keep: true },
+    };
+
+    const moved = mergeSyncMappingForIdentityMove(null, legacy, {
+      source: 'web',
+      conversationKey: 'article:https://example.com/a',
+    });
+
+    expect(moved).toMatchObject({
+      id: 11,
+      source: 'web',
+      conversationKey: 'article:https://example.com/a',
+      notionPageId: 'page-legacy',
+      notionSections: { conversations: { headingBlockId: 'h5' } },
+      feishuDocId: 'doc-legacy',
+      feishuLastContentHash: 'hash-legacy',
+      unknownLegacy: { keep: true },
+    });
+  });
+
+  it('keeps target provider groups while filling unknown metadata from legacy', () => {
+    const target = {
+      id: 20,
+      source: 'web',
+      conversationKey: 'canonical',
+      ...notionState({ pageId: 'page-target', syncedAt: 10, key: 'target', sequence: 1, heading: 'h-target', digest: 'd-target' }),
+      feishuDocId: 'doc-target',
+      feishuLastContentHash: 'hash-target',
+      shared: 'target',
+    };
+    const legacy = {
+      id: 21,
+      ...notionState({ pageId: 'page-legacy', syncedAt: 999, key: 'legacy', sequence: 9, heading: 'h-legacy', digest: 'd-legacy' }),
+      feishuDocId: 'doc-legacy',
+      feishuLastContentHash: 'hash-legacy',
+      shared: 'legacy',
+      legacyOnly: true,
+    };
+
+    const merged = mergeSyncMappingForIdentityMove(target, legacy, {
+      source: 'web',
+      conversationKey: 'canonical',
+      fallbackNotionPageId: 'page-fallback',
+    });
+
+    expect(merged).toMatchObject({
+      id: 20,
+      notionPageId: 'page-target',
+      lastSyncedMessageKey: 'target',
+      notionSections: { conversations: { headingBlockId: 'h-target' } },
+      feishuDocId: 'doc-target',
+      feishuLastContentHash: 'hash-target',
+      shared: 'target',
+      legacyOnly: true,
+    });
+  });
+
+  it('adopts legacy provider groups only when the target lacks that provider target', () => {
+    const target = { id: 30, source: 'web', conversationKey: 'canonical', targetOnly: true };
+    const legacy = {
+      id: 31,
+      ...notionState({ pageId: 'page-legacy', syncedAt: 50, key: 'legacy', sequence: 5, heading: 'h-legacy', digest: 'd-legacy' }),
+      feishuDocId: 'doc-legacy',
+      feishuLastContentHash: 'hash-legacy',
+    };
+
+    const merged = mergeSyncMappingForIdentityMove(target, legacy, {
+      source: 'web',
+      conversationKey: 'canonical',
+    });
+
+    expect(merged).toMatchObject({
+      id: 30,
+      notionPageId: 'page-legacy',
+      lastSyncedMessageKey: 'legacy',
+      notionSections: { conversations: { headingBlockId: 'h-legacy' } },
+      feishuDocId: 'doc-legacy',
+      feishuLastContentHash: 'hash-legacy',
+      targetOnly: true,
+    });
+  });
+
+  it('uses fallback Notion page only after provider-state selection leaves the page empty', () => {
+    const merged = mergeSyncMappingForIdentityMove(
+      { id: 40, lastSyncedMessageKey: 'target-orphan' },
+      null,
+      { source: 'web', conversationKey: 'canonical', fallbackNotionPageId: 'page-fallback' },
+    );
+
+    expect(merged).toMatchObject({
+      id: 40,
+      notionPageId: 'page-fallback',
+      lastSyncedMessageKey: 'target-orphan',
+    });
   });
 
   it('strips only the browser-local id without mutating the source', () => {
