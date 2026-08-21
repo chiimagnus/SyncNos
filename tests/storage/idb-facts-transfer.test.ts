@@ -282,6 +282,85 @@ describe('IndexedDB migration facts transfer', () => {
     expect(blobAsset.frames.filter((wireFrame) => wireFrame.type === 'data')).toHaveLength(3);
   });
 
+  it('normalizes malformed historical comment topology before strict migration validation', async () => {
+    const db = await openDb();
+    openedDatabases.push(db);
+    const transaction = db.transaction(['conversations', 'article_comments'], 'readwrite');
+    const conversations = transaction.objectStore('conversations');
+    const comments = transaction.objectStore('article_comments');
+    await requestToPromise(
+      conversations.add({ id: 10, source: 'web', conversationKey: 'article:https://example.com/a' }),
+    );
+    await requestToPromise(
+      conversations.add({ id: 11, source: 'web', conversationKey: 'article:https://example.com/b' }),
+    );
+    const comment = (input: {
+      id: number;
+      parentId: number | null;
+      conversationId?: number;
+      canonicalUrl?: string;
+      createdAt?: number;
+    }) => ({
+      id: input.id,
+      parentId: input.parentId,
+      conversationId: input.conversationId ?? 10,
+      canonicalUrl: input.canonicalUrl ?? 'https://example.com/a',
+      authorName: null,
+      quoteText: '',
+      commentText: `comment-${input.id}`,
+      locator: null,
+      createdAt: input.createdAt ?? input.id,
+      updatedAt: input.createdAt ?? input.id,
+    });
+    await requestToPromise(comments.add(comment({ id: 50, parentId: null })));
+    await requestToPromise(comments.add(comment({ id: 51, parentId: 50 })));
+    await requestToPromise(comments.add(comment({ id: 52, parentId: 51 })));
+    await requestToPromise(comments.add(comment({ id: 53, parentId: 999 })));
+    await requestToPromise(comments.add(comment({ id: 54, parentId: 55, createdAt: 6 })));
+    await requestToPromise(comments.add(comment({ id: 55, parentId: 54, createdAt: 5 })));
+    await requestToPromise(
+      comments.add(
+        comment({
+          id: 56,
+          parentId: 50,
+          conversationId: 11,
+          canonicalUrl: 'https://example.com/b',
+        }),
+      ),
+    );
+    await transactionDone(transaction);
+
+    const frames: NativeWireFrame[] = [];
+    const manifest = await transferIndexedDbFacts({
+      db,
+      digestProvider: nodeDigestProvider,
+      migrationId: MIGRATION_ID,
+      createSessionId: nextSessionIds(),
+      onFrame: (wireFrame) => frames.push(wireFrame),
+    });
+    expect(manifest.factCounts.article_comments).toBe(7);
+
+    const facts = (await decodeSessions(frames))
+      .flatMap((session) => (session.record ? [session.record] : []))
+      .filter(
+        (fact): fact is Extract<MigrationFactRecord, { kind: 'article_comments' }> => fact.kind === 'article_comments',
+      );
+    const byId = new Map(facts.map((fact) => [fact.sourceLocalId, fact]));
+    expect(byId.get('50')?.parentSourceLocalId).toBeNull();
+    expect(byId.get('51')?.parentSourceLocalId).toBe('50');
+    expect(byId.get('52')?.parentSourceLocalId).toBe('50');
+    expect(byId.get('52')?.archiveIdentity.rootStructuralDigest).toBe(
+      byId.get('50')?.archiveIdentity.rootStructuralDigest,
+    );
+    expect(byId.get('53')?.parentSourceLocalId).toBeNull();
+    expect(byId.get('54')?.parentSourceLocalId).toBe('55');
+    expect(byId.get('55')?.parentSourceLocalId).toBeNull();
+    expect(byId.get('54')?.archiveIdentity.rootStructuralDigest).toBe(
+      byId.get('55')?.archiveIdentity.rootStructuralDigest,
+    );
+    expect(byId.get('56')?.parentSourceLocalId).toBeNull();
+  });
+
   it('does not keep an IndexedDB transaction open while consumer backpressure or a Blob slice is delayed', async () => {
     const { db } = await seedCompleteFacts();
     const tracker = trackTransactions(db);

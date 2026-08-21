@@ -1,6 +1,8 @@
+import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import {
   createMigrationCommentFact,
   createMigrationCommentOccurrenceTracker,
+  createMigrationCommentTopologyNode,
   createMigrationConversationFact,
   createMigrationFactReferenceValidator,
   createMigrationMessageFact,
@@ -10,6 +12,8 @@ import {
   splitCanonicalJsonText,
   streamMigrationImageBytes,
   type CanonicalJson,
+  type MigrationCommentTopologyEntry,
+  type MigrationCommentTopologyNode,
   type MigrationConversationIdentity,
   type MigrationFactRecord,
   type MigrationImageByteSource,
@@ -54,7 +58,7 @@ type DetachedIdbFactPage = Readonly<{
 
 type FactsTransferState = {
   commentOccurrenceTracker: ReturnType<typeof createMigrationCommentOccurrenceTracker>;
-  commentRootDigests: Map<number, string>;
+  commentTopology: ReadonlyMap<number, MigrationCommentTopologyEntry> | null;
   conversations: Map<number, MigrationConversationIdentity>;
   referenceValidator: ReturnType<typeof createMigrationFactReferenceValidator>;
 };
@@ -432,12 +436,63 @@ async function emitPreparedFact(input: {
   }
 }
 
-function commentParentRootDigest(row: unknown, roots: ReadonlyMap<number, string>): string | undefined {
-  const parentId = record(row).parentId;
-  if (parentId == null) return undefined;
-  const rootDigest = roots.get(sourceId(parentId));
-  if (!rootDigest) fail();
-  return rootDigest;
+function normalizeMigrationCommentTopology(
+  nodes: readonly MigrationCommentTopologyNode[],
+): ReadonlyMap<number, MigrationCommentTopologyEntry> {
+  const graph = normalizeCommentThreadGraph(nodes);
+  if (graph.duplicateIds.length) fail();
+  const normalized = new Map<number, MigrationCommentTopologyEntry>();
+  for (const thread of graph.threads) {
+    normalized.set(
+      thread.root.id,
+      Object.freeze({ parentId: null, rootStructuralDigest: thread.root.rootStructuralDigest }),
+    );
+    for (const reply of thread.replies) {
+      const sameContext = reply.context === thread.root.context;
+      normalized.set(
+        reply.id,
+        Object.freeze({
+          parentId: sameContext ? thread.root.id : null,
+          rootStructuralDigest: sameContext ? thread.root.rootStructuralDigest : reply.rootStructuralDigest,
+        }),
+      );
+    }
+  }
+  if (normalized.size !== nodes.length) fail();
+  return normalized;
+}
+
+async function readNormalizedCommentTopology(input: {
+  db: IDBDatabase;
+  digestProvider: DigestProvider;
+  conversations: ReadonlyMap<number, MigrationConversationIdentity>;
+  signal?: AbortSignal;
+}): Promise<ReadonlyMap<number, MigrationCommentTopologyEntry>> {
+  const nodes: MigrationCommentTopologyNode[] = [];
+  let afterId: number | null = null;
+  while (true) {
+    const page = await readDetachedPage({
+      db: input.db,
+      storeName: 'article_comments',
+      afterId,
+      pageSize: FACTS_TRANSFER_PAGE_ROWS,
+      signal: input.signal,
+    });
+    for (const row of page.rows) {
+      nodes.push(
+        await createMigrationCommentTopologyNode({
+          conversations: input.conversations,
+          digestProvider: input.digestProvider,
+          row: row.row,
+          sourceLocalId: row.id,
+        }),
+      );
+    }
+    if (page.exhausted) break;
+    if (page.lastId == null) fail();
+    afterId = page.lastId;
+  }
+  return normalizeMigrationCommentTopology(nodes);
 }
 
 async function transferDetachedRow(input: {
@@ -480,16 +535,17 @@ async function transferDetachedRow(input: {
       return;
     }
     case 'article_comments': {
+      const topology = input.state.commentTopology?.get(input.id);
+      if (!topology) fail();
       const fact = await createMigrationCommentFact({
         conversations: input.state.conversations,
         digestProvider: input.transfer.digestProvider,
         occurrenceTracker: input.state.commentOccurrenceTracker,
-        parentRootStructuralDigest: commentParentRootDigest(input.row, input.state.commentRootDigests),
-        row: input.row,
+        parentRootStructuralDigest: topology.parentId == null ? undefined : topology.rootStructuralDigest,
+        row: { ...record(input.row), parentId: topology.parentId },
         sourceLocalId: input.id,
       });
-      if (!fact.parentSourceLocalId)
-        input.state.commentRootDigests.set(input.id, fact.archiveIdentity.rootStructuralDigest);
+      if (fact.archiveIdentity.rootStructuralDigest !== topology.rootStructuralDigest) fail();
       await emitPreparedFact({ emission: input.emission, transfer: input.transfer, state: input.state, record: fact });
       return;
     }
@@ -512,13 +568,21 @@ export async function transferIndexedDbFacts(input: IndexedDbFactsTransferInput)
     const manifest = await FactsManifestAccumulator.create({ migrationId, provider: input.digestProvider });
     const state: FactsTransferState = {
       commentOccurrenceTracker: createMigrationCommentOccurrenceTracker(),
-      commentRootDigests: new Map(),
+      commentTopology: null,
       conversations: new Map(),
       referenceValidator: createMigrationFactReferenceValidator(),
     };
     const emission: FactsTransferEmission = { manifest, nextManifestSequence: 0 };
 
     for (const storeName of FACTS_IDB_STORE_NAMES) {
+      if (storeName === 'article_comments') {
+        state.commentTopology = await readNormalizedCommentTopology({
+          db,
+          digestProvider: input.digestProvider,
+          conversations: state.conversations,
+          signal: input.signal,
+        });
+      }
       let afterId: number | null = null;
       while (true) {
         const page = await readDetachedPage({

@@ -118,6 +118,19 @@ export type MigrationCommentOccurrenceTracker = Readonly<{
   allocate: (input: { sourceLocalId: MigrationSourceLocalId; structuralDigest: string }) => number;
 }>;
 
+export type MigrationCommentTopologyNode = Readonly<{
+  context: string;
+  createdAt: number;
+  id: number;
+  parentId: number | null;
+  rootStructuralDigest: string;
+}>;
+
+export type MigrationCommentTopologyEntry = Readonly<{
+  parentId: number | null;
+  rootStructuralDigest: string;
+}>;
+
 export type MigrationCommentMergeDecision =
   | Readonly<{ action: 'merge'; diagnostic: null }>
   | Readonly<{
@@ -664,6 +677,36 @@ function normaliseCommentPayload(raw: Record<string, unknown>): {
   payload.createdAt = createdAt;
   payload.updatedAt = updatedAt;
   return { canonicalUrl, payload: canonicalJsonObject(payload) };
+}
+
+export async function createMigrationCommentTopologyNode(input: {
+  conversations: ReadonlyMap<number, MigrationConversationIdentity>;
+  digestProvider: DigestProvider;
+  row: unknown;
+  sourceLocalId: unknown;
+}): Promise<MigrationCommentTopologyNode> {
+  const raw = record(input.row);
+  const sourceLocalId = sourceLocalIdFromNumeric(input.sourceLocalId);
+  assertRawIdMatches(raw, sourceLocalId);
+  const parentSourceLocalId = parseOptionalRawId(raw.parentId);
+  const conversationSourceLocalId = parseOptionalRawId(raw.conversationId);
+  const normalised = normaliseCommentPayload(raw);
+  const context = migrationCommentContext({
+    canonicalUrl: normalised.canonicalUrl,
+    conversationSourceLocalId,
+    conversations: input.conversations,
+  });
+  const rootStructuralDigest = await sha256Hex(
+    input.digestProvider,
+    encodeCanonicalJson(commentStructuralInput({ context, payload: normalised.payload, role: 'root' })).bytes,
+  );
+  return Object.freeze({
+    context: encodeCanonicalJson(context).text,
+    createdAt: Number(normalised.payload.createdAt),
+    id: sourceLocalIdToNumeric(sourceLocalId),
+    parentId: parentSourceLocalId ? sourceLocalIdToNumeric(parentSourceLocalId) : null,
+    rootStructuralDigest,
+  });
 }
 
 function parseOptionalRawId(value: unknown): MigrationSourceLocalId | null {

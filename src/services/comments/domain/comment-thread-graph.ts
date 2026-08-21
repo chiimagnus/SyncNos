@@ -1,7 +1,9 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 
-export type CommentThread<T extends ArticleCommentDto = ArticleCommentDto> = { root: T; replies: T[] };
-export type CommentThreadGraph<T extends ArticleCommentDto = ArticleCommentDto> = {
+export type CommentThreadNode = Pick<ArticleCommentDto, 'id' | 'parentId' | 'createdAt'>;
+
+export type CommentThread<T extends CommentThreadNode = ArticleCommentDto> = { root: T; replies: T[] };
+export type CommentThreadGraph<T extends CommentThreadNode = ArticleCommentDto> = {
   threads: CommentThread<T>[];
   orderedItems: T[];
   orphanIds: number[];
@@ -9,11 +11,11 @@ export type CommentThreadGraph<T extends ArticleCommentDto = ArticleCommentDto> 
   duplicateIds: number[];
 };
 
-function timeAsc(a: ArticleCommentDto, b: ArticleCommentDto): number {
+function timeAsc(a: CommentThreadNode, b: CommentThreadNode): number {
   return a.createdAt - b.createdAt || a.id - b.id;
 }
 
-function timeDesc(a: ArticleCommentDto, b: ArticleCommentDto): number {
+function timeDesc(a: CommentThreadNode, b: CommentThreadNode): number {
   return b.createdAt - a.createdAt || b.id - a.id;
 }
 
@@ -28,7 +30,7 @@ type RootResolution = { rootId: number };
  * - a cycle is collapsed under the oldest member of that cycle;
  * - the first row wins for duplicate IDs, while duplicates are reported separately.
  */
-export function normalizeCommentThreadGraph<T extends ArticleCommentDto>(
+export function normalizeCommentThreadGraph<T extends CommentThreadNode>(
   input: readonly T[] | null | undefined,
 ): CommentThreadGraph<T> {
   const byId = new Map<number, T>();
