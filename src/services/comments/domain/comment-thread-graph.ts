@@ -23,6 +23,7 @@ function stableValue(value: unknown): unknown {
 
 function stableCommentTieKey(comment: ArticleCommentDto): string {
   return JSON.stringify({
+    createdAt: Number(comment.createdAt) || 0,
     updatedAt: Number(comment.updatedAt) || 0,
     canonicalUrl: String(comment.canonicalUrl || ''),
     authorName: String(comment.authorName || ''),
