@@ -102,11 +102,15 @@ describe('sync mapping persistence record', () => {
       heading: 'h-missing',
       digest: 'd-missing',
     });
+    const incomingNull = { ...incomingMissing, lastSyncedAt: null };
+    const incomingEmpty = { ...incomingMissing, lastSyncedAt: '' };
 
     expect(mergeSyncMappingForImport(local, incomingEqual).lastSyncedMessageKey).toBe('incoming-equal');
     const missingMerged = mergeSyncMappingForImport(local, incomingMissing);
     expect(missingMerged.lastSyncedMessageKey).toBe('incoming-missing');
     expect(missingMerged.notionSections).toEqual({ conversations: { headingBlockId: 'h-missing' } });
+    expect(mergeSyncMappingForImport(local, incomingNull).lastSyncedMessageKey).toBe('incoming-missing');
+    expect(mergeSyncMappingForImport(local, incomingEmpty).lastSyncedMessageKey).toBe('incoming-missing');
   });
 
   it('different Notion pages keep the complete local provider state', () => {

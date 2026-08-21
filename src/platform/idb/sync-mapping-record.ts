@@ -24,6 +24,8 @@ function safeString(value: unknown): string {
 }
 
 function finiteNumber(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === 'string' && !value.trim()) return null;
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : null;
 }
