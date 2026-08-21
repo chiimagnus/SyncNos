@@ -15,6 +15,7 @@ import type {
   ConversationListSummary,
 } from '@services/conversations/domain/list-pagination';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
+import { mergeSyncMappingPatch } from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 
 let cachedDb: IDBDatabase | null = null;
@@ -1410,40 +1411,13 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
   const idx = stores.sync_mappings.index('by_source_conversationKey');
   const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
   const now = Date.now();
-  const patchObj: any = { ...patch };
-  const incomingSections =
-    patchObj.notionSections && typeof patchObj.notionSections === 'object' ? patchObj.notionSections : null;
-  if (incomingSections) delete patchObj.notionSections;
-  const existingSections =
-    existing && typeof existing === 'object' && existing.notionSections && typeof existing.notionSections === 'object'
-      ? existing.notionSections
-      : null;
-  const mergedSections = incomingSections
-    ? {
-        ...(existingSections || {}),
-        ...Object.fromEntries(
-          Object.entries(incomingSections).map(([key, value]) => [
-            key,
-            {
-              ...((existingSections &&
-              (existingSections as any)[key] &&
-              typeof (existingSections as any)[key] === 'object'
-                ? (existingSections as any)[key]
-                : null) || {}),
-              ...((value && typeof value === 'object' ? value : null) || {}),
-            },
-          ]),
-        ),
-      }
-    : null;
+  const merged = mergeSyncMappingPatch(existing, patch) as any;
   const next = {
-    ...(existing && typeof existing === 'object' ? existing : null),
-    ...patchObj,
+    ...merged,
     source,
     conversationKey,
-    notionPageId: String((patch as any)?.notionPageId || existing?.notionPageId || conversation.notionPageId || ''),
-    feishuDocId: String((patch as any)?.feishuDocId || existing?.feishuDocId || conversation.feishuDocId || ''),
-    ...(mergedSections ? { notionSections: mergedSections } : null),
+    notionPageId: safeString(merged.notionPageId) || safeString(existing?.notionPageId) || safeString(conversation.notionPageId),
+    feishuDocId: safeString(merged.feishuDocId) || safeString(existing?.feishuDocId) || safeString(conversation.feishuDocId),
     updatedAt: now,
   } as any;
   const payload: any = withOptionalId(existing && existing.id, next);
@@ -1520,87 +1494,21 @@ export async function setSyncCursor(
     notionSections?: Record<string, unknown>;
   },
 ): Promise<true> {
-  const id = Number(conversationId);
-  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
-  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
-  if (!conversation) throw new Error('conversation not found');
-
-  const source = String(conversation.source || '').trim();
-  const conversationKey = String(conversation.conversationKey || '').trim();
-  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
-
-  const idx = stores.sync_mappings.index('by_source_conversationKey');
-  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
-  const now = Date.now();
-  const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
-  if (preserved && typeof preserved === 'object') delete preserved.id;
-  const mergeNestedRecord = (prev: any, incoming: any): any | null => {
-    if (!incoming || typeof incoming !== 'object') return null;
-    const base = prev && typeof prev === 'object' ? prev : {};
-    const out: any = { ...base };
-    for (const [key, value] of Object.entries(incoming)) {
-      const k = String(key || '').trim();
-      if (!k) continue;
-      out[k] = {
-        ...((base as any)[k] && typeof (base as any)[k] === 'object' ? (base as any)[k] : {}),
-        ...(value && typeof value === 'object' ? value : {}),
-      };
-    }
-    return out;
+  const finiteOrNull = (value: unknown): number | null => {
+    if (value == null) return null;
+    if (typeof value === 'string' && !value.trim()) return null;
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
   };
-  const mergedNotionSections = mergeNestedRecord(preserved.notionSections, input?.notionSections);
-  const mergedNotionSectionCursors = mergeNestedRecord(preserved.notionSectionCursors, input?.notionSectionCursors);
-  const mergedNotionSectionDigests = mergeNestedRecord(preserved.notionSectionDigests, input?.notionSectionDigests);
-  const payload: any = withOptionalId(existing && existing.id, {
-    ...preserved,
-    source,
-    conversationKey,
-    notionPageId: String(existing?.notionPageId || conversation.notionPageId || ''),
-    lastSyncedMessageKey: String(input?.lastSyncedMessageKey || ''),
-    lastSyncedSequence: Number.isFinite(Number(input?.lastSyncedSequence)) ? Number(input?.lastSyncedSequence) : null,
-    lastSyncedAt: Number.isFinite(Number(input?.lastSyncedAt)) ? Number(input?.lastSyncedAt) : now,
-    lastSyncedMessageUpdatedAt: Number.isFinite(Number(input?.lastSyncedMessageUpdatedAt))
-      ? Number(input?.lastSyncedMessageUpdatedAt)
-      : null,
-    ...(mergedNotionSections ? { notionSections: mergedNotionSections } : null),
-    ...(mergedNotionSectionCursors ? { notionSectionCursors: mergedNotionSectionCursors } : null),
-    ...(mergedNotionSectionDigests ? { notionSectionDigests: mergedNotionSectionDigests } : null),
-    updatedAt: now,
+  const lastSyncedAt = finiteOrNull(input?.lastSyncedAt);
+
+  return patchSyncMapping(conversationId, {
+    lastSyncedMessageKey: safeString(input?.lastSyncedMessageKey),
+    lastSyncedSequence: finiteOrNull(input?.lastSyncedSequence),
+    lastSyncedAt: lastSyncedAt ?? Date.now(),
+    lastSyncedMessageUpdatedAt: finiteOrNull(input?.lastSyncedMessageUpdatedAt),
+    ...(input?.notionSectionCursors !== undefined ? { notionSectionCursors: input.notionSectionCursors } : null),
+    ...(input?.notionSectionDigests !== undefined ? { notionSectionDigests: input.notionSectionDigests } : null),
+    ...(input?.notionSections !== undefined ? { notionSections: input.notionSections } : null),
   });
-  if (existing) await reqToPromise(stores.sync_mappings.put(payload));
-  else await reqToPromise(stores.sync_mappings.add(payload));
-
-  await txDone(t);
-  return true;
-}
-
-export async function clearSyncCursor(conversationId: number): Promise<true> {
-  const id = Number(conversationId);
-  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
-  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
-  if (!conversation) throw new Error('conversation not found');
-
-  const source = String(conversation.source || '').trim();
-  const conversationKey = String(conversation.conversationKey || '').trim();
-  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
-
-  const idx = stores.sync_mappings.index('by_source_conversationKey');
-  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
-  if (existing && existing.id) {
-    existing.lastSyncedMessageKey = '';
-    existing.lastSyncedSequence = null;
-    existing.lastSyncedAt = null;
-    existing.lastSyncedMessageUpdatedAt = null;
-    existing.updatedAt = Date.now();
-    await reqToPromise(stores.sync_mappings.put(existing));
-  }
-
-  await txDone(t);
-  return true;
 }

@@ -1,5 +1,4 @@
 import {
-  clearSyncCursor,
   deleteConversationsByIds,
   getConversationById,
   getMessagesByConversationId,
@@ -25,7 +24,6 @@ export const backgroundStorage = {
   getSyncMappingByConversation,
   patchSyncMapping,
   setSyncCursor,
-  clearSyncCursor,
   getArticleCommentsByConversationId,
   attachOrphanArticleCommentsToConversation,
 };

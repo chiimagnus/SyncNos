@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeSyncMappingForImport, stripSyncMappingLocalId } from '@platform/idb/sync-mapping-record';
+import {
+  mergeSyncMappingForImport,
+  mergeSyncMappingPatch,
+  stripSyncMappingLocalId,
+} from '@platform/idb/sync-mapping-record';
 
 function notionState(input: {
   pageId: string;
@@ -31,6 +35,65 @@ function notionState(input: {
 }
 
 describe('sync mapping persistence record', () => {
+  it('merges only explicitly provided valid Notion nested sections', () => {
+    const existing = {
+      id: 7,
+      notionSections: {
+        conversations: { headingBlockId: 'h-old', stable: true },
+        comments: { headingBlockId: 'h-comments' },
+      },
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 },
+      },
+      notionSectionDigests: {
+        article: { digest: 'old', lastSyncedAt: 1 },
+      },
+    };
+    const patch = {
+      id: 999,
+      notionSections: {
+        conversations: { headingBlockId: 'h-new' },
+      },
+      notionSectionCursors: {
+        conversations: { lastSyncedSequence: 2 },
+        invalid: null,
+      },
+    };
+
+    const merged = mergeSyncMappingPatch(existing, patch);
+
+    expect(merged.id).toBe(7);
+    expect(merged.notionSections).toEqual({
+      conversations: { headingBlockId: 'h-new', stable: true },
+      comments: { headingBlockId: 'h-comments' },
+    });
+    expect(merged.notionSectionCursors).toEqual({
+      conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 2 },
+    });
+    expect(merged.notionSectionDigests).toEqual(existing.notionSectionDigests);
+  });
+
+  it('ignores invalid Notion nested field patches and does not mutate inputs', () => {
+    const existing = {
+      notionSections: { conversations: { headingBlockId: 'h1' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm1' } },
+      notionSectionDigests: { article: { digest: 'd1' } },
+    };
+    const patch = {
+      notionSections: null,
+      notionSectionCursors: ['bad'],
+      notionSectionDigests: 'bad',
+    };
+    const existingBefore = structuredClone(existing);
+    const patchBefore = structuredClone(patch);
+
+    const merged = mergeSyncMappingPatch(existing, patch);
+
+    expect(merged).toMatchObject(existing);
+    expect(existing).toEqual(existingBefore);
+    expect(patch).toEqual(patchBefore);
+  });
+
   it('strips only the browser-local id without mutating the source', () => {
     const source = { id: 7, source: 'chatgpt', conversationKey: 'c1', nested: { value: 1 } };
     const stripped = stripSyncMappingLocalId(source);

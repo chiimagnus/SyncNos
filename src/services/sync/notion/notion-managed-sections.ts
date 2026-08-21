@@ -38,17 +38,6 @@ export function getNotionSectionAnchorsFromMapping(mapping: unknown): NotionSect
   return out;
 }
 
-export function mergeNotionSectionAnchorsPatch(
-  prevAnchors: NotionSectionAnchors,
-  patch: { sectionId: string; headingBlockId: string },
-): { notionSections: NotionSectionAnchors } {
-  const next: NotionSectionAnchors = { ...(prevAnchors || {}) };
-  const sectionId = safeString(patch?.sectionId);
-  const headingBlockId = safeString(patch?.headingBlockId);
-  if (sectionId) next[sectionId] = { headingBlockId };
-  return { notionSections: next };
-}
-
 export function layoutSpecForConversationKind(kindId: string): NotionManagedLayoutSpec {
   const id = safeString(kindId).toLowerCase();
   if (id === 'article') {
@@ -103,7 +92,7 @@ export async function ensureSectionHeadingBlockId(input: {
   }
 
   if (foundId) {
-    await maybePersistHeadingIdToMapping(input, anchors, sectionId, foundId);
+    await maybePersistHeadingIdToMapping(input, sectionId, foundId);
     return { headingBlockId: foundId, discoveredBy: 'scan' };
   }
 
@@ -113,7 +102,7 @@ export async function ensureSectionHeadingBlockId(input: {
   const results = Array.isArray((appended as any)?.results) ? (appended as any).results : [];
   const createdId = safeString(results?.[0]?.id);
   if (!createdId) throw new Error('failed to create section heading');
-  await maybePersistHeadingIdToMapping(input, anchors, sectionId, createdId);
+  await maybePersistHeadingIdToMapping(input, sectionId, createdId);
   return { headingBlockId: createdId, discoveredBy: 'created' };
 }
 
@@ -122,15 +111,15 @@ async function maybePersistHeadingIdToMapping(
     storage?: { patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any> };
     conversationId?: number;
   },
-  anchors: NotionSectionAnchors,
   sectionId: string,
   headingBlockId: string,
 ): Promise<void> {
   const conversationId = Number(input?.conversationId);
   if (!Number.isFinite(conversationId) || conversationId <= 0) return;
   if (!input?.storage?.patchSyncMapping) return;
-  const patch = mergeNotionSectionAnchorsPatch(anchors, { sectionId, headingBlockId });
-  await input.storage.patchSyncMapping(conversationId, patch as any);
+  await input.storage.patchSyncMapping(conversationId, {
+    notionSections: { [sectionId]: { headingBlockId } },
+  });
 }
 
 export async function rebuildSectionByArchivingHeading(input: {

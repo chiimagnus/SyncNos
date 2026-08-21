@@ -11,7 +11,10 @@ import {
   getConversationListBootstrap,
   getMessagesByConversationId,
   getMessagesTailByConversationId,
+  getSyncMappingByConversation,
   mergeConversationsByIds,
+  patchSyncMapping,
+  setSyncCursor,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
@@ -721,6 +724,105 @@ describe('conversations storage-idb', () => {
     expect(windowResult.messages).toHaveLength(200);
     expect(windowResult.messages[0]?.sequence).toBe(101);
     expect(windowResult.messages[199]?.sequence).toBe(300);
+  });
+
+  it('patches mapping nested state through one writer and keeps mapping identity stable', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-patch',
+      title: 'Mapping patch',
+      notionPageId: 'page-1',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    const mappingId = await reqToPromise<number>(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'mapping-patch',
+        notionPageId: 'page-1',
+        notionSections: {
+          conversations: { headingBlockId: 'h-old', stable: true },
+          comments: { headingBlockId: 'h-comments' },
+        },
+        notionSectionCursors: {
+          conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 },
+        },
+        notionSectionDigests: {
+          article: { digest: 'd-old', lastSyncedAt: 10 },
+        },
+        updatedAt: 10,
+      }) as any,
+    );
+    await txDone(seedTx);
+    db.close();
+
+    await patchSyncMapping(conversationId, {
+      notionSections: { conversations: { headingBlockId: 'h-new' } },
+      notionSectionCursors: { conversations: { lastSyncedSequence: 2 } },
+      notionSectionDigests: { comments: { digest: 'd-comments', lastSyncedAt: 20 } },
+      feishuDocId: 'doc-1',
+      feishuLastContentHash: 'hash-1',
+    });
+
+    const afterPatch = await getSyncMappingByConversation(conversationId);
+    expect(afterPatch?.mapping).toMatchObject({
+      id: mappingId,
+      source: 'debug',
+      conversationKey: 'mapping-patch',
+      notionPageId: 'page-1',
+      notionSections: {
+        conversations: { headingBlockId: 'h-new', stable: true },
+        comments: { headingBlockId: 'h-comments' },
+      },
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 2 },
+      },
+      notionSectionDigests: {
+        article: { digest: 'd-old', lastSyncedAt: 10 },
+        comments: { digest: 'd-comments', lastSyncedAt: 20 },
+      },
+      feishuDocId: 'doc-1',
+      feishuLastContentHash: 'hash-1',
+    });
+    expect(afterPatch?.conversation.feishuDocId).toBe('doc-1');
+
+    const beforeCursorUpdatedAt = Number(afterPatch?.mapping?.updatedAt) || 0;
+    await setSyncCursor(conversationId, {
+      lastSyncedMessageKey: 'm2',
+      lastSyncedSequence: null,
+      lastSyncedAt: null,
+      lastSyncedMessageUpdatedAt: null,
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm2', lastSyncedSequence: 2 },
+      },
+    });
+
+    const afterCursor = await getSyncMappingByConversation(conversationId);
+    expect(afterCursor?.mapping).toMatchObject({
+      id: mappingId,
+      source: 'debug',
+      conversationKey: 'mapping-patch',
+      lastSyncedMessageKey: 'm2',
+      lastSyncedSequence: null,
+      lastSyncedMessageUpdatedAt: null,
+      notionSections: {
+        conversations: { headingBlockId: 'h-new', stable: true },
+        comments: { headingBlockId: 'h-comments' },
+      },
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm2', lastSyncedSequence: 2 },
+      },
+      notionSectionDigests: {
+        article: { digest: 'd-old', lastSyncedAt: 10 },
+        comments: { digest: 'd-comments', lastSyncedAt: 20 },
+      },
+    });
+    expect(Number(afterCursor?.mapping?.lastSyncedAt)).toBeGreaterThan(0);
+    expect(Number(afterCursor?.mapping?.updatedAt)).toBeGreaterThanOrEqual(beforeCursorUpdatedAt);
   });
 
   it('deletes conversations, messages, and sync mappings', async () => {

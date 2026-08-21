@@ -14,9 +14,14 @@ const NOTION_CONTINUITY_FIELDS = [
 ] as const;
 
 const FEISHU_CONTINUITY_FIELDS = ['feishuDocId', 'feishuLastContentHash'] as const;
+const NOTION_NESTED_FIELDS = ['notionSections', 'notionSectionCursors', 'notionSectionDigests'] as const;
+
+function isRecord(value: unknown): value is SyncMappingRecord {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
 function asRecord(value: unknown): SyncMappingRecord {
-  return value && typeof value === 'object' ? (value as SyncMappingRecord) : {};
+  return isRecord(value) ? value : {};
 }
 
 function safeString(value: unknown): string {
@@ -44,6 +49,36 @@ function replaceGroup(
 export function stripSyncMappingLocalId(record: unknown): SyncMappingRecord {
   const next = { ...asRecord(record) };
   delete next.id;
+  return next;
+}
+
+export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMappingRecord {
+  const base = asRecord(existing);
+  const incoming = stripSyncMappingLocalId(patch);
+  const next: SyncMappingRecord = { ...base, ...incoming };
+
+  for (const field of NOTION_NESTED_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(incoming, field)) continue;
+    const patchSections = incoming[field];
+    if (!isRecord(patchSections)) {
+      if (Object.prototype.hasOwnProperty.call(base, field)) next[field] = base[field];
+      else delete next[field];
+      continue;
+    }
+
+    const baseSections = asRecord(base[field]);
+    const mergedSections: SyncMappingRecord = { ...baseSections };
+    for (const [rawSectionId, sectionPatch] of Object.entries(patchSections)) {
+      const sectionId = safeString(rawSectionId);
+      if (!sectionId || !isRecord(sectionPatch)) continue;
+      mergedSections[sectionId] = {
+        ...asRecord(baseSections[sectionId]),
+        ...sectionPatch,
+      };
+    }
+    next[field] = mergedSections;
+  }
+
   return next;
 }
 
