@@ -146,6 +146,26 @@ function createWindowsFilesystem(files: Map<string, FakeEntry>): {
   };
 }
 
+function createUnixRegistrationMemoryFixture() {
+  const paths = resolveSyncNosRuntimePaths({ platform: 'linux', homeDirectory: '/home/chii' });
+  const packageRoot = '/opt/lib/node_modules/@chiimagnus/syncnoscli';
+  const nodePath = '/usr/bin/node';
+  const files = new Map<string, FakeEntry>([
+    [packageRoot, { directory: true }],
+    [`${packageRoot}/package.json`, { bytes: Buffer.from('{"name":"@chiimagnus/syncnoscli","version":"0.1.0"}') }],
+    [`${packageRoot}/dist`, { directory: true }],
+    [`${packageRoot}/dist/native-host.cjs`, { bytes: Buffer.from('process.exitCode = 0;') }],
+    [nodePath, { bytes: Buffer.from('node') }],
+  ]);
+  return Object.freeze({
+    files,
+    nodePath,
+    packageRoot,
+    paths,
+    ...createWindowsFilesystem(files),
+  });
+}
+
 function createWindowsRegistrationFixture() {
   const paths = resolveSyncNosRuntimePaths({ platform: 'win32', homeDirectory: 'C:\\Users\\chii' });
   const packageRoot = 'C:\\Program Files\\node_modules\\@chiimagnus\\syncnoscli';
@@ -535,7 +555,7 @@ describe('SyncNos Native Host registration', () => {
     ];
     for (const browser of browsers) {
       for (const kind of ['manifest', 'owner'] as const) {
-        const fixture = await createUnixFixture();
+        const fixture = createUnixRegistrationMemoryFixture();
         const locations = getNativeHostRegistrationLocations(fixture.paths);
         const location = locationByBrowser(locations, browser);
         const destination = kind === 'manifest' ? location.manifestPath : location.ownerPath;
@@ -543,35 +563,46 @@ describe('SyncNos Native Host registration', () => {
 
         await expect(
           ensureNativeHostRegistrations({
+            launcherDependencies: fixture.launcherDependencies,
+            nodePath: fixture.nodePath,
             packageRoot: fixture.packageRoot,
             paths: fixture.paths,
             registrationDependencies: {
+              ...fixture.registrationDependencies,
               rename: async (source, nextDestination) => {
                 if (!injected && nextDestination === destination) {
                   injected = true;
                   throw new Error(`injected ${location.browser} ${kind} commit failure`);
                 }
-                await rename(source, nextDestination);
+                await fixture.registrationDependencies.rename!(source, nextDestination);
               },
             },
           }),
         ).rejects.toMatchObject({ code: 'REGISTRATION_UNAVAILABLE' });
         expect(injected).toBe(true);
-        await expect(access(fixture.paths.registrationUpdateIntentPath)).resolves.toBeUndefined();
+        expect(fixture.files.has(fixture.paths.registrationUpdateIntentPath)).toBe(true);
 
         await expect(
-          ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+          ensureNativeHostRegistrations({
+            launcherDependencies: fixture.launcherDependencies,
+            nodePath: fixture.nodePath,
+            packageRoot: fixture.packageRoot,
+            paths: fixture.paths,
+            registrationDependencies: fixture.registrationDependencies,
+          }),
         ).resolves.toMatchObject({
           browsers: expect.arrayContaining([expect.objectContaining({ browser: location.browser })]),
         });
         const inspection = await inspectNativeHostRegistrations({
+          launcherDependencies: fixture.launcherDependencies,
           packageRoot: fixture.packageRoot,
           paths: fixture.paths,
+          registrationDependencies: fixture.registrationDependencies,
         });
         expect(inspection.browsers.map((entry) => entry.browser)).toEqual(locations.map((entry) => entry.browser));
         expect(inspection.browsers.every((entry) => entry.manifest === 'owned')).toBe(true);
-        await expect(access(fixture.paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
-        await expect(access(fixture.paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
+        expect(fixture.files.has(fixture.paths.registrationUpdateIntentPath)).toBe(false);
+        expect(fixture.files.has(fixture.paths.databasePath)).toBe(false);
       }
     }
   }, 15_000);
