@@ -1,3 +1,4 @@
+import { stripSyncMappingLocalId } from '@platform/idb/sync-mapping-record';
 import { storageGetAll, storageSet } from '@platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
@@ -48,12 +49,6 @@ function stripLocalMessage(message: AnyRecord) {
   const m = message && typeof message === 'object' ? { ...message } : {};
   delete (m as any).id;
   delete (m as any).conversationId;
-  return m;
-}
-
-function stripLocalMapping(mapping: AnyRecord) {
-  const m = mapping && typeof mapping === 'object' ? { ...mapping } : {};
-  delete (m as any).id;
   return m;
 }
 
@@ -303,7 +298,7 @@ export async function exportBackupZipV2(
       const uk = uniqueConversationKey(c);
       const mapping = uk ? mappingByUniqueKey.get(uk) || null : null;
       const safeConversation = stripLocalConversation(c);
-      const safeMapping = mapping ? stripLocalMapping(mapping) : null;
+      const safeMapping = mapping ? stripSyncMappingLocalId(mapping) : null;
 
       const bundle = {
         schemaVersion: 1,

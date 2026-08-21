@@ -55,11 +55,6 @@ function pickStringPreferExisting(existing: unknown, incoming: unknown) {
   return isNonEmptyString(b) ? b.trim() : '';
 }
 
-function safeFiniteNumber(value: unknown): number | null {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
 function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
   const a = Array.isArray(existing) ? existing : [];
   const b = Array.isArray(incoming) ? incoming : [];
@@ -133,54 +128,6 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
   if (Number.isFinite(bSeq)) next.sequence = bSeq;
   else if (Number.isFinite(aSeq)) next.sequence = aSeq;
   else next.sequence = 0;
-
-  return next;
-}
-
-export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-
-  const next: UnknownRecord = { ...a };
-  next.source = pickStringPreferExisting(a.source, b.source);
-  next.conversationKey = pickStringPreferExisting(a.conversationKey, b.conversationKey);
-
-  // notionPageId: only fill when missing locally.
-  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
-  // feishuDocId: only fill when missing locally.
-  next.feishuDocId = pickStringPreferExisting(a.feishuDocId, b.feishuDocId);
-
-  // cursor: prefer existing local value; only fill when missing locally.
-  next.lastSyncedMessageKey = pickStringPreferExisting(a.lastSyncedMessageKey, b.lastSyncedMessageKey);
-  const aSeq = Number(a.lastSyncedSequence);
-  const bSeq = Number(b.lastSyncedSequence);
-  if (Number.isFinite(aSeq)) next.lastSyncedSequence = aSeq;
-  else if (Number.isFinite(bSeq)) next.lastSyncedSequence = bSeq;
-
-  const chosenKey = pickStringPreferExisting(next.lastSyncedMessageKey, '');
-  const chosenSeq = safeFiniteNumber(next.lastSyncedSequence);
-  const existingKey = pickStringPreferExisting(a.lastSyncedMessageKey, '');
-  const incomingKey = pickStringPreferExisting(b.lastSyncedMessageKey, '');
-  const existingMatchesChosen = chosenKey
-    ? existingKey === chosenKey
-    : chosenSeq != null && Number.isFinite(aSeq) && aSeq === chosenSeq;
-  const incomingMatchesChosen = chosenKey
-    ? incomingKey === chosenKey
-    : chosenSeq != null && Number.isFinite(bSeq) && bSeq === chosenSeq;
-
-  const aAt = Number(a.lastSyncedAt);
-  const bAt = Number(b.lastSyncedAt);
-  if (Number.isFinite(aAt)) next.lastSyncedAt = aAt;
-  else if (Number.isFinite(bAt)) next.lastSyncedAt = bAt;
-
-  const aMessageUpdatedAt = safeFiniteNumber(a.lastSyncedMessageUpdatedAt);
-  const bMessageUpdatedAt = safeFiniteNumber(b.lastSyncedMessageUpdatedAt);
-  if (existingMatchesChosen && aMessageUpdatedAt != null) next.lastSyncedMessageUpdatedAt = aMessageUpdatedAt;
-  else if (incomingMatchesChosen && bMessageUpdatedAt != null) next.lastSyncedMessageUpdatedAt = bMessageUpdatedAt;
-
-  const aUpdated = Number(a.updatedAt) || 0;
-  const bUpdated = Number(b.updatedAt) || 0;
-  next.updatedAt = Math.max(aUpdated, bUpdated, 0);
 
   return next;
 }

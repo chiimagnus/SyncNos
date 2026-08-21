@@ -153,6 +153,7 @@ describe('backup service', () => {
     expect(bundle.conversation.source).toBe('chatgpt');
     expect(bundle.messages.length).toBe(1);
     expect(bundle.syncMapping.notionPageId).toBe('np1');
+    expect(bundle.syncMapping.id).toBeUndefined();
 
     expect(entries.has('assets/image-cache/index.json')).toBe(true);
     const imageIndex = JSON.parse(new TextDecoder().decode(entries.get('assets/image-cache/index.json')!));
@@ -642,11 +643,25 @@ describe('backup service', () => {
         ],
         sync_mappings: [
           {
-            id: 2,
+            id: 200,
             source: 'chatgpt',
             conversationKey: 'c1',
             notionPageId: 'np1',
-            updatedAt: 1,
+            notionPageUrl: 'https://www.notion.so/ws/np1',
+            notionWorkspaceSlug: 'ws',
+            lastSyncedMessageKey: 'm1',
+            lastSyncedSequence: 1,
+            lastSyncedAt: 100,
+            lastSyncedMessageUpdatedAt: 1,
+            notionSections: { conversations: { headingBlockId: 'h1' } },
+            notionSectionCursors: {
+              conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1, lastSyncedMessageUpdatedAt: 1 },
+            },
+            notionSectionDigests: { article: { digest: 'digest-1', lastSyncedAt: 100 } },
+            feishuDocId: 'doc1',
+            feishuLastContentHash: 'hash1',
+            futureProviderMetadata: { version: 1 },
+            updatedAt: 101,
           },
         ],
       },
@@ -678,11 +693,228 @@ describe('backup service', () => {
     expect(convs.length).toBe(1);
     expect(msgs.length).toBe(1);
     expect(maps.length).toBe(1);
+    expect(maps[0]).toMatchObject({
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      notionPageId: 'np1',
+      notionPageUrl: 'https://www.notion.so/ws/np1',
+      notionWorkspaceSlug: 'ws',
+      notionSections: { conversations: { headingBlockId: 'h1' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 } },
+      notionSectionDigests: { article: { digest: 'digest-1' } },
+      feishuDocId: 'doc1',
+      feishuLastContentHash: 'hash1',
+      futureProviderMetadata: { version: 1 },
+    });
+    expect(maps[0].id).not.toBe(200);
+    expect(convs[0]).toMatchObject({
+      notionPageId: 'np1',
+      notionPageUrl: 'https://www.notion.so/ws/np1',
+      notionWorkspaceSlug: 'ws',
+      feishuDocId: 'doc1',
+    });
 
     // Ensure secrets are not stored via settings merge.
     expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_token_v1'))).toBe(
       false,
     );
     expect(chromeMock.__setPayloads.some((p) => (p as any).notion_oauth_client_id === 'cid')).toBe(true);
+  });
+
+  it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations', 'sync_mappings'], 'readwrite');
+    for (const key of ['same', 'different']) {
+      await reqToPromise(
+        seedTx.objectStore('conversations').add({
+          sourceType: 'chat',
+          source: 'chatgpt',
+          conversationKey: key,
+          title: key,
+          url: `https://example.com/${key}`,
+          notionPageId: key === 'same' ? 'page-same' : 'page-local',
+          notionPageUrl: key === 'same' ? 'https://notion.so/old-same' : 'https://notion.so/page-local',
+          notionWorkspaceSlug: 'local-ws',
+          feishuDocId: key === 'same' ? 'doc-same' : 'doc-local',
+          lastCapturedAt: 1,
+        }) as any,
+      );
+    }
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'chatgpt',
+        conversationKey: 'same',
+        notionPageId: 'page-same',
+        notionPageUrl: 'https://notion.so/old-same',
+        notionWorkspaceSlug: 'old-ws',
+        lastSyncedMessageKey: 'local-m1',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 10,
+        notionSections: { conversations: { headingBlockId: 'local-heading' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'local-m1', lastSyncedSequence: 1 } },
+        feishuDocId: 'doc-same',
+        feishuLastContentHash: 'local-hash',
+        localOnly: 'keep',
+        updatedAt: 500,
+      }) as any,
+    );
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'chatgpt',
+        conversationKey: 'different',
+        notionPageId: 'page-local',
+        notionPageUrl: 'https://notion.so/page-local',
+        notionWorkspaceSlug: 'local-ws',
+        lastSyncedMessageKey: 'local-m2',
+        lastSyncedSequence: 2,
+        lastSyncedAt: 20,
+        notionSections: { conversations: { headingBlockId: 'local-heading-2' } },
+        feishuDocId: 'doc-local',
+        feishuLastContentHash: 'local-hash-2',
+        updatedAt: 20,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      seedTx.oncomplete = () => resolve();
+      seedTx.onerror = () => reject(seedTx.error);
+      seedTx.onabort = () => reject(seedTx.error);
+    });
+    db.close();
+
+    const bundles = [
+      {
+        key: 'same',
+        mapping: {
+          source: 'chatgpt',
+          conversationKey: 'same',
+          notionPageId: 'page-same',
+          notionPageUrl: 'https://notion.so/new-same',
+          notionWorkspaceSlug: 'new-ws',
+          lastSyncedMessageKey: 'incoming-m9',
+          lastSyncedSequence: 9,
+          lastSyncedAt: 100,
+          notionSections: { conversations: { headingBlockId: 'incoming-heading' } },
+          notionSectionCursors: { conversations: { lastSyncedMessageKey: 'incoming-m9', lastSyncedSequence: 9 } },
+          feishuDocId: 'doc-same',
+          feishuLastContentHash: 'incoming-hash',
+          incomingOnly: 'filled',
+          updatedAt: 100,
+        },
+      },
+      {
+        key: 'different',
+        mapping: {
+          source: 'chatgpt',
+          conversationKey: 'different',
+          notionPageId: 'page-other',
+          notionPageUrl: 'https://notion.so/page-other',
+          notionWorkspaceSlug: 'other-ws',
+          lastSyncedMessageKey: 'incoming-other',
+          lastSyncedSequence: 99,
+          lastSyncedAt: 999,
+          notionSections: { conversations: { headingBlockId: 'other-heading' } },
+          feishuDocId: 'doc-other',
+          feishuLastContentHash: 'other-hash',
+          incomingOnly: 'filled-different',
+          updatedAt: 999,
+        },
+      },
+    ];
+    const files = bundles.map((item) => `sources/chatgpt/${item.key}.json`);
+    const manifest = {
+      backupSchemaVersion: 2,
+      exportedAt: '2026-08-21T00:00:00.000Z',
+      db: { name: 'webclipper', version: 8 },
+      counts: { conversations: 2, messages: 0, sync_mappings: 2 },
+      config: { storageLocalPath: 'config/storage-local.json' },
+      index: { conversationsCsvPath: 'sources/conversations.csv' },
+      sources: [{ source: 'chatgpt', conversationCount: 2, files }],
+    };
+    const enc = new TextEncoder();
+    const entries = new Map<string, Uint8Array>([
+      ['manifest.json', enc.encode(JSON.stringify(manifest))],
+      ['config/storage-local.json', enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+      ['sources/conversations.csv', enc.encode('source,conversationKey\n')],
+    ]);
+    bundles.forEach((item, index) => {
+      entries.set(
+        files[index]!,
+        enc.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              sourceType: 'chat',
+              source: 'chatgpt',
+              conversationKey: item.key,
+              title: item.key,
+              url: `https://example.com/${item.key}`,
+              lastCapturedAt: 2,
+            },
+            messages: [],
+            syncMapping: item.mapping,
+          }),
+        ),
+      );
+    });
+
+    await importBackupZipV2Merge(entries);
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['conversations', 'sync_mappings'], 'readonly');
+    const conversations = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll() as any);
+    const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      verifyTx.oncomplete = () => resolve();
+      verifyTx.onerror = () => reject(verifyTx.error);
+      verifyTx.onabort = () => reject(verifyTx.error);
+    });
+    verifyDb.close();
+
+    const sameMapping = mappings.find((row) => row.conversationKey === 'same');
+    expect(sameMapping).toMatchObject({
+      notionPageId: 'page-same',
+      notionPageUrl: 'https://notion.so/new-same',
+      notionWorkspaceSlug: 'new-ws',
+      lastSyncedMessageKey: 'incoming-m9',
+      notionSections: { conversations: { headingBlockId: 'incoming-heading' } },
+      feishuDocId: 'doc-same',
+      feishuLastContentHash: 'incoming-hash',
+      localOnly: 'keep',
+      incomingOnly: 'filled',
+      updatedAt: 500,
+    });
+    const sameConversation = conversations.find((row) => row.conversationKey === 'same');
+    expect(sameConversation).toMatchObject({
+      notionPageId: 'page-same',
+      notionPageUrl: 'https://notion.so/new-same',
+      notionWorkspaceSlug: 'new-ws',
+      feishuDocId: 'doc-same',
+    });
+
+    const differentMapping = mappings.find((row) => row.conversationKey === 'different');
+    expect(differentMapping).toMatchObject({
+      notionPageId: 'page-local',
+      notionPageUrl: 'https://notion.so/page-local',
+      notionWorkspaceSlug: 'local-ws',
+      lastSyncedMessageKey: 'local-m2',
+      notionSections: { conversations: { headingBlockId: 'local-heading-2' } },
+      feishuDocId: 'doc-local',
+      feishuLastContentHash: 'local-hash-2',
+      incomingOnly: 'filled-different',
+      updatedAt: 999,
+    });
+    const differentConversation = conversations.find((row) => row.conversationKey === 'different');
+    expect(differentConversation).toMatchObject({
+      notionPageId: 'page-local',
+      notionPageUrl: 'https://notion.so/page-local',
+      notionWorkspaceSlug: 'local-ws',
+      feishuDocId: 'doc-local',
+    });
   });
 });

@@ -1,10 +1,10 @@
+import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
 import {
   filterStorageForBackup,
   validateImageCacheIndexDocument,
   mergeConversationRecord,
   mergeMessageRecord,
-  mergeSyncMappingRecord,
   uniqueConversationKey,
   validateBackupDocument,
   validateBackupManifest,
@@ -171,6 +171,65 @@ function normalizeListDerivedKeys(record: AnyRecord): AnyRecord {
   };
 }
 
+const CONVERSATION_MAPPING_MIRROR_FIELDS = [
+  'notionPageId',
+  'notionPageUrl',
+  'notionWorkspaceSlug',
+  'feishuDocId',
+] as const;
+
+async function upsertImportedSyncMappings(input: {
+  db: IDBDatabase;
+  mappings: AnyRecord[];
+  stats: ImportStats;
+  stage: string;
+  bump: (delta: number, stage: string) => void;
+}): Promise<void> {
+  const { t, stores } = tx(input.db, ['sync_mappings', 'conversations'], 'readwrite');
+  const mappingIndex = stores.sync_mappings.index('by_source_conversationKey');
+  const conversationIndex = stores.conversations.index('by_source_conversationKey');
+
+  for (const incoming of input.mappings) {
+    const source = safeString(incoming?.source);
+    const conversationKey = safeString(incoming?.conversationKey);
+    if (!source || !conversationKey) {
+      input.bump(1, input.stage);
+      continue;
+    }
+
+    const existing = (await reqToPromise(mappingIndex.get([source, conversationKey]) as any)) as AnyRecord;
+    const merged = mergeSyncMappingForImport(existing, incoming) as AnyRecord;
+    merged.source = source;
+    merged.conversationKey = conversationKey;
+
+    if (existing?.id) {
+      merged.id = existing.id;
+      await reqToPromise(stores.sync_mappings.put(merged as any));
+      input.stats.mappingsUpdated += 1;
+    } else {
+      delete merged.id;
+      await reqToPromise(stores.sync_mappings.add(merged as any));
+      input.stats.mappingsAdded += 1;
+    }
+
+    const conversation = (await reqToPromise(conversationIndex.get([source, conversationKey]) as any)) as AnyRecord;
+    if (conversation?.id) {
+      let changed = false;
+      for (const field of CONVERSATION_MAPPING_MIRROR_FIELDS) {
+        const value = safeString(merged[field]);
+        if (!value || safeString(conversation[field]) === value) continue;
+        conversation[field] = value;
+        changed = true;
+      }
+      if (changed) await reqToPromise(stores.conversations.put(conversation));
+    }
+
+    input.bump(1, input.stage);
+  }
+
+  await txDone(t);
+}
+
 export async function importBackupLegacyJsonMerge(
   doc: unknown,
   onProgress?: (p: ImportProgress) => void,
@@ -303,69 +362,15 @@ export async function importBackupLegacyJsonMerge(
     await txDone(t);
   }
 
-  // 3) Upsert sync mappings by (source, conversationKey) and fill missing convo.notionPageId (also preserves feishuDocId).
-  {
-    const { t, stores: s } = tx(db, ['sync_mappings', 'conversations'], 'readwrite');
-    const idx = s.sync_mappings.index('by_source_conversationKey');
-    const convoIdx = s.conversations.index('by_source_conversationKey');
-
-    progress.stage = 'mappings';
-    report();
-    for (let i = 0; i < backupMappings.length; i += 1) {
-      const incoming = backupMappings[i];
-      if (!incoming) {
-        bump(1, 'mappings');
-        continue;
-      }
-      const source = incoming.source ? String(incoming.source) : '';
-      const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
-      if (!source || !conversationKey) {
-        bump(1, 'mappings');
-        continue;
-      }
-
-      const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = mergeSyncMappingRecord(existing, incoming);
-
-      if (existing && existing.id) {
-        merged.id = existing.id;
-
-        await reqToPromise(s.sync_mappings.put(merged as any));
-        stats.mappingsUpdated += 1;
-      } else {
-        await reqToPromise(s.sync_mappings.add(merged as any));
-        stats.mappingsAdded += 1;
-      }
-
-      const notionPageId = merged.notionPageId ? String(merged.notionPageId) : '';
-      const feishuDocId = merged.feishuDocId ? String(merged.feishuDocId) : '';
-      if (notionPageId) {
-        const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
-        if (convo && convo.id) {
-          let changed = false;
-          if (!convo.notionPageId || !String(convo.notionPageId).trim()) {
-            convo.notionPageId = notionPageId;
-            changed = true;
-          }
-          if (feishuDocId && (!convo.feishuDocId || !String(convo.feishuDocId).trim())) {
-            convo.feishuDocId = feishuDocId;
-            changed = true;
-          }
-          if (changed) await reqToPromise(s.conversations.put(convo));
-        }
-      } else if (feishuDocId) {
-        const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
-        if (convo && convo.id && (!convo.feishuDocId || !String(convo.feishuDocId).trim())) {
-          convo.feishuDocId = feishuDocId;
-          await reqToPromise(s.conversations.put(convo));
-        }
-      }
-
-      bump(1, 'mappings');
-    }
-
-    await txDone(t);
-  }
+  progress.stage = 'mappings';
+  report();
+  await upsertImportedSyncMappings({
+    db,
+    mappings: backupMappings,
+    stats,
+    stage: 'mappings',
+    bump,
+  });
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'settings';
@@ -904,53 +909,15 @@ export async function importBackupZipV2Merge(
     await txDone(t);
   }
 
-  // 3) Upsert sync mappings by (source, conversationKey) and fill missing convo.notionPageId (also preserves feishuDocId).
-  {
-    const { t, stores: s } = tx(db, ['sync_mappings', 'conversations'], 'readwrite');
-    const idx = s.sync_mappings.index('by_source_conversationKey');
-    const convoIdx = s.conversations.index('by_source_conversationKey');
-
-    progress.stage = 'Mappings';
-    report();
-    for (let i = 0; i < incomingMappings.length; i += 1) {
-      const incoming = incomingMappings[i];
-      const source = incoming && incoming.source ? String(incoming.source) : '';
-      const conversationKey = incoming && incoming.conversationKey ? String(incoming.conversationKey) : '';
-      if (!source || !conversationKey) {
-        bump(1, 'Mappings');
-        continue;
-      }
-
-      const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = mergeSyncMappingRecord(existing, incoming);
-      merged.source = source;
-      merged.conversationKey = conversationKey;
-
-      if (existing && existing.id) {
-        merged.id = existing.id;
-
-        await reqToPromise(s.sync_mappings.put(merged as any));
-        stats.mappingsUpdated += 1;
-      } else {
-        await reqToPromise(s.sync_mappings.add(merged as any));
-        stats.mappingsAdded += 1;
-      }
-
-      const notionPageId = merged.notionPageId ? String(merged.notionPageId) : '';
-      if (notionPageId) {
-        const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
-        if (convo && convo.id && (!convo.notionPageId || !String(convo.notionPageId).trim())) {
-          convo.notionPageId = notionPageId;
-
-          await reqToPromise(s.conversations.put(convo));
-        }
-      }
-
-      bump(1, 'Mappings');
-    }
-
-    await txDone(t);
-  }
+  progress.stage = 'Mappings';
+  report();
+  await upsertImportedSyncMappings({
+    db,
+    mappings: incomingMappings,
+    stats,
+    stage: 'Mappings',
+    bump,
+  });
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'Settings';
