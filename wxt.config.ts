@@ -64,7 +64,7 @@ export const resolveManifest: UserManifestFn = (env) => {
 
   const manifest = {
     name: isSafari ? '__MSG_name__' : '__MSG_extName__',
-    version: '1.9.4',
+    version: '2.0.0',
     description: isSafari ? '__MSG_description__' : '__MSG_extDescription__',
     default_locale: 'en',
     permissions,
