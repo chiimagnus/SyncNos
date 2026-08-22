@@ -12,13 +12,15 @@
 | OAuth Connect 无响应 | client id、redirect URI、pending state、Worker endpoint 和浏览器日志。 |
 | article 只有文本没有图片 | 图片设置、anti-hotlink rule、referer 与下载 warning；文本成功仍是成功。 |
 | 视频提示没有字幕 | 先在页面开启并等待字幕请求加载，再 capture。 |
-| `Could not establish connection` / `Receiving end does not exist` | 先按发送方向区分生命周期：In Page 已出现后的 content → background 首击失败应检查 MV3 background listener 是否被异步初始化挡住；background → content 则先判断 content script 是否尚未注入/初始化。不要把它和 `Extension context invalidated` 混为一类，也不要用通用 retry 掩盖 background cold-start。 |
+| `Could not establish connection` / `Receiving end does not exist` | 先按发送方向和生命周期分类：content → background 冷启动、background → content 尚未注入、port 已建立后关闭、旧 context 失效是不同问题。不要用通用 retry 掩盖 background cold-start，也不要把 `message port closed` 或 `Extension context invalidated` 当成 missing receiver。 |
 
-### 连接错误的方向性判断
+### 连接错误的五类生命周期
 
-- **content → background**：In Page 按钮已经存在、worker 冷启动后第一次点击失败而第二次立即成功，优先检查 background `runtime.onMessage` 是否在任何 `await` 之后才注册。background receiver 应 listener-first，不能靠 retry、keep-alive 或扩大 timeout 修复。
-- **background → content**：页面刚导航时 content script 可能尚未有 receiver；这不等价于 background cold-start。content entrypoint 自身的异步初始化窗口也要单独检查，不能反向套用 content → background 的结论。
-- **`Extension context invalidated`**：extension reload/update 后旧页面脚本属于旧 context 生命周期，继续走现有 invalidated-context 处理；不要归入 receiving-end retry。
+- **content → background / background cold-start**：In Page 按钮已经存在、worker 冷启动后第一次点击失败而第二次立即成功，优先检查 background `runtime.onMessage` 是否在任何 `await` 之后才注册。background receiver 应 listener-first，不能靠 retry、keep-alive 或扩大 timeout 修复。
+- **background → content / 人为初始化窗口**：content entrypoint 已执行但仍被 locale await 挡住 listener 的窗口已经消除；Current Page / comments / video 只在 handler 内等语言，article extract 不等语言。
+- **background → content / 尚未注入**：页面刚导航、content script 根本还没注入时，仍可能没有 receiver。这是真实平台窗口，不等价于 background cold-start；现有 article navigation 的一次 missing-receiver retry 只属于该 caller。
+- **message port closed**：listener/port 已经建立后又因导航、reload 或 teardown 关闭。这不是“从未有 receiver”，不得借用 missing-receiver retry 隐藏。
+- **`Extension context invalidated`**：extension reload/update 后旧页面脚本属于旧 context 生命周期，继续走现有 invalidated-context 处理；不要归入 receiving-end retry。content → background 不增加 retry。
 
 ## 评论精确定位
 
