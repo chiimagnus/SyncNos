@@ -32,6 +32,7 @@ export type InsightStats = {
   totalClips: number;
   chatCount: number;
   articleCount: number;
+  videoCount: number;
   chatDailyTrend: InsightDailyTrendPoint[];
   chatSourceDistribution: InsightDistributionItem[];
   totalMessages: number;
@@ -196,6 +197,7 @@ export function createEmptyInsightStats(): InsightStats {
     totalClips: 0,
     chatCount: 0,
     articleCount: 0,
+    videoCount: 0,
     chatDailyTrend: [],
     chatSourceDistribution: [],
     totalMessages: 0,
@@ -295,6 +297,11 @@ export function buildInsightStats(
       } else if (!hasRange) {
         articleUnknownDateCount += 1;
       }
+      continue;
+    }
+
+    if (sourceType === 'video') {
+      stats.videoCount += 1;
     }
   }
 
@@ -312,7 +319,7 @@ export function buildInsightStats(
       return b.conversationId - a.conversationId;
     })
     .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
-  stats.totalClips = stats.chatCount + stats.articleCount;
+  stats.totalClips = stats.chatCount + stats.articleCount + stats.videoCount;
   stats.articleDailyTrend = buildDailyTrend({
     counts: articleDailyCounts,
     unknownCount: articleUnknownDateCount,

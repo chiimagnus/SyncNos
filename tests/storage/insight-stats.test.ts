@@ -84,6 +84,7 @@ describe('insight stats', () => {
       totalClips: 0,
       chatCount: 0,
       articleCount: 0,
+      videoCount: 0,
       chatDailyTrend: [],
       chatSourceDistribution: [],
       totalMessages: 0,
@@ -224,7 +225,7 @@ describe('insight stats', () => {
     ]);
   });
 
-  it('keeps total clips aligned with recognized chat and article rows only', async () => {
+  it('includes video transcripts and excludes unknown rows from the total clip count', async () => {
     await seedConversation({
       sourceType: 'chat',
       source: 'ChatGPT',
@@ -244,16 +245,24 @@ describe('insight stats', () => {
     await seedConversation({
       sourceType: 'video',
       source: 'YouTube',
-      conversationKey: 'video-ignored',
-      title: 'Ignored type',
+      conversationKey: 'video-known',
+      title: 'Saved transcript',
       lastCapturedAt: 3,
+    });
+    await seedConversation({
+      sourceType: 'unknown',
+      source: 'Unknown',
+      conversationKey: 'unknown-ignored',
+      title: 'Ignored type',
+      lastCapturedAt: 4,
     });
 
     const stats = await getInsightStats();
 
-    expect(stats.totalClips).toBe(2);
+    expect(stats.totalClips).toBe(3);
     expect(stats.chatCount).toBe(1);
     expect(stats.articleCount).toBe(1);
+    expect(stats.videoCount).toBe(1);
   });
 
   it('folds long source and domain tails into the other bucket', async () => {

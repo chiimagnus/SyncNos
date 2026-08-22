@@ -477,6 +477,7 @@ export const en = {
   insightOverviewTotalClips: '📦 Total Clips',
   insightOverviewChatCount: '💬 AI Conversations',
   insightOverviewArticleCount: '📄 Web Articles',
+  insightOverviewVideoCount: '🎬 Video Transcripts',
   insightChatSectionAria: 'AI conversations',
   insightChatSectionTitle: '💬 AI Conversations',
   insightChatSectionSubtitle: 'Platform distribution + total messages + Top 3 longest conversations',

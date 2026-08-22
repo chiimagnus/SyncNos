@@ -473,6 +473,7 @@ export const zh: { [K in TranslationKey]: string } = {
   insightOverviewTotalClips: '📦 总 Clip',
   insightOverviewChatCount: '💬 AI 对话',
   insightOverviewArticleCount: '📄 网页文章',
+  insightOverviewVideoCount: '🎬 视频字幕',
   insightChatSectionAria: 'AI 对话',
   insightChatSectionTitle: '💬 AI 对话',
   insightChatSectionSubtitle: '平台分布 + 总消息数 + Top 3 最长对话',

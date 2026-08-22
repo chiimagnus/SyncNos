@@ -380,7 +380,7 @@ export function InsightPanel(props: {
         />
       </header>
 
-      <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>
+      <section className="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4" aria-label={t('insightOverviewAria')}>
         <div
           className={[
             cardClassName,
@@ -434,6 +434,25 @@ export function InsightPanel(props: {
           </div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--secondary)]">
             {formatCount(stats.articleCount)}
+          </div>
+        </div>
+        <div
+          className={[
+            cardClassName,
+            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-border-[color-mix(in_srgb,var(--success)_34%,var(--border))]',
+            'tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))]',
+          ].join(' ')}
+        >
+          <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+            <span
+              className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--success)]"
+              aria-hidden="true"
+            />
+            {t('insightOverviewVideoCount')}
+          </div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--success)]">
+            {formatCount(stats.videoCount)}
           </div>
         </div>
       </section>
