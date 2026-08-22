@@ -133,11 +133,10 @@ async function ensureReadability(tabId: number) {
   }
 }
 
-function isNoReceiverError(error: unknown): boolean {
+function isMissingContentReceiverError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
-  return /receiving end does not exist|could not establish connection|no receiving end|message port closed/i.test(
-    message,
-  );
+  // port closed means a receiver existed and then tore down; do not hide it behind missing-receiver retry
+  return /receiving end does not exist|no receiving end/i.test(message);
 }
 
 async function extractArticleOnTab(tabId: number, includeXiaohongshuComments: boolean) {
@@ -155,7 +154,7 @@ async function extractArticleOnTab(tabId: number, includeXiaohongshuComments: bo
     response = await tabsSendMessage(tabId, payload);
   } catch (error) {
     // Content scripts may not be ready right after navigation; retry once to reduce flaky "no receiver" failures.
-    if (isNoReceiverError(error)) {
+    if (isMissingContentReceiverError(error)) {
       await sleep(CONTENT_MESSAGE_RETRY_DELAY_MS);
       response = await tabsSendMessage(tabId, payload);
     } else {
