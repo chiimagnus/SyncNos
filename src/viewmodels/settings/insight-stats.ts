@@ -5,6 +5,7 @@ import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 import { encodeConversationLoc } from '@services/shared/conversation-loc';
 
 type MessageCountByConversation = Map<number, number>;
+type CommentCountByConversation = Map<number, number>;
 
 export type InsightTimeRange = 'all' | 'today' | '7d' | '30d';
 
@@ -28,6 +29,10 @@ export type InsightTopConversation = {
   loc: string;
 };
 
+export type InsightTopCommentedClip = Omit<InsightTopConversation, 'messageCount'> & {
+  commentCount: number;
+};
+
 export type InsightStats = {
   totalClips: number;
   chatCount: number;
@@ -39,13 +44,16 @@ export type InsightStats = {
   topConversations: InsightTopConversation[];
   articleDailyTrend: InsightDailyTrendPoint[];
   articleDomainDistribution: InsightDistributionItem[];
+  topArticleCommentedClips: InsightTopCommentedClip[];
   videoDailyTrend: InsightDailyTrendPoint[];
   videoPlatformDistribution: InsightDistributionItem[];
+  topVideoCommentedClips: InsightTopCommentedClip[];
 };
 
 export type InsightStatsSourceData = {
   conversations: Conversation[];
   messageCounts: MessageCountByConversation;
+  commentCounts: CommentCountByConversation;
 };
 
 export const INSIGHT_CHAT_SOURCE_LIMIT = 4;
@@ -181,11 +189,11 @@ async function readAllConversations(conversationsStore: IDBObjectStore): Promise
   return ((await reqToPromise(conversationsStore.getAll())) as Conversation[]) || [];
 }
 
-async function readMessageCounts(messagesStore: IDBObjectStore): Promise<MessageCountByConversation> {
-  const counts: MessageCountByConversation = new Map();
+async function readCountsByConversationId(store: IDBObjectStore): Promise<Map<number, number>> {
+  const counts = new Map<number, number>();
 
   await new Promise<void>((resolve, reject) => {
-    const request = messagesStore.openCursor();
+    const request = store.openCursor();
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) {
@@ -218,8 +226,10 @@ export function createEmptyInsightStats(): InsightStats {
     topConversations: [],
     articleDailyTrend: [],
     articleDomainDistribution: [],
+    topArticleCommentedClips: [],
     videoDailyTrend: [],
     videoPlatformDistribution: [],
+    topVideoCommentedClips: [],
   };
 }
 
@@ -232,6 +242,25 @@ function isWithinRange(value: unknown, since: number, until: number): boolean {
   const ts = Number(value) || 0;
   if (!Number.isFinite(ts) || ts <= 0) return false;
   return ts >= since && ts <= until;
+}
+
+function createInsightTopClip(
+  conversation: Conversation,
+  source: string,
+): Omit<InsightTopConversation, 'messageCount'> {
+  const openSource = safeString(conversation.source).toLowerCase();
+  const openConversationKey = safeString(conversation.conversationKey);
+  return {
+    conversationId: Number(conversation.id),
+    title: normalizeConversationTitle(conversation.title),
+    source,
+    openSource,
+    openConversationKey,
+    loc:
+      openSource && openConversationKey
+        ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey })
+        : '',
+  };
 }
 
 export function getInsightTimeRangeWindow(range: InsightTimeRange, now = Date.now()): { since: number; until: number } {
@@ -260,6 +289,8 @@ export function buildInsightStats(
   const articleDomains = new Map<string, number>();
   const videoPlatforms = new Map<string, number>();
   const topConversations: InsightTopConversation[] = [];
+  const topArticleCommentedClips: InsightTopCommentedClip[] = [];
+  const topVideoCommentedClips: InsightTopCommentedClip[] = [];
   const chatDailyCounts = new Map<number, number>();
   const articleDailyCounts = new Map<number, number>();
   const videoDailyCounts = new Map<number, number>();
@@ -288,20 +319,10 @@ export function buildInsightStats(
 
       const conversationId = Number(conversation.id);
       const messageCount = Number(data.messageCounts.get(conversationId) || 0);
-      const openSource = safeString(conversation.source).toLowerCase();
-      const openConversationKey = safeString(conversation.conversationKey);
       stats.totalMessages += messageCount;
       topConversations.push({
-        conversationId,
-        title: normalizeConversationTitle(conversation.title),
+        ...createInsightTopClip(conversation, sourceLabel),
         messageCount,
-        source: sourceLabel,
-        openSource,
-        openConversationKey,
-        loc:
-          openSource && openConversationKey
-            ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey })
-            : '',
       });
       continue;
     }
@@ -310,6 +331,14 @@ export function buildInsightStats(
       stats.articleCount += 1;
       const domain = parseHostname(conversation.url);
       articleDomains.set(domain, (articleDomains.get(domain) || 0) + 1);
+
+      const commentCount = Number(data.commentCounts.get(Number(conversation.id)) || 0);
+      if (commentCount > 0) {
+        topArticleCommentedClips.push({
+          ...createInsightTopClip(conversation, domain),
+          commentCount,
+        });
+      }
 
       if (Number.isFinite(dayStart)) {
         articleDailyCounts.set(dayStart, (articleDailyCounts.get(dayStart) || 0) + 1);
@@ -323,6 +352,14 @@ export function buildInsightStats(
       stats.videoCount += 1;
       const platform = parseVideoPlatform(conversation.url, conversation.source);
       videoPlatforms.set(platform, (videoPlatforms.get(platform) || 0) + 1);
+
+      const commentCount = Number(data.commentCounts.get(Number(conversation.id)) || 0);
+      if (commentCount > 0) {
+        topVideoCommentedClips.push({
+          ...createInsightTopClip(conversation, platform),
+          commentCount,
+        });
+      }
 
       if (Number.isFinite(dayStart)) {
         videoDailyCounts.set(dayStart, (videoDailyCounts.get(dayStart) || 0) + 1);
@@ -347,6 +384,12 @@ export function buildInsightStats(
       return b.conversationId - a.conversationId;
     })
     .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
+  stats.topArticleCommentedClips = topArticleCommentedClips
+    .sort((a, b) => b.commentCount - a.commentCount || b.conversationId - a.conversationId)
+    .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
+  stats.topVideoCommentedClips = topVideoCommentedClips
+    .sort((a, b) => b.commentCount - a.commentCount || b.conversationId - a.conversationId)
+    .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
   stats.totalClips = stats.chatCount + stats.articleCount + stats.videoCount;
   stats.articleDailyTrend = buildDailyTrend({
     counts: articleDailyCounts,
@@ -367,17 +410,19 @@ export function buildInsightStats(
 export async function getInsightStatsSourceData(): Promise<InsightStatsSourceData> {
   const db = await openDb();
   try {
-    const t = db.transaction(['conversations', 'messages'], 'readonly');
+    const t = db.transaction(['conversations', 'messages', 'article_comments'], 'readonly');
     const conversationsStore = t.objectStore('conversations');
     const messagesStore = t.objectStore('messages');
+    const commentsStore = t.objectStore('article_comments');
 
-    const [conversations, messageCounts] = await Promise.all([
+    const [conversations, messageCounts, commentCounts] = await Promise.all([
       readAllConversations(conversationsStore),
-      readMessageCounts(messagesStore),
+      readCountsByConversationId(messagesStore),
+      readCountsByConversationId(commentsStore),
     ]);
     await txDone(t);
 
-    return { conversations, messageCounts };
+    return { conversations, messageCounts, commentCounts };
   } finally {
     db.close();
   }

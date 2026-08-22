@@ -9,6 +9,7 @@ import {
   type InsightDailyTrendPoint,
   type InsightDistributionItem,
   type InsightStats,
+  type InsightTopCommentedClip,
   type InsightTopConversation,
   INSIGHT_UNKNOWN_DATE_LABEL,
 } from '@viewmodels/settings/insight-stats';
@@ -250,18 +251,17 @@ function DailyTrendChart(props: { items: InsightDailyTrendPoint[]; stroke: strin
   );
 }
 
-function TopConversationList(props: {
-  items: InsightTopConversation[];
-  getLinkTo: (item: InsightTopConversation) => string;
-  onOpenConversation: (item: InsightTopConversation) => void;
+function TopRankedList<T extends InsightTopConversation | InsightTopCommentedClip>(props: {
+  items: T[];
+  count: (item: T) => number;
+  unit: string;
+  emptyText: string;
+  getLinkTo: (item: InsightTopConversation | InsightTopCommentedClip) => string;
+  onOpenConversation: (item: InsightTopConversation | InsightTopCommentedClip) => void;
 }) {
-  const { items, getLinkTo, onOpenConversation } = props;
+  const { items, count, unit, emptyText, getLinkTo, onOpenConversation } = props;
   if (!items.length) {
-    return (
-      <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-        {t('insightTopConversationsEmpty')}
-      </div>
-    );
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{emptyText}</div>;
   }
 
   const rankToneClassName = (index: number) => {
@@ -310,7 +310,7 @@ function TopConversationList(props: {
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
           </div>
           <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
-            {formatCount(item.messageCount)} {t('insightTurnsUnit')}
+            {formatCount(count(item))} {unit}
           </div>
         </div>
       ))}
@@ -333,13 +333,13 @@ export function InsightPanel(props: {
     return from || '/';
   }, [routerLocation]);
 
-  const getLinkTo = (item: InsightTopConversation) => {
+  const getLinkTo = (item: InsightTopConversation | InsightTopCommentedClip) => {
     const loc = String(item?.loc || '').trim();
     if (!loc) return fallbackTo;
     return buildConversationRouteFromLoc(loc);
   };
 
-  const onOpenConversation = (item: InsightTopConversation) => {
+  const onOpenConversation = (item: InsightTopConversation | InsightTopCommentedClip) => {
     const source = String(item?.openSource || '').trim();
     const conversationKey = String(item?.openConversationKey || '').trim();
     const conversationId = Number(item?.conversationId);
@@ -492,8 +492,11 @@ export function InsightPanel(props: {
                 </div>
               </div>
             </div>
-            <TopConversationList
+            <TopRankedList
               items={stats.topConversations}
+              count={(item) => item.messageCount}
+              unit={t('insightTurnsUnit')}
+              emptyText={t('insightTopConversationsEmpty')}
               getLinkTo={getLinkTo}
               onOpenConversation={onOpenConversation}
             />
@@ -517,6 +520,19 @@ export function InsightPanel(props: {
             </div>
             <DistributionChart items={stats.articleDomainDistribution} emptyText={t('insightDistributionEmpty')} />
           </div>
+          <div className="tw-mt-5">
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightTopCommentedClipsTitle')}
+            </div>
+            <TopRankedList
+              items={stats.topArticleCommentedClips}
+              count={(item) => item.commentCount}
+              unit={t('insightCommentsUnit')}
+              emptyText={t('insightTopConversationsEmpty')}
+              getLinkTo={getLinkTo}
+              onOpenConversation={onOpenConversation}
+            />
+          </div>
         </section>
 
         <section
@@ -538,6 +554,19 @@ export function InsightPanel(props: {
               {t('insightSourceDistributionTitle')}
             </div>
             <DistributionChart items={stats.videoPlatformDistribution} emptyText={t('insightDistributionEmpty')} />
+          </div>
+          <div className="tw-mt-5">
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightTopCommentedClipsTitle')}
+            </div>
+            <TopRankedList
+              items={stats.topVideoCommentedClips}
+              count={(item) => item.commentCount}
+              unit={t('insightCommentsUnit')}
+              emptyText={t('insightTopConversationsEmpty')}
+              getLinkTo={getLinkTo}
+              onOpenConversation={onOpenConversation}
+            />
           </div>
         </section>
       </div>
