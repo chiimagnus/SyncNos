@@ -11,8 +11,44 @@ import {
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
+function UserNameCard(props: { value: string; onChange: (next: string) => void; onSave: () => void }) {
+  const { value, onChange, onSave } = props;
+  return (
+    <section className={cardClassName} aria-label={t('aboutYouUserNameSectionAria')}>
+      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+        {t('aboutYouUserNameSectionTitle')}
+      </h2>
+      <input
+        className={[
+          'tw-mt-3 tw-w-full tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
+          'tw-px-3 tw-py-2 tw-text-sm tw-font-semibold tw-text-[var(--text-primary)]',
+          'focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-[var(--focus-ring)] focus-visible:tw-ring-offset-2',
+          'focus-visible:tw-ring-offset-[var(--bg-card)]',
+        ].join(' ')}
+        value={value}
+        onChange={(e) => onChange(String((e.target as any)?.value || ''))}
+        onBlur={onSave}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          onSave();
+        }}
+        placeholder={t('aboutYouUserNamePlaceholder')}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        {t('aboutYouUserNameHint')}
+      </div>
+    </section>
+  );
+}
+
 export function InpageSection(props: {
   busy: boolean;
+  userName: string;
+  onChangeUserName: (next: string) => void;
+  onSaveUserName: () => void;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
   localePreference: LocalePreference;
@@ -39,6 +75,9 @@ export function InpageSection(props: {
 }) {
   const {
     busy,
+    userName,
+    onChangeUserName,
+    onSaveUserName,
     displayMode,
     onChangeDisplayMode,
     localePreference,
@@ -71,6 +110,8 @@ export function InpageSection(props: {
 
   return (
     <div className="tw-grid tw-gap-4">
+      <UserNameCard value={userName} onChange={onChangeUserName} onSave={onSaveUserName} />
+
       <section className={cardClassName} aria-label={t('languageHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('languageHeading')}</h2>
         <div className="tw-mt-2.5">

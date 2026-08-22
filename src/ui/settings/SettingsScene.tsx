@@ -382,17 +382,17 @@ export function SettingsScene(props: SettingsSceneProps) {
           hasLoaded={hasLoadedInsight}
           range={insightRange}
           onChangeRange={setInsightRange}
-          userName={aboutYouUserName}
-          onChangeUserName={onChangeAboutYouUserName}
-          onSaveUserName={() => {
-            void onSaveAboutYouUserName();
-          }}
         />
       ) : null}
 
       {activeSection === 'general' ? (
         <InpageSection
           busy={busy}
+          userName={aboutYouUserName}
+          onChangeUserName={onChangeAboutYouUserName}
+          onSaveUserName={() => {
+            void onSaveAboutYouUserName();
+          }}
           displayMode={inpageDisplayMode}
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);

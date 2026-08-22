@@ -113,6 +113,9 @@ describe('inpage anti-hotlink advanced editor', () => {
   function renderInpage(props: Partial<Parameters<typeof InpageSection>[0]> = {}) {
     const baseProps: Parameters<typeof InpageSection>[0] = {
       busy: false,
+      userName: '',
+      onChangeUserName: () => {},
+      onSaveUserName: () => {},
       displayMode: 'supported',
       onChangeDisplayMode: () => {},
       localePreference: 'system',
@@ -178,6 +181,21 @@ describe('inpage anti-hotlink advanced editor', () => {
       chinese!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     expect(onChangeLocalePreference).toHaveBeenCalledWith('zh');
+  });
+
+  it('keeps the username save behavior in general settings', () => {
+    const onSaveUserName = vi.fn();
+    renderInpage({ userName: 'Ada', onSaveUserName });
+
+    const input = document.querySelector('input[autocomplete="off"]') as HTMLInputElement | null;
+    expect(input).toBeTruthy();
+    expect(input?.value).toBe('Ada');
+
+    act(() => {
+      input!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
+    });
+
+    expect(onSaveUserName).toHaveBeenCalledTimes(1);
   });
 
   it('renders editor rows and validation errors when expanded', () => {
