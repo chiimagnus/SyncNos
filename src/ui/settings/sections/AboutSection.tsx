@@ -92,7 +92,7 @@ export function AboutSection() {
             type="button"
             onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/issues').catch(() => {})}
           >
-            GitHub 问题反馈、功能需求
+            {t('githubFeedback')}
           </button>
           <button
             id="btnAboutAngels"

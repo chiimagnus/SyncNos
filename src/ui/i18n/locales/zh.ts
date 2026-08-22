@@ -245,6 +245,7 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // AboutSection
   sourceCode: '源代码',
+  githubFeedback: 'GitHub 问题反馈、功能需求',
   changelog: '更新日志',
   mail: '邮件',
   versionPrefix: '版本',

@@ -248,6 +248,7 @@ export const en = {
 
   // AboutSection
   sourceCode: 'Source Code',
+  githubFeedback: 'GitHub Feedback & Feature Requests',
   changelog: 'Changelog',
   mail: 'Mail',
   versionPrefix: 'Version',
