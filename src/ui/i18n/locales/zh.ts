@@ -244,7 +244,6 @@ export const zh: { [K in TranslationKey]: string } = {
   sourceCode: '源代码',
   githubFeedback: 'GitHub 问题反馈、功能需求',
   changelog: '更新日志',
-  mail: '邮件',
   versionPrefix: '版本',
   authorTagline: '时光机创造者~',
   angelsCta: '快来看看吧！这是可爱的天使赞助者们',

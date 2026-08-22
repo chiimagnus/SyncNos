@@ -247,7 +247,6 @@ export const en = {
   sourceCode: 'Source Code',
   githubFeedback: 'GitHub Feedback & Feature Requests',
   changelog: 'Changelog',
-  mail: 'Mail',
   versionPrefix: 'Version',
   authorTagline: 'Time Machine Creator~',
   angelsCta: 'Come take a look! Here are our lovely angel sponsors',

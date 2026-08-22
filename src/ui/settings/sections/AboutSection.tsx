@@ -77,16 +77,6 @@ export function AboutSection() {
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
           <button
-            id="btnAboutMail"
-            className={buttonClassName}
-            type="button"
-            onClick={() =>
-              openUrl('mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback').catch(() => {})
-            }
-          >
-            {t('mail')}
-          </button>
-          <button
             id="btnAboutGitHub"
             className={buttonClassName}
             type="button"
