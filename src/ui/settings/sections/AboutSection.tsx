@@ -90,9 +90,9 @@ export function AboutSection() {
             id="btnAboutGitHub"
             className={buttonClassName}
             type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus').catch(() => {})}
+            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/issues').catch(() => {})}
           >
-            GitHub
+            GitHub 问题反馈、功能需求
           </button>
           <button
             id="btnAboutAngels"
