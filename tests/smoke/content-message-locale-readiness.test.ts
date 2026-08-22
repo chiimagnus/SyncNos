@@ -79,10 +79,10 @@ describe('content message locale readiness', () => {
     const captureVideoTranscript = vi.fn(async () => ({ title: 'Talk', isNew: true, subtitleStatus: 'ok' }));
     const showSaveTip = vi.fn();
 
-    registerVideoTranscriptCaptureContentHandlers(
-      { captureVideoTranscript } as any,
-      { inpageTip: { showSaveTip }, localeReady: locale.promise },
-    );
+    registerVideoTranscriptCaptureContentHandlers({ captureVideoTranscript } as any, {
+      inpageTip: { showSaveTip },
+      localeReady: locale.promise,
+    });
 
     expect(runtime.addListener).toHaveBeenCalledTimes(1);
     const pending = runtime.emit({
@@ -107,10 +107,10 @@ describe('content message locale readiness', () => {
     const captureVideoTranscript = vi.fn(async () => ({ title: 'Talk', isNew: false, subtitleStatus: 'empty' }));
     const showSaveTip = vi.fn();
 
-    registerVideoTranscriptCaptureContentHandlers(
-      { captureVideoTranscript } as any,
-      { inpageTip: { showSaveTip }, localeReady: locale.promise },
-    );
+    registerVideoTranscriptCaptureContentHandlers({ captureVideoTranscript } as any, {
+      inpageTip: { showSaveTip },
+      localeReady: locale.promise,
+    });
 
     const pending = runtime.emit({
       type: CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT,

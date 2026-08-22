@@ -91,11 +91,13 @@ export function registerInpageCommentsPanelContentHandlers(
 
     void Promise.resolve(deps.localeReady)
       .catch(() => undefined)
-      .then(() => controller.open({
-        tabId: normalizePositiveInt(msg?.payload?.tabId) || null,
-        focusComposer: true,
-        ensureArticle: true,
-      }))
+      .then(() =>
+        controller.open({
+          tabId: normalizePositiveInt(msg?.payload?.tabId) || null,
+          focusComposer: true,
+          ensureArticle: true,
+        }),
+      )
       .finally(() => {
         sendResponse?.({ ok: true });
       });
