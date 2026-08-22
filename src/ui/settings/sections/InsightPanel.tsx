@@ -457,7 +457,7 @@ export function InsightPanel(props: {
         </div>
       </section>
 
-      <div className="tw-grid tw-gap-4 lg:tw-grid-cols-2">
+      <div className="tw-grid tw-gap-4 lg:tw-grid-cols-3">
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
             {t('insightChatSectionTitle')}
@@ -535,10 +535,7 @@ export function InsightPanel(props: {
           </div>
         </section>
 
-        <section
-          className={`${cardClassName} tw-h-full tw-min-w-0 lg:tw-col-span-2`}
-          aria-label={t('insightVideosSectionAria')}
-        >
+        <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightVideosSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
             {t('insightVideosSectionTitle')}
           </h2>
