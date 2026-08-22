@@ -38,14 +38,6 @@ export function AboutSection() {
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label={t('linksAria')}>
           <button
-            id="btnAboutMacApp"
-            className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://apps.apple.com/app/syncnos/id6755133888').catch(() => {})}
-          >
-            {t('macApp')}
-          </button>
-          <button
             id="btnAboutSource"
             className={buttonClassName}
             type="button"
@@ -85,22 +77,12 @@ export function AboutSection() {
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
           <button
-            id="btnAboutMail"
-            className={buttonClassName}
-            type="button"
-            onClick={() =>
-              openUrl('mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback').catch(() => {})
-            }
-          >
-            {t('mail')}
-          </button>
-          <button
             id="btnAboutGitHub"
             className={buttonClassName}
             type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus').catch(() => {})}
+            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/issues').catch(() => {})}
           >
-            GitHub
+            {t('githubFeedback')}
           </button>
           <button
             id="btnAboutAngels"

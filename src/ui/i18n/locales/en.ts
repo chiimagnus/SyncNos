@@ -1,8 +1,5 @@
 export const en = {
   // Settings sections
-  settingsGroupFeatures: 'Features',
-  settingsGroupData: 'Data',
-  settingsGroupAbout: 'About',
   section_backup_label: 'Backup',
   section_backup_desc: 'Export/import your database.',
   section_language_label: 'Language',
@@ -247,10 +244,9 @@ export const en = {
   obsidianPathsNote: 'Vault-relative paths; empty uses defaults.',
 
   // AboutSection
-  macApp: 'Mac App',
   sourceCode: 'Source Code',
+  githubFeedback: 'GitHub Feedback & Feature Requests',
   changelog: 'Changelog',
-  mail: 'Mail',
   versionPrefix: 'Version',
   authorTagline: 'Time Machine Creator~',
   angelsCta: 'Come take a look! Here are our lovely angel sponsors',

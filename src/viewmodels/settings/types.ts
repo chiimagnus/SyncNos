@@ -11,24 +11,18 @@ export type SettingsSectionKey =
   | 'videos'
   | 'aboutme';
 
-export type SettingsSectionGroupTitleKey = 'settingsGroupFeatures' | 'settingsGroupData' | 'settingsGroupAbout';
-
 export type SettingsSectionGroup = {
-  titleKey: SettingsSectionGroupTitleKey;
   sections: ReadonlyArray<{ key: SettingsSectionKey }>;
 };
 
 export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   {
-    titleKey: 'settingsGroupFeatures',
     sections: [{ key: 'general' }, { key: 'articles' }, { key: 'ai_chats' }, { key: 'videos' }, { key: 'chat_with' }],
   },
   {
-    titleKey: 'settingsGroupData',
     sections: [{ key: 'backup' }, { key: 'notion' }, { key: 'feishu' }, { key: 'obsidian' }],
   },
   {
-    titleKey: 'settingsGroupAbout',
     sections: [{ key: 'aboutyou' }, { key: 'aboutme' }],
   },
 ];

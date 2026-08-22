@@ -2,9 +2,6 @@ import type { TranslationKey } from './en';
 
 export const zh: { [K in TranslationKey]: string } = {
   // Settings sections
-  settingsGroupFeatures: '功能',
-  settingsGroupData: '数据',
-  settingsGroupAbout: '关于',
   section_backup_label: '备份',
   section_backup_desc: '导出/导入你的数据库。',
   section_language_label: '语言',
@@ -244,10 +241,9 @@ export const zh: { [K in TranslationKey]: string } = {
   obsidianPathsNote: '相对 Vault 的路径；留空使用默认值。',
 
   // AboutSection
-  macApp: 'Mac 应用',
   sourceCode: '源代码',
+  githubFeedback: 'GitHub 问题反馈、功能需求',
   changelog: '更新日志',
-  mail: '邮件',
   versionPrefix: '版本',
   authorTagline: '时光机创造者~',
   angelsCta: '快来看看吧！这是可爱的天使赞助者们',

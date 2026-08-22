@@ -6,6 +6,7 @@ import { JSDOM } from 'jsdom';
 import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels/settings/types';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
+import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
 
 describe('settings section definitions', () => {
   it('keeps the flattened settings navigation order stable', () => {
@@ -25,16 +26,33 @@ describe('settings section definitions', () => {
   });
 
   it('groups sections into integrations, behavior, and about areas', () => {
-    expect(
-      SETTINGS_SECTION_GROUPS.map((group) => ({
-        titleKey: group.titleKey,
-        keys: group.sections.map((section) => section.key),
-      })),
-    ).toEqual([
-      { titleKey: 'settingsGroupFeatures', keys: ['general', 'articles', 'ai_chats', 'videos', 'chat_with'] },
-      { titleKey: 'settingsGroupData', keys: ['backup', 'notion', 'feishu', 'obsidian'] },
-      { titleKey: 'settingsGroupAbout', keys: ['aboutyou', 'aboutme'] },
+    expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
+      ['general', 'articles', 'ai_chats', 'videos', 'chat_with'],
+      ['backup', 'notion', 'feishu', 'obsidian'],
+      ['aboutyou', 'aboutme'],
     ]);
+  });
+
+  it('hides group titles and separates sidebar groups', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+    act(() => {
+      root.render(createElement(SettingsSidebarNav, { activeSection: 'general', onSelectSection: () => {} }));
+    });
+
+    const groupList = document.querySelector('nav')?.firstElementChild;
+    const groups = groupList ? Array.from(groupList.children) : [];
+    expect(groups).toHaveLength(3);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 4, 2]);
+    expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
+    expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
+      true,
+    );
+    expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
+
+    act(() => root.unmount());
+    cleanupDom();
   });
 });
 
