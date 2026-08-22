@@ -22,6 +22,7 @@ export type InpageCommentsPanelController = {
 };
 
 export type InpageCommentsPanelDeps = {
+  localeReady?: Promise<unknown>;
   domSource: InpageCommentsDomSource;
   // Injected from the entrypoint (UI layer) so that `services` never imports `ui`
   // directly, preserving the one-way layering rule in AGENTS.md.
@@ -88,12 +89,13 @@ export function registerInpageCommentsPanelContentHandlers(
     if (!msg || typeof msg.type !== 'string') return undefined;
     if (msg.type !== CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL) return undefined;
 
-    void controller
-      .open({
+    void Promise.resolve(deps.localeReady)
+      .catch(() => undefined)
+      .then(() => controller.open({
         tabId: normalizePositiveInt(msg?.payload?.tabId) || null,
         focusComposer: true,
         ensureArticle: true,
-      })
+      }))
       .finally(() => {
         sendResponse?.({ ok: true });
       });
