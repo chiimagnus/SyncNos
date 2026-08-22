@@ -483,6 +483,8 @@ export const zh: { [K in TranslationKey]: string } = {
   insightTopConversationsEmpty: '暂无数据',
   insightArticlesSectionAria: '网页文章',
   insightArticlesSectionTitle: '📄 网页文章',
+  insightVideosSectionAria: '视频字幕',
+  insightVideosSectionTitle: '🎬 视频字幕',
   insightArticleDomainsTitle: '域名分布',
   insightDistributionEmpty: '暂无数据',
   insightTooltipClips: '条',

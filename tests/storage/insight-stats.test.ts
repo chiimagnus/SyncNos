@@ -13,6 +13,7 @@ import {
   INSIGHT_CHAT_SOURCE_LIMIT,
   INSIGHT_OTHER_LABEL,
   INSIGHT_UNKNOWN_DOMAIN_LABEL,
+  INSIGHT_UNKNOWN_SOURCE_LABEL,
   INSIGHT_UNTITLED_CONVERSATION,
 } from '../../src/viewmodels/settings/insight-stats';
 import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
@@ -91,6 +92,8 @@ describe('insight stats', () => {
       topConversations: [],
       articleDailyTrend: [],
       articleDomainDistribution: [],
+      videoDailyTrend: [],
+      videoPlatformDistribution: [],
     });
   });
 
@@ -247,7 +250,24 @@ describe('insight stats', () => {
       source: 'YouTube',
       conversationKey: 'video-known',
       title: 'Saved transcript',
+      url: 'https://www.youtube.com/watch?v=abc',
       lastCapturedAt: 3,
+    });
+    await seedConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video-bilibili',
+      title: 'Bilibili transcript',
+      url: 'https://www.bilibili.com/video/BV1xx411c7mD/',
+      lastCapturedAt: 4,
+    });
+    await seedConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video-unknown-platform',
+      title: 'Unknown platform transcript',
+      url: 'https://example.com/watch?v=abc',
+      lastCapturedAt: 5,
     });
     await seedConversation({
       sourceType: 'unknown',
@@ -259,10 +279,42 @@ describe('insight stats', () => {
 
     const stats = await getInsightStats();
 
-    expect(stats.totalClips).toBe(3);
+    expect(stats.totalClips).toBe(5);
     expect(stats.chatCount).toBe(1);
     expect(stats.articleCount).toBe(1);
+    expect(stats.videoCount).toBe(3);
+    expect(stats.videoDailyTrend.map((item) => item.count)).toEqual([3]);
+    expect(stats.videoPlatformDistribution).toEqual([
+      { label: 'Bilibili', count: 1 },
+      { label: INSIGHT_UNKNOWN_SOURCE_LABEL, count: 1 },
+      { label: 'YouTube', count: 1 },
+    ]);
+  });
+
+  it('filters video trends and platforms by the selected range', async () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    await seedConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video-before-range',
+      title: 'Earlier transcript',
+      url: 'https://www.youtube.com/watch?v=abc',
+      lastCapturedAt: dayMs,
+    });
+    await seedConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video-in-range',
+      title: 'Current transcript',
+      url: 'https://www.bilibili.com/video/BV1xx411c7mD/',
+      lastCapturedAt: dayMs * 2,
+    });
+
+    const stats = await getInsightStats({ since: dayMs * 2, until: dayMs * 2 + 1 });
+
     expect(stats.videoCount).toBe(1);
+    expect(stats.videoDailyTrend.map((item) => item.count)).toEqual([1]);
+    expect(stats.videoPlatformDistribution).toEqual([{ label: 'Bilibili', count: 1 }]);
   });
 
   it('folds long source and domain tails into the other bucket', async () => {

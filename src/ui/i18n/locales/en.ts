@@ -487,6 +487,8 @@ export const en = {
   insightTopConversationsEmpty: 'No data yet',
   insightArticlesSectionAria: 'Web articles',
   insightArticlesSectionTitle: '📄 Web Articles',
+  insightVideosSectionAria: 'Video transcripts',
+  insightVideosSectionTitle: '🎬 Video Transcripts',
   insightArticleDomainsTitle: 'Domain distribution',
   insightDistributionEmpty: 'No data yet',
   insightTooltipClips: 'Clips',

@@ -518,6 +518,28 @@ export function InsightPanel(props: {
             <DistributionChart items={stats.articleDomainDistribution} emptyText={t('insightDistributionEmpty')} />
           </div>
         </section>
+
+        <section
+          className={`${cardClassName} tw-h-full tw-min-w-0 lg:tw-col-span-2`}
+          aria-label={t('insightVideosSectionAria')}
+        >
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('insightVideosSectionTitle')}
+          </h2>
+          <div className="tw-mt-3">
+            <DailyTrendChart
+              items={stats.videoDailyTrend}
+              stroke="var(--success)"
+              ariaLabel={t('insightOverviewVideoCount')}
+            />
+          </div>
+          <div className="tw-mt-4">
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightSourceDistributionTitle')}
+            </div>
+            <DistributionChart items={stats.videoPlatformDistribution} emptyText={t('insightDistributionEmpty')} />
+          </div>
+        </section>
       </div>
     </div>
   );

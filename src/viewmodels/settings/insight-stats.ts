@@ -39,6 +39,8 @@ export type InsightStats = {
   topConversations: InsightTopConversation[];
   articleDailyTrend: InsightDailyTrendPoint[];
   articleDomainDistribution: InsightDistributionItem[];
+  videoDailyTrend: InsightDailyTrendPoint[];
+  videoPlatformDistribution: InsightDistributionItem[];
 };
 
 export type InsightStatsSourceData = {
@@ -48,6 +50,7 @@ export type InsightStatsSourceData = {
 
 export const INSIGHT_CHAT_SOURCE_LIMIT = 4;
 export const INSIGHT_ARTICLE_DOMAIN_LIMIT = 8;
+export const INSIGHT_VIDEO_PLATFORM_LIMIT = 3;
 export const INSIGHT_TOP_CONVERSATION_LIMIT = 3;
 export const INSIGHT_OTHER_LABEL = t('insightOtherLabel');
 export const INSIGHT_UNKNOWN_DOMAIN_LABEL = t('insightUnknownLabel');
@@ -108,6 +111,17 @@ function buildDistribution(counts: Map<string, number>, limit: number): InsightD
 function parseHostname(value: unknown): string {
   const hostname = parseHostnameFromUrl(value);
   return hostname || INSIGHT_UNKNOWN_DOMAIN_LABEL;
+}
+
+function parseVideoPlatform(url: unknown, source: unknown): string {
+  const hostname = parseHostnameFromUrl(url).toLowerCase();
+  if (hostname === 'youtu.be' || hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) return 'YouTube';
+  if (hostname === 'bilibili.com' || hostname.endsWith('.bilibili.com')) return 'Bilibili';
+
+  const sourceName = safeString(source).toLowerCase();
+  if (sourceName === 'youtube') return 'YouTube';
+  if (sourceName === 'bilibili') return 'Bilibili';
+  return INSIGHT_UNKNOWN_SOURCE_LABEL;
 }
 
 function getStartOfLocalDay(ts: number): number {
@@ -204,6 +218,8 @@ export function createEmptyInsightStats(): InsightStats {
     topConversations: [],
     articleDailyTrend: [],
     articleDomainDistribution: [],
+    videoDailyTrend: [],
+    videoPlatformDistribution: [],
   };
 }
 
@@ -242,11 +258,14 @@ export function buildInsightStats(
 
   const chatSources = new Map<string, number>();
   const articleDomains = new Map<string, number>();
+  const videoPlatforms = new Map<string, number>();
   const topConversations: InsightTopConversation[] = [];
   const chatDailyCounts = new Map<number, number>();
   const articleDailyCounts = new Map<number, number>();
+  const videoDailyCounts = new Map<number, number>();
   let chatUnknownDateCount = 0;
   let articleUnknownDateCount = 0;
+  let videoUnknownDateCount = 0;
 
   for (const conversation of data.conversations) {
     if (hasRange && !isWithinRange(conversation.lastCapturedAt, since, until)) {
@@ -302,6 +321,14 @@ export function buildInsightStats(
 
     if (sourceType === 'video') {
       stats.videoCount += 1;
+      const platform = parseVideoPlatform(conversation.url, conversation.source);
+      videoPlatforms.set(platform, (videoPlatforms.get(platform) || 0) + 1);
+
+      if (Number.isFinite(dayStart)) {
+        videoDailyCounts.set(dayStart, (videoDailyCounts.get(dayStart) || 0) + 1);
+      } else if (!hasRange) {
+        videoUnknownDateCount += 1;
+      }
     }
   }
 
@@ -313,6 +340,7 @@ export function buildInsightStats(
   });
   stats.chatSourceDistribution = buildDistribution(chatSources, INSIGHT_CHAT_SOURCE_LIMIT);
   stats.articleDomainDistribution = buildDistribution(articleDomains, INSIGHT_ARTICLE_DOMAIN_LIMIT);
+  stats.videoPlatformDistribution = buildDistribution(videoPlatforms, INSIGHT_VIDEO_PLATFORM_LIMIT);
   stats.topConversations = topConversations
     .sort((a, b) => {
       if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
@@ -323,6 +351,12 @@ export function buildInsightStats(
   stats.articleDailyTrend = buildDailyTrend({
     counts: articleDailyCounts,
     unknownCount: articleUnknownDateCount,
+    since: hasRange ? since : undefined,
+    until: hasRange ? until : undefined,
+  });
+  stats.videoDailyTrend = buildDailyTrend({
+    counts: videoDailyCounts,
+    unknownCount: videoUnknownDateCount,
     since: hasRange ? since : undefined,
     until: hasRange ? until : undefined,
   });
