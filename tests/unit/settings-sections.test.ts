@@ -45,8 +45,9 @@ describe('settings section definitions', () => {
     const groups = groupList ? Array.from(groupList.children) : [];
     expect(groups).toHaveLength(3);
     expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 4, 2]);
-    expect(groups.slice(1).every((group) => group.classList.contains('tw-border-t'))).toBe(true);
-    expect(groups.every((group) => Array.from(group.children).every((child) => child.tagName === 'BUTTON'))).toBe(true);
+    expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
+    expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
 
     act(() => root.unmount());
     cleanupDom();

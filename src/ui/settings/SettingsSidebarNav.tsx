@@ -23,11 +23,14 @@ export function SettingsSidebarNav(props: {
           {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
             <div
               key={groupIndex}
-              className={[
-                'tw-flex tw-flex-col tw-gap-0.5',
-                groupIndex === 0 ? '' : 'tw-border-t tw-border-[var(--border)] tw-pt-3',
-              ].join(' ')}
+              className="tw-flex tw-flex-col tw-gap-0.5"
             >
+              {groupIndex === 0 ? null : (
+                <div
+                  className="tw-mb-3 tw-h-px tw-w-full tw-bg-[var(--border)] tw-opacity-70"
+                  aria-hidden="true"
+                />
+              )}
               {group.sections.map((section) => {
                 const active = activeSection === section.key;
                 const label = sectionLabel(section.key);
