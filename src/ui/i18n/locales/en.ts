@@ -1,8 +1,5 @@
 export const en = {
   // Settings sections
-  settingsGroupFeatures: 'Features',
-  settingsGroupData: 'Data',
-  settingsGroupAbout: 'About',
   section_backup_label: 'Backup',
   section_backup_desc: 'Export/import your database.',
   section_language_label: 'Language',

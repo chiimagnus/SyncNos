@@ -2,9 +2,6 @@ import type { TranslationKey } from './en';
 
 export const zh: { [K in TranslationKey]: string } = {
   // Settings sections
-  settingsGroupFeatures: '功能',
-  settingsGroupData: '数据',
-  settingsGroupAbout: '关于',
   section_backup_label: '备份',
   section_backup_desc: '导出/导入你的数据库。',
   section_language_label: '语言',

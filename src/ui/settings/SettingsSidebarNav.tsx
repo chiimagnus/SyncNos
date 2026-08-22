@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { navGroupTitleClassName, navItemClassName } from '@ui/shared/nav-styles';
+import { navItemClassName } from '@ui/shared/nav-styles';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { SETTINGS_SECTION_GROUPS } from '@viewmodels/settings/types';
 
@@ -23,9 +23,11 @@ export function SettingsSidebarNav(props: {
           {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
             <div
               key={groupIndex}
-              className={['tw-flex tw-flex-col tw-gap-0.5', groupIndex === 0 ? '' : 'tw-pt-3'].join(' ')}
+              className={[
+                'tw-flex tw-flex-col tw-gap-0.5',
+                groupIndex === 0 ? '' : 'tw-border-t tw-border-[var(--border)] tw-pt-3',
+              ].join(' ')}
             >
-              <div className={navGroupTitleClassName()}>{t(group.titleKey)}</div>
               {group.sections.map((section) => {
                 const active = activeSection === section.key;
                 const label = sectionLabel(section.key);
