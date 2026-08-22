@@ -46,7 +46,9 @@ describe('settings section definitions', () => {
     expect(groups).toHaveLength(3);
     expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 4, 2]);
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
-    expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
+      true,
+    );
     expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
 
     act(() => root.unmount());

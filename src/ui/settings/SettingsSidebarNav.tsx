@@ -21,15 +21,9 @@ export function SettingsSidebarNav(props: {
       >
         <div className="tw-flex tw-flex-col tw-gap-4">
           {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
-            <div
-              key={groupIndex}
-              className="tw-flex tw-flex-col tw-gap-0.5"
-            >
+            <div key={groupIndex} className="tw-flex tw-flex-col tw-gap-0.5">
               {groupIndex === 0 ? null : (
-                <div
-                  className="tw-mb-3 tw-h-px tw-w-full tw-bg-[var(--border)] tw-opacity-70"
-                  aria-hidden="true"
-                />
+                <div className="tw-mb-3 tw-h-px tw-w-full tw-bg-[var(--border)] tw-opacity-70" aria-hidden="true" />
               )}
               {group.sections.map((section) => {
                 const active = activeSection === section.key;
