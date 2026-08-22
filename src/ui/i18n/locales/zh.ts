@@ -244,7 +244,6 @@ export const zh: { [K in TranslationKey]: string } = {
   obsidianPathsNote: '相对 Vault 的路径；留空使用默认值。',
 
   // AboutSection
-  macApp: 'Mac 应用',
   sourceCode: '源代码',
   changelog: '更新日志',
   mail: '邮件',

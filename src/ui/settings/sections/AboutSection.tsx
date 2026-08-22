@@ -38,14 +38,6 @@ export function AboutSection() {
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label={t('linksAria')}>
           <button
-            id="btnAboutMacApp"
-            className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://apps.apple.com/app/syncnos/id6755133888').catch(() => {})}
-          >
-            {t('macApp')}
-          </button>
-          <button
             id="btnAboutSource"
             className={buttonClassName}
             type="button"

@@ -247,7 +247,6 @@ export const en = {
   obsidianPathsNote: 'Vault-relative paths; empty uses defaults.',
 
   // AboutSection
-  macApp: 'Mac App',
   sourceCode: 'Source Code',
   changelog: 'Changelog',
   mail: 'Mail',
