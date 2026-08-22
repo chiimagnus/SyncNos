@@ -730,6 +730,37 @@ describe('article-fetch-service', () => {
     vi.useRealTimers();
   });
 
+  it('does not treat a closed message port as a missing content receiver', async () => {
+    storageMocks.hasConversation.mockResolvedValue(false);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const runtime = { lastError: null as any };
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) =>
+      cb(Array.isArray(details?.files) ? [{}] : []),
+    );
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      runtime.lastError = { message: 'The message port closed before a response was received.' };
+      cb(null);
+      runtime.lastError = null;
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime,
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 88, url: 'https://example.com/closed', title: 'T' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const service = await loadArticleFetchService();
+    const pending = service.fetchActiveTabArticle();
+    await expect(pending).rejects.toThrow(/message port closed/i);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+  });
+
   it('continues capture when readability injection fails', async () => {
     const upsertConversation = vi.fn(async (payload: any) => ({ id: 61, ...payload }));
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));

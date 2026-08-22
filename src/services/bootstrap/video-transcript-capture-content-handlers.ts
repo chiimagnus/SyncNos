@@ -8,6 +8,10 @@ type InpageTipApi = {
   showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
 };
 
+type LocaleReadyOptions = {
+  localeReady?: Promise<unknown>;
+};
+
 function toErrorMessage(error: unknown, fallback: string): string {
   const msg = error instanceof Error ? error.message : String(error ?? '');
   const text = String(msg || '').trim();
@@ -16,12 +20,13 @@ function toErrorMessage(error: unknown, fallback: string): string {
 
 export function registerVideoTranscriptCaptureContentHandlers(
   service: VideoTranscriptCaptureService,
-  options?: { inpageTip?: InpageTipApi | null },
+  options?: { inpageTip?: InpageTipApi | null } & LocaleReadyOptions,
 ) {
   const runtime = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
   const onMessage = runtime?.onMessage;
   if (!onMessage?.addListener) return () => {};
 
+  const localeReady = options?.localeReady ?? Promise.resolve();
   const listener = (msg: any, _sender: any, sendResponse: (value: ApiResponse<any>) => void) => {
     if (!msg || typeof msg.type !== 'string') return undefined;
     if (msg.type !== CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT) return undefined;
@@ -32,10 +37,12 @@ export function registerVideoTranscriptCaptureContentHandlers(
     const inpageTip = options?.inpageTip;
     const showTip = source === 'contextmenu' && typeof inpageTip?.showSaveTip === 'function';
 
-    if (showTip) inpageTip?.showSaveTip?.(t('fetchingDots'), { kind: 'default' });
-
-    Promise.resolve()
-      .then(() => service.captureVideoTranscript())
+    Promise.resolve(localeReady)
+      .catch(() => undefined)
+      .then(() => {
+        if (showTip) inpageTip?.showSaveTip?.(t('fetchingDots'), { kind: 'default' });
+        return service.captureVideoTranscript();
+      })
       .then((data) => {
         if (showTip) {
           if (data?.subtitleStatus === 'empty') {

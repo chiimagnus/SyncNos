@@ -25,7 +25,7 @@ export default defineContentScript({
   // This avoids browser-specific dynamic content-script registration support gaps.
   matches: ['http://*/*', 'https://*/*'],
   async main() {
-    await initializeLocale();
+    const localeReady = initializeLocale();
     const runtime = createRuntimeClient();
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
     const collectorsRegistry = createCollectorsRegistry();
@@ -35,8 +35,12 @@ export default defineContentScript({
       collectorsRegistry,
     });
 
-    registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
+    registerCurrentPageCaptureContentHandlers(currentPageCapture, {
+      inpageTip: inpageTipApi,
+      localeReady,
+    });
     registerInpageCommentsPanelContentHandlers(runtime, {
+      localeReady,
       createPanelApi: (rt) => getInpageCommentsPanelApi(rt),
       domSource: createInpageCommentsDomSource({
         window,
@@ -47,8 +51,10 @@ export default defineContentScript({
     registerWebArticleExtractContentHandlers();
     registerVideoTranscriptCaptureContentHandlers(createVideoTranscriptCaptureService({ runtime }), {
       inpageTip: inpageTipApi,
+      localeReady,
     });
 
+    await localeReady.catch(() => undefined);
     const itemMentionController = createItemMentionController({ runtime, ui: inpageItemMentionApi });
     const controller = createContentController({
       runtime,

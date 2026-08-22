@@ -12,7 +12,15 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any, sender?: any) => Promise<any> | any) => void;
 };
 
-export function registerUiMessageHandlers(router: AnyRouter) {
+type UiMessageHandlersOptions = {
+  localeReady?: Promise<unknown>;
+};
+
+export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions = {}) {
+  const localeReady = options.localeReady || Promise.resolve();
+  const waitLocale = async () => {
+    await localeReady.catch(() => undefined);
+  };
   router.register(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, async (msg: any, sender: any) => {
     const explicitTabId = Number((msg as any)?.tabId);
     const senderTabId = Number(sender?.tab?.id);
@@ -62,6 +70,7 @@ export function registerUiMessageHandlers(router: AnyRouter) {
   });
 
   router.register(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, async () => {
+    await waitLocale();
     const activeTab = await getActiveTab();
     if (!activeTab.ok) return router.ok(activeTab.state);
 
@@ -72,6 +81,7 @@ export function registerUiMessageHandlers(router: AnyRouter) {
   });
 
   router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async () => {
+    await waitLocale();
     const activeTab = await getActiveTab();
     if (!activeTab.ok) {
       return router.err(activeTab.state.reason || t('currentPageCannotBeCaptured'), {
