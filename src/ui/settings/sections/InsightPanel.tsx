@@ -9,6 +9,7 @@ import {
   type InsightDailyTrendPoint,
   type InsightDistributionItem,
   type InsightStats,
+  type InsightTopCommentedClip,
   type InsightTopConversation,
   INSIGHT_UNKNOWN_DATE_LABEL,
 } from '@viewmodels/settings/insight-stats';
@@ -250,18 +251,17 @@ function DailyTrendChart(props: { items: InsightDailyTrendPoint[]; stroke: strin
   );
 }
 
-function TopConversationList(props: {
-  items: InsightTopConversation[];
-  getLinkTo: (item: InsightTopConversation) => string;
-  onOpenConversation: (item: InsightTopConversation) => void;
+function TopRankedList<T extends InsightTopConversation | InsightTopCommentedClip>(props: {
+  items: T[];
+  count: (item: T) => number;
+  unit: string;
+  emptyText: string;
+  getLinkTo: (item: InsightTopConversation | InsightTopCommentedClip) => string;
+  onOpenConversation: (item: InsightTopConversation | InsightTopCommentedClip) => void;
 }) {
-  const { items, getLinkTo, onOpenConversation } = props;
+  const { items, count, unit, emptyText, getLinkTo, onOpenConversation } = props;
   if (!items.length) {
-    return (
-      <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-        {t('insightTopConversationsEmpty')}
-      </div>
-    );
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{emptyText}</div>;
   }
 
   const rankToneClassName = (index: number) => {
@@ -310,7 +310,7 @@ function TopConversationList(props: {
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
           </div>
           <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
-            {formatCount(item.messageCount)} {t('insightTurnsUnit')}
+            {formatCount(count(item))} {unit}
           </div>
         </div>
       ))}
@@ -333,13 +333,13 @@ export function InsightPanel(props: {
     return from || '/';
   }, [routerLocation]);
 
-  const getLinkTo = (item: InsightTopConversation) => {
+  const getLinkTo = (item: InsightTopConversation | InsightTopCommentedClip) => {
     const loc = String(item?.loc || '').trim();
     if (!loc) return fallbackTo;
     return buildConversationRouteFromLoc(loc);
   };
 
-  const onOpenConversation = (item: InsightTopConversation) => {
+  const onOpenConversation = (item: InsightTopConversation | InsightTopCommentedClip) => {
     const source = String(item?.openSource || '').trim();
     const conversationKey = String(item?.openConversationKey || '').trim();
     const conversationId = Number(item?.conversationId);
@@ -380,7 +380,7 @@ export function InsightPanel(props: {
         />
       </header>
 
-      <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>
+      <section className="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4" aria-label={t('insightOverviewAria')}>
         <div
           className={[
             cardClassName,
@@ -436,9 +436,28 @@ export function InsightPanel(props: {
             {formatCount(stats.articleCount)}
           </div>
         </div>
+        <div
+          className={[
+            cardClassName,
+            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-border-[color-mix(in_srgb,var(--success)_34%,var(--border))]',
+            'tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))]',
+          ].join(' ')}
+        >
+          <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+            <span
+              className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--success)]"
+              aria-hidden="true"
+            />
+            {t('insightOverviewVideoCount')}
+          </div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--success)]">
+            {formatCount(stats.videoCount)}
+          </div>
+        </div>
       </section>
 
-      <div className="tw-grid tw-gap-4 lg:tw-grid-cols-2">
+      <div className="tw-grid tw-gap-4 lg:tw-grid-cols-3">
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
             {t('insightChatSectionTitle')}
@@ -473,8 +492,11 @@ export function InsightPanel(props: {
                 </div>
               </div>
             </div>
-            <TopConversationList
+            <TopRankedList
               items={stats.topConversations}
+              count={(item) => item.messageCount}
+              unit={t('insightTurnsUnit')}
+              emptyText={t('insightTopConversationsEmpty')}
               getLinkTo={getLinkTo}
               onOpenConversation={onOpenConversation}
             />
@@ -497,6 +519,51 @@ export function InsightPanel(props: {
               {t('insightArticleDomainsTitle')}
             </div>
             <DistributionChart items={stats.articleDomainDistribution} emptyText={t('insightDistributionEmpty')} />
+          </div>
+          <div className="tw-mt-5">
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightTopCommentedClipsTitle')}
+            </div>
+            <TopRankedList
+              items={stats.topArticleCommentedClips}
+              count={(item) => item.commentCount}
+              unit={t('insightCommentsUnit')}
+              emptyText={t('insightTopConversationsEmpty')}
+              getLinkTo={getLinkTo}
+              onOpenConversation={onOpenConversation}
+            />
+          </div>
+        </section>
+
+        <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightVideosSectionAria')}>
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('insightVideosSectionTitle')}
+          </h2>
+          <div className="tw-mt-3">
+            <DailyTrendChart
+              items={stats.videoDailyTrend}
+              stroke="var(--success)"
+              ariaLabel={t('insightOverviewVideoCount')}
+            />
+          </div>
+          <div className="tw-mt-4">
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightSourceDistributionTitle')}
+            </div>
+            <DistributionChart items={stats.videoPlatformDistribution} emptyText={t('insightDistributionEmpty')} />
+          </div>
+          <div className="tw-mt-5">
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightTopCommentedClipsTitle')}
+            </div>
+            <TopRankedList
+              items={stats.topVideoCommentedClips}
+              count={(item) => item.commentCount}
+              unit={t('insightCommentsUnit')}
+              emptyText={t('insightTopConversationsEmpty')}
+              getLinkTo={getLinkTo}
+              onOpenConversation={onOpenConversation}
+            />
           </div>
         </section>
       </div>
