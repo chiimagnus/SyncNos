@@ -37,11 +37,12 @@ export function registerVideoTranscriptCaptureContentHandlers(
     const inpageTip = options?.inpageTip;
     const showTip = source === 'contextmenu' && typeof inpageTip?.showSaveTip === 'function';
 
-    if (showTip) inpageTip?.showSaveTip?.(t('fetchingDots'), { kind: 'default' });
-
     Promise.resolve(localeReady)
       .catch(() => undefined)
-      .then(() => service.captureVideoTranscript())
+      .then(() => {
+        if (showTip) inpageTip?.showSaveTip?.(t('fetchingDots'), { kind: 'default' });
+        return service.captureVideoTranscript();
+      })
       .then((data) => {
         if (showTip) {
           if (data?.subtitleStatus === 'empty') {
