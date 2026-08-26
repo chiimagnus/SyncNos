@@ -30,6 +30,9 @@ import type { DetailHeaderAction } from '@services/integrations/detail-header-ac
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
+import { storageOnChanged } from '@services/shared/storage';
+import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
+import { listSyncProviders } from '@services/sync/sync-provider-registry';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 import {
@@ -502,6 +505,7 @@ export function ConversationsProvider({
     return toConversationFromOpenTarget(activeConversationSnapshot);
   }, [activeConversationSnapshot, items, activeId]);
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
+  const [detailHeaderActionsRevision, setDetailHeaderActionsRevision] = useState(0);
 
   const setListSourceFilterKeyPersistent = useCallback((next: string) => {
     const value =
@@ -1052,6 +1056,15 @@ export function ConversationsProvider({
   }, [refreshActiveDetail, refreshList]);
 
   useEffect(() => {
+    const providerKeys = listSyncProviders().map((provider) => syncProviderEnabledStorageKey(provider.id));
+    return storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
+      if (!providerKeys.some((key) => Object.prototype.hasOwnProperty.call(changes, key))) return;
+      setDetailHeaderActionsRevision((value) => value + 1);
+    });
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     if (!selectedConversation) {
@@ -1097,7 +1110,7 @@ export function ConversationsProvider({
     return () => {
       cancelled = true;
     };
-  }, [detail, refreshActiveDetail, selectedConversation]);
+  }, [detail, detailHeaderActionsRevision, refreshActiveDetail, selectedConversation]);
 
   const toggleSelected = useCallback((id: number) => {
     const safeId = Number(id);

@@ -14,6 +14,8 @@ const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
+const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
+let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
@@ -57,7 +59,16 @@ vi.mock('@services/comments/client/repo', () => ({
 }));
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
-  resolveDetailHeaderActions: vi.fn(async () => []),
+  resolveDetailHeaderActions: (...args: any[]) => resolveDetailHeaderActions(...args),
+}));
+
+vi.mock('@services/shared/storage', () => ({
+  storageOnChanged: (listener: (changes: any, areaName: string) => void) => {
+    storageChangeListener = listener;
+    return () => {
+      if (storageChangeListener === listener) storageChangeListener = null;
+    };
+  },
 }));
 
 vi.mock('@services/shared/ports', () => ({
@@ -174,6 +185,9 @@ describe('ConversationsProvider pagination state', () => {
     upsertConversation.mockReset();
     mergeConversations.mockReset();
     backfillConversationImages.mockReset();
+    resolveDetailHeaderActions.mockReset();
+    resolveDetailHeaderActions.mockResolvedValue([]);
+    storageChangeListener = null;
 
     getConversationListPage.mockResolvedValue(makePage([]));
     findConversationById.mockResolvedValue(null);
@@ -449,6 +463,40 @@ describe('ConversationsProvider pagination state', () => {
 
     expect(Number(latestState.detail?.conversationId)).toBe(3);
     expect(String(latestState.detail?.messages?.[0]?.contentMarkdown || '')).toBe('article three');
+  });
+
+  it('re-resolves detail header actions when a sync provider gate changes', async () => {
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(401, 'chatgpt', 'conv-401')]));
+    getConversationDetail.mockResolvedValue({ conversationId: 401, messages: [] });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    const initialCalls = resolveDetailHeaderActions.mock.calls.length;
+    expect(initialCalls).toBeGreaterThan(0);
+    expect(storageChangeListener).toBeTruthy();
+
+    await act(async () => {
+      storageChangeListener?.(
+        { webclipper_sync_provider_notion_enabled: { oldValue: true, newValue: false } },
+        'local',
+      );
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(resolveDetailHeaderActions.mock.calls.length).toBeGreaterThan(initialCalls);
+    expect(resolveDetailHeaderActions.mock.calls.at(-1)?.[0]?.conversation?.id).toBe(401);
+
+    const afterProviderChangeCalls = resolveDetailHeaderActions.mock.calls.length;
+    await act(async () => {
+      storageChangeListener?.({ unrelated_key: { oldValue: 1, newValue: 2 } }, 'local');
+      await flushMicrotasks();
+    });
+    expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(afterProviderChangeCalls);
   });
 
   it('provides cache-images tools action for article conversations', async () => {
