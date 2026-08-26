@@ -152,6 +152,18 @@ describe('github auth service', () => {
     expect(await getGithubAuthState()).toEqual({ version: 1, state: 'disconnected' });
   });
 
+  it('clears only the auth record that matches the access token rejected by GitHub', async () => {
+    const { replaceGithubAuthState, getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
+    const { clearGithubAuthForAccessToken } = await import('@services/sync/github/auth/github-auth-service');
+    await replaceGithubAuthState(connectedState({ accessToken: 'ACCESS_ROTATED_SECRET' }));
+
+    await clearGithubAuthForAccessToken('STALE_ACCESS_SECRET');
+    expect((await getGithubAuthState()).state).toBe('connected');
+
+    await clearGithubAuthForAccessToken('ACCESS_ROTATED_SECRET');
+    expect(await getGithubAuthState()).toEqual({ version: 1, state: 'disconnected' });
+  });
+
   it('preserves the previous complete token record on transient or incomplete refresh failure', async () => {
     const { replaceGithubAuthState, getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
     await replaceGithubAuthState(connectedState({ accessExpiresAt: 2_000 }));

@@ -133,6 +133,13 @@ function refreshSingleFlight(
   return promise;
 }
 
+export async function clearGithubAuthForAccessToken(accessToken: string): Promise<void> {
+  await updateGithubAuthState((current) => {
+    if (current.state !== 'connected' || current.token.accessToken !== accessToken) return current;
+    return { version: 1, state: 'disconnected' };
+  });
+}
+
 export async function getValidAccessToken({
   fetchImpl = fetch,
   now = () => Date.now(),
