@@ -57,6 +57,9 @@ vi.mock('../../src/ui/i18n', () => ({
       selectAConversation: 'Select a conversation',
       backButton: 'Back',
       detailHeaderOpenInMenuAria: 'Open destinations',
+      detailHeaderCopyLinkMenuLabel: 'Copy link',
+      detailHeaderCopyLinkMenuAria: 'Copy destinations',
+      copied: 'Copied',
       messageRoleFallback: 'message',
       openCommentsSidebar: 'Comment',
       closeCommentsSidebar: 'Collapse comments sidebar',
@@ -190,6 +193,250 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+  });
+
+  it('renders a separate single-provider Copy action without replacing Open in', async () => {
+    const openTrigger = vi.fn(async () => {});
+    const copyTrigger = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'open-in-notion',
+        label: 'Open in Notion',
+        kind: 'external-link',
+        provider: 'notion',
+        slot: 'open',
+        href: 'https://app.notion.com/example',
+        onTrigger: openTrigger,
+      },
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        href: 'https://app.notion.com/example',
+        afterTriggerLabel: 'Copied',
+        onTrigger: copyTrigger,
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    const openButton = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
+    const copyButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
+    expect(openButton).toBeTruthy();
+    expect(copyButton).toBeTruthy();
+    expect(openButton?.closest('.tw-order-1')).toBeTruthy();
+    expect(copyButton?.closest('.tw-order-2')).toBeTruthy();
+
+    await act(async () => {
+      copyButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(copyTrigger).toHaveBeenCalledTimes(1);
+    expect(openTrigger).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+    expect(document.body.textContent || '').not.toContain('Copied Notion link');
+  });
+
+  it('renders one Copy dropdown for multiple providers and routes each item correctly', async () => {
+    const notionCopy = vi.fn(async () => {});
+    const feishuCopy = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'open-in-notion',
+        label: 'Open in Notion',
+        kind: 'external-link',
+        provider: 'notion',
+        slot: 'open',
+        href: 'https://app.notion.com/example',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        href: 'https://app.notion.com/example',
+        afterTriggerLabel: 'Copied',
+        onTrigger: notionCopy,
+      },
+      {
+        id: 'copy-feishu-link',
+        label: 'Copy Feishu link',
+        kind: 'copy-text',
+        provider: 'feishu',
+        slot: 'copy',
+        href: 'https://www.feishu.cn/docx/example',
+        afterTriggerLabel: 'Copied',
+        onTrigger: feishuCopy,
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    const trigger = document.querySelector('[aria-label="Copy destinations"]') as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+    expect(document.querySelectorAll('[aria-label="Copy destinations"][aria-haspopup="menu"]')).toHaveLength(1);
+    expect(trigger?.closest('.tw-order-2')).toBeTruthy();
+
+    await act(async () => {
+      trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const menu = document.querySelector('[role="menu"][aria-label="Copy destinations"]') as HTMLElement | null;
+    expect(menu).toBeTruthy();
+    const items = Array.from(menu!.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    expect(items.map((item) => item.textContent)).toEqual(['Copy Notion link', 'Copy Feishu link']);
+
+    await act(async () => {
+      items[1]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(feishuCopy).toHaveBeenCalledTimes(1);
+    expect(notionCopy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const reopenedItems = Array.from(
+      document.querySelectorAll('[role="menu"][aria-label="Copy destinations"] [role="menuitem"]'),
+    ) as HTMLButtonElement[];
+    await act(async () => {
+      reopenedItems[0]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(notionCopy).toHaveBeenCalledTimes(1);
+    expect(feishuCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failed Copy action without showing stale success feedback', async () => {
+    const alertSpy = vi.fn();
+    Object.defineProperty(globalThis.window, 'alert', { configurable: true, value: alertSpy });
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        afterTriggerLabel: 'Copied',
+        onTrigger: vi.fn(async () => {
+          throw new Error('copy failed');
+        }),
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+    const copyButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement;
+    await act(async () => {
+      copyButton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith('copy failed');
+    expect(document.querySelector('[role="status"]')).toBeFalsy();
+  });
+
+  it('hides the Copy header entry when no copy actions are available', () => {
+    currentState.detailHeaderActions = [
+      {
+        id: 'open-in-notion',
+        label: 'Open in Notion',
+        kind: 'external-link',
+        provider: 'notion',
+        slot: 'open',
+        href: 'https://app.notion.com/example',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Copy destinations"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Copy Notion link"]')).toBeFalsy();
+  });
+
+  it('clears Copied feedback when the copy action set or selected conversation changes', async () => {
+    vi.useFakeTimers();
+    try {
+      const copyNotion = {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text' as const,
+        provider: 'notion',
+        slot: 'copy',
+        afterTriggerLabel: 'Copied',
+        onTrigger: vi.fn(async () => {}),
+      };
+      currentState.detailHeaderActions = [copyNotion];
+
+      act(() => {
+        root!.render(createElement(ConversationDetailPane));
+      });
+      let button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement;
+      await act(async () => {
+        button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+
+      currentState.detailHeaderActions = [
+        copyNotion,
+        {
+          id: 'copy-feishu-link',
+          label: 'Copy Feishu link',
+          kind: 'copy-text',
+          provider: 'feishu',
+          slot: 'copy',
+          afterTriggerLabel: 'Copied',
+          onTrigger: vi.fn(async () => {}),
+        },
+      ];
+      act(() => {
+        root!.render(createElement(ConversationDetailPane));
+      });
+      expect(document.querySelector('[role="status"]')).toBeFalsy();
+
+      const multiTrigger = document.querySelector('[aria-label="Copy destinations"]') as HTMLButtonElement;
+      await act(async () => {
+        multiTrigger.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+      });
+      const notionItem = Array.from(
+        document.querySelectorAll('[role="menu"][aria-label="Copy destinations"] [role="menuitem"]'),
+      ).find((item) => item.textContent === 'Copy Notion link') as HTMLButtonElement;
+      await act(async () => {
+        notionItem.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+
+      currentState.activeId = 12;
+      currentState.selectedConversation = {
+        ...currentState.selectedConversation,
+        id: 12,
+        conversationKey: 'conv-12',
+      } as any;
+      currentState.detail = { conversationId: 12, messages: [] } as any;
+      act(() => {
+        root!.render(createElement(ConversationDetailPane));
+      });
+      expect(document.querySelector('[role="status"]')).toBeFalsy();
+    } finally {
+      vi.useRealTimers();
+      currentState.activeId = 11;
+    }
   });
 
   it('hides the app detail action area when no header actions are available', () => {
@@ -376,10 +623,10 @@ describe('ConversationDetailPane header actions', () => {
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
-    expect(openBtn?.className || '').toContain('tw-order-2');
+    expect(openBtn?.className || '').toContain('tw-order-3');
     const moreBtn = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
     expect(moreBtn).toBeTruthy();
-    expect(moreBtn?.closest('.tw-order-3')).toBeTruthy();
+    expect(moreBtn?.closest('.tw-order-4')).toBeTruthy();
 
     act(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));

@@ -1,4 +1,4 @@
-import { ChevronLeft, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, Copy, MoreHorizontal } from 'lucide-react';
 
 import { ChatDetailView } from '@ui/conversations/views/ChatDetailView';
 import { ArticleReaderView } from '@ui/conversations/views/ArticleReaderView';
@@ -61,7 +61,9 @@ export function ConversationDetailPane({
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
+  const copyActions = safeActions.filter((action) => action.slot === 'copy');
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
+  const copyActionScopeKey = `${Number((selected as any)?.id ?? activeId) || 0}:${copyActions.map((action) => action.id).join('|')}`;
 
   const headerIconButtonClass = headerButtonClassName();
   const kindView = conversationKinds.pick(selected as any)?.view ?? DEFAULT_VIEW;
@@ -400,13 +402,25 @@ export function ConversationDetailPane({
               className="tw-order-1"
             />
 
+            <DetailHeaderActionBar
+              key={copyActionScopeKey}
+              actions={copyActions}
+              buttonClassName={headerIconButtonClass}
+              iconOnly
+              triggerIcon={<Copy size={16} strokeWidth={2} aria-hidden="true" />}
+              menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
+              menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
+              menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
+              className="tw-order-2"
+            />
+
             {canOpenCommentsSidebar ? (
               <button
                 type="button"
                 onClick={() => {
                   onTriggerCommentsSidebar?.();
                 }}
-                className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
+                className={[headerButtonClassName(), 'tw-order-3'].join(' ')}
                 aria-label={commentsSidebarLabel}
                 {...tooltipAttrs(commentsSidebarLabel)}
                 aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
@@ -434,7 +448,7 @@ export function ConversationDetailPane({
                 align="end"
                 panelMinWidth={214}
                 panelClassName={moreMenuPanelClassName}
-                className="tw-order-3"
+                className="tw-order-4"
                 trigger={(triggerProps) => (
                   <button
                     {...triggerProps}

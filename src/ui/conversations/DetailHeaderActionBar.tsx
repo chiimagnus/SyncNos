@@ -41,6 +41,9 @@ export function DetailHeaderActionBar({
 
   const handleTrigger = async (action: DetailHeaderAction) => {
     if (busy || action.disabled) return;
+    if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
+    labelResetTimerRef.current = null;
+    setLabelOverride('');
     setBusy(true);
     try {
       await action.onTrigger();
@@ -52,6 +55,7 @@ export function DetailHeaderActionBar({
         if (durationMs > 0) {
           labelResetTimerRef.current = globalThis.setTimeout(() => {
             setLabelOverride('');
+            labelResetTimerRef.current = null;
           }, durationMs);
         } else {
           labelResetTimerRef.current = null;
@@ -121,6 +125,17 @@ export function DetailHeaderActionBar({
     );
   }
 
+  const iconOnlyStatus =
+    iconOnly && labelOverride ? (
+      <span
+        role="status"
+        aria-live="polite"
+        className="tw-absolute tw-right-0 tw-top-[calc(100%+6px)] tw-z-10 tw-whitespace-nowrap tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] tw-shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+      >
+        {labelOverride}
+      </span>
+    ) : null;
+
   if (actions.length === 1) {
     const action = actions[0]!;
     const buttonLabel = busy ? String(action.busyLabel || action.label) : labelOverride || action.label;
@@ -131,7 +146,7 @@ export function DetailHeaderActionBar({
       );
     const triggerButtonClassName = iconOnly ? buttonClassName : [buttonClassName, 'tw-text-[13px]'].join(' ');
     return (
-      <div className={['tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
+      <div className={[iconOnly ? 'tw-relative' : '', 'tw-flex tw-items-center tw-gap-2', className || ''].filter(Boolean).join(' ')}>
         <button
           key={action.id}
           type="button"
@@ -170,6 +185,7 @@ export function DetailHeaderActionBar({
             </span>
           )}
         </button>
+        {iconOnlyStatus}
       </div>
     );
   }
@@ -188,7 +204,7 @@ export function DetailHeaderActionBar({
   const menuButtonClass = buttonMenuItemClassName();
 
   return (
-    <div className={['tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
+    <div className={[iconOnly ? 'tw-relative' : '', 'tw-flex tw-items-center tw-gap-2', className || ''].filter(Boolean).join(' ')}>
       <MenuPopover
         open={menuOpen}
         onOpenChange={setMenuOpen}
@@ -249,6 +265,7 @@ export function DetailHeaderActionBar({
           </button>
         ))}
       </MenuPopover>
+      {iconOnlyStatus}
     </div>
   );
 }
