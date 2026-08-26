@@ -91,6 +91,10 @@ async function refreshAccessToken(
     throw new GithubAuthServiceError('github_auth_refresh_failed');
   }
 
+  if (json?.error === 'bad_refresh_token') {
+    await clearIfCurrentToken(accessToken, refreshToken);
+    throw new GithubAuthServiceError('github_auth_required');
+  }
   if (!response.ok) {
     if (response.status === 400 || response.status === 401) {
       await clearIfCurrentToken(accessToken, refreshToken);

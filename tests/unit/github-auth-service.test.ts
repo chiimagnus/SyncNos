@@ -135,10 +135,12 @@ describe('github auth service', () => {
     expect(await getGithubAuthState()).toEqual({ version: 1, state: 'disconnected' });
   });
 
-  it('clears auth on deterministic invalid refresh but never leaks token sentinels in the error', async () => {
+  it.each([200, 400])('clears auth on bad_refresh_token even when the OAuth error uses HTTP %s', async (status) => {
     const { replaceGithubAuthState, getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
     await replaceGithubAuthState(connectedState({ accessExpiresAt: 2_000 }));
-    const fetchImpl = vi.fn(async () => jsonResponse({ error: 'bad_refresh_token' }, 400)) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ error: 'bad_refresh_token' }, status),
+    ) as unknown as typeof fetch;
     const { getValidAccessToken } = await import('@services/sync/github/auth/github-auth-service');
 
     let caught: unknown;
