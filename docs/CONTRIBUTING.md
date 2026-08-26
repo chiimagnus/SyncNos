@@ -2,7 +2,7 @@
 
 SyncNos 欢迎聚焦明确的 Bug 修复、站点适配器、文档改进，以及在不破坏仓库现有契约前提下进行的产品改动。
 
-本仓库**仅维护 SyncNos WebClipper**。iOS、macOS 和 CLI 相关工作应在各自仓库中进行，除非某项任务明确需要修改由本仓库负责的集成契约。
+本仓库**仅维护 SyncNos WebClipper**。
 
 ## 开始之前
 
