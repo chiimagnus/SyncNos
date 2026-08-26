@@ -166,7 +166,7 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
     }
   }
 
-  const title = selectTitle(spec, workingRoot, text);
+  const title = selectTitle(spec, root, text);
   const imageHtml = buildHtmlImageBlocks(urls);
   const textContent = text || dedupeUrls(urls).join('\n');
   const htmlBody = spec.useSanitizedRootHtml
