@@ -308,6 +308,71 @@ describe('github git transport staged path/delete resolver', () => {
     });
   });
 
+  it('uses an explicit safe commit message and rejects unsafe messages before mutations', async () => {
+    const NEW_TREE = '1'.repeat(40);
+    const COMMIT = '2'.repeat(40);
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    const api = {
+      async get<T>(): Promise<T> {
+        throw new Error('no deletes');
+      },
+      async post<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ method: 'POST', path, body });
+        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ method: 'PATCH', path, body });
+        return { object: { sha: COMMIT } } as T;
+      },
+    };
+
+    await commitGithubStagedOperationsOnce(
+      {
+        repository: 'owner/repo',
+        branch: 'main',
+        headSha: 'f'.repeat(40),
+        treeSha: ROOT,
+        operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
+        message: 'SyncNos GitHub sync (2 items)',
+      },
+      api,
+    );
+    expect(calls.find((call) => call.path.endsWith('/git/commits'))?.body).toMatchObject({
+      message: 'SyncNos GitHub sync (2 items)',
+    });
+
+    let mutations = 0;
+    const noMutationApi = {
+      async get<T>(): Promise<T> {
+        throw new Error('must-not-read');
+      },
+      async post<T>(): Promise<T> {
+        mutations += 1;
+        throw new Error('must-not-post');
+      },
+      async patch<T>(): Promise<T> {
+        mutations += 1;
+        throw new Error('must-not-patch');
+      },
+    };
+    await expect(
+      commitGithubStagedOperationsOnce(
+        {
+          repository: 'owner/repo',
+          branch: 'main',
+          headSha: 'f'.repeat(40),
+          treeSha: ROOT,
+          operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
+          message: 'SyncNos\nbody',
+        },
+        noMutationApi,
+      ),
+    ).rejects.toMatchObject({ code: 'github_git_message_invalid' });
+    expect(mutations).toBe(0);
+  });
+
   it('returns no_changes for absent deletes without creating tree/commit/ref', async () => {
     const calls: string[] = [];
     const api = {

@@ -41,6 +41,7 @@ export const defaultGithubOrchestratorServices: GithubOrchestratorServices = {
   storage: backgroundStorage,
   loadImage: getImageCacheAssetById,
   createBlob: createGithubBlob,
-  commit: ({ repository, branch, operations }) => commitGithubStagedOperations({ repository, branch, operations }),
+  commit: ({ repository, branch, operations, message }) =>
+    commitGithubStagedOperations({ repository, branch, operations, message }),
   now: Date.now,
 };
