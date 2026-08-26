@@ -30,6 +30,15 @@ describe('backup backup-utils', () => {
       notion_oauth_token_v1: { accessToken: 'secret' },
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       obsidian_api_key: 'obsidian-key',
+      github_repository: 'chiimagnus/SyncNos-Webclipper',
+      github_branch: 'main',
+      github_chat_folder: 'SyncNos-AIChats',
+      github_auth_state_v1: {
+        version: 1,
+        state: 'connected',
+        token: { accessToken: 'ACCESS_SENTINEL_SECRET', refreshToken: 'REFRESH_SENTINEL_SECRET' },
+      },
+      github_auth_state_v2: { deviceCode: 'DEVICE_SENTINEL_SECRET' },
     });
     expect(filtered).toEqual({
       notion_oauth_client_id: 'abc',
@@ -41,7 +50,13 @@ describe('backup backup-utils', () => {
       chat_with_prompt_template_v1: 'talk',
       chat_with_ai_platforms_v1: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
       obsidian_api_base_url: 'http://127.0.0.1:27123',
+      github_repository: 'chiimagnus/SyncNos-Webclipper',
+      github_branch: 'main',
+      github_chat_folder: 'SyncNos-AIChats',
     });
+    expect(JSON.stringify(filtered)).not.toMatch(
+      /ACCESS_SENTINEL_SECRET|REFRESH_SENTINEL_SECRET|DEVICE_SENTINEL_SECRET/,
+    );
   });
 
   it('validateBackupDocument rejects unsupported version', () => {
