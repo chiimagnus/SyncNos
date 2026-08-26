@@ -14,9 +14,19 @@ import type {
   ConversationListPage,
   ConversationListSummary,
 } from '@services/conversations/domain/list-pagination';
+import {
+  buildGithubCleanupOutboxRecord,
+  GITHUB_CLEANUP_OUTBOX_STORE,
+} from '@platform/idb/github-cleanup-outbox-record';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
-import { mergeSyncMappingForIdentityMove, mergeSyncMappingPatch } from '@platform/idb/sync-mapping-record';
+import {
+  mergeSyncMappingForIdentityMove,
+  mergeSyncMappingPatch,
+  readGithubContinuity,
+} from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
+import { stableConversationId10 } from '@services/conversations/domain/file-naming';
+import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -1158,7 +1168,11 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   }
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
+  const { t, stores } = tx(
+    db,
+    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+    'readwrite',
+  );
 
   let deletedConversations = 0;
   let deletedMessages = 0;
@@ -1168,57 +1182,102 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   const msgIdx = stores.messages.index('by_conversationId_sequence');
   const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
   const imageCacheIdx = stores.image_cache.index('by_conversationId');
+  const articleCommentsIdx = stores.article_comments.index('by_conversationId_createdAt');
+  const now = Date.now();
 
-  for (const id of ids) {
-    const convo: any = await reqToPromise(stores.conversations.get(id));
-    if (!convo) continue;
+  try {
+    for (const id of ids) {
+      const convo: any = await reqToPromise(stores.conversations.get(id));
+      if (!convo) continue;
 
-    // Delete messages under this conversation.
-    const range = IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
-    const cursorReq = msgIdx.openCursor(range);
-
-    await new Promise<void>((resolve, reject) => {
-      cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-      cursorReq.onsuccess = () => {
-        const cursor = cursorReq.result;
-        if (!cursor) return resolve();
-        cursor.delete();
-        deletedMessages += 1;
-        cursor.continue();
-      };
-    });
-
-    // Delete notion mapping if present.
-    const source = convo.source || '';
-    const conversationKey = convo.conversationKey || '';
-    if (source && conversationKey) {
-      const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
-      if (mapping && mapping.id) {
-        await reqToPromise(stores.sync_mappings.delete(mapping.id));
-        deletedMappings += 1;
+      const source = safeString(convo.source);
+      const conversationKey = safeString(convo.conversationKey);
+      if (source && conversationKey) {
+        const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
+        if (mapping && mapping.id) {
+          const continuity = readGithubContinuity(mapping);
+          const remoteKey = safeString(continuity.githubRemoteKey);
+          const managedFiles =
+            continuity.githubManagedFiles && typeof continuity.githubManagedFiles === 'object'
+              ? (continuity.githubManagedFiles as Record<string, any>)
+              : {};
+          const stableId = stableConversationId10(convo);
+          const ownedPaths = Object.entries(managedFiles)
+            .filter(([path, metadata]) => isGithubManagedPathOwnedByStableId(path, metadata?.kind, stableId))
+            .map(([path]) => path);
+          if (remoteKey && ownedPaths.length) {
+            await reqToPromise(
+              stores[GITHUB_CLEANUP_OUTBOX_STORE].add(
+                buildGithubCleanupOutboxRecord({ remoteKey, paths: ownedPaths, reason: 'delete', createdAt: now }),
+              ),
+            );
+          }
+          await reqToPromise(stores.sync_mappings.delete(mapping.id));
+          deletedMappings += 1;
+        }
       }
+
+      if (safeString(convo.sourceType).toLowerCase() === 'article') {
+        const commentRange = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+        const commentCursor = articleCommentsIdx.openCursor(commentRange);
+        await new Promise<void>((resolve, reject) => {
+          commentCursor.onerror = () => reject(commentCursor.error || new Error('article comment cursor failed'));
+          commentCursor.onsuccess = () => {
+            const cursor = commentCursor.result;
+            if (!cursor) return resolve();
+            const row = cursor.value as Record<string, unknown>;
+            let updateRequest: IDBRequest;
+            try {
+              updateRequest = cursor.update({ ...row, conversationId: null });
+            } catch (error) {
+              reject(error);
+              return;
+            }
+            updateRequest.onerror = () => reject(updateRequest.error || new Error('article comment detach failed'));
+            updateRequest.onsuccess = () => cursor.continue();
+          };
+        });
+      }
+
+      const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+      const cursorReq = msgIdx.openCursor(range);
+      await new Promise<void>((resolve, reject) => {
+        cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return resolve();
+          cursor.delete();
+          deletedMessages += 1;
+          cursor.continue();
+        };
+      });
+
+      await reqToPromise(stores.conversations.delete(id));
+      deletedConversations += 1;
+
+      const imgRange = globalThis.IDBKeyRange.only(id);
+      const imgCursorReq = imageCacheIdx.openCursor(imgRange);
+      await new Promise<void>((resolve, reject) => {
+        imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
+        imgCursorReq.onsuccess = () => {
+          const cursor = imgCursorReq.result;
+          if (!cursor) return resolve();
+          cursor.delete();
+          deletedImageCache += 1;
+          cursor.continue();
+        };
+      });
     }
 
-    await reqToPromise(stores.conversations.delete(id));
-    deletedConversations += 1;
-
-    // Delete cached images under this conversation.
-    const imgRange = IDBKeyRange.only(id);
-    const imgCursorReq = imageCacheIdx.openCursor(imgRange);
-
-    await new Promise<void>((resolve, reject) => {
-      imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
-      imgCursorReq.onsuccess = () => {
-        const cursor = imgCursorReq.result;
-        if (!cursor) return resolve();
-        cursor.delete();
-        deletedImageCache += 1;
-        cursor.continue();
-      };
-    });
+    await txDone(t);
+  } catch (error) {
+    try {
+      t.abort();
+    } catch (_abortError) {
+      // The transaction may already be aborted by the failing request.
+    }
+    throw error;
   }
-
-  await txDone(t);
   invalidateConversationListStatsCache();
   return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
 }

@@ -4,10 +4,10 @@ import type {
   GithubProjectionManagedFile,
 } from '@services/sync/github/github-markdown-projection';
 import { validateGithubGitPath, type GithubStagedOperation } from '@services/sync/github/github-git-transport';
+import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
-const ASSET_FILE_RE = /^[0-9a-f]{64}\.[a-z0-9]{1,10}$/;
 
 export type GithubSyncPlannerMode = 'incremental' | 'reconcile';
 
@@ -57,27 +57,6 @@ function isSafeGitPath(path: string): boolean {
   } catch (_error) {
     return false;
   }
-}
-
-function basenameWithoutMd(path: string): string | null {
-  const filename = path.split('/').pop() || '';
-  return filename.endsWith('.md') ? filename.slice(0, -3) : null;
-}
-
-function isOwnedManagedPath(path: string, kind: 'markdown' | 'asset', stableId: string): boolean {
-  if (!isSafeGitPath(path) || !stableId) return false;
-  if (kind === 'markdown') {
-    const basename = basenameWithoutMd(path);
-    return !!basename && basename.endsWith(`-${stableId}`);
-  }
-
-  const segments = path.split('/');
-  if (segments.length < 2) return false;
-  const filename = segments.at(-1) || '';
-  const namespace = segments.at(-2) || '';
-  if (!ASSET_FILE_RE.test(filename) || !namespace.endsWith('.assets')) return false;
-  const noteBasename = namespace.slice(0, -'.assets'.length);
-  return !!noteBasename && noteBasename.endsWith(`-${stableId}`);
 }
 
 function currentFiles(projection: GithubMarkdownProjection): Record<string, GithubSyncContinuityDraftFile> {
@@ -154,7 +133,7 @@ export function planGithubConversationSync(input: {
               ([oldPath, candidate]) =>
                 candidate.kind === 'markdown' &&
                 candidate.contentHash === row.contentHash &&
-                isOwnedManagedPath(oldPath, 'markdown', stableId),
+                isGithubManagedPathOwnedByStableId(oldPath, 'markdown', stableId),
             )
           : undefined;
         if (renamed) {
@@ -175,7 +154,7 @@ export function planGithubConversationSync(input: {
   if (sameTarget) {
     for (const [path, old] of Object.entries(previous)) {
       if (current[path]) continue;
-      if (!isOwnedManagedPath(path, old.kind, stableId)) {
+      if (!isGithubManagedPathOwnedByStableId(path, old.kind, stableId)) {
         warnings.push('github_managed_path_ignored');
         continue;
       }

@@ -101,7 +101,7 @@ function normalizeGithubManagedFiles(value: unknown): SyncMappingRecord {
   return normalized;
 }
 
-function normalizeGithubContinuityGroup(source: unknown): SyncMappingRecord {
+export function readGithubContinuity(source: unknown): SyncMappingRecord {
   const record = asRecord(source);
   const remoteKey = normalizeGithubRemoteKey(record.githubRemoteKey);
   if (!remoteKey) return {};
@@ -121,7 +121,7 @@ function normalizeGithubContinuityGroup(source: unknown): SyncMappingRecord {
 }
 
 function replaceGithubGroup(target: SyncMappingRecord, source: unknown): void {
-  replaceGroup(target, normalizeGithubContinuityGroup(source), GITHUB_CONTINUITY_FIELDS);
+  replaceGroup(target, readGithubContinuity(source), GITHUB_CONTINUITY_FIELDS);
 }
 
 function hasGithubContinuityField(record: SyncMappingRecord): boolean {
@@ -148,7 +148,8 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
   const feishuTargetChanged = hasFeishuTargetPatch && safeString(base.feishuDocId) !== safeString(incoming.feishuDocId);
   const hasGithubTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'githubRemoteKey');
   const githubTargetChanged =
-    hasGithubTargetPatch && normalizeGithubRemoteKey(base.githubRemoteKey) !== normalizeGithubRemoteKey(incoming.githubRemoteKey);
+    hasGithubTargetPatch &&
+    normalizeGithubRemoteKey(base.githubRemoteKey) !== normalizeGithubRemoteKey(incoming.githubRemoteKey);
   const hasGithubPatch = hasGithubContinuityField(incoming);
   const next: SyncMappingRecord = { ...base };
   if (notionTargetChanged) {
@@ -277,7 +278,8 @@ export function mergeSyncMappingForImport(existing: unknown, incoming: unknown):
   } else {
     const localSyncedAt = githubContinuityTimestamp(local);
     const importedSyncedAt = githubContinuityTimestamp(imported);
-    if (localSyncedAt != null && importedSyncedAt != null) githubSource = localSyncedAt > importedSyncedAt ? local : imported;
+    if (localSyncedAt != null && importedSyncedAt != null)
+      githubSource = localSyncedAt > importedSyncedAt ? local : imported;
     else if (localSyncedAt != null) githubSource = local;
     else githubSource = imported;
   }

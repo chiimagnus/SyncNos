@@ -8,6 +8,7 @@ import {
   normalizeGithubCleanupOutboxRecord,
 } from '@platform/idb/github-cleanup-outbox-record';
 import { openDb } from '@platform/idb/schema';
+import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
 import {
   ackGithubCleanupRows,
   deferGithubCleanupRows,
@@ -120,6 +121,25 @@ describe('github cleanup outbox record', () => {
         }),
       ).toBeNull();
     }
+  });
+});
+
+describe('github managed path ownership', () => {
+  it('uses the same stable-id and asset-namespace grammar for cleanup authority', () => {
+    const stableId = '1234567890';
+    expect(isGithubManagedPathOwnedByStableId(`Chats/chat-title-${stableId}.md`, 'markdown', stableId)).toBe(true);
+    expect(
+      isGithubManagedPathOwnedByStableId(
+        `Chats/chat-title-${stableId}.assets/${'a'.repeat(64)}.png`,
+        'asset',
+        stableId,
+      ),
+    ).toBe(true);
+    expect(isGithubManagedPathOwnedByStableId('README.md', 'markdown', stableId)).toBe(false);
+    expect(isGithubManagedPathOwnedByStableId('Chats/chat-title-0000000000.md', 'markdown', stableId)).toBe(false);
+    expect(isGithubManagedPathOwnedByStableId(`Chats/chat-title-${stableId}.assets/image.png`, 'asset', stableId)).toBe(
+      false,
+    );
   });
 });
 

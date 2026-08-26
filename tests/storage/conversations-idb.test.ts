@@ -4,6 +4,12 @@ import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { openDb } from '../../src/platform/idb/schema';
 
 import {
+  __closeDbForTests as __closeCommentDbForTests,
+  attachOrphanCommentsToConversation,
+  listArticleCommentsByConversationId,
+} from '@services/comments/data/storage-idb';
+import { stableConversationId10 } from '@services/conversations/domain/file-naming';
+import {
   __closeDbForTests,
   deleteConversationsByIds,
   getConversationById,
@@ -52,6 +58,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await __closeDbForTests();
+  await __closeCommentDbForTests();
 });
 
 async function listAllConversationsForTests() {
@@ -1012,6 +1019,220 @@ describe('conversations storage-idb', () => {
 
     const items = await listAllConversationsForTests();
     expect(items.length).toBe(0);
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['github_cleanup_outbox'], 'readonly');
+    expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
+    await txDone(verifyTx);
+    verifyDb.close();
+  });
+
+  it('atomically enqueues only identity-owned GitHub managed paths before deleting local facts', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'github-delete',
+      title: 'GitHub delete',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    const stableId = stableConversationId10(convo);
+    const notePath = `Chats/debug-GitHub delete-${stableId}.md`;
+    const assetPath = `Chats/debug-GitHub delete-${stableId}.assets/${'a'.repeat(64)}.png`;
+    const metadata = { sha: 'b'.repeat(40), contentHash: 'c'.repeat(64) };
+    await patchSyncMapping(id, {
+      githubRemoteKey: 'github.com/owner/repo@main',
+      githubManagedFiles: {
+        [notePath]: { ...metadata, kind: 'markdown' },
+        [assetPath]: { ...metadata, kind: 'asset' },
+        'README.md': { ...metadata, kind: 'markdown' },
+        'Chats/other-0000000000.md': { ...metadata, kind: 'markdown' },
+        [`Chats/debug-GitHub delete-${stableId}.assets/not-a-content-hash.png`]: { ...metadata, kind: 'asset' },
+      },
+      githubProjectionFingerprint: 'd'.repeat(64),
+      githubLastSyncedAt: 10,
+    });
+
+    await deleteConversationsByIds([id]);
+
+    expect(await getConversationById(id)).toBeNull();
+    expect(await getSyncMappingByConversation(id)).toBeNull();
+    const db = await openDb();
+    const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
+    const rows = await reqToPromise<any[]>(tx.objectStore('github_cleanup_outbox').getAll());
+    await txDone(tx);
+    db.close();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      remoteKey: 'github.com/owner/repo@main',
+      paths: [assetPath, notePath].sort(),
+      reason: 'delete',
+    });
+    expect(rows[0].nextAttemptAt).toBe(rows[0].createdAt);
+  });
+
+  it('keeps article comment trees as orphans on delete and allows canonical-url reattach', async () => {
+    const canonicalUrl = 'https://example.com/article';
+    const convo = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${canonicalUrl}`,
+      title: 'Article',
+      url: canonicalUrl,
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    const db = await openDb();
+    const tx = db.transaction(['article_comments'], 'readwrite');
+    const store = tx.objectStore('article_comments');
+    const parentId = await reqToPromise<number>(
+      store.add({
+        parentId: null,
+        conversationId: id,
+        canonicalUrl,
+        quoteText: 'quote',
+        commentText: 'parent',
+        locator: { kind: 'text_quote', exact: 'quote' },
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    const replyId = await reqToPromise<number>(
+      store.add({
+        parentId,
+        conversationId: id,
+        canonicalUrl,
+        quoteText: '',
+        commentText: 'reply',
+        createdAt: 2,
+        updatedAt: 2,
+      }) as any,
+    );
+    await txDone(tx);
+    db.close();
+
+    await deleteConversationsByIds([id]);
+
+    const orphanDb = await openDb();
+    const orphanTx = orphanDb.transaction(['article_comments'], 'readonly');
+    const orphans = await reqToPromise<any[]>(orphanTx.objectStore('article_comments').getAll());
+    await txDone(orphanTx);
+    orphanDb.close();
+    expect(orphans).toHaveLength(2);
+    expect(orphans.map((row) => row.conversationId)).toEqual([null, null]);
+    expect(orphans.find((row) => row.id === replyId)?.parentId).toBe(parentId);
+    expect(orphans.find((row) => row.id === parentId)).toMatchObject({
+      canonicalUrl,
+      quoteText: 'quote',
+      commentText: 'parent',
+      locator: { kind: 'text_quote', exact: 'quote' },
+    });
+
+    const replacement = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${canonicalUrl}`,
+      title: 'Article restored',
+      url: canonicalUrl,
+      lastCapturedAt: 2,
+    });
+    const replacementId = Number(replacement.id);
+    await expect(attachOrphanCommentsToConversation(canonicalUrl, replacementId)).resolves.toEqual({ updated: 2 });
+    const attached = await listArticleCommentsByConversationId(replacementId);
+    expect(attached.map((row) => row.id).sort((a, b) => a - b)).toEqual([parentId, replyId]);
+    expect(attached.find((row) => row.id === replyId)?.parentId).toBe(parentId);
+  });
+
+  it('does not enqueue corrupt imported GitHub ownership claims', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'corrupt-github-delete',
+      title: 'Corrupt',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    const stableId = stableConversationId10(convo);
+    const metadata = { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64) };
+    await patchSyncMapping(id, {
+      githubRemoteKey: 'github.com/owner/repo@main',
+      githubManagedFiles: {
+        'README.md': { ...metadata, kind: 'markdown' },
+        'Chats/another-0000000000.md': { ...metadata, kind: 'markdown' },
+        [`Chats/debug-Corrupt-${stableId}.assets/image.png`]: { ...metadata, kind: 'asset' },
+      },
+    });
+
+    await deleteConversationsByIds([id]);
+    const db = await openDb();
+    const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
+    expect(await reqToPromise(tx.objectStore('github_cleanup_outbox').count())).toBe(0);
+    await txDone(tx);
+    db.close();
+  });
+
+  it('aborts conversation delete if cleanup enqueue fails, preserving conversation mapping and comments', async () => {
+    const canonicalUrl = 'https://example.com/abort';
+    const convo = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${canonicalUrl}`,
+      title: 'Abort delete',
+      url: canonicalUrl,
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    const stableId = stableConversationId10(convo);
+    await patchSyncMapping(id, {
+      githubRemoteKey: 'github.com/owner/repo@main',
+      githubManagedFiles: {
+        [`Articles/web-Abort delete-${stableId}.md`]: {
+          kind: 'markdown',
+          sha: 'a'.repeat(40),
+          contentHash: 'b'.repeat(64),
+        },
+      },
+    });
+    const db = await openDb();
+    const commentTx = db.transaction(['article_comments'], 'readwrite');
+    await reqToPromise(
+      commentTx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId: id,
+        canonicalUrl,
+        quoteText: '',
+        commentText: 'must survive',
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    await txDone(commentTx);
+    const probeTx = db.transaction(['github_cleanup_outbox'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
+    const originalAdd = prototype.add;
+    await txDone(probeTx);
+    db.close();
+
+    prototype.add = function add(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'github_cleanup_outbox') throw new DOMException('forced outbox failure', 'DataError');
+      return originalAdd.call(this, value, key);
+    };
+    try {
+      await expect(deleteConversationsByIds([id])).rejects.toThrow();
+    } finally {
+      prototype.add = originalAdd;
+    }
+
+    expect(await getConversationById(id)).not.toBeNull();
+    expect((await getSyncMappingByConversation(id))?.mapping?.githubRemoteKey).toBe('github.com/owner/repo@main');
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['article_comments', 'github_cleanup_outbox'], 'readonly');
+    const comments = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
+    expect(comments).toHaveLength(1);
+    expect(comments[0]?.conversationId).toBe(id);
+    expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
+    await txDone(verifyTx);
+    verifyDb.close();
   });
 
   it('reuses and rewrites legacy article conversation rows by normalized url', async () => {
