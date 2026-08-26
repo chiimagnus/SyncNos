@@ -289,7 +289,7 @@ export async function preflightGithubRepository(
     throw error;
   }
   const headSha = requireGitSha(ref?.object?.sha);
-  if (safeString(ref?.object?.type) && safeString(ref?.object?.type) !== 'commit') {
+  if (safeString(ref?.object?.type) !== 'commit') {
     throw new GithubRepositoryError('github_repository_response_invalid');
   }
 

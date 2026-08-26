@@ -289,6 +289,24 @@ describe('github repository service', () => {
     ).rejects.toMatchObject({ code: 'github_repository_not_accessible' });
   });
 
+  it('rejects a Git ref response with a valid SHA but missing object.type', async () => {
+    const { api } = createApi((path) => {
+      if (path === '/user') return { login: 'user' };
+      if (path.startsWith('/user/installations?')) return { installations: [installation(1)] };
+      if (path.startsWith('/user/installations/1/repositories?')) {
+        return { repositories: [repo('owner', 'repo', { push: true })] };
+      }
+      if (path === '/repos/owner/repo') return { default_branch: 'main' };
+      if (path === '/repos/owner/repo/git/ref/heads/main') return { object: { sha: 'a'.repeat(40) } };
+      if (path === `/repos/owner/repo/git/commits/${'a'.repeat(40)}`) return { tree: { sha: 'b'.repeat(40) } };
+      throw new Error(`unexpected:${path}`);
+    });
+
+    await expect(preflightGithubRepository({ repository: 'owner/repo', branch: '' }, api)).rejects.toMatchObject({
+      code: 'github_repository_response_invalid',
+    });
+  });
+
   it('rejects malformed GitHub response shapes and invalid SHA/type fail-closed', async () => {
     const invalidInstallations = createApi((path) => {
       if (path === '/user') return { login: 'user' };
