@@ -123,7 +123,8 @@ The repository scripts define the acceptance bar:
 | Change | Required local validation |
 | --- | --- |
 | Normal code change | `npm run compile` and `npm run test` during development |
-| PR ready for review | `npm run gate:ci` |
+| Code PR ready for review | `npm run gate:ci` |
+| Documentation / GitHub-template-only change | `gate:ci` may be `N/A` when no runtime, build, or dependency files changed; state the reason in the PR |
 | Production build, manifest, permission, packaging, or release change | `npm run gate` |
 | Browser/site-specific behavior | Exercise the affected browser/site path manually; run the relevant `dev:*` / build command when applicable |
 | Visual behavior | Record the affected state before/after or provide equivalent screenshots |
