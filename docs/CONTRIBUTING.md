@@ -75,34 +75,6 @@ npm run setup:safari:xcode
 
 对于站点适配器，请明确支持范围内的页面类型，以及必须采集哪些内容。不要让一个 Issue 覆盖一个边界开放、彼此无关的站点集合。
 
-## Commit
-
-使用 **Conventional Commits**。一个 commit 应只表达一个可验证的关注点。
-
-常见前缀包括：
-
-- `feat:` — 用户可见的新能力；
-- `fix:` — 缺陷修复；
-- `refactor:` — 不改变行为的结构调整；
-- `test:` — 仅测试变更；
-- `docs:` — 仅文档变更；
-- `chore:` — 仓库维护；
-- `ci:` / `build:` — 自动化或构建系统变更。
-
-当 scope 能提供有用上下文时可以添加，例如 `fix(collectors): ...` 或 `feat(settings): ...`。
-
-请写有意义的摘要，不要使用 `-` 之类的占位消息。只有明确的发布/版本自动化才应使用纯版本消息，普通开发 commit 不应如此。当修改原因、兼容性决策或取舍无法从 diff 中直接看出时，应补充 commit body。
-
-示例：
-
-```text
-fix(collectors): preserve complete virtualized chat capture
-feat(settings): add per-site capture toggle
-docs: clarify contributor validation workflow
-```
-
-中文或英文摘要都可以；清晰度和可审计性比语言本身更重要。
-
 ## Pull Request
 
 PR 应在不依赖作者本地上下文的情况下也能被理解。
