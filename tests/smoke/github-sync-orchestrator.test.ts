@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { GithubCleanupOutboxRecord } from '@platform/idb/github-cleanup-outbox-record';
 import { GithubApiError } from '@services/sync/github/github-api-client';
-import { commitGithubStagedOperations } from '@services/sync/github/github-git-transport';
+import { commitGithubStagedOperations, GithubGitTransportError } from '@services/sync/github/github-git-transport';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
 import type { GithubOrchestratorServices } from '@services/sync/github/github-orchestrator-services';
 import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
@@ -483,6 +483,136 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(services.deferCleanupRows).not.toHaveBeenCalled();
     expect(getCleanupRows()).toHaveLength(1);
     expect(result.nextCleanupDueAt).toBeNull();
+  });
+});
+
+describe('github sync orchestrator cleanup crash recovery', () => {
+  it('does not ack an outcome-unknown cleanup and acks it on the next absent no-op retry', async () => {
+    let remotePresent = true;
+    let attempts = 0;
+    const { services, getCleanupRows } = fakeServices({
+      rows: {},
+      cleanupRows: [cleanupRow(20)],
+      commitImpl: async ({ operations }) => {
+        attempts += 1;
+        if (attempts === 1) {
+          remotePresent = false;
+          throw new GithubApiError('github_outcome_unknown', 0, 'github_outcome_unknown');
+        }
+        expect(remotePresent).toBe(false);
+        return {
+          status: 'no_changes',
+          treeSha: 'f'.repeat(40),
+          files: operations.map((operation) =>
+            operation.type === 'delete'
+              ? { path: operation.path, status: 'absent' as const }
+              : { path: operation.path, status: 'written' as const, sha: 'e'.repeat(40) },
+          ),
+        };
+      },
+    });
+    const orchestrator = createGithubSyncOrchestrator(services);
+
+    const first = await orchestrator.sync({ conversationIds: [] });
+    expect(first.transport.status).toBe('failed');
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()).toHaveLength(1);
+
+    const second = await orchestrator.sync({ conversationIds: [] });
+    expect(second.transport.status).toBe('no_changes');
+    expect(getCleanupRows()).toEqual([]);
+    expect(services.ackCleanupRows).toHaveBeenCalledWith([20]);
+  });
+
+  it('keeps cleanup pending across exhausted ref races and acks only after a later successful run', async () => {
+    let failRace = true;
+    const { services, getCleanupRows } = fakeServices({
+      rows: {},
+      cleanupRows: [cleanupRow(21)],
+      commitImpl: async ({ operations }) => {
+        if (failRace) throw new GithubGitTransportError('github_git_branch_race_exhausted');
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+    const orchestrator = createGithubSyncOrchestrator(services);
+
+    const first = await orchestrator.sync({ conversationIds: [] });
+    expect(first.transport.status).toBe('failed');
+    expect(getCleanupRows()).toHaveLength(1);
+
+    failRace = false;
+    const second = await orchestrator.sync({ conversationIds: [] });
+    expect(second.transport.status).toBe('committed');
+    expect(getCleanupRows()).toEqual([]);
+  });
+
+  it('defers identity cleanup when the replacement is in the current run but local projection fails', async () => {
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: { 22: { conversation: chat(22), mapping: null } },
+      messages: { 22: new Error('projection failed') },
+      cleanupRows: [cleanupRow(22, { reason: 'identity_move', replacementConversationId: 22 })],
+      now: 30_000,
+      replacementDeferMs: 4_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [22] });
+
+    expect(result.items[0]).toMatchObject({ conversationId: 22, status: 'failed' });
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).toHaveBeenCalledWith([22], 34_000);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(34_000);
+    expect(result.deferredReplacementConversationIds).toEqual([22]);
+  });
+
+  it('pages cleanup without starvation after a full page of identity rows is deferred', async () => {
+    const replacementIds = Array.from({ length: 100 }, (_, index) => 1_000 + index);
+    const rows = replacementIds.map((replacementConversationId, index) =>
+      cleanupRow(index + 1, {
+        reason: 'identity_move',
+        replacementConversationId,
+        createdAt: 1,
+        nextAttemptAt: 1,
+      }),
+    );
+    rows.push(cleanupRow(101, { paths: ['Old/after-deferred-page.md'], createdAt: 2, nextAttemptAt: 2 }));
+    const replacementRows = Object.fromEntries(
+      replacementIds.map((id) => [id, { conversation: chat(id), mapping: null }]),
+    );
+    let committedOperations: readonly any[] = [];
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: replacementRows,
+      cleanupRows: rows,
+      now: 10,
+      replacementDeferMs: 1_000,
+      commitImpl: async ({ operations }) => {
+        committedOperations = operations;
+        return {
+          status: 'no_changes',
+          treeSha: 'f'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+    const orchestrator = createGithubSyncOrchestrator(services);
+
+    const first = await orchestrator.sync({ conversationIds: [] });
+    expect(first.cleanupHasMoreDue).toBe(true);
+    expect(first.deferredReplacementConversationIds).toHaveLength(100);
+    expect(commit).not.toHaveBeenCalled();
+    expect(getCleanupRows().filter((row) => row.nextAttemptAt === 1_010)).toHaveLength(100);
+
+    const second = await orchestrator.sync({ conversationIds: [] });
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(committedOperations).toEqual([{ type: 'delete', path: 'Old/after-deferred-page.md' }]);
+    expect(getCleanupRows()).toHaveLength(100);
+    expect(second.cleanupHasMoreDue).toBe(false);
+    expect(second.nextCleanupDueAt).toBe(1_010);
   });
 });
 
