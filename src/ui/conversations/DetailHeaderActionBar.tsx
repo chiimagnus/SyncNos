@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, ImageDown } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
@@ -12,7 +12,6 @@ export type DetailHeaderActionBarProps = {
   buttonClassName: string;
   closeMenuOnActionTrigger?: () => void;
   inlineMenuItems?: boolean;
-  triggerIcon?: ReactNode;
   menuTriggerLabel?: string;
   menuTriggerAriaLabel?: string;
   menuAriaLabel?: string;
@@ -44,7 +43,6 @@ export function DetailHeaderActionBar({
   buttonClassName,
   closeMenuOnActionTrigger,
   inlineMenuItems = false,
-  triggerIcon,
   menuTriggerLabel,
   menuTriggerAriaLabel,
   menuAriaLabel,
@@ -141,7 +139,7 @@ export function DetailHeaderActionBar({
   ) : null;
   if (actions.length === 1) {
     const action = actions[0]!;
-    const resolvedTriggerIcon = triggerIcon || providerLogo(action) || (
+    const resolvedTriggerIcon = providerLogo(action) || (
       <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
     );
     return (
@@ -167,7 +165,7 @@ export function DetailHeaderActionBar({
   }
 
   const primaryAction = actions.find((action) => action.id === primaryActionId) || actions[0]!;
-  const resolvedTriggerIcon = triggerIcon || providerLogo(primaryAction) || (
+  const resolvedTriggerIcon = providerLogo(primaryAction) || (
     <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
   );
   const resolvedMenuTriggerLabel = String(menuTriggerLabel || '').trim() || 'Open in...';

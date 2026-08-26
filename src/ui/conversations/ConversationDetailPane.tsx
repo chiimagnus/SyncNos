@@ -1,4 +1,4 @@
-import { ChevronLeft, Link, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 
 import { ChatDetailView } from '@ui/conversations/views/ChatDetailView';
 import { ArticleReaderView } from '@ui/conversations/views/ArticleReaderView';
@@ -400,7 +400,6 @@ export function ConversationDetailPane({
               key={copyActionScopeKey}
               actions={copyActions}
               buttonClassName={headerIconButtonClass}
-              triggerIcon={<Link size={16} strokeWidth={2} aria-hidden="true" />}
               menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
               menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
               menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
