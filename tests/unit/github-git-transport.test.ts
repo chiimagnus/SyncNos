@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { GithubApiError } from '@services/sync/github/github-api-client';
 import {
   GithubGitTransportError,
+  commitGithubStagedOperationsOnce,
+  createGithubBlob,
   resolveOwnedGithubDeletes,
   validateGithubGitPath,
   validateGithubStagedOperations,
@@ -189,6 +192,229 @@ describe('github git transport staged path/delete resolver', () => {
       api,
     );
     expect(result.deletes).toEqual([{ path: 'folder/old.md', status: 'failure' }]);
+  });
+
+  it('creates standalone text and binary blobs through the shared mutation primitive', async () => {
+    const calls: Array<{ path: string; body: any }> = [];
+    const api = {
+      async post<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ path, body });
+        return { sha: calls.length === 1 ? BLOB_1 : BLOB_2 } as T;
+      },
+    };
+    await expect(createGithubBlob({ repository: 'owner/repo', content: 'héllo' }, api)).resolves.toEqual({
+      sha: BLOB_1,
+    });
+    await expect(
+      createGithubBlob({ repository: 'owner/repo', content: new Uint8Array([0, 255, 1]) }, api),
+    ).resolves.toEqual({
+      sha: BLOB_2,
+    });
+    expect(calls).toEqual([
+      {
+        path: '/repos/owner/repo/git/blobs',
+        body: { content: 'héllo', encoding: 'utf-8' },
+      },
+      {
+        path: '/repos/owner/repo/git/blobs',
+        body: { content: 'AP8B', encoding: 'base64' },
+      },
+    ]);
+  });
+
+  it('does not retry standalone blob outcome-unknown', async () => {
+    let calls = 0;
+    const error = new GithubApiError('github_outcome_unknown', 0, 'github_outcome_unknown');
+    const api = {
+      async post<T>(): Promise<T> {
+        calls += 1;
+        throw error;
+      },
+    };
+    await expect(createGithubBlob({ repository: 'owner/repo', content: 'body' }, api)).rejects.toBe(error);
+    expect(calls).toBe(1);
+  });
+
+  it('commits write/reuse/delete as one base-tree transaction and updates ref with force false', async () => {
+    const NEW_TREE = '1'.repeat(40);
+    const COMMIT = '2'.repeat(40);
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        calls.push({ method: 'GET', path });
+        if (path.endsWith(ROOT)) return tree([{ path: 'old.md', type: 'blob', sha: BLOB_2 }]) as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ method: 'POST', path, body });
+        if (path.endsWith('/git/blobs')) return { sha: BLOB_1 } as T;
+        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ method: 'PATCH', path, body });
+        return { object: { sha: COMMIT } } as T;
+      },
+    };
+
+    const result = await commitGithubStagedOperationsOnce(
+      {
+        repository: 'owner/repo',
+        branch: 'feature/foo',
+        headSha: 'f'.repeat(40),
+        treeSha: ROOT,
+        operations: [
+          { type: 'write', path: 'new.md', content: 'body' },
+          { type: 'reuse', path: 'asset.png', sha: BLOB_2 },
+          { type: 'delete', path: 'old.md' },
+        ],
+      },
+      api,
+    );
+
+    expect(result).toEqual({
+      status: 'committed',
+      treeSha: NEW_TREE,
+      commitSha: COMMIT,
+      files: [
+        { path: 'new.md', status: 'written', sha: BLOB_1 },
+        { path: 'asset.png', status: 'reused', sha: BLOB_2 },
+        { path: 'old.md', status: 'deleted' },
+      ],
+    });
+    const createTree = calls.find((call) => call.path.endsWith('/git/trees'));
+    expect(createTree?.body).toEqual({
+      base_tree: ROOT,
+      tree: [
+        { path: 'new.md', mode: '100644', type: 'blob', sha: BLOB_1 },
+        { path: 'asset.png', mode: '100644', type: 'blob', sha: BLOB_2 },
+        { path: 'old.md', mode: '100644', type: 'blob', sha: null },
+      ],
+    });
+    const commit = calls.find((call) => call.path.endsWith('/git/commits'));
+    expect(commit?.body).toEqual({
+      message: 'SyncNos: sync 3 files',
+      tree: NEW_TREE,
+      parents: ['f'.repeat(40)],
+    });
+    expect(JSON.stringify(commit?.body)).not.toMatch(/body|new\.md|old\.md/i);
+    expect(calls.find((call) => call.method === 'PATCH')).toEqual({
+      method: 'PATCH',
+      path: '/repos/owner/repo/git/refs/heads/feature/foo',
+      body: { sha: COMMIT, force: false },
+    });
+  });
+
+  it('returns no_changes for absent deletes without creating tree/commit/ref', async () => {
+    const calls: string[] = [];
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        calls.push(`GET ${path}`);
+        return tree([]) as T;
+      },
+      async post<T>(path: string): Promise<T> {
+        calls.push(`POST ${path}`);
+        throw new Error('must-not-post');
+      },
+      async patch<T>(path: string): Promise<T> {
+        calls.push(`PATCH ${path}`);
+        throw new Error('must-not-patch');
+      },
+    };
+    const result = await commitGithubStagedOperationsOnce(
+      {
+        repository: 'owner/repo',
+        branch: 'main',
+        headSha: 'f'.repeat(40),
+        treeSha: ROOT,
+        operations: [{ type: 'delete', path: 'missing.md' }],
+      },
+      api,
+    );
+    expect(result).toEqual({
+      status: 'no_changes',
+      treeSha: ROOT,
+      files: [{ path: 'missing.md', status: 'absent' }],
+    });
+    expect(calls.some((call) => call.startsWith('POST') || call.startsWith('PATCH'))).toBe(false);
+  });
+
+  it('returns complete no_changes file resolution when GitHub tree equals base tree', async () => {
+    let commits = 0;
+    let patches = 0;
+    const api = {
+      async get<T>(): Promise<T> {
+        throw new Error('no deletes');
+      },
+      async post<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/blobs')) return { sha: BLOB_1 } as T;
+        if (path.endsWith('/git/trees')) return { sha: ROOT } as T;
+        if (path.endsWith('/git/commits')) commits += 1;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(): Promise<T> {
+        patches += 1;
+        throw new Error('unexpected patch');
+      },
+    };
+    const result = await commitGithubStagedOperationsOnce(
+      {
+        repository: 'owner/repo',
+        branch: 'main',
+        headSha: 'f'.repeat(40),
+        treeSha: ROOT,
+        operations: [
+          { type: 'write', path: 'same.md', content: 'same' },
+          { type: 'reuse', path: 'same-asset.png', sha: BLOB_2 },
+        ],
+      },
+      api,
+    );
+    expect(result).toEqual({
+      status: 'no_changes',
+      treeSha: ROOT,
+      files: [
+        { path: 'same.md', status: 'written', sha: BLOB_1 },
+        { path: 'same-asset.png', status: 'reused', sha: BLOB_2 },
+      ],
+    });
+    expect(commits).toBe(0);
+    expect(patches).toBe(0);
+  });
+
+  it('does not convert ref outcome-unknown into an ackable success or retry it', async () => {
+    const NEW_TREE = '1'.repeat(40);
+    const COMMIT = '2'.repeat(40);
+    let patchCalls = 0;
+    const outcomeUnknown = new GithubApiError('github_outcome_unknown', 0, 'github_outcome_unknown');
+    const api = {
+      async get<T>(): Promise<T> {
+        throw new Error('no deletes');
+      },
+      async post<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(): Promise<T> {
+        patchCalls += 1;
+        throw outcomeUnknown;
+      },
+    };
+    await expect(
+      commitGithubStagedOperationsOnce(
+        {
+          repository: 'owner/repo',
+          branch: 'main',
+          headSha: 'f'.repeat(40),
+          treeSha: ROOT,
+          operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
+        },
+        api,
+      ),
+    ).rejects.toBe(outcomeUnknown);
+    expect(patchCalls).toBe(1);
   });
 
   it('rejects invalid repository/root tree inputs before making any remote read', async () => {

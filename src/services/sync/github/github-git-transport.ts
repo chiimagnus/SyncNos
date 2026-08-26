@@ -1,5 +1,10 @@
 import { githubApiClient } from '@services/sync/github/github-api-client';
-import { encodeGithubRepositoryPath, normalizeGithubRepository } from '@services/sync/github/settings-store';
+import {
+  encodeGithubBranchPath,
+  encodeGithubRepositoryPath,
+  normalizeGithubBranch,
+  normalizeGithubRepository,
+} from '@services/sync/github/settings-store';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 
@@ -35,7 +40,12 @@ export type GithubOwnedDeleteResolution = {
   deletes: GithubDeleteResolution[];
 };
 
-export type GithubGitTransportErrorCode = 'github_git_path_invalid' | 'github_git_sha_invalid';
+export type GithubGitTransportErrorCode =
+  | 'github_git_path_invalid'
+  | 'github_git_branch_invalid'
+  | 'github_git_sha_invalid'
+  | 'github_git_delete_resolution_failed'
+  | 'github_git_response_invalid';
 
 export class GithubGitTransportError extends Error {
   constructor(readonly code: GithubGitTransportErrorCode) {
@@ -46,6 +56,11 @@ export class GithubGitTransportError extends Error {
 
 type GithubApiReader = {
   get<T>(path: string): Promise<T>;
+};
+
+type GithubGitApi = GithubApiReader & {
+  post<T>(path: string, body?: unknown): Promise<T>;
+  patch<T>(path: string, body?: unknown): Promise<T>;
 };
 
 type GitTreeEntry = {
@@ -61,6 +76,13 @@ type ParsedTree = {
 function requireGitSha(value: unknown): string {
   if (typeof value !== 'string' || value !== value.trim() || !GIT_SHA_RE.test(value)) {
     throw new GithubGitTransportError('github_git_sha_invalid');
+  }
+  return value.toLowerCase();
+}
+
+function requireResponseGitSha(value: unknown): string {
+  if (typeof value !== 'string' || !GIT_SHA_RE.test(value)) {
+    throw new GithubGitTransportError('github_git_response_invalid');
   }
   return value.toLowerCase();
 }
@@ -172,4 +194,129 @@ export async function resolveOwnedGithubDeletes(
     if (resolution.status === 'present') kept.push(operation);
   }
   return { operations: kept, deletes };
+}
+
+export type GithubFinalFileResolution =
+  | { path: string; status: 'written' | 'reused'; sha: string }
+  | { path: string; status: 'deleted' | 'absent' };
+
+export type GithubGitTransactionResult =
+  | {
+      status: 'no_changes';
+      treeSha: string;
+      files: GithubFinalFileResolution[];
+    }
+  | {
+      status: 'committed';
+      treeSha: string;
+      commitSha: string;
+      files: GithubFinalFileResolution[];
+    };
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+export async function createGithubBlob(
+  input: { repository: string; content: string | Uint8Array },
+  api: Pick<GithubGitApi, 'post'> = githubApiClient,
+): Promise<{ sha: string }> {
+  const repository = normalizeGithubRepository(input.repository);
+  if (!repository) throw new GithubGitTransportError('github_git_path_invalid');
+  const encodedRepository = encodeGithubRepositoryPath(repository);
+  let body: { content: string; encoding: 'base64' | 'utf-8' };
+  if (input.content instanceof Uint8Array) {
+    body = { content: bytesToBase64(input.content), encoding: 'base64' };
+  } else if (typeof input.content === 'string') {
+    body = { content: input.content, encoding: 'utf-8' };
+  } else {
+    throw new GithubGitTransportError('github_git_path_invalid');
+  }
+  const response = await api.post<any>(`/repos/${encodedRepository}/git/blobs`, body);
+  return { sha: requireResponseGitSha(response?.sha) };
+}
+
+export async function commitGithubStagedOperationsOnce(
+  input: {
+    repository: string;
+    branch: string;
+    headSha: string;
+    treeSha: string;
+    operations: readonly GithubStagedOperation[];
+  },
+  api: GithubGitApi = githubApiClient,
+): Promise<GithubGitTransactionResult> {
+  const repository = normalizeGithubRepository(input.repository);
+  if (!repository) throw new GithubGitTransportError('github_git_path_invalid');
+  const branch = normalizeGithubBranch(input.branch);
+  if (!branch) throw new GithubGitTransportError('github_git_branch_invalid');
+  const encodedRepository = encodeGithubRepositoryPath(repository);
+  const encodedBranch = encodeGithubBranchPath(branch);
+  const headSha = requireGitSha(input.headSha);
+  const baseTreeSha = requireGitSha(input.treeSha);
+  const operations = validateGithubStagedOperations(input.operations);
+
+  const deleteResolution = await resolveOwnedGithubDeletes({ repository, treeSha: baseTreeSha, operations }, api);
+  if (deleteResolution.deletes.some((item) => item.status === 'failure')) {
+    throw new GithubGitTransportError('github_git_delete_resolution_failed');
+  }
+  const deleteByPath = new Map(deleteResolution.deletes.map((item) => [item.path, item] as const));
+  const blobByPath = new Map<string, { status: 'written' | 'reused'; sha: string }>();
+  const treeEntries: Array<{ path: string; mode: '100644'; type: 'blob'; sha: string | null }> = [];
+
+  for (const operation of deleteResolution.operations) {
+    if (operation.type === 'write') {
+      const blob = await createGithubBlob({ repository, content: operation.content }, api);
+      blobByPath.set(operation.path, { status: 'written', sha: blob.sha });
+      treeEntries.push({ path: operation.path, mode: '100644', type: 'blob', sha: blob.sha });
+      continue;
+    }
+    if (operation.type === 'reuse') {
+      blobByPath.set(operation.path, { status: 'reused', sha: operation.sha });
+      treeEntries.push({ path: operation.path, mode: '100644', type: 'blob', sha: operation.sha });
+      continue;
+    }
+    treeEntries.push({ path: operation.path, mode: '100644', type: 'blob', sha: null });
+  }
+
+  const files = (): GithubFinalFileResolution[] =>
+    operations.map((operation) => {
+      if (operation.type === 'write' || operation.type === 'reuse') {
+        const resolved = blobByPath.get(operation.path);
+        if (!resolved) throw new GithubGitTransportError('github_git_response_invalid');
+        return { path: operation.path, ...resolved };
+      }
+      const resolved = deleteByPath.get(operation.path);
+      if (!resolved || resolved.status === 'failure') throw new GithubGitTransportError('github_git_response_invalid');
+      return { path: operation.path, status: resolved.status === 'absent' ? 'absent' : 'deleted' };
+    });
+
+  if (treeEntries.length === 0) return { status: 'no_changes', treeSha: baseTreeSha, files: files() };
+
+  const treeResponse = await api.post<any>(`/repos/${encodedRepository}/git/trees`, {
+    base_tree: baseTreeSha,
+    tree: treeEntries,
+  });
+  const treeSha = requireResponseGitSha(treeResponse?.sha);
+  if (treeSha === baseTreeSha) return { status: 'no_changes', treeSha, files: files() };
+
+  const commitResponse = await api.post<any>(`/repos/${encodedRepository}/git/commits`, {
+    message: `SyncNos: sync ${treeEntries.length} file${treeEntries.length === 1 ? '' : 's'}`,
+    tree: treeSha,
+    parents: [headSha],
+  });
+  const commitSha = requireResponseGitSha(commitResponse?.sha);
+  const refResponse = await api.patch<any>(`/repos/${encodedRepository}/git/refs/heads/${encodedBranch}`, {
+    sha: commitSha,
+    force: false,
+  });
+  const updatedSha = requireResponseGitSha(refResponse?.object?.sha);
+  if (updatedSha !== commitSha) throw new GithubGitTransportError('github_git_response_invalid');
+
+  return { status: 'committed', treeSha, commitSha, files: files() };
 }
