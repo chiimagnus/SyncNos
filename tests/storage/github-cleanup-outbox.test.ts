@@ -90,6 +90,25 @@ describe('github cleanup outbox record', () => {
     });
   });
 
+  it('builds identity-move rows due-now with a replacement conversation id', () => {
+    expect(
+      buildGithubCleanupOutboxRecord({
+        remoteKey: REMOTE_A,
+        paths: ['Chats/old.md'],
+        reason: 'identity_move',
+        replacementConversationId: 42,
+        createdAt: 15,
+      }),
+    ).toEqual({
+      remoteKey: REMOTE_A,
+      paths: ['Chats/old.md'],
+      reason: 'identity_move',
+      replacementConversationId: 42,
+      createdAt: 15,
+      nextAttemptAt: 15,
+    });
+  });
+
   it('requires identity replacement and rejects unsafe or malformed rows', () => {
     expect(
       normalizeGithubCleanupOutboxRecord({

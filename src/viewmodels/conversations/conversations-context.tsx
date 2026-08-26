@@ -25,7 +25,6 @@ import {
   upsertConversation,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
-import { migrateArticleCommentsCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
@@ -772,7 +771,6 @@ export function ConversationsProvider({
       const nextCanonical = canonicalizeHttpUrl(nextUrl);
       if (!nextCanonical) throw new Error('URL must be an http(s) page');
 
-      const currentCanonical = canonicalizeHttpUrl((convo as any)?.url);
       const sourceType = String((convo as any)?.sourceType || '')
         .trim()
         .toLowerCase();
@@ -805,6 +803,7 @@ export function ConversationsProvider({
       }
 
       const payload: any = {
+        id: Number((convo as any)?.id),
         source: (convo as any)?.source,
         conversationKey: (convo as any)?.conversationKey,
         sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
@@ -812,14 +811,6 @@ export function ConversationsProvider({
         lastCapturedAt: (convo as any)?.lastCapturedAt,
       };
       await upsertConversation(payload);
-
-      if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
-        await migrateArticleCommentsCanonicalUrl({
-          fromCanonicalUrl: currentCanonical,
-          toCanonicalUrl: nextCanonical,
-          conversationId: Number((convo as any)?.id) || null,
-        });
-      }
 
       if (isArticle) {
         const conflict = (Array.isArray(items) ? items : []).find((item) => {

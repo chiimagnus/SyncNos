@@ -4,6 +4,7 @@ import {
   mergeSyncMappingForIdentityMove,
   mergeSyncMappingForImport,
   mergeSyncMappingPatch,
+  readGithubContinuity,
   stripSyncMappingLocalId,
 } from '@platform/idb/sync-mapping-record';
 
@@ -223,29 +224,59 @@ describe('sync mapping persistence record', () => {
       'padded-kind.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: ' markdown ' },
     };
 
-    const merged = mergeSyncMappingPatch({}, {
-      ...valid,
-      githubManagedFiles: unsafeFiles,
-    });
+    const merged = mergeSyncMappingPatch(
+      {},
+      {
+        ...valid,
+        githubManagedFiles: unsafeFiles,
+      },
+    );
 
     expect(merged.githubManagedFiles).toEqual(valid.githubManagedFiles);
 
-    const invalidRemote = mergeSyncMappingPatch({}, {
-      ...valid,
-      githubRemoteKey: 'github.com/example/syncnos?access_token=secret@main',
-      githubProjectionFingerprint: ` ${'a'.repeat(64)} `,
-      githubLastSyncedAt: '100',
-    });
+    const invalidRemote = mergeSyncMappingPatch(
+      {},
+      {
+        ...valid,
+        githubRemoteKey: 'github.com/example/syncnos?access_token=secret@main',
+        githubProjectionFingerprint: ` ${'a'.repeat(64)} `,
+        githubLastSyncedAt: '100',
+      },
+    );
     expect(invalidRemote.githubRemoteKey).toBeUndefined();
     expect(invalidRemote.githubManagedFiles).toBeUndefined();
     expect(invalidRemote.githubProjectionFingerprint).toBeUndefined();
     expect(invalidRemote.githubLastSyncedAt).toBeUndefined();
 
-    const branchWithAt = mergeSyncMappingPatch({}, {
-      ...valid,
-      githubRemoteKey: 'github.com/example/syncnos@feature/user@topic',
-    });
+    const branchWithAt = mergeSyncMappingPatch(
+      {},
+      {
+        ...valid,
+        githubRemoteKey: 'github.com/example/syncnos@feature/user@topic',
+      },
+    );
     expect(branchWithAt.githubRemoteKey).toBe('github.com/example/syncnos@feature/user@topic');
+  });
+
+  it('exposes the normalized GitHub continuity reader without granting authority to malformed fields', () => {
+    const normalized = readGithubContinuity({
+      ...githubState({ marker: 'A' as any }),
+      githubManagedFiles: {
+        'safe/note.md': { sha: 'A'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+        '../escape.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      },
+      githubProjectionFingerprint: 'c'.repeat(64),
+      githubLastSyncedAt: 20,
+    });
+    expect(normalized).toEqual({
+      githubRemoteKey: 'github.com/example/syncnos@main',
+      githubManagedFiles: {
+        'safe/note.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      },
+      githubProjectionFingerprint: 'c'.repeat(64),
+      githubLastSyncedAt: 20,
+    });
+    expect(readGithubContinuity({ githubRemoteKey: 'not-a-remote', githubManagedFiles: {} })).toEqual({});
   });
 
   it('ignores invalid Notion nested field patches and does not mutate inputs', () => {
