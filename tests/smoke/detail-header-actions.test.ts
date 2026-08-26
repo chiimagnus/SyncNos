@@ -235,6 +235,60 @@ describe('detail-header-actions', () => {
     expect(getSyncMappingByConversationMock).toHaveBeenCalledWith(5);
   });
 
+  it('recovers a valid hydrated Notion target when the conversation mirror has an invalid page id', async () => {
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: { id: 6, notionPageId: NOTION_PAGE_ID },
+      mapping: {
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'mapping-workspace',
+        notionPageUrl: 'https://app.notion.com/p/mapping-workspace/0123456789abcdef0123456789abcdef',
+      },
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 6,
+        source: 'chatgpt',
+        conversationKey: 'conv-6',
+        title: 'Conversation',
+        notionPageId: 'not-a-valid-page-id',
+        notionWorkspaceSlug: 'stale-workspace',
+        notionPageUrl: 'https://app.notion.com/p/stale-workspace/not-a-valid-page-id',
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')?.href).toBe(
+      'https://app.notion.com/p/mapping-workspace/0123456789abcdef0123456789abcdef',
+    );
+    expect(byId(actions, 'copy-notion-link')?.href).toBe(byId(actions, 'open-in-notion')?.href);
+    expect(getSyncMappingByConversationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not hydrate unverifiable Notion URL metadata when the mapping has no valid page id', async () => {
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: { id: 7, notionPageId: '' },
+      mapping: {
+        notionWorkspaceSlug: 'stale-workspace',
+        notionPageUrl: 'https://app.notion.com/p/stale-workspace/aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb',
+      },
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 7,
+        source: 'chatgpt',
+        conversationKey: 'conv-7',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')?.href).toBe('https://www.notion.so/0123456789abcdef0123456789abcdef');
+    expect(byId(actions, 'copy-notion-link')?.href).toBe(byId(actions, 'open-in-notion')?.href);
+  });
+
   it('preserves caller Notion metadata and never mixes metadata from a different hydrated target', async () => {
     getSyncMappingByConversationMock.mockResolvedValue({
       conversation: { id: 6, notionPageId: OTHER_NOTION_PAGE_ID },

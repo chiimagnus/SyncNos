@@ -91,25 +91,24 @@ export async function resolveOpenInDetailHeaderActions({
 
   if (notionEnabled) {
     let convo = conversation;
+    const currentNotionPageId = normalizeNotionPageId(safeString((convo as any)?.notionPageId));
     if (
       convo &&
-      (!safeString((convo as any).notionPageId) ||
+      (!currentNotionPageId ||
         !safeString((convo as any).notionPageUrl) ||
         !safeString((convo as any).notionWorkspaceSlug))
     ) {
       const mappingRes = await resolveSyncMapping();
-      const currentPageId = safeString((convo as any).notionPageId);
-      const hydratedPageId = hydratedValue(mappingRes, 'notionPageId');
-      const sameTarget =
-        !currentPageId ||
-        !hydratedPageId ||
-        normalizeNotionPageId(currentPageId) === normalizeNotionPageId(hydratedPageId);
+      const currentPageId = normalizeNotionPageId(safeString((convo as any).notionPageId));
+      const hydratedPageId = normalizeNotionPageId(hydratedValue(mappingRes, 'notionPageId'));
+      const canHydrateTargetMetadata = Boolean(hydratedPageId) && (!currentPageId || currentPageId === hydratedPageId);
       const pageId = currentPageId || hydratedPageId;
       const pageUrl =
-        safeString((convo as any).notionPageUrl) || (sameTarget ? hydratedValue(mappingRes, 'notionPageUrl') : '');
+        (currentPageId ? safeString((convo as any).notionPageUrl) : '') ||
+        (canHydrateTargetMetadata ? hydratedValue(mappingRes, 'notionPageUrl') : '');
       const workspaceSlug =
-        safeString((convo as any).notionWorkspaceSlug) ||
-        (sameTarget ? hydratedValue(mappingRes, 'notionWorkspaceSlug') : '');
+        (currentPageId ? safeString((convo as any).notionWorkspaceSlug) : '') ||
+        (canHydrateTargetMetadata ? hydratedValue(mappingRes, 'notionWorkspaceSlug') : '');
       if (pageId || pageUrl || workspaceSlug) {
         convo = {
           ...(convo as any),
