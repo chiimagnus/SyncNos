@@ -313,7 +313,12 @@ export async function commitGithubStagedOperationsOnce(
     tree: treeEntries,
   });
   const treeSha = requireResponseGitSha(treeResponse?.sha);
-  if (treeSha === baseTreeSha) return { status: 'no_changes', treeSha, files: files() };
+  if (treeSha === baseTreeSha) {
+    if (deleteResolution.deletes.some((item) => item.status === 'present')) {
+      throw new GithubGitTransportError('github_git_response_invalid');
+    }
+    return { status: 'no_changes', treeSha, files: files() };
+  }
 
   const commitResponse = await api.post<any>(`/repos/${encodedRepository}/git/commits`, {
     message: `SyncNos: sync ${treeEntries.length} file${treeEntries.length === 1 ? '' : 's'}`,

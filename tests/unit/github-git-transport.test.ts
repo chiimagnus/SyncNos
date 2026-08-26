@@ -342,6 +342,41 @@ describe('github git transport staged path/delete resolver', () => {
     expect(calls.some((call) => call.startsWith('POST') || call.startsWith('PATCH'))).toBe(false);
   });
 
+  it('rejects an unchanged tree when a delete was proven present', async () => {
+    let commits = 0;
+    let patches = 0;
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path.endsWith(ROOT)) return tree([{ path: 'old.md', type: 'blob', sha: BLOB_1 }]) as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/trees')) return { sha: ROOT } as T;
+        if (path.endsWith('/git/commits')) commits += 1;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(): Promise<T> {
+        patches += 1;
+        throw new Error('unexpected patch');
+      },
+    };
+
+    await expect(
+      commitGithubStagedOperationsOnce(
+        {
+          repository: 'owner/repo',
+          branch: 'main',
+          headSha: 'f'.repeat(40),
+          treeSha: ROOT,
+          operations: [{ type: 'delete', path: 'old.md' }],
+        },
+        api,
+      ),
+    ).rejects.toMatchObject({ code: 'github_git_response_invalid' });
+    expect(commits).toBe(0);
+    expect(patches).toBe(0);
+  });
+
   it('returns complete no_changes file resolution when GitHub tree equals base tree', async () => {
     let commits = 0;
     let patches = 0;
