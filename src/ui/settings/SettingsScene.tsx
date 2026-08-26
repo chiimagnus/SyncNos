@@ -267,6 +267,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           feishuChatFolder={feishuChatFolder}
           feishuArticleFolder={feishuArticleFolder}
           feishuVideoFolder={feishuVideoFolder}
+          feishuLogoUrl={getURL('icons/feishu.svg' as any)}
           setupGuideUrl={feishuSetupGuideUrl}
           onToggleSyncEnabled={(enabled) => {
             void onToggleFeishuSyncEnabled(enabled);
