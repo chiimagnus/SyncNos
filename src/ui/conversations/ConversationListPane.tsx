@@ -620,7 +620,7 @@ export function ConversationListPane({
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
       <div
         ref={scrollRef}
-        className="route-scroll webclipper-detail-route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden"
+        className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden"
         onScroll={() => onListScrollTopChange?.(scrollRef.current?.scrollTop || 0)}
       >
         <div className="tw-grid tw-gap-2 tw-p-3">
