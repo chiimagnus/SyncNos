@@ -56,6 +56,13 @@ describe('writeTextToClipboard', () => {
 
     execCommand.mockReturnValue(false);
     await expect(writeTextToClipboard('fallback failed')).resolves.toBe(false);
+    expect(document.querySelector('textarea')).toBeNull();
+
+    execCommand.mockImplementation(() => {
+      throw new Error('legacy copy failed');
+    });
+    await expect(writeTextToClipboard('fallback throws')).resolves.toBe(false);
+    expect(document.querySelector('textarea')).toBeNull();
   });
 
   it('rejects empty text without touching browser clipboard APIs', async () => {

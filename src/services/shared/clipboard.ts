@@ -11,10 +11,11 @@ export async function writeTextToClipboard(value: string): Promise<boolean> {
     // ignore and fall back
   }
 
+  const doc = globalThis.document;
+  if (!doc) return false;
+  let ta: HTMLTextAreaElement | null = null;
   try {
-    const doc = globalThis.document;
-    if (!doc) return false;
-    const ta = doc.createElement('textarea');
+    ta = doc.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', 'true');
     ta.style.position = 'fixed';
@@ -24,9 +25,10 @@ export async function writeTextToClipboard(value: string): Promise<boolean> {
     ta.focus();
     ta.select();
     const ok = typeof doc.execCommand === 'function' ? doc.execCommand('copy') : false;
-    ta.remove();
     return Boolean(ok);
   } catch (_e) {
     return false;
+  } finally {
+    ta?.remove();
   }
 }
