@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { GithubCleanupOutboxRecord } from '@platform/idb/github-cleanup-outbox-record';
 import { GithubApiError } from '@services/sync/github/github-api-client';
 import { commitGithubStagedOperations } from '@services/sync/github/github-git-transport';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
@@ -55,6 +56,9 @@ function fakeServices(input: {
   patchFailures?: ReadonlySet<number>;
   loadImage?: GithubOrchestratorServices['loadImage'];
   createBlob?: GithubOrchestratorServices['createBlob'];
+  cleanupRows?: GithubCleanupOutboxRecord[];
+  cleanupHasMoreDue?: boolean;
+  replacementDeferMs?: number;
   now?: number;
 }) {
   const defaultCommit: GithubOrchestratorServices['commit'] = async () => ({
@@ -63,6 +67,7 @@ function fakeServices(input: {
     files: [],
   });
   const commit = vi.fn(input.commitImpl ?? defaultCommit);
+  let cleanupRows = (input.cleanupRows ?? []).map((row) => ({ ...row, paths: [...row.paths] }));
   const services: GithubOrchestratorServices = {
     getSettings: vi.fn(async () => settings),
     preflight: vi.fn(async () => preflight),
@@ -92,9 +97,31 @@ function fakeServices(input: {
     loadImage: input.loadImage ?? vi.fn(async () => null),
     createBlob: input.createBlob ?? vi.fn(async () => ({ sha: 'c'.repeat(40) })),
     commit,
+    listDueCleanupRows: vi.fn(async (remoteKey, now, limit) => {
+      const due = cleanupRows
+        .filter((row) => row.remoteKey === remoteKey && row.nextAttemptAt <= now)
+        .sort((left, right) => left.nextAttemptAt - right.nextAttemptAt || left.createdAt - right.createdAt);
+      return {
+        rows: due.slice(0, limit),
+        hasMoreDue: input.cleanupHasMoreDue ?? due.length > limit,
+      };
+    }),
+    getNextCleanupDueAt: vi.fn(async (remoteKey) => {
+      const values = cleanupRows.filter((row) => row.remoteKey === remoteKey).map((row) => row.nextAttemptAt);
+      return values.length ? Math.min(...values) : null;
+    }),
+    deferCleanupRows: vi.fn(async (ids, nextAttemptAt) => {
+      const selected = new Set(ids.map(Number));
+      cleanupRows = cleanupRows.map((row) => (selected.has(Number(row.id)) ? { ...row, nextAttemptAt } : row));
+    }),
+    ackCleanupRows: vi.fn(async (ids) => {
+      const selected = new Set(ids.map(Number));
+      cleanupRows = cleanupRows.filter((row) => !selected.has(Number(row.id)));
+    }),
+    replacementDeferMs: input.replacementDeferMs ?? 5_000,
     now: () => input.now ?? 1234,
   };
-  return { services, commit };
+  return { services, commit, getCleanupRows: () => cleanupRows.map((row) => ({ ...row, paths: [...row.paths] })) };
 }
 
 function resolvedFiles(operations: readonly any[], sha = 'e'.repeat(40)) {
@@ -106,6 +133,18 @@ function resolvedFiles(operations: readonly any[], sha = 'e'.repeat(40)) {
       sha: operation.type === 'reuse' ? operation.sha : sha,
     };
   });
+}
+
+function cleanupRow(id: number, overrides: Partial<GithubCleanupOutboxRecord> = {}): GithubCleanupOutboxRecord {
+  return {
+    id,
+    remoteKey: preflight.remoteKey,
+    paths: [`Old/owned-${id}.md`],
+    reason: 'delete',
+    createdAt: 1,
+    nextAttemptAt: 1,
+    ...overrides,
+  };
 }
 
 describe('github sync orchestrator staging', () => {
@@ -230,6 +269,220 @@ describe('github sync orchestrator staging', () => {
     expect(result.operations).toEqual([]);
     expect(result.items[0]?.status).toBe('no_changes');
     expect(commit).not.toHaveBeenCalled();
+  });
+});
+
+describe('github sync orchestrator cleanup outbox', () => {
+  it('runs unconditional cleanup without conversation candidates and acks only after one successful transport', async () => {
+    let committedOperations: readonly any[] = [];
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: {},
+      cleanupRows: [cleanupRow(1)],
+      commitImpl: async ({ operations }) => {
+        committedOperations = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(committedOperations).toEqual([{ type: 'delete', path: 'Old/owned-1.md' }]);
+    expect(services.ackCleanupRows).toHaveBeenCalledWith([1]);
+    expect(getCleanupRows()).toEqual([]);
+    expect(result.transport.status).toBe('committed');
+    expect(result.cleanupHasMoreDue).toBe(false);
+    expect(result.nextCleanupDueAt).toBeNull();
+    expect(result.deferredReplacementConversationIds).toEqual([]);
+  });
+
+  it('merges cleanup into the conversation branch transaction and lets current writes override stale deletes', async () => {
+    const current = chat(1);
+    const messages = [message('current body')];
+    const projection = await buildGithubMarkdownProjection({ conversation: current, messages, folders: settings });
+    let committedOperations: readonly any[] = [];
+    const { services, commit } = fakeServices({
+      rows: { 1: { conversation: current } },
+      messages: { 1: messages },
+      cleanupRows: [
+        cleanupRow(1, {
+          paths: [projection.markdownPath, 'Old/stale.md'],
+        }),
+      ],
+      commitImpl: async ({ operations }) => {
+        committedOperations = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1] });
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(committedOperations.filter((operation) => operation.path === projection.markdownPath)).toHaveLength(1);
+    expect(committedOperations.find((operation) => operation.path === projection.markdownPath)?.type).toBe('write');
+    expect(committedOperations).toContainEqual({ type: 'delete', path: 'Old/stale.md' });
+    expect(result.items[0]?.status).toBe('synced');
+    expect(services.ackCleanupRows).toHaveBeenCalledWith([1]);
+  });
+
+  it('defers identity cleanup while the replacement exists without same-target success', async () => {
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: { 2: { conversation: chat(2), mapping: null } },
+      cleanupRows: [
+        cleanupRow(7, {
+          reason: 'identity_move',
+          replacementConversationId: 2,
+        }),
+      ],
+      now: 2_000,
+      replacementDeferMs: 7_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).toHaveBeenCalledWith([7], 9_000);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(9_000);
+    expect(result.transport.status).toBe('not_needed');
+    expect(result.deferredReplacementConversationIds).toEqual([2]);
+    expect(result.nextCleanupDueAt).toBe(9_000);
+  });
+
+  it('allows identity cleanup after same-target replacement success or local replacement deletion', async () => {
+    let committedOperations: readonly any[] = [];
+    const { services, getCleanupRows } = fakeServices({
+      rows: {
+        2: {
+          conversation: chat(2),
+          mapping: { githubRemoteKey: preflight.remoteKey, githubLastSyncedAt: 100, githubManagedFiles: {} },
+        },
+      },
+      cleanupRows: [
+        cleanupRow(8, { reason: 'identity_move', replacementConversationId: 2 }),
+        cleanupRow(9, { reason: 'identity_move', replacementConversationId: 3 }),
+      ],
+      commitImpl: async ({ operations }) => {
+        committedOperations = operations;
+        return {
+          status: 'no_changes',
+          treeSha: 'f'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(committedOperations).toEqual([
+      { type: 'delete', path: 'Old/owned-8.md' },
+      { type: 'delete', path: 'Old/owned-9.md' },
+    ]);
+    expect(services.ackCleanupRows).toHaveBeenCalledWith([8, 9]);
+    expect(getCleanupRows()).toEqual([]);
+    expect(result.transport.status).toBe('no_changes');
+  });
+
+  it('keeps eligible cleanup pending when the shared transport fails', async () => {
+    const { services, getCleanupRows } = fakeServices({
+      rows: {},
+      cleanupRows: [cleanupRow(10)],
+      commitImpl: async () => {
+        throw Object.assign(new Error('offline'), { code: 'github_network_error' });
+      },
+      now: 4_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(result.transport.status).toBe('failed');
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()).toHaveLength(1);
+    expect(result.nextCleanupDueAt).toBe(1);
+  });
+
+  it('returns bounded cleanup scheduling metadata without treating deferred rows as more due work', async () => {
+    const { services } = fakeServices({
+      rows: { 5: { conversation: chat(5), mapping: null } },
+      cleanupRows: [cleanupRow(11, { reason: 'identity_move', replacementConversationId: 5 })],
+      cleanupHasMoreDue: false,
+      now: 10_000,
+      replacementDeferMs: 2_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+    expect(result.cleanupHasMoreDue).toBe(false);
+    expect(result.nextCleanupDueAt).toBe(12_000);
+    expect(result.deferredReplacementConversationIds).toEqual([5]);
+  });
+
+  it('keeps a successful remote result when local cleanup acknowledgement fails', async () => {
+    const { services, getCleanupRows } = fakeServices({
+      rows: {},
+      cleanupRows: [cleanupRow(12)],
+      commitImpl: async ({ operations }) => ({
+        status: 'committed',
+        treeSha: 'f'.repeat(40),
+        commitSha: '1'.repeat(40),
+        files: resolvedFiles(operations),
+      }),
+    });
+    services.ackCleanupRows = vi.fn(async () => {
+      throw new Error('local ack failed');
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(result.transport).toEqual({ status: 'committed', commitSha: '1'.repeat(40) });
+    expect(result.cleanupWarnings).toContain('github_cleanup_ack_failed');
+    expect(getCleanupRows()).toHaveLength(1);
+    expect(result.nextCleanupDueAt).toBe(1);
+  });
+
+  it('keeps deferred cleanup locally retryable when the defer write fails', async () => {
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: { 6: { conversation: chat(6), mapping: null } },
+      cleanupRows: [cleanupRow(13, { reason: 'identity_move', replacementConversationId: 6 })],
+      now: 20_000,
+      replacementDeferMs: 3_000,
+    });
+    services.deferCleanupRows = vi.fn(async () => {
+      throw new Error('local defer failed');
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(result.cleanupWarnings).toContain('github_cleanup_defer_failed');
+    expect(result.deferredReplacementConversationIds).toEqual([6]);
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(1);
+    expect(result.nextCleanupDueAt).toBe(1);
+  });
+
+  it('leaves cleanup for another remote target untouched', async () => {
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: {},
+      cleanupRows: [cleanupRow(14, { remoteKey: 'github.com/owner/other@main' })],
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()).toHaveLength(1);
+    expect(result.nextCleanupDueAt).toBeNull();
   });
 });
 

@@ -1,3 +1,5 @@
+import type { GithubCleanupOutboxRecord } from '@platform/idb/github-cleanup-outbox-record';
+import { GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT } from '@services/sync/github/github-cleanup-outbox-store';
 import type {
   GithubFinalFileResolution,
   GithubGitTransactionResult,
@@ -67,6 +69,10 @@ export type GithubSyncRunResult = {
     failedCount: number;
     warningCount: number;
   };
+  cleanupHasMoreDue: boolean;
+  nextCleanupDueAt: number | null;
+  deferredReplacementConversationIds: number[];
+  cleanupWarnings: string[];
 };
 
 function normalizeIds(input: readonly unknown[] | undefined): number[] {
@@ -210,6 +216,34 @@ function transportFailureCode(error: unknown): string {
   return code.startsWith('github_') ? code : 'github_transport_failed';
 }
 
+function positiveId(value: unknown): number | null {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function managedPathSet(mapping: any): Set<string> {
+  const files = mapping?.githubManagedFiles;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return new Set();
+  return new Set(Object.keys(files));
+}
+
+function hasSuccessfulSameTargetMapping(mapping: any, remoteKey: string): boolean {
+  return safeString(mapping?.githubRemoteKey) === remoteKey && Number.isFinite(mapping?.githubLastSyncedAt);
+}
+
+function mergeCleanupDeletes(
+  currentOperations: readonly GithubStagedOperation[],
+  cleanupPaths: ReadonlySet<string>,
+): GithubStagedOperation[] {
+  const operations = [...currentOperations];
+  const currentByPath = new Map(currentOperations.map((operation) => [operation.path, operation]));
+  for (const path of [...cleanupPaths].sort()) {
+    if (currentByPath.has(path)) continue;
+    operations.push({ type: 'delete', path });
+  }
+  return operations;
+}
+
 export function createGithubSyncOrchestrator(services: GithubOrchestratorServices = defaultGithubOrchestratorServices) {
   async function stage(input: {
     conversationIds?: readonly unknown[];
@@ -295,12 +329,155 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     mode?: GithubSyncPlannerMode;
   }): Promise<GithubSyncRunResult> {
     const staged = await stage(input);
+    const runNow = services.now();
+    const cleanupWarnings: string[] = [];
+    const deferredReplacementIds = new Set<number>();
+    let cleanupHasMoreDue = false;
+    let dueRows: GithubCleanupOutboxRecord[] = [];
+
+    try {
+      const batch = await services.listDueCleanupRows(
+        staged.target.remoteKey,
+        runNow,
+        GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT,
+      );
+      dueRows = batch.rows;
+      cleanupHasMoreDue = batch.hasMoreDue;
+    } catch (_error) {
+      cleanupWarnings.push('github_cleanup_list_failed');
+    }
+
+    const stagedByConversationId = new Map(staged.items.map((item) => [item.conversationId, item]));
+    const replacementChecks = new Map<
+      number,
+      { safe: boolean; dependsOnCurrentTransport: boolean; protectedPaths: Set<string> }
+    >();
+    const resolveReplacement = async (conversationId: number) => {
+      const cached = replacementChecks.get(conversationId);
+      if (cached) return cached;
+
+      const current = stagedByConversationId.get(conversationId);
+      if (current) {
+        const safe = current.status === 'staged' || current.status === 'no_changes';
+        const result = {
+          safe,
+          dependsOnCurrentTransport: current.status === 'staged',
+          protectedPaths: safe
+            ? new Set(Object.keys(current.nextContinuity?.githubManagedFiles ?? {}))
+            : new Set<string>(),
+        };
+        replacementChecks.set(conversationId, result);
+        return result;
+      }
+
+      try {
+        const row = await services.storage.getSyncMappingByConversation(conversationId);
+        if (!row?.conversation) {
+          const result = { safe: true, dependsOnCurrentTransport: false, protectedPaths: new Set<string>() };
+          replacementChecks.set(conversationId, result);
+          return result;
+        }
+        const safe = hasSuccessfulSameTargetMapping(row.mapping, staged.target.remoteKey);
+        const result = {
+          safe,
+          dependsOnCurrentTransport: false,
+          protectedPaths: safe ? managedPathSet(row.mapping) : new Set<string>(),
+        };
+        replacementChecks.set(conversationId, result);
+        return result;
+      } catch (_error) {
+        cleanupWarnings.push('github_cleanup_replacement_check_failed');
+        const result = { safe: false, dependsOnCurrentTransport: false, protectedPaths: new Set<string>() };
+        replacementChecks.set(conversationId, result);
+        return result;
+      }
+    };
+
+    const cleanupDeletePaths = new Set<string>();
+    const ackAfterTransportIds: number[] = [];
+    const ackSupersededIds: number[] = [];
+    const deferIds: number[] = [];
+    for (const row of dueRows) {
+      const rowId = positiveId(row.id);
+      if (!rowId) {
+        cleanupWarnings.push('github_cleanup_row_id_invalid');
+        continue;
+      }
+      if (row.reason === 'delete') {
+        ackAfterTransportIds.push(rowId);
+        row.paths.forEach((path) => cleanupDeletePaths.add(path));
+        continue;
+      }
+
+      const replacementConversationId = positiveId(row.replacementConversationId);
+      if (!replacementConversationId) {
+        cleanupWarnings.push('github_cleanup_replacement_id_invalid');
+        continue;
+      }
+      const replacement = await resolveReplacement(replacementConversationId);
+      if (!replacement.safe) {
+        deferIds.push(rowId);
+        deferredReplacementIds.add(replacementConversationId);
+        continue;
+      }
+
+      const remainingPaths = row.paths.filter((path) => !replacement.protectedPaths.has(path));
+      remainingPaths.forEach((path) => cleanupDeletePaths.add(path));
+      if (remainingPaths.length || replacement.dependsOnCurrentTransport) ackAfterTransportIds.push(rowId);
+      else ackSupersededIds.push(rowId);
+    }
+
+    const replacementDeferMs =
+      Number.isFinite(services.replacementDeferMs) && services.replacementDeferMs > 0
+        ? Math.floor(services.replacementDeferMs)
+        : 1;
+    if (deferIds.length) {
+      try {
+        await services.deferCleanupRows(deferIds, runNow + replacementDeferMs);
+      } catch (_error) {
+        cleanupWarnings.push('github_cleanup_defer_failed');
+      }
+    }
+    if (ackSupersededIds.length) {
+      try {
+        await services.ackCleanupRows(ackSupersededIds);
+      } catch (_error) {
+        cleanupWarnings.push('github_cleanup_ack_failed');
+      }
+    }
+
+    type ResultWithoutCleanup = Omit<
+      GithubSyncRunResult,
+      'cleanupHasMoreDue' | 'nextCleanupDueAt' | 'deferredReplacementConversationIds' | 'cleanupWarnings'
+    >;
+    const finalizeCleanup = async (result: ResultWithoutCleanup): Promise<GithubSyncRunResult> => {
+      let nextCleanupDueAt: number | null = null;
+      try {
+        nextCleanupDueAt = await services.getNextCleanupDueAt(staged.target.remoteKey);
+      } catch (_error) {
+        cleanupWarnings.push('github_cleanup_next_due_failed');
+      }
+      return {
+        ...result,
+        cleanupHasMoreDue,
+        nextCleanupDueAt,
+        deferredReplacementConversationIds: [...deferredReplacementIds].slice(0, GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT),
+        cleanupWarnings: [...new Set(cleanupWarnings)],
+      };
+    };
+
+    const operations = mergeCleanupDeletes(staged.operations, cleanupDeletePaths);
     const changed = staged.items.filter((item) => item.status === 'staged');
-    if (!staged.operations.length) {
+    if (!operations.length) {
       const items = staged.items.map((item) =>
         item.status === 'no_changes' ? finalItem(item, 'no_changes') : finalItem(item, 'failed', item.error),
       );
-      return { target: staged.target, transport: { status: 'not_needed' }, items, summary: finalSummary(items) };
+      return await finalizeCleanup({
+        target: staged.target,
+        transport: { status: 'not_needed' },
+        items,
+        summary: finalSummary(items),
+      });
     }
 
     let transport: GithubGitTransactionResult;
@@ -308,7 +485,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       transport = await services.commit({
         repository: staged.target.repository,
         branch: staged.target.branch,
-        operations: staged.operations,
+        operations,
         message: `SyncNos GitHub sync (${changed.length} items)`,
       });
     } catch (error) {
@@ -318,7 +495,12 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         if (item.status === 'staged') return finalItem(item, 'failed', code);
         return finalItem(item, 'failed', item.error);
       });
-      return { target: staged.target, transport: { status: 'failed' }, items, summary: finalSummary(items) };
+      return await finalizeCleanup({
+        target: staged.target,
+        transport: { status: 'failed' },
+        items,
+        summary: finalSummary(items),
+      });
     }
 
     if (transport.status !== 'committed' && transport.status !== 'no_changes') {
@@ -329,15 +511,15 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
             ? finalItem(item, 'no_changes')
             : finalItem(item, 'failed', item.error),
       );
-      return {
+      return await finalizeCleanup({
         target: staged.target,
         transport: { status: 'invalid_resolution' },
         items,
         summary: finalSummary(items),
-      };
+      });
     }
 
-    const resolutions = buildResolutionMap(staged.operations, transport.files);
+    const resolutions = buildResolutionMap(operations, transport.files);
     if (!resolutions) {
       const items = staged.items.map((item) =>
         item.status === 'staged'
@@ -346,7 +528,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
             ? finalItem(item, 'no_changes')
             : finalItem(item, 'failed', item.error),
       );
-      return {
+      return await finalizeCleanup({
         target: staged.target,
         transport: {
           status: 'invalid_resolution',
@@ -354,10 +536,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         },
         items,
         summary: finalSummary(items),
-      };
+      });
     }
 
-    const syncedAt = services.now();
     const items: GithubSyncRunItem[] = [];
     for (const item of staged.items) {
       if (item.status === 'no_changes') {
@@ -369,7 +550,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         continue;
       }
 
-      const patch = buildContinuityAck(item, resolutions, syncedAt);
+      const patch = buildContinuityAck(item, resolutions, runNow);
       if (!patch) {
         items.push(finalItem(item, 'failed', 'github_transport_resolution_incomplete'));
         continue;
@@ -384,7 +565,15 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       }
     }
 
-    return {
+    if (ackAfterTransportIds.length) {
+      try {
+        await services.ackCleanupRows(ackAfterTransportIds);
+      } catch (_error) {
+        cleanupWarnings.push('github_cleanup_ack_failed');
+      }
+    }
+
+    return await finalizeCleanup({
       target: staged.target,
       transport: {
         status: transport.status,
@@ -392,7 +581,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       },
       items,
       summary: finalSummary(items),
-    };
+    });
   }
 
   return { stage, sync };
