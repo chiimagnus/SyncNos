@@ -519,14 +519,6 @@ export const en = {
   detailHeaderCopyFeishuLink: 'Copy Feishu link',
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
   detailHeaderCacheImagesLabel: 'Cache images',
-  detailHeaderCacheImagesInProgressLabel: 'Caching images...',
-  detailHeaderCacheImagesDoneLabel: 'Cache complete',
-  detailHeaderCacheImagesSuccess: 'Images cached.',
-  detailHeaderCacheImagesUpdatedMessages: 'Updated messages:',
-  detailHeaderCacheImagesDownloaded: 'downloaded',
-  detailHeaderCacheImagesCacheHits: 'cache hits',
-  detailHeaderCacheImagesNoop: 'No images to cache.',
-  detailHeaderCacheImagesFailed: 'Cache images failed',
   detailWordCountLabel: 'Words',
 
   // Conversation sources / sync feedback

@@ -515,14 +515,6 @@ export const zh: { [K in TranslationKey]: string } = {
   detailHeaderCopyFeishuLink: '复制飞书链接',
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
   detailHeaderCacheImagesLabel: '缓存图片',
-  detailHeaderCacheImagesSuccess: '图片已缓存。',
-  detailHeaderCacheImagesUpdatedMessages: '更新消息数：',
-  detailHeaderCacheImagesInProgressLabel: '正在缓存中…',
-  detailHeaderCacheImagesDoneLabel: '缓存完成',
-  detailHeaderCacheImagesDownloaded: '下载',
-  detailHeaderCacheImagesCacheHits: '命中缓存',
-  detailHeaderCacheImagesNoop: '没有可缓存的图片。',
-  detailHeaderCacheImagesFailed: '缓存图片失败',
   detailWordCountLabel: '字数',
 
   // Conversation sources / sync feedback

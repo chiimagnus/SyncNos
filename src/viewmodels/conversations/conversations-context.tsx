@@ -1087,13 +1087,9 @@ export function ConversationsProvider({
             ? {
                 id: 'cache-images',
                 label: t('detailHeaderCacheImagesLabel'),
-                busyLabel: t('detailHeaderCacheImagesInProgressLabel'),
-                showBusyProgress: true,
                 kind: 'open-target',
                 provider: 'local',
                 slot: 'tools',
-                afterTriggerLabel: t('detailHeaderCacheImagesDoneLabel'),
-                afterTriggerLabelDurationMs: 0,
                 onTrigger: async () => {
                   await backfillConversationImages(conversationId, conversationUrl);
                   await refreshActiveDetail();

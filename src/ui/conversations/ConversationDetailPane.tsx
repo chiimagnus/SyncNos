@@ -398,7 +398,6 @@ export function ConversationDetailPane({
             <DetailHeaderActionBar
               actions={openActions}
               buttonClassName={headerIconButtonClass}
-              iconOnly
               menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
               menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
               menuAriaLabel={t('detailHeaderOpenInMenuAria')}
@@ -409,7 +408,6 @@ export function ConversationDetailPane({
               key={copyActionScopeKey}
               actions={copyActions}
               buttonClassName={headerIconButtonClass}
-              iconOnly
               triggerIcon={<Copy size={16} strokeWidth={2} aria-hidden="true" />}
               menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
               menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
@@ -486,7 +484,6 @@ export function ConversationDetailPane({
                         <DetailHeaderActionBar
                           actions={toolActions}
                           buttonClassName={buttonMenuItemClassName()}
-                          showLabelAlways
                           inlineMenuItems
                           closeMenuOnActionTrigger={closeMoreMenu}
                           className="tw-w-full"
