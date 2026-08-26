@@ -13,12 +13,4 @@
 
 新设置先写 protocol/normalizer，再由 ViewModel 编排，UI 只渲染；不得形成长期双写兼容路径。Feishu 的 OAuth 默认值与 Worker 部署见 [feishu-setup.md](feishu-setup.md)。
 
-## 命令与验证
-
-```bash
-npm ci
-npm run dev
-npm run gate:ci
-```
-
-manifest、权限、发布构建或产物相关改动再运行 `npm run gate`。可用的 browser-specific `dev:*` / `build:*` 命令以 `package.json` 为准。
+开发环境、浏览器特定命令和提交前验证统一见 [CONTRIBUTING.md](CONTRIBUTING.md)；具体脚本真源以 `package.json` 为准。

@@ -6,7 +6,7 @@ SyncNos 将 AI 对话、网页文章和已加载的视频字幕统一为浏览�
 
 | 目标 | 页面 |
 | --- | --- |
-| 提交 Issue、commit 或 Pull Request | [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| 提交 Issue、commit 或 Pull Request | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 本地数据、备份和安全边界 | [storage.md](storage.md) |
 | 设置、构建与环境变量 | [configuration.md](configuration.md) |
 | 部署或维护 Feishu OAuth | [feishu-setup.md](feishu-setup.md) |

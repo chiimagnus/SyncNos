@@ -1,6 +1,6 @@
 # 仓库指南
 
-本仓库只维护 SyncNos WebClipper。iOS、macOS 与 CLI 已拆分到独立仓库。
+贡献流程、提交规范和通用验证要求统一见 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)。本文件只维护代码架构、不可破坏契约和 agent 特有的实现约束。
 
 ## 分层与依赖方向
 
@@ -40,36 +40,14 @@ collectors -> services/shared
 
 长期说明统一放在 [docs/overview.md](docs/overview.md) 导航下；不要在 README、AGENTS 和多个模块页重复维护同一事实。
 
-## 修改约定
+## Agent 实现约束
 
 - 默认不查看或编辑 i18n 文案，除非任务明确涉及文案。
-- Commit message 使用 Conventional Commits；一个提交只做一件可验证的事。
-- 新 API、新状态或新文件必须接入生产入口，同时删除被替代的旧路径、兼容分支和测试假设。
-- 先从代码和脚本确认行为，再改文档；不要根据旧文档互相抄写。
-- 版本、DB schema、权限和迁移等易漂移事实只在对应源文件或一个 canonical 文档中维护，其他页面只链接。
+- 新 API、新状态或新文件必须接入生产入口；不要留下只被测试引用、没有生产消费者的实现。
 
-## 验证
+## 架构自检
 
-日常功能改动至少运行：
-
-```bash
-npm run compile
-npm run test
-```
-
-提交前运行：
-
-```bash
-npm run gate:ci
-```
-
-发布或构建相关改动再运行：
-
-```bash
-npm run gate
-```
-
-边界扫描：
+通用验证矩阵见 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)。涉及对应边界时额外运行：
 
 ```bash
 rg -n "@platform/|src/platform|/platform/" src/ui src/viewmodels

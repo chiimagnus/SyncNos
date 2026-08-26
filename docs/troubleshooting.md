@@ -1,6 +1,6 @@
 # 排障
 
-先运行 `npm ci` 和 `npm run gate:ci`。manifest、权限、发布构建或产物问题再运行 `npm run gate`；仅检查默认浏览器产物可运行 `npm run check`。
+通用开发环境与提交前验证见 [CONTRIBUTING.md](CONTRIBUTING.md)。本页只记录故障诊断；仅检查默认浏览器产物时可运行 `npm run check`。
 
 ## 常见问题
 

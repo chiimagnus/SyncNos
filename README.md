@@ -81,28 +81,13 @@ WebClipper Settings: backup and sync (Notion / Obsidian / Feishu)
 Article discussion sidebar: exact quotes, compact threads, and one active reply composer
 ![Article discussion sidebar](docs/assets/comments-discussion.png)
 
-## Development
-
-```bash
-npm ci
-npm run dev
-```
-
-Before submitting code, run:
-
-```bash
-npm run gate:ci
-```
-
-Use `npm run gate` when the change affects production builds, manifests, permissions, or release packaging.
-
 ## Contributing
 
-Before opening an issue or pull request, read [CONTRIBUTING.md](CONTRIBUTING.md). It defines the expected issue evidence, Conventional Commit rules, PR contents, and validation bar. Read [AGENTS.md](AGENTS.md) before changing code for repository architecture and non-negotiable product contracts.
+Development setup, issue/commit/PR workflow, and validation requirements are maintained in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Architecture and non-negotiable product contracts are maintained in [AGENTS.md](AGENTS.md).
 
 ## Documentation
 
-Start at [docs/overview.md](docs/overview.md). It links configuration, local-data/security boundaries, Feishu setup, troubleshooting, and the contributor workflow. Repository rules are in [AGENTS.md](AGENTS.md).
+Start at [docs/overview.md](docs/overview.md) for product, configuration, storage, and troubleshooting documentation.
 
 ## Support
 

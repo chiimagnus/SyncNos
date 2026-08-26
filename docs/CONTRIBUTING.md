@@ -2,13 +2,13 @@
 
 SyncNos welcomes focused bug fixes, site adapters, documentation improvements, and product changes that preserve the repository's existing contracts.
 
-This repository maintains **SyncNos WebClipper only**. iOS, macOS, and CLI work belongs in their own repositories unless the task explicitly changes an integration contract owned here.
+This repository maintains **SyncNos WebClipper only**. iOS, macOS, and CLI work belongs in their own repositories unless a task explicitly changes an integration contract owned here.
 
 ## Before you start
 
 1. Search existing [issues](https://github.com/chiimagnus/SyncNos/issues) and [pull requests](https://github.com/chiimagnus/SyncNos/pulls) first.
-2. Read [`AGENTS.md`](AGENTS.md) before changing code. It is the source of truth for dependency direction, product invariants, commit discipline, and validation commands.
-3. Start from [`docs/overview.md`](docs/overview.md) for long-lived product and data-model documentation.
+2. Read [`AGENTS.md`](../AGENTS.md) before changing code. It is the source of truth for dependency direction, product invariants, and architecture-specific checks.
+3. Start from [`overview.md`](overview.md) for long-lived product and data-model documentation.
 4. Discuss non-trivial behavior changes before investing in an implementation. New site adapters/integrations, storage or schema changes, permission changes, migrations, and release behavior should normally have an agreed issue first. Small documentation, typo, and clearly mechanical maintenance changes may go directly to a PR.
 5. Keep the change narrow. Do not mix unrelated cleanup, formatting, localization, or refactors into a functional patch.
 
@@ -37,11 +37,13 @@ For Safari/Xcode integration work, use the repository script rather than maintai
 npm run setup:safari:xcode
 ```
 
-## Architecture and source of truth
+The current command and dependency source of truth is [`package.json`](../package.json).
 
-Do not duplicate architectural rules here. Follow [`AGENTS.md`](AGENTS.md), including the dependency direction between `ui`, `viewmodels`, `services`, `platform`, `collectors`, and `entrypoints`.
+## Source of truth
 
-Long-lived product facts belong under [`docs/overview.md`](docs/overview.md) and its linked pages. Version numbers, permissions, schemas, migrations, and other fast-drifting facts should stay in their canonical source file or one canonical document; other docs should link to them.
+Do not duplicate architectural rules here. Follow [`AGENTS.md`](../AGENTS.md) for dependency direction and product invariants.
+
+Long-lived product facts belong under [`overview.md`](overview.md) and its linked pages. Version numbers, permissions, schemas, migrations, and other fast-drifting facts should stay in their canonical source file or one canonical document; other docs should link to them.
 
 When documentation and implementation disagree, verify behavior from code and repository scripts first, then correct the stale documentation in the same PR.
 
@@ -75,7 +77,7 @@ For site adapters, identify which page type is in scope and what content must be
 
 ## Commits
 
-Use **Conventional Commits**, as required by [`AGENTS.md`](AGENTS.md). A commit should represent one verifiable concern.
+Use **Conventional Commits**. A commit should represent one verifiable concern.
 
 Typical prefixes include:
 
@@ -131,7 +133,7 @@ The repository scripts define the acceptance bar:
 
 GitHub Actions currently runs `npm ci` and `npm run gate:ci` for non-draft PRs that touch WebClipper code paths. That CI result does **not** replace a required local production build or manual browser validation.
 
-When a change touches a product invariant in [`AGENTS.md`](AGENTS.md), include the relevant boundary scan or targeted test evidence in the PR.
+When a change touches a product invariant in [`AGENTS.md`](../AGENTS.md), include the relevant architecture-specific scan or targeted test evidence in the PR.
 
 ## Data and privacy changes
 
@@ -141,4 +143,4 @@ Do not commit real credentials, private user content, browser profiles, generate
 
 ## License
 
-Contributions accepted into this repository are distributed under the repository's [GNU Affero General Public License v3](LICENSE.APGLv3).
+Contributions accepted into this repository are distributed under the repository's [GNU Affero General Public License v3](../LICENSE.APGLv3).

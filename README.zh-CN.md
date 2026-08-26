@@ -107,7 +107,7 @@ WebClipper Settings：备份与同步（Notion / Obsidian / 飞书）
 
 ## 参与贡献
 
-提交 Issue、commit 或 PR 前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，其中定义了问题证据、Conventional Commits、PR 内容和验证要求。修改代码前同时阅读 [AGENTS.md](AGENTS.md)，以仓库分层与不可破坏的产品契约为准。
+开发环境、Issue / commit / PR 流程与验证要求统一见 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)；代码分层和不可破坏的产品契约见 [AGENTS.md](AGENTS.md)。
 
 ## 支持
 
