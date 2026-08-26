@@ -192,6 +192,7 @@
 }
 
 .detail-header-split-button__menu > .webclipper-btn {
+  width: 28px;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
