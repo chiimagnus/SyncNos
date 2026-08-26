@@ -177,6 +177,25 @@
   color: var(--text-primary);
 }
 
+.detail-header-split-button {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.detail-header-split-button > .webclipper-btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.detail-header-split-button__menu {
+  margin-left: -1px;
+}
+
+.detail-header-split-button__menu > .webclipper-btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 .webclipper-btn--icon-sm {
   --btn-icon-size: 32px;
 }

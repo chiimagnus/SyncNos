@@ -52,6 +52,7 @@ export function DetailHeaderActionBar({
 }: DetailHeaderActionBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [primaryActionId, setPrimaryActionId] = useState('');
   const [labelOverride, setLabelOverride] = useState<string>('');
   const labelResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -60,6 +61,7 @@ export function DetailHeaderActionBar({
     if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
     labelResetTimerRef.current = null;
     setLabelOverride('');
+    setPrimaryActionId(action.id);
     setBusy(true);
     try {
       await action.onTrigger();
@@ -93,6 +95,8 @@ export function DetailHeaderActionBar({
   if (!actions.length) return null;
 
   const resolveInlineActionIcon = (action: DetailHeaderAction) => {
+    const logo = providerLogo(action);
+    if (logo) return logo;
     if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.provider === 'source' && action.kind === 'external-link')
       return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
@@ -162,7 +166,10 @@ export function DetailHeaderActionBar({
     );
   }
 
-  const resolvedTriggerIcon = triggerIcon || <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
+  const primaryAction = actions.find((action) => action.id === primaryActionId) || actions[0]!;
+  const resolvedTriggerIcon = triggerIcon || providerLogo(primaryAction) || (
+    <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
+  );
   const resolvedMenuTriggerLabel = String(menuTriggerLabel || '').trim() || 'Open in...';
   const resolvedMenuTriggerAriaLabel = String(menuTriggerAriaLabel || '').trim() || 'Open destinations';
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
@@ -170,54 +177,69 @@ export function DetailHeaderActionBar({
 
   return (
     <div className={['tw-relative tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
-      <MenuPopover
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        disabled={busy}
-        ariaLabel={resolvedMenuAriaLabel}
-        side="bottom"
-        align="end"
-        panelMinWidth={170}
-        trigger={(triggerProps) => (
-          <button
-            {...triggerProps}
-            {...tooltipAttrs(resolvedMenuTriggerLabel)}
-            aria-label={resolvedMenuTriggerAriaLabel}
-            className={buttonClassName}
-          >
-            <span className="tw-inline-flex tw-items-center tw-justify-center tw-gap-0.5">
-              {resolvedTriggerIcon}
+      <div className="detail-header-split-button">
+        <button
+          key={primaryAction.id}
+          type="button"
+          {...tooltipAttrs(primaryAction.label)}
+          onClick={() => {
+            void handleTrigger(primaryAction);
+            closeMenuOnActionTrigger?.();
+          }}
+          className={buttonClassName}
+          aria-label={primaryAction.label}
+          aria-disabled={primaryAction.disabled ? 'true' : undefined}
+          disabled={busy || !!primaryAction.disabled}
+        >
+          <span className="tw-inline-flex tw-items-center tw-justify-center">{resolvedTriggerIcon}</span>
+        </button>
+        <MenuPopover
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          disabled={busy}
+          ariaLabel={resolvedMenuAriaLabel}
+          side="bottom"
+          align="end"
+          panelMinWidth={170}
+          className="detail-header-split-button__menu"
+          trigger={(triggerProps) => (
+            <button
+              {...triggerProps}
+              {...tooltipAttrs(resolvedMenuTriggerLabel)}
+              aria-label={resolvedMenuTriggerAriaLabel}
+              className={buttonClassName}
+            >
               <span
                 className="tw-w-[10px] tw-text-center tw-text-[10px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
                 aria-hidden="true"
               >
                 ▾
               </span>
-            </span>
-          </button>
-        )}
-      >
-        {actions.map((action) => (
-          <button
-            key={action.id}
-            className={menuButtonClass}
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              void handleTrigger(action);
-              setMenuOpen(false);
-              closeMenuOnActionTrigger?.();
-            }}
-            aria-disabled={action.disabled ? 'true' : undefined}
-            disabled={busy || !!action.disabled}
-          >
-            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-              {providerLogo(action)}
-              <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
-            </span>
-          </button>
-        ))}
-      </MenuPopover>
+            </button>
+          )}
+        >
+          {actions.map((action) => (
+            <button
+              key={action.id}
+              className={menuButtonClass}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                void handleTrigger(action);
+                setMenuOpen(false);
+                closeMenuOnActionTrigger?.();
+              }}
+              aria-disabled={action.disabled ? 'true' : undefined}
+              disabled={busy || !!action.disabled}
+            >
+              <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+                {providerLogo(action)}
+                <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
+              </span>
+            </button>
+          ))}
+        </MenuPopover>
+      </div>
       {status}
     </div>
   );

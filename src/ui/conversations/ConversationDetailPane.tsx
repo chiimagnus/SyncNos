@@ -63,6 +63,7 @@ export function ConversationDetailPane({
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const copyActions = safeActions.filter((action) => action.slot === 'copy');
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
+  const moreActions = [...openActions, ...toolActions];
   const copyActionScopeKey = JSON.stringify([
     Number((selected as any)?.id ?? activeId) || 0,
     copyActions.map((action) => [action.id, String(action.href || '')]),
@@ -183,7 +184,7 @@ export function ConversationDetailPane({
       ? `${wordCountLabel} ${Math.max(0, Math.floor(wordCount)).toLocaleString()}`
       : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
-  const hasMoreMenuContent = Boolean(wordCountText) || toolActions.length > 0 || hasReaderMoreMenuContent;
+  const hasMoreMenuContent = Boolean(wordCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
   const moreMenuPanelClassName = 'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
   const closeMoreMenu = useCallback(() => {
     setMoreMenuOpen(false);
@@ -396,15 +397,6 @@ export function ConversationDetailPane({
           </div>
           <div className="tw-flex tw-shrink-0 tw-items-center tw-justify-end tw-gap-2 tw-whitespace-nowrap">
             <DetailHeaderActionBar
-              actions={openActions}
-              buttonClassName={headerIconButtonClass}
-              menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
-              menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
-              menuAriaLabel={t('detailHeaderOpenInMenuAria')}
-              className="tw-order-1"
-            />
-
-            <DetailHeaderActionBar
               key={copyActionScopeKey}
               actions={copyActions}
               buttonClassName={headerIconButtonClass}
@@ -412,7 +404,7 @@ export function ConversationDetailPane({
               menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
               menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
               menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
-              className="tw-order-2"
+              className="tw-order-1"
             />
 
             {canOpenCommentsSidebar ? (
@@ -421,7 +413,7 @@ export function ConversationDetailPane({
                 onClick={() => {
                   onTriggerCommentsSidebar?.();
                 }}
-                className={[headerButtonClassName(), 'tw-order-3'].join(' ')}
+                className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
                 aria-label={commentsSidebarLabel}
                 {...tooltipAttrs(commentsSidebarLabel)}
                 aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
@@ -449,7 +441,7 @@ export function ConversationDetailPane({
                 align="end"
                 panelMinWidth={214}
                 panelClassName={moreMenuPanelClassName}
-                className="tw-order-4"
+                className="tw-order-3"
                 trigger={(triggerProps) => (
                   <button
                     {...triggerProps}
@@ -472,7 +464,7 @@ export function ConversationDetailPane({
                       />
                     ) : null}
 
-                    {toolActions.length ? (
+                    {moreActions.length ? (
                       <div
                         className={[
                           hasReaderMoreMenuContent ? 'tw-border-t tw-border-[var(--border)] tw-pt-1' : '',
@@ -482,7 +474,7 @@ export function ConversationDetailPane({
                           .join(' ')}
                       >
                         <DetailHeaderActionBar
-                          actions={toolActions}
+                          actions={moreActions}
                           buttonClassName={buttonMenuItemClassName()}
                           inlineMenuItems
                           closeMenuOnActionTrigger={closeMoreMenu}
@@ -494,7 +486,7 @@ export function ConversationDetailPane({
                     {wordCountText ? (
                       <div
                         className={[
-                          hasReaderMoreMenuContent || toolActions.length
+                          hasReaderMoreMenuContent || moreActions.length
                             ? 'tw-border-t tw-border-[var(--border)] tw-pt-1'
                             : '',
                           'tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]',

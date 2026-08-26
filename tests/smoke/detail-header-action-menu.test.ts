@@ -83,7 +83,9 @@ describe('DetailHeaderActionBar', () => {
     expect(button?.textContent).not.toContain('▾');
   });
 
-  it('renders a menu trigger when multiple destinations exist', () => {
+  it('renders a split button and promotes a selected menu action', async () => {
+    const notionTrigger = vi.fn(async () => {});
+    const obsidianTrigger = vi.fn(async () => {});
     act(() => {
       root!.render(
         createElement(DetailHeaderActionBar, {
@@ -95,7 +97,7 @@ describe('DetailHeaderActionBar', () => {
               kind: 'external-link',
               slot: 'open',
               href: 'https://app.notion.com/example',
-              onTrigger: vi.fn(async () => {}),
+              onTrigger: notionTrigger,
             },
             {
               id: 'open-in-obsidian',
@@ -103,7 +105,7 @@ describe('DetailHeaderActionBar', () => {
               provider: 'obsidian',
               kind: 'open-target',
               slot: 'open',
-              onTrigger: vi.fn(async () => {}),
+              onTrigger: obsidianTrigger,
             },
           ],
           buttonClassName,
@@ -112,9 +114,25 @@ describe('DetailHeaderActionBar', () => {
     });
 
     const trigger = document.querySelector('[aria-label="Open destinations"]') as HTMLButtonElement | null;
+    const primaryButton = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
     expect(trigger).toBeTruthy();
     expect(trigger?.textContent).toContain('▾');
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+    expect(primaryButton).toBeTruthy();
+    expect(trigger?.parentElement?.className || '').toContain('detail-header-split-button__menu');
+
+    await act(async () => {
+      trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const menuItems = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    await act(async () => {
+      menuItems[1]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(obsidianTrigger).toHaveBeenCalledTimes(1);
+    expect(notionTrigger).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-label="Open in Obsidian"]')).toBeTruthy();
   });
 
   it('renders menu items as vertical flex buttons that can wrap text', async () => {

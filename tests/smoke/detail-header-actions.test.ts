@@ -5,6 +5,10 @@ const openObsidianTargetMock = vi.fn();
 const getSyncMappingByConversationMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const formatConversationMarkdownMock = vi.fn();
+const { storageGetMock, storageSetMock } = vi.hoisted(() => ({
+  storageGetMock: vi.fn(),
+  storageSetMock: vi.fn(),
+}));
 
 vi.mock('@services/integrations/openin/obsidian-open-target', () => ({
   resolveObsidianOpenTarget: (...args: any[]) => resolveObsidianOpenTargetMock(...args),
@@ -25,7 +29,13 @@ vi.mock('@services/integrations/chatwith/chatwith-settings', () => ({
   formatConversationMarkdownForExternalOutput: (...args: any[]) => formatConversationMarkdownMock(...args),
 }));
 
+vi.mock('@services/shared/storage', () => ({
+  storageGet: (...args: any[]) => storageGetMock(...args),
+  storageSet: (...args: any[]) => storageSetMock(...args),
+}));
+
 import { t } from '@i18n';
+import { DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY } from '@services/integrations/detail-header-copy-link-preference';
 import { DETAIL_HEADER_ACTION_LABELS, resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/openin-detail-header-actions';
 
@@ -91,6 +101,10 @@ describe('detail-header-actions', () => {
     writeTextToClipboardMock.mockResolvedValue(true);
     formatConversationMarkdownMock.mockReset();
     formatConversationMarkdownMock.mockResolvedValue('# exact markdown\n');
+    storageGetMock.mockReset();
+    storageGetMock.mockResolvedValue({});
+    storageSetMock.mockReset();
+    storageSetMock.mockResolvedValue(undefined);
   });
 
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
@@ -178,6 +192,7 @@ describe('detail-header-actions', () => {
   });
 
   it('keeps copy provider order stable when Notion and Feishu are both available', async () => {
+    storageGetMock.mockResolvedValue({ [DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY]: 'copy-removed-link' });
     const actions = await resolveDetailHeaderActions({
       conversation: {
         id: 4,
@@ -196,6 +211,26 @@ describe('detail-header-actions', () => {
     expect(bySlot(actions, 'copy').map((action) => action.provider)).toEqual(['notion', 'feishu']);
     expect(byId(actions, 'copy-notion-link')?.href).toBe(byId(actions, 'open-in-notion')?.href);
     expect(byId(actions, 'copy-feishu-link')?.href).toBe(byId(actions, 'open-in-feishu')?.href);
+  });
+
+  it('promotes and remembers the last selected copy target', async () => {
+    storageGetMock.mockResolvedValue({ [DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY]: 'copy-feishu-link' });
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 40,
+        source: 'chatgpt',
+        conversationKey: 'conv-40',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'chiimagnus',
+        feishuDocId: 'doc-40',
+      },
+      port: createPort(),
+    });
+
+    expect(bySlot(actions, 'copy').map((action) => action.id)).toEqual(['copy-feishu-link', 'copy-notion-link']);
+    await byId(actions, 'copy-feishu-link')?.onTrigger();
+    expect(storageSetMock).toHaveBeenCalledWith({ [DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY]: 'copy-feishu-link' });
   });
 
   it('hydrates deep-link Notion and Feishu metadata with a single mapping read', async () => {
