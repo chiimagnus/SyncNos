@@ -146,7 +146,11 @@ export function DetailHeaderActionBar({
       );
     const triggerButtonClassName = iconOnly ? buttonClassName : [buttonClassName, 'tw-text-[13px]'].join(' ');
     return (
-      <div className={[iconOnly ? 'tw-relative' : '', 'tw-flex tw-items-center tw-gap-2', className || ''].filter(Boolean).join(' ')}>
+      <div
+        className={[iconOnly ? 'tw-relative' : '', 'tw-flex tw-items-center tw-gap-2', className || '']
+          .filter(Boolean)
+          .join(' ')}
+      >
         <button
           key={action.id}
           type="button"
@@ -204,7 +208,11 @@ export function DetailHeaderActionBar({
   const menuButtonClass = buttonMenuItemClassName();
 
   return (
-    <div className={[iconOnly ? 'tw-relative' : '', 'tw-flex tw-items-center tw-gap-2', className || ''].filter(Boolean).join(' ')}>
+    <div
+      className={[iconOnly ? 'tw-relative' : '', 'tw-flex tw-items-center tw-gap-2', className || '']
+        .filter(Boolean)
+        .join(' ')}
+    >
       <MenuPopover
         open={menuOpen}
         onOpenChange={setMenuOpen}
