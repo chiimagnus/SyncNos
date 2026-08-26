@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { GithubApiError } from '@services/sync/github/github-api-client';
+import { commitGithubStagedOperations } from '@services/sync/github/github-git-transport';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
 import type { GithubOrchestratorServices } from '@services/sync/github/github-orchestrator-services';
 import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
@@ -51,6 +53,8 @@ function fakeServices(input: {
   order?: string[];
   commitImpl?: GithubOrchestratorServices['commit'];
   patchFailures?: ReadonlySet<number>;
+  loadImage?: GithubOrchestratorServices['loadImage'];
+  createBlob?: GithubOrchestratorServices['createBlob'];
   now?: number;
 }) {
   const defaultCommit: GithubOrchestratorServices['commit'] = async () => ({
@@ -85,8 +89,8 @@ function fakeServices(input: {
         return true;
       }),
     },
-    loadImage: vi.fn(async () => null),
-    createBlob: vi.fn(async () => ({ sha: 'c'.repeat(40) })),
+    loadImage: input.loadImage ?? vi.fn(async () => null),
+    createBlob: input.createBlob ?? vi.fn(async () => ({ sha: 'c'.repeat(40) })),
     commit,
     now: () => input.now ?? 1234,
   };
@@ -385,5 +389,297 @@ describe('github sync orchestrator transport acknowledgement', () => {
     expect(result.transport.status).toBe('invalid_resolution');
     expect(result.items[0]).toMatchObject({ status: 'failed', error: 'github_transport_resolution_incomplete' });
     expect(services.storage.patchSyncMapping).not.toHaveBeenCalled();
+  });
+});
+
+describe('github sync orchestrator atomic cross-layer contracts', () => {
+  function actualTransport(treeNoOp = false) {
+    const HEAD = '3'.repeat(40);
+    const BASE = '4'.repeat(40);
+    const NEXT = '5'.repeat(40);
+    const COMMIT = '6'.repeat(40);
+    let blobIndex = 0;
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        calls.push({ method: 'GET', path });
+        if (path.endsWith('/git/ref/heads/main')) return { object: { type: 'commit', sha: HEAD } } as T;
+        if (path.endsWith(`/git/commits/${HEAD}`)) return { tree: { sha: BASE } } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ method: 'POST', path, body });
+        if (path.endsWith('/git/blobs')) {
+          blobIndex += 1;
+          return {
+            sha: Math.min(15, 6 + blobIndex)
+              .toString(16)
+              .repeat(40),
+          } as T;
+        }
+        if (path.endsWith('/git/trees')) return { sha: treeNoOp ? BASE : NEXT } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(path: string, body?: unknown): Promise<T> {
+        calls.push({ method: 'PATCH', path, body });
+        return { object: { sha: COMMIT } } as T;
+      },
+    };
+    const commitImpl: GithubOrchestratorServices['commit'] = (input) => commitGithubStagedOperations(input, api);
+    return { calls, commitImpl, BASE, NEXT, COMMIT };
+  }
+
+  it('puts two changed conversations into exactly one Git commit and one ref update', async () => {
+    const remote = actualTransport();
+    const { services } = fakeServices({
+      rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
+      commitImpl: remote.commitImpl,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1, 2] });
+    expect(result.items.map((item) => item.status)).toEqual(['synced', 'synced']);
+    expect(remote.calls.filter((call) => call.path.endsWith('/git/commits'))).toHaveLength(1);
+    expect(remote.calls.filter((call) => call.method === 'PATCH')).toHaveLength(1);
+    expect(remote.calls.find((call) => call.path.endsWith('/git/commits'))?.body.message).toBe(
+      'SyncNos GitHub sync (2 items)',
+    );
+  });
+
+  it('still commits the safe row when another conversation fails local projection', async () => {
+    const remote = actualTransport();
+    const { services } = fakeServices({
+      rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
+      messages: { 1: new Error('local read failed'), 2: [message('safe body')] },
+      commitImpl: remote.commitImpl,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1, 2] });
+    expect(result.items.map((item) => item.status)).toEqual(['failed', 'synced']);
+    expect(remote.calls.filter((call) => call.path.endsWith('/git/commits'))).toHaveLength(1);
+    expect(remote.calls.filter((call) => call.method === 'PATCH')).toHaveLength(1);
+  });
+
+  it('does not enter Git transport at all when every row is a local no-op', async () => {
+    const current = chat(1);
+    const messages = [message('same body')];
+    const p = await buildGithubMarkdownProjection({ conversation: current, messages, folders: settings });
+    const mapping = {
+      githubRemoteKey: preflight.remoteKey,
+      githubProjectionFingerprint: p.projectionFingerprint,
+      githubManagedFiles: {
+        [p.markdownPath]: { kind: 'markdown', contentHash: p.markdownContentHash, sha: 'd'.repeat(40) },
+      },
+    };
+    const { services, commit } = fakeServices({
+      rows: { 1: { conversation: current, mapping } },
+      messages: { 1: messages },
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1] });
+    expect(result.transport.status).toBe('not_needed');
+    expect(result.items[0]?.status).toBe('no_changes');
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('authoritative reconcile restores remote drift and remains commit-free when the tree is already authoritative', async () => {
+    const current = chat(1);
+    const messages = [message('same body')];
+    const p = await buildGithubMarkdownProjection({ conversation: current, messages, folders: settings });
+    const mapping = {
+      githubRemoteKey: preflight.remoteKey,
+      githubProjectionFingerprint: p.projectionFingerprint,
+      githubManagedFiles: {
+        [p.markdownPath]: { kind: 'markdown', contentHash: p.markdownContentHash, sha: 'd'.repeat(40) },
+      },
+    };
+
+    const drifted = actualTransport(false);
+    const driftedServices = fakeServices({
+      rows: { 1: { conversation: current, mapping } },
+      messages: { 1: messages },
+      commitImpl: drifted.commitImpl,
+    }).services;
+    const driftedResult = await createGithubSyncOrchestrator(driftedServices).sync({
+      conversationIds: [1],
+      mode: 'reconcile',
+    });
+    expect(driftedResult.transport.status).toBe('committed');
+    expect(drifted.calls.find((call) => call.path.endsWith('/git/trees'))?.body.tree).toEqual([
+      { path: p.markdownPath, mode: '100644', type: 'blob', sha: 'd'.repeat(40) },
+    ]);
+    expect(drifted.calls.filter((call) => call.path.endsWith('/git/commits'))).toHaveLength(1);
+
+    const currentRemote = actualTransport(true);
+    const currentServices = fakeServices({
+      rows: { 1: { conversation: current, mapping } },
+      messages: { 1: messages },
+      commitImpl: currentRemote.commitImpl,
+    }).services;
+    const currentResult = await createGithubSyncOrchestrator(currentServices).sync({
+      conversationIds: [1],
+      mode: 'reconcile',
+    });
+    expect(currentResult.transport.status).toBe('no_changes');
+    expect(currentResult.items[0]?.status).toBe('synced');
+    expect(currentRemote.calls.filter((call) => call.path.endsWith('/git/commits'))).toHaveLength(0);
+    expect(currentRemote.calls.filter((call) => call.method === 'PATCH')).toHaveLength(0);
+  });
+
+  it('keeps same-target rename add/delete together while target switch never deletes the old target', async () => {
+    const oldConversation = chat(1, { title: 'Old title' });
+    const nextConversation = { ...oldConversation, title: 'New title' };
+    const messages = [message('same body')];
+    const oldProjection = await buildGithubMarkdownProjection({
+      conversation: oldConversation,
+      messages,
+      folders: settings,
+    });
+    const mapping = {
+      githubRemoteKey: preflight.remoteKey,
+      githubProjectionFingerprint: oldProjection.projectionFingerprint,
+      githubManagedFiles: {
+        [oldProjection.markdownPath]: {
+          kind: 'markdown',
+          contentHash: oldProjection.markdownContentHash,
+          sha: 'd'.repeat(40),
+        },
+      },
+    };
+    let renameOps: readonly any[] = [];
+    const renameServices = fakeServices({
+      rows: { 1: { conversation: nextConversation, mapping } },
+      messages: { 1: messages },
+      commitImpl: async ({ operations }) => {
+        renameOps = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    }).services;
+    await createGithubSyncOrchestrator(renameServices).sync({ conversationIds: [1] });
+    expect(renameOps).toContainEqual(expect.objectContaining({ type: 'reuse', sha: 'd'.repeat(40) }));
+    expect(renameOps).toContainEqual({ type: 'delete', path: oldProjection.markdownPath });
+
+    let switchOps: readonly any[] = [];
+    const switchServices = fakeServices({
+      rows: {
+        1: { conversation: nextConversation, mapping: { ...mapping, githubRemoteKey: 'github.com/old/repo@main' } },
+      },
+      messages: { 1: messages },
+      commitImpl: async ({ operations }) => {
+        switchOps = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    }).services;
+    await createGithubSyncOrchestrator(switchServices).sync({ conversationIds: [1] });
+    expect(switchOps.some((operation) => operation.type === 'delete')).toBe(false);
+  });
+
+  it('keeps text sync alive when image blob upload is outcome-unknown and exposes only a safe fallback warning', async () => {
+    let committedMarkdown = '';
+    const { services } = fakeServices({
+      rows: { 1: { conversation: chat(1) } },
+      messages: { 1: [message('before ![img](syncnos-asset://1) after')] },
+      loadImage: async () => ({
+        id: 1,
+        conversationId: 1,
+        url: 'https://cdn.example.com/image.png',
+        blob: new Blob([new Uint8Array([1])], { type: 'image/png' }),
+        byteSize: 1,
+        contentType: 'image/png',
+      }),
+      createBlob: async () => {
+        throw new GithubApiError('github_outcome_unknown', 0, 'github_outcome_unknown');
+      },
+      commitImpl: async ({ operations }) => {
+        const write = operations.find((operation) => operation.type === 'write');
+        committedMarkdown = write?.type === 'write' ? String(write.content) : '';
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1] });
+    expect(result.items[0]?.status).toBe('synced');
+    expect(result.items[0]?.warnings).toContain('image_upload_failed');
+    expect(committedMarkdown).toContain('![img](https://cdn.example.com/image.png)');
+    expect(committedMarkdown).not.toContain('syncnos-asset://');
+  });
+
+  it('self-heals continuity on the next run when ref update succeeded remotely but returned outcome-unknown', async () => {
+    const current = chat(1);
+    const messages = [message('authoritative body')];
+    const projection = await buildGithubMarkdownProjection({ conversation: current, messages, folders: settings });
+    const mapping = {
+      githubRemoteKey: preflight.remoteKey,
+      githubProjectionFingerprint: '0'.repeat(64),
+      githubManagedFiles: {
+        [projection.markdownPath]: { kind: 'markdown', contentHash: '1'.repeat(64), sha: 'a'.repeat(40) },
+      },
+    };
+    const HEAD_1 = '2'.repeat(40);
+    const BASE_1 = '3'.repeat(40);
+    const NEW_TREE = '4'.repeat(40);
+    const COMMIT = '5'.repeat(40);
+    const DESIRED_BLOB = '6'.repeat(40);
+    let head = HEAD_1;
+    let commitCreates = 0;
+    let refPatches = 0;
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/ref/heads/main')) return { object: { type: 'commit', sha: head } } as T;
+        if (path.endsWith(`/git/commits/${HEAD_1}`)) return { tree: { sha: BASE_1 } } as T;
+        if (path.endsWith(`/git/commits/${COMMIT}`)) return { tree: { sha: NEW_TREE } } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string, body?: any): Promise<T> {
+        if (path.endsWith('/git/blobs')) return { sha: DESIRED_BLOB } as T;
+        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
+        if (path.endsWith('/git/commits')) {
+          commitCreates += 1;
+          return { sha: COMMIT } as T;
+        }
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(): Promise<T> {
+        refPatches += 1;
+        head = COMMIT;
+        throw new GithubApiError('github_outcome_unknown', 0, 'github_outcome_unknown');
+      },
+    };
+    const commitImpl: GithubOrchestratorServices['commit'] = (input) => commitGithubStagedOperations(input, api);
+    const { services } = fakeServices({
+      rows: { 1: { conversation: current, mapping } },
+      messages: { 1: messages },
+      commitImpl,
+    });
+    const orchestrator = createGithubSyncOrchestrator(services);
+
+    const first = await orchestrator.sync({ conversationIds: [1] });
+    expect(first.transport.status).toBe('failed');
+    expect(first.items[0]).toMatchObject({ status: 'failed', error: 'github_outcome_unknown' });
+    expect(services.storage.patchSyncMapping).not.toHaveBeenCalled();
+    expect(commitCreates).toBe(1);
+    expect(refPatches).toBe(1);
+
+    const second = await orchestrator.sync({ conversationIds: [1] });
+    expect(second.transport.status).toBe('no_changes');
+    expect(second.items[0]?.status).toBe('synced');
+    expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(1);
+    expect(commitCreates).toBe(1);
+    expect(refPatches).toBe(1);
   });
 });

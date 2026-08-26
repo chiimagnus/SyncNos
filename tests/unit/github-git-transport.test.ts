@@ -533,6 +533,7 @@ describe('github git transport staged path/delete resolver', () => {
     let commitCreates = 0;
     let patches = 0;
     const treeBodies: any[] = [];
+    const commitBodies: any[] = [];
     const patchBodies: any[] = [];
     const api = {
       async get<T>(path: string): Promise<T> {
@@ -552,6 +553,7 @@ describe('github git transport staged path/delete resolver', () => {
         }
         if (path.endsWith('/git/commits')) {
           commitCreates += 1;
+          commitBodies.push(body);
           return { sha: commitCreates === 1 ? COMMIT_1 : COMMIT_2 } as T;
         }
         throw new Error(`unexpected:${path}`);
@@ -565,12 +567,21 @@ describe('github git transport staged path/delete resolver', () => {
     };
 
     const result = await commitGithubStagedOperations(
-      { repository: 'owner/repo', branch: 'main', operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }] },
+      {
+        repository: 'owner/repo',
+        branch: 'main',
+        operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
+        message: 'SyncNos GitHub sync (1 items)',
+      },
       api,
     );
     expect(result).toMatchObject({ status: 'committed', treeSha: NEW_2, commitSha: COMMIT_2 });
     expect(refReads).toBe(2);
     expect(treeBodies.map((body) => body.base_tree)).toEqual([BASE_1, BASE_2]);
+    expect(commitBodies.map((body) => body.message)).toEqual([
+      'SyncNos GitHub sync (1 items)',
+      'SyncNos GitHub sync (1 items)',
+    ]);
     expect(patchBodies).toEqual([
       { sha: COMMIT_1, force: false },
       { sha: COMMIT_2, force: false },
