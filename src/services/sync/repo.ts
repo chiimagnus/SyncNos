@@ -1,5 +1,6 @@
 import {
   FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@platform/messaging/message-contracts';
@@ -53,6 +54,16 @@ export async function clearFeishuSyncStatus(): Promise<SyncJobStatusResponse> {
   return unwrap(res);
 }
 
+export async function getGithubSyncStatus(): Promise<SyncJobStatusResponse> {
+  const res = await send<ApiResponse<SyncJobStatusResponse>>(GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS);
+  return unwrap(res);
+}
+
+export async function clearGithubSyncStatus(): Promise<SyncJobStatusResponse> {
+  const res = await send<ApiResponse<SyncJobStatusResponse>>(GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS);
+  return unwrap(res);
+}
+
 function normalizeIds(ids: unknown): number[] {
   return Array.isArray(ids)
     ? Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)))
@@ -84,5 +95,12 @@ export async function syncFeishuConversations(conversationIds: number[]): Promis
   const ids = normalizeIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
   const res = await send<ApiResponse<SyncStartAck>>(FEISHU_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
+  return unwrap(res);
+}
+
+export async function syncGithubConversations(conversationIds: number[]): Promise<SyncStartAck> {
+  const ids = normalizeIds(conversationIds);
+  if (!ids.length) throw new Error('No conversations selected');
+  const res = await send<ApiResponse<SyncStartAck>>(GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
   return unwrap(res);
 }

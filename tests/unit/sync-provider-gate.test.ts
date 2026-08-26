@@ -32,6 +32,8 @@ describe('sync provider gate', () => {
     expect(await isSyncProviderEnabled('notion')).toBe(true);
     expect(await isSyncProviderEnabled('obsidian')).toBe(true);
     expect(await isSyncProviderEnabled('feishu')).toBe(true);
+    expect(await isSyncProviderEnabled('github')).toBe(true);
+    // GitHub is intentionally absent from the visible registry until P5-T8 wires the real UI callback.
     expect(await getEnabledSyncProviders()).toEqual(['obsidian', 'notion', 'feishu']);
   });
 
@@ -51,5 +53,9 @@ describe('sync provider gate', () => {
     await setSyncProviderEnabled('feishu', false);
     expect(await isSyncProviderEnabled('feishu')).toBe(false);
     expect(await ensureSyncProviderEnabled('feishu')).toEqual({ code: 'sync_provider_disabled', provider: 'feishu' });
+
+    await setSyncProviderEnabled('github', false);
+    expect(await isSyncProviderEnabled('github')).toBe(false);
+    expect(await ensureSyncProviderEnabled('github')).toEqual({ code: 'sync_provider_disabled', provider: 'github' });
   });
 });
