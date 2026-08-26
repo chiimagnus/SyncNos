@@ -1,4 +1,5 @@
 import type { GithubCleanupOutboxRecord } from '@platform/idb/github-cleanup-outbox-record';
+import { readGithubContinuity } from '@platform/idb/sync-mapping-record';
 import { GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT } from '@services/sync/github/github-cleanup-outbox-store';
 import type {
   GithubFinalFileResolution,
@@ -228,7 +229,8 @@ function managedPathSet(mapping: any): Set<string> {
 }
 
 function hasSuccessfulSameTargetMapping(mapping: any, remoteKey: string): boolean {
-  return safeString(mapping?.githubRemoteKey) === remoteKey && Number.isFinite(mapping?.githubLastSyncedAt);
+  const continuity = readGithubContinuity(mapping);
+  return continuity.githubRemoteKey === remoteKey && typeof continuity.githubLastSyncedAt === 'number';
 }
 
 function mergeCleanupDeletes(

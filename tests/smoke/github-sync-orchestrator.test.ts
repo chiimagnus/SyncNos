@@ -359,6 +359,28 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(result.nextCleanupDueAt).toBe(9_000);
   });
 
+  it('rejects malformed same-target success timestamps before identity cleanup', async () => {
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: {
+        7: {
+          conversation: chat(7),
+          mapping: { githubRemoteKey: preflight.remoteKey, githubLastSyncedAt: -1, githubManagedFiles: {} },
+        },
+      },
+      cleanupRows: [cleanupRow(15, { reason: 'identity_move', replacementConversationId: 7 })],
+      now: 5_000,
+      replacementDeferMs: 1_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).toHaveBeenCalledWith([15], 6_000);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(6_000);
+    expect(result.deferredReplacementConversationIds).toEqual([7]);
+  });
+
   it('allows identity cleanup after same-target replacement success or local replacement deletion', async () => {
     let committedOperations: readonly any[] = [];
     const { services, getCleanupRows } = fakeServices({
