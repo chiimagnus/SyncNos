@@ -1,12 +1,13 @@
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { t } from '@i18n';
 import { writeTextToClipboard } from '@services/shared/clipboard';
+import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
 import { launchObsidianApp } from '@services/sync/obsidian/obsidian-app-launch';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import { reportObsidianOpenError, waitForDelay } from '@services/integrations/openin/obsidian-open-target';
 import { resolveOpenInDetailHeaderActions } from '@services/integrations/openin/openin-detail-header-actions';
-import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { normalizeHttpUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
 
 export { DETAIL_HEADER_ACTION_LABELS } from '@services/integrations/openin/openin-detail-header-actions';
 export type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
@@ -30,6 +31,51 @@ export const defaultDetailHeaderActionPort: DetailHeaderActionPort = {
   wait: waitForDelay,
   reportError: reportObsidianOpenError,
 };
+
+function buildDetailUtilityActions({
+  conversation,
+  detail,
+  port,
+}: {
+  conversation: Conversation | null | undefined;
+  detail: ConversationDetail | null | undefined;
+  port: DetailHeaderActionPort;
+}): DetailHeaderAction[] {
+  const matchingDetail =
+    conversation && detail && Number(detail.conversationId) === Number(conversation.id) ? detail : null;
+  const safeOriginalUrl = sanitizeHttpUrl(conversation?.url);
+
+  return [
+    {
+      id: 'copy-full-markdown',
+      label: t('copyFullMarkdown'),
+      kind: 'copy-text',
+      provider: 'local',
+      slot: 'tools',
+      disabled: !matchingDetail,
+      onTrigger: async () => {
+        if (!conversation || !matchingDetail) throw new Error(t('copyFailed'));
+        const markdown = await formatConversationMarkdownForExternalOutput(conversation, matchingDetail);
+        const copied = await writeTextToClipboard(markdown);
+        if (!copied) throw new Error(t('copyFailed'));
+      },
+    },
+    {
+      id: 'open-original',
+      label: t('openOriginalChat'),
+      kind: 'external-link',
+      provider: 'source',
+      slot: 'tools',
+      disabled: !safeOriginalUrl,
+      ...(safeOriginalUrl ? { href: safeOriginalUrl } : null),
+      onTrigger: async () => {
+        if (!safeOriginalUrl) throw new Error(t('actionFailedFallback'));
+        const opened = await port.openExternalUrl(safeOriginalUrl);
+        if (!opened) throw new Error(t('actionFailedFallback'));
+      },
+    },
+  ];
+}
 
 function buildCopyLinkActions(openActions: DetailHeaderAction[]): DetailHeaderAction[] {
   const copyTargets = {
@@ -65,9 +111,13 @@ function buildCopyLinkActions(openActions: DetailHeaderAction[]): DetailHeaderAc
 
 export async function resolveDetailHeaderActions({
   conversation,
-  detail: _detail,
+  detail,
   port = defaultDetailHeaderActionPort,
 }: ResolveDetailHeaderActionsInput): Promise<DetailHeaderAction[]> {
   const openActions = await resolveOpenInDetailHeaderActions({ conversation, port });
-  return [...openActions, ...buildCopyLinkActions(openActions)];
+  return [
+    ...openActions,
+    ...buildCopyLinkActions(openActions),
+    ...buildDetailUtilityActions({ conversation, detail, port }),
+  ];
 }

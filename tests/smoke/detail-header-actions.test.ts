@@ -4,6 +4,7 @@ const resolveObsidianOpenTargetMock = vi.fn();
 const openObsidianTargetMock = vi.fn();
 const getSyncMappingByConversationMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
+const formatConversationMarkdownMock = vi.fn();
 
 vi.mock('@services/integrations/openin/obsidian-open-target', () => ({
   resolveObsidianOpenTarget: (...args: any[]) => resolveObsidianOpenTargetMock(...args),
@@ -18,6 +19,10 @@ vi.mock('@services/conversations/data/storage-idb', () => ({
 
 vi.mock('@services/shared/clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),
+}));
+
+vi.mock('@services/integrations/chatwith/chatwith-settings', () => ({
+  formatConversationMarkdownForExternalOutput: (...args: any[]) => formatConversationMarkdownMock(...args),
 }));
 
 import { t } from '@i18n';
@@ -84,6 +89,8 @@ describe('detail-header-actions', () => {
     getSyncMappingByConversationMock.mockResolvedValue(null);
     writeTextToClipboardMock.mockReset();
     writeTextToClipboardMock.mockResolvedValue(true);
+    formatConversationMarkdownMock.mockReset();
+    formatConversationMarkdownMock.mockResolvedValue('# exact markdown\n');
   });
 
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
@@ -101,7 +108,7 @@ describe('detail-header-actions', () => {
     ).toBe('https://app.notion.com/p/chiimagnus/0123456789abcdef0123456789abcdef');
   });
 
-  it('returns no provider actions when no synced destination is available', async () => {
+  it('returns no open/copy provider actions when no synced destination is available', async () => {
     const actions = await resolveDetailHeaderActions({
       conversation: {
         id: 1,
@@ -111,7 +118,11 @@ describe('detail-header-actions', () => {
       },
     });
 
-    expect(actions).toEqual([]);
+    expect(bySlot(actions, 'open')).toEqual([]);
+    expect(bySlot(actions, 'copy')).toEqual([]);
+    expect(bySlot(actions, 'tools').map((action) => action.id)).toEqual(['copy-full-markdown', 'open-original']);
+    expect(byId(actions, 'copy-full-markdown')?.disabled).toBe(true);
+    expect(byId(actions, 'open-original')?.disabled).toBe(true);
     expect(getSyncMappingByConversationMock).toHaveBeenCalledTimes(1);
   });
 
@@ -326,6 +337,100 @@ describe('detail-header-actions', () => {
     expect(bySlot(actions, 'open')[0]?.label).toBe('Obsidian API not connected');
     expect(bySlot(actions, 'open')[0]?.disabled).toBe(true);
     expect(bySlot(actions, 'copy')).toEqual([]);
+  });
+
+  it('copies full Markdown only from detail matching the active conversation', async () => {
+    const conversation = {
+      id: 20,
+      source: 'chatgpt',
+      conversationKey: 'conv-20',
+      title: 'Conversation',
+      url: 'https://example.com/chat/20',
+    };
+    const detail = { conversationId: 20, messages: [{ role: 'user', contentText: 'hello' }] } as any;
+    const actions = await resolveDetailHeaderActions({ conversation, detail, port: createPort() });
+    const action = byId(actions, 'copy-full-markdown');
+
+    expect(action?.disabled).toBe(false);
+    await action?.onTrigger();
+    expect(formatConversationMarkdownMock).toHaveBeenCalledTimes(1);
+    expect(formatConversationMarkdownMock).toHaveBeenCalledWith(conversation, detail);
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('# exact markdown\n');
+  });
+
+  it('disables full Markdown copying for missing or stale detail and never formats stale data', async () => {
+    const conversation = {
+      id: 21,
+      source: 'chatgpt',
+      conversationKey: 'conv-21',
+      title: 'Conversation',
+    };
+    const missingActions = await resolveDetailHeaderActions({ conversation, detail: null, port: createPort() });
+    const staleActions = await resolveDetailHeaderActions({
+      conversation,
+      detail: { conversationId: 999, messages: [{ role: 'user', contentText: 'stale' }] } as any,
+      port: createPort(),
+    });
+
+    expect(byId(missingActions, 'copy-full-markdown')?.disabled).toBe(true);
+    expect(byId(staleActions, 'copy-full-markdown')?.disabled).toBe(true);
+    await expect(byId(staleActions, 'copy-full-markdown')?.onTrigger()).rejects.toThrow(t('copyFailed'));
+    expect(formatConversationMarkdownMock).not.toHaveBeenCalled();
+    expect(writeTextToClipboardMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the exact trimmed original HTTP(S) URL without removing query or hash', async () => {
+    const port = createPort();
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 22,
+        source: 'chatgpt',
+        conversationKey: 'conv-22',
+        title: 'Conversation',
+        url: '  https://example.com/path?x=1#section  ',
+      },
+      port,
+    });
+    const action = byId(actions, 'open-original');
+
+    expect(action?.disabled).toBe(false);
+    expect(action?.href).toBe('https://example.com/path?x=1#section');
+    await action?.onTrigger();
+    expect(port.openExternalUrl).toHaveBeenCalledWith('https://example.com/path?x=1#section');
+  });
+
+  it.each(['', 'javascript:alert(1)', 'obsidian://open?vault=x'])('disables Open original for %s', async (url) => {
+    const port = createPort();
+    const actions = await resolveDetailHeaderActions({
+      conversation: { id: 23, source: 'chatgpt', conversationKey: 'conv-23', title: 'Conversation', url },
+      port,
+    });
+    const action = byId(actions, 'open-original');
+
+    expect(action?.disabled).toBe(true);
+    expect(action?.href).toBeUndefined();
+    await expect(action?.onTrigger()).rejects.toThrow(t('actionFailedFallback'));
+    expect(port.openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('propagates utility clipboard and open failures through the action error path', async () => {
+    const port = createPort();
+    port.openExternalUrl.mockResolvedValue(false);
+    writeTextToClipboardMock.mockResolvedValue(false);
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 24,
+        source: 'chatgpt',
+        conversationKey: 'conv-24',
+        title: 'Conversation',
+        url: 'https://example.com/chat/24',
+      },
+      detail: { conversationId: 24, messages: [] } as any,
+      port,
+    });
+
+    await expect(byId(actions, 'copy-full-markdown')?.onTrigger()).rejects.toThrow(t('copyFailed'));
+    await expect(byId(actions, 'open-original')?.onTrigger()).rejects.toThrow(t('actionFailedFallback'));
   });
 
   it('rejects a copy trigger when clipboard write fails', async () => {

@@ -13,6 +13,12 @@ function parseHttpUrl(raw: unknown): URL | null {
   }
 }
 
+export function sanitizeHttpUrl(raw: unknown): string {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  return /^https?:\/\//i.test(text) ? text : '';
+}
+
 export function normalizeHttpUrl(raw: unknown): string {
   const url = parseHttpUrl(raw);
   if (!url) return '';

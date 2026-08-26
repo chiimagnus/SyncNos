@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl, normalizeHttpUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
+
+describe('sanitizeHttpUrl', () => {
+  it('preserves original http/https query and hash while trimming whitespace', () => {
+    expect(sanitizeHttpUrl('  https://example.com/path?x=1#section  ')).toBe('https://example.com/path?x=1#section');
+    expect(sanitizeHttpUrl(' http://example.com/a?b=1#hash ')).toBe('http://example.com/a?b=1#hash');
+  });
+
+  it('rejects empty and non-http schemes', () => {
+    expect(sanitizeHttpUrl('')).toBe('');
+    expect(sanitizeHttpUrl('   ')).toBe('');
+    expect(sanitizeHttpUrl('javascript:alert(1)')).toBe('');
+    expect(sanitizeHttpUrl('obsidian://open?vault=x')).toBe('');
+    expect(sanitizeHttpUrl('ftp://example.com')).toBe('');
+  });
+});
 
 describe('normalizeHttpUrl', () => {
   it('returns empty string for empty or invalid inputs', () => {

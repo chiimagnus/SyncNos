@@ -80,6 +80,7 @@ function cleanupDom() {
   delete (globalThis as any).localStorage;
   delete (globalThis as any).getComputedStyle;
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+  delete (globalThis as any).alert;
 }
 
 function buildState() {
@@ -201,6 +202,46 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
     expect(copyButton?.textContent).toBe('⧉');
+  });
+
+  it('opens the exact trimmed original https URL without activating the row', async () => {
+    currentState.items[0].url = '  https://example.com/path?x=1#section  ';
+    await renderPane();
+    const openButton = document.querySelector('[aria-label="openOriginalChat"]') as HTMLButtonElement | null;
+    expect(openButton).toBeTruthy();
+    expect(openButton?.disabled).toBe(false);
+
+    await act(async () => {
+      openButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    expect(tabsCreateMock).toHaveBeenCalledWith({ url: 'https://example.com/path?x=1#section' });
+    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(onOpenConversation).not.toHaveBeenCalled();
+  });
+
+  it('keeps http original URLs available', async () => {
+    currentState.items[0].url = ' http://example.com/path#hash ';
+    await renderPane();
+    const openButton = document.querySelector('[aria-label="openOriginalChat"]') as HTMLButtonElement | null;
+
+    await act(async () => {
+      openButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    expect(tabsCreateMock).toHaveBeenCalledWith({ url: 'http://example.com/path#hash' });
+  });
+
+  it.each(['', 'javascript:alert(1)', 'obsidian://open?vault=x'])('disables Open original for %s', async (url) => {
+    currentState.items[0].url = url;
+    await renderPane();
+    const openButton = document.querySelector('[aria-label="openOriginalChat"]') as HTMLButtonElement | null;
+
+    expect(openButton).toBeTruthy();
+    expect(openButton?.disabled).toBe(true);
+    expect(tabsCreateMock).not.toHaveBeenCalled();
   });
 
   it('reports clipboard failure without showing a copied state', async () => {

@@ -5,6 +5,7 @@ import { getConversationDetail } from '@services/conversations/client/repo';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
+import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
 import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageOnChanged } from '@services/shared/storage';
 import { buildConversationSidebarRenderItems } from '@services/conversations/domain/sidebar-time-groups';
@@ -43,13 +44,6 @@ function formatTime(ts?: number) {
   } catch {
     return String(ts);
   }
-}
-
-function sanitizeHttpUrl(url: unknown) {
-  const text = String(url || '').trim();
-  if (!text) return '';
-  if (/^https?:\/\//i.test(text)) return text;
-  return '';
 }
 
 function providerButtonLabel(provider: SyncProvider) {
