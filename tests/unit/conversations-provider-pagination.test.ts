@@ -3,6 +3,7 @@ import { JSDOM } from 'jsdom';
 import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
+import { UI_EVENT_TYPES } from '../../src/services/protocols/message-contracts';
 import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
 
 const getConversationListBootstrap = vi.fn();
@@ -16,6 +17,8 @@ const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
 let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
+let portMessageListener: ((message: any) => void) | null = null;
+let portDisconnectListener: (() => void) | null = null;
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
@@ -74,12 +77,20 @@ vi.mock('@services/shared/storage', () => ({
 vi.mock('@services/shared/ports', () => ({
   connectPort: () => ({
     onMessage: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
+      addListener: (listener: (message: any) => void) => {
+        portMessageListener = listener;
+      },
+      removeListener: (listener: (message: any) => void) => {
+        if (portMessageListener === listener) portMessageListener = null;
+      },
     },
     onDisconnect: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
+      addListener: (listener: () => void) => {
+        portDisconnectListener = listener;
+      },
+      removeListener: (listener: () => void) => {
+        if (portDisconnectListener === listener) portDisconnectListener = null;
+      },
     },
     disconnect: vi.fn(),
   }),
@@ -188,6 +199,8 @@ describe('ConversationsProvider pagination state', () => {
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
     storageChangeListener = null;
+    portMessageListener = null;
+    portDisconnectListener = null;
 
     getConversationListPage.mockResolvedValue(makePage([]));
     findConversationById.mockResolvedValue(null);
@@ -463,6 +476,42 @@ describe('ConversationsProvider pagination state', () => {
 
     expect(Number(latestState.detail?.conversationId)).toBe(3);
     expect(String(latestState.detail?.messages?.[0]?.contentMarkdown || '')).toBe('article three');
+  });
+
+  it('refreshes both list and active detail when syncFinished is broadcast', async () => {
+    vi.useFakeTimers();
+    const conversation = makeConversation(402, 'chatgpt', 'conv-402');
+    getConversationListBootstrap.mockResolvedValue(makePage([conversation]));
+    getConversationDetail.mockResolvedValue({ conversationId: 402, messages: [] });
+
+    try {
+      await renderProvider();
+      await act(async () => {
+        await flushMicrotasks();
+        await flushMicrotasks();
+      });
+
+      const listCallsBefore = getConversationListBootstrap.mock.calls.length;
+      const detailCallsBefore = getConversationDetail.mock.calls.length;
+      expect(portMessageListener).toBeTruthy();
+
+      await act(async () => {
+        portMessageListener?.({
+          type: UI_EVENT_TYPES.CONVERSATIONS_CHANGED,
+          payload: { reason: 'syncFinished' },
+        });
+        vi.advanceTimersByTime(250);
+        await flushMicrotasks();
+        await flushMicrotasks();
+        await flushMicrotasks();
+      });
+
+      expect(getConversationListBootstrap.mock.calls.length).toBeGreaterThan(listCallsBefore);
+      expect(getConversationDetail.mock.calls.length).toBeGreaterThan(detailCallsBefore);
+      expect(getConversationDetail).toHaveBeenLastCalledWith(402);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('re-resolves detail header actions when a sync provider gate changes', async () => {
