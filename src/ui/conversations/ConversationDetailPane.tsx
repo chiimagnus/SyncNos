@@ -9,7 +9,12 @@ import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useCha
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
-import { buttonMenuItemClassName, headerButtonClassName } from '@ui/shared/button-styles';
+import {
+  buttonFilledClassName,
+  buttonMenuItemClassName,
+  buttonTintClassName,
+  headerButtonClassName,
+} from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -56,7 +61,6 @@ export function ConversationDetailPane({
     detail,
     detailHeaderActions,
     updateSelectedConversationUrl,
-    cleanUrlDraft,
   } = useConversationsApp();
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
@@ -169,7 +173,6 @@ export function ConversationDetailPane({
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
-  const [urlCleaning, setUrlCleaning] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
@@ -204,7 +207,6 @@ export function ConversationDetailPane({
   useEffect(() => {
     setUrlEditing(false);
     setUrlDraft('');
-    setUrlCleaning(false);
     closeMoreMenu();
   }, [activeId, selected?.id, closeMoreMenu]);
 
@@ -262,6 +264,21 @@ export function ConversationDetailPane({
     setUrlEditing(false);
   };
 
+  const cancelUrlEditing = () => {
+    setUrlEditing(false);
+    setUrlDraft('');
+  };
+
+  const submitUrlDraft = () => {
+    void saveUrlDraft().catch((error) => {
+      const message =
+        error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+      if (message === 'SYNCNOS_URL_EDIT_CANCELLED') return;
+      if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+      else console.error(message);
+    });
+  };
+
   return (
     <section className="tw-min-h-full tw-bg-[var(--bg-card)]">
       <section className="tw-flex tw-flex-col tw-bg-[var(--bg-card)]" aria-label={t('conversationDetailAria')}>
@@ -310,7 +327,7 @@ export function ConversationDetailPane({
                     <>
                       <input
                         ref={urlInputRef}
-                        className="tw-min-w-0 tw-flex-1 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                        className="tw-min-w-0 tw-w-56 tw-max-w-full tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
                         value={urlDraft}
                         onChange={(e) => setUrlDraft(e.target.value)}
                         placeholder="https://"
@@ -321,55 +338,29 @@ export function ConversationDetailPane({
                         onKeyDown={(e) => {
                           if (e.key === 'Escape') {
                             e.preventDefault();
-                            setUrlEditing(false);
-                            setUrlDraft('');
+                            cancelUrlEditing();
                             return;
                           }
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            void (async () => {
-                              try {
-                                await saveUrlDraft();
-                              } catch (error) {
-                                const message =
-                                  error instanceof Error && error.message
-                                    ? error.message
-                                    : String(error || t('actionFailedFallback'));
-                                if (message === 'SYNCNOS_URL_EDIT_CANCELLED') return;
-                                if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
-                                else console.error(message);
-                              }
-                            })();
+                            submitUrlDraft();
                           }
                         }}
                       />
                       <button
                         type="button"
-                        className="tw-shrink-0 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] disabled:tw-opacity-60"
-                        disabled={urlCleaning}
-                        onClick={() => {
-                          if (urlCleaning) return;
-                          void (async () => {
-                            setUrlCleaning(true);
-                            try {
-                              const cleaned = await cleanUrlDraft(String(urlDraft || ''));
-                              setUrlDraft(cleaned);
-                            } catch (error) {
-                              const message =
-                                error instanceof Error && error.message
-                                  ? error.message
-                                  : String(error || t('actionFailedFallback'));
-                              if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
-                              else console.error(message);
-                            } finally {
-                              setUrlCleaning(false);
-                            }
-                          })();
-                        }}
+                        className={`${buttonFilledClassName()} tw-h-6 tw-min-h-0 tw-shrink-0 tw-px-2 tw-text-[11px]`}
+                        onClick={submitUrlDraft}
                       >
-                        {urlCleaning ? '清理中…' : '清理参数'}
+                        {t('saveButton')}
                       </button>
-                      <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter 保存 · Esc 取消</span>
+                      <button
+                        type="button"
+                        className={`${buttonTintClassName()} tw-h-6 tw-min-h-0 tw-shrink-0 tw-px-2 tw-text-[11px]`}
+                        onClick={cancelUrlEditing}
+                      >
+                        {t('cancelButton')}
+                      </button>
                     </>
                   ) : (
                     <>

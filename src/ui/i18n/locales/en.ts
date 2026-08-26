@@ -312,6 +312,7 @@ export const en = {
   conversationGroupEarlier: 'Earlier',
   todayLabel: 'Today:',
   totalLabel: 'Total:',
+  saveButton: 'Save',
   cancelButton: 'Cancel',
 
   // ConversationDetailPane

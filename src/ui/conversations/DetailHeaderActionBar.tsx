@@ -144,9 +144,7 @@ export function DetailHeaderActionBar({
   ) : null;
   if (actions.length === 1) {
     const action = actions[0]!;
-    const resolvedTriggerIcon = providerLogo(action) || (
-      <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
-    );
+    const resolvedTriggerIcon = providerLogo(action) || <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
     return (
       <div className={['tw-relative tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
         <button
