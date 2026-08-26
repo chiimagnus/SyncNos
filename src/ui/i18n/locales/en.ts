@@ -505,16 +505,18 @@ export const en = {
   aboutYouUserNameHint: 'Applies to new comments and chat messages only.',
   aboutYouInsightSectionTitle: 'Insight',
 
-  // DetailHeaderActionBar / DetailNavigationHeader
+  // DetailHeaderActionBar
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
-  detailHeaderToolsMenuLabel: 'Tools...',
-  detailHeaderToolsMenuAria: 'Tools',
   detailHeaderOpenInMenuLabel: 'Open in...',
   detailHeaderOpenInMenuAria: 'Open destinations',
   detailHeaderOpenInNotion: 'Open in Notion',
   detailHeaderOpenInObsidian: 'Open in Obsidian',
   detailHeaderOpenInFeishu: 'Open in Feishu',
+  detailHeaderCopyLinkMenuLabel: 'Copy link',
+  detailHeaderCopyLinkMenuAria: 'Copy synced page link',
+  detailHeaderCopyNotionLink: 'Copy Notion link',
+  detailHeaderCopyFeishuLink: 'Copy Feishu link',
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
   detailHeaderCacheImagesLabel: 'Cache images',
   detailHeaderCacheImagesInProgressLabel: 'Caching images...',

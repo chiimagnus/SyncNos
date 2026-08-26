@@ -501,16 +501,18 @@ export const zh: { [K in TranslationKey]: string } = {
   aboutYouUserNameHint: '仅对新评论和聊天消息生效。',
   aboutYouInsightSectionTitle: '统计',
 
-  // DetailHeaderActionBar / DetailNavigationHeader
+  // DetailHeaderActionBar
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
-  detailHeaderToolsMenuLabel: '工具...',
-  detailHeaderToolsMenuAria: '工具',
   detailHeaderOpenInMenuLabel: '打开到...',
   detailHeaderOpenInMenuAria: '打开目录',
   detailHeaderOpenInNotion: '在 Notion 中打开',
   detailHeaderOpenInObsidian: '在 Obsidian 中打开',
   detailHeaderOpenInFeishu: '在飞书中打开',
+  detailHeaderCopyLinkMenuLabel: '复制链接',
+  detailHeaderCopyLinkMenuAria: '复制已同步页面链接',
+  detailHeaderCopyNotionLink: '复制 Notion 链接',
+  detailHeaderCopyFeishuLink: '复制飞书链接',
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
   detailHeaderCacheImagesLabel: '缓存图片',
   detailHeaderCacheImagesSuccess: '图片已缓存。',

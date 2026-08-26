@@ -1,8 +1,8 @@
-export type DetailHeaderActionKind = 'external-link' | 'open-target';
+export type DetailHeaderActionKind = 'external-link' | 'open-target' | 'copy-text';
 
 export type DetailHeaderActionProvider = string;
 
-export type DetailHeaderActionSlot = 'open' | 'tools';
+export type DetailHeaderActionSlot = 'open' | 'copy' | 'tools';
 
 export type DetailHeaderAction = {
   id: string;
