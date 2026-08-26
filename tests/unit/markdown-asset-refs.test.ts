@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collectOrderedSyncnosAssetIds,
   parseSyncnosAssetId,
+  replaceSyncnosAssetImageReferences,
   replaceSyncnosAssetImageTargets,
 } from '@services/sync/shared/markdown-asset-refs';
 
@@ -28,6 +29,14 @@ describe('markdown asset refs', () => {
     ].join('\n');
 
     expect(collectOrderedSyncnosAssetIds(markdown)).toEqual([2, 1]);
+  });
+
+  it('can replace a whole internal image reference for provider-specific readable degradation', () => {
+    expect(
+      replaceSyncnosAssetImageReferences('before ![x](syncnos-asset://7 "caption") after', ({ assetId }) =>
+        assetId === 7 ? { replacement: '[Image unavailable]' } : null,
+      ),
+    ).toBe('before [Image unavailable] after');
   });
 
   it('replaces only mapped SyncNos image targets while preserving angle brackets, alt text and title suffix', () => {
