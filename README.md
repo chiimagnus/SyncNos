@@ -85,10 +85,6 @@ Article discussion sidebar: exact quotes, compact threads, and one active reply 
 
 Development setup, issue/commit/PR workflow, and validation requirements are maintained in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Architecture and non-negotiable product contracts are maintained in [AGENTS.md](AGENTS.md).
 
-## Documentation
-
-Start at [docs/overview.md](docs/overview.md) for product, configuration, storage, and troubleshooting documentation.
-
 ## Support
 
 SyncNos is a one-person project, built with care.
