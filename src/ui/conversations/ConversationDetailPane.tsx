@@ -470,6 +470,7 @@ export function ConversationDetailPane({
                           actions={toolActions}
                           buttonClassName={buttonMenuItemClassName()}
                           showLabelAlways
+                          inlineMenuItems
                           closeMenuOnActionTrigger={closeMoreMenu}
                           className="tw-w-full"
                         />

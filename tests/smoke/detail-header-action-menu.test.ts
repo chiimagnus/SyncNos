@@ -154,6 +154,57 @@ describe('DetailHeaderActionBar', () => {
     expect(menuItems[0]?.className || '').toContain('tw-break-words');
   });
 
+  it('renders multiple inline menu items without creating a nested popover', async () => {
+    const firstTrigger = vi.fn(async () => {});
+    const disabledTrigger = vi.fn(async () => {});
+    const closeMenu = vi.fn();
+
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'copy-full-markdown',
+              label: 'Copy full Markdown',
+              provider: 'local',
+              kind: 'copy-text',
+              slot: 'tools',
+              onTrigger: firstTrigger,
+            },
+            {
+              id: 'open-original',
+              label: 'Open original',
+              provider: 'source',
+              kind: 'external-link',
+              slot: 'tools',
+              disabled: true,
+              onTrigger: disabledTrigger,
+            },
+          ],
+          buttonClassName,
+          inlineMenuItems: true,
+          closeMenuOnActionTrigger: closeMenu,
+        }),
+      );
+    });
+
+    expect(document.querySelector('[aria-haspopup="menu"]')).toBeFalsy();
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    expect(items).toHaveLength(2);
+    expect(items.map((item) => item.textContent)).toEqual(['Copy full Markdown', 'Open original']);
+    expect(items[1]?.disabled).toBe(true);
+
+    await act(async () => {
+      items[0]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(firstTrigger).toHaveBeenCalledTimes(1);
+    expect(closeMenu).toHaveBeenCalledTimes(1);
+
+    items[1]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    expect(disabledTrigger).not.toHaveBeenCalled();
+  });
+
   it('reports an error instead of swallowing a failed action trigger', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis.window, 'alert', {

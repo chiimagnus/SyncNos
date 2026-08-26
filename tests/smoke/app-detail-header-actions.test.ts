@@ -289,6 +289,70 @@ describe('ConversationDetailPane header actions', () => {
     expect(onTrigger).toHaveBeenCalledTimes(1);
   });
 
+  it('renders multiple More tool actions as first-level menu items and closes after trigger', async () => {
+    const cacheTrigger = vi.fn(async () => {});
+    const copyTrigger = vi.fn(async () => {});
+    const openTrigger = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'cache-images',
+        label: 'Cache images',
+        provider: 'local',
+        kind: 'open-target',
+        slot: 'tools',
+        onTrigger: cacheTrigger,
+      },
+      {
+        id: 'copy-full-markdown',
+        label: 'Copy full Markdown',
+        provider: 'local',
+        kind: 'copy-text',
+        slot: 'tools',
+        onTrigger: copyTrigger,
+      },
+      {
+        id: 'open-original',
+        label: 'Open original',
+        provider: 'source',
+        kind: 'external-link',
+        slot: 'tools',
+        disabled: true,
+        onTrigger: openTrigger,
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
+    expect(moreButton).toBeTruthy();
+    await act(async () => {
+      moreButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
+    expect(moreMenu).toBeTruthy();
+    const items = Array.from(moreMenu!.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    expect(items.map((item) => String(item.textContent || '').trim())).toEqual([
+      'Cache images',
+      'Copy full Markdown',
+      'Open original',
+    ]);
+    expect(moreMenu!.querySelector('[aria-haspopup="menu"]')).toBeFalsy();
+    expect(items[2]?.disabled).toBe(true);
+
+    await act(async () => {
+      items[1]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(copyTrigger).toHaveBeenCalledTimes(1);
+    expect(cacheTrigger).not.toHaveBeenCalled();
+    expect(openTrigger).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="menu"][aria-label="moreButton"]')?.hasAttribute('hidden')).toBe(true);
+  });
+
   it('shows a comments sidebar toggle in article detail mode', async () => {
     currentState.selectedConversation = {
       id: 11,

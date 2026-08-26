@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, ExternalLink, FileText, ImageDown, Link2Off } from 'lucide-react';
+import { BookOpen, Copy, ExternalLink, FileText, ImageDown, Link2Off } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { t } from '@i18n';
@@ -13,6 +13,7 @@ export type DetailHeaderActionBarProps = {
   iconOnly?: boolean;
   showLabelAlways?: boolean;
   closeMenuOnActionTrigger?: () => void;
+  inlineMenuItems?: boolean;
   triggerIcon?: ReactNode;
   menuTriggerLabel?: string;
   menuTriggerAriaLabel?: string;
@@ -26,6 +27,7 @@ export function DetailHeaderActionBar({
   iconOnly = false,
   showLabelAlways = false,
   closeMenuOnActionTrigger,
+  inlineMenuItems = false,
   triggerIcon,
   menuTriggerLabel,
   menuTriggerAriaLabel,
@@ -78,6 +80,9 @@ export function DetailHeaderActionBar({
   if (!actions.length) return null;
 
   const resolveActionIcon = (action: DetailHeaderAction) => {
+    if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.provider === 'source' && action.kind === 'external-link')
+      return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.slot === 'tools') return <ImageDown size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.provider === 'obsidian' && action.disabled)
       return <Link2Off size={16} strokeWidth={2} aria-hidden="true" />;
@@ -88,6 +93,33 @@ export function DetailHeaderActionBar({
     if (action.kind === 'external-link') return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
     return null;
   };
+
+  if (inlineMenuItems) {
+    return (
+      <div className={['tw-flex tw-flex-col tw-gap-1', className || ''].join(' ').trim()}>
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            className={buttonClassName}
+            type="button"
+            role="menuitem"
+            aria-label={action.label}
+            aria-disabled={action.disabled ? 'true' : undefined}
+            disabled={busy || !!action.disabled}
+            onClick={() => {
+              void handleTrigger(action);
+              closeMenuOnActionTrigger?.();
+            }}
+          >
+            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+              {resolveActionIcon(action)}
+              <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   if (actions.length === 1) {
     const action = actions[0]!;
