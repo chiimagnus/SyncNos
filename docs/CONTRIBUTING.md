@@ -1,29 +1,29 @@
-# Contributing to SyncNos WebClipper
+# 为 SyncNos WebClipper 做贡献
 
-SyncNos welcomes focused bug fixes, site adapters, documentation improvements, and product changes that preserve the repository's existing contracts.
+SyncNos 欢迎聚焦明确的 Bug 修复、站点适配器、文档改进，以及在不破坏仓库现有契约前提下进行的产品改动。
 
-This repository maintains **SyncNos WebClipper only**. iOS, macOS, and CLI work belongs in their own repositories unless a task explicitly changes an integration contract owned here.
+本仓库**仅维护 SyncNos WebClipper**。iOS、macOS 和 CLI 相关工作应在各自仓库中进行，除非某项任务明确需要修改由本仓库负责的集成契约。
 
-## Before you start
+## 开始之前
 
-1. Search existing [issues](https://github.com/chiimagnus/SyncNos/issues) and [pull requests](https://github.com/chiimagnus/SyncNos/pulls) first.
-2. Read [`AGENTS.md`](../AGENTS.md) before changing code. It is the source of truth for dependency direction, product invariants, and architecture-specific checks.
-3. Start from [`overview.md`](overview.md) for long-lived product and data-model documentation.
-4. Discuss non-trivial behavior changes before investing in an implementation. New site adapters/integrations, storage or schema changes, permission changes, migrations, and release behavior should normally have an agreed issue first. Small documentation, typo, and clearly mechanical maintenance changes may go directly to a PR.
-5. Keep the change narrow. Do not mix unrelated cleanup, formatting, localization, or refactors into a functional patch.
+1. 先搜索现有的 [Issues](https://github.com/chiimagnus/SyncNos/issues) 和 [Pull Requests](https://github.com/chiimagnus/SyncNos/pulls)。
+2. 修改代码前先阅读 [`AGENTS.md`](../AGENTS.md)。它是依赖方向、产品不变量和架构专项检查的事实真源。
+3. 长期维护的产品与数据模型文档从 [`overview.md`](overview.md) 开始阅读。
+4. 在投入实现之前，先讨论非平凡的行为变更。新增站点适配器/集成、存储或 schema 变更、权限变更、迁移以及发布行为，通常都应先有一个达成共识的 Issue。小型文档修改、拼写修正和明显的机械性维护，可以直接提交 PR。
+5. 保持改动范围聚焦。不要把无关的清理、格式化、本地化或重构混入功能补丁。
 
-A patch can be technically correct and still be declined if it breaks a product invariant, adds an unwanted compatibility path, or expands scope beyond what was agreed.
+即使一个补丁在技术上是正确的，如果它破坏产品不变量、增加不需要的兼容路径，或超出已约定范围，仍可能被拒绝。
 
-## Local setup
+## 本地环境
 
-Use Node.js 22 when possible so local behavior matches GitHub Actions.
+尽可能使用 Node.js 22，使本地行为与 GitHub Actions 保持一致。
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Other supported development targets are available when the change affects them:
+如果改动涉及其他受支持的开发目标，可以使用：
 
 ```bash
 npm run dev:firefox
@@ -31,69 +31,69 @@ npm run dev:zen
 npm run dev:safari
 ```
 
-For Safari/Xcode integration work, use the repository script rather than maintaining generated project output by hand:
+涉及 Safari/Xcode 集成时，应使用仓库脚本，而不是手工维护生成的工程输出：
 
 ```bash
 npm run setup:safari:xcode
 ```
 
-The current command and dependency source of truth is [`package.json`](../package.json).
+当前命令和依赖的事实真源是 [`package.json`](../package.json)。
 
-## Source of truth
+## 事实真源
 
-Do not duplicate architectural rules here. Follow [`AGENTS.md`](../AGENTS.md) for dependency direction and product invariants.
+不要在这里重复架构规则。依赖方向和产品不变量统一遵循 [`AGENTS.md`](../AGENTS.md)。
 
-Long-lived product facts belong under [`overview.md`](overview.md) and its linked pages. Version numbers, permissions, schemas, migrations, and other fast-drifting facts should stay in their canonical source file or one canonical document; other docs should link to them.
+长期产品事实应维护在 [`overview.md`](overview.md) 及其链接页面中。版本号、权限、schema、迁移以及其他容易漂移的事实，应保留在各自的 canonical 源文件或唯一的 canonical 文档中；其他文档只应链接过去。
 
-When documentation and implementation disagree, verify behavior from code and repository scripts first, then correct the stale documentation in the same PR.
+当文档与实现不一致时，先从代码和仓库脚本确认实际行为，然后在同一个 PR 中修正过时文档。
 
-## Opening an issue
+## 提交 Issue
 
-### Bug reports
+### Bug 报告
 
-A useful bug report should make the failure reproducible and distinguish a product defect from a site change or environment problem. Include:
+有用的 Bug 报告应能让问题复现，并能区分产品缺陷、站点变化和环境问题。请包含：
 
-- a short description of the failure;
-- affected surface or site;
-- exact reproduction steps;
-- expected and actual behavior;
-- OS, browser + version, and SyncNos version or commit;
-- whether existing local data was modified, lost, or left intact;
-- screenshots, recordings, or logs when they materially shorten diagnosis.
+- 对故障的简短描述；
+- 受影响的界面或站点；
+- 精确的复现步骤；
+- 预期行为和实际行为；
+- 操作系统、浏览器及版本，以及 SyncNos 版本或 commit；
+- 现有本地数据是否被修改、丢失，或保持完整；
+- 如果截图、录屏或日志能显著缩短诊断过程，请一并提供。
 
-Redact private conversation content, account identifiers, cookies, access tokens, OAuth secrets, API keys, and exported backup data before attaching evidence.
+附加证据前，请遮盖私人对话内容、账号标识符、Cookie、Access Token、OAuth Secret、API Key，以及导出的备份数据。
 
-### Feature and site-support requests
+### 功能与站点支持请求
 
-Describe the user problem before prescribing an implementation. Explain:
+先描述用户问题，再提出实现方案。请说明：
 
-- why the capability belongs in SyncNos;
-- the intended workflow and default behavior;
-- scope and explicit non-goals;
-- affected browsers/sites/targets;
-- any storage, permission, privacy, migration, or compatibility implications.
+- 为什么这个能力应属于 SyncNos；
+- 预期工作流和默认行为；
+- 范围以及明确的非目标；
+- 受影响的浏览器、站点或目标；
+- 对存储、权限、隐私、迁移或兼容性的任何影响。
 
-For site adapters, identify which page type is in scope and what content must be captured. Avoid asking one issue to cover an open-ended family of unrelated sites.
+对于站点适配器，请明确支持范围内的页面类型，以及必须采集哪些内容。不要让一个 Issue 覆盖一个边界开放、彼此无关的站点集合。
 
-## Commits
+## Commit
 
-Use **Conventional Commits**. A commit should represent one verifiable concern.
+使用 **Conventional Commits**。一个 commit 应只表达一个可验证的关注点。
 
-Typical prefixes include:
+常见前缀包括：
 
-- `feat:` — user-visible capability;
-- `fix:` — defect correction;
-- `refactor:` — behavior-preserving structural change;
-- `test:` — test-only change;
-- `docs:` — documentation-only change;
-- `chore:` — repository maintenance;
-- `ci:` / `build:` — automation or build-system change.
+- `feat:` — 用户可见的新能力；
+- `fix:` — 缺陷修复；
+- `refactor:` — 不改变行为的结构调整；
+- `test:` — 仅测试变更；
+- `docs:` — 仅文档变更；
+- `chore:` — 仓库维护；
+- `ci:` / `build:` — 自动化或构建系统变更。
 
-Scopes are optional when they add useful context, for example `fix(collectors): ...` or `feat(settings): ...`.
+当 scope 能提供有用上下文时可以添加，例如 `fix(collectors): ...` 或 `feat(settings): ...`。
 
-Write a meaningful summary. Do not use placeholder messages such as `-`. Version-only messages should be reserved for explicit release/version automation, not ordinary development commits. Add a commit body when the reason, compatibility decision, or tradeoff is not obvious from the diff.
+请写有意义的摘要，不要使用 `-` 之类的占位消息。只有明确的发布/版本自动化才应使用纯版本消息，普通开发 commit 不应如此。当修改原因、兼容性决策或取舍无法从 diff 中直接看出时，应补充 commit body。
 
-Examples:
+示例：
 
 ```text
 fix(collectors): preserve complete virtualized chat capture
@@ -101,46 +101,46 @@ feat(settings): add per-site capture toggle
 docs: clarify contributor validation workflow
 ```
 
-Chinese or English summaries are both acceptable; clarity and auditability matter more than language.
+中文或英文摘要都可以；清晰度和可审计性比语言本身更重要。
 
-## Pull requests
+## Pull Request
 
-A PR should be understandable without reconstructing the author's local context.
+PR 应在不依赖作者本地上下文的情况下也能被理解。
 
-- Link the agreed issue for non-trivial behavior changes. Documentation and clearly mechanical maintenance may use `N/A` with a short reason.
-- Fill every applicable section of the PR template. Use `N/A` instead of silently deleting a required explanation.
-- Explain the user-visible or architectural reason for the change, not only the files edited.
-- Call out deliberate non-goals, tradeoffs, migrations, permission changes, and compatibility decisions.
-- Update any canonical documentation made stale by the patch.
-- Remove replaced production paths, dead compatibility branches, and outdated test assumptions instead of leaving parallel implementations behind.
-- For visual changes, attach before/after screenshots or a short recording using comparable states.
-- Use a draft PR while the patch is not ready for review.
+- 非平凡行为变更应关联已达成共识的 Issue。文档和明显的机械性维护可填写 `N/A`，并简短说明原因。
+- 填写 PR 模板中所有适用部分。对于不适用项应填写 `N/A`，不要直接删除必填说明。
+- 说明改动在用户层面或架构层面的原因，而不只是列出修改了哪些文件。
+- 明确指出有意设置的非目标、取舍、迁移、权限变更和兼容性决策。
+- 更新因本次补丁而过时的 canonical 文档。
+- 删除已被替代的生产路径、失效的兼容分支和过时的测试假设，不要留下并行实现。
+- 对视觉改动，请使用可比较的状态附上修改前/后的截图或短录屏。
+- 补丁尚未准备好接受审查时，请使用 Draft PR。
 
-Keep the branch current with `main` and resolve conflicts before requesting final review.
+请求最终审查前，应让分支保持与 `main` 同步，并解决冲突。
 
-## Validation before review
+## 审查前验证
 
-The repository scripts define the acceptance bar:
+仓库脚本定义了验收门槛：
 
-| Change | Required local validation |
+| 变更 | 必需的本地验证 |
 | --- | --- |
-| Normal code change | `npm run compile` and `npm run test` during development |
-| Code PR ready for review | `npm run gate:ci` |
-| Documentation / GitHub-template-only change | `gate:ci` may be `N/A` when no runtime, build, or dependency files changed; state the reason in the PR |
-| Production build, manifest, permission, packaging, or release change | `npm run gate` |
-| Browser/site-specific behavior | Exercise the affected browser/site path manually; run the relevant `dev:*` / build command when applicable |
-| Visual behavior | Record the affected state before/after or provide equivalent screenshots |
+| 常规代码改动 | 开发期间运行 `npm run compile` 和 `npm run test` |
+| 代码 PR 准备接受审查 | `npm run gate:ci` |
+| 仅文档 / GitHub 模板变更 | 如果没有修改运行时、构建或依赖文件，`gate:ci` 可以填写 `N/A`；需在 PR 中说明原因 |
+| 生产构建、manifest、权限、打包或发布变更 | `npm run gate` |
+| 浏览器/站点专项行为 | 手动验证受影响的浏览器/站点路径；适用时运行对应的 `dev:*` / build 命令 |
+| 视觉行为 | 记录受影响状态的修改前/后效果，或提供等价截图 |
 
-GitHub Actions currently runs `npm ci` and `npm run gate:ci` for non-draft PRs that touch WebClipper code paths. That CI result does **not** replace a required local production build or manual browser validation.
+对于触及 WebClipper 代码路径的非 Draft PR，GitHub Actions 当前会运行 `npm ci` 和 `npm run gate:ci`。该 CI 结果**不能**替代要求的本地 production build 或手动浏览器验证。
 
-When a change touches a product invariant in [`AGENTS.md`](../AGENTS.md), include the relevant architecture-specific scan or targeted test evidence in the PR.
+当改动涉及 [`AGENTS.md`](../AGENTS.md) 中的产品不变量时，请在 PR 中提供相应的架构专项扫描或定向测试证据。
 
-## Data and privacy changes
+## 数据与隐私变更
 
-SyncNos is local-first, so changes involving IndexedDB, backup/restore, sync mappings, OAuth, cached images, permissions, or migrations need explicit failure-path review. State what happens when an external target fails and how existing local data remains recoverable.
+SyncNos 采用 local-first，因此涉及 IndexedDB、备份/恢复、同步映射、OAuth、缓存图片、权限或迁移的改动，都需要明确审查失败路径。请说明外部目标失败时会发生什么，以及现有本地数据如何保持可恢复。
 
-Do not commit real credentials, private user content, browser profiles, generated backup archives containing personal data, or captured session material.
+不要提交真实凭据、私人用户内容、浏览器 profile、包含个人数据的生成备份归档，或采集到的 session 材料。
 
-## License
+## 许可证
 
-Contributions accepted into this repository are distributed under the repository's [GNU Affero General Public License v3](../LICENSE.APGLv3).
+接受到本仓库中的贡献将按照仓库的 [GNU Affero General Public License v3](../LICENSE.APGLv3) 分发。
