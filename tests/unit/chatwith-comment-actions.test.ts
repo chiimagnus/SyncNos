@@ -13,7 +13,7 @@ vi.mock('../../src/services/integrations/chatwith/chatwith-settings', async () =
   };
 });
 
-vi.mock('../../src/services/integrations/chatwith/chatwith-clipboard', () => ({
+vi.mock('../../src/services/shared/clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),
 }));
 

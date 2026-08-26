@@ -12,7 +12,6 @@ export async function writeTextToClipboard(value: string): Promise<boolean> {
   }
 
   try {
-    // Best-effort fallback for older runtimes.
     const doc = globalThis.document;
     if (!doc) return false;
     const ta = doc.createElement('textarea');
