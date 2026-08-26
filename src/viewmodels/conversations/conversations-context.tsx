@@ -776,64 +776,44 @@ export function ConversationsProvider({
         .toLowerCase();
       const isArticle = sourceType === 'article';
 
-      if (isArticle) {
-        const conflict = (Array.isArray(items) ? items : []).find((item) => {
-          if (!item) return false;
-          const id = Number((item as any).id);
-          if (!Number.isFinite(id) || id <= 0) return false;
-          if (id === Number((convo as any).id)) return false;
-          const itemSourceType = String((item as any).sourceType || '')
-            .trim()
-            .toLowerCase();
-          if (itemSourceType !== 'article') return false;
-          const itemCanonical = canonicalizeHttpUrl((item as any).url);
-          if (!itemCanonical) return false;
-          return itemCanonical === nextCanonical;
-        });
+      const conflict = isArticle
+        ? (Array.isArray(items) ? items : []).find((item) => {
+            if (!item) return false;
+            const id = Number((item as any).id);
+            if (!Number.isFinite(id) || id <= 0) return false;
+            if (id === Number((convo as any).id)) return false;
+            const itemSourceType = String((item as any).sourceType || '')
+              .trim()
+              .toLowerCase();
+            if (itemSourceType !== 'article') return false;
+            const itemCanonical = canonicalizeHttpUrl((item as any).url);
+            if (!itemCanonical) return false;
+            return itemCanonical === nextCanonical;
+          })
+        : undefined;
 
-        if (conflict) {
-          const confirmed =
-            typeof globalThis.window?.confirm === 'function'
-              ? globalThis.window.confirm(
-                  '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
-                )
-              : true;
-          if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
-        }
+      if (conflict) {
+        const confirmed =
+          typeof globalThis.window?.confirm === 'function'
+            ? globalThis.window.confirm(
+                '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
+              )
+            : true;
+        if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
+
+        await mergeConversations({
+          keepConversationId: Number((convo as any).id),
+          removeConversationId: Number((conflict as any).id),
+        });
       }
 
-      const payload: any = {
+      await upsertConversation({
         id: Number((convo as any)?.id),
         source: (convo as any)?.source,
         conversationKey: (convo as any)?.conversationKey,
         sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
         url: nextCanonical,
-        lastCapturedAt: (convo as any)?.lastCapturedAt,
-      };
-      await upsertConversation(payload);
-
-      if (isArticle) {
-        const conflict = (Array.isArray(items) ? items : []).find((item) => {
-          if (!item) return false;
-          const id = Number((item as any).id);
-          if (!Number.isFinite(id) || id <= 0) return false;
-          if (id === Number((convo as any).id)) return false;
-          const itemSourceType = String((item as any).sourceType || '')
-            .trim()
-            .toLowerCase();
-          if (itemSourceType !== 'article') return false;
-          const itemCanonical = canonicalizeHttpUrl((item as any).url);
-          if (!itemCanonical) return false;
-          return itemCanonical === nextCanonical;
-        });
-
-        if (conflict) {
-          await mergeConversations({
-            keepConversationId: Number((convo as any).id),
-            removeConversationId: Number((conflict as any).id),
-          });
-        }
-      }
+      });
     },
     [items, selectedConversation],
   );
