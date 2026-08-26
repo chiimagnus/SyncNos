@@ -1,58 +1,21 @@
-# WebClipper UI 规范（Scope: `src/ui/**`）
+# WebClipper UI 约束（Scope: `src/ui/**`）
 
-本文件是 WebClipper UI 的工作约定与设计系统真源导航，用于避免“局部改样式 → 全局不一致”的回归。
+根 `AGENTS.md` 的分层和产品 invariant 对本目录全部生效。本文件只补充 UI 层无法从源码结构自然推导的局部约束。
 
-> 目标：让贡献者不需要通读整个 UI，也能在新增/修改组件时保持一致的视觉语言与交互行为。
+## 边界
 
-## 1. 真源与边界
+- `src/ui/**` 只负责组件、样式和 DOM 面板；不得直接访问 `src/platform/**`。
+- 数据读取、写入、归一化和跨界面状态编排放在 ViewModel / Service，不要在组件中形成第二套业务逻辑。
+- 设计 token 的唯一事实源是 `src/ui/styles/tokens.css`；不要在文档或组件旁复制完整 token 清单。
 
-| 主题 | 真源文件 | 说明 |
-| --- | --- | --- |
-| 设计 tokens | `src/ui/styles/tokens.css` | 颜色、圆角、字体等 token 的单一事实源 |
-| 全局主题 | `src/services/protocols/app-theme.ts` + `src/viewmodels/theme/useAppThemeMode.ts` | `system/light/sepia/dark/black` 写入 `app_theme_mode_v1`，通过 `html[data-theme-mode]` 驱动 popup / app |
-| 组件层 | `src/ui/**` | 只放组件/样式/DOM 面板；不直接访问 `src/platform/**` |
-| 依赖方向 | `ui → viewmodels → services → platform` | `src/ui/**` 禁止 import `@platform/*` |
+## 视觉与交互
 
-## 2. 圆角规范（B2.2 · 同心圆角分级）
+- 新样式优先复用现有 token、shared style 和已有组件模式，不创建局部设计系统。
+- 非 reset 的圆角使用现有 radius token；按钮不得用硬编码超大圆角模拟 pill。
+- 详情页次级操作优先沿用右上角更多菜单模式，避免在正文 header 平铺一组并列操作。
+- 可交互元素必须保留清晰的 `focus-visible` 状态，不以鼠标视觉效果换掉键盘可访问性。
+- 修改共享视觉规则时先改 canonical token/shared style，再让消费者继承，不在多个组件中同步手抄常量。
 
-### 2.1 Token 列表
+## 验证
 
-圆角 token 位于 `src/ui/styles/tokens.css`：
-
-- `--radius-outer`
-- `--radius-card`
-- `--radius-control`
-- `--radius-chip`
-- `--radius-inline`
-- `--radius-pill`
-
-### 2.2 使用规则（同心层级）
-
-| 场景 | 建议 token | 说明 |
-| --- | --- | --- |
-| 页面/大容器外框 | `--radius-outer` | 外层包裹或大面积容器 |
-| Card/Panel | `--radius-card` | 设置卡片、notice 面板等 |
-| 控件（Button/Input/Select） | `--radius-control` | 主交互控件统一圆角 |
-| 小标签/Badge | `--radius-chip` | 小面积强调信息 |
-| Inline 小块（code tag 等） | `--radius-inline` | 文本行内元素 |
-| 非按钮的 pill 外观 | `--radius-pill` | 只用于 pill 语义的非按钮元素 |
-
-### 2.3 禁止项
-
-- 新增样式不要写裸 `border-radius: <px>`（允许 `border-radius: 0` 作为 reset）。
-- 不要用 `999px` 给按钮做圆角（按钮应使用 `--radius-control`）。
-
-## 3. CSS / Tailwind 风格约定
-
-- 优先复用现有 class 组合与 shared style（例如 `src/ui/shared/button-styles.ts`）。
-- 新增 UI 状态尽量用 token 或现有 utility，不要引入新的一套“局部常量”。
-- 详情页的次级操作优先收进右上角更多菜单，菜单内入口应使用竖排的 `menu-item` 风格，避免在正文 header 里散落多个并列按钮。
-- 在可交互元素上保留可见的 `focus-visible` 样式（避免键盘可访问性回退）。
-
-## 4. 自检命令（手动）
-
-```bash
-rg -n "src/platform|/platform/" src/ui
-rg -n "border-radius:\\s*[0-9]|tw-rounded-\\[" src/ui src/entrypoints
-rg -n -- "--radius-" src/ui/styles/tokens.css
-```
+架构扫描、通用构建/测试要求和提交前验证统一遵循根 `AGENTS.md` 与 `docs/CONTRIBUTING.md`。涉及视觉行为时同时检查受影响的 popup / app / in-page surface，避免只验证单一入口。
