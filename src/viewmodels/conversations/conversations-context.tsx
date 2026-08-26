@@ -426,7 +426,6 @@ type ConversationsAppState = {
   deleteSelected: () => Promise<void>;
 
   updateSelectedConversationUrl: (nextUrl: string) => Promise<void>;
-  cleanUrlDraft: (rawUrl: string) => Promise<string>;
 };
 
 const ConversationsContext = createContext<ConversationsAppState | null>(null);
@@ -847,12 +846,6 @@ export function ConversationsProvider({
     },
     [items, selectedConversation],
   );
-
-  const cleanUrlDraft = useCallback(async (rawUrl: string) => {
-    const canonical = canonicalizeHttpUrl(rawUrl);
-    if (!canonical) throw new Error('URL must be an http(s) page');
-    return canonical;
-  }, []);
 
   useEffect(() => {
     if (didBootstrapRef.current) return;
@@ -1280,7 +1273,6 @@ export function ConversationsProvider({
     clearSyncFeedback,
     deleteSelected,
     updateSelectedConversationUrl,
-    cleanUrlDraft,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;
