@@ -305,7 +305,9 @@ describe('ConversationDetailPane header actions', () => {
     expect(menu).toBeTruthy();
     const items = Array.from(menu!.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
     expect(items.map((item) => item.textContent)).toEqual(['Copy Notion link', 'Copy Feishu link']);
-    expect(primaryButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(primaryButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe(
+      '/icons/notion.svg',
+    );
     expect(trigger?.textContent).toContain('▾');
     expect(items[0]?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
     expect(items[1]?.querySelector('[data-provider-logo="feishu"]')?.getAttribute('src')).toBe('/icons/feishu.svg');
@@ -547,7 +549,9 @@ describe('ConversationDetailPane header actions', () => {
     expect(input?.className).toContain('tw-w-56');
 
     const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Save');
-    const cancelButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Cancel');
+    const cancelButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Cancel',
+    );
     expect(saveButton).toBeTruthy();
     expect(cancelButton).toBeTruthy();
 
