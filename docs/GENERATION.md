@@ -23,7 +23,7 @@ The audit covered all tracked Markdown with a long-term repository role:
 - root and nested `AGENTS.md`;
 - `docs/**/*.md`;
 - `.github/PULL_REQUEST_TEMPLATE.md`;
-- the integration guides migrated from `.github/guide/**` to `docs/guide/**`, including their documentation screenshots.
+- the integration guides and documentation screenshots under `docs/guide/**`.
 
 Source facts were checked against CodeGraph plus the relevant manifest/configuration, package scripts, tests, workflows, OAuth/sync services, backup logic, and Safari tooling.
 
@@ -52,6 +52,6 @@ Source facts were checked against CodeGraph plus the relevant manifest/configura
 
 ## Cleanup Result
 
-The Feishu and Obsidian bilingual guides previously under `.github/guide/` were migrated to `docs/guide/`, which now owns those detailed setup procedures. The existing Obsidian screenshots moved with the guide so the user-facing steps remain self-contained. The temporary condensed `docs/feishu-setup.md` and `docs/obsidian-setup.md` pages were removed to avoid maintaining duplicate canonical text. Settings UI guide links were updated to the new paths, and Obsidian now selects the Chinese or English guide consistently with Feishu. The contributor guide no longer refers to separate iOS, macOS, or CLI repositories that are not part of the current project structure. `docs/configuration.md` remains removed after its durable content was assigned to the existing contribution, architecture, and source-of-truth owners.
+Feishu and Obsidian setup is owned only by the bilingual guides under `docs/guide/**`, and the settings UI links select the matching language. Contributor guidance is scoped to this WebClipper repository and its PR CI. Troubleshooting documents current receiver-order, comment-locator, and Zen development behavior rather than retired debugging hooks or migration history. No duplicate setup or configuration page is retained.
 
 No unresolved product-policy decision was inferred from source code. External provider UI and policies can change independently of this repository; the integration pages therefore document only the repository-controlled setup contract and link outward where appropriate.

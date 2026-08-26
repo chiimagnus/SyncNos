@@ -16,7 +16,7 @@ SyncNos 欢迎聚焦明确的 Bug 修复、站点适配器、文档改进，以�
 
 ## 本地环境
 
-尽可能使用 Node.js 22，使本地行为与 GitHub Actions 保持一致。
+尽可能使用 Node.js 22，使本地行为与 PR CI 保持一致。
 
 ```bash
 npm ci
