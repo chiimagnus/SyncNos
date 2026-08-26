@@ -80,6 +80,7 @@ describe('DetailHeaderActionBar', () => {
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeFalsy();
     const logo = button?.querySelector('[data-provider-logo="notion"]') as HTMLImageElement | null;
     expect(logo?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(logo?.className).toContain('webclipper-provider-logo--notion');
     expect(button?.textContent).not.toContain('▾');
   });
 

@@ -197,6 +197,17 @@
   border-bottom-left-radius: 0;
 }
 
+[data-theme-mode='dark'] .webclipper-provider-logo--notion,
+[data-theme-mode='black'] .webclipper-provider-logo--notion {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme-mode]) .webclipper-provider-logo--notion {
+    filter: invert(1);
+  }
+}
+
 .webclipper-btn--icon-sm {
   --btn-icon-size: 32px;
 }

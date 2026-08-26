@@ -32,7 +32,12 @@ function providerLogo(action: DetailHeaderAction) {
       src={src}
       alt=""
       aria-hidden="true"
-      className="tw-h-4 tw-w-4 tw-shrink-0 tw-object-contain"
+      className={[
+        'tw-h-4 tw-w-4 tw-shrink-0 tw-object-contain',
+        action.provider === 'notion' ? 'webclipper-provider-logo--notion' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       data-provider-logo={action.provider}
     />
   );
