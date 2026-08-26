@@ -52,7 +52,6 @@ async function buildObsidianOpenInAction({
     kind: 'open-target',
     provider: 'obsidian',
     slot: 'open',
-    triggerPayload: obsidianTarget.trigger as unknown as Record<string, unknown>,
     onTrigger: async () => {
       await openObsidianTarget({
         trigger: obsidianTarget.trigger!,

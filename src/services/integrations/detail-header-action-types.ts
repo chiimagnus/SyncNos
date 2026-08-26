@@ -12,7 +12,6 @@ export type DetailHeaderAction = {
   slot: DetailHeaderActionSlot;
   disabled?: boolean;
   href?: string;
-  triggerPayload?: Record<string, unknown>;
   afterTriggerLabel?: string;
   onTrigger: () => Promise<void>;
 };
