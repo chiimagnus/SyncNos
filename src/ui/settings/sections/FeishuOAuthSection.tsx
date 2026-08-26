@@ -18,6 +18,7 @@ export function FeishuOAuthSection(props: {
   feishuChatFolder: string;
   feishuArticleFolder: string;
   feishuVideoFolder: string;
+  feishuLogoUrl: string;
   setupGuideUrl: string;
   onToggleSyncEnabled: (enabled: boolean) => void;
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
@@ -47,6 +48,7 @@ export function FeishuOAuthSection(props: {
     feishuChatFolder,
     feishuArticleFolder,
     feishuVideoFolder,
+    feishuLogoUrl,
     setupGuideUrl,
     onToggleSyncEnabled,
     onToggleAutoSyncEnabled,
@@ -78,6 +80,7 @@ export function FeishuOAuthSection(props: {
     <>
       <section className={cardClassName} aria-label={t('feishuOAuth')}>
         <div className="tw-flex tw-items-center tw-gap-2">
+          <img className="tw-h-5 tw-w-5 tw-shrink-0" src={feishuLogoUrl} alt="" aria-hidden="true" />
           <div className="tw-min-w-0 tw-flex-1 tw-text-[var(--text-primary)]">
             <span className="tw-text-base tw-font-extrabold">{t('feishuOAuth')}</span>
             <span className="tw-mx-2 tw-text-[var(--text-secondary)]" aria-hidden="true">

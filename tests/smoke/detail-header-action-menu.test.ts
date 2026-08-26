@@ -75,8 +75,11 @@ describe('DetailHeaderActionBar', () => {
       );
     });
 
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    const button = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeFalsy();
+    const logo = button?.querySelector('[data-provider-logo="notion"]') as HTMLImageElement | null;
+    expect(logo?.getAttribute('src')).toBe('/icons/notion.svg');
   });
 
   it('renders a menu trigger when multiple destinations exist', () => {
@@ -152,6 +155,61 @@ describe('DetailHeaderActionBar', () => {
     expect(menuItems[0]?.className || '').toContain('tw-flex');
     expect(menuItems[0]?.className || '').toContain('tw-whitespace-normal');
     expect(menuItems[0]?.className || '').toContain('tw-break-words');
+    expect(menuItems[0]?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(menuItems[1]?.querySelector('[data-provider-logo="obsidian"]')?.getAttribute('src')).toBe(
+      '/icons/obsidian.svg',
+    );
+  });
+
+  it('renders multiple inline menu items without creating a nested popover', async () => {
+    const firstTrigger = vi.fn(async () => {});
+    const disabledTrigger = vi.fn(async () => {});
+    const closeMenu = vi.fn();
+
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'copy-full-markdown',
+              label: 'Copy full Markdown',
+              provider: 'local',
+              kind: 'copy-text',
+              slot: 'tools',
+              onTrigger: firstTrigger,
+            },
+            {
+              id: 'open-original',
+              label: 'Open original',
+              provider: 'source',
+              kind: 'external-link',
+              slot: 'tools',
+              disabled: true,
+              onTrigger: disabledTrigger,
+            },
+          ],
+          buttonClassName,
+          inlineMenuItems: true,
+          closeMenuOnActionTrigger: closeMenu,
+        }),
+      );
+    });
+
+    expect(document.querySelector('[aria-haspopup="menu"]')).toBeFalsy();
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    expect(items).toHaveLength(2);
+    expect(items.map((item) => item.textContent)).toEqual(['Copy full Markdown', 'Open original']);
+    expect(items[1]?.disabled).toBe(true);
+
+    await act(async () => {
+      items[0]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(firstTrigger).toHaveBeenCalledTimes(1);
+    expect(closeMenu).toHaveBeenCalledTimes(1);
+
+    items[1]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    expect(disabledTrigger).not.toHaveBeenCalled();
   });
 
   it('reports an error instead of swallowing a failed action trigger', async () => {
@@ -192,6 +250,92 @@ describe('DetailHeaderActionBar', () => {
     expect(alertSpy).toHaveBeenCalledWith('Failed to open Notion page');
   });
 
+  it('shows transient icon-only success status without changing the button into a text action', async () => {
+    vi.useFakeTimers();
+    try {
+      const onTrigger = vi.fn(async () => {});
+      act(() => {
+        root!.render(
+          createElement(DetailHeaderActionBar, {
+            actions: [
+              {
+                id: 'copy-notion-link',
+                label: 'Copy Notion link',
+                provider: 'notion',
+                kind: 'copy-text',
+                slot: 'copy',
+                afterTriggerLabel: 'Copied',
+                onTrigger,
+              },
+            ],
+            buttonClassName,
+          }),
+        );
+      });
+
+      const button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
+      expect(button).toBeTruthy();
+      expect(button?.textContent || '').not.toContain('Copy Notion link');
+
+      await act(async () => {
+        button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const status = document.querySelector('[role="status"]') as HTMLElement | null;
+      expect(status?.textContent).toBe('Copied');
+      expect(status?.className || '').toContain('tw-absolute');
+      expect(button?.textContent || '').not.toContain('Copied');
+
+      await act(async () => {
+        vi.advanceTimersByTime(2_600);
+        await Promise.resolve();
+      });
+      expect(document.querySelector('[role="status"]')).toBeFalsy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears stale success feedback before a later action that fails', async () => {
+    const alertSpy = vi.fn();
+    Object.defineProperty(globalThis.window, 'alert', { configurable: true, value: alertSpy });
+    const onTrigger = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('copy denied'));
+
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'copy-notion-link',
+              label: 'Copy Notion link',
+              provider: 'notion',
+              kind: 'copy-text',
+              slot: 'copy',
+              afterTriggerLabel: 'Copied',
+              onTrigger,
+            },
+          ],
+          buttonClassName,
+        }),
+      );
+    });
+
+    const button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement;
+    await act(async () => {
+      button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+
+    await act(async () => {
+      button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(alertSpy).toHaveBeenCalledWith('copy denied');
+    expect(document.querySelector('[role="status"]')).toBeFalsy();
+  });
+
   it('renders a disabled direct button for unavailable integrations', () => {
     act(() => {
       root!.render(
@@ -215,59 +359,5 @@ describe('DetailHeaderActionBar', () => {
     const button = document.querySelector('[aria-label="Obsidian API not connected"]') as HTMLButtonElement | null;
     expect(button).toBeTruthy();
     expect(button?.disabled).toBe(true);
-  });
-
-  it('shows busy and done labels for cache action progress state', async () => {
-    let resolveTrigger: (() => void) | null = null;
-    const onTrigger = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveTrigger = resolve;
-        }),
-    );
-
-    act(() => {
-      root!.render(
-        createElement(DetailHeaderActionBar, {
-          actions: [
-            {
-              id: 'cache-images',
-              label: 'Cache images',
-              busyLabel: 'Caching images...',
-              showBusyProgress: true,
-              afterTriggerLabel: 'Cache complete',
-              afterTriggerLabelDurationMs: 0,
-              provider: 'local',
-              kind: 'open-target',
-              slot: 'tools',
-              onTrigger,
-            },
-          ],
-          buttonClassName,
-        }),
-      );
-    });
-
-    const button = document.querySelector('[aria-label="Cache images"]') as HTMLButtonElement | null;
-    expect(button).toBeTruthy();
-    expect(button?.textContent || '').toContain('Cache images');
-
-    await act(async () => {
-      button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
-    });
-
-    expect(onTrigger).toHaveBeenCalledTimes(1);
-    expect(button?.disabled).toBe(true);
-    expect(button?.textContent || '').toContain('Caching images...');
-    expect(document.querySelector('.tw-animate-pulse')).toBeTruthy();
-
-    await act(async () => {
-      resolveTrigger?.();
-      await Promise.resolve();
-    });
-
-    expect(button?.disabled).toBe(false);
-    expect(button?.textContent || '').toContain('Cache complete');
   });
 });

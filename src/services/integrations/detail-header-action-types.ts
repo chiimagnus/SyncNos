@@ -1,22 +1,18 @@
-export type DetailHeaderActionKind = 'external-link' | 'open-target';
+export type DetailHeaderActionKind = 'external-link' | 'open-target' | 'copy-text';
 
 export type DetailHeaderActionProvider = string;
 
-export type DetailHeaderActionSlot = 'open' | 'tools';
+export type DetailHeaderActionSlot = 'open' | 'copy' | 'tools';
 
 export type DetailHeaderAction = {
   id: string;
   label: string;
-  busyLabel?: string;
-  showBusyProgress?: boolean;
   kind: DetailHeaderActionKind;
   provider: DetailHeaderActionProvider;
   slot: DetailHeaderActionSlot;
   disabled?: boolean;
   href?: string;
-  triggerPayload?: Record<string, unknown>;
   afterTriggerLabel?: string;
-  afterTriggerLabelDurationMs?: number;
   onTrigger: () => Promise<void>;
 };
 

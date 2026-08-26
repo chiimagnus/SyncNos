@@ -60,6 +60,7 @@ describe('settings section definitions', () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
     const setupGuideUrl = 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.en.md';
+    const onTest = vi.fn();
 
     act(() => {
       root.render(
@@ -88,13 +89,25 @@ describe('settings section definitions', () => {
           onToggleAutoSyncEnabled: () => {},
           onSave: () => {},
           onSaveApiKey: () => {},
-          onTest: () => {},
+          onTest,
           onOpenSetupGuide: () => {},
         }),
       );
     });
 
     expect(document.querySelector(`a[href="${setupGuideUrl}"]`)).toBeTruthy();
+    const section = document.querySelector('section[aria-label="Obsidian Local REST API"]');
+    const header = section?.firstElementChild;
+    const testButton = Array.from(header?.querySelectorAll('button') || []).find(
+      (button) => button.textContent?.trim() === 'Test',
+    ) as HTMLButtonElement | undefined;
+    expect(testButton).toBeTruthy();
+    expect(header?.contains(testButton!)).toBe(true);
+
+    act(() => {
+      testButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(onTest).toHaveBeenCalledTimes(1);
 
     act(() => root.unmount());
     cleanupDom();

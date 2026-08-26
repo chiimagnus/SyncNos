@@ -3,7 +3,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Conversation } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
+import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
 import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageOnChanged } from '@services/shared/storage';
 import { buildConversationSidebarRenderItems } from '@services/conversations/domain/sidebar-time-groups';
@@ -44,13 +46,6 @@ function formatTime(ts?: number) {
   }
 }
 
-function sanitizeHttpUrl(url: unknown) {
-  const text = String(url || '').trim();
-  if (!text) return '';
-  if (/^https?:\/\//i.test(text)) return text;
-  return '';
-}
-
 function providerButtonLabel(provider: SyncProvider) {
   const definition = getSyncProviderDefinition(provider);
   const labelKey = definition?.labelKey;
@@ -65,29 +60,6 @@ function isPopupUi() {
   } catch (_e) {
     return false;
   }
-}
-
-async function copyTextToClipboard(text: string) {
-  const raw = String(text || '');
-  try {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      await navigator.clipboard.writeText(raw);
-      return;
-    }
-  } catch (_e) {
-    // fallthrough
-  }
-  const el = document.createElement('textarea');
-  el.value = raw;
-  el.style.position = 'fixed';
-  el.style.left = '-9999px';
-  el.style.top = '0';
-  document.body.appendChild(el);
-  el.focus();
-  el.select();
-  const ok = document.execCommand('copy');
-  document.body.removeChild(el);
-  if (!ok) throw new Error('copy failed');
 }
 
 function syncMenuItemLabel(provider: SyncProvider, syncing: boolean) {
@@ -517,7 +489,8 @@ export function ConversationListPane({
     try {
       const d = await getConversationDetail(id);
       const mdText = await formatConversationMarkdownForExternalOutput(conversation as any, d as any);
-      await copyTextToClipboard(mdText);
+      const copied = await writeTextToClipboard(mdText);
+      if (!copied) throw new Error(t('copyFailed'));
       setCopiedId(id);
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = window.setTimeout(() => {

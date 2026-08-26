@@ -52,7 +52,6 @@ async function buildObsidianOpenInAction({
     kind: 'open-target',
     provider: 'obsidian',
     slot: 'open',
-    triggerPayload: obsidianTarget.trigger as unknown as Record<string, unknown>,
     onTrigger: async () => {
       await openObsidianTarget({
         trigger: obsidianTarget.trigger!,
@@ -74,6 +73,15 @@ export async function resolveOpenInDetailHeaderActions({
   port: DetailHeaderActionPort;
 }): Promise<DetailHeaderAction[]> {
   const actions: DetailHeaderAction[] = [];
+  let mappingPromise: ReturnType<typeof getSyncMappingByConversation> | null = null;
+  const resolveSyncMapping = () => {
+    const conversationId = Number((conversation as any)?.id);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) return Promise.resolve(null);
+    if (!mappingPromise) mappingPromise = getSyncMappingByConversation(conversationId).catch(() => null);
+    return mappingPromise;
+  };
+  const hydratedValue = (mappingRes: any, field: string) =>
+    safeString(mappingRes?.mapping?.[field]) || safeString(mappingRes?.conversation?.[field]);
 
   const [notionEnabled, obsidianEnabled, feishuEnabled] = await Promise.all([
     isSyncProviderEnabled('notion').catch(() => true),
@@ -83,17 +91,28 @@ export async function resolveOpenInDetailHeaderActions({
 
   if (notionEnabled) {
     let convo = conversation;
+    const currentNotionPageId = normalizeNotionPageId(safeString((convo as any)?.notionPageId));
     if (
       convo &&
-      (!safeString((convo as any).notionPageUrl) || !safeString((convo as any).notionWorkspaceSlug)) &&
-      safeString((convo as any).notionPageId)
+      (!currentNotionPageId ||
+        !safeString((convo as any).notionPageUrl) ||
+        !safeString((convo as any).notionWorkspaceSlug))
     ) {
-      const mappingRes = await getSyncMappingByConversation(Number((convo as any).id) || 0).catch(() => null);
-      const pageUrl = safeString(mappingRes?.mapping?.notionPageUrl);
-      const workspaceSlug = safeString(mappingRes?.mapping?.notionWorkspaceSlug);
-      if (pageUrl || workspaceSlug) {
+      const mappingRes = await resolveSyncMapping();
+      const currentPageId = normalizeNotionPageId(safeString((convo as any).notionPageId));
+      const hydratedPageId = normalizeNotionPageId(hydratedValue(mappingRes, 'notionPageId'));
+      const canHydrateTargetMetadata = Boolean(hydratedPageId) && (!currentPageId || currentPageId === hydratedPageId);
+      const pageId = currentPageId || hydratedPageId;
+      const pageUrl =
+        (currentPageId ? safeString((convo as any).notionPageUrl) : '') ||
+        (canHydrateTargetMetadata ? hydratedValue(mappingRes, 'notionPageUrl') : '');
+      const workspaceSlug =
+        (currentPageId ? safeString((convo as any).notionWorkspaceSlug) : '') ||
+        (canHydrateTargetMetadata ? hydratedValue(mappingRes, 'notionWorkspaceSlug') : '');
+      if (pageId || pageUrl || workspaceSlug) {
         convo = {
           ...(convo as any),
+          ...(pageId ? { notionPageId: pageId } : null),
           ...(pageUrl ? { notionPageUrl: pageUrl } : null),
           ...(workspaceSlug ? { notionWorkspaceSlug: workspaceSlug } : null),
         } as any;
@@ -106,8 +125,8 @@ export async function resolveOpenInDetailHeaderActions({
   if (feishuEnabled) {
     let convo = conversation;
     if (convo && !safeString((convo as any).feishuDocId)) {
-      const mappingRes = await getSyncMappingByConversation(Number((convo as any).id) || 0).catch(() => null);
-      const docId = safeString(mappingRes?.mapping?.feishuDocId);
+      const mappingRes = await resolveSyncMapping();
+      const docId = hydratedValue(mappingRes, 'feishuDocId');
       if (docId) convo = { ...(convo as any), feishuDocId: docId } as any;
     }
     const feishuAction = buildFeishuOpenInAction({ conversation: convo, port, labels: DETAIL_HEADER_ACTION_LABELS });

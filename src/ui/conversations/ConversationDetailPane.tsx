@@ -1,4 +1,4 @@
-import { ChevronLeft, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, Link, MoreHorizontal } from 'lucide-react';
 
 import { ChatDetailView } from '@ui/conversations/views/ChatDetailView';
 import { ArticleReaderView } from '@ui/conversations/views/ArticleReaderView';
@@ -61,7 +61,12 @@ export function ConversationDetailPane({
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
+  const copyActions = safeActions.filter((action) => action.slot === 'copy');
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
+  const copyActionScopeKey = JSON.stringify([
+    Number((selected as any)?.id ?? activeId) || 0,
+    copyActions.map((action) => [action.id, String(action.href || '')]),
+  ]);
 
   const headerIconButtonClass = headerButtonClassName();
   const kindView = conversationKinds.pick(selected as any)?.view ?? DEFAULT_VIEW;
@@ -393,11 +398,21 @@ export function ConversationDetailPane({
             <DetailHeaderActionBar
               actions={openActions}
               buttonClassName={headerIconButtonClass}
-              iconOnly
               menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
               menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
               menuAriaLabel={t('detailHeaderOpenInMenuAria')}
               className="tw-order-1"
+            />
+
+            <DetailHeaderActionBar
+              key={copyActionScopeKey}
+              actions={copyActions}
+              buttonClassName={headerIconButtonClass}
+              triggerIcon={<Link size={16} strokeWidth={2} aria-hidden="true" />}
+              menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
+              menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
+              menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
+              className="tw-order-2"
             />
 
             {canOpenCommentsSidebar ? (
@@ -406,7 +421,7 @@ export function ConversationDetailPane({
                 onClick={() => {
                   onTriggerCommentsSidebar?.();
                 }}
-                className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
+                className={[headerButtonClassName(), 'tw-order-3'].join(' ')}
                 aria-label={commentsSidebarLabel}
                 {...tooltipAttrs(commentsSidebarLabel)}
                 aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
@@ -434,7 +449,7 @@ export function ConversationDetailPane({
                 align="end"
                 panelMinWidth={214}
                 panelClassName={moreMenuPanelClassName}
-                className="tw-order-3"
+                className="tw-order-4"
                 trigger={(triggerProps) => (
                   <button
                     {...triggerProps}
@@ -469,7 +484,7 @@ export function ConversationDetailPane({
                         <DetailHeaderActionBar
                           actions={toolActions}
                           buttonClassName={buttonMenuItemClassName()}
-                          showLabelAlways
+                          inlineMenuItems
                           closeMenuOnActionTrigger={closeMoreMenu}
                           className="tw-w-full"
                         />
