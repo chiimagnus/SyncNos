@@ -71,8 +71,6 @@ YouTube and Bilibili pages can capture transcripts/subtitles that the page has a
 | **Feishu (DocX)** | Syncs local content to Feishu DocX after OAuth. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/feishu/DocxSync.en.md). |
 | **Markdown / Zip** | Exports individual content or a local backup package. |
 
-For storage, backup, permission, and network behavior, see [Privacy Policy](PRIVACY.md) and the [documentation index](docs/overview.md).
-
 ## Screenshots
 
 WebClipper Popup: save and browse conversations

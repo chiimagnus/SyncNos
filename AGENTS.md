@@ -38,8 +38,6 @@ collectors -> services/shared
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
 - `anti_hotlink_rules_v1` 命中后补 referer 并尝试缓存图片，但图片失败不得阻断正文采集。
 
-长期说明统一放在 [docs/overview.md](docs/overview.md) 导航下；不要在 README、AGENTS 和多个模块页重复维护同一事实。
-
 ## Agent 实现约束
 
 - 默认不查看或编辑 i18n 文案，除非任务明确涉及文案。
