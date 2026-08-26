@@ -105,6 +105,10 @@ WebClipper Settings：备份与同步（Notion / Obsidian / 飞书）
 文章讨论侧栏：精确引用、紧凑线程与单 active reply composer
 ![文章讨论侧栏](docs/assets/comments-discussion.png)
 
+## 参与贡献
+
+提交 Issue、commit 或 PR 前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，其中定义了问题证据、Conventional Commits、PR 内容和验证要求。修改代码前同时阅读 [AGENTS.md](AGENTS.md)，以仓库分层与不可破坏的产品契约为准。
+
 ## 支持
 
 SyncNos 是一个人用心做的项目。
