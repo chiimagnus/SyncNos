@@ -5,6 +5,7 @@ function safeString(v: unknown) {
 }
 
 function safeNumberOrNull(v: unknown) {
+  if (v == null) return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
   return n;
@@ -51,11 +52,12 @@ function buildSyncnosObject({
   const conversationKey = safeString(c.conversationKey);
   if (!source || !conversationKey) throw new Error('missing source or conversationKey');
 
+  const normalizedLastSyncedAt = safeNumberOrNull(lastSyncedAt);
   return {
     source,
     conversationKey,
     schemaVersion: SCHEMA_VERSION,
-    lastSyncedAt: safeNumberOrNull(lastSyncedAt),
+    ...(normalizedLastSyncedAt == null ? {} : { lastSyncedAt: normalizedLastSyncedAt }),
   };
 }
 

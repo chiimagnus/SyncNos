@@ -15,7 +15,7 @@ import {
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
-} from '@services/sync/obsidian/obsidian-sync-metadata.ts';
+} from '@services/sync/shared/remote-markdown-metadata.ts';
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 

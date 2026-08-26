@@ -81,7 +81,7 @@ describe('obsidian-sync-orchestrator', () => {
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
-    await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
+    await loadModule('@services/sync/shared/remote-markdown-metadata.ts');
     await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
@@ -130,7 +130,7 @@ describe('obsidian-sync-orchestrator', () => {
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
-    await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
+    await loadModule('@services/sync/shared/remote-markdown-metadata.ts');
     await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
@@ -222,7 +222,7 @@ describe('obsidian-sync-orchestrator', () => {
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
-    await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
+    await loadModule('@services/sync/shared/remote-markdown-metadata.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     const convo = {
@@ -300,7 +300,7 @@ describe('obsidian-sync-orchestrator', () => {
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
-    await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
+    await loadModule('@services/sync/shared/remote-markdown-metadata.ts');
     await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
@@ -361,7 +361,7 @@ describe('obsidian-sync-orchestrator', () => {
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
-    await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
+    await loadModule('@services/sync/shared/remote-markdown-metadata.ts');
     await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
@@ -434,7 +434,7 @@ describe('obsidian-sync-orchestrator', () => {
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
-    await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
+    await loadModule('@services/sync/shared/remote-markdown-metadata.ts');
     await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const naming = await loadModule('@services/conversations/domain/file-naming.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
