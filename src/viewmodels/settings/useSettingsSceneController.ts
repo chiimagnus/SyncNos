@@ -79,7 +79,7 @@ import {
   type NotionPageOption,
 } from '@viewmodels/settings/utils';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
-import { getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
+import { getCurrentLocale, getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
@@ -1400,21 +1400,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     }
   }, [busy, openExtensionAppSettings, useAppImport]);
 
-  const onOpenObsidianSetupGuide = useCallback(() => {
-    openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md');
-  }, []);
+  const guideLocale = getCurrentLocale();
+  const obsidianSetupGuideUrl =
+    guideLocale === 'zh'
+      ? 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.zh.md'
+      : 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.en.md';
+  const feishuSetupGuideUrl =
+    guideLocale === 'zh'
+      ? 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.zh.md'
+      : 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.en.md';
 
-  const feishuSetupGuideUrl = useMemo(() => {
-    try {
-      const lang = String(globalThis.navigator?.language || '').toLowerCase();
-      const useZh = lang.startsWith('zh');
-      return useZh
-        ? 'https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/feishu/DocxSync.zh.md'
-        : 'https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/feishu/DocxSync.en.md';
-    } catch (_e) {
-      return 'https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/feishu/DocxSync.en.md';
-    }
-  }, []);
+  const onOpenObsidianSetupGuide = useCallback(() => {
+    openHttpUrl(obsidianSetupGuideUrl);
+  }, [obsidianSetupGuideUrl]);
 
   const onOpenFeishuSetupGuide = useCallback(() => {
     openHttpUrl(feishuSetupGuideUrl);
@@ -1536,6 +1534,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onSaveObsidianSettings,
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
+    obsidianSetupGuideUrl,
 
     exportStatus,
     importStatus,

@@ -12,7 +12,7 @@ This file records the source baseline and ownership rules used for the long-term
 | Canonical entry | `docs/overview.md` |
 | Method | Neat Freak full-repository documentation audit |
 
-`Commit hash` is the code/documentation baseline that was audited before this documentation-only branch started. Documentation commits made during the cleanup intentionally do not replace that baseline.
+`Commit hash` is the code/documentation baseline that was audited before this cleanup branch started. Documentation commits and the guide-link source fix made during the cleanup intentionally do not replace that baseline.
 
 ## Audited Scope
 
@@ -52,6 +52,6 @@ Source facts were checked against CodeGraph plus the relevant manifest/configura
 
 ## Cleanup Result
 
-The Feishu and Obsidian bilingual guides previously under `.github/guide/` were migrated to `docs/guide/`, which now owns those detailed setup procedures. The existing Obsidian screenshots moved with the guide so the user-facing steps remain self-contained. The temporary condensed `docs/feishu-setup.md` and `docs/obsidian-setup.md` pages were removed to avoid maintaining duplicate canonical text. `docs/configuration.md` remains removed after its durable content was assigned to the existing contribution, architecture, and source-of-truth owners.
+The Feishu and Obsidian bilingual guides previously under `.github/guide/` were migrated to `docs/guide/`, which now owns those detailed setup procedures. The existing Obsidian screenshots moved with the guide so the user-facing steps remain self-contained. The temporary condensed `docs/feishu-setup.md` and `docs/obsidian-setup.md` pages were removed to avoid maintaining duplicate canonical text. Settings UI guide links were updated to the new paths, and Obsidian now selects the Chinese or English guide consistently with Feishu. `docs/configuration.md` remains removed after its durable content was assigned to the existing contribution, architecture, and source-of-truth owners.
 
 No unresolved product-policy decision was inferred from source code. External provider UI and policies can change independently of this repository; the integration pages therefore document only the repository-controlled setup contract and link outward where appropriate.

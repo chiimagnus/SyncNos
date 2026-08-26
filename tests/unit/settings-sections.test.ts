@@ -6,6 +6,7 @@ import { JSDOM } from 'jsdom';
 import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels/settings/types';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
+import { ObsidianSettingsSection } from '../../src/ui/settings/sections/ObsidianSettingsSection';
 import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
 
 describe('settings section definitions', () => {
@@ -50,6 +51,50 @@ describe('settings section definitions', () => {
       true,
     );
     expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
+
+    act(() => root.unmount());
+    cleanupDom();
+  });
+
+  it('uses the supplied Obsidian setup guide URL', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+    const setupGuideUrl = 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.en.md';
+
+    act(() => {
+      root.render(
+        createElement(ObsidianSettingsSection, {
+          busy: false,
+          syncEnabled: true,
+          autoSyncEnabled: false,
+          apiBaseUrl: 'http://127.0.0.1:27123',
+          authHeaderName: 'Authorization',
+          apiKeyDraft: '',
+          apiKeyPresent: false,
+          apiKeyMasked: '',
+          chatFolder: 'SyncNos-AIChats',
+          articleFolder: 'SyncNos-WebArticles',
+          videoFolder: 'SyncNos-Videos',
+          statusText: '',
+          obsidianLogoUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+          setupGuideUrl,
+          onChangeApiBaseUrl: () => {},
+          onChangeAuthHeaderName: () => {},
+          onChangeApiKeyDraft: () => {},
+          onChangeChatFolder: () => {},
+          onChangeArticleFolder: () => {},
+          onChangeVideoFolder: () => {},
+          onToggleSyncEnabled: () => {},
+          onToggleAutoSyncEnabled: () => {},
+          onSave: () => {},
+          onSaveApiKey: () => {},
+          onTest: () => {},
+          onOpenSetupGuide: () => {},
+        }),
+      );
+    });
+
+    expect(document.querySelector(`a[href="${setupGuideUrl}"]`)).toBeTruthy();
 
     act(() => root.unmount());
     cleanupDom();

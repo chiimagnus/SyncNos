@@ -18,6 +18,7 @@ export function ObsidianSettingsSection(props: {
   videoFolder: string;
   statusText: string;
   obsidianLogoUrl: string;
+  setupGuideUrl: string;
   onChangeApiBaseUrl: (v: string) => void;
   onChangeAuthHeaderName: (v: string) => void;
   onChangeApiKeyDraft: (v: string) => void;
@@ -45,6 +46,7 @@ export function ObsidianSettingsSection(props: {
     videoFolder,
     statusText,
     obsidianLogoUrl,
+    setupGuideUrl,
     onChangeApiBaseUrl,
     onChangeAuthHeaderName,
     onChangeApiKeyDraft,
@@ -168,7 +170,7 @@ export function ObsidianSettingsSection(props: {
               {t('obsidianInstallNote')}{' '}
               <a
                 className="tw-underline hover:tw-opacity-80"
-                href="https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md"
+                href={setupGuideUrl}
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => {
