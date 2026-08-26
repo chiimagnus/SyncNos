@@ -19,6 +19,26 @@ export type DetailHeaderActionBarProps = {
   className?: string;
 };
 
+const PROVIDER_LOGO_SRC: Record<string, string> = {
+  notion: '/icons/notion.svg',
+  obsidian: '/icons/obsidian.svg',
+  feishu: '/icons/feishu.svg',
+};
+
+function providerLogo(action: DetailHeaderAction) {
+  const src = PROVIDER_LOGO_SRC[action.provider];
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      className="tw-h-4 tw-w-4 tw-shrink-0 tw-object-contain"
+      data-provider-logo={action.provider}
+    />
+  );
+}
+
 export function DetailHeaderActionBar({
   actions,
   buttonClassName,
@@ -115,10 +135,11 @@ export function DetailHeaderActionBar({
       {labelOverride}
     </span>
   ) : null;
-  const resolvedTriggerIcon = triggerIcon || <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
-
   if (actions.length === 1) {
     const action = actions[0]!;
+    const resolvedTriggerIcon = triggerIcon || providerLogo(action) || (
+      <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
+    );
     return (
       <div className={['tw-relative tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
         <button
@@ -141,6 +162,7 @@ export function DetailHeaderActionBar({
     );
   }
 
+  const resolvedTriggerIcon = triggerIcon || <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
   const resolvedMenuTriggerLabel = String(menuTriggerLabel || '').trim() || 'Open in...';
   const resolvedMenuTriggerAriaLabel = String(menuTriggerAriaLabel || '').trim() || 'Open destinations';
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
@@ -181,7 +203,10 @@ export function DetailHeaderActionBar({
             aria-disabled={action.disabled ? 'true' : undefined}
             disabled={busy || !!action.disabled}
           >
-            {action.label}
+            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+              {providerLogo(action)}
+              <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
+            </span>
           </button>
         ))}
       </MenuPopover>

@@ -230,6 +230,9 @@ describe('ConversationDetailPane header actions', () => {
     expect(copyButton).toBeTruthy();
     expect(openButton?.closest('.tw-order-1')).toBeTruthy();
     expect(copyButton?.closest('.tw-order-2')).toBeTruthy();
+    expect(openButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(copyButton?.querySelector('.lucide-link')).toBeTruthy();
+    expect(copyButton?.querySelector('.lucide-copy')).toBeFalsy();
 
     await act(async () => {
       copyButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -293,6 +296,9 @@ describe('ConversationDetailPane header actions', () => {
     expect(menu).toBeTruthy();
     const items = Array.from(menu!.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
     expect(items.map((item) => item.textContent)).toEqual(['Copy Notion link', 'Copy Feishu link']);
+    expect(trigger?.querySelector('.lucide-link')).toBeTruthy();
+    expect(items[0]?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(items[1]?.querySelector('[data-provider-logo="feishu"]')?.getAttribute('src')).toBe('/icons/feishu.svg');
 
     await act(async () => {
       items[1]!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));

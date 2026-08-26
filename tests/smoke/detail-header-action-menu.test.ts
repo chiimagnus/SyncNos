@@ -75,8 +75,11 @@ describe('DetailHeaderActionBar', () => {
       );
     });
 
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    const button = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeFalsy();
+    const logo = button?.querySelector('[data-provider-logo="notion"]') as HTMLImageElement | null;
+    expect(logo?.getAttribute('src')).toBe('/icons/notion.svg');
   });
 
   it('renders a menu trigger when multiple destinations exist', () => {
@@ -152,6 +155,10 @@ describe('DetailHeaderActionBar', () => {
     expect(menuItems[0]?.className || '').toContain('tw-flex');
     expect(menuItems[0]?.className || '').toContain('tw-whitespace-normal');
     expect(menuItems[0]?.className || '').toContain('tw-break-words');
+    expect(menuItems[0]?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(menuItems[1]?.querySelector('[data-provider-logo="obsidian"]')?.getAttribute('src')).toBe(
+      '/icons/obsidian.svg',
+    );
   });
 
   it('renders multiple inline menu items without creating a nested popover', async () => {
