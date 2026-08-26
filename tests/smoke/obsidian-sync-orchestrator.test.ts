@@ -6,6 +6,7 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   getArticleCommentsByConversationId: vi.fn(),
   attachOrphanArticleCommentsToConversation: vi.fn(),
 }));
+const imageCacheMocks = vi.hoisted(() => ({ getImageCacheAssetById: vi.fn() }));
 
 vi.mock('@services/conversations/background/storage', () => ({
   backgroundStorage: {
@@ -15,6 +16,7 @@ vi.mock('@services/conversations/background/storage', () => ({
     attachOrphanArticleCommentsToConversation: backgroundStorageMocks.attachOrphanArticleCommentsToConversation,
   },
 }));
+vi.mock('@services/conversations/data/image-cache-read', () => imageCacheMocks);
 
 async function loadModule(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -123,6 +125,66 @@ describe('obsidian-sync-orchestrator', () => {
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(syncRes.results[0].ok).toBe(true);
+  });
+
+  it('materializes SyncNos image refs through the shared Markdown helper without changing Obsidian naming', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const naming = await loadModule('@services/conversations/domain/file-naming.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    const convo = { id: 1, sourceType: 'chat', source: 'chatgpt', conversationKey: 'k1', title: 'Image Note' };
+    const noteBasename = naming.buildConversationBasename(convo);
+    backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      {
+        messageKey: 'm1',
+        sequence: 1,
+        contentMarkdown: 'before\n\n![diagram](<syncnos-asset://7> "caption")\n\nafter',
+        updatedAt: 1,
+      },
+    ]);
+    imageCacheMocks.getImageCacheAssetById.mockResolvedValue({
+      id: 7,
+      conversationId: 1,
+      url: 'https://example.com/diagram.png',
+      blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+      byteSize: 3,
+      contentType: 'image/png',
+    });
+
+    const seen: Array<{ method: string; url: string; body: unknown }> = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      seen.push({ method, url: String(url), body: init?.body });
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    expect(syncRes.results[0].ok).toBe(true);
+    expect(imageCacheMocks.getImageCacheAssetById).toHaveBeenCalledWith({ id: 7 });
+
+    const encodedAttachmentName = encodeURIComponent(`${noteBasename}-1.png`);
+    const encodedNoteName = encodeURIComponent(`${noteBasename}.md`);
+    const binaryPut = seen.find((call) => call.method === 'PUT' && call.url.endsWith(encodedAttachmentName));
+    expect(binaryPut?.url).toContain(`/vault/SyncNos-AIChats/${encodedAttachmentName}`);
+    const markdownPut = seen.find((call) => call.method === 'PUT' && call.url.endsWith(encodedNoteName));
+    expect(String(markdownPut?.body || '')).toContain(`![diagram](<${noteBasename}-1.png> "caption")`);
+    expect(String(markdownPut?.body || '')).not.toContain('syncnos-asset://');
   });
 
   it('rebuilds chat note when remote exists', async () => {
@@ -523,6 +585,7 @@ afterEach(() => {
   backgroundStorageMocks.getMessagesByConversationId.mockReset();
   backgroundStorageMocks.getArticleCommentsByConversationId.mockReset();
   backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockReset();
+  imageCacheMocks.getImageCacheAssetById.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup

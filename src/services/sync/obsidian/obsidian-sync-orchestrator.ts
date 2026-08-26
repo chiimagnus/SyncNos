@@ -18,26 +18,15 @@ import {
 } from '@services/sync/shared/remote-markdown-metadata.ts';
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import {
+  collectOrderedSyncnosAssetIds,
+  replaceSyncnosAssetImageTargets,
+} from '@services/sync/shared/markdown-asset-refs';
 
 const SYNC_PROVIDER = 'obsidian';
-const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
-}
-
-function stripAngleBrackets(url: unknown) {
-  const text = safeString(url);
-  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
-  return text;
-}
-
-function parseSyncnosAssetId(url: unknown) {
-  const text = safeString(url);
-  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
-  if (!matched) return 0;
-  const id = Number(matched[1]);
-  return Number.isFinite(id) && id > 0 ? id : 0;
 }
 
 function normalizeImageExt(raw: unknown) {
@@ -67,41 +56,6 @@ function inferImageExtFromAsset(asset: { contentType?: unknown; url?: unknown })
     // ignore
   }
   return 'png';
-}
-
-function collectOrderedSyncnosAssetIds(markdown: unknown): number[] {
-  const text = String(markdown || '');
-  if (!text) return [];
-  const seen = new Set<number>();
-  const ordered: number[] = [];
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  let match: RegExpExecArray | null = null;
-  while ((match = MARKDOWN_IMAGE_RE.exec(text)) != null) {
-    const urlPart = match[2] ? String(match[2]) : '';
-    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
-    if (!assetId) continue;
-    if (seen.has(assetId)) continue;
-    seen.add(assetId);
-    ordered.push(assetId);
-  }
-  return ordered;
-}
-
-function replaceSyncnosAssetsWithAttachmentNames(markdown: unknown, attachmentNameByAssetId: Map<number, string>) {
-  const text = String(markdown || '');
-  if (!text || !attachmentNameByAssetId.size) return text;
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  return text.replace(MARKDOWN_IMAGE_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
-    const alt = altRaw ? String(altRaw) : '';
-    const urlPart = urlPartRaw ? String(urlPartRaw) : '';
-    const title = titleRaw ? String(titleRaw) : '';
-    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
-    if (!assetId) return _full;
-    const attachmentName = attachmentNameByAssetId.get(assetId);
-    if (!attachmentName) return _full;
-    const nextPart = urlPart.trim().startsWith('<') ? `<${attachmentName}>` : attachmentName;
-    return `![${alt}](${nextPart}${title})`;
-  });
 }
 
 function buildNoteBasenameFromFilePath(filePath: unknown) {
@@ -174,7 +128,7 @@ async function materializeMarkdownAssetsForObsidian({
     }
   }
 
-  return replaceSyncnosAssetsWithAttachmentNames(targetMarkdown, attachmentNameByAssetId);
+  return replaceSyncnosAssetImageTargets(targetMarkdown, attachmentNameByAssetId);
 }
 
 function normalizeIds(list: unknown) {
