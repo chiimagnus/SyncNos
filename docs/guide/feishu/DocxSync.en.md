@@ -63,13 +63,13 @@ The Client Secret is local credential data and is excluded from SyncNos backups.
 
 ## 3. Connect WebClipper
 
-1. Open WebClipper → `Settings` → `Feishu` → `Advanced`.
-2. Enter the App ID / Client ID.
+1. Open WebClipper → `Settings` → `Feishu`.
+2. Enter the App ID / Client ID in the Feishu settings card.
 3. Choose one mode:
-   - Proxy: enter the Worker exchange URL and leave App Secret empty.
-   - Direct: enter App Secret and leave Proxy URL empty.
-4. Save the settings.
-5. Click `Connect` and finish authorization in Feishu.
+   - Proxy: enter the Worker exchange URL and leave Client Secret / App Secret empty.
+   - Direct: enter Client Secret / App Secret and leave Proxy URL empty.
+4. Changes are saved when you leave the field or press Enter; the current page has no separate `Advanced` expansion step or `Save` button.
+5. Click `Connect` in the top-right corner and finish authorization in Feishu.
 
 After connection, manual sync is available. If Feishu auto-sync is explicitly enabled, local content changes can also enter the provider's automatic sync queue.
 

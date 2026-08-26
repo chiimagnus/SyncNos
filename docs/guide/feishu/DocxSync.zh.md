@@ -63,13 +63,13 @@ Client Secret 属于本机凭据，不会进入 SyncNos 备份。
 
 ## 3. 在 WebClipper 中连接
 
-1. 打开 WebClipper → `Settings` → `Feishu` → `Advanced`。
-2. 填写 App ID / Client ID。
+1. 打开 WebClipper → `Settings` → `Feishu`。
+2. 在飞书设置卡片中填写 App ID / Client ID。
 3. 二选一：
-   - Proxy：填写 Worker exchange URL，App Secret 留空。
-   - Direct：填写 App Secret，Proxy URL 留空。
-4. 保存设置。
-5. 点击 `Connect`，在飞书授权页完成授权。
+   - Proxy：填写 Worker exchange URL，Client Secret / App Secret 留空。
+   - Direct：填写 Client Secret / App Secret，Proxy URL 留空。
+4. 修改字段后离开输入框或按 Enter 即会保存；当前页面没有单独的 `Advanced` 展开步骤或 `Save` 按钮。
+5. 点击右上角的 `Connect`，在飞书授权页完成授权。
 
 连接成功后始终可以手动同步；如果显式开启 Feishu auto-sync，本地内容变化也可以进入该 provider 的自动同步队列。
 
