@@ -25,7 +25,7 @@ const PROVIDER_LOGO_SRC: Record<string, string> = {
   feishu: '/icons/feishu.svg',
 };
 
-function providerLogo(action: DetailHeaderAction) {
+function providerLogo(action: DetailHeaderAction, className = 'tw-h-4 tw-w-4 tw-shrink-0 tw-object-contain') {
   const src = PROVIDER_LOGO_SRC[action.provider];
   if (!src) return null;
   return (
@@ -33,7 +33,7 @@ function providerLogo(action: DetailHeaderAction) {
       src={src}
       alt=""
       aria-hidden="true"
-      className="tw-h-4 tw-w-4 tw-shrink-0 tw-object-contain"
+      className={className}
       data-provider-logo={action.provider}
     />
   );
@@ -103,6 +103,20 @@ export function DetailHeaderActionBar({
     return <ImageDown size={16} strokeWidth={2} aria-hidden="true" />;
   };
 
+  const renderPrimaryIcon = (action: DetailHeaderAction, icon: ReactNode) => {
+    const badge = triggerIcon ? providerLogo(action, 'tw-h-[8px] tw-w-[8px] tw-object-contain') : null;
+    return (
+      <span className="tw-relative tw-inline-flex tw-items-center tw-justify-center">
+        {icon}
+        {badge ? (
+          <span className="tw-absolute tw-bottom-0 tw-right-0 tw-flex tw-h-3 tw-w-3 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]">
+            {badge}
+          </span>
+        ) : null}
+      </span>
+    );
+  };
+
   if (inlineMenuItems) {
     return (
       <div className={['tw-flex tw-flex-col tw-gap-1', className || ''].join(' ').trim()}>
@@ -159,7 +173,7 @@ export function DetailHeaderActionBar({
           aria-disabled={action.disabled ? 'true' : undefined}
           disabled={busy || !!action.disabled}
         >
-          <span className="tw-inline-flex tw-items-center tw-justify-center">{resolvedTriggerIcon}</span>
+          {renderPrimaryIcon(action, resolvedTriggerIcon)}
         </button>
         {status}
       </div>
@@ -191,7 +205,7 @@ export function DetailHeaderActionBar({
           aria-disabled={primaryAction.disabled ? 'true' : undefined}
           disabled={busy || !!primaryAction.disabled}
         >
-          <span className="tw-inline-flex tw-items-center tw-justify-center">{resolvedTriggerIcon}</span>
+          {renderPrimaryIcon(primaryAction, resolvedTriggerIcon)}
         </button>
         <MenuPopover
           open={menuOpen}
