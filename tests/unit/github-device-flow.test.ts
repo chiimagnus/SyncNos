@@ -132,6 +132,41 @@ describe('github device flow', () => {
     expect(state.state === 'pending' && state.pending.nextPollAt).toBe(31_000);
   });
 
+  it.each(['network', 'invalid_json', 'unknown_error'] as const)(
+    'keeps the minimum polling interval after a %s poll failure',
+    async (failureKind) => {
+      let now = 1_000;
+      let pollRequests = 0;
+      const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+        if (String(url).endsWith('/login/device/code')) return jsonResponse(deviceStartBody());
+        pollRequests += 1;
+        if (failureKind === 'network') throw new Error('network failed');
+        if (failureKind === 'invalid_json') return new Response('not-json', { status: 200 });
+        return jsonResponse({ error: 'unexpected_oauth_error' });
+      }) as unknown as typeof fetch;
+      const { pollDeviceFlowOnce, startDeviceFlow } = await import('@services/sync/github/auth/device-flow');
+      const { getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
+
+      await startDeviceFlow({ fetchImpl, now: () => now });
+      now = 6_000;
+      await expect(pollDeviceFlowOnce({ fetchImpl, now: () => now })).rejects.toMatchObject({
+        code: 'github_device_poll_failed',
+      });
+      let state = await getGithubAuthState();
+      expect(state.state === 'pending' && state.pending.nextPollAt).toBe(11_000);
+      expect(pollRequests).toBe(1);
+
+      now = 6_001;
+      await expect(pollDeviceFlowOnce({ fetchImpl, now: () => now })).resolves.toMatchObject({
+        state: 'pending',
+        nextPollAt: 11_000,
+      });
+      state = await getGithubAuthState();
+      expect(state.state === 'pending' && state.pending.nextPollAt).toBe(11_000);
+      expect(pollRequests).toBe(1);
+    },
+  );
+
   it('atomically replaces pending with connected without returning token secrets', async () => {
     let now = 1_000;
     const responses = [

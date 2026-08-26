@@ -70,6 +70,18 @@ async function updateCurrentPending(
   return { applied, state };
 }
 
+async function deferFailedPoll(deviceCode: string, pollAt: number): Promise<GithubSafeAuthSummary> {
+  const deferred = await updateCurrentPending(deviceCode, (current) => ({
+    ...current,
+    pending: {
+      ...current.pending,
+      nextPollAt: Math.max(current.pending.nextPollAt, pollAt + current.pending.intervalMs),
+    },
+  }));
+  if (!deferred.applied) return toGithubSafeAuthSummary(deferred.state);
+  throw new GithubDeviceFlowError('github_device_poll_failed');
+}
+
 function buildConnectedState(json: any, now: number): GithubConnectedAuthState | null {
   const accessToken = nonEmptyString(json?.access_token);
   if (!accessToken) return null;
@@ -177,10 +189,15 @@ export async function pollDeviceFlowOnce({
       }),
     });
   } catch (_error) {
-    throw new GithubDeviceFlowError('github_device_poll_failed');
+    return deferFailedPoll(deviceCode, pollAt);
   }
 
-  const json = await parseJsonResponse(response, 'github_device_poll_failed');
+  let json: any;
+  try {
+    json = await parseJsonResponse(response, 'github_device_poll_failed');
+  } catch (_error) {
+    return deferFailedPoll(deviceCode, pollAt);
+  }
   const connected = buildConnectedState(json, pollAt);
   if (response.ok && connected) {
     const saved = await updateCurrentPending(deviceCode, () => connected);
@@ -216,7 +233,7 @@ export async function pollDeviceFlowOnce({
     throw new GithubDeviceFlowError(terminalCode);
   }
 
-  throw new GithubDeviceFlowError('github_device_poll_failed');
+  return deferFailedPoll(deviceCode, pollAt);
 }
 
 export async function cancelDeviceFlow(): Promise<GithubSafeAuthSummary> {
