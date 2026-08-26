@@ -80,6 +80,7 @@ describe('DetailHeaderActionBar', () => {
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeFalsy();
     const logo = button?.querySelector('[data-provider-logo="notion"]') as HTMLImageElement | null;
     expect(logo?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(button?.textContent).not.toContain('▾');
   });
 
   it('renders a menu trigger when multiple destinations exist', () => {
@@ -110,7 +111,9 @@ describe('DetailHeaderActionBar', () => {
       );
     });
 
-    expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
+    const trigger = document.querySelector('[aria-label="Open destinations"]') as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+    expect(trigger?.textContent).toContain('▾');
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 

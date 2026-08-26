@@ -185,7 +185,15 @@ export function DetailHeaderActionBar({
             aria-label={resolvedMenuTriggerAriaLabel}
             className={buttonClassName}
           >
-            <span className="tw-inline-flex tw-items-center tw-justify-center">{resolvedTriggerIcon}</span>
+            <span className="tw-inline-flex tw-items-center tw-justify-center tw-gap-0.5">
+              {resolvedTriggerIcon}
+              <span
+                className="tw-w-[10px] tw-text-center tw-text-[10px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                aria-hidden="true"
+              >
+                ▾
+              </span>
+            </span>
           </button>
         )}
       >
