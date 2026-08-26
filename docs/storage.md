@@ -1,25 +1,32 @@
-# 本地数据与安全边界
+# 本地数据、备份与恢复边界
 
-## 事实源
+本页只维护会影响数据安全和恢复行为的长期契约。具体 object store、索引、schema 版本和迁移以 `src/platform/idb/schema.ts` 及相关数据层源码为准。
 
-| 位置 | 内容 | 规则 |
-| --- | --- | --- |
-| IndexedDB | `conversations`、`messages`、`sync_mappings`、`image_cache`、`article_comments` | 会话事实源；schema、索引和迁移以 `src/platform/idb/schema.ts` 为准。 |
-| `chrome.storage.local` | 跨界面设置、OAuth 状态、同步配置和 job snapshot | 不是会话正文；敏感键必须排除出备份。 |
-| `localStorage` / `sessionStorage` | 筛选、导航和布局等 UI 临时状态 | 不进入备份，也不得承载共享事实。 |
-| Notion / Obsidian / Feishu / 导出文件 | 同步或导出的结果 | 派生自本地，不能反向覆盖本地 conversation。 |
+## 本地真源
 
-`article_comments` 是 article 的独立注释层；根评论可有 locator，回复必须属于同一 article identity 的根线程。删除 conversation 时必须同时清理其消息与 mapping。
+- AI 对话、文章、视频字幕及其消息内容先保存到浏览器本地；外部同步目标和导出文件都是派生结果。
+- 同步 mapping、cursor 或远端状态不能反向覆盖本地内容事实。
+- 虚拟列表来源只有在完整性得到确认后才能做完整快照；不完整采集只能追加已验证内容，不能因为当前 DOM 缺失而删除历史消息。
+- 文章评论属于本地文章身份下的独立注释层；回复必须保持在线程所属的同一文章身份中。
+- 图片缓存是增强数据。下载或缓存失败不得阻断正文保存。
 
-## 写入与备份
+## 备份
 
-- 完整采集可用快照同步；不完整的虚拟列表采集只能追加已验证的 diff，不能删掉旧消息。
-- 图片缓存不改变会话主事实，失败不阻断文本写入。
-- Zip 备份包含本地会话、mapping、图片缓存、评论线程与非敏感设置；导入是 merge，不是覆盖。
-- 备份和导入必须拒绝危险 Zip 路径、校验 manifest/schema，并保留无法恢复的资产为明确降级，而不是写入坏数据。
+当前 Zip 备份用于恢复本地数据，而不是复制浏览器内部数据库文件。它可包含：
 
-## 凭据与权限
+- 本地采集内容及其消息；
+- 同步映射；
+- 可恢复的图片缓存；
+- 文章评论；
+- 非敏感设置。
 
-- OAuth token、client secret 和任何以 token 前缀命名的键必须从备份和日志中排除。
-- 官方 OAuth 的 secret 只放在 Worker secret；用户自建 Feishu 应用的 secret 可在本机保存，但仍不得备份或记录。
-- `wxt.config.ts` 是 permissions、host permissions 和 web-accessible resources 的真源。修改权限时评估新增的信任边界，并运行完整构建验证。
+认证秘密必须被排除。当前过滤至少覆盖 Notion / Feishu OAuth token、相关 client secret，以及 Obsidian Local REST API key；实际过滤逻辑以 `src/services/sync/backup/backup-utils.ts` 为准。
+
+## 导入与失败语义
+
+- 导入执行合并恢复，不把备份当成无条件覆盖当前本地数据库的镜像。
+- 备份 manifest、schema 和 Zip 内部路径必须先验证；危险路径或无效结构应拒绝导入。
+- 某些非关键资产无法恢复时，应保留明确 warning / 降级结果，而不是写入损坏数据。
+- 外部同步失败不能删除或回滚已经成功保存的本地内容。
+
+更广泛的权限、OAuth 和网络行为见 [PRIVACY.md](../PRIVACY.md)。

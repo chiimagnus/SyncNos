@@ -1,82 +1,86 @@
 # Privacy Policy
 
-**Last Updated: April 9, 2026**
+**Last Updated: 2026-08-26**
 
-This Privacy Policy applies to **SyncNos WebClipper** (the “Extension”), a browser extension for Chrome/Chromium and Firefox.
+This Privacy Policy applies to SyncNos WebClipper (the “Extension”), including its supported Chromium, Firefox-family, and Safari builds.
 
-## 1. Single Purpose
+## 1. Purpose
 
-The Extension’s single purpose is to help you save **visible** AI conversations (and optionally web articles) from pages you view to your browser locally, manage local article comments, export them, and (optionally) sync them to external destinations (e.g., Notion / Obsidian) **when you manually trigger a sync**.
+The Extension helps you capture supported AI conversations, web articles, and already-loaded video transcripts; manage local article comments and cached images; export local data; and optionally sync local content to external destinations that you configure.
 
-## 2. What Data the Extension Accesses
+SyncNos is local-first. A successful local save is the primary record; external sync targets and exported files are derived copies.
 
-When you visit a supported site, the Extension may read content from the current page **that is visible to you**, such as:
+## 2. Page Data the Extension May Read
 
-- Conversation text (user/assistant messages)
-- Page metadata needed to organize saves (e.g., title and URL)
-- Image URLs embedded in the conversation (for preview/export and optional Notion sync)
+Depending on the feature you invoke or enable, the Extension may read data that is available in pages you visit, including:
 
-When you manually save a web page as an article, the Extension may read the article content from the current page to extract a readable version (title/body) for local storage and export.
+- AI conversation messages and related page metadata;
+- article text, title, URL, author, publish date, and site-specific metadata;
+- video transcripts/subtitles that the page has already loaded;
+- image URLs embedded in captured content;
+- text selections and locator metadata used for local article comments.
 
-If you use article comments or in-page comments, the Extension may also read and write the local comment thread content, quoted text, and locator metadata that you enter in the Extension UI.
+Supported non-virtualized AI sites can be captured automatically when AI auto-save is enabled. ChatGPT and Google AI Studio require explicit manual capture because their virtualized lists cannot be treated as complete automatically. Article capture is manually initiated.
 
-For supported conversations and articles, the Extension may also read embedded image URLs so it can preview, export, or cache images locally when you enable image-related features.
+## 3. Local Storage and Backups
 
-The Extension may automatically capture updates while you stay on a supported conversation page, and it also provides an in-page “Save” button for manual capture.
+The Extension stores durable captured content in browser IndexedDB. Browser extension local storage is used for settings, connection state, OAuth credentials, sync configuration, queues/jobs, and other small state. UI-only state may also use local or session storage.
 
-## 3. Local Storage
+Backup/export packages are assembled locally. They may include captured content, sync mappings, cached images, article comments, and non-sensitive settings. Backup filtering excludes authentication secrets including Notion and Feishu OAuth tokens, Notion and Feishu client secrets, and the Obsidian Local REST API key.
 
-The Extension is local-first:
+For the current storage and recovery contract, see [docs/storage.md](docs/storage.md).
 
-- Saved conversations and messages are stored locally in your browser using IndexedDB.
-- Article comments, sync mappings, and other local thread metadata are stored locally as part of the Extension’s own data model.
-- Settings and small state (e.g., Notion connection status, selected parent page ID) are stored locally using `chrome.storage.local`.
-- Small UI state (e.g., in-page button position) may be stored using `localStorage`.
-- Backup/export packages are created locally; they may include conversations, messages, comments, and settings, while sensitive OAuth tokens are excluded.
+## 4. External Sync and Network Requests
 
-## 4. Notion Sync (Optional, Manual)
+External sync is optional. Connected providers can be synchronized manually, and each provider also has an optional auto-sync setting. When auto-sync is enabled, local content changes can be queued and sent to that provider without another manual sync click.
 
-If you choose to connect Notion and manually trigger sync:
+### Notion
 
-- The Extension sends data to Notion over HTTPS using the Notion API.
-- If you sync an article that has local comments, the Extension may include the related comment thread content and comment-count metadata in the synced output.
-- The Extension may download referenced images (by URL) and upload them to Notion as file uploads if supported by Notion.
+Notion sync sends selected local content to the Notion API over HTTPS. The Extension may also fetch referenced images and upload them to Notion when the relevant image feature is used.
 
-Notion’s handling of data is governed by Notion’s own privacy policy.
+Notion OAuth uses a token-exchange proxy so the Extension does not embed the official Notion client secret. The proxy receives the OAuth authorization code and redirect URI needed for token exchange; it is not used to receive captured conversation/article/video content.
 
-## 5. OAuth / Token Exchange Proxy
+### Feishu (Lark)
 
-To avoid embedding a Notion OAuth client secret in the Extension, the Extension uses a small server endpoint to exchange the OAuth authorization code for a token:
+Feishu sync sends selected local content to Feishu APIs over HTTPS.
 
-- The endpoint receives an authorization code and redirect URI and returns the token response to the Extension.
-- The endpoint applies best-effort rate limiting and is not intended to store your conversation content.
+Feishu OAuth supports two modes:
 
-## 6. Permissions and Why They Are Needed
+- **Proxy mode:** the configured OAuth Worker receives the authorization code or refresh token needed for token exchange/refresh and forwards the exchange to Feishu. The Worker is not used to receive captured conversation/article/video content.
+- **Direct mode:** for a user-provided Feishu app, the Extension stores that app's client secret locally and sends the OAuth token request directly to Feishu.
 
-- `storage`: store settings and small state locally (e.g., Notion connection status, selected parent page ID).
-- `contextMenus`: provide right-click menu actions (e.g., capture/save/export/sync entry points).
-- `tabs`: open/focus the extension app page, open authorization/help links, and improve UX during OAuth flows.
-- `tabGroups`: keep Chat with AI result tabs organized when the browser supports tab grouping.
-- `webNavigation`: detect the OAuth redirect/callback navigation to complete the connection flow.
-- `activeTab`: access the current tab when you interact with the Extension (e.g., manual capture) without needing persistent access.
-- `scripting`: inject packaged scripts into the current page to enable capture and in-page UI.
-- `declarativeNetRequestWithHostAccess`: temporarily adjust request headers for anti-hotlink image downloads on supported browsers.
-- Host permissions: allow the Extension to run on supported AI chat sites and arbitrary web pages for manual article capture, to access Notion endpoints and the OAuth worker required for sync, and to reach CDN hosts used by anti-hotlink image caching.
+The repository's Feishu Worker also performs best-effort request rate limiting using request/network metadata available to the Worker platform.
+
+### Obsidian
+
+Obsidian sync uses the Local REST API plugin on your computer. The current client uses a local HTTP endpoint (by default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. SyncNos does not require an external SyncNos server for this path.
+
+### Image fetching and anti-hotlink handling
+
+When image caching or anti-hotlink handling is used, the Extension may request image URLs from their original/CDN hosts. On supported browsers it may temporarily adjust request headers such as Referer for matching anti-hotlink rules. Image download failure does not block saving the captured text.
+
+Third-party services handle data according to their own privacy policies once you send data to them.
+
+## 5. OAuth Credentials
+
+OAuth tokens and locally configured secrets are stored in the browser extension's local storage so the configured integrations can operate. They are excluded from SyncNos backup exports as described above.
+
+Disconnecting an integration removes the corresponding active connection state according to that integration's current implementation.
+
+## 6. Browser Permissions
+
+The manifest source of truth is `wxt.config.ts`. Current builds request the permissions needed for local storage, context-menu actions, tab/navigation handling, packaged script injection, scheduled auto-sync work, and anti-hotlink request handling. Browser-specific builds may use different declarative-network-request or tab-group permissions where the platform supports them.
+
+The Extension currently declares `http://*/*` and `https://*/*` host access so it can capture arbitrary user-requested web pages and reach configured sync/OAuth/image endpoints. This broad access is not permission to upload page content by default; external transmission occurs through the features described in this policy.
 
 ## 7. Remote Code
 
-The Extension does **not** download or execute remote code. All executable code is packaged with the Extension; network requests are used only to exchange data (e.g., Notion OAuth and Notion API) when you choose to connect or sync.
+The Extension does not download and execute remote code. Executable extension code is packaged with the Extension. Network requests exchange data with sites or services used by the features above.
 
 ## 8. Data Sharing
 
-We do not sell your data. Data is only sent to third parties when you use those features, such as:
-
-- Notion (when you connect/sync)
-- The token exchange proxy endpoint (only for OAuth token exchange)
-- Obsidian Local REST API (on your device, when you configure/sync to Obsidian)
+We do not sell your data. Data is sent to third parties only when required by a feature you configure or invoke, such as Notion, Feishu, an OAuth token-exchange proxy, an image host, or your locally running Obsidian Local REST API service.
 
 ## 9. Contact
 
-If you have questions about this Privacy Policy:
-
-- GitHub Issues: https://github.com/chiimagnus/SyncNos/issues
+Questions about this policy can be filed through [GitHub Issues](https://github.com/chiimagnus/SyncNos/issues).

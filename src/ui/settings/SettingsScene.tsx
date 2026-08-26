@@ -127,6 +127,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveObsidianSettings,
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
+    obsidianSetupGuideUrl,
 
     exportStatus,
     importStatus,
@@ -323,6 +324,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           videoFolder={obsidianVideoFolder}
           statusText={obsidianStatus}
           obsidianLogoUrl={getURL('icons/obsidian.svg' as any)}
+          setupGuideUrl={obsidianSetupGuideUrl}
           onChangeApiBaseUrl={setObsidianApiBaseUrl}
           onChangeAuthHeaderName={setObsidianAuthHeaderName}
           onChangeApiKeyDraft={setObsidianApiKeyDraft}
