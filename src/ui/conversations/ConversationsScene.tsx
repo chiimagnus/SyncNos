@@ -16,7 +16,6 @@ import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
-import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 
@@ -206,12 +205,7 @@ export function ConversationsScene({
   return (
     <div className={wideContainerClassName}>
       {wideHideList ? null : (
-        <aside
-          className={[
-            'tw-flex tw-min-h-0 tw-w-[min(360px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
-            columnDividerRightClassName(),
-          ].join(' ')}
-        >
+        <aside className="tw-flex tw-min-h-0 tw-w-[min(360px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]">
           {list}
         </aside>
       )}
