@@ -1,4 +1,5 @@
 import { tabsCreate } from '@platform/webext/tabs';
+import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
 
 async function openInNewTab(safeUrl: string): Promise<boolean> {
   try {
@@ -17,7 +18,7 @@ async function openInNewTab(safeUrl: string): Promise<boolean> {
 }
 
 export async function openExternalUrl(url: string): Promise<boolean> {
-  const safeUrl = String(url || '').trim();
-  if (!/^https?:\/\//i.test(safeUrl)) return false;
+  const safeUrl = sanitizeHttpUrl(url);
+  if (!safeUrl) return false;
   return openInNewTab(safeUrl);
 }
