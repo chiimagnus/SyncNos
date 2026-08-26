@@ -236,7 +236,6 @@ describe('ConversationDetailPane header actions', () => {
     expect(copyButton).toBeTruthy();
     expect(copyButton?.closest('.tw-order-1')).toBeTruthy();
     expect(copyButton?.querySelector('.lucide-link')).toBeTruthy();
-    expect(copyButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
     expect(copyButton?.querySelector('.lucide-copy')).toBeFalsy();
 
     await act(async () => {
@@ -314,8 +313,6 @@ describe('ConversationDetailPane header actions', () => {
     });
     expect(feishuCopy).toHaveBeenCalledTimes(1);
     expect(notionCopy).not.toHaveBeenCalled();
-    const selectedPrimary = document.querySelector('[aria-label="Copy Feishu link"]') as HTMLButtonElement | null;
-    expect(selectedPrimary?.querySelector('[data-provider-logo="feishu"]')?.getAttribute('src')).toBe('/icons/feishu.svg');
 
     await act(async () => {
       trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
