@@ -23,7 +23,7 @@ The audit covered all tracked Markdown with a long-term repository role:
 - root and nested `AGENTS.md`;
 - `docs/**/*.md`;
 - `.github/PULL_REQUEST_TEMPLATE.md`;
-- the former `.github/guide/**/*.md` integration guides and their documentation-only screenshots.
+- the integration guides migrated from `.github/guide/**` to `docs/guide/**`, including their documentation screenshots.
 
 Source facts were checked against CodeGraph plus the relevant manifest/configuration, package scripts, tests, workflows, OAuth/sync services, backup logic, and Safari tooling.
 
@@ -36,8 +36,8 @@ Source facts were checked against CodeGraph plus the relevant manifest/configura
 | Long-term documentation navigation and fact ownership | `docs/overview.md` |
 | Contribution, Issue, commit, PR, and validation workflow | `docs/CONTRIBUTING.md` |
 | Local data, backup, and recovery invariants | `docs/storage.md` |
-| Feishu OAuth / DocX setup | `docs/feishu-setup.md` |
-| Obsidian Local REST API setup | `docs/obsidian-setup.md` |
+| Feishu OAuth / DocX setup | `docs/guide/feishu/DocxSync.en.md`, `docs/guide/feishu/DocxSync.zh.md` |
+| Obsidian Local REST API setup | `docs/guide/obsidian/LocalRestAPI.en.md`, `docs/guide/obsidian/LocalRestAPI.zh.md` |
 | Failure diagnosis | `docs/troubleshooting.md` |
 | Repository architecture and product invariants | `AGENTS.md` |
 | UI-only non-derivable constraints | `src/ui/AGENTS.md` |
@@ -52,6 +52,6 @@ Source facts were checked against CodeGraph plus the relevant manifest/configura
 
 ## Cleanup Result
 
-The previous Feishu and Obsidian bilingual guides under `.github/guide/` were merged into the canonical `docs/` integration pages and removed. Their Obsidian third-party UI screenshots were also removed because the external plugin UI is not a stable repository contract. `docs/configuration.md` was removed after its durable content was assigned to the existing contribution, architecture, and source-of-truth owners.
+The Feishu and Obsidian bilingual guides previously under `.github/guide/` were migrated to `docs/guide/`, which now owns those detailed setup procedures. The existing Obsidian screenshots moved with the guide so the user-facing steps remain self-contained. The temporary condensed `docs/feishu-setup.md` and `docs/obsidian-setup.md` pages were removed to avoid maintaining duplicate canonical text. `docs/configuration.md` remains removed after its durable content was assigned to the existing contribution, architecture, and source-of-truth owners.
 
 No unresolved product-policy decision was inferred from source code. External provider UI and policies can change independently of this repository; the integration pages therefore document only the repository-controlled setup contract and link outward where appropriate.

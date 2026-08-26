@@ -67,8 +67,8 @@ YouTube 和 Bilibili 页面可采集页面已经加载的字幕 / 转录内容�
 | 目标 | 行为 |
 | --- | --- |
 | **Notion** | OAuth 后通过 Notion API 同步本地内容；始终可手动同步，也可显式开启自动同步。 |
-| **Obsidian** | 通过本机 Local REST API 把 Markdown 和本地图片附件写入 vault。参见[配置指南](docs/obsidian-setup.md)。 |
-| **飞书（DocX）** | OAuth 后同步本地内容到飞书 DocX；始终可手动同步，也可显式开启自动同步。参见[配置指南](docs/feishu-setup.md)。 |
+| **Obsidian** | 通过本机 Local REST API 把 Markdown 和本地图片附件写入 vault。参见[配置指南](docs/guide/obsidian/LocalRestAPI.zh.md)。 |
+| **飞书（DocX）** | OAuth 后同步本地内容到飞书 DocX；始终可手动同步，也可显式开启自动同步。参见[配置指南](docs/guide/feishu/DocxSync.zh.md)。 |
 | **Markdown / Zip** | 导出单条内容或本地备份包。 |
 
 存储、备份、权限和网络行为见[隐私政策](PRIVACY.md)与[长期文档入口](docs/overview.md)。

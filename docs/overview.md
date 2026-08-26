@@ -10,8 +10,8 @@
 | 查看隐私、权限、网络与数据去向 | [PRIVACY.md](../PRIVACY.md) |
 | 提交 Issue、commit 或 Pull Request | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 理解本地数据、备份与恢复边界 | [storage.md](storage.md) |
-| 配置 Feishu DocX | [feishu-setup.md](feishu-setup.md) |
-| 配置 Obsidian Local REST API | [obsidian-setup.md](obsidian-setup.md) |
+| 配置 Feishu DocX | [中文](guide/feishu/DocxSync.zh.md) / [English](guide/feishu/DocxSync.en.md) |
+| 配置 Obsidian Local REST API | [中文](guide/obsidian/LocalRestAPI.zh.md) / [English](guide/obsidian/LocalRestAPI.en.md) |
 | 排查构建、采集、消息连接与评论定位 | [troubleshooting.md](troubleshooting.md) |
 | 查看架构边界与 agent 约束 | [AGENTS.md](../AGENTS.md) |
 
