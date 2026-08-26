@@ -47,8 +47,8 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
     const settingsStore = await load('@services/sync/obsidian/settings-store.ts');
     await load('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await load('@services/sync/obsidian/obsidian-note-path.ts');
-    await load('@services/sync/obsidian/obsidian-sync-metadata.ts');
-    await load('@services/sync/obsidian/obsidian-markdown-writer.ts');
+    await load('@services/sync/shared/remote-markdown-metadata.ts');
+    await load('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await load('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     // Local data
