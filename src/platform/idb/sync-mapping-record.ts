@@ -48,16 +48,30 @@ function replaceGroup(target: SyncMappingRecord, source: SyncMappingRecord, fiel
   }
 }
 
+function isSafeGitRefName(value: string): boolean {
+  if (!value || value === '@' || value.startsWith('/') || value.endsWith('/') || value.endsWith('.')) return false;
+  if (value.includes('..') || value.includes('//') || value.includes('@{')) return false;
+  if (/[\x00-\x20\x7f]/.test(value)) return false;
+  if (['~', '^', ':', '?', '*', '[', '\\'].some((character) => value.includes(character))) return false;
+  const segments = value.split('/');
+  if (segments.some((segment) => !segment || segment.startsWith('.') || segment.endsWith('.lock'))) return false;
+  return true;
+}
+
 function normalizeGithubRemoteKey(value: unknown): string {
-  const remoteKey = safeString(value);
-  if (!remoteKey || remoteKey !== String(value ?? '') || /[\x00-\x20\x7f]/.test(remoteKey)) return '';
-  if (!remoteKey.startsWith('github.com/')) return '';
-  const at = remoteKey.lastIndexOf('@');
-  if (at <= 'github.com/'.length || at >= remoteKey.length - 1) return '';
-  const repo = remoteKey.slice('github.com/'.length, at);
-  const parts = repo.split('/');
-  if (parts.length !== 2 || parts.some((part) => !part)) return '';
-  return remoteKey;
+  if (typeof value !== 'string' || !value || value !== value.trim()) return '';
+  const prefix = 'github.com/';
+  if (!value.startsWith(prefix)) return '';
+  const at = value.indexOf('@', prefix.length);
+  if (at <= prefix.length || at >= value.length - 1) return '';
+  const repo = value.slice(prefix.length, at);
+  const branch = value.slice(at + 1);
+  const [owner, repository, ...extra] = repo.split('/');
+  if (extra.length || !owner || !repository) return '';
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(owner)) return '';
+  if (!/^[A-Za-z0-9._-]{1,100}$/.test(repository) || repository === '.' || repository === '..') return '';
+  if (!isSafeGitRefName(branch)) return '';
+  return value;
 }
 
 function isSafeRelativeGitPath(value: unknown): value is string {
@@ -76,11 +90,11 @@ function normalizeGithubManagedFiles(value: unknown): SyncMappingRecord {
   const entries = Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   for (const [path, rawMetadata] of entries) {
     if (!isSafeRelativeGitPath(path) || !isRecord(rawMetadata)) continue;
-    const sha = safeString(rawMetadata.sha);
-    const contentHash = safeString(rawMetadata.contentHash);
-    const kind = safeString(rawMetadata.kind);
-    if (!/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(sha)) continue;
-    if (!/^[0-9a-f]{64}$/.test(contentHash)) continue;
+    const sha = rawMetadata.sha;
+    const contentHash = rawMetadata.contentHash;
+    const kind = rawMetadata.kind;
+    if (typeof sha !== 'string' || !/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(sha)) continue;
+    if (typeof contentHash !== 'string' || !/^[0-9a-f]{64}$/.test(contentHash)) continue;
     if (kind !== 'markdown' && kind !== 'asset') continue;
     normalized[path] = { sha: sha.toLowerCase(), contentHash, kind };
   }
@@ -95,10 +109,14 @@ function normalizeGithubContinuityGroup(source: unknown): SyncMappingRecord {
   if (Object.prototype.hasOwnProperty.call(record, 'githubManagedFiles')) {
     normalized.githubManagedFiles = normalizeGithubManagedFiles(record.githubManagedFiles);
   }
-  const fingerprint = safeString(record.githubProjectionFingerprint);
-  if (/^[0-9a-f]{64}$/.test(fingerprint)) normalized.githubProjectionFingerprint = fingerprint;
-  const lastSyncedAt = finiteNumber(record.githubLastSyncedAt);
-  if (lastSyncedAt != null) normalized.githubLastSyncedAt = lastSyncedAt;
+  const fingerprint = record.githubProjectionFingerprint;
+  if (typeof fingerprint === 'string' && /^[0-9a-f]{64}$/.test(fingerprint)) {
+    normalized.githubProjectionFingerprint = fingerprint;
+  }
+  const lastSyncedAt = record.githubLastSyncedAt;
+  if (typeof lastSyncedAt === 'number' && Number.isFinite(lastSyncedAt) && lastSyncedAt >= 0) {
+    normalized.githubLastSyncedAt = lastSyncedAt;
+  }
   return normalized;
 }
 

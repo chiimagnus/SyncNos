@@ -216,8 +216,11 @@ describe('sync mapping persistence record', () => {
       '.github/workflows/publish.yml': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'asset' },
       'control\u0001.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
       'bad-sha.md': { sha: 'not-a-sha', contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'padded-sha.md': { sha: ` ${'a'.repeat(40)} `, contentHash: 'b'.repeat(64), kind: 'markdown' },
       'bad-hash.md': { sha: 'a'.repeat(40), contentHash: 'B'.repeat(64), kind: 'markdown' },
+      'padded-hash.md': { sha: 'a'.repeat(40), contentHash: ` ${'b'.repeat(64)} `, kind: 'markdown' },
       'bad-kind.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'other' },
+      'padded-kind.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: ' markdown ' },
     };
 
     const merged = mergeSyncMappingPatch({}, {
@@ -226,6 +229,23 @@ describe('sync mapping persistence record', () => {
     });
 
     expect(merged.githubManagedFiles).toEqual(valid.githubManagedFiles);
+
+    const invalidRemote = mergeSyncMappingPatch({}, {
+      ...valid,
+      githubRemoteKey: 'github.com/example/syncnos?access_token=secret@main',
+      githubProjectionFingerprint: ` ${'a'.repeat(64)} `,
+      githubLastSyncedAt: '100',
+    });
+    expect(invalidRemote.githubRemoteKey).toBeUndefined();
+    expect(invalidRemote.githubManagedFiles).toBeUndefined();
+    expect(invalidRemote.githubProjectionFingerprint).toBeUndefined();
+    expect(invalidRemote.githubLastSyncedAt).toBeUndefined();
+
+    const branchWithAt = mergeSyncMappingPatch({}, {
+      ...valid,
+      githubRemoteKey: 'github.com/example/syncnos@feature/user@topic',
+    });
+    expect(branchWithAt.githubRemoteKey).toBe('github.com/example/syncnos@feature/user@topic');
   });
 
   it('ignores invalid Notion nested field patches and does not mutate inputs', () => {
