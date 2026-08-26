@@ -346,6 +346,59 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.querySelector('[role="status"]')).toBeFalsy();
   });
 
+  it('clears Copied feedback when the same copy action id points to a new href', async () => {
+    const firstTrigger = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        href: 'https://app.notion.com/old-target',
+        afterTriggerLabel: 'Copied',
+        onTrigger: firstTrigger,
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+    const firstButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement;
+    await act(async () => {
+      firstButton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(firstTrigger).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+
+    const nextTrigger = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        href: 'https://app.notion.com/new-target',
+        afterTriggerLabel: 'Copied',
+        onTrigger: nextTrigger,
+      },
+    ];
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(document.querySelector('[role="status"]')).toBeFalsy();
+    const nextButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement;
+    await act(async () => {
+      nextButton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(nextTrigger).toHaveBeenCalledTimes(1);
+    expect(firstTrigger).toHaveBeenCalledTimes(1);
+  });
+
   it('hides the Copy header entry when no copy actions are available', () => {
     currentState.detailHeaderActions = [
       {

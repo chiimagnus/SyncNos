@@ -63,7 +63,10 @@ export function ConversationDetailPane({
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const copyActions = safeActions.filter((action) => action.slot === 'copy');
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
-  const copyActionScopeKey = `${Number((selected as any)?.id ?? activeId) || 0}:${copyActions.map((action) => action.id).join('|')}`;
+  const copyActionScopeKey = JSON.stringify([
+    Number((selected as any)?.id ?? activeId) || 0,
+    copyActions.map((action) => [action.id, String(action.href || '')]),
+  ]);
 
   const headerIconButtonClass = headerButtonClassName();
   const kindView = conversationKinds.pick(selected as any)?.view ?? DEFAULT_VIEW;
