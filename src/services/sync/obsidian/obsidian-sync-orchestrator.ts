@@ -5,7 +5,7 @@ import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
 } from '@services/sync/obsidian/obsidian-local-rest-client.ts';
-import { buildFullNoteMarkdown as buildDefaultFullNoteMarkdown } from '@services/sync/obsidian/obsidian-markdown-writer.ts';
+import { buildFullNoteMarkdown as buildDefaultFullNoteMarkdown } from '@services/sync/shared/remote-markdown-writer.ts';
 import {
   buildStableNotePath as buildDefaultStableNotePath,
   buildLegacyHashNotePath as buildDefaultLegacyHashNotePath,

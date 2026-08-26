@@ -82,7 +82,7 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
     await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
-    await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
+    await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
@@ -131,7 +131,7 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
     await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
-    await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
+    await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
@@ -301,7 +301,7 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
     await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
-    await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
+    await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
@@ -362,7 +362,7 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
     await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
-    await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
+    await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
@@ -435,7 +435,7 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');
     await loadModule('@services/sync/obsidian/obsidian-note-path.ts');
     await loadModule('@services/sync/obsidian/obsidian-sync-metadata.ts');
-    await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
+    await loadModule('@services/sync/shared/remote-markdown-writer.ts');
     const naming = await loadModule('@services/conversations/domain/file-naming.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 

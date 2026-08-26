@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 async function loadWriter() {
-  const mod = await import('@services/sync/obsidian/obsidian-markdown-writer.ts');
+  const mod = await import('@services/sync/shared/remote-markdown-writer.ts');
   return mod.default || mod;
 }
 
-describe('obsidian-markdown-writer', () => {
+describe('remote-markdown-writer', () => {
   it('builds full markdown with frontmatter and stable heading', async () => {
     const w = await loadWriter();
     const md = w.buildFullNoteMarkdown({
@@ -82,6 +82,37 @@ describe('obsidian-markdown-writer', () => {
     expect(md.match(/^- You \|/gm)?.length || 0).toBe(2);
     expect(md).toContain('  Root');
     expect(md).toContain('  Reply');
+  });
+
+  it('keeps default/local comment timestamps compatible and supports deterministic UTC rendering', async () => {
+    const w = await loadWriter();
+    const timestamp = Date.UTC(2026, 0, 2, 3, 4);
+    const date = new Date(timestamp);
+    const pad2 = (value: number) => String(value).padStart(2, '0');
+    const localTime = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+    const input = {
+      conversation: { sourceType: 'article' },
+      comments: [
+        {
+          id: 1,
+          parentId: null,
+          conversationId: 1,
+          canonicalUrl: 'https://example.com',
+          quoteText: '',
+          commentText: 'Comment',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    };
+
+    const defaultMd = w.buildFullNoteMarkdown(input);
+    const localMd = w.buildFullNoteMarkdown({ ...input, commentTimeZone: 'local' });
+    const utcMd = w.buildFullNoteMarkdown({ ...input, commentTimeZone: 'utc' });
+
+    expect(defaultMd).toBe(localMd);
+    expect(defaultMd).toContain(`- You | ${localTime}`);
+    expect(utcMd).toContain('- You | 2026-01-02 03:04');
   });
 
   it('normalizes standalone image lines that append caption text', async () => {
