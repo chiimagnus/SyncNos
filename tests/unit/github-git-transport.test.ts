@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { GithubApiError } from '@services/sync/github/github-api-client';
 import {
+  GITHUB_BRANCH_RACE_MAX_ATTEMPTS,
   GithubGitTransportError,
+  commitGithubStagedOperations,
   commitGithubStagedOperationsOnce,
   createGithubBlob,
   resolveOwnedGithubDeletes,
@@ -415,6 +417,210 @@ describe('github git transport staged path/delete resolver', () => {
       ),
     ).rejects.toBe(outcomeUnknown);
     expect(patchCalls).toBe(1);
+  });
+
+  it('re-resolves fresh HEAD/tree after a ref non-fast-forward race and succeeds on the next attempt', async () => {
+    const HEAD_1 = '3'.repeat(40);
+    const HEAD_2 = '4'.repeat(40);
+    const BASE_1 = '5'.repeat(40);
+    const BASE_2 = '6'.repeat(40);
+    const NEW_1 = '7'.repeat(40);
+    const NEW_2 = '8'.repeat(40);
+    const COMMIT_1 = '9'.repeat(40);
+    const COMMIT_2 = 'a'.repeat(40);
+    let refReads = 0;
+    let treeCreates = 0;
+    let commitCreates = 0;
+    let patches = 0;
+    const treeBodies: any[] = [];
+    const patchBodies: any[] = [];
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path === '/repos/owner/repo/git/ref/heads/main') {
+          refReads += 1;
+          return { object: { type: 'commit', sha: refReads === 1 ? HEAD_1 : HEAD_2 } } as T;
+        }
+        if (path.endsWith(HEAD_1)) return { tree: { sha: BASE_1 } } as T;
+        if (path.endsWith(HEAD_2)) return { tree: { sha: BASE_2 } } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string, body?: unknown): Promise<T> {
+        if (path.endsWith('/git/trees')) {
+          treeCreates += 1;
+          treeBodies.push(body);
+          return { sha: treeCreates === 1 ? NEW_1 : NEW_2 } as T;
+        }
+        if (path.endsWith('/git/commits')) {
+          commitCreates += 1;
+          return { sha: commitCreates === 1 ? COMMIT_1 : COMMIT_2 } as T;
+        }
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(_path: string, body?: unknown): Promise<T> {
+        patches += 1;
+        patchBodies.push(body);
+        if (patches === 1) throw new GithubApiError('github_http_error', 422, 'Update is not a fast forward');
+        return { object: { sha: COMMIT_2 } } as T;
+      },
+    };
+
+    const result = await commitGithubStagedOperations(
+      { repository: 'owner/repo', branch: 'main', operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }] },
+      api,
+    );
+    expect(result).toMatchObject({ status: 'committed', treeSha: NEW_2, commitSha: COMMIT_2 });
+    expect(refReads).toBe(2);
+    expect(treeBodies.map((body) => body.base_tree)).toEqual([BASE_1, BASE_2]);
+    expect(patchBodies).toEqual([
+      { sha: COMMIT_1, force: false },
+      { sha: COMMIT_2, force: false },
+    ]);
+  });
+
+  it('does not retry validation or protected-branch failures', async () => {
+    let reads = 0;
+    const neverApi = {
+      async get<T>(): Promise<T> {
+        reads += 1;
+        throw new Error('must-not-read');
+      },
+      async post<T>(): Promise<T> {
+        throw new Error('must-not-post');
+      },
+      async patch<T>(): Promise<T> {
+        throw new Error('must-not-patch');
+      },
+    };
+    await expect(
+      commitGithubStagedOperations(
+        { repository: 'owner/repo', branch: 'main', operations: [{ type: 'delete', path: '../bad.md' }] },
+        neverApi,
+      ),
+    ).rejects.toMatchObject({ code: 'github_git_path_invalid' });
+    expect(reads).toBe(0);
+
+    const HEAD = '3'.repeat(40);
+    const BASE = '4'.repeat(40);
+    const NEW_TREE = '5'.repeat(40);
+    const COMMIT = '6'.repeat(40);
+    let refReads = 0;
+    let patchCalls = 0;
+    const protectedError = new GithubApiError('github_http_error', 422, 'Protected branch update failed');
+    const protectedApi = {
+      async get<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/ref/heads/main')) {
+          refReads += 1;
+          return { object: { type: 'commit', sha: HEAD } } as T;
+        }
+        if (path.endsWith(HEAD)) return { tree: { sha: BASE } } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(): Promise<T> {
+        patchCalls += 1;
+        throw protectedError;
+      },
+    };
+    await expect(
+      commitGithubStagedOperations(
+        { repository: 'owner/repo', branch: 'main', operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }] },
+        protectedApi,
+      ),
+    ).rejects.toBe(protectedError);
+    expect(refReads).toBe(1);
+    expect(patchCalls).toBe(1);
+  });
+
+  it('exhausts branch-race retries at the fixed hard cap', async () => {
+    const HEAD = '3'.repeat(40);
+    const BASE = '4'.repeat(40);
+    const NEW_TREE = '5'.repeat(40);
+    const COMMIT = '6'.repeat(40);
+    let refReads = 0;
+    let patches = 0;
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/ref/heads/main')) {
+          refReads += 1;
+          return { object: { type: 'commit', sha: HEAD } } as T;
+        }
+        if (path.endsWith(HEAD)) return { tree: { sha: BASE } } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(_path: string, body?: any): Promise<T> {
+        patches += 1;
+        expect(body.force).toBe(false);
+        throw new GithubApiError('github_http_error', 422, 'Update is not a fast-forward');
+      },
+    };
+    await expect(
+      commitGithubStagedOperations(
+        { repository: 'owner/repo', branch: 'main', operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }] },
+        api,
+      ),
+    ).rejects.toMatchObject({ code: 'github_git_branch_race_exhausted' });
+    expect(refReads).toBe(GITHUB_BRANCH_RACE_MAX_ATTEMPTS);
+    expect(patches).toBe(GITHUB_BRANCH_RACE_MAX_ATTEMPTS);
+  });
+
+  it('re-resolves deletes against the fresh tree and treats a concurrently removed path as satisfied', async () => {
+    const HEAD_1 = '3'.repeat(40);
+    const HEAD_2 = '4'.repeat(40);
+    const BASE_1 = '5'.repeat(40);
+    const BASE_2 = '6'.repeat(40);
+    const NEW_1 = '7'.repeat(40);
+    const COMMIT_1 = '8'.repeat(40);
+    let refReads = 0;
+    let patches = 0;
+    const treeReads: string[] = [];
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/ref/heads/main')) {
+          refReads += 1;
+          return { object: { type: 'commit', sha: refReads === 1 ? HEAD_1 : HEAD_2 } } as T;
+        }
+        if (path.endsWith(HEAD_1)) return { tree: { sha: BASE_1 } } as T;
+        if (path.endsWith(HEAD_2)) return { tree: { sha: BASE_2 } } as T;
+        if (path.endsWith(BASE_1)) {
+          treeReads.push(BASE_1);
+          return tree([{ path: 'old.md', type: 'blob', sha: BLOB_1 }]) as T;
+        }
+        if (path.endsWith(BASE_2)) {
+          treeReads.push(BASE_2);
+          return tree([]) as T;
+        }
+        throw new Error(`unexpected:${path}`);
+      },
+      async post<T>(path: string): Promise<T> {
+        if (path.endsWith('/git/trees')) return { sha: NEW_1 } as T;
+        if (path.endsWith('/git/commits')) return { sha: COMMIT_1 } as T;
+        throw new Error(`unexpected:${path}`);
+      },
+      async patch<T>(): Promise<T> {
+        patches += 1;
+        throw new GithubApiError('github_http_error', 422, 'Update is not a fast forward');
+      },
+    };
+    const result = await commitGithubStagedOperations(
+      { repository: 'owner/repo', branch: 'main', operations: [{ type: 'delete', path: 'old.md' }] },
+      api,
+    );
+    expect(result).toEqual({
+      status: 'no_changes',
+      treeSha: BASE_2,
+      files: [{ path: 'old.md', status: 'absent' }],
+    });
+    expect(treeReads).toEqual([BASE_1, BASE_2]);
+    expect(patches).toBe(1);
   });
 
   it('rejects invalid repository/root tree inputs before making any remote read', async () => {

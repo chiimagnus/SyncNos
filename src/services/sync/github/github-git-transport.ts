@@ -1,4 +1,4 @@
-import { githubApiClient } from '@services/sync/github/github-api-client';
+import { GithubApiError, githubApiClient } from '@services/sync/github/github-api-client';
 import {
   encodeGithubBranchPath,
   encodeGithubRepositoryPath,
@@ -45,7 +45,9 @@ export type GithubGitTransportErrorCode =
   | 'github_git_branch_invalid'
   | 'github_git_sha_invalid'
   | 'github_git_delete_resolution_failed'
-  | 'github_git_response_invalid';
+  | 'github_git_response_invalid'
+  | 'github_git_branch_race'
+  | 'github_git_branch_race_exhausted';
 
 export class GithubGitTransportError extends Error {
   constructor(readonly code: GithubGitTransportErrorCode) {
@@ -241,6 +243,14 @@ export async function createGithubBlob(
   return { sha: requireResponseGitSha(response?.sha) };
 }
 
+function isRefBranchRace(error: unknown): boolean {
+  return (
+    error instanceof GithubApiError &&
+    error.status === 422 &&
+    /(?:not (?:a )?fast[- ]forward|non-fast[- ]forward)/i.test(error.safeMessage)
+  );
+}
+
 export async function commitGithubStagedOperationsOnce(
   input: {
     repository: string;
@@ -311,12 +321,59 @@ export async function commitGithubStagedOperationsOnce(
     parents: [headSha],
   });
   const commitSha = requireResponseGitSha(commitResponse?.sha);
-  const refResponse = await api.patch<any>(`/repos/${encodedRepository}/git/refs/heads/${encodedBranch}`, {
-    sha: commitSha,
-    force: false,
-  });
+  let refResponse: any;
+  try {
+    refResponse = await api.patch<any>(`/repos/${encodedRepository}/git/refs/heads/${encodedBranch}`, {
+      sha: commitSha,
+      force: false,
+    });
+  } catch (error) {
+    if (isRefBranchRace(error)) throw new GithubGitTransportError('github_git_branch_race');
+    throw error;
+  }
   const updatedSha = requireResponseGitSha(refResponse?.object?.sha);
   if (updatedSha !== commitSha) throw new GithubGitTransportError('github_git_response_invalid');
 
   return { status: 'committed', treeSha, commitSha, files: files() };
+}
+
+export const GITHUB_BRANCH_RACE_MAX_ATTEMPTS = 3;
+
+async function resolveGithubBranchState(
+  repository: string,
+  branch: string,
+  api: Pick<GithubGitApi, 'get'>,
+): Promise<{ headSha: string; treeSha: string }> {
+  const encodedRepository = encodeGithubRepositoryPath(repository);
+  const encodedBranch = encodeGithubBranchPath(branch);
+  const ref = await api.get<any>(`/repos/${encodedRepository}/git/ref/heads/${encodedBranch}`);
+  if (ref?.object?.type !== 'commit') throw new GithubGitTransportError('github_git_response_invalid');
+  const headSha = requireResponseGitSha(ref?.object?.sha);
+  const commit = await api.get<any>(`/repos/${encodedRepository}/git/commits/${encodeURIComponent(headSha)}`);
+  const treeSha = requireResponseGitSha(commit?.tree?.sha);
+  return { headSha, treeSha };
+}
+
+export async function commitGithubStagedOperations(
+  input: { repository: string; branch: string; operations: readonly GithubStagedOperation[] },
+  api: GithubGitApi = githubApiClient,
+): Promise<GithubGitTransactionResult> {
+  const repository = normalizeGithubRepository(input.repository);
+  if (!repository) throw new GithubGitTransportError('github_git_path_invalid');
+  const branch = normalizeGithubBranch(input.branch);
+  if (!branch) throw new GithubGitTransportError('github_git_branch_invalid');
+  const operations = validateGithubStagedOperations(input.operations);
+
+  for (let attempt = 1; attempt <= GITHUB_BRANCH_RACE_MAX_ATTEMPTS; attempt += 1) {
+    const state = await resolveGithubBranchState(repository, branch, api);
+    try {
+      return await commitGithubStagedOperationsOnce({ repository, branch, ...state, operations }, api);
+    } catch (error) {
+      if (!(error instanceof GithubGitTransportError) || error.code !== 'github_git_branch_race') throw error;
+      if (attempt >= GITHUB_BRANCH_RACE_MAX_ATTEMPTS) {
+        throw new GithubGitTransportError('github_git_branch_race_exhausted');
+      }
+    }
+  }
+  throw new GithubGitTransportError('github_git_branch_race_exhausted');
 }
