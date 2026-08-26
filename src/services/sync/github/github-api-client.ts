@@ -3,13 +3,20 @@ import { clearGithubAuthForAccessToken, getValidAccessToken } from '@services/sy
 
 export const GITHUB_API_VERSION = '2026-03-10';
 export const GITHUB_API_DEFAULT_TIMEOUT_MS = 15_000;
+export const GITHUB_READ_MAX_ATTEMPTS = 3;
+export const GITHUB_MUTATION_RATE_LIMIT_MAX_ATTEMPTS = 3;
+export const GITHUB_MUTATION_MIN_INTERVAL_MS = 1_000;
+export const GITHUB_SECONDARY_RATE_LIMIT_BASE_DELAY_MS = 60_000;
 
 export type GithubApiErrorCode =
   | 'github_auth_required'
+  | 'github_auth_refresh_failed'
   | 'github_http_error'
   | 'github_network_error'
   | 'github_timeout'
-  | 'github_response_invalid';
+  | 'github_response_invalid'
+  | 'github_outcome_unknown'
+  | 'github_rate_limited';
 
 export class GithubApiError extends Error {
   constructor(
@@ -37,6 +44,7 @@ type GithubApiClientOptions = {
   onUnauthorized?: (accessToken: string) => Promise<void> | void;
   fetchImpl?: typeof fetch;
   clock?: GithubApiClock;
+  sleep?: (ms: number) => Promise<void>;
   timeoutMs?: number;
 };
 
@@ -50,6 +58,8 @@ const DEFAULT_CLOCK: GithubApiClock = {
   setTimeout: (callback, ms) => setTimeout(callback, ms),
   clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
 };
+
+const DEFAULT_SLEEP = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function safeHeader(response: Response, name: string): string | undefined {
   const value = response.headers.get(name)?.trim();
@@ -122,20 +132,70 @@ function validatePath(path: string): string {
   return path;
 }
 
+function isSecondaryRateLimit(error: GithubApiError): boolean {
+  return (error.status === 403 || error.status === 429) && /secondary rate limit/i.test(error.safeMessage);
+}
+
+function isPrimaryRateLimit(error: GithubApiError): boolean {
+  return (error.status === 403 || error.status === 429) && error.rateLimitRemaining === 0;
+}
+
+function isConfirmedRateLimit(error: GithubApiError): boolean {
+  return isPrimaryRateLimit(error) || isSecondaryRateLimit(error);
+}
+
+function toOutcomeUnknown(error: GithubApiError): GithubApiError {
+  return new GithubApiError(
+    'github_outcome_unknown',
+    error.status,
+    'github_outcome_unknown',
+    error.requestId,
+    error.retryAfterMs,
+    error.rateLimitRemaining,
+    error.rateLimitResetAt,
+  );
+}
+
+function toRateLimited(error: GithubApiError): GithubApiError {
+  return new GithubApiError(
+    'github_rate_limited',
+    error.status,
+    'github_rate_limited',
+    error.requestId,
+    error.retryAfterMs,
+    error.rateLimitRemaining,
+    error.rateLimitResetAt,
+  );
+}
+
 export function createGithubApiClient({
   getAccessToken = getValidAccessToken,
   onUnauthorized = clearGithubAuthForAccessToken,
   fetchImpl = fetch,
   clock = DEFAULT_CLOCK,
+  sleep = DEFAULT_SLEEP,
   timeoutMs = GITHUB_API_DEFAULT_TIMEOUT_MS,
 }: GithubApiClientOptions = {}) {
-  async function request<T>(
+  let mutationQueue: Promise<void> = Promise.resolve();
+  let lastMutationStartedAt = Number.NEGATIVE_INFINITY;
+
+  async function performAttempt<T>(
     method: 'GET' | 'POST' | 'PATCH',
     path: string,
-    options: GithubRequestOptions = {},
+    options: GithubRequestOptions,
   ): Promise<T> {
     const requestPath = validatePath(path);
-    const accessToken = await getAccessToken();
+    let accessToken: string;
+    try {
+      accessToken = await getAccessToken();
+    } catch (error) {
+      const code = (error as any)?.code;
+      if (code === 'github_auth_required' || code === 'github_auth_refresh_failed') {
+        throw new GithubApiError(code, 0, code);
+      }
+      throw error;
+    }
+
     const controller = new AbortController();
     let timedOut = false;
     const requestTimeoutMs = Math.max(1, options.timeoutMs ?? timeoutMs);
@@ -187,13 +247,91 @@ export function createGithubApiClient({
     }
   }
 
+  function confirmedRateLimitDelay(error: GithubApiError, attempt: number): number {
+    if (error.retryAfterMs != null) return error.retryAfterMs;
+    if (isPrimaryRateLimit(error) && error.rateLimitResetAt != null) {
+      return Math.max(0, error.rateLimitResetAt - clock.now());
+    }
+    return Math.min(GITHUB_SECONDARY_RATE_LIMIT_BASE_DELAY_MS * 2 ** Math.max(0, attempt - 1), 5 * 60_000);
+  }
+
+  function readRetryDelay(error: GithubApiError, attempt: number): number {
+    if (isConfirmedRateLimit(error)) return confirmedRateLimitDelay(error, attempt);
+    if (error.retryAfterMs != null) return error.retryAfterMs;
+    return Math.min(500 * 2 ** Math.max(0, attempt - 1), 4_000);
+  }
+
+  async function executeRead<T>(path: string, options: GithubRequestOptions): Promise<T> {
+    for (let attempt = 1; attempt <= GITHUB_READ_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        return await performAttempt<T>('GET', path, options);
+      } catch (error) {
+        if (!(error instanceof GithubApiError)) throw error;
+        const retryable =
+          error.code === 'github_network_error' ||
+          error.code === 'github_timeout' ||
+          error.status === 429 ||
+          error.status >= 500 ||
+          isConfirmedRateLimit(error);
+        if (!retryable) throw error;
+        if (attempt >= GITHUB_READ_MAX_ATTEMPTS) {
+          if (error.status === 429 || isConfirmedRateLimit(error)) throw toRateLimited(error);
+          throw error;
+        }
+        await sleep(readRetryDelay(error, attempt));
+      }
+    }
+    throw new GithubApiError('github_http_error', 0, 'github_retry_exhausted');
+  }
+
+  async function paceMutation(): Promise<void> {
+    const waitMs = Math.max(0, lastMutationStartedAt + GITHUB_MUTATION_MIN_INTERVAL_MS - clock.now());
+    if (waitMs > 0) await sleep(waitMs);
+    lastMutationStartedAt = clock.now();
+  }
+
+  async function executeMutation<T>(method: 'POST' | 'PATCH', path: string, options: GithubRequestOptions): Promise<T> {
+    for (let attempt = 1; attempt <= GITHUB_MUTATION_RATE_LIMIT_MAX_ATTEMPTS; attempt += 1) {
+      await paceMutation();
+      try {
+        return await performAttempt<T>(method, path, options);
+      } catch (error) {
+        if (!(error instanceof GithubApiError)) throw error;
+        if (
+          error.code === 'github_network_error' ||
+          error.code === 'github_timeout' ||
+          error.code === 'github_response_invalid' ||
+          error.status >= 500
+        ) {
+          throw toOutcomeUnknown(error);
+        }
+        if (!isConfirmedRateLimit(error)) throw error;
+        if (attempt >= GITHUB_MUTATION_RATE_LIMIT_MAX_ATTEMPTS) throw toRateLimited(error);
+        await sleep(confirmedRateLimitDelay(error, attempt));
+      }
+    }
+    throw new GithubApiError('github_http_error', 0, 'github_retry_exhausted');
+  }
+
+  function enqueueMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const run = mutationQueue.then(operation, operation);
+    mutationQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
   return {
-    request,
-    get: <T>(path: string, options?: Omit<GithubRequestOptions, 'body'>) => request<T>('GET', path, options),
+    request: <T>(method: 'GET' | 'POST' | 'PATCH', path: string, options: GithubRequestOptions = {}) =>
+      method === 'GET'
+        ? executeRead<T>(path, options)
+        : enqueueMutation(() => executeMutation<T>(method, path, options)),
+    get: <T>(path: string, options?: Omit<GithubRequestOptions, 'body'>) => executeRead<T>(path, options || {}),
     post: <T>(path: string, body?: unknown, options?: Omit<GithubRequestOptions, 'body'>) =>
-      request<T>('POST', path, { ...options, body }),
+      enqueueMutation(() => executeMutation<T>('POST', path, { ...options, body })),
     patch: <T>(path: string, body?: unknown, options?: Omit<GithubRequestOptions, 'body'>) =>
-      request<T>('PATCH', path, { ...options, body }),
+      enqueueMutation(() => executeMutation<T>('PATCH', path, { ...options, body })),
   };
 }
 

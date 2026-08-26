@@ -29,6 +29,7 @@ describe('github api client', () => {
       onUnauthorized: vi.fn(),
       fetchImpl,
       clock: fixedClock(),
+      sleep: async () => {},
     });
 
     expect(await client.get('/user')).toEqual({ ok: true, method: 'GET' });
@@ -53,7 +54,7 @@ describe('github api client', () => {
     expect(requests[2].init?.body).toBe('{"force":false}');
   });
 
-  it('uses AbortController timeout without clearing auth state', async () => {
+  it('turns a mutation timeout into outcome_unknown without retrying or clearing auth', async () => {
     const onUnauthorized = vi.fn();
     const clearTimeout = vi.fn();
     const clock: GithubApiClock = {
@@ -75,7 +76,10 @@ describe('github api client', () => {
       clock,
     });
 
-    await expect(client.get('/user')).rejects.toMatchObject({ code: 'github_timeout', status: 0 });
+    await expect(client.post('/git/blobs', { content: 'hello' })).rejects.toMatchObject({
+      code: 'github_outcome_unknown',
+      status: 0,
+    });
     expect(onUnauthorized).not.toHaveBeenCalled();
     expect(clearTimeout).toHaveBeenCalledWith(7);
   });
@@ -117,7 +121,7 @@ describe('github api client', () => {
         {
           'x-github-request-id': `REQ-${status}`,
           'retry-after': '2',
-          'x-ratelimit-remaining': '0',
+          'x-ratelimit-remaining': '42',
           'x-ratelimit-reset': '123',
         },
       ),
@@ -140,7 +144,7 @@ describe('github api client', () => {
       status,
       requestId: `REQ-${status}`,
       retryAfterMs: 2_000,
-      rateLimitRemaining: 0,
+      rateLimitRemaining: 42,
       rateLimitResetAt: 123_000,
     });
     expect(caught.safeMessage.length).toBeLessThanOrEqual(240);
@@ -159,6 +163,7 @@ describe('github api client', () => {
       onUnauthorized: vi.fn(),
       fetchImpl,
       clock: fixedClock(),
+      sleep: async () => {},
     });
 
     let caught: any;
@@ -173,7 +178,137 @@ describe('github api client', () => {
     await expect(client.get('https://evil.example/user')).rejects.toMatchObject({
       safeMessage: 'github_api_path_invalid',
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it('bounds GET retries for network/5xx failures', async () => {
+    const sleeps: number[] = [];
+    const fetchImpl = vi.fn(async () => jsonResponse({ message: 'server error' }, 503)) as unknown as typeof fetch;
+    const client = createGithubApiClient({
+      getAccessToken: async () => 'ACCESS_SENTINEL_SECRET',
+      onUnauthorized: vi.fn(),
+      fetchImpl,
+      clock: fixedClock(),
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+
+    await expect(client.get('/user')).rejects.toMatchObject({ code: 'github_http_error', status: 503 });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(sleeps).toEqual([500, 1_000]);
+  });
+
+  it('retries mutation only for confirmed primary rate limit and prioritizes Retry-After', async () => {
+    let now = 1_000;
+    const sleeps: number[] = [];
+    const responses = [
+      jsonResponse({ message: 'API rate limit exceeded' }, 403, {
+        'retry-after': '4',
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': '2',
+      }),
+      jsonResponse({ sha: 'abc' }, 201),
+    ];
+    const clock: GithubApiClock = {
+      now: () => now,
+      setTimeout: () => 1,
+      clearTimeout: () => {},
+    };
+    const fetchImpl = vi.fn(async () => responses.shift() as Response) as unknown as typeof fetch;
+    const client = createGithubApiClient({
+      getAccessToken: async () => 'ACCESS_SENTINEL_SECRET',
+      onUnauthorized: vi.fn(),
+      fetchImpl,
+      clock,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+    });
+
+    expect(await client.post('/git/blobs', { content: 'x' })).toEqual({ sha: 'abc' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleeps).toEqual([4_000]);
+  });
+
+  it('does not retry ordinary permission 403 mutations', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ message: 'Resource not accessible by integration' }, 403),
+    ) as unknown as typeof fetch;
+    const client = createGithubApiClient({
+      getAccessToken: async () => 'ACCESS_SENTINEL_SECRET',
+      onUnauthorized: vi.fn(),
+      fetchImpl,
+      clock: fixedClock(),
+      sleep: async () => {},
+    });
+
+    await expect(client.patch('/git/refs/heads/main', { force: false })).rejects.toMatchObject({
+      code: 'github_http_error',
+      status: 403,
+    });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('recognizes secondary rate limits and waits at least 60 seconds without headers', async () => {
+    let now = 1_000;
+    const sleeps: number[] = [];
+    const responses = [
+      jsonResponse({ message: 'You have exceeded a secondary rate limit.' }, 403),
+      jsonResponse({ sha: 'ok' }, 201),
+    ];
+    const fetchImpl = vi.fn(async () => responses.shift() as Response) as unknown as typeof fetch;
+    const clock: GithubApiClock = { now: () => now, setTimeout: () => 1, clearTimeout: () => {} };
+    const client = createGithubApiClient({
+      getAccessToken: async () => 'ACCESS_SENTINEL_SECRET',
+      onUnauthorized: vi.fn(),
+      fetchImpl,
+      clock,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+    });
+
+    expect(await client.post('/git/blobs', { content: 'x' })).toEqual({ sha: 'ok' });
+    expect(sleeps).toEqual([60_000]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('serializes mutations and paces adjacent writes by at least one second', async () => {
+    let now = 0;
+    const starts: number[] = [];
+    const sleeps: number[] = [];
+    let active = 0;
+    let maxActive = 0;
+    const fetchImpl = vi.fn(async () => {
+      starts.push(now);
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await Promise.resolve();
+      active -= 1;
+      return jsonResponse({ ok: true }, 201);
+    }) as unknown as typeof fetch;
+    const clock: GithubApiClock = { now: () => now, setTimeout: () => 1, clearTimeout: () => {} };
+    const client = createGithubApiClient({
+      getAccessToken: async () => 'ACCESS_SENTINEL_SECRET',
+      onUnauthorized: vi.fn(),
+      fetchImpl,
+      clock,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+    });
+
+    await Promise.all([
+      client.post('/git/blobs', { content: 'a' }),
+      client.patch('/git/refs/heads/main', { force: false }),
+    ]);
+    expect(starts).toEqual([0, 1_000]);
+    expect(sleeps).toEqual([1_000]);
+    expect(maxActive).toBe(1);
   });
 
   it('rejects malformed successful JSON without retaining the response body', async () => {
