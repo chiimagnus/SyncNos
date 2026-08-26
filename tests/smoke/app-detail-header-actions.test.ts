@@ -30,6 +30,7 @@ const currentState = {
       onTrigger: vi.fn(async () => {}),
     },
   ] as any[],
+  updateSelectedConversationUrl: vi.fn(async () => {}),
 };
 
 vi.mock('../../src/ui/shared/ChatMessageBubble', () => ({
@@ -63,6 +64,8 @@ vi.mock('../../src/ui/i18n', () => ({
       openCommentsSidebar: 'Comment',
       closeCommentsSidebar: 'Collapse comments sidebar',
       readerToolbarAria: 'Reader tools',
+      saveButton: 'Save',
+      cancelButton: 'Cancel',
     };
     return labels[key] || key;
   },
@@ -514,6 +517,64 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('saves and cancels URL edits with compact explicit controls', async () => {
+    const updateSelectedConversationUrl = vi.fn(async () => {});
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-11',
+      url: 'https://example.com/article',
+    } as any;
+    currentState.updateSelectedConversationUrl = updateSelectedConversationUrl;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    const editButton = document.querySelector('[aria-label="Edit URL"]') as HTMLButtonElement | null;
+    expect(editButton).toBeTruthy();
+
+    act(() => {
+      editButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    let input = document.querySelector('input[inputmode="url"]') as HTMLInputElement | null;
+    expect(input).toBeTruthy();
+    expect(input?.className).toContain('tw-w-56');
+
+    const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Save');
+    const cancelButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Cancel');
+    expect(saveButton).toBeTruthy();
+    expect(cancelButton).toBeTruthy();
+
+    act(() => {
+      cancelButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(document.querySelector('input[inputmode="url"]')).toBeFalsy();
+    expect(updateSelectedConversationUrl).not.toHaveBeenCalled();
+
+    const editButtonAfterCancel = document.querySelector('[aria-label="Edit URL"]') as HTMLButtonElement | null;
+    expect(editButtonAfterCancel).toBeTruthy();
+    act(() => {
+      editButtonAfterCancel!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    input = document.querySelector('input[inputmode="url"]') as HTMLInputElement | null;
+    expect(input).toBeTruthy();
+    const saveButtonAfterCancel = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Save',
+    );
+    expect(saveButtonAfterCancel).toBeTruthy();
+
+    await act(async () => {
+      saveButtonAfterCancel!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(updateSelectedConversationUrl).toHaveBeenCalledWith('https://example.com/article');
+    expect(document.querySelector('input[inputmode="url"]')).toBeFalsy();
   });
 
   it('shows multiple Open in destinations in the More menu', async () => {

@@ -308,6 +308,7 @@ export const zh: { [K in TranslationKey]: string } = {
   conversationGroupEarlier: '更早',
   todayLabel: '今日：',
   totalLabel: '总计：',
+  saveButton: '保存',
   cancelButton: '取消',
 
   // ConversationDetailPane
