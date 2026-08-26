@@ -41,7 +41,7 @@ Then open WebClipper → `Settings` → `Obsidian` and configure:
 - API Key: the key copied from Obsidian.
 - Auth Header: normally `Authorization`.
 
-Run the connection test after saving. The API Key is stored locally by the extension and is excluded from SyncNos backups.
+Changes are saved when you leave the field or press Enter; then click `Test` to verify the connection. The API Key is stored locally by the extension and is excluded from SyncNos backups.
 
 ## 4. Sync behavior
 

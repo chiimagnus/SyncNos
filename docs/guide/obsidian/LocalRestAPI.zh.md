@@ -41,7 +41,7 @@ http://127.0.0.1:27123
 - API Key：从 Obsidian 复制的 key。
 - Auth Header：通常保持 `Authorization`。
 
-保存后运行连接测试。API Key 保存在扩展本机，并会从 SyncNos 备份中排除。
+修改字段后离开输入框或按 Enter 即会保存；随后点击 `测试` 验证连接。API Key 保存在扩展本机，并会从 SyncNos 备份中排除。
 
 ## 4. 同步行为
 
