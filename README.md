@@ -81,24 +81,9 @@ WebClipper Settings: backup and sync (Notion / Obsidian / Feishu)
 Article discussion sidebar: exact quotes, compact threads, and one active reply composer
 ![Article discussion sidebar](docs/assets/comments-discussion.png)
 
-## Development
+## Contributing
 
-```bash
-npm ci
-npm run dev
-```
-
-Before submitting code, run:
-
-```bash
-npm run gate:ci
-```
-
-Use `npm run gate` when the change affects production builds, manifests, permissions, or release packaging.
-
-## Documentation
-
-Start at [docs/overview.md](docs/overview.md). It links configuration, local-data/security boundaries, Feishu setup, and troubleshooting. Repository rules are in [AGENTS.md](AGENTS.md).
+Development setup, issue/commit/PR workflow, and validation requirements are maintained in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Architecture and non-negotiable product contracts are maintained in [AGENTS.md](AGENTS.md).
 
 ## Support
 

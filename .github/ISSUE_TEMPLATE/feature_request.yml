@@ -1,0 +1,101 @@
+name: 'Feature request / 功能建议'
+description: 'Propose a focused capability, site adapter, integration, or developer-facing improvement'
+title: '[Feature] '
+labels:
+  - webclipper
+body:
+  - type: checkboxes
+    id: existing_search
+    attributes:
+      label: Existing requests / 已有需求
+      options:
+        - label: 'I searched open and closed issues and did not find the same request. / 我已搜索 open 和 closed issues，没有找到同一需求。'
+          required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Request type / 需求类型
+      options:
+        - Product feature / 产品功能
+        - Site adapter or source support / 站点适配或来源支持
+        - Sync or export integration / 同步或导出集成
+        - Documentation or developer experience / 文档或开发体验
+        - Other / 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem / 用户问题
+      description: 'Describe the workflow or limitation before proposing implementation details.'
+      placeholder: 'What can the user not do today, and when does that matter?'
+    validations:
+      required: true
+
+  - type: textarea
+    id: why_syncnos
+    attributes:
+      label: Why this belongs in SyncNos / 为什么适合进入 SyncNos
+      description: 'Explain the value relative to SyncNos local-first capture, reading, sync, or export workflows.'
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior / 期望行为
+      description: 'Describe the intended user-visible result, including defaults or opt-in settings when relevant.'
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals / 范围与非目标
+      description: 'Keep the first implementation bounded. For site support, identify the exact page/content type in scope.'
+      placeholder: |-
+        In scope:
+        - ...
+
+        Not in scope:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: surfaces
+    attributes:
+      label: Affected sites, browsers, or targets / 影响的站点、浏览器或目标
+      placeholder: 'chatgpt.com; Chrome + Firefox; Notion sync; etc.'
+    validations:
+      required: false
+
+  - type: textarea
+    id: data_permissions
+    attributes:
+      label: Data, permissions, privacy, or migration impact / 数据、权限、隐私或迁移影响
+      description: 'State whether the request needs new browser permissions, changes local storage/schema, affects backup/restore, or sends data to a new external target. Write N/A if none.'
+      placeholder: 'N/A'
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Examples or references / 示例或参考（可选）
+      description: 'Screenshots, public URLs, comparable UX, or related issues are useful. Redact private user content and credentials.'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Contribution intent / 是否愿意提交 PR（可选）
+      options:
+        - I can work on a PR after scope is agreed / 范围确认后我愿意提交 PR
+        - I can help test or provide examples / 我可以协助测试或提供案例
+        - I am only proposing the idea / 仅提出需求
+    validations:
+      required: false
