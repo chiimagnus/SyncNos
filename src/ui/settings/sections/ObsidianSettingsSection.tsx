@@ -80,6 +80,9 @@ export function ObsidianSettingsSection(props: {
           <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
             {t('obsidianLocalRestApi')}
           </h2>
+          <button className={buttonClassName} onClick={onTest} disabled={busy} type="button">
+            {t('test')}
+          </button>
         </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
@@ -151,14 +154,6 @@ export function ObsidianSettingsSection(props: {
               className={textInputClassName}
               aria-label={t('authHeader')}
             />
-          </SettingsFormRow>
-
-          <SettingsFormRow label="">
-            <div className="tw-flex tw-items-center tw-gap-2">
-              <button className={buttonClassName} onClick={onTest} disabled={busy} type="button">
-                {t('test')}
-              </button>
-            </div>
           </SettingsFormRow>
 
           <SettingsFormRow label={t('status')} align="start">
