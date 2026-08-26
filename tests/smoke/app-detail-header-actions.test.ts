@@ -56,7 +56,6 @@ vi.mock('../../src/ui/i18n', () => ({
       noMessages: 'No messages',
       selectAConversation: 'Select a conversation',
       backButton: 'Back',
-      detailHeaderOpenInMenuAria: 'Open destinations',
       detailHeaderCopyLinkMenuLabel: 'Copy link',
       detailHeaderCopyLinkMenuAria: 'Copy destinations',
       copied: 'Copied',
@@ -175,7 +174,7 @@ describe('ConversationDetailPane header actions', () => {
     cleanupDom();
   });
 
-  it('shows Open in Notion in the app detail header when the action is available', () => {
+  it('moves Open in Notion into the More menu when the action is available', async () => {
     currentState.detailHeaderActions = [
       {
         id: 'open-in-notion',
@@ -192,6 +191,13 @@ describe('ConversationDetailPane header actions', () => {
       root!.render(createElement(ConversationDetailPane));
     });
 
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+    const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
+    expect(moreButton).toBeTruthy();
+    await act(async () => {
+      moreButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
   });
 
@@ -226,12 +232,10 @@ describe('ConversationDetailPane header actions', () => {
 
     const openButton = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
     const copyButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
-    expect(openButton).toBeTruthy();
+    expect(openButton).toBeFalsy();
     expect(copyButton).toBeTruthy();
-    expect(openButton?.closest('.tw-order-1')).toBeTruthy();
-    expect(copyButton?.closest('.tw-order-2')).toBeTruthy();
-    expect(openButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
-    expect(copyButton?.querySelector('.lucide-link')).toBeTruthy();
+    expect(copyButton?.closest('.tw-order-1')).toBeTruthy();
+    expect(copyButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
     expect(copyButton?.querySelector('.lucide-copy')).toBeFalsy();
 
     await act(async () => {
@@ -284,9 +288,11 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     const trigger = document.querySelector('[aria-label="Copy destinations"]') as HTMLButtonElement | null;
+    const primaryButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
     expect(trigger).toBeTruthy();
+    expect(primaryButton).toBeTruthy();
     expect(document.querySelectorAll('[aria-label="Copy destinations"][aria-haspopup="menu"]')).toHaveLength(1);
-    expect(trigger?.closest('.tw-order-2')).toBeTruthy();
+    expect(trigger?.closest('.tw-order-1')).toBeTruthy();
 
     await act(async () => {
       trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -296,7 +302,8 @@ describe('ConversationDetailPane header actions', () => {
     expect(menu).toBeTruthy();
     const items = Array.from(menu!.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
     expect(items.map((item) => item.textContent)).toEqual(['Copy Notion link', 'Copy Feishu link']);
-    expect(trigger?.querySelector('.lucide-link')).toBeTruthy();
+    expect(primaryButton?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
+    expect(trigger?.textContent).toContain('▾');
     expect(items[0]?.querySelector('[data-provider-logo="notion"]')?.getAttribute('src')).toBe('/icons/notion.svg');
     expect(items[1]?.querySelector('[data-provider-logo="feishu"]')?.getAttribute('src')).toBe('/icons/feishu.svg');
 
@@ -421,7 +428,8 @@ describe('ConversationDetailPane header actions', () => {
     act(() => {
       root!.render(createElement(ConversationDetailPane));
     });
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+    expect(document.querySelector('[data-detail-header-more-trigger="true"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Copy destinations"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Copy Notion link"]')).toBeFalsy();
   });
@@ -508,7 +516,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 
-  it('shows a menu trigger in the app detail header when multiple destinations are available', () => {
+  it('shows multiple Open in destinations in the More menu', async () => {
     currentState.detailHeaderActions = [
       {
         id: 'open-in-notion',
@@ -533,8 +541,15 @@ describe('ConversationDetailPane header actions', () => {
       root!.render(createElement(ConversationDetailPane));
     });
 
-    expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Open destinations"]')).toBeFalsy();
+    const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
+    expect(moreButton).toBeTruthy();
+    await act(async () => {
+      moreButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Open in Obsidian"]')).toBeTruthy();
   });
 
   it('shows Cache images for article detail when tools action is provided', async () => {
@@ -682,10 +697,10 @@ describe('ConversationDetailPane header actions', () => {
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
-    expect(openBtn?.className || '').toContain('tw-order-3');
+    expect(openBtn?.className || '').toContain('tw-order-2');
     const moreBtn = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
     expect(moreBtn).toBeTruthy();
-    expect(moreBtn?.closest('.tw-order-4')).toBeTruthy();
+    expect(moreBtn?.closest('.tw-order-3')).toBeTruthy();
 
     act(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));

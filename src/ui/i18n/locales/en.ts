@@ -508,8 +508,6 @@ export const en = {
   // DetailHeaderActionBar
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
-  detailHeaderOpenInMenuLabel: 'Open in...',
-  detailHeaderOpenInMenuAria: 'Open destinations',
   detailHeaderOpenInNotion: 'Open in Notion',
   detailHeaderOpenInObsidian: 'Open in Obsidian',
   detailHeaderOpenInFeishu: 'Open in Feishu',

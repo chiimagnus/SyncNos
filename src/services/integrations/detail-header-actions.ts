@@ -2,6 +2,11 @@ import type { Conversation, ConversationDetail } from '@services/conversations/d
 import { t } from '@i18n';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import {
+  prioritizeDetailHeaderCopyLinkActions,
+  readLastDetailHeaderCopyLinkActionId,
+  rememberDetailHeaderCopyLinkAction,
+} from '@services/integrations/detail-header-copy-link-preference';
 import { launchObsidianApp } from '@services/sync/obsidian/obsidian-app-launch';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 import { openExternalUrl } from '@services/integrations/open-external-url';
@@ -77,7 +82,7 @@ function buildDetailUtilityActions({
   ];
 }
 
-function buildCopyLinkActions(openActions: DetailHeaderAction[]): DetailHeaderAction[] {
+async function buildCopyLinkActions(openActions: DetailHeaderAction[]): Promise<DetailHeaderAction[]> {
   const copyTargets = {
     notion: { id: 'copy-notion-link', label: t('detailHeaderCopyNotionLink') },
     feishu: { id: 'copy-feishu-link', label: t('detailHeaderCopyFeishuLink') },
@@ -106,7 +111,14 @@ function buildCopyLinkActions(openActions: DetailHeaderAction[]): DetailHeaderAc
     });
   }
 
-  return actions;
+  const preferredActionId = await readLastDetailHeaderCopyLinkActionId();
+  return prioritizeDetailHeaderCopyLinkActions(actions, preferredActionId).map((action) => ({
+    ...action,
+    onTrigger: async () => {
+      await rememberDetailHeaderCopyLinkAction(action.id);
+      await action.onTrigger();
+    },
+  }));
 }
 
 export async function resolveDetailHeaderActions({
@@ -115,9 +127,6 @@ export async function resolveDetailHeaderActions({
   port = defaultDetailHeaderActionPort,
 }: ResolveDetailHeaderActionsInput): Promise<DetailHeaderAction[]> {
   const openActions = await resolveOpenInDetailHeaderActions({ conversation, port });
-  return [
-    ...openActions,
-    ...buildCopyLinkActions(openActions),
-    ...buildDetailUtilityActions({ conversation, detail, port }),
-  ];
+  const copyActions = await buildCopyLinkActions(openActions);
+  return [...openActions, ...copyActions, ...buildDetailUtilityActions({ conversation, detail, port })];
 }

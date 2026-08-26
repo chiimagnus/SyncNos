@@ -75,7 +75,12 @@ export function NotionOAuthSection(props: {
   return (
     <section className={cardClassName} aria-label={t('notionOAuth')}>
       <div className="tw-flex tw-items-center tw-gap-2">
-        <img className="tw-h-5 tw-w-5 tw-shrink-0" src={notionLogoUrl} alt="" aria-hidden="true" />
+        <img
+          className="webclipper-provider-logo--notion tw-h-5 tw-w-5 tw-shrink-0"
+          src={notionLogoUrl}
+          alt=""
+          aria-hidden="true"
+        />
         <div className="tw-min-w-0 tw-flex-1 tw-text-[var(--text-primary)]">
           <span className="tw-text-base tw-font-extrabold">{t('notionOAuth')}</span>
           <span className="tw-mx-2 tw-text-[var(--text-secondary)]" aria-hidden="true">
