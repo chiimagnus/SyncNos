@@ -96,6 +96,63 @@ describe('github-auto-sync-scheduler', () => {
     });
   });
 
+  it('retains dirty ids when projection reports an item-level GitHub network failure', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '9': 9_999 };
+    const sync = vi.fn().mockResolvedValue({
+      transport: { status: 'not_needed' },
+      items: [{ conversationId: 9, status: 'failed', error: 'github_network_error' }],
+    });
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-auto-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flush();
+
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({
+      '9': 10_000 + GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS,
+    });
+  });
+
+  it('retains dirty ids when the orchestrator returns an invalid transport resolution', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '10': 9_999 };
+    const sync = vi.fn().mockResolvedValue({
+      transport: { status: 'invalid_resolution' },
+      items: [{ conversationId: 10, status: 'failed', error: 'github_transport_resolution_incomplete' }],
+    });
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-auto-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flush();
+
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({
+      '10': 10_000 + GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS,
+    });
+  });
+
+  it('retains dirty ids when local mapping acknowledgement fails after a GitHub commit', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '11': 9_999 };
+    const sync = vi.fn().mockResolvedValue({
+      transport: { status: 'committed' },
+      items: [{ conversationId: 11, status: 'mapping_failed', error: 'github_mapping_patch_failed' }],
+    });
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-auto-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flush();
+
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({
+      '11': 10_000 + GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS,
+    });
+  });
+
   it('classifies safe GitHub failures without retrying unrelated errors', () => {
     expect(getGithubAutoSyncFailureRetryDelayMs({ code: 'github_timeout' })).toBe(GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS);
     expect(getGithubAutoSyncFailureRetryDelayMs({ code: 'github_auth_required' })).toBe(

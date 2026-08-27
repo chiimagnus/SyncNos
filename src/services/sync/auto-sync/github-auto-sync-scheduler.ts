@@ -30,6 +30,7 @@ const TRANSIENT_CODES = new Set([
   'github_http_error',
   'github_git_branch_race',
   'github_git_branch_race_exhausted',
+  'github_transport_resolution_incomplete',
 ]);
 
 export function getGithubAutoSyncFailureRetryDelayMs(error: unknown): number | undefined {
@@ -38,10 +39,18 @@ export function getGithubAutoSyncFailureRetryDelayMs(error: unknown): number | u
   return TRANSIENT_CODES.has(code) ? GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS : GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS;
 }
 
-function firstTransportFailureCode(result: any): string {
-  if (result?.transport?.status !== 'failed') return '';
-  const item = Array.isArray(result?.items) ? result.items.find((row: any) => row?.status === 'failed') : null;
-  return String(item?.error || 'github_transport_failed').trim() || 'github_transport_failed';
+function resultFailureCode(result: any): string {
+  const items = Array.isArray(result?.items) ? result.items : [];
+  for (const item of items) {
+    if (item?.status !== 'failed' && item?.status !== 'mapping_failed') continue;
+    const code = String(item?.error || '').trim();
+    if (code.startsWith('github_')) return code;
+  }
+
+  const transportStatus = String(result?.transport?.status || '').trim();
+  if (transportStatus === 'invalid_resolution') return 'github_transport_resolution_incomplete';
+  if (transportStatus === 'failed') return 'github_transport_failed';
+  return '';
 }
 
 function normalizePositiveIds(value: unknown): number[] {
@@ -86,7 +95,7 @@ export function createGithubAutoSyncScheduler(
     isProviderEnabled: () => isSyncProviderEnabled('github'),
     syncConversations: async (conversationIds, instanceId) => {
       const result = await deps.githubSyncOrchestrator.sync({ conversationIds, mode: 'incremental', instanceId });
-      const code = firstTransportFailureCode(result);
+      const code = resultFailureCode(result);
       if (code) throw Object.assign(new Error(code), { code });
     },
     getFailureRetryDelayMs: getGithubAutoSyncFailureRetryDelayMs,
