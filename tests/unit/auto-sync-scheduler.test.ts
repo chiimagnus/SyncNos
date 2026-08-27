@@ -218,6 +218,55 @@ describe('auto-sync-scheduler-core', () => {
     expect(after).toBeGreaterThan(before);
   });
 
+  it('optionally retains due items with a caller-defined retry delay after sync failure', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1, '2': infraPack.infra.now() + 30_000 };
+    const err: any = new Error('temporary failure');
+    err.code = 'temporary';
+    syncConversations.mockRejectedValue(err);
+    const getFailureRetryDelayMs = vi.fn(() => 120_000);
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-retry',
+      isProviderEnabled,
+      syncConversations,
+      getFailureRetryDelayMs,
+    });
+
+    const now = infraPack.infra.now();
+    await scheduler.flush();
+
+    expect(getFailureRetryDelayMs).toHaveBeenCalledWith(err);
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '1': now + 120_000, '2': now + 30_000 });
+    expect(infraPack.alarm.when).toBe(now + 30_000);
+  });
+
+  it('preserves existing failure removal behavior when no retry policy is configured', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1 };
+    syncConversations.mockRejectedValue(new Error('ordinary provider failure'));
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-default',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await scheduler.flush();
+
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({});
+  });
+
   it('flushes due items on enqueue when alarms are unavailable (best-effort fallback)', async () => {
     infraPack.storage[ENABLED_KEY] = true;
 
