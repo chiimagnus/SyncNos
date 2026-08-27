@@ -564,6 +564,8 @@ export const zh: { [K in TranslationKey]: string } = {
   githubTestConnection: '测试连接',
   githubTestSuccess: '连接可用',
   githubStatusWaiting: '等待 GitHub 授权',
+  githubPaths: 'GitHub 路径',
+  githubPathsNote: '路径相对于 repository 根目录。同一 repository/branch 下修改路径后，下一次同步会写入新路径并清理旧的受管路径；切换 repository 或 branch 时不会跨目标清理旧内容。',
   notionSyncEnabledLabel: '同步到 Notion',
   notionAutoSyncEnabledLabel: '自动同步',
   obsidianSyncEnabledLabel: '同步到 Obsidian',

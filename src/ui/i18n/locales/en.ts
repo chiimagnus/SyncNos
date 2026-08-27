@@ -568,6 +568,8 @@ export const en = {
   githubTestConnection: 'Test connection',
   githubTestSuccess: 'Connection ready',
   githubStatusWaiting: 'Waiting for GitHub authorization',
+  githubPaths: 'GitHub Paths',
+  githubPathsNote: 'Repository-relative paths. On the same repository/branch, the next sync writes to a changed path and cleans up the previous managed path. Changing repository or branch never cleans up the previous target.',
   notionSyncEnabledLabel: 'Sync to Notion',
   notionAutoSyncEnabledLabel: 'Auto sync',
   obsidianSyncEnabledLabel: 'Sync to Obsidian',
