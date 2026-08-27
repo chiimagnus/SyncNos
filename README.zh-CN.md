@@ -4,7 +4,7 @@
 
 把 AI 对话、网页文章和视频字幕先保存到浏览器本地，再决定是否同步或导出。
 
-支持采集的 AI 对话、网页文章与 YouTube/Bilibili 字幕会先进入本地存储；之后可选择同步到 Notion / Obsidian / 飞书，或导出 Markdown / Zip。
+支持采集的 AI 对话、网页文章与 YouTube/Bilibili 字幕会先进入本地存储；之后可选择同步到 Notion / Obsidian / 飞书 / GitHub，或导出 Markdown / Zip。
 
 [SyncNos 天使赞助者们😍](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
 
@@ -18,7 +18,7 @@
 
 ## 产品原则
 
-SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派生到 Notion、Obsidian、飞书或导出文件。外部目标失败不应让已经保存的本地内容消失。
+SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派生到 Notion、Obsidian、飞书、GitHub 或导出文件。外部目标失败不应让已经保存的本地内容消失。
 
 ## 下载与安装
 
@@ -69,6 +69,7 @@ YouTube 和 Bilibili 页面可采集页面已经加载的字幕 / 转录内容�
 | **Notion** | OAuth 后通过 Notion API 同步本地内容；始终可手动同步，也可显式开启自动同步。 |
 | **Obsidian** | 通过本机 Local REST API 把 Markdown 和本地图片附件写入 vault。参见[配置指南](docs/guide/obsidian/LocalRestAPI.zh.md)。 |
 | **飞书（DocX）** | OAuth 后同步本地内容到飞书 DocX；始终可手动同步，也可显式开启自动同步。参见[配置指南](docs/guide/feishu/DocxSync.zh.md)。 |
+| **GitHub（Markdown）** | 通过 SyncNos GitHub App 把本地 projection 写入已授权的 repository/branch；始终可手动同步，也可显式开启自动同步。参见[配置指南](docs/guide/github/GitHubSync.zh.md)。 |
 | **Markdown / Zip** | 导出单条内容或本地备份包。 |
 
 ## 界面预览

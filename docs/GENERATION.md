@@ -9,3 +9,10 @@ This file records the source baseline and ownership rules used for the long-term
 | Repository | `SyncNos-Webclipper` (origin: `chiimagnus/SyncNos`) |
 | Commit hash | `fc2c806f28d4cd29b22d4375d2ee36bd14e7822f` |
 | Generated at | `2026-08-26` |
+
+## Documentation Ownership
+
+- `README.md` and `README.zh-CN.md` own the top-level feature/output summary and links only; they do not duplicate integration setup.
+- `docs/guide/github/GitHubSync.en.md` and `docs/guide/github/GitHubSync.zh.md` are the canonical user setup guides for GitHub App Device Flow, installation scope, repository/branch selection, folders, Test Connection, sync behavior, and troubleshooting.
+- GitHub runtime behavior is owned by `src/services/sync/github/**`; the guide should describe user-visible behavior without copying implementation constants that are already enforced by code.
+- `docs/overview.md` was intentionally retired from the long-term documentation set; README is the current top-level navigation surface. Do not recreate `docs/overview.md` or a duplicate `docs/configuration.md`.
