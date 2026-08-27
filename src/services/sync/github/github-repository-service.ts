@@ -228,8 +228,8 @@ export async function discoverGithubRepositories(
   };
 }
 
-function isApi404(error: unknown): boolean {
-  return error instanceof GithubApiError && error.status === 404;
+function isApiStatus(error: unknown, status: number): boolean {
+  return error instanceof GithubApiError && error.status === status;
 }
 
 function requireGitSha(value: unknown): string {
@@ -264,7 +264,7 @@ export async function preflightGithubRepository(
   try {
     metadata = await api.get<any>(`/repos/${encodedRepository}`);
   } catch (error) {
-    if (isApi404(error)) throw new GithubRepositoryError('github_repository_not_accessible');
+    if (isApiStatus(error, 404)) throw new GithubRepositoryError('github_repository_not_accessible');
     throw error;
   }
 
@@ -283,7 +283,8 @@ export async function preflightGithubRepository(
   try {
     ref = await api.get<any>(`/repos/${encodedRepository}/git/ref/heads/${encodeGithubBranchPath(branch)}`);
   } catch (error) {
-    if (isApi404(error)) {
+    if (isApiStatus(error, 409)) throw new GithubRepositoryError('github_repository_uninitialized');
+    if (isApiStatus(error, 404)) {
       throw new GithubRepositoryError(explicitBranch ? 'github_branch_not_found' : 'github_default_branch_unavailable');
     }
     throw error;

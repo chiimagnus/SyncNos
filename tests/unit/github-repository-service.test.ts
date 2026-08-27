@@ -30,8 +30,8 @@ function repo(owner: string, name: string, permissions: Record<string, unknown>,
   return { owner: { login: owner }, name, private: false, permissions, ...extra };
 }
 
-function json404(): GithubApiError {
-  return new GithubApiError('github_http_error', 404, 'Not Found');
+function githubHttpError(status: number): GithubApiError {
+  return new GithubApiError('github_http_error', status, status === 404 ? 'Not Found' : 'Conflict');
 }
 
 describe('github repository service', () => {
@@ -269,10 +269,21 @@ describe('github repository service', () => {
 
     await expect(
       preflightGithubRepository(
+        { repository: 'owner/repo', branch: 'main' },
+        base((path) => {
+          if (path === '/repos/owner/repo') return { default_branch: 'main' };
+          if (path === '/repos/owner/repo/git/ref/heads/main') throw githubHttpError(409);
+          throw new Error(`unexpected:${path}`);
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'github_repository_uninitialized' });
+
+    await expect(
+      preflightGithubRepository(
         { repository: 'owner/repo', branch: 'feature/missing' },
         base((path) => {
           if (path === '/repos/owner/repo') return { default_branch: 'main' };
-          if (path === '/repos/owner/repo/git/ref/heads/feature/missing') throw json404();
+          if (path === '/repos/owner/repo/git/ref/heads/feature/missing') throw githubHttpError(404);
           throw new Error(`unexpected:${path}`);
         }),
       ),
@@ -282,7 +293,7 @@ describe('github repository service', () => {
       preflightGithubRepository(
         { repository: 'owner/repo', branch: '' },
         base((path) => {
-          if (path === '/repos/owner/repo') throw json404();
+          if (path === '/repos/owner/repo') throw githubHttpError(404);
           throw new Error(`unexpected:${path}`);
         }),
       ),
