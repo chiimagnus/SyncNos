@@ -33,10 +33,11 @@ const TRANSIENT_CODES = new Set([
   'github_transport_resolution_incomplete',
 ]);
 
-export function getGithubAutoSyncFailureRetryDelayMs(error: unknown): number | undefined {
+export function getGithubAutoSyncFailureRetryDelayMs(error: unknown): number {
   const code = String((error as any)?.code || '').trim();
-  if (!code.startsWith('github_')) return undefined;
-  return TRANSIENT_CODES.has(code) ? GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS : GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS;
+  return code.startsWith('github_') && TRANSIENT_CODES.has(code)
+    ? GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS
+    : GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS;
 }
 
 function resultFailureCode(result: any): string {
@@ -44,7 +45,7 @@ function resultFailureCode(result: any): string {
   for (const item of items) {
     if (item?.status !== 'failed' && item?.status !== 'mapping_failed') continue;
     const code = String(item?.error || '').trim();
-    if (code.startsWith('github_')) return code;
+    return code.startsWith('github_') ? code : 'github_sync_item_failed';
   }
 
   const transportStatus = String(result?.transport?.status || '').trim();
