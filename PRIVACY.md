@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-08-26**
+**Last Updated: 2026-08-27**
 
 This Privacy Policy applies to SyncNos WebClipper (the “Extension”), including its supported Chromium, Firefox-family, and Safari builds.
 
@@ -26,7 +26,7 @@ Supported non-virtualized AI sites can be captured automatically when AI auto-sa
 
 The Extension stores durable captured content in browser IndexedDB. Browser extension local storage is used for settings, connection state, OAuth credentials, sync configuration, queues/jobs, and other small state. UI-only state may also use local or session storage.
 
-Backup/export packages are assembled locally. They may include captured content, sync mappings, cached images, article comments, and non-sensitive settings. Backup filtering excludes authentication secrets including Notion and Feishu OAuth tokens, Notion and Feishu client secrets, and the Obsidian Local REST API key.
+Backup/export packages are assembled locally. They may include captured content, sync mappings, cached images, article comments, and non-sensitive settings. Backup filtering excludes authentication secrets including Notion and Feishu OAuth tokens, Notion and Feishu client secrets, the Obsidian Local REST API key, and GitHub Device Flow/auth state containing access tokens, refresh tokens, or pending device credentials.
 
 For the current storage and recovery contract, see [docs/storage.md](docs/storage.md).
 
@@ -55,6 +55,14 @@ The repository's Feishu Worker also performs best-effort request rate limiting u
 
 Obsidian sync uses the Local REST API plugin on your computer. The current client uses a local HTTP endpoint (by default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. SyncNos does not require an external SyncNos server for this path.
 
+### GitHub
+
+GitHub Markdown sync uses GitHub App Device Flow. The Extension sends Device Flow, token polling/refresh, repository discovery, preflight, Git data, and managed Markdown/assets directly to GitHub over HTTPS. This GitHub path does not use a SyncNos OAuth server or Cloudflare Worker.
+
+The GitHub App Client ID is public application metadata. The Extension does not contain a GitHub Client Secret or GitHub App private key. GitHub user access tokens, optional refresh tokens, and short-lived pending Device Flow state are stored only in extension-local storage and are excluded from SyncNos backup exports.
+
+SyncNos `Disconnect` clears the GitHub auth state stored by this Extension on the current device. It does not revoke authorization or uninstall the GitHub App at GitHub. GitHub's **Authorized GitHub Apps → Revoke** and **Installed GitHub Apps → Configure / Uninstall** are separate GitHub-side controls.
+
 ### Image fetching and anti-hotlink handling
 
 When image caching or anti-hotlink handling is used, the Extension may request image URLs from their original/CDN hosts. On supported browsers it may temporarily adjust request headers such as Referer for matching anti-hotlink rules. Image download failure does not block saving the captured text.
@@ -63,9 +71,9 @@ Third-party services handle data according to their own privacy policies once yo
 
 ## 5. OAuth Credentials
 
-OAuth tokens and locally configured secrets are stored in the browser extension's local storage so the configured integrations can operate. They are excluded from SyncNos backup exports as described above.
+OAuth tokens and locally configured secrets are stored in the browser extension's local storage so the configured integrations can operate. They are excluded from SyncNos backup exports as described above. For GitHub, the same local auth state also temporarily holds the Device Flow device credential while authorization is pending.
 
-Disconnecting an integration removes the corresponding active connection state according to that integration's current implementation.
+Disconnecting an integration removes the corresponding active connection state according to that integration's current implementation. For GitHub specifically, local Disconnect is distinct from revoking the user authorization or changing/uninstalling the GitHub App installation at GitHub.
 
 ## 6. Browser Permissions
 
@@ -79,7 +87,7 @@ The Extension does not download and execute remote code. Executable extension co
 
 ## 8. Data Sharing
 
-We do not sell your data. Data is sent to third parties only when required by a feature you configure or invoke, such as Notion, Feishu, an OAuth token-exchange proxy, an image host, or your locally running Obsidian Local REST API service.
+We do not sell your data. Data is sent to third parties only when required by a feature you configure or invoke, such as Notion, Feishu, GitHub, an OAuth token-exchange proxy used by another configured integration, an image host, or your locally running Obsidian Local REST API service.
 
 ## 9. Contact
 
