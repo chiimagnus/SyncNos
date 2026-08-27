@@ -541,10 +541,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         const body = button?.nextElementSibling;
         if (!body || body?.closest?.('[data-message-author-role]')) continue;
         const owner = assistants.find(
-          (wrapper) =>
-            wrapper !== group &&
-            !body?.contains?.(wrapper) &&
-            compareDocumentOrder(body, wrapper) < 0,
+          (wrapper) => wrapper !== group && !body?.contains?.(wrapper) && compareDocumentOrder(body, wrapper) < 0,
         );
         if (!owner) continue;
         const snapshot = snapshotCotBody(body, includeOuterHtml);

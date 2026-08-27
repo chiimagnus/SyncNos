@@ -514,15 +514,17 @@ describe('chatgpt-collector', () => {
 describe('chatgpt expanded COT manual capture', () => {
   const hiddenToolDetail = `${'hidden tool detail '.repeat(12)}\n\n\`\`\`ts\nconst secret = true;\n\`\`\``;
 
-  function expandedCotBody(options: {
-    firstReasoning?: string;
-    firstTool?: string;
-    secondReasoning?: string;
-    secondTool?: string;
-    transitionClass?: string;
-    transitionStyle?: string;
-    direction?: string;
-  } = {}) {
+  function expandedCotBody(
+    options: {
+      firstReasoning?: string;
+      firstTool?: string;
+      secondReasoning?: string;
+      secondTool?: string;
+      transitionClass?: string;
+      transitionStyle?: string;
+      direction?: string;
+    } = {},
+  ) {
     const firstReasoning = options.firstReasoning || 'Reasoning <strong>block one</strong>.';
     const firstTool = options.firstTool || 'Visible tool summary one';
     const secondReasoning = options.secondReasoning || 'Reasoning block two.';
@@ -782,9 +784,7 @@ describe('chatgpt expanded COT manual capture', () => {
     expect(preparedOwner.payload.contentText).toContain('Reasoning same source.');
     expect(preparedOwner.payload.contentMarkdown).toContain('[same source](https://example.com/source-a)');
 
-    const link = dom.window.document.querySelector(
-      '[data-testid="cot-top-body"] .markdown a',
-    ) as HTMLAnchorElement;
+    const link = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown a') as HTMLAnchorElement;
     link.setAttribute('href', 'https://example.com/source-b');
     const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
     expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
