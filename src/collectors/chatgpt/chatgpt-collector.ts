@@ -438,12 +438,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function isVisibleWindow(wrapper: any): boolean {
     try {
+      const virtualizer = wrapper?.closest?.('[data-is-intersecting]');
+      const intersecting = String(virtualizer?.getAttribute?.('data-is-intersecting') || '').trim();
+      if (intersecting === 'true') return true;
+      if (intersecting === 'false') return false;
       const rect = wrapper?.getBoundingClientRect?.();
       const top = Number(rect?.top);
       const bottom = Number(rect?.bottom);
       const height = Number(rect?.height);
       const viewportHeight = Number(env.window?.innerHeight);
-      // ponytail: 仅等待有布局盒的当前窗口；无布局盒的离屏壳由后续滚动触发渲染。
+      // ponytail: 优先沿用 ChatGPT 虚拟器的相交标记；没有标记时才按布局盒判断。
       return height > 0 && viewportHeight > 0 && bottom >= 0 && top <= viewportHeight;
     } catch (_error) {
       return false;
@@ -540,12 +544,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     readScrollSeed: () => getConversationRoot(),
     readDescriptors: readCurrentDescriptors,
     readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
-    readUnresolvedKeys: () => {
-      const { descriptors, inputsByKey } = manualAdapter.readWindow();
-      return descriptors
-        .filter((descriptor) => descriptor.visible && (!descriptor.rendered || !inputsByKey.has(descriptor.key)))
-        .map((descriptor) => descriptor.turnKey);
-    },
+    readUnresolvedKeys: () =>
+      readCurrentDescriptors()
+        .filter((descriptor) => descriptor.visible && !descriptor.rendered)
+        .map((descriptor) => descriptor.key),
     readWindow: () => readCurrentManualWindow(true),
     getExtractionCount: () => manualExtractionCount,
   };

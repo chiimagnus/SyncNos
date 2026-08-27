@@ -414,6 +414,7 @@ export type VirtualizedPassAdapter<T> = {
   getScrollSeed: () => Element | null;
   sampleIdentity: () => string | null;
   readDescriptorKeys: () => string[];
+  // Unresolved entries must use the matching descriptor/message key, never a shared turn key.
   readUnresolvedKeys?: () => string[];
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
 };
@@ -554,7 +555,6 @@ export async function runVirtualizedPass<T>(
   const clearResolvedKeys = () => {
     for (const record of accumulator.records) {
       unresolvedKeys.delete(record.key);
-      unresolvedKeys.delete(record.turnKey);
     }
   };
 

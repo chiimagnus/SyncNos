@@ -633,6 +633,39 @@ describe('virtualized chat single-pass sweep', () => {
     expect(result.reasons).toContain('unresolved_turn');
   });
 
+  it('does not resolve an unloaded sibling from the same turn', async () => {
+    let clock = 0;
+    const test = singlePageAdapter([[{ key: 'turn-a:user:0', fingerprint: 'q', text: 'Q' }]], () => ['turn-a']);
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(target, [
+        {
+          key: 'turn-a:user:0',
+          turnKey: 'turn-a',
+          withinTurn: 0,
+          fingerprint: 'q',
+          payload: { text: 'Q' },
+        },
+      ]);
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      {
+        stableSamples: 1,
+        pollMs: 1,
+        stepTimeoutMs: 2,
+        now: () => clock,
+        sleep: async () => {
+          clock += 1;
+        },
+      },
+    );
+
+    expect(result.completeness).toBe('partial');
+    expect(result.reasons).toContain('unresolved_turn');
+  });
+
   it('keeps sanitized provider errors incomplete', async () => {
     const test = singlePageAdapter([
       [{ key: 'a', fingerprint: 'a', text: 'A' }],

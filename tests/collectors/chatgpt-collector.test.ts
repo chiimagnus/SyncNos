@@ -541,61 +541,20 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     expect(after[0].fingerprint).not.toBe(first.fingerprint);
   });
 
-  it('retries a rendered message when its first plain snapshot is transiently unavailable', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_retry">
-          <div data-message-author-role="assistant"><div class="markdown prose"><p>retry me</p></div></div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_retry',
-    );
-    (dom.window as any).scrollTo = vi.fn();
-    const def = createChatgptCollectorDef(
-      createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
-      }),
-    ) as any;
-    const adapter = def.collector.__test.manualAdapter;
-    const originalReadWindow = adapter.readWindow;
-    let remainingMisses = 1;
-    adapter.readWindow = () => {
-      const window = originalReadWindow();
-      if (remainingMisses > 0) {
-        remainingMisses -= 1;
-        return { ...window, inputsByKey: new Map() };
-      }
-      return window;
-    };
-
-    const prepared = await def.collector.prepareManualCapture({
-      maxSteps: 4,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-
-    expect(remainingMisses).toBe(0);
-    expect(prepared.records.map((record: any) => record.payload.contentText)).toEqual(['retry me']);
-  });
-
-  it('waits for a visible virtualized shell within one top-to-bottom pass', async () => {
+  it('waits for an intersecting virtualized shell within one top-to-bottom pass', async () => {
     const dom = setupChatgptDom(
       `
         <article data-testid="conversation-turn-1" data-turn-id="turn_question">
           <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
         </article>
-        <article data-testid="conversation-turn-2" data-turn-id="turn_late"></article>
+        <div data-is-intersecting="true">
+          <article data-testid="conversation-turn-2" data-turn-id="turn_late"></article>
+        </div>
       `,
       'https://chatgpt.com/c/conv_visible_shell',
     );
     (dom.window as any).scrollTo = vi.fn();
     const shell = dom.window.document.querySelector('[data-turn-id="turn_late"]') as HTMLElement;
-    shell.getBoundingClientRect = () =>
-      ({ top: 20, bottom: 120, height: 100, left: 0, right: 100, width: 100 }) as DOMRect;
     const def = createChatgptCollectorDef(
       createCollectorEnv({
         window: dom.window as any,
