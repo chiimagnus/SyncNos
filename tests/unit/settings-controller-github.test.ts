@@ -568,7 +568,7 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.error).toBeNull();
   });
 
-  it('invalidates a tested target as soon as the branch draft changes and keeps it invalid after save rejection', async () => {
+  it('reverts a rejected branch draft to the persisted target before later target actions can run', async () => {
     githubSettingsData = githubSettings({ state: 'connected' });
     githubRepositoryData = readyRepositories();
     await renderController();
@@ -587,10 +587,21 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(saveCalls).toHaveLength(1);
     expect(saveCalls[0]?.[1]).toEqual({ branch: '../main' });
     expect(latestSnapshot?.error).toBe('github_settings_invalid:branch');
-    expect(latestSnapshot?.githubBranch).toBe('../main');
+    expect(latestSnapshot?.githubBranch).toBe('main');
     expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
     expect(githubSettingsData.settings.branch).toBe('main');
+
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest).toEqual({
+      status: 'success',
+      target: {
+        repository: 'owner/repo',
+        branch: 'main',
+        remoteKey: 'github.com/owner/repo@main',
+        installationId: 1,
+      },
+    });
   });
 
   it('invalidates a successful connection test when repository access is refreshed', async () => {

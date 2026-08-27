@@ -333,6 +333,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubRepositories, setGithubRepositories] = useState<GithubRepositoryOption[]>([]);
   const [githubRepository, setGithubRepository] = useState('');
   const [githubBranch, setGithubBranch] = useState('');
+  const githubPersistedBranchRef = useRef('');
   const [githubVerificationUrl, setGithubVerificationUrl] = useState('');
   const [githubAppUrl, setGithubAppUrl] = useState('');
   const [githubInstallUrl, setGithubInstallUrl] = useState('');
@@ -439,19 +440,26 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [clearGithubRepositoryDiscovery],
   );
 
+  const applyGithubTargetSettings = useCallback((value: any) => {
+    const repository = String(value?.repository || '');
+    const branch = String(value?.branch || '');
+    setGithubRepository(repository);
+    githubPersistedBranchRef.current = branch;
+    setGithubBranch(branch);
+  }, []);
+
   const applyGithubSettingsResponse = useCallback(
     (value: any) => {
       const settings = value?.settings || {};
       const app = value?.app || {};
-      setGithubRepository(String(settings.repository || ''));
-      setGithubBranch(String(settings.branch || ''));
+      applyGithubTargetSettings(settings);
       setGithubVerificationUrl(String(app.verificationUrl || ''));
       setGithubAppUrl(String(app.appUrl || ''));
       setGithubInstallUrl(String(app.installUrl || ''));
       setGithubConnectionTest({ status: 'idle' });
       return applyGithubAuth(value?.auth);
     },
-    [applyGithubAuth],
+    [applyGithubAuth, applyGithubTargetSettings],
   );
 
   const loadGithubRepositoriesInternal = useCallback(async () => {
@@ -1039,14 +1047,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
             }),
           );
           const settings = data?.settings || {};
-          setGithubRepository(String(settings.repository || ''));
-          setGithubBranch(String(settings.branch || ''));
+          applyGithubTargetSettings(settings);
           setGithubConnectionTest({ status: 'idle' });
         },
         { fallbackMessage: 'github_settings_save_failed' },
       );
     },
-    [githubRepositories, githubRepository, runTask],
+    [applyGithubTargetSettings, githubRepositories, githubRepository, runTask],
   );
 
   const onChangeGithubBranch = useCallback((value: string) => {
@@ -1055,21 +1062,28 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const onSaveGithubBranch = useCallback(async () => {
-    await runTask(
+    const saved = await runTask(
       async () => {
         const data = unwrap(
           await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, {
             branch: githubBranch,
           }),
         );
-        const settings = data?.settings || {};
-        setGithubRepository(String(settings.repository || ''));
-        setGithubBranch(String(settings.branch || ''));
+        applyGithubTargetSettings(data?.settings || {});
         setGithubConnectionTest({ status: 'idle' });
       },
       { fallbackMessage: 'github_settings_save_failed' },
     );
-  }, [githubBranch, runTask]);
+    if (saved) return;
+
+    try {
+      const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
+      applyGithubTargetSettings(snapshot?.settings || {});
+    } catch (_error) {
+      setGithubBranch(githubPersistedBranchRef.current);
+    }
+    setGithubConnectionTest({ status: 'idle' });
+  }, [applyGithubTargetSettings, githubBranch, runTask]);
 
   const onTestGithubConnection = useCallback(async () => {
     setGithubConnectionTest({ status: 'testing' });
