@@ -1,4 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
+import { hasAsciiControlCharacter } from '@platform/validation/ascii-control';
 
 export const GITHUB_STORAGE_KEYS = Object.freeze({
   repository: 'github_repository',
@@ -36,10 +37,6 @@ function requireString(value: unknown, field: GithubSettingsField): string {
   return value;
 }
 
-function hasControl(value: string): boolean {
-  return /[\u0000-\u001f\u007f]/.test(value);
-}
-
 function isValidOwner(owner: string): boolean {
   return /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(owner);
 }
@@ -51,7 +48,7 @@ function isValidRepositoryName(repo: string): boolean {
 export function normalizeGithubRepository(input: unknown): string {
   const raw = requireString(input, 'repository');
   if (raw === '') return '';
-  if (hasControl(raw) || raw.includes('\\')) invalid('repository');
+  if (hasAsciiControlCharacter(raw) || raw.includes('\\')) invalid('repository');
 
   const parts = raw.split('/');
   if (parts.length !== 2) invalid('repository');
@@ -72,7 +69,7 @@ function isUnsafeGitRef(value: string): boolean {
   if (!value || value.startsWith('/') || value.endsWith('/') || value.endsWith('.') || value.startsWith('-'))
     return true;
   if (value === '@' || value.includes('..') || value.includes('//') || value.includes('@{')) return true;
-  if (/[\u0000-\u0020\u007f~^:?*\[\\]/.test(value)) return true;
+  if (hasAsciiControlCharacter(value) || value.includes(' ') || /[~^:?*\[\\]/.test(value)) return true;
   return value
     .split('/')
     .some(
@@ -103,7 +100,8 @@ export function normalizeGithubFolderPath(
   field: Exclude<GithubSettingsField, 'repository' | 'branch'>,
 ): string {
   const raw = input == null ? fallbackFolder : requireString(input, field);
-  if (!raw || raw !== raw.trim() || raw.startsWith('/') || raw.includes('\\') || hasControl(raw)) invalid(field);
+  if (!raw || raw !== raw.trim() || raw.startsWith('/') || raw.includes('\\') || hasAsciiControlCharacter(raw))
+    invalid(field);
 
   const segments = raw.split('/');
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) invalid(field);

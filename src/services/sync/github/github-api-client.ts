@@ -1,3 +1,4 @@
+import { replaceAsciiControlCharacters } from '@platform/validation/ascii-control';
 import { GITHUB_APP_CONFIG } from '@services/sync/github/github-app-config';
 import { clearGithubAuthForAccessToken, getValidAccessToken } from '@services/sync/github/auth/github-auth-service';
 
@@ -88,10 +89,7 @@ function parseRateLimitResetAt(response: Response): number | undefined {
 
 function sanitizeMessage(value: unknown, accessToken: string): string {
   if (typeof value !== 'string') return '';
-  let message = value
-    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let message = replaceAsciiControlCharacters(value, ' ').replace(/\s+/g, ' ').trim();
   if (accessToken) message = message.split(accessToken).join('[redacted]');
   message = message.replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer [redacted]');
   return message.slice(0, 240);

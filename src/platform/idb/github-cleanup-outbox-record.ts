@@ -1,3 +1,5 @@
+import { hasAsciiControlCharacter } from '@platform/validation/ascii-control';
+
 export const GITHUB_CLEANUP_OUTBOX_STORE = 'github_cleanup_outbox' as const;
 export const GITHUB_CLEANUP_OUTBOX_DUE_INDEX = 'by_remoteKey_nextAttemptAt_createdAt' as const;
 
@@ -15,7 +17,7 @@ export type GithubCleanupOutboxRecord = {
 
 function normalizeRemoteKey(value: unknown): string | null {
   if (typeof value !== 'string' || !value || value !== value.trim()) return null;
-  if (/[\u0000-\u001f\u007f]/.test(value)) return null;
+  if (hasAsciiControlCharacter(value)) return null;
   return value;
 }
 
@@ -29,7 +31,7 @@ function normalizePositiveInt(value: unknown): number | null {
 
 export function isSafeGithubCleanupPath(value: unknown): value is string {
   if (typeof value !== 'string' || !value || value !== value.trim()) return false;
-  if (value.startsWith('/') || value.includes('\\') || /[\u0000-\u001f\u007f]/.test(value)) return false;
+  if (value.startsWith('/') || value.includes('\\') || hasAsciiControlCharacter(value)) return false;
   const segments = value.split('/');
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return false;
   const lower = value.toLowerCase();

@@ -1293,7 +1293,7 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
         if (path.endsWith(`/git/commits/${COMMIT}`)) return { tree: { sha: NEW_TREE } } as T;
         throw new Error(`unexpected:${path}`);
       },
-      async post<T>(path: string, body?: any): Promise<T> {
+      async post<T>(path: string, _body?: any): Promise<T> {
         if (path.endsWith('/git/blobs')) return { sha: DESIRED_BLOB } as T;
         if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
         if (path.endsWith('/git/commits')) {

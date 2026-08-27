@@ -1,3 +1,5 @@
+import { hasAsciiControlCharacter } from '@platform/validation/ascii-control';
+
 type SyncMappingRecord = Record<string, unknown>;
 
 const NOTION_CONTINUITY_FIELDS = [
@@ -51,7 +53,7 @@ function replaceGroup(target: SyncMappingRecord, source: SyncMappingRecord, fiel
 function isSafeGitRefName(value: string): boolean {
   if (!value || value === '@' || value.startsWith('/') || value.endsWith('/') || value.endsWith('.')) return false;
   if (value.includes('..') || value.includes('//') || value.includes('@{')) return false;
-  if (/[\x00-\x20\x7f]/.test(value)) return false;
+  if (hasAsciiControlCharacter(value) || value.includes(' ')) return false;
   if (['~', '^', ':', '?', '*', '[', '\\'].some((character) => value.includes(character))) return false;
   const segments = value.split('/');
   if (segments.some((segment) => !segment || segment.startsWith('.') || segment.endsWith('.lock'))) return false;
@@ -76,7 +78,7 @@ function normalizeGithubRemoteKey(value: unknown): string {
 
 function isSafeRelativeGitPath(value: unknown): value is string {
   if (typeof value !== 'string' || !value || value !== value.trim()) return false;
-  if (value.startsWith('/') || value.includes('\\') || /[\x00-\x1f\x7f]/.test(value)) return false;
+  if (value.startsWith('/') || value.includes('\\') || hasAsciiControlCharacter(value)) return false;
   const segments = value.split('/');
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return false;
   const lower = value.toLowerCase();

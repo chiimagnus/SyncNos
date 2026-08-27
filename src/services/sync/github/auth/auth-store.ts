@@ -1,4 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
+import { hasAsciiControlCharacter } from '@platform/validation/ascii-control';
 
 export const GITHUB_AUTH_STATE_KEY = 'github_auth_state_v1';
 
@@ -42,9 +43,7 @@ function isFiniteNonNegative(value: unknown): value is number {
 }
 
 function isSecretString(value: unknown): value is string {
-  return (
-    typeof value === 'string' && value.length > 0 && value === value.trim() && !/[\u0000-\u001f\u007f]/.test(value)
-  );
+  return typeof value === 'string' && value.length > 0 && value === value.trim() && !hasAsciiControlCharacter(value);
 }
 
 function parseGithubAuthState(value: unknown): GithubAuthState {

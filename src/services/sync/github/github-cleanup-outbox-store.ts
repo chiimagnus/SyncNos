@@ -5,6 +5,7 @@ import {
   type GithubCleanupOutboxRecord,
 } from '@platform/idb/github-cleanup-outbox-record';
 import { openDb } from '@platform/idb/schema';
+import { hasAsciiControlCharacter } from '@platform/validation/ascii-control';
 
 export const GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT = 100;
 
@@ -24,7 +25,7 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 function requireRemoteKey(value: unknown): string {
-  if (typeof value !== 'string' || !value || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) {
+  if (typeof value !== 'string' || !value || value !== value.trim() || hasAsciiControlCharacter(value)) {
     throw new Error('github_cleanup_outbox_remote_key_invalid');
   }
   return value;
