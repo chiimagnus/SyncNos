@@ -658,12 +658,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
     );
     chatWithHydratedRef.current = true;
-  }, [
-    applyGithubSettingsResponse,
-    articleDbSpec.storageKey,
-    chatDbSpec.storageKey,
-    videoDbSpec.storageKey,
-  ]);
+  }, [applyGithubSettingsResponse, articleDbSpec.storageKey, chatDbSpec.storageKey, videoDbSpec.storageKey]);
 
   const refresh = useCallback(async () => {
     await runTask(refreshInternal);

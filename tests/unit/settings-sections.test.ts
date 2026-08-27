@@ -260,7 +260,7 @@ describe('settings section definitions', () => {
       verificationUrl: 'https://github.com/login/device',
       appUrl: 'https://github.com/apps/syncnos',
       installUrl: 'https://github.com/apps/syncnos/installations/new',
-      connectionTest: { status: 'idle' },
+      connectionTest: { status: 'uninitialized' },
       githubLogoUrl: '/icons/github.svg',
       onToggleSyncEnabled: () => {},
       onToggleAutoSyncEnabled: () => {},
@@ -292,6 +292,9 @@ describe('settings section definitions', () => {
     const testButton = Array.from(document.querySelectorAll('button')).find(
       (button) => button.textContent?.trim() === 'Test connection',
     ) as HTMLButtonElement | undefined;
+    const initializeButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Initialize repository',
+    ) as HTMLButtonElement | undefined;
     const appLink = document.querySelector('a[href="https://github.com/apps/syncnos"]') as HTMLAnchorElement | null;
 
     expect(repositoryTrigger?.disabled).toBe(true);
@@ -303,6 +306,7 @@ describe('settings section definitions', () => {
     expect(autoSyncToggle?.disabled).toBe(false);
     expect(branchInput?.disabled).toBe(false);
     expect(testButton?.disabled).toBe(false);
+    expect(initializeButton?.disabled).toBe(false);
     expect(appLink).toBeTruthy();
 
     act(() => {
