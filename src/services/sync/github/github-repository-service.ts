@@ -20,6 +20,7 @@ export type GithubRepositoryErrorCode =
   | 'github_app_contents_write_required'
   | 'github_repository_write_required'
   | 'github_repository_uninitialized'
+  | 'github_repository_already_initialized'
   | 'github_branch_not_found'
   | 'github_default_branch_unavailable'
   | 'github_repository_response_invalid';
@@ -34,6 +35,13 @@ export class GithubRepositoryError extends Error {
 type GithubApiReader = {
   get<T>(path: string): Promise<T>;
 };
+
+type GithubApiWriter = GithubApiReader & {
+  put<T>(path: string, body?: unknown): Promise<T>;
+};
+
+const INITIAL_README = '# SyncNos\n\nThis repository is initialized by [SyncNos](https://github.com/chiimagnus/SyncNos).\n';
+const INITIAL_COMMIT_MESSAGE = 'Initialize repository for SyncNos';
 
 export type GithubSafeAccount = {
   login: string;
@@ -304,6 +312,41 @@ export async function preflightGithubRepository(
     headSha,
     treeSha,
   };
+}
+
+export async function initializeGithubRepository(
+  input: { repository: string; branch: string },
+  api: GithubApiWriter = githubApiClient,
+): Promise<GithubRepositoryPreflight> {
+  const repository = normalizeGithubRepository(input.repository);
+  if (!repository) throw new GithubRepositoryError('github_repository_not_configured');
+  const explicitBranch = normalizeGithubBranch(input.branch);
+
+  try {
+    await preflightGithubRepository({ repository, branch: explicitBranch }, api);
+    throw new GithubRepositoryError('github_repository_already_initialized');
+  } catch (error) {
+    if (!(error instanceof GithubRepositoryError) || error.code !== 'github_repository_uninitialized') throw error;
+  }
+
+  const encodedRepository = encodeGithubRepositoryPath(repository);
+  const metadata = await api.get<any>(`/repos/${encodedRepository}`);
+  const defaultBranchRaw = safeString(metadata?.default_branch);
+  let branch: string;
+  try {
+    branch = explicitBranch || normalizeGithubBranch(defaultBranchRaw);
+  } catch (_error) {
+    throw new GithubRepositoryError('github_default_branch_unavailable');
+  }
+  if (!branch) throw new GithubRepositoryError('github_default_branch_unavailable');
+
+  await api.put(`/repos/${encodedRepository}/contents/README.md`, {
+    message: INITIAL_COMMIT_MESSAGE,
+    content: btoa(INITIAL_README),
+    branch,
+  });
+
+  return preflightGithubRepository({ repository, branch }, api);
 }
 
 export async function preflightConfiguredGithubRepository(

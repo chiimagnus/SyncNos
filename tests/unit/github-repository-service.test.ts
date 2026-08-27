@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { GithubApiError } from '@services/sync/github/github-api-client';
 import {
   GithubRepositoryError,
   discoverGithubRepositories,
+  initializeGithubRepository,
   preflightGithubRepository,
 } from '@services/sync/github/github-repository-service';
 
@@ -298,6 +299,75 @@ describe('github repository service', () => {
         }),
       ),
     ).rejects.toMatchObject({ code: 'github_repository_not_accessible' });
+  });
+
+  it('initializes an empty repository with the SyncNos README and then preflights the new branch', async () => {
+    let initialized = false;
+    const put = vi.fn(async (path: string, body?: unknown) => {
+      expect(path).toBe('/repos/owner/repo/contents/README.md');
+      expect(body).toMatchObject({ message: 'Initialize repository for SyncNos', branch: 'main' });
+      expect(atob(String((body as any)?.content || ''))).toBe(
+        '# SyncNos\n\nThis repository is initialized by [SyncNos](https://github.com/chiimagnus/SyncNos).\n',
+      );
+      initialized = true;
+      return { content: { path: 'README.md' }, commit: { sha: 'a'.repeat(40) } };
+    });
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path === '/user') return { login: 'user' } as T;
+        if (path.startsWith('/user/installations?')) return { installations: [installation(1)] } as T;
+        if (path.startsWith('/user/installations/1/repositories?')) {
+          return { repositories: [repo('owner', 'repo', { push: true })] } as T;
+        }
+        if (path === '/repos/owner/repo') return { default_branch: 'main' } as T;
+        if (path === '/repos/owner/repo/git/ref/heads/main') {
+          if (!initialized) throw githubHttpError(409);
+          return { object: { type: 'commit', sha: 'a'.repeat(40) } } as T;
+        }
+        if (path === `/repos/owner/repo/git/commits/${'a'.repeat(40)}`) {
+          return { tree: { sha: 'b'.repeat(40) } } as T;
+        }
+        throw new Error(`unexpected:${path}`);
+      },
+      put,
+    };
+
+    await expect(initializeGithubRepository({ repository: 'owner/repo', branch: 'main' }, api)).resolves.toEqual({
+      repository: 'owner/repo',
+      branch: 'main',
+      remoteKey: 'github.com/owner/repo@main',
+      installationId: 1,
+      headSha: 'a'.repeat(40),
+      treeSha: 'b'.repeat(40),
+    });
+    expect(put).toHaveBeenCalledTimes(1);
+  });
+
+  it('never writes README when the repository is already initialized', async () => {
+    const put = vi.fn();
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path === '/user') return { login: 'user' } as T;
+        if (path.startsWith('/user/installations?')) return { installations: [installation(1)] } as T;
+        if (path.startsWith('/user/installations/1/repositories?')) {
+          return { repositories: [repo('owner', 'repo', { push: true })] } as T;
+        }
+        if (path === '/repos/owner/repo') return { default_branch: 'main' } as T;
+        if (path === '/repos/owner/repo/git/ref/heads/main') {
+          return { object: { type: 'commit', sha: 'a'.repeat(40) } } as T;
+        }
+        if (path === `/repos/owner/repo/git/commits/${'a'.repeat(40)}`) {
+          return { tree: { sha: 'b'.repeat(40) } } as T;
+        }
+        throw new Error(`unexpected:${path}`);
+      },
+      put,
+    };
+
+    await expect(initializeGithubRepository({ repository: 'owner/repo', branch: 'main' }, api)).rejects.toMatchObject({
+      code: 'github_repository_already_initialized',
+    });
+    expect(put).not.toHaveBeenCalled();
   });
 
   it('rejects a Git ref response with a valid SHA but missing object.type', async () => {
