@@ -263,7 +263,8 @@ export const zh: { [K in TranslationKey]: string } = {
   // untitled is shared: used by ConversationListPane, ConversationDetailPane, and ConversationsScene
   untitled: '(无标题)',
   selectLabel: '选择',
-  selectAll: '全选',
+  selectAll: '选择已加载项',
+  deselectLoadedItems: '取消选择已加载项',
   tooltipLoadedVisibleSelectionScope: '仅当前已加载可见项',
   copyFullMarkdown: '复制完整 Markdown',
   copied: '已复制',

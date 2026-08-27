@@ -237,7 +237,18 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(loadMoreList).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps select-all and batch tooltip semantics scoped to loaded visible items', async () => {
+  it('does not attach selection or batch tooltips when nothing is selected', async () => {
+    currentState = buildState({ selectedIds: [] });
+    await renderPane();
+
+    const selectAllLabel = document.querySelector('label[aria-label="selectAll"]') as HTMLLabelElement | null;
+    expect(selectAllLabel?.hasAttribute('data-tooltip-content')).toBe(false);
+    for (const buttonId of ['btnDelete', 'btnExport', 'btnSyncProvider']) {
+      expect(document.getElementById(buttonId)?.closest('[data-tooltip-content]')).toBeNull();
+    }
+  });
+
+  it('keeps loaded-item selection and batch tooltip semantics scoped to loaded visible items', async () => {
     const toggleAll = vi.fn();
     currentState = buildState({
       selectedIds: [11, 22, 999],
@@ -249,11 +260,9 @@ describe('ConversationListPane pagination behaviors', () => {
       await flushMicrotasks();
     });
 
-    const selectAllLabel = document.querySelector('label[aria-label="selectAll"]') as HTMLLabelElement | null;
-    expect(selectAllLabel).toBeTruthy();
-    expect(String(selectAllLabel?.getAttribute('data-tooltip-content') || '')).toContain(
-      'tooltipLoadedVisibleSelectionScope',
-    );
+    const loadedSelectionLabel = document.querySelector('label[aria-label="selectAll"]') as HTMLLabelElement | null;
+    expect(loadedSelectionLabel).toBeTruthy();
+    expect(String(loadedSelectionLabel?.getAttribute('data-tooltip-content') || '')).toBe('deselectLoadedItems (2)');
 
     const selectAllCheckbox = document.getElementById('chkSelectAll') as HTMLInputElement | null;
     expect(selectAllCheckbox).toBeTruthy();

@@ -267,7 +267,8 @@ export const en = {
   // untitled is shared: used by ConversationListPane, ConversationDetailPane, and ConversationsScene
   untitled: '(Untitled)',
   selectLabel: 'Select',
-  selectAll: 'Select all',
+  selectAll: 'Select loaded items',
+  deselectLoadedItems: 'Deselect loaded items',
   tooltipLoadedVisibleSelectionScope: 'Only currently loaded visible items',
   copyFullMarkdown: 'Copy full markdown',
   copied: 'Copied',

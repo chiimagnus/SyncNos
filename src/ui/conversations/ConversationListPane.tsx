@@ -599,10 +599,8 @@ export function ConversationListPane({
   const armedDeleteKey = deleteConfirm.getArmedKey();
   const deleteConfirming = !!deleteConfirmKey && armedDeleteKey != null && deleteConfirm.isArmed(deleteConfirmKey);
   const loadedVisibleScopeHint = t('tooltipLoadedVisibleSelectionScope');
-  const selectAllTooltip =
-    total > 0
-      ? `${t('selectAll')} · ${loadedVisibleScopeHint} (${total})`
-      : `${t('selectAll')} · ${loadedVisibleScopeHint}`;
+  const loadedSelectionAction = total > 0 && selectedCount === total ? t('deselectLoadedItems') : t('selectAll');
+  const loadedSelectionTooltip = total > 0 ? `${loadedSelectionAction} (${total})` : loadedSelectionAction;
   const deleteTooltip = deleteConfirming
     ? `${t('tooltipDeleteSelectedConfirmDetailed')} · ${loadedVisibleScopeHint}`
     : hasSelection
@@ -849,7 +847,7 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
-              {...tooltipAttrs(selectAllTooltip)}
+              {...tooltipAttrs(hasSelection ? loadedSelectionTooltip : '')}
             >
               <input
                 ref={selectAllRef}
@@ -917,7 +915,7 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <span className="tw-inline-flex" {...tooltipAttrs(deleteTooltip)}>
+              <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? deleteTooltip : '')}>
                 <button
                   id="btnDelete"
                   type="button"
@@ -959,7 +957,7 @@ export function ConversationListPane({
                 align="end"
                 panelMinWidth={150}
                 trigger={(triggerProps) => (
-                  <span className="tw-inline-flex" {...tooltipAttrs(exportTooltip)}>
+                  <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? exportTooltip : '')}>
                     <button {...triggerProps} id="btnExport" className={actionButton}>
                       <span className="tw-leading-none">{t('exportButton')}</span>
                       <span
@@ -999,7 +997,7 @@ export function ConversationListPane({
               </MenuPopover>
 
               {singleSyncProvider ? (
-                <span className="tw-inline-flex" {...tooltipAttrs(singleSyncTooltip)}>
+                <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? singleSyncTooltip : '')}>
                   <button
                     id="btnSyncProvider"
                     className={actionButton}
@@ -1024,7 +1022,7 @@ export function ConversationListPane({
                   align="end"
                   panelMinWidth={170}
                   trigger={(triggerProps) => (
-                    <span className="tw-inline-flex" {...tooltipAttrs(syncMenuTooltip)}>
+                    <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? syncMenuTooltip : '')}>
                       <button {...triggerProps} id="btnSyncTo" className={actionButton}>
                         <span className="tw-leading-none">{syncMenuButtonLabel}</span>
                         <span
