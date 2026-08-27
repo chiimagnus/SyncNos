@@ -41,6 +41,7 @@ import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
+import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
 import {
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
@@ -434,7 +435,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     (value: unknown) => {
       const next = normalizeGithubAuthSummary(value);
       setGithubAuth(next);
-      if (next.state !== 'connected') clearGithubRepositoryDiscovery();
+      if (next.state !== 'connected') {
+        setGithubConnectionTest({ status: 'idle' });
+        clearGithubRepositoryDiscovery();
+      }
       return next;
     },
     [clearGithubRepositoryDiscovery],
@@ -495,6 +499,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       throw error;
     }
   }, [clearGithubRepositoryDiscovery]);
+
+  const refreshGithubAuthFromStorageSignal = useCallback(async () => {
+    try {
+      const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
+      applyGithubAuth(snapshot?.auth);
+    } catch (_error) {
+      // Storage changes are only a wake signal. Keep the current safe UI snapshot if rehydration fails.
+    }
+  }, [applyGithubAuth]);
 
   const refreshInternal = useCallback(async () => {
     const [notionRes, feishuRes, local, obsidianRes, githubRes, antiHotlinkRulesDraft] = await Promise.all([
@@ -673,6 +686,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const nextValue = changes[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]?.newValue;
         setGithubAutoSyncEnabled(nextValue === true);
       }
+      if (Object.prototype.hasOwnProperty.call(changes, GITHUB_AUTH_STATE_KEY)) {
+        void refreshGithubAuthFromStorageSignal();
+      }
       if (Object.prototype.hasOwnProperty.call(changes, READER_PREFS_STORAGE_KEY)) {
         const nextValue = changes[READER_PREFS_STORAGE_KEY]?.newValue;
         setReaderPrefs(normalizeReaderPrefs(nextValue));
@@ -713,7 +729,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setFeishuVideoFolder(normalizeFeishuFolderPath(nextValue, FEISHU_DEFAULTS.videoFolder));
       }
     });
-  }, [refresh]);
+  }, [refresh, refreshGithubAuthFromStorageSignal]);
 
   const onSaveFeishuPaths = useCallback(async () => {
     if (busy) return;
