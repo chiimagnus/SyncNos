@@ -80,7 +80,7 @@ describe('DetailHeaderActionBar', () => {
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeFalsy();
     const logo = button?.querySelector('[data-provider-logo="notion"]') as HTMLImageElement | null;
     expect(logo?.getAttribute('src')).toBe('/icons/notion.svg');
-    expect(logo?.className).toContain('webclipper-provider-logo--notion');
+    expect(logo?.className).toContain('webclipper-provider-logo--invert-in-dark');
     expect(button?.getAttribute('data-tooltip-id')).toBe('webclipper-tooltip');
     expect(button?.textContent).not.toContain('▾');
   });
@@ -109,6 +109,7 @@ describe('DetailHeaderActionBar', () => {
     const logo = button?.querySelector('[data-provider-logo="github"]') as HTMLImageElement | null;
     expect(button).toBeTruthy();
     expect(logo?.getAttribute('src')).toBe('/icons/github.svg');
+    expect(logo?.className).toContain('webclipper-provider-logo--invert-in-dark');
   });
 
   it('renders a split button and promotes a selected menu action', async () => {

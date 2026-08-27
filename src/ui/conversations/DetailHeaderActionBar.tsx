@@ -35,7 +35,7 @@ function providerLogo(action: DetailHeaderAction) {
       aria-hidden="true"
       className={[
         'tw-h-4 tw-w-4 tw-shrink-0 tw-object-contain',
-        action.provider === 'notion' ? 'webclipper-provider-logo--notion' : '',
+        ['notion', 'github'].includes(action.provider) ? 'webclipper-provider-logo--invert-in-dark' : '',
       ]
         .filter(Boolean)
         .join(' ')}
