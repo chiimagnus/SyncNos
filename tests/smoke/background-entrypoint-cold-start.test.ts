@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   registerNotionSettingsHandlers: vi.fn(),
   registerObsidianSettingsHandlers: vi.fn(),
   registerFeishuSettingsHandlers: vi.fn(),
+  registerGithubSettingsHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
   ensureDefaultNotionOAuthClientId: vi.fn(),
@@ -63,6 +64,9 @@ vi.mock('@services/sync/obsidian/settings-background-handlers', () => ({
 }));
 vi.mock('@services/sync/feishu/settings-background-handlers', () => ({
   registerFeishuSettingsHandlers: mocks.registerFeishuSettingsHandlers,
+}));
+vi.mock('@services/sync/github/settings-background-handlers', () => ({
+  registerGithubSettingsHandlers: mocks.registerGithubSettingsHandlers,
 }));
 vi.mock('@services/sync/notion/auth/oauth', () => ({
   ensureDefaultNotionOAuthClientId: mocks.ensureDefaultNotionOAuthClientId,
@@ -187,6 +191,7 @@ describe('background entrypoint cold start', () => {
     expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
     expect(mocks.registerUiMessageHandlers.mock.calls[0]?.[1]?.localeReady).toBe(locale.promise);
     expect(mocks.registerClipperContextMenu.mock.calls[0]?.[0]?.localeReady).toBe(locale.promise);
+    expect(mocks.registerGithubSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerSyncHandlers.mock.calls[0]?.[1]?.githubSyncOrchestrator).toBe(
       mocks.createBackgroundServices.mock.results[0]?.value.githubSyncOrchestrator,
     );
@@ -234,6 +239,26 @@ describe('background entrypoint cold start', () => {
     expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
     expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates GitHub settings registration failure from core router and startup recovery', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.registerGithubSettingsHandlers.mockImplementationOnce(() => {
+      throw new Error('github settings registration failed');
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    expect(() => callback()).not.toThrow();
+    await flushMicrotasks();
+
+    expect(mocks.registerUiMessageHandlers).toHaveBeenCalledTimes(1);
+    expect(mocks.registerSyncHandlers).toHaveBeenCalledTimes(1);
+    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
+    expect(mocks.githubAbort).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
   });
 
   it('wakes durable GitHub cleanup when auto-sync or provider gate becomes enabled', async () => {

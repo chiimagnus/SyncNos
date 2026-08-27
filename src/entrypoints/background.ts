@@ -20,6 +20,7 @@ import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerFeishuSettingsHandlers } from '@services/sync/feishu/settings-background-handlers';
+import { registerGithubSettingsHandlers } from '@services/sync/github/settings-background-handlers';
 import { onInstalled } from '@platform/runtime/runtime';
 import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 import { registerClipperContextMenu } from '@platform/context-menus/clipper-context-menu';
@@ -81,6 +82,11 @@ export default defineBackground(() => {
     getInstanceId: getBackgroundInstanceId,
     testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
   });
+  try {
+    registerGithubSettingsHandlers(router);
+  } catch (_error) {
+    // GitHub Settings is optional during startup; a registration failure must not block the core router.
+  }
   registerUiMessageHandlers(router, { localeReady });
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,

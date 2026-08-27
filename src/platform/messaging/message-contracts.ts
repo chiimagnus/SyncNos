@@ -39,6 +39,14 @@ export const FEISHU_MESSAGE_TYPES = {
 } as const;
 
 export const GITHUB_MESSAGE_TYPES = {
+  GET_SETTINGS: 'githubGetSettings',
+  START_DEVICE_FLOW: 'githubStartDeviceFlow',
+  POLL_DEVICE_FLOW: 'githubPollDeviceFlow',
+  CANCEL_DEVICE_FLOW: 'githubCancelDeviceFlow',
+  DISCONNECT: 'githubDisconnect',
+  LIST_REPOSITORIES: 'githubListRepositories',
+  SAVE_SETTINGS: 'githubSaveSettings',
+  TEST_CONNECTION: 'githubTestConnection',
   SYNC_CONVERSATIONS: 'githubSyncConversations',
   GET_SYNC_STATUS: 'getGithubSyncStatus',
   CLEAR_SYNC_STATUS: 'clearGithubSyncStatus',
