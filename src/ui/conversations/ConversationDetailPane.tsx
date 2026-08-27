@@ -327,7 +327,7 @@ export function ConversationDetailPane({
                     <>
                       <input
                         ref={urlInputRef}
-                        className="tw-min-w-0 tw-w-56 tw-max-w-full tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                        className="webclipper-field tw-min-w-0 tw-w-56 tw-max-w-full tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)]"
                         value={urlDraft}
                         onChange={(e) => setUrlDraft(e.target.value)}
                         placeholder="https://"

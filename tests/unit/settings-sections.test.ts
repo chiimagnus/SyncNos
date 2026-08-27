@@ -162,7 +162,7 @@ describe('settings section definitions', () => {
     expect(document.querySelector('input[aria-label="Repository"]')).toBeNull();
     const branchInput = document.querySelector('input[aria-label="Branch"]') as HTMLInputElement | null;
     expect(branchInput).toBeTruthy();
-    expect(branchInput?.className || '').toContain('tw-rounded-[var(--radius-inline)]');
+    expect(branchInput?.className || '').toContain('webclipper-field');
     expect(document.querySelector('input[aria-label="AI Chats Folder"]')).toBeNull();
     expect(document.querySelector('input[aria-label="Web Clipper Folder"]')).toBeNull();
     expect(document.querySelector('input[aria-label="Video Scripts Folder"]')).toBeNull();
@@ -449,6 +449,7 @@ describe('inpage anti-hotlink advanced editor', () => {
     const input = document.querySelector('input[autocomplete="off"]') as HTMLInputElement | null;
     expect(input).toBeTruthy();
     expect(input?.value).toBe('Ada');
+    expect(input?.className || '').toContain('webclipper-field');
 
     act(() => {
       input!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));

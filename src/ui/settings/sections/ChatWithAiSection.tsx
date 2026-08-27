@@ -11,8 +11,7 @@ import {
 } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
-const textareaClassName =
-  'tw-min-h-[140px] tw-w-full tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-2 tw-text-sm tw-text-[var(--text-primary)] focus-visible:tw-border-[var(--focus-ring)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
+const textareaClassName = `${textInputClassName} tw-min-h-[140px] tw-w-full tw-py-2`;
 
 function makePlatformId(): string {
   const rand = Math.random().toString(16).slice(2, 10);
