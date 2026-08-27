@@ -288,7 +288,11 @@ export function createGithubApiClient({
     lastMutationStartedAt = clock.now();
   }
 
-  async function executeMutation<T>(method: 'POST' | 'PATCH' | 'PUT', path: string, options: GithubRequestOptions): Promise<T> {
+  async function executeMutation<T>(
+    method: 'POST' | 'PATCH' | 'PUT',
+    path: string,
+    options: GithubRequestOptions,
+  ): Promise<T> {
     for (let attempt = 1; attempt <= GITHUB_MUTATION_RATE_LIMIT_MAX_ATTEMPTS; attempt += 1) {
       await paceMutation();
       try {
