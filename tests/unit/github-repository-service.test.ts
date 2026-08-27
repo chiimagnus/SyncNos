@@ -343,6 +343,30 @@ describe('github repository service', () => {
     expect(put).toHaveBeenCalledTimes(1);
   });
 
+  it('does not invent a non-default branch while initializing an empty repository', async () => {
+    const put = vi.fn();
+    const api = {
+      async get<T>(path: string): Promise<T> {
+        if (path === '/user') return { login: 'user' } as T;
+        if (path.startsWith('/user/installations?')) return { installations: [installation(1)] } as T;
+        if (path.startsWith('/user/installations/1/repositories?')) {
+          return { repositories: [repo('owner', 'repo', { push: true })] } as T;
+        }
+        if (path === '/repos/owner/repo') return { default_branch: 'main' } as T;
+        if (path === '/repos/owner/repo/git/ref/heads/release/v1') throw githubHttpError(409);
+        throw new Error(`unexpected:${path}`);
+      },
+      put,
+    };
+
+    await expect(
+      initializeGithubRepository({ repository: 'owner/repo', branch: 'release/v1' }, api),
+    ).rejects.toMatchObject({
+      code: 'github_branch_not_found',
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it('never writes README when the repository is already initialized', async () => {
     const put = vi.fn();
     const api = {

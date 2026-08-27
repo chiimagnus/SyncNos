@@ -40,7 +40,8 @@ type GithubApiWriter = GithubApiReader & {
   put<T>(path: string, body?: unknown): Promise<T>;
 };
 
-const INITIAL_README = '# SyncNos\n\nThis repository is initialized by [SyncNos](https://github.com/chiimagnus/SyncNos).\n';
+const INITIAL_README =
+  '# SyncNos\n\nThis repository is initialized by [SyncNos](https://github.com/chiimagnus/SyncNos).\n';
 const INITIAL_COMMIT_MESSAGE = 'Initialize repository for SyncNos';
 
 export type GithubSafeAccount = {
@@ -334,11 +335,12 @@ export async function initializeGithubRepository(
   const defaultBranchRaw = safeString(metadata?.default_branch);
   let branch: string;
   try {
-    branch = explicitBranch || normalizeGithubBranch(defaultBranchRaw);
+    branch = normalizeGithubBranch(defaultBranchRaw);
   } catch (_error) {
     throw new GithubRepositoryError('github_default_branch_unavailable');
   }
   if (!branch) throw new GithubRepositoryError('github_default_branch_unavailable');
+  if (explicitBranch && explicitBranch !== branch) throw new GithubRepositoryError('github_branch_not_found');
 
   await api.put(`/repos/${encodedRepository}/contents/README.md`, {
     message: INITIAL_COMMIT_MESSAGE,
