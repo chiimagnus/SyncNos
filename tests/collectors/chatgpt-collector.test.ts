@@ -220,6 +220,41 @@ describe('chatgpt-collector', () => {
     expect(assistant.contentText).not.toContain('复制');
   });
 
+  it('extracts arbitrary rendered roots with the same semantic cleanup as assistant content', () => {
+    const dom = new JSDOM(`<!DOCTYPE html><html><body>
+      <div id="rendered-root">
+        <section>
+          <h2>Rendered heading</h2>
+          <p>First sibling with <strong>bold text</strong>.</p>
+        </section>
+        <section>
+          <ul><li>Second sibling item</li></ul>
+          <pre><code class="language-ts">const value = 1;</code></pre>
+          <p>Formula <span class="math-block" data-math="x^2"></span></p>
+          <button type="button">Copy chrome</button>
+        </section>
+      </div>
+    </body></html>`);
+    const root = dom.window.document.querySelector('#rendered-root');
+
+    const markdown = chatgptMarkdown.extractRenderedMarkdown(root);
+    const text = chatgptMarkdown.extractRenderedText(root);
+
+    expect(markdown).toContain('## Rendered heading');
+    expect(markdown).toContain('First sibling with **bold text**.');
+    expect(markdown).toContain('- Second sibling item');
+    expect(markdown).toContain('```ts');
+    expect(markdown).toContain('const value = 1;');
+    expect(markdown).toContain('x^2');
+    expect(markdown).not.toContain('Copy chrome');
+    expect(text).toContain('Rendered heading');
+    expect(text).toContain('First sibling with bold text.');
+    expect(text).toContain('Second sibling item');
+    expect(text).toContain('const value = 1;');
+    expect(text).toContain('x^2');
+    expect(text).not.toContain('Copy chrome');
+  });
+
   it('keeps ChatGPT source links while omitting their Google favicon images', async () => {
     const html = `
       <article data-testid="conversation-turn-1" data-turn-id="turn_favicon">
