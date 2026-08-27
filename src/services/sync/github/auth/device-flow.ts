@@ -37,6 +37,8 @@ type PendingUpdateResult = {
   state: GithubAuthState;
 };
 
+let startInFlight: Promise<GithubSafeAuthSummary> | null = null;
+
 function positiveNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
@@ -68,6 +70,23 @@ async function updateCurrentPending(
     return update(current);
   });
   return { applied, state };
+}
+
+async function claimCurrentPendingPoll(deviceCode: string, pollAt: number): Promise<PendingUpdateResult> {
+  let claimed = false;
+  const state = await updateGithubAuthState((current) => {
+    if (current.state !== 'pending' || current.pending.deviceCode !== deviceCode) return current;
+    if (pollAt < current.pending.nextPollAt || pollAt >= current.pending.expiresAt) return current;
+    claimed = true;
+    return {
+      ...current,
+      pending: {
+        ...current.pending,
+        nextPollAt: pollAt + current.pending.intervalMs,
+      },
+    };
+  });
+  return { applied: claimed, state };
 }
 
 async function deferFailedPoll(deviceCode: string, pollAt: number): Promise<GithubSafeAuthSummary> {
@@ -108,7 +127,7 @@ function buildConnectedState(json: any, now: number): GithubConnectedAuthState |
   };
 }
 
-export async function startDeviceFlow({
+async function startDeviceFlowRequest({
   fetchImpl = fetch,
   now = () => Date.now(),
 }: DeviceFlowDeps = {}): Promise<GithubSafeAuthSummary> {
@@ -158,6 +177,15 @@ export async function startDeviceFlow({
   return toGithubSafeAuthSummary(state);
 }
 
+export function startDeviceFlow(deps: DeviceFlowDeps = {}): Promise<GithubSafeAuthSummary> {
+  if (startInFlight) return startInFlight;
+  const promise = startDeviceFlowRequest(deps).finally(() => {
+    if (startInFlight === promise) startInFlight = null;
+  });
+  startInFlight = promise;
+  return promise;
+}
+
 export async function pollDeviceFlowOnce({
   fetchImpl = fetch,
   now = () => Date.now(),
@@ -173,6 +201,9 @@ export async function pollDeviceFlowOnce({
     throw new GithubDeviceFlowError('github_device_expired');
   }
   if (pollAt < state.pending.nextPollAt) return toGithubSafeAuthSummary(state);
+
+  const claim = await claimCurrentPendingPoll(deviceCode, pollAt);
+  if (!claim.applied) return toGithubSafeAuthSummary(claim.state);
 
   let response: Response;
   try {
