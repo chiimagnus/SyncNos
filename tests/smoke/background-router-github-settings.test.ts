@@ -221,6 +221,7 @@ describe('background-router GitHub settings routes', () => {
 
     const tested = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
     expect(preflightRepository).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main' });
+    expect(saveSettings).toHaveBeenCalledTimes(1);
     expect(tested).toMatchObject({
       ok: true,
       data: {
