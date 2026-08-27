@@ -32,7 +32,6 @@ describe('collectors images (smoke)', () => {
     });
     const collector = createChatgptCollectorDef(env).collector;
     const preparedCapture = await collector.prepareManualCapture({
-      maxPasses: 1,
       maxSteps: 1,
       stableSamples: 1,
       pollMs: 0,

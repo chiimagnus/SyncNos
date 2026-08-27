@@ -567,12 +567,11 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
           readUnresolvedKeys: () =>
             readCurrentDescriptors()
               .filter((descriptor) => !descriptor.rendered)
-              .map((descriptor) => descriptor.turnKey),
+              .map((descriptor) => descriptor.key),
           harvest: (target) => harvestManualInto(target, ctx),
         },
         accumulator,
         {
-          maxPasses: options.maxPasses,
           totalDeadlineMs: options.totalDeadlineMs,
           maxSteps: options.maxSteps,
           stableSamples: options.stableSamples,

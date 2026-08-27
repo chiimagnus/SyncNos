@@ -218,7 +218,6 @@ const VIRTUALIZED_REASON_CODES = new Set([
   'order_conflict',
   'step_timeout',
   'step_budget_exhausted',
-  'pass_budget_exhausted',
   'total_deadline_exhausted',
   'unresolved_turn',
   'pass_failed',
@@ -415,6 +414,7 @@ export type VirtualizedPassAdapter<T> = {
   getScrollSeed: () => Element | null;
   sampleIdentity: () => string | null;
   readDescriptorKeys: () => string[];
+  // Unresolved entries must use the matching descriptor/message key, never a shared turn key.
   readUnresolvedKeys?: () => string[];
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
 };
@@ -452,7 +452,6 @@ const PASS_DEFAULTS = Object.freeze({
 });
 
 const SWEEP_DEFAULTS = Object.freeze({
-  maxPasses: 4,
   totalDeadlineMs: 30_000,
 });
 
@@ -537,22 +536,25 @@ export async function runVirtualizedPass<T>(
   let added = 0;
   let updated = 0;
   const unresolvedKeys = new Set<string>();
-  const sampleUnresolvedKeys = (): boolean => {
+  const readUnresolvedKeys = (): string[] | null => {
     try {
+      const output: string[] = [];
       for (const key of adapter.readUnresolvedKeys?.() || []) {
         const normalized = String(key || '').trim();
-        if (normalized) unresolvedKeys.add(normalized);
+        if (normalized) output.push(normalized);
       }
-      return true;
+      return output;
     } catch (_error) {
       addReason('pass_failed');
-      return false;
+      return null;
     }
+  };
+  const rememberUnresolvedKeys = (keys: string[]) => {
+    for (const key of keys) unresolvedKeys.add(key);
   };
   const clearResolvedKeys = () => {
     for (const record of accumulator.records) {
       unresolvedKeys.delete(record.key);
-      unresolvedKeys.delete(record.turnKey);
     }
   };
 
@@ -578,28 +580,32 @@ export async function runVirtualizedPass<T>(
     return true;
   };
 
-  const stabilize = async (): Promise<{ metrics: ScrollMetrics; keys: string[] } | null> => {
+  const stabilize = async (): Promise<{ metrics: ScrollMetrics; keys: string[]; unresolvedKeys: string[] } | null> => {
     const deadline = now() + stepTimeoutMs;
     let lastSignature = '';
     let stableCount = 0;
+    let latest: { metrics: ScrollMetrics; keys: string[]; unresolvedKeys: string[] } | null = null;
     while (now() <= deadline) {
       const metrics = readScrollMetrics(runtime, root);
       const keys = adapter
         .readDescriptorKeys()
         .map((key) => String(key || '').trim())
         .filter(Boolean);
+      const currentUnresolvedKeys = readUnresolvedKeys();
+      if (!currentUnresolvedKeys) return null;
+      latest = { metrics, keys, unresolvedKeys: currentUnresolvedKeys };
       const signature = contentFreeWindowSignature(originalIdentity, metrics, keys);
       if (signature === lastSignature) stableCount += 1;
       else {
         lastSignature = signature;
         stableCount = 1;
       }
-      if (stableCount >= stableSamples) return { metrics, keys };
+      if (stableCount >= stableSamples && !currentUnresolvedKeys.length) return latest;
       await sleep(pollMs);
       if (deadlineExceeded() || !validateAfterAwait()) return null;
     }
-    addReason('step_timeout');
-    return null;
+    if (latest && !latest.unresolvedKeys.length) addReason('step_timeout');
+    return latest;
   };
 
   try {
@@ -626,7 +632,7 @@ export async function runVirtualizedPass<T>(
         continue;
       }
       if (!hasOverlap && knownKeys.size) addReason('order_unanchored');
-      if (!sampleUnresolvedKeys()) break;
+      rememberUnresolvedKeys(stable.unresolvedKeys);
 
       if (deadlineExceeded()) break;
       const checkpoint = checkpointAccumulatorData(accumulator);
@@ -684,7 +690,6 @@ export async function runVirtualizedPass<T>(
 }
 
 export type VirtualizedSweepOptions = VirtualizedPassOptions & {
-  maxPasses?: number;
   totalDeadlineMs?: number;
 };
 
@@ -705,7 +710,6 @@ const INCOMPLETE_REASONS = new Set([
   'restore_failed',
   'step_timeout',
   'step_budget_exhausted',
-  'pass_budget_exhausted',
   'total_deadline_exhausted',
   'root_detached',
   'root_replaced',
@@ -727,20 +731,9 @@ export async function runVirtualizedSweep<T>(
   accumulator: PreparedAccumulator<T>,
   options: VirtualizedSweepOptions = {},
 ): Promise<VirtualizedSweepResult> {
-  const maxPasses = boundedInteger(options.maxPasses, SWEEP_DEFAULTS.maxPasses, 2, 20);
   const totalDeadlineMs = boundedInteger(options.totalDeadlineMs, SWEEP_DEFAULTS.totalDeadlineMs, 1, 300_000);
   const now = options.now || Date.now;
   const deadline = now() + totalDeadlineMs;
-  let passes = 0;
-  let steps = 0;
-  let maxScrollExtent = 0;
-  let reachedTop = false;
-  let reachedBottom = false;
-  let previousExtent: number | null = null;
-  let complete = false;
-  let finalUnresolved: string[] = [];
-  const unresolvedAcrossPasses = new Set<string>();
-  let finalLiveChanged = false;
   const sweepIdentity = String(adapter.sampleIdentity() || '').trim();
   const validateSweepIdentity = (): boolean => {
     const currentIdentity = String(adapter.sampleIdentity() || '').trim();
@@ -749,99 +742,51 @@ export async function runVirtualizedSweep<T>(
     invalidateAccumulatorIdentity(accumulator);
     return false;
   };
-  const terminalPassReasons = new Set([
-    'missing_identity',
-    'identity_changed',
-    'root_detached',
-    'root_replaced',
-    'extraction_error',
-    'pass_failed',
-  ]);
-
-  for (; passes < maxPasses; ) {
-    if (!validateSweepIdentity()) break;
-    if (now() > deadline) {
-      addPreparedReason(accumulator, 'total_deadline_exhausted');
-      break;
-    }
-    const pass = await runVirtualizedPass(runtime, adapter, accumulator, { ...options, deadline });
-    passes += 1;
-    steps += pass.steps;
-    maxScrollExtent = Math.max(maxScrollExtent, pass.maxScrollExtent);
-    reachedTop = pass.reachedTop;
-    reachedBottom = pass.reachedBottom;
-
-    if (!validateSweepIdentity()) break;
-    if (now() > deadline) {
-      addPreparedReason(accumulator, 'total_deadline_exhausted');
-      break;
-    }
-    if (pass.reasons.some((reason) => terminalPassReasons.has(reason))) break;
-
-    for (const key of pass.unresolvedKeys) unresolvedAcrossPasses.add(key);
-    for (const record of accumulator.records) {
-      unresolvedAcrossPasses.delete(record.key);
-      unresolvedAcrossPasses.delete(record.turnKey);
-    }
-    const unresolved = Array.from(unresolvedAcrossPasses);
-    finalUnresolved = unresolved;
-    const extentStable = previousExtent !== null && previousExtent === pass.maxScrollExtent;
-    previousExtent = pass.maxScrollExtent;
-    const noChanges = pass.added === 0 && pass.updated === 0;
-    const hasBlockingReason = accumulator.reasons.some((reason) => INCOMPLETE_REASONS.has(reason));
-    if (hasBlockingReason) break;
-
-    if (
-      passes >= 2 &&
-      noChanges &&
-      extentStable &&
-      pass.reachedTop &&
-      pass.reachedBottom &&
-      accumulator.identityVerified &&
-      !unresolved.length &&
-      !hasBlockingReason
-    ) {
-      const checkpoint = checkpointAccumulatorData(accumulator);
-      try {
-        const finalLive = await adapter.harvest(accumulator);
-        if (!validateSweepIdentity()) {
-          restoreAccumulatorData(accumulator, checkpoint);
-          invalidateAccumulatorIdentity(accumulator);
-          break;
-        }
-        if (finalLive.added === 0 && finalLive.updated === 0) {
-          complete = true;
-          break;
-        }
-        finalLiveChanged = true;
-      } catch (_error) {
-        restoreAccumulatorData(accumulator, checkpoint);
-        addPreparedReason(accumulator, 'extraction_error');
-        break;
-      }
+  let pass: VirtualizedPassResult = {
+    reachedTop: false,
+    reachedBottom: false,
+    steps: 0,
+    maxScrollExtent: 0,
+    reasons: [],
+    added: 0,
+    updated: 0,
+    unresolvedKeys: [],
+  };
+  let ranPass = false;
+  if (validateSweepIdentity()) {
+    if (now() > deadline) addPreparedReason(accumulator, 'total_deadline_exhausted');
+    else {
+      ranPass = true;
+      pass = await runVirtualizedPass(runtime, adapter, accumulator, { ...options, deadline });
     }
   }
+  if (validateSweepIdentity() && now() > deadline) addPreparedReason(accumulator, 'total_deadline_exhausted');
 
-  if (!complete && finalUnresolved.length) addPreparedReason(accumulator, 'unresolved_turn');
-  if (!complete && finalLiveChanged) addPreparedReason(accumulator, 'final_live_changed');
-  if (!complete && passes >= maxPasses) addPreparedReason(accumulator, 'pass_budget_exhausted');
-  if (!reachedTop) addPreparedReason(accumulator, 'top_not_reached');
-  if (!reachedBottom) addPreparedReason(accumulator, 'bottom_not_reached');
+  if (pass.unresolvedKeys.length) addPreparedReason(accumulator, 'unresolved_turn');
+  if (!pass.reachedTop) addPreparedReason(accumulator, 'top_not_reached');
+  if (!pass.reachedBottom) addPreparedReason(accumulator, 'bottom_not_reached');
+  const hasBlockingReason = accumulator.reasons.some((reason) => INCOMPLETE_REASONS.has(reason));
+  const complete =
+    pass.reachedTop &&
+    pass.reachedBottom &&
+    accumulator.identityVerified &&
+    !pass.unresolvedKeys.length &&
+    !hasBlockingReason;
   accumulator.completeness = complete ? 'complete' : 'partial';
   accumulator.sweepMetrics = {
-    passes,
-    steps,
-    maxScrollExtent,
-    reachedTop,
-    reachedBottom,
+    passes: ranPass ? 1 : 0,
+    steps: pass.steps,
+    maxScrollExtent: pass.maxScrollExtent,
+    reachedTop: pass.reachedTop,
+    reachedBottom: pass.reachedBottom,
   };
   return {
     completeness: accumulator.completeness,
-    passes,
-    steps,
-    maxScrollExtent,
-    reachedTop,
-    reachedBottom,
+    passes: ranPass ? 1 : 0,
+    steps: pass.steps,
+    maxScrollExtent: pass.maxScrollExtent,
+    reachedTop: pass.reachedTop,
+    reachedBottom: pass.reachedBottom,
     reasons: accumulator.reasons.slice(),
   };
 }

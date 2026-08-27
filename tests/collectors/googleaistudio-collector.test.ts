@@ -553,7 +553,6 @@ describe('googleaistudio-collector', () => {
       }),
     ) as any;
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 3,
       maxSteps: 20,
       stableSamples: 1,
       pollMs: 0,
@@ -590,6 +589,34 @@ describe('googleaistudio-collector', () => {
     expect(
       preparedCapture.records.every((record: any) => !String(record.payload.messageKey).startsWith('fallback_')),
     ).toBe(true);
+  });
+
+  it('keeps an unloaded message in a multi-message turn partial', async () => {
+    const html = `<div class="chat-session-content"><ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">Q</div></div><div data-turn-role="Model"><div class="turn-content"></div></div></ms-chat-turn></div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/identity');
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    let clock = 0;
+
+    const preparedCapture = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 1,
+      stepTimeoutMs: 2,
+      now: () => clock,
+      sleep: async () => {
+        clock += 1;
+      },
+    });
+
+    expect(preparedCapture.completeness).toBe('partial');
+    expect(preparedCapture.reasons).toContain('unresolved_turn');
+    expect(preparedCapture.records.map((record: any) => record.key)).toEqual(['turn-1:user:0']);
   });
 
   it('refuses to verify manual identity when stable turn ids are missing', async () => {

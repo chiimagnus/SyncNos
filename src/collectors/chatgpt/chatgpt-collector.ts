@@ -300,6 +300,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     fingerprint: string;
     hasDeepResearch: boolean;
     rendered: boolean;
+    visible: boolean;
   };
 
   type ChatgptExtractionInput = ChatgptDescriptor & {
@@ -435,6 +436,24 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return compactFingerprintPart(source);
   }
 
+  function isVisibleWindow(wrapper: any): boolean {
+    try {
+      const virtualizer = wrapper?.closest?.('[data-is-intersecting]');
+      const intersecting = String(virtualizer?.getAttribute?.('data-is-intersecting') || '').trim();
+      if (intersecting === 'true') return true;
+      if (intersecting === 'false') return false;
+      const rect = wrapper?.getBoundingClientRect?.();
+      const top = Number(rect?.top);
+      const bottom = Number(rect?.bottom);
+      const height = Number(rect?.height);
+      const viewportHeight = Number(env.window?.innerHeight);
+      // ponytail: 优先沿用 ChatGPT 虚拟器的相交标记；没有标记时才按布局盒判断。
+      return height > 0 && viewportHeight > 0 && bottom >= 0 && top <= viewportHeight;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function readCurrentManualWindow(includeInputs = false): {
     descriptors: ChatgptDescriptor[];
     inputsByKey: Map<string, ChatgptExtractionInput>;
@@ -465,6 +484,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         fingerprint: descriptorFingerprint({ role, key, text, imageUrls, iframeUrl }),
         hasDeepResearch: !!iframe,
         rendered: !!text || imageUrls.length > 0 || !!iframe,
+        visible: isVisibleWindow(wrapper),
       };
       descriptors.push(descriptor);
       if (includeInputs) {
@@ -526,8 +546,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
     readUnresolvedKeys: () =>
       readCurrentDescriptors()
-        .filter((descriptor) => !descriptor.rendered)
-        .map((descriptor) => descriptor.turnKey),
+        .filter((descriptor) => descriptor.visible && !descriptor.rendered)
+        .map((descriptor) => descriptor.key),
     readWindow: () => readCurrentManualWindow(true),
     getExtractionCount: () => manualExtractionCount,
   };
@@ -631,7 +651,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         },
         accumulator,
         {
-          maxPasses: options.maxPasses,
           totalDeadlineMs: options.totalDeadlineMs,
           maxSteps: options.maxSteps,
           stableSamples: options.stableSamples,

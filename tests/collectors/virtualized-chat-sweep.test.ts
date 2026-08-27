@@ -533,7 +533,7 @@ describe('virtualized chat single pass', () => {
   });
 });
 
-describe('virtualized chat confirmation sweep', () => {
+describe('virtualized chat single-pass sweep', () => {
   function singlePageAdapter(
     harvestPayloads: Array<Array<{ key: string; fingerprint: string; text: string }>>,
     unresolved: () => string[] = () => [],
@@ -578,7 +578,7 @@ describe('virtualized chat confirmation sweep', () => {
     return { dom, accumulator, adapter };
   }
 
-  it('marks complete only after a no-change confirmation pass and final live sample', async () => {
+  it('marks complete after one stable top-to-bottom pass', async () => {
     const test = singlePageAdapter([
       [{ key: 'a', fingerprint: 'a', text: 'A' }],
       [{ key: 'a', fingerprint: 'a', text: 'A' }],
@@ -588,106 +588,82 @@ describe('virtualized chat confirmation sweep', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 4 },
+      { stableSamples: 1, pollMs: 0 },
     );
     expect(result).toMatchObject({ completeness: 'complete', reachedTop: true, reachedBottom: true });
-    expect(result.passes).toBe(2);
+    expect(result.passes).toBe(1);
   });
 
-  it('continues when a second pass discovers a late turn', async () => {
-    const test = singlePageAdapter([
-      [{ key: 'a', fingerprint: 'a', text: 'A' }],
-      [
-        { key: 'a', fingerprint: 'a', text: 'A' },
-        { key: 'b', fingerprint: 'b', text: 'B' },
-      ],
-      [
-        { key: 'a', fingerprint: 'a', text: 'A' },
-        { key: 'b', fingerprint: 'b', text: 'B' },
-      ],
-      [
-        { key: 'a', fingerprint: 'a', text: 'A' },
-        { key: 'b', fingerprint: 'b', text: 'B' },
-      ],
-    ]);
+  it('waits within the current window for an unresolved turn instead of starting another pass', async () => {
+    let unresolvedReads = 0;
+    let clock = 0;
+    const test = singlePageAdapter([[{ key: 'a', fingerprint: 'a', text: 'A' }]], () =>
+      unresolvedReads++ < 2 ? ['turn-a'] : [],
+    );
     const result = await runVirtualizedSweep(
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 5 },
+      {
+        stableSamples: 1,
+        pollMs: 1,
+        stepTimeoutMs: 20,
+        now: () => clock,
+        sleep: async () => {
+          clock += 1;
+        },
+      },
     );
     expect(result.completeness).toBe('complete');
-    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a', 'b']);
+    expect(result.passes).toBe(1);
+    expect(unresolvedReads).toBeGreaterThanOrEqual(2);
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a']);
   });
 
-  it('requires another confirmation after a late known-key update or final-live change', async () => {
-    const test = singlePageAdapter([
-      [{ key: 'a', fingerprint: 'draft', text: 'draft' }],
-      [{ key: 'a', fingerprint: 'final', text: 'final' }],
-      [{ key: 'a', fingerprint: 'final', text: 'final' }],
-      [
-        { key: 'a', fingerprint: 'final', text: 'final' },
-        { key: 'b', fingerprint: 'late', text: 'late' },
-      ],
-      [
-        { key: 'a', fingerprint: 'final', text: 'final' },
-        { key: 'b', fingerprint: 'late', text: 'late' },
-      ],
-      [
-        { key: 'a', fingerprint: 'final', text: 'final' },
-        { key: 'b', fingerprint: 'late', text: 'late' },
-      ],
-    ]);
-    const result = await runVirtualizedSweep(
-      { document: test.dom.window.document, window: test.dom.window as any },
-      test.adapter,
-      test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 6 },
-    );
-    expect(result.completeness).toBe('complete');
-    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.payload.text)).toEqual([
-      'final',
-      'late',
-    ]);
-  });
-
-  it('clears an unresolved turn when a message from that turn is harvested later', async () => {
-    let phase = 0;
-    const test = singlePageAdapter(
-      [
-        [],
-        [{ key: 'message-a', fingerprint: 'a', text: 'A' }],
-        [{ key: 'message-a', fingerprint: 'a', text: 'A' }],
-        [{ key: 'message-a', fingerprint: 'a', text: 'A' }],
-      ],
-      () => (phase++ === 0 ? ['turn-a'] : []),
-    );
-    const originalHarvest = test.adapter.harvest;
-    test.adapter.harvest = async (target) => {
-      const result = await originalHarvest(target);
-      for (const record of target.records) record.turnKey = 'turn-a';
-      return result;
-    };
-    const result = await runVirtualizedSweep(
-      { document: test.dom.window.document, window: test.dom.window as any },
-      test.adapter,
-      test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 4 },
-    );
-    expect(result.completeness).toBe('complete');
-    expect(result.reasons).not.toContain('unresolved_turn');
-  });
-
-  it('keeps unresolved expected turns and pass exhaustion partial', async () => {
+  it('keeps unresolved expected turns partial without restarting the pass', async () => {
     const test = singlePageAdapter([[{ key: 'a', fingerprint: 'a', text: 'A' }]], () => ['unresolved-shell']);
     const result = await runVirtualizedSweep(
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 2 },
+      { stableSamples: 1, pollMs: 0, stepTimeoutMs: 3, sleep: async () => {} },
     );
     expect(result.completeness).toBe('partial');
-    expect(result.reasons).toEqual(expect.arrayContaining(['unresolved_turn', 'pass_budget_exhausted']));
+    expect(result).toMatchObject({ passes: 1 });
+    expect(result.reasons).toContain('unresolved_turn');
+  });
+
+  it('does not resolve an unloaded sibling from the same turn', async () => {
+    let clock = 0;
+    const test = singlePageAdapter([[{ key: 'turn-a:user:0', fingerprint: 'q', text: 'Q' }]], () => ['turn-a']);
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(target, [
+        {
+          key: 'turn-a:user:0',
+          turnKey: 'turn-a',
+          withinTurn: 0,
+          fingerprint: 'q',
+          payload: { text: 'Q' },
+        },
+      ]);
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      {
+        stableSamples: 1,
+        pollMs: 1,
+        stepTimeoutMs: 2,
+        now: () => clock,
+        sleep: async () => {
+          clock += 1;
+        },
+      },
+    );
+
+    expect(result.completeness).toBe('partial');
+    expect(result.reasons).toContain('unresolved_turn');
   });
 
   it('keeps sanitized provider errors incomplete', async () => {
@@ -707,7 +683,7 @@ describe('virtualized chat confirmation sweep', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 2 },
+      { stableSamples: 1, pollMs: 0 },
     );
 
     expect(result.completeness).toBe('partial');
@@ -726,7 +702,6 @@ describe('virtualized chat confirmation sweep', () => {
       {
         stableSamples: 2,
         pollMs: 1,
-        maxPasses: 4,
         totalDeadlineMs: 3,
         now: () => clock,
         sleep: async () => {
@@ -750,7 +725,6 @@ describe('virtualized chat confirmation sweep', () => {
       test.adapter,
       test.accumulator,
       {
-        maxPasses: Number.NaN,
         maxSteps: -10,
         stableSamples: 0,
         pollMs: -1,
@@ -761,10 +735,10 @@ describe('virtualized chat confirmation sweep', () => {
       },
     );
     expect(result.completeness).toBe('complete');
-    expect(result.passes).toBe(2);
+    expect(result.passes).toBe(1);
   });
 
-  it('invalidates data when identity changes between passes', async () => {
+  it('invalidates data when identity changes during the pass', async () => {
     const test = singlePageAdapter([
       [{ key: 'old-message', fingerprint: 'old', text: 'old' }],
       [{ key: 'new-message', fingerprint: 'new', text: 'new' }],
@@ -782,7 +756,7 @@ describe('virtualized chat confirmation sweep', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, maxPasses: 2 },
+      { stableSamples: 1, pollMs: 0 },
     );
 
     expect(result.completeness).toBe('partial');
