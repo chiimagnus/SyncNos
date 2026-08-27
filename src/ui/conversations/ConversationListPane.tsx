@@ -600,8 +600,7 @@ export function ConversationListPane({
   const deleteConfirming = !!deleteConfirmKey && armedDeleteKey != null && deleteConfirm.isArmed(deleteConfirmKey);
   const loadedVisibleScopeHint = t('tooltipLoadedVisibleSelectionScope');
   const loadedSelectionAction = total > 0 && selectedCount === total ? t('deselectLoadedItems') : t('selectAll');
-  const loadedSelectionTooltip =
-    total > 0 ? `${loadedSelectionAction} (${total})` : loadedSelectionAction;
+  const loadedSelectionTooltip = total > 0 ? `${loadedSelectionAction} (${total})` : loadedSelectionAction;
   const deleteTooltip = deleteConfirming
     ? `${t('tooltipDeleteSelectedConfirmDetailed')} · ${loadedVisibleScopeHint}`
     : hasSelection
