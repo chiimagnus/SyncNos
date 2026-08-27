@@ -11,11 +11,14 @@ import {
   defaultGithubOrchestratorServices,
   type GithubOrchestratorServices,
 } from '@services/sync/github/github-orchestrator-services';
+import type { GithubRepositoryPreflight } from '@services/sync/github/github-repository-service';
 import {
   planGithubConversationSync,
   type GithubSyncContinuityDraft,
   type GithubSyncPlannerMode,
 } from '@services/sync/github/github-sync-planner';
+import type { GithubSettings } from '@services/sync/github/settings-store';
+import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@services/sync/models';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
@@ -246,15 +249,38 @@ function mergeCleanupDeletes(
   return operations;
 }
 
+function buildAlreadyRunningError(): Error {
+  return Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' });
+}
+
+function buildJobPersistenceError(): Error {
+  return Object.assign(new Error('github sync job persistence failed'), { code: 'github_sync_job_persist_failed' });
+}
+
+function toJobWarnings(codes: readonly string[]): SyncWarning[] {
+  return [...new Set(codes.map(safeString).filter(Boolean))].map((code) => ({ code, message: code }));
+}
+
+function toJobRows(items: readonly GithubSyncRunItem[], at: number): SyncPerConversationResult[] {
+  return items.map((item) => ({
+    conversationId: item.conversationId,
+    conversationTitle: item.conversationTitle || undefined,
+    ok: item.status === 'synced' || item.status === 'no_changes',
+    mode: item.status,
+    appended: 0,
+    error: item.error,
+    warnings: toJobWarnings(item.warnings),
+    at,
+  }));
+}
+
 export function createGithubSyncOrchestrator(services: GithubOrchestratorServices = defaultGithubOrchestratorServices) {
-  async function stage(input: {
-    conversationIds?: readonly unknown[];
-    mode?: GithubSyncPlannerMode;
-  }): Promise<GithubSyncStagedRun> {
-    const ids = normalizeIds(input.conversationIds);
-    const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
-    const settings = await services.getSettings();
-    const preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
+  async function stageResolved(
+    ids: readonly number[],
+    mode: GithubSyncPlannerMode,
+    settings: GithubSettings,
+    preflight: GithubRepositoryPreflight,
+  ): Promise<GithubSyncStagedRun> {
     const items: GithubSyncStagedItem[] = [];
 
     for (const conversationId of ids) {
@@ -326,28 +352,134 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     };
   }
 
+  async function stage(input: {
+    conversationIds?: readonly unknown[];
+    mode?: GithubSyncPlannerMode;
+  }): Promise<GithubSyncStagedRun> {
+    const ids = normalizeIds(input.conversationIds);
+    const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
+    const settings = await services.getSettings();
+    const preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
+    return stageResolved(ids, mode, settings, preflight);
+  }
+
   async function sync(input: {
     conversationIds?: readonly unknown[];
     mode?: GithubSyncPlannerMode;
+    instanceId?: string;
   }): Promise<GithubSyncRunResult> {
-    const staged = await stage(input);
+    const ids = normalizeIds(input.conversationIds);
+    const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
+    const instanceId = safeString(input.instanceId);
     const runNow = services.now();
     const cleanupWarnings: string[] = [];
     const deferredReplacementIds = new Set<number>();
     let cleanupHasMoreDue = false;
     let dueRows: GithubCleanupOutboxRecord[] = [];
+    let currentJob: SyncJobSnapshot | null = null;
+    let jobPersistenceWarning = false;
+
+    const persistCurrentJob = async (partial: Partial<SyncJobSnapshot>): Promise<boolean> => {
+      if (!currentJob) return true;
+      const next = { ...currentJob, ...partial, updatedAt: services.now() };
+      const persisted = await services.jobStore.setJob(next);
+      if (persisted) currentJob = next;
+      else jobPersistenceWarning = true;
+      return persisted;
+    };
+
+    const claimJob = async (currentStage: string) => {
+      const existingJob = await services.jobStore.abortRunningJobIfFromOtherInstance(instanceId);
+      if (services.jobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
+
+      const startedAt = services.now();
+      const candidate: SyncJobSnapshot = {
+        id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+        provider: 'github',
+        instanceId,
+        status: 'running',
+        startedAt,
+        updatedAt: startedAt,
+        finishedAt: null,
+        conversationIds: [...ids],
+        currentConversationId: ids[0] || undefined,
+        currentStage,
+        okCount: 0,
+        failCount: 0,
+        perConversation: [],
+      };
+      if (!(await services.jobStore.setJob(candidate))) throw buildJobPersistenceError();
+
+      const claimed = await services.jobStore.getJob();
+      if (!claimed || claimed.status !== 'running' || safeString(claimed.id) !== candidate.id) {
+        if (services.jobStore.isRunningJob(claimed)) throw buildAlreadyRunningError();
+        throw buildJobPersistenceError();
+      }
+      currentJob = candidate;
+    };
+
+    const persistFailedTerminalJob = async (error: unknown) => {
+      if (!currentJob) return;
+      const at = services.now();
+      const code = safeString((error as any)?.code || (error as any)?.message || 'github_sync_failed');
+      const perConversation: SyncPerConversationResult[] = ids.map((conversationId) => ({
+        conversationId,
+        ok: false,
+        mode: 'failed',
+        appended: 0,
+        error: code,
+        warnings: [],
+        at,
+      }));
+      await persistCurrentJob({
+        status: 'done',
+        finishedAt: at,
+        currentConversationId: undefined,
+        currentConversationTitle: undefined,
+        currentStage: 'done',
+        okCount: 0,
+        failCount: perConversation.length,
+        perConversation,
+      });
+    };
 
     try {
-      const batch = await services.listDueCleanupRows(
-        staged.target.remoteKey,
-        runNow,
-        GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT,
-      );
-      dueRows = batch.rows;
-      cleanupHasMoreDue = batch.hasMoreDue;
-    } catch (_error) {
-      cleanupWarnings.push('github_cleanup_list_failed');
-    }
+      let settings: GithubSettings;
+      let preflight: GithubRepositoryPreflight;
+      let staged: GithubSyncStagedRun;
+
+      if (ids.length) {
+        await claimJob('preparing_queue');
+        await persistCurrentJob({ currentStage: 'preflight' });
+        settings = await services.getSettings();
+        preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
+        await persistCurrentJob({ currentStage: 'staging_projection' });
+        staged = await stageResolved(ids, mode, settings, preflight);
+        await persistCurrentJob({ currentStage: 'cleaning_remote_files' });
+      } else {
+        settings = await services.getSettings();
+        preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
+        staged = {
+          target: { repository: preflight.repository, branch: preflight.branch, remoteKey: preflight.remoteKey },
+          operations: [],
+          items: [],
+          summary: { candidateCount: 0, noOpCount: 0, stagedCount: 0, failedCount: 0, warningCount: 0 },
+        };
+      }
+
+      try {
+        const batch = await services.listDueCleanupRows(
+          staged.target.remoteKey,
+          runNow,
+          GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT,
+        );
+        dueRows = batch.rows;
+        cleanupHasMoreDue = batch.hasMoreDue;
+      } catch (_error) {
+        cleanupWarnings.push('github_cleanup_list_failed');
+      }
+
+      if (!ids.length && dueRows.length) await claimJob('cleaning_remote_files');
 
     const stagedByConversationId = new Map(staged.items.map((item) => [item.conversationId, item]));
     const replacementChecks = new Map<
@@ -459,13 +591,32 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       } catch (_error) {
         cleanupWarnings.push('github_cleanup_next_due_failed');
       }
-      return {
+
+      const finalResult: GithubSyncRunResult = {
         ...result,
         cleanupHasMoreDue,
         nextCleanupDueAt,
         deferredReplacementConversationIds: [...deferredReplacementIds].slice(0, GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT),
         cleanupWarnings: [...new Set(cleanupWarnings)],
       };
+      if (currentJob) {
+        const finishedAt = services.now();
+        const perConversation = toJobRows(finalResult.items, finishedAt);
+        await persistCurrentJob({
+          status: 'done',
+          finishedAt,
+          currentConversationId: undefined,
+          currentConversationTitle: undefined,
+          currentStage: 'done',
+          okCount: perConversation.filter((row) => row.ok).length,
+          failCount: perConversation.filter((row) => !row.ok).length,
+          perConversation,
+        });
+      }
+      if (jobPersistenceWarning) {
+        finalResult.cleanupWarnings = [...new Set([...finalResult.cleanupWarnings, 'github_sync_job_persist_failed'])];
+      }
+      return finalResult;
     };
 
     const operations = mergeCleanupDeletes(staged.operations, cleanupDeletePaths);
@@ -484,6 +635,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
 
     let transport: GithubGitTransactionResult;
     try {
+      await persistCurrentJob({ currentStage: 'committing_tree' });
       transport = await services.commit({
         repository: staged.target.repository,
         branch: staged.target.branch,
@@ -541,6 +693,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       });
     }
 
+    await persistCurrentJob({ currentStage: 'updating_mappings' });
     const items: GithubSyncRunItem[] = [];
     for (const item of staged.items) {
       if (item.status === 'no_changes') {
@@ -575,15 +728,19 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       }
     }
 
-    return await finalizeCleanup({
-      target: staged.target,
-      transport: {
-        status: transport.status,
-        ...(transport.status === 'committed' ? { commitSha: transport.commitSha } : {}),
-      },
-      items,
-      summary: finalSummary(items),
-    });
+      return await finalizeCleanup({
+        target: staged.target,
+        transport: {
+          status: transport.status,
+          ...(transport.status === 'committed' ? { commitSha: transport.commitSha } : {}),
+        },
+        items,
+        summary: finalSummary(items),
+      });
+    } catch (error) {
+      await persistFailedTerminalJob(error);
+      throw error;
+    }
   }
 
   return { stage, sync };

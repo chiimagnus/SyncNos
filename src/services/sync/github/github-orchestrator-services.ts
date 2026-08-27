@@ -16,6 +16,7 @@ import {
   preflightGithubRepository,
   type GithubRepositoryPreflight,
 } from '@services/sync/github/github-repository-service';
+import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
 import { getGithubSettings, type GithubSettings } from '@services/sync/github/settings-store';
 
 export type GithubOrchestratorStorage = {
@@ -44,6 +45,7 @@ export type GithubOrchestratorServices = {
   getNextCleanupDueAt: typeof getNextGithubCleanupDueAt;
   deferCleanupRows: typeof deferGithubCleanupRows;
   ackCleanupRows: typeof ackGithubCleanupRows;
+  jobStore: typeof githubSyncJobStore;
   replacementDeferMs: number;
   now: () => number;
 };
@@ -60,6 +62,7 @@ export const defaultGithubOrchestratorServices: GithubOrchestratorServices = {
   getNextCleanupDueAt: getNextGithubCleanupDueAt,
   deferCleanupRows: deferGithubCleanupRows,
   ackCleanupRows: ackGithubCleanupRows,
+  jobStore: githubSyncJobStore,
   replacementDeferMs: DEFAULT_GITHUB_REPLACEMENT_DEFER_MS,
   now: Date.now,
 };
