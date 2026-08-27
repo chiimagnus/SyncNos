@@ -1,3 +1,5 @@
+import { resolveConversationMessageTextSource } from '@services/conversations/domain/message-text-source';
+
 function normalizeText(text: unknown): string {
   return String(text || '')
     .replace(/\r\n/g, '\n')
@@ -30,14 +32,9 @@ export function countWordsFromMessages(
   messages: Array<{ contentText?: string | null; contentMarkdown?: string | null }>,
 ): number {
   const parts: string[] = [];
-  for (const m of messages || []) {
-    const text = normalizeText(m?.contentText);
-    if (text) {
-      parts.push(text);
-      continue;
-    }
-    const markdown = normalizeText(m?.contentMarkdown);
-    if (markdown) parts.push(markdown);
+  for (const message of messages || []) {
+    const source = resolveConversationMessageTextSource(message);
+    if (source.kind !== 'empty') parts.push(source.value);
   }
   if (!parts.length) return 0;
   return countWords(parts.join('\n'));

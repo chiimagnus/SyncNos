@@ -1,11 +1,12 @@
-import type { ConversationMessage } from '@services/conversations/domain/models';
-
 export type ConversationMessageTextSource =
   | { kind: 'text'; value: string }
   | { kind: 'markdown'; value: string }
   | { kind: 'empty'; value: '' };
 
-type MessageTextFields = Pick<ConversationMessage, 'contentText' | 'contentMarkdown'>;
+type MessageTextFields = {
+  contentText?: string | null;
+  contentMarkdown?: string | null;
+};
 
 function normalizeLineEndings(value: unknown): string {
   return String(value ?? '')
