@@ -7,6 +7,7 @@ import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 import { ObsidianSettingsSection } from '../../src/ui/settings/sections/ObsidianSettingsSection';
+import { GitHubSettingsSection } from '../../src/ui/settings/sections/GitHubSettingsSection';
 import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
 
 describe('settings section definitions', () => {
@@ -21,6 +22,7 @@ describe('settings section definitions', () => {
       'notion',
       'feishu',
       'obsidian',
+      'github',
       'aboutyou',
       'aboutme',
     ]);
@@ -29,7 +31,7 @@ describe('settings section definitions', () => {
   it('groups sections into integrations, behavior, and about areas', () => {
     expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
       ['general', 'articles', 'ai_chats', 'videos', 'chat_with'],
-      ['backup', 'notion', 'feishu', 'obsidian'],
+      ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
   });
@@ -45,12 +47,141 @@ describe('settings section definitions', () => {
     const groupList = document.querySelector('nav')?.firstElementChild;
     const groups = groupList ? Array.from(groupList.children) : [];
     expect(groups).toHaveLength(3);
-    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 4, 2]);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 5, 2]);
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
     expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
       true,
     );
     expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
+
+    act(() => root.unmount());
+    cleanupDom();
+  });
+
+  it('wires GitHub connect, pending Device Flow, and connected repository actions without a token input', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+    const callbacks = {
+      onConnect: vi.fn(),
+      onCancelDeviceFlow: vi.fn(),
+      onDisconnect: vi.fn(),
+      onRefreshRepositories: vi.fn(),
+      onChangeRepository: vi.fn(),
+      onSaveTarget: vi.fn(),
+      onTestConnection: vi.fn(),
+    };
+    const baseProps: Parameters<typeof GitHubSettingsSection>[0] = {
+      busy: false,
+      syncEnabled: true,
+      autoSyncEnabled: false,
+      auth: { state: 'disconnected' },
+      account: null,
+      repositoryStatus: null,
+      repositories: [],
+      targetUnavailable: false,
+      repository: '',
+      branch: 'main',
+      verificationUrl: 'https://github.com/login/device',
+      appUrl: 'https://github.com/apps/syncnos',
+      installUrl: 'https://github.com/apps/syncnos/installations/new',
+      connectionTest: { status: 'idle' },
+      githubLogoUrl: '/icons/github.svg',
+      onToggleSyncEnabled: () => {},
+      onToggleAutoSyncEnabled: () => {},
+      onConnect: callbacks.onConnect,
+      onCancelDeviceFlow: callbacks.onCancelDeviceFlow,
+      onDisconnect: callbacks.onDisconnect,
+      onRefreshRepositories: callbacks.onRefreshRepositories,
+      onChangeRepository: callbacks.onChangeRepository,
+      onChangeBranch: () => {},
+      onSaveTarget: callbacks.onSaveTarget,
+      onTestConnection: callbacks.onTestConnection,
+    };
+
+    act(() => {
+      root.render(createElement(GitHubSettingsSection, baseProps));
+    });
+    const connectButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Connect GitHub',
+    ) as HTMLButtonElement | undefined;
+    expect(connectButton).toBeTruthy();
+    act(() => connectButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(callbacks.onConnect).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    expect(document.body.textContent || '').not.toContain('Personal Access Token');
+    expect(document.body.textContent || '').not.toContain('PAT');
+
+    act(() => {
+      root.render(
+        createElement(GitHubSettingsSection, {
+          ...baseProps,
+          auth: {
+            state: 'pending',
+            userCode: 'ABCD-EFGH',
+            verificationUri: 'https://github.com/login/device',
+            expiresAt: Date.now() + 60_000,
+            nextPollAt: Date.now() + 5_000,
+          },
+        }),
+      );
+    });
+    expect(document.querySelector('[data-github-device-user-code="true"]')?.textContent).toContain('ABCD-EFGH');
+    const openGithubLink = document.querySelector('[data-github-device-link="true"]') as HTMLAnchorElement | null;
+    expect(openGithubLink?.getAttribute('href')).toBe('https://github.com/login/device');
+    const openClick = vi.fn((event: Event) => event.preventDefault());
+    openGithubLink?.addEventListener('click', openClick);
+    act(() => openGithubLink!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true })));
+    expect(openClick).toHaveBeenCalledTimes(1);
+    const cancelButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Cancel',
+    ) as HTMLButtonElement | undefined;
+    act(() => cancelButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(callbacks.onCancelDeviceFlow).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root.render(
+        createElement(GitHubSettingsSection, {
+          ...baseProps,
+          auth: { state: 'connected' },
+          account: { login: 'octocat', avatarUrl: '', url: 'https://github.com/octocat' },
+          repositoryStatus: 'ready',
+          repositories: [
+            { fullName: 'owner/repo', contentWriteCapable: true },
+            { fullName: 'owner/other', contentWriteCapable: true },
+            { fullName: 'owner/read-only', contentWriteCapable: false },
+          ],
+          repository: 'owner/repo',
+        }),
+      );
+    });
+    expect(document.body.textContent || '').toContain('Connected as octocat');
+    expect(document.querySelector('input[aria-label="Repository"]')).toBeNull();
+    expect(document.querySelector('input[aria-label="Branch"]')).toBeTruthy();
+    expect(document.querySelector('a[href="https://github.com/apps/syncnos"]')).toBeTruthy();
+
+    const repositoryTrigger = document.querySelector('button#githubRepository') as HTMLButtonElement | null;
+    act(() => repositoryTrigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    const repositoryOptions = Array.from(document.querySelectorAll('button[role="menuitemradio"]'));
+    expect(repositoryOptions.some((button) => button.textContent?.includes('owner/not-authorized'))).toBe(false);
+    const otherRepository = repositoryOptions.find((button) => button.textContent?.includes('owner/other')) as
+      | HTMLButtonElement
+      | undefined;
+    act(() => otherRepository!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(callbacks.onChangeRepository).toHaveBeenCalledWith('owner/other');
+
+    for (const [label, callback] of [
+      ['Disconnect', callbacks.onDisconnect],
+      ['Refresh repositories', callbacks.onRefreshRepositories],
+      ['Save target', callbacks.onSaveTarget],
+      ['Test connection', callbacks.onTestConnection],
+    ] as const) {
+      const button = Array.from(document.querySelectorAll('button')).find(
+        (candidate) => candidate.textContent?.trim() === label,
+      ) as HTMLButtonElement | undefined;
+      expect(button).toBeTruthy();
+      act(() => button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+      expect(callback).toHaveBeenCalledTimes(1);
+    }
 
     act(() => root.unmount());
     cleanupDom();

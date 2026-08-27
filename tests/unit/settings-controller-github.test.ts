@@ -433,6 +433,12 @@ describe('Settings controller GitHub Device Flow', () => {
     act(() => latestSnapshot?.onChangeGithubRepository('owner/not-authorized'));
     expect(latestSnapshot?.githubRepository).toBe('owner/lost');
 
+    githubRepositoryData = readyRepositories(['owner/other', 'owner/read-only']);
+    githubRepositoryData.repositories[1].contentWriteCapable = false;
+    await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
+    act(() => latestSnapshot?.onChangeGithubRepository('owner/read-only'));
+    expect(latestSnapshot?.githubRepository).toBe('owner/lost');
+
     act(() => latestSnapshot?.onChangeGithubRepository('owner/other'));
     expect(latestSnapshot?.githubRepository).toBe('owner/other');
     expect(latestSnapshot?.githubTargetUnavailable).toBe(false);
@@ -447,6 +453,20 @@ describe('Settings controller GitHub Device Flow', () => {
     await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
     expect(latestSnapshot?.githubRepositoryStatus).toBe('github_app_not_installed');
     expect(latestSnapshot?.githubRepository).toBe('owner/other');
+    expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
+  });
+
+  it('treats a stored read-only repository as unavailable instead of a valid sync target', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' }, 'owner/read-only');
+    githubRepositoryData = readyRepositories(['owner/read-only']);
+    githubRepositoryData.repositories[0].contentWriteCapable = false;
+
+    await renderController();
+
+    expect(latestSnapshot?.githubRepository).toBe('owner/read-only');
+    expect(latestSnapshot?.githubRepositories).toEqual([
+      expect.objectContaining({ fullName: 'owner/read-only', contentWriteCapable: false }),
+    ]);
     expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
   });
 

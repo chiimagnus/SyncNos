@@ -17,6 +17,7 @@ import { InpageSection } from '@ui/settings/sections/InpageSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
+import { GitHubSettingsSection } from '@ui/settings/sections/GitHubSettingsSection';
 import { WebArticlesSection } from '@ui/settings/sections/WebArticlesSection';
 import { VideosSection } from '@ui/settings/sections/VideosSection';
 
@@ -128,6 +129,30 @@ export function SettingsScene(props: SettingsSceneProps) {
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
     obsidianSetupGuideUrl,
+
+    githubAuth,
+    githubAccount,
+    githubRepositoryStatus,
+    githubRepositories,
+    githubTargetUnavailable,
+    githubRepository,
+    onChangeGithubRepository,
+    githubBranch,
+    setGithubBranch,
+    githubVerificationUrl,
+    githubAppUrl,
+    githubInstallUrl,
+    githubSyncEnabled,
+    onToggleGithubSyncEnabled,
+    githubAutoSyncEnabled,
+    onToggleGithubAutoSyncEnabled,
+    githubConnectionTest,
+    onGithubConnect,
+    onCancelGithubDeviceFlow,
+    onDisconnectGithub,
+    onRefreshGithubRepositories,
+    onSaveGithubSettings,
+    onTestGithubConnection,
 
     exportStatus,
     importStatus,
@@ -348,6 +373,52 @@ export function SettingsScene(props: SettingsSceneProps) {
             void onTestObsidianConnection();
           }}
           onOpenSetupGuide={onOpenObsidianSetupGuide}
+        />
+      ) : null}
+
+      {activeSection === 'github' ? (
+        <GitHubSettingsSection
+          busy={busy}
+          syncEnabled={githubSyncEnabled}
+          autoSyncEnabled={githubAutoSyncEnabled}
+          auth={githubAuth}
+          account={githubAccount}
+          repositoryStatus={githubRepositoryStatus}
+          repositories={githubRepositories}
+          targetUnavailable={githubTargetUnavailable}
+          repository={githubRepository}
+          branch={githubBranch}
+          verificationUrl={githubVerificationUrl}
+          appUrl={githubAppUrl}
+          installUrl={githubInstallUrl}
+          connectionTest={githubConnectionTest}
+          githubLogoUrl={getURL('icons/github.svg' as any)}
+          onToggleSyncEnabled={(enabled) => {
+            void onToggleGithubSyncEnabled(enabled);
+          }}
+          onToggleAutoSyncEnabled={(enabled) => {
+            void onToggleGithubAutoSyncEnabled(enabled);
+          }}
+          onConnect={() => {
+            void onGithubConnect();
+          }}
+          onCancelDeviceFlow={() => {
+            void onCancelGithubDeviceFlow();
+          }}
+          onDisconnect={() => {
+            void onDisconnectGithub();
+          }}
+          onRefreshRepositories={() => {
+            void onRefreshGithubRepositories();
+          }}
+          onChangeRepository={onChangeGithubRepository}
+          onChangeBranch={setGithubBranch}
+          onSaveTarget={() => {
+            void onSaveGithubSettings();
+          }}
+          onTestConnection={() => {
+            void onTestGithubConnection();
+          }}
         />
       ) : null}
 

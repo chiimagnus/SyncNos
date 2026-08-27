@@ -1012,7 +1012,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     (value: string) => {
       const next = String(value || '').trim();
       const current = String(githubRepository || '').trim();
-      const allowed = githubRepositories.some((repository) => repository.fullName === next);
+      const allowed = githubRepositories.some(
+        (repository) => repository.fullName === next && repository.contentWriteCapable,
+      );
       if (!next || (next !== current && !allowed)) return;
       setGithubRepository(next);
       setGithubConnectionTest({ status: 'idle' });
@@ -1072,7 +1074,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const selected = String(githubRepository || '').trim().toLowerCase();
     if (!selected || githubAuth.state !== 'connected' || githubRepositoryStatus == null) return false;
     if (githubRepositoryStatus !== 'ready') return true;
-    return !githubRepositories.some((repository) => repository.fullName.toLowerCase() === selected);
+    const target = githubRepositories.find((repository) => repository.fullName.toLowerCase() === selected);
+    return !target?.contentWriteCapable;
   }, [githubAuth.state, githubRepositories, githubRepository, githubRepositoryStatus]);
 
   const normalizeHttpsUrlOrEmpty = (raw: string) => {
