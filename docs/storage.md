@@ -22,7 +22,7 @@
 
 认证秘密必须被排除。当前过滤至少覆盖 Notion / Feishu OAuth token、相关 client secret、Obsidian Local REST API key，以及 `github_auth_state_v1` / `github_auth_*` 中的 GitHub access token、refresh token 和 pending Device Flow credential；实际过滤逻辑以 `src/services/sync/backup/backup-utils.ts` 为准。
 
-GitHub 的 repository、branch 和三类目标目录属于非敏感配置，可按现有 storage backup 策略恢复。GitHub App Client ID 是公开应用配置；扩展中不存在 GitHub Client Secret 或 GitHub App private key。
+GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage backup 策略恢复。GitHub 三类输出目录固定为 `AIChats`、`WebArticles`、`VideosScripts`，不属于用户设置，也没有对应的 storage key。GitHub App Client ID 是公开应用配置；扩展中不存在 GitHub Client Secret 或 GitHub App private key。
 
 ## GitHub 恢复状态
 
