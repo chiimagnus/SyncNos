@@ -134,6 +134,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     githubAccount,
     githubRepositoryStatus,
     githubRepositories,
+    githubRepositoriesLoading,
+    githubRepositoryDiscoveryError,
     githubTargetUnavailable,
     githubRepository,
     onChangeGithubRepository,
@@ -386,6 +388,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           account={githubAccount}
           repositoryStatus={githubRepositoryStatus}
           repositories={githubRepositories}
+          repositoriesLoading={githubRepositoriesLoading}
+          repositoryDiscoveryError={githubRepositoryDiscoveryError}
           targetUnavailable={githubTargetUnavailable}
           repository={githubRepository}
           branch={githubBranch}

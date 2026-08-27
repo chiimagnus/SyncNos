@@ -1976,6 +1976,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     githubAccount,
     githubRepositoryStatus,
     githubRepositories,
+    githubRepositoriesLoading,
+    githubRepositoryDiscoveryError,
     githubTargetUnavailable,
     githubRepository,
     onChangeGithubRepository,

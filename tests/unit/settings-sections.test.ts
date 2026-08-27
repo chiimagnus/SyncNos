@@ -81,6 +81,8 @@ describe('settings section definitions', () => {
       account: null,
       repositoryStatus: null,
       repositories: [],
+      repositoriesLoading: false,
+      repositoryDiscoveryError: '',
       targetUnavailable: false,
       repository: '',
       branch: 'main',
@@ -234,6 +236,90 @@ describe('settings section definitions', () => {
     expect(initializeButton).toBeTruthy();
     act(() => initializeButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(callbacks.onInitializeRepository).toHaveBeenCalledTimes(1);
+
+    act(() => root.unmount());
+    cleanupDom();
+  });
+
+  it('scopes GitHub repository discovery loading and errors to repository controls', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+    const baseProps: Parameters<typeof GitHubSettingsSection>[0] = {
+      busy: false,
+      syncEnabled: true,
+      autoSyncEnabled: true,
+      auth: { state: 'connected' },
+      account: { login: 'octocat', avatarUrl: '', url: 'https://github.com/octocat' },
+      repositoryStatus: 'ready',
+      repositories: [{ fullName: 'owner/repo', contentWriteCapable: true }],
+      repositoriesLoading: true,
+      repositoryDiscoveryError: '',
+      targetUnavailable: false,
+      repository: 'owner/repo',
+      branch: 'main',
+      verificationUrl: 'https://github.com/login/device',
+      appUrl: 'https://github.com/apps/syncnos',
+      installUrl: 'https://github.com/apps/syncnos/installations/new',
+      connectionTest: { status: 'idle' },
+      githubLogoUrl: '/icons/github.svg',
+      onToggleSyncEnabled: () => {},
+      onToggleAutoSyncEnabled: () => {},
+      onConnect: () => {},
+      onCancelDeviceFlow: () => {},
+      onDisconnect: () => {},
+      onRefreshRepositories: () => {},
+      onChangeRepository: () => {},
+      onChangeBranch: () => {},
+      onSaveBranch: () => {},
+      onTestConnection: () => {},
+      onInitializeRepository: () => {},
+    };
+
+    act(() => {
+      root.render(createElement(GitHubSettingsSection, baseProps));
+    });
+
+    const repositoryTrigger = document.querySelector('button#githubRepository') as HTMLButtonElement | null;
+    const refreshButton = document.querySelector(
+      'button[aria-label="Refresh repositories"]',
+    ) as HTMLButtonElement | null;
+    const disconnectButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Disconnect',
+    ) as HTMLButtonElement | undefined;
+    const syncToggle = document.querySelector('#githubSyncEnabledToggle') as HTMLInputElement | null;
+    const autoSyncToggle = document.querySelector('#githubAutoSyncEnabledToggle') as HTMLInputElement | null;
+    const branchInput = document.querySelector('input[aria-label="Branch"]') as HTMLInputElement | null;
+    const testButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Test connection',
+    ) as HTMLButtonElement | undefined;
+    const appLink = document.querySelector('a[href="https://github.com/apps/syncnos"]') as HTMLAnchorElement | null;
+
+    expect(repositoryTrigger?.disabled).toBe(true);
+    expect(refreshButton?.disabled).toBe(true);
+    expect(refreshButton?.getAttribute('aria-busy')).toBe('true');
+    expect(refreshButton?.textContent).toContain('⏳');
+    expect(disconnectButton?.disabled).toBe(false);
+    expect(syncToggle?.disabled).toBe(false);
+    expect(autoSyncToggle?.disabled).toBe(false);
+    expect(branchInput?.disabled).toBe(false);
+    expect(testButton?.disabled).toBe(false);
+    expect(appLink).toBeTruthy();
+
+    act(() => {
+      root.render(
+        createElement(GitHubSettingsSection, {
+          ...baseProps,
+          repositoriesLoading: false,
+          repositoryDiscoveryError: 'github_repository_list_failed',
+        }),
+      );
+    });
+
+    const repositoryCard = document.querySelector('section[aria-label="Repository"]');
+    const discoveryError = document.querySelector('[data-github-repository-discovery-error="true"]');
+    expect(discoveryError?.textContent || '').toContain('github_repository_list_failed');
+    expect(repositoryCard?.contains(discoveryError)).toBe(true);
+    expect(document.querySelector('[aria-label="settings-error"]')).toBeNull();
 
     act(() => root.unmount());
     cleanupDom();
