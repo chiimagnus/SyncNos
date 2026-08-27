@@ -511,6 +511,314 @@ describe('chatgpt-collector', () => {
   });
 });
 
+describe('chatgpt expanded COT manual capture', () => {
+  const hiddenToolDetail = `${'hidden tool detail '.repeat(12)}\n\n\`\`\`ts\nconst secret = true;\n\`\`\``;
+
+  function expandedCotBody(options: {
+    firstReasoning?: string;
+    firstTool?: string;
+    secondReasoning?: string;
+    secondTool?: string;
+    transitionClass?: string;
+    transitionStyle?: string;
+    direction?: string;
+  } = {}) {
+    const firstReasoning = options.firstReasoning || 'Reasoning <strong>block one</strong>.';
+    const firstTool = options.firstTool || 'Visible tool summary one';
+    const secondReasoning = options.secondReasoning || 'Reasoning block two.';
+    const secondTool = options.secondTool || 'Visible tool summary two';
+    return `
+      <div
+        data-testid="cot-top-body"
+        data-item-anchor="start"
+        data-dimension="height"
+        data-direction="${options.direction || 'in'}"
+        class="${options.transitionClass || 'transition-body'}"
+        style="${options.transitionStyle || '--transition-progress: 1'}"
+      >
+        <div class="markdown prose"><p>${firstReasoning}</p></div>
+        <div class="tool-row">
+          <button
+            type="button"
+            aria-label="Nested tool chrome should not be saved"
+            aria-controls="cot-hidden-tool-1"
+            aria-expanded="false"
+          ></button>
+          <div class="tool-summary">
+            <span data-testid="cot-v5-tool-icon-pile"><svg aria-hidden="true"><path d="M0 0" /></svg></span>
+            <span>${firstTool}</span>
+            <svg aria-hidden="true"><path d="M1 1" /></svg>
+          </div>
+          <div id="cot-hidden-tool-1" aria-hidden="true">
+            <pre class="sr-only" aria-hidden="true"><code class="language-ts">${hiddenToolDetail}</code></pre>
+          </div>
+        </div>
+        <div class="markdown prose"><p>${secondReasoning}</p></div>
+        <div class="tool-row">
+          <button
+            type="button"
+            aria-label="Second nested tool chrome should not be saved"
+            aria-controls="cot-hidden-tool-2"
+            aria-expanded="false"
+          ></button>
+          <div class="tool-summary">
+            <span data-testid="cot-v5-tool-icon-pile"><svg aria-hidden="true"><path d="M2 2" /></svg></span>
+            <span>${secondTool}</span>
+          </div>
+          <div id="cot-hidden-tool-2" aria-hidden="true">
+            <div>${'another hidden detail '.repeat(10)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function modernCotDom(expanded = true) {
+    return setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_cot_modern">
+          <div data-message-author-role="user" data-message-id="m_user_cot">
+            <div class="whitespace-pre-wrap">Question</div>
+          </div>
+          <div data-message-author-role="assistant" data-message-id="m_assistant_first" class="text-message">
+            <div class="markdown prose"><p>First assistant answer.</p></div>
+          </div>
+          <button data-testid="cot-top-toggle" type="button" aria-expanded="${expanded ? 'true' : 'false'}">
+            TOP_TOGGLE_CHROME
+            <svg aria-hidden="true"><path d="M3 3" /></svg>
+          </button>
+          ${expanded ? expandedCotBody() : ''}
+          <div data-message-author-role="assistant" data-message-id="m_assistant_second" class="text-message">
+            <div class="markdown prose"><p>Final assistant answer.</p></div>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_cot_modern',
+    );
+  }
+
+  function buildCotDef(dom: JSDOM) {
+    (dom.window as any).scrollTo = vi.fn();
+    return createChatgptCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+  }
+
+  it('associates an expanded modern-turn COT only with the following assistant and keeps ordered visible blocks', async () => {
+    const dom = modernCotDom(true);
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    expect(snap).toBeTruthy();
+
+    const byKey = new Map(snap.messages.map((message: any) => [message.messageKey, message]));
+    expect(byKey.get('m_user_cot')?.contentText).toBe('Question');
+    expect(byKey.get('m_assistant_first')?.contentText).toBe('First assistant answer.');
+
+    const owner = byKey.get('m_assistant_second') as any;
+    expect(owner).toBeTruthy();
+    expect(owner.contentText).toBe(
+      [
+        'Reasoning block one.',
+        'Visible tool summary one',
+        'Reasoning block two.',
+        'Visible tool summary two',
+        'Final assistant answer.',
+      ].join('\n\n'),
+    );
+    expect(owner.contentMarkdown).toBe(
+      [
+        'Reasoning **block one**.',
+        'Visible tool summary one',
+        'Reasoning block two.',
+        'Visible tool summary two',
+        'Final assistant answer.',
+      ].join('\n\n'),
+    );
+    expect(owner.contentText).not.toContain('TOP_TOGGLE_CHROME');
+    expect(owner.contentText).not.toContain('Nested tool chrome should not be saved');
+    expect(owner.contentText).not.toContain('hidden tool detail');
+    expect(owner.contentMarkdown).not.toContain('const secret');
+  });
+
+  it('uses the same following-assistant ownership rule for the .agent-turn fallback', async () => {
+    const dom = setupChatgptDom(
+      `
+        <div class="agent-turn" data-turn-id="turn_cot_agent">
+          <div data-message-author-role="assistant" data-message-id="m_agent_first">
+            <div class="markdown prose"><p>Agent first.</p></div>
+          </div>
+          <button type="button" aria-expanded="true">Top COT chrome</button>
+          ${expandedCotBody({ firstReasoning: 'Agent reasoning.', firstTool: 'Agent tool summary' })}
+          <div data-message-author-role="assistant" data-message-id="m_agent_second">
+            <div class="markdown prose"><p>Agent second.</p></div>
+          </div>
+        </div>
+      `,
+      'https://chatgpt.com/c/conv_cot_agent',
+    );
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    const first = snap.messages.find((message: any) => message.messageKey === 'm_agent_first');
+    const second = snap.messages.find((message: any) => message.messageKey === 'm_agent_second');
+    expect(first.contentText).toBe('Agent first.');
+    expect(second.contentText).toContain('Agent reasoning.');
+    expect(second.contentText).toContain('Agent tool summary');
+    expect(second.contentText).toMatch(/Agent reasoning\.[\s\S]*Agent second\./);
+  });
+
+  it('keeps collapsed top COT answer-only', async () => {
+    const dom = modernCotDom(false);
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    const owner = snap.messages.find((message: any) => message.messageKey === 'm_assistant_second');
+    expect(owner.contentText).toBe('Final assistant answer.');
+    expect(owner.contentMarkdown).toBe('Final assistant answer.');
+  });
+
+  it('fingerprints only visible COT semantics, not hidden tool details or transition attributes', () => {
+    const dom = modernCotDom(true);
+    const def = buildCotDef(dom);
+    const adapter = def.collector.__test.manualAdapter;
+    const beforeWindow = adapter.readWindow();
+    const beforeByKey = new Map(beforeWindow.descriptors.map((descriptor: any) => [descriptor.key, descriptor]));
+    const ownerBefore: any = beforeByKey.get('m_assistant_second');
+    const firstBefore: any = beforeByKey.get('m_assistant_first');
+    const userBefore: any = beforeByKey.get('m_user_cot');
+    const ownerInput = beforeWindow.inputsByKey.get('m_assistant_second');
+
+    expect(ownerInput.cotOuterHtml).toEqual(expect.any(String));
+    expect(ownerInput.cotOuterHtml).not.toContain('cot-hidden-tool-1');
+    expect(ownerInput.cotOuterHtml).not.toContain('hidden tool detail');
+    expect(JSON.parse(JSON.stringify(ownerInput))).toEqual(ownerInput);
+    expect(Object.values(ownerInput).some((value) => value instanceof dom.window.Element)).toBe(false);
+
+    const hidden = dom.window.document.querySelector('#cot-hidden-tool-1 code') as HTMLElement;
+    hidden.textContent = `${'changed hidden detail '.repeat(20)}\nconst hiddenChanged = true;`;
+    const body = dom.window.document.querySelector('[data-testid="cot-top-body"]') as HTMLElement;
+    body.className = 'completely-different-transition-class';
+    body.style.cssText = '--transition-progress: 0.42; opacity: 0.5';
+    body.setAttribute('data-direction', 'out');
+
+    const cosmeticByKey = new Map(adapter.readDescriptors().map((descriptor: any) => [descriptor.key, descriptor]));
+    expect((cosmeticByKey.get('m_assistant_second') as any).fingerprint).toBe(ownerBefore.fingerprint);
+    expect((cosmeticByKey.get('m_assistant_first') as any).fingerprint).toBe(firstBefore.fingerprint);
+    expect((cosmeticByKey.get('m_user_cot') as any).fingerprint).toBe(userBefore.fingerprint);
+
+    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
+    toggle.setAttribute('aria-expanded', 'false');
+    const collapsedByKey = new Map(adapter.readDescriptors().map((descriptor: any) => [descriptor.key, descriptor]));
+    expect((collapsedByKey.get('m_assistant_second') as any).fingerprint).not.toBe(ownerBefore.fingerprint);
+    expect((collapsedByKey.get('m_assistant_first') as any).fingerprint).toBe(firstBefore.fingerprint);
+    expect((collapsedByKey.get('m_user_cot') as any).fingerprint).toBe(userBefore.fingerprint);
+  });
+
+  it('fails safe for unrelated expanded accordions, user collapse controls, and assistant-internal accordions', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_negative_cot">
+          <button type="button" aria-expanded="true">Unrelated accordion</button>
+          <div><div class="markdown prose"><p>UNRELATED_ACCORDION_CONTENT</p></div></div>
+
+          <button
+            type="button"
+            data-testid="collapsible-user-message-toggle"
+            aria-controls="user-long-message"
+            aria-expanded="true"
+          >Show less</button>
+          <div id="user-long-message"><p>USER_COLLAPSE_CONTENT</p></div>
+
+          <div data-message-author-role="assistant" data-message-id="m_negative_owner">
+            <button type="button" aria-expanded="true">Internal accordion</button>
+            <div data-item-anchor="start" data-dimension="height">
+              <p>INTERNAL_ACCORDION_CONTENT</p>
+            </div>
+            <div class="markdown prose"><p>Safe final answer.</p></div>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_negative_cot',
+    );
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0].contentText).toBe('Safe final answer.');
+    expect(snap.messages[0].contentText).not.toContain('UNRELATED_ACCORDION_CONTENT');
+    expect(snap.messages[0].contentText).not.toContain('USER_COLLAPSE_CONTENT');
+    expect(snap.messages[0].contentText).not.toContain('INTERNAL_ACCORDION_CONTENT');
+  });
+
+  it('supports the verified transition-body fallback without broad accordion matching', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_fallback_cot">
+          <button type="button" aria-expanded="true">Top COT chrome</button>
+          <div data-item-anchor="start" data-dimension="height"><p>Markerless reasoning summary.</p></div>
+          <div data-message-author-role="assistant" data-message-id="m_fallback_cot">
+            <div class="markdown prose"><p>Fallback final answer.</p></div>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_fallback_cot',
+    );
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    expect(snap.messages[0].contentText).toBe('Markerless reasoning summary.\n\nFallback final answer.');
+  });
+
+  it('keeps COT snapshot and fingerprint empty for Deep Research placeholders', async () => {
+    const reportUrl = 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-cot';
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_dr_cot">
+          <button data-testid="cot-top-toggle" type="button" aria-expanded="true">Top COT chrome</button>
+          ${expandedCotBody({ firstReasoning: 'Reasoning that must not alter Deep Research.' })}
+          <div data-message-author-role="assistant" data-message-id="m_dr_cot">
+            <iframe title="internal://deep-research" src="${reportUrl}"></iframe>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_dr_cot',
+    );
+    const def = buildCotDef(dom);
+    const before = def.collector.__test.manualAdapter.readWindow();
+    const descriptorBefore = before.descriptors.find((descriptor: any) => descriptor.key === 'm_dr_cot');
+    const inputBefore = before.inputsByKey.get('m_dr_cot');
+    expect(inputBefore.cotOuterHtml).toBe('');
+
+    const reasoning = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown p') as HTMLElement;
+    reasoning.textContent = 'Changed COT that Deep Research must ignore.';
+    const descriptorAfter = def.collector.__test.manualAdapter
+      .readDescriptors()
+      .find((descriptor: any) => descriptor.key === 'm_dr_cot');
+    expect(descriptorAfter.fingerprint).toBe(descriptorBefore.fingerprint);
+
+    const snap = (await capturePrepared(def)) as any;
+    expect(snap.messages[0].contentText).toBe(`Deep Research (iframe): ${reportUrl}`);
+    expect(snap.messages[0].contentMarkdown).toBe(`Deep Research (iframe): ${reportUrl}`);
+  });
+
+  it('keeps prepared COT capture plain-data and JSON round-trippable', async () => {
+    const dom = modernCotDom(true);
+    const def = buildCotDef(dom);
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    expect(prepared).toBeTruthy();
+    expect(JSON.parse(JSON.stringify(prepared))).toEqual(prepared);
+
+    const containsElement = (value: any): boolean => {
+      if (value instanceof dom.window.Element) return true;
+      if (!value || typeof value !== 'object') return false;
+      return Object.values(value).some((child) => containsElement(child));
+    };
+    expect(containsElement(prepared)).toBe(false);
+    const ownerRecord = prepared.records.find((record: any) => record.key === 'm_assistant_second');
+    expect(ownerRecord.payload.contentText).toContain('Reasoning block one.');
+  });
+});
+
 describe('chatgpt turn identity primitive', () => {
   it('resolves the same turn UUID from a role node and its shell', () => {
     const dom = new JSDOM(`<!DOCTYPE html><html><body>
