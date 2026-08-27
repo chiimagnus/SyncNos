@@ -35,6 +35,7 @@ vi.mock('@services/shared/storage', () => ({
 }));
 
 import { t } from '@i18n';
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY } from '@services/integrations/detail-header-copy-link-preference';
 import { DETAIL_HEADER_ACTION_LABELS, resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/openin-detail-header-actions';
@@ -78,6 +79,25 @@ function createPort() {
     launchProtocolUrl: vi.fn(async () => true),
     wait: vi.fn(async () => {}),
     reportError: vi.fn(),
+  };
+}
+
+function githubMapping(conversation: any, overrides: Record<string, unknown> = {}) {
+  const markdownPath = `AIChats/${buildConversationBasename(conversation)}.md`;
+  return {
+    markdownPath,
+    mapping: {
+      githubRemoteKey: 'github.com/octocat/sync-notes@feature/github-links',
+      githubLastSyncedAt: 1_725_000_000_000,
+      githubManagedFiles: {
+        [markdownPath]: {
+          kind: 'markdown',
+          contentHash: 'a'.repeat(64),
+          sha: 'b'.repeat(40),
+        },
+      },
+      ...overrides,
+    },
   };
 }
 
@@ -189,6 +209,98 @@ describe('detail-header-actions', () => {
     expect(copyAction?.href).toBe(openAction?.href);
     expect(copyAction?.provider).toBe('feishu');
     expect(copyAction?.kind).toBe('copy-text');
+  });
+
+  it('opens and copies the exact GitHub Markdown URL from successful sync continuity', async () => {
+    const conversation = {
+      id: 31,
+      source: 'chatgpt',
+      conversationKey: 'conv-31',
+      title: 'GitHub 链接 test',
+    };
+    const { mapping, markdownPath } = githubMapping(conversation);
+    getSyncMappingByConversationMock.mockResolvedValue({ conversation, mapping });
+    const port = createPort();
+
+    const actions = await resolveDetailHeaderActions({ conversation, port });
+    const openAction = byId(actions, 'open-in-github');
+    const copyAction = byId(actions, 'copy-github-link');
+    const encodedPath = markdownPath
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    const expectedUrl = `https://github.com/octocat/sync-notes/blob/feature/github-links/${encodedPath}`;
+
+    expect(openAction?.label).toBe(DETAIL_HEADER_ACTION_LABELS.openInGithub);
+    expect(openAction?.provider).toBe('github');
+    expect(openAction?.href).toBe(expectedUrl);
+    expect(copyAction?.provider).toBe('github');
+    expect(copyAction?.href).toBe(expectedUrl);
+    expect(copyAction?.afterTriggerLabel).toBe('Copied');
+
+    await openAction?.onTrigger();
+    expect(port.openExternalUrl).toHaveBeenCalledWith(expectedUrl);
+    await copyAction?.onTrigger();
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith(expectedUrl);
+  });
+
+  it('keeps the last successfully synced GitHub path available after a local title change', async () => {
+    const syncedConversation = {
+      id: 32,
+      source: 'chatgpt',
+      conversationKey: 'conv-32',
+      title: 'Old title',
+    };
+    const currentConversation = { ...syncedConversation, title: 'New title before next sync' };
+    const { mapping, markdownPath } = githubMapping(syncedConversation);
+    getSyncMappingByConversationMock.mockResolvedValue({ conversation: currentConversation, mapping });
+
+    const actions = await resolveDetailHeaderActions({ conversation: currentConversation, port: createPort() });
+    const encodedPath = markdownPath
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    const expectedUrl = `https://github.com/octocat/sync-notes/blob/feature/github-links/${encodedPath}`;
+
+    expect(byId(actions, 'open-in-github')?.href).toBe(expectedUrl);
+    expect(byId(actions, 'copy-github-link')?.href).toBe(expectedUrl);
+  });
+
+  it('does not expose GitHub actions for incomplete or ambiguous continuity', async () => {
+    const conversation = {
+      id: 33,
+      source: 'chatgpt',
+      conversationKey: 'conv-33',
+      title: 'Conversation',
+    };
+    const valid = githubMapping(conversation);
+
+    getSyncMappingByConversationMock.mockResolvedValueOnce({
+      conversation,
+      mapping: { ...valid.mapping, githubLastSyncedAt: undefined },
+    });
+    const incompleteActions = await resolveDetailHeaderActions({ conversation, port: createPort() });
+    expect(byId(incompleteActions, 'open-in-github')).toBeUndefined();
+    expect(byId(incompleteActions, 'copy-github-link')).toBeUndefined();
+
+    const secondOwnedMarkdownPath = `AIChats/${buildConversationBasename({ ...conversation, title: 'Previous title' })}.md`;
+    getSyncMappingByConversationMock.mockResolvedValueOnce({
+      conversation,
+      mapping: {
+        ...valid.mapping,
+        githubManagedFiles: {
+          ...(valid.mapping.githubManagedFiles as Record<string, unknown>),
+          [secondOwnedMarkdownPath]: {
+            kind: 'markdown',
+            contentHash: 'c'.repeat(64),
+            sha: 'd'.repeat(40),
+          },
+        },
+      },
+    });
+    const ambiguousActions = await resolveDetailHeaderActions({ conversation, port: createPort() });
+    expect(byId(ambiguousActions, 'open-in-github')).toBeUndefined();
+    expect(byId(ambiguousActions, 'copy-github-link')).toBeUndefined();
   });
 
   it('keeps copy provider order stable when Notion and Feishu are both available', async () => {
