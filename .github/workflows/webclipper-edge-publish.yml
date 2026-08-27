@@ -90,7 +90,8 @@ jobs:
             --zip \
             --zip-name="SyncNos-WebClipper-edge-${{ steps.tag.outputs.name }}.zip"
 
-      # Required secrets:
+      # Required secrets. Edge Publish API v1.1 API keys expire every 72 days,
+      # so EDGE_ADDONS_CLIENT_ID and EDGE_ADDONS_API_KEY must be rotated together.
       # - EDGE_ADDONS_CLIENT_ID
       # - EDGE_ADDONS_API_KEY
       # - EDGE_ADDONS_PRODUCT_ID

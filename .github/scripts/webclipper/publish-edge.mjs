@@ -38,6 +38,15 @@ async function sleep(ms) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+function edgeHttpErrorMessage({ method, url, status, body }) {
+  const responseBody = String(body || '').trim() || '(empty response body)';
+  const authHint =
+    status === 401
+      ? '\n[edge] authentication failed. Microsoft Edge Publish API v1.1 API keys expire every 72 days. Renew the API credentials in Partner Center, then replace GitHub Actions secrets EDGE_ADDONS_CLIENT_ID and EDGE_ADDONS_API_KEY.'
+      : '';
+  return `[edge] ${method} ${url} failed (${status}):\n${responseBody}${authHint}`;
+}
+
 async function edgeRequest({ method, url, clientId, apiKey, headers, body }) {
   const res = await fetch(url, {
     method,
@@ -59,7 +68,7 @@ async function edgeRequest({ method, url, clientId, apiKey, headers, body }) {
 
   if (!res.ok) {
     const msg = json ? JSON.stringify(json, null, 2) : text;
-    throw new Error(`[edge] ${method} ${url} failed (${res.status}):\n${msg}`);
+    throw new Error(edgeHttpErrorMessage({ method, url, status: res.status, body: msg }));
   }
 
   return { res, text, json };
