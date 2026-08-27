@@ -18,7 +18,7 @@ function fixedClock(now = 1_000): GithubApiClock {
 }
 
 describe('github api client', () => {
-  it('centralizes GitHub headers and decodes GET/POST/PATCH JSON', async () => {
+  it('centralizes GitHub headers and decodes GET/POST/PATCH/PUT JSON', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       requests.push({ url: String(url), init });
@@ -35,11 +35,16 @@ describe('github api client', () => {
     expect(await client.get('/user')).toEqual({ ok: true, method: 'GET' });
     expect(await client.post('/git/blobs', { content: 'hello' })).toEqual({ ok: true, method: 'POST' });
     expect(await client.patch('/git/refs/heads/main', { force: false })).toEqual({ ok: true, method: 'PATCH' });
+    expect(await client.put('/repos/owner/repo/contents/README.md', { content: 'IyBTeW5jTm9z' })).toEqual({
+      ok: true,
+      method: 'PUT',
+    });
 
     expect(requests.map((request) => request.url)).toEqual([
       'https://api.github.com/user',
       'https://api.github.com/git/blobs',
       'https://api.github.com/git/refs/heads/main',
+      'https://api.github.com/repos/owner/repo/contents/README.md',
     ]);
     for (const request of requests) {
       expect(request.init?.headers).toMatchObject({
@@ -52,6 +57,7 @@ describe('github api client', () => {
     expect(requests[1].init?.headers).toMatchObject({ 'Content-Type': 'application/json' });
     expect(requests[1].init?.body).toBe('{"content":"hello"}');
     expect(requests[2].init?.body).toBe('{"force":false}');
+    expect(requests[3].init?.body).toBe('{"content":"IyBTeW5jTm9z"}');
   });
 
   it('turns a mutation timeout into outcome_unknown without retrying or clearing auth', async () => {

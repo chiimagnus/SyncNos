@@ -178,7 +178,7 @@ export function createGithubApiClient({
   let lastMutationStartedAt = Number.NEGATIVE_INFINITY;
 
   async function performAttempt<T>(
-    method: 'GET' | 'POST' | 'PATCH',
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
     path: string,
     options: GithubRequestOptions,
   ): Promise<T> {
@@ -288,7 +288,7 @@ export function createGithubApiClient({
     lastMutationStartedAt = clock.now();
   }
 
-  async function executeMutation<T>(method: 'POST' | 'PATCH', path: string, options: GithubRequestOptions): Promise<T> {
+  async function executeMutation<T>(method: 'POST' | 'PATCH' | 'PUT', path: string, options: GithubRequestOptions): Promise<T> {
     for (let attempt = 1; attempt <= GITHUB_MUTATION_RATE_LIMIT_MAX_ATTEMPTS; attempt += 1) {
       await paceMutation();
       try {
@@ -321,7 +321,7 @@ export function createGithubApiClient({
   }
 
   return {
-    request: <T>(method: 'GET' | 'POST' | 'PATCH', path: string, options: GithubRequestOptions = {}) =>
+    request: <T>(method: 'GET' | 'POST' | 'PATCH' | 'PUT', path: string, options: GithubRequestOptions = {}) =>
       method === 'GET'
         ? executeRead<T>(path, options)
         : enqueueMutation(() => executeMutation<T>(method, path, options)),
@@ -330,6 +330,8 @@ export function createGithubApiClient({
       enqueueMutation(() => executeMutation<T>('POST', path, { ...options, body })),
     patch: <T>(path: string, body?: unknown, options?: Omit<GithubRequestOptions, 'body'>) =>
       enqueueMutation(() => executeMutation<T>('PATCH', path, { ...options, body })),
+    put: <T>(path: string, body?: unknown, options?: Omit<GithubRequestOptions, 'body'>) =>
+      enqueueMutation(() => executeMutation<T>('PUT', path, { ...options, body })),
   };
 }
 
