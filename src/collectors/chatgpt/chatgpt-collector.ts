@@ -273,13 +273,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return env.document.querySelector('main') || env.document.querySelector("[role='main']") || env.document.body;
   }
 
-  function inEditMode(root: any): any {
-    if (!root) return false;
-    const ta = root.querySelector('textarea');
-    if (!ta) return false;
-    return env.document.activeElement === ta || ta.contains(env.document.activeElement);
-  }
-
   function userContentNode(element: any): any {
     return element.querySelector('.whitespace-pre-wrap') || element;
   }
@@ -366,55 +359,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (wrapper && wrapper.classList && wrapper.classList.contains('agent-turn')) return 'assistant';
     if (wrapper && wrapper.querySelector && wrapper.querySelector("div[class*='user']")) return 'user';
     return 'assistant';
-  }
-
-  // Extract a single message from one turn wrapper. Returns null when the wrapper has no
-  // textual content and no images (e.g. virtualized empty shells), so callers can skip it.
-  async function extractMessageFromWrapper(el: any, i: number, { messageKeyOverride }: any = {}): Promise<any | null> {
-    const role = roleFromWrapper(el);
-    const messageId =
-      (el.getAttribute && (el.getAttribute('data-message-id') || el.getAttribute('data-turn-id') || el.id)) || '';
-    const node = role === 'user' ? userContentNode(el) : assistantContentNode(el);
-    const raw = node ? node.innerText || node.textContent || '' : '';
-    const fallbackText = env.normalize.normalizeText(raw);
-    let contentText =
-      role === 'assistant' && typeof chatgptMarkdown.extractAssistantText === 'function'
-        ? chatgptMarkdown.extractAssistantText(el) || fallbackText
-        : fallbackText;
-    const imageUrls = (() => {
-      const primary = extractChatgptImageUrls(node || el);
-      if (!node || node === el) return primary;
-      const secondary = extractChatgptImageUrls(el);
-      return Array.from(new Set(primary.concat(secondary)));
-    })();
-
-    let baseMarkdown =
-      role === 'assistant' && typeof chatgptMarkdown.extractAssistantMarkdown === 'function'
-        ? chatgptMarkdown.extractAssistantMarkdown(el) || contentText || ''
-        : contentText || '';
-
-    const deepResearchIframe = role === 'assistant' ? findDeepResearchIframe(el) : null;
-    if (role === 'assistant' && deepResearchIframe) {
-      const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
-      const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
-      contentText = placeholder;
-      baseMarkdown = placeholder;
-    }
-
-    if (!contentText && !imageUrls.length) return null;
-    const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
-    const messageKey =
-      String(messageKeyOverride || '').trim() ||
-      messageId ||
-      env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
-    return {
-      messageKey,
-      role,
-      contentText,
-      contentMarkdown,
-      sequence: i,
-      updatedAt: Date.now(),
-    };
   }
 
   function compactFingerprintPart(value: string): string {
@@ -551,21 +495,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     readWindow: () => readCurrentManualWindow(true),
     getExtractionCount: () => manualExtractionCount,
   };
-
-  async function collectMessages({ allowEditing }: any = {}): Promise<any[]> {
-    const root = getConversationRoot();
-    if (!root) return [];
-    if (!allowEditing && inEditMode(root)) return [];
-
-    const wrappers = getTurnWrappers(root);
-    const out: any[] = [];
-    for (let i = 0; i < wrappers.length; i += 1) {
-      const msg = await extractMessageFromWrapper(wrappers[i], i);
-      if (msg) out.push(msg);
-    }
-
-    return out;
-  }
 
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
@@ -743,7 +672,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       identityConversationKey,
       manualAdapter,
       getRoot: getConversationRoot,
-      collectMessages,
     },
   };
 
