@@ -363,6 +363,19 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     return stageResolved(ids, mode, settings, preflight);
   }
 
+  async function getSyncStatus(input: { instanceId?: string } = {}) {
+    return {
+      provider: 'github' as const,
+      job: await services.jobStore.getJob(),
+      instanceId: safeString(input.instanceId),
+    };
+  }
+
+  async function clearSyncStatus(input: { instanceId?: string } = {}) {
+    await services.jobStore.setJob(null);
+    return { provider: 'github' as const, job: null, instanceId: safeString(input.instanceId) };
+  }
+
   async function sync(input: {
     conversationIds?: readonly unknown[];
     mode?: GithubSyncPlannerMode;
@@ -743,7 +756,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     }
   }
 
-  return { stage, sync };
+  return { stage, sync, getSyncStatus, clearSyncStatus };
 }
 
 export const githubSyncOrchestrator = createGithubSyncOrchestrator();

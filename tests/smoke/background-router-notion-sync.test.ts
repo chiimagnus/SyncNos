@@ -167,6 +167,11 @@ function createRouter({
       clearSyncStatus: async () => ({ job: null }),
       syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
     },
+    githubSyncOrchestrator: {
+      getSyncStatus: async () => ({ job: null }),
+      clearSyncStatus: async () => ({ job: null }),
+      sync: async () => ({ summary: { syncedCount: 0, failedCount: 0 } }),
+    },
   });
 
   return router;

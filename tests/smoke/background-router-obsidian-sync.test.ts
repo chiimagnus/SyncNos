@@ -92,6 +92,11 @@ describe('background-router obsidian sync routes', () => {
           return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
         },
       },
+      githubSyncOrchestrator: {
+        getSyncStatus: async () => ({ job: null }),
+        clearSyncStatus: async () => ({ job: null }),
+        sync: async () => ({ summary: { syncedCount: 0, failedCount: 0 } }),
+      },
     });
 
     store['webclipper_sync_provider_obsidian_enabled'] = false;

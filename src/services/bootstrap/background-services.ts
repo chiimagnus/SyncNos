@@ -21,6 +21,7 @@ import {
   getSyncStatus as getFeishuSyncStatus,
   syncConversations as feishuSyncConversations,
 } from '@services/sync/feishu/feishu-sync-orchestrator.ts';
+import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
 
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import {
@@ -69,6 +70,8 @@ export type FeishuSyncOrchestrator = {
   clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
 };
 
+export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestrator>;
+
 export type BackgroundServices = {
   articleFetchService: typeof articleFetchService;
   conversationKinds: typeof conversationKinds;
@@ -76,6 +79,7 @@ export type BackgroundServices = {
   notionSyncOrchestrator: NotionSyncOrchestrator;
   obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
   feishuSyncOrchestrator: FeishuSyncOrchestrator;
+  githubSyncOrchestrator: GithubSyncOrchestrator;
   autoSync: {
     notionScheduler: NotionAutoSyncScheduler;
     obsidianScheduler: ObsidianAutoSyncScheduler;
@@ -96,6 +100,8 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
     syncService: notionSyncService,
     jobStore: notionSyncJobStore,
   });
+
+  const githubSyncOrchestrator = createGithubSyncOrchestrator();
 
   const notionScheduler = createNotionAutoSyncScheduler({
     getInstanceId: deps.getInstanceId,
@@ -124,6 +130,7 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
     conversationKinds,
     notionSyncJobStore,
     notionSyncOrchestrator,
+    githubSyncOrchestrator,
     autoSync: {
       notionScheduler,
       obsidianScheduler,

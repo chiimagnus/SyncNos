@@ -74,6 +74,7 @@ export default defineBackground(() => {
     notionSyncOrchestrator: services.notionSyncOrchestrator,
     obsidianSyncOrchestrator: services.obsidianSyncOrchestrator,
     feishuSyncOrchestrator: services.feishuSyncOrchestrator,
+    githubSyncOrchestrator: services.githubSyncOrchestrator,
   });
 
   router.start();
