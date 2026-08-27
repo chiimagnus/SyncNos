@@ -129,6 +129,22 @@ function createTurndownService() {
     },
   });
 
+  turndown.addRule('syncnos-wechat-embedded-video', {
+    filter(node) {
+      const el = node as Element;
+      return el?.getAttribute?.('data-syncnos-origin') === 'wechat-embedded-video';
+    },
+    replacement(_content, node) {
+      const el = node as Element;
+      const coverUrl = normalizeText(el?.querySelector?.('img[src]')?.getAttribute?.('src') || '');
+      const playerUrl = normalizeText(el?.querySelector?.('a[href]')?.getAttribute?.('href') || '');
+      const blocks: string[] = [];
+      if (coverUrl) blocks.push(`![微信视频](${coverUrl})`);
+      blocks.push(playerUrl ? `[微信视频](${playerUrl})` : '微信视频');
+      return `\n\n${blocks.join('\n\n')}\n\n`;
+    },
+  });
+
   turndown.addRule('syncnos-summary', {
     filter: 'summary',
     replacement(content) {
