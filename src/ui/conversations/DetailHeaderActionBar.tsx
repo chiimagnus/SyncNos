@@ -110,6 +110,10 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
+  const copyOnly = actions.every((action) => action.kind === 'copy-text');
+  const resolveActionTooltipAttrs = (action: DetailHeaderAction) =>
+    action.kind === 'copy-text' ? {} : tooltipAttrs(action.label);
+
   const resolveActionIcon = (action: DetailHeaderAction) => {
     if (action.kind === 'copy-text' && copiedActionId === action.id) {
       return (
@@ -174,7 +178,7 @@ export function DetailHeaderActionBar({
         <button
           key={action.id}
           type="button"
-          {...tooltipAttrs(action.label)}
+          {...resolveActionTooltipAttrs(action)}
           onClick={() => {
             void handleTrigger(action);
             closeMenuOnActionTrigger?.();
@@ -204,7 +208,7 @@ export function DetailHeaderActionBar({
         <button
           key={primaryAction.id}
           type="button"
-          {...tooltipAttrs(primaryAction.label)}
+          {...resolveActionTooltipAttrs(primaryAction)}
           onClick={() => {
             void handleTrigger(primaryAction);
             closeMenuOnActionTrigger?.();
@@ -228,7 +232,7 @@ export function DetailHeaderActionBar({
           trigger={(triggerProps) => (
             <button
               {...triggerProps}
-              {...tooltipAttrs(resolvedMenuTriggerLabel)}
+              {...(copyOnly ? {} : tooltipAttrs(resolvedMenuTriggerLabel))}
               aria-label={resolvedMenuTriggerAriaLabel}
               className={buttonClassName}
             >

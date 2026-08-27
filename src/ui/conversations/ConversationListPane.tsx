@@ -774,23 +774,14 @@ export function ConversationListPane({
                   </div>
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrs(
-                        copiedId === id
-                          ? `${t('copied')} · ${t('tooltipCopyFullMarkdownDetailed')}`
-                          : t('tooltipCopyFullMarkdownDetailed'),
-                      )}
+                    <button
+                      className={buttonMiniIconClassName(isActive)}
+                      type="button"
+                      aria-label={t('copyFullMarkdown')}
+                      onClick={(e) => void onCopyConversation(conversation as any, e)}
                     >
-                      <button
-                        className={buttonMiniIconClassName(isActive)}
-                        type="button"
-                        aria-label={t('copyFullMarkdown')}
-                        onClick={(e) => void onCopyConversation(conversation as any, e)}
-                      >
-                        {copiedId === id ? '✓' : '⧉'}
-                      </button>
-                    </span>
+                      {copiedId === id ? '✓' : '⧉'}
+                    </button>
 
                     <button
                       type="button"

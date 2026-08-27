@@ -189,6 +189,7 @@ describe('ConversationListPane row actions', () => {
     expect(copyButton).toBeTruthy();
     expect(document.querySelector('[data-conversation-source-link="11"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="openOriginalChat"]')).toBeNull();
+    expect(copyButton?.getAttribute('data-tooltip-id')).toBeNull();
     expect(copyButton?.textContent).toBe('⧉');
 
     await act(async () => {

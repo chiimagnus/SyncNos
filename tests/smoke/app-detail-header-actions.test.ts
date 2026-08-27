@@ -295,6 +295,8 @@ describe('ConversationDetailPane header actions', () => {
     const primaryButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
     expect(trigger).toBeTruthy();
     expect(primaryButton).toBeTruthy();
+    expect(trigger?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(primaryButton?.getAttribute('data-tooltip-id')).toBeNull();
     expect(document.querySelectorAll('[aria-label="Copy destinations"][aria-haspopup="menu"]')).toHaveLength(1);
     expect(trigger?.closest('.tw-order-1')).toBeTruthy();
 

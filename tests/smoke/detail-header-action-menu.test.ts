@@ -81,6 +81,7 @@ describe('DetailHeaderActionBar', () => {
     const logo = button?.querySelector('[data-provider-logo="notion"]') as HTMLImageElement | null;
     expect(logo?.getAttribute('src')).toBe('/icons/notion.svg');
     expect(logo?.className).toContain('webclipper-provider-logo--notion');
+    expect(button?.getAttribute('data-tooltip-id')).toBe('webclipper-tooltip');
     expect(button?.textContent).not.toContain('▾');
   });
 
@@ -298,6 +299,7 @@ describe('DetailHeaderActionBar', () => {
       const button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
       expect(button).toBeTruthy();
       expect(button?.textContent || '').not.toContain('Copy Notion link');
+      expect(button?.getAttribute('data-tooltip-id')).toBeNull();
       expect(button?.querySelector('[data-provider-logo="notion"]')?.className || '').toContain('tw-h-4 tw-w-4');
 
       await act(async () => {
