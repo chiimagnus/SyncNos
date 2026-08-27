@@ -332,6 +332,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubAccount, setGithubAccount] = useState<GithubSafeAccount | null>(null);
   const [githubRepositoryStatus, setGithubRepositoryStatus] = useState<GithubRepositoryStatus>(null);
   const [githubRepositories, setGithubRepositories] = useState<GithubRepositoryOption[]>([]);
+  const [, setGithubRepositoriesLoading] = useState(false);
+  const [, setGithubRepositoryDiscoveryError] = useState('');
+  const githubRepositoryDiscoveryGenerationRef = useRef(0);
   const [githubRepository, setGithubRepository] = useState('');
   const [githubBranch, setGithubBranch] = useState('');
   const githubPersistedBranchRef = useRef('');
@@ -426,9 +429,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const clearGithubRepositoryDiscovery = useCallback(() => {
+    githubRepositoryDiscoveryGenerationRef.current += 1;
     setGithubAccount(null);
     setGithubRepositoryStatus(null);
     setGithubRepositories([]);
+    setGithubRepositoriesLoading(false);
+    setGithubRepositoryDiscoveryError('');
   }, []);
 
   const applyGithubAuth = useCallback(
@@ -466,10 +472,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [applyGithubAuth, applyGithubTargetSettings],
   );
 
-  const loadGithubRepositoriesInternal = useCallback(async () => {
+  const runGithubRepositoryDiscovery = useCallback(async () => {
+    const requestGeneration = githubRepositoryDiscoveryGenerationRef.current + 1;
+    githubRepositoryDiscoveryGenerationRef.current = requestGeneration;
     setGithubConnectionTest({ status: 'idle' });
+    setGithubRepositoryDiscoveryError('');
+    setGithubRepositoriesLoading(true);
+
     try {
       const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES, {}));
+      if (githubRepositoryDiscoveryGenerationRef.current !== requestGeneration) return;
+
       const status: GithubRepositoryStatus =
         data?.status === 'ready' ||
         data?.status === 'github_app_not_installed' ||
@@ -490,15 +503,26 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setGithubRepositories(normalizeGithubRepositoryOptions(data?.repositories));
       if (data?.appUrl) setGithubAppUrl(String(data.appUrl));
       if (data?.installUrl) setGithubInstallUrl(String(data.installUrl));
-      return data;
     } catch (error) {
-      if (toErrorMessage(error, '') === 'github_auth_required') {
-        setGithubAuth({ state: 'disconnected' });
-        clearGithubRepositoryDiscovery();
+      if (githubRepositoryDiscoveryGenerationRef.current !== requestGeneration) return;
+      const message = toErrorMessage(error, 'github_repository_list_failed');
+      if (message === 'github_auth_required') {
+        applyGithubAuth({ state: 'disconnected' });
+        return;
       }
-      throw error;
+      setGithubRepositoryDiscoveryError(message);
+    } finally {
+      if (githubRepositoryDiscoveryGenerationRef.current === requestGeneration) {
+        setGithubRepositoriesLoading(false);
+      }
     }
-  }, [clearGithubRepositoryDiscovery]);
+  }, [applyGithubAuth]);
+
+  useEffect(() => {
+    return () => {
+      githubRepositoryDiscoveryGenerationRef.current += 1;
+    };
+  }, []);
 
   const refreshGithubAuthFromStorageSignal = useCallback(async () => {
     try {
@@ -625,7 +649,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     const githubSettings = unwrap(githubRes);
     const githubAuthState = applyGithubSettingsResponse(githubSettings);
-    if (githubAuthState.state === 'connected') await loadGithubRepositoriesInternal();
+    if (githubAuthState.state === 'connected') await runGithubRepositoryDiscovery();
 
     const chatWith = await loadChatWithSettings();
     setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
@@ -637,7 +661,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     applyGithubSettingsResponse,
     articleDbSpec.storageKey,
     chatDbSpec.storageKey,
-    loadGithubRepositoriesInternal,
+    runGithubRepositoryDiscovery,
     videoDbSpec.storageKey,
   ]);
 
@@ -977,11 +1001,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       async () => {
         const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW, {}));
         const auth = applyGithubAuth(data?.auth);
-        if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+        if (auth.state === 'connected') await runGithubRepositoryDiscovery();
       },
       { fallbackMessage: 'github_device_start_failed' },
     );
-  }, [applyGithubAuth, loadGithubRepositoriesInternal, runTask]);
+  }, [applyGithubAuth, runGithubRepositoryDiscovery, runTask]);
 
   const onPollGithubDeviceFlow = useCallback(async () => {
     await runTask(
@@ -989,14 +1013,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         try {
           const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, {}));
           const auth = applyGithubAuth(data?.auth);
-          if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+          if (auth.state === 'connected') await runGithubRepositoryDiscovery();
         } catch (error) {
           // P2 may have advanced nextPollAt or cleared a terminal flow before returning an error.
           // Rehydrate only the safe local DTO so the timer follows the persisted state instead of stale React state.
           try {
             const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
             const auth = applyGithubSettingsResponse(snapshot);
-            if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+            if (auth.state === 'connected') await runGithubRepositoryDiscovery();
           } catch (_refreshError) {
             // Keep the original poll error; GET_SETTINGS is recovery, not a replacement failure surface.
           }
@@ -1005,7 +1029,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       },
       { useBusy: false, clearError: false, fallbackMessage: 'github_device_poll_failed' },
     );
-  }, [applyGithubAuth, applyGithubSettingsResponse, loadGithubRepositoriesInternal, runTask]);
+  }, [applyGithubAuth, applyGithubSettingsResponse, runGithubRepositoryDiscovery, runTask]);
 
   useEffect(() => {
     if (githubAuth.state !== 'pending') return;
@@ -1038,13 +1062,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [applyGithubAuth, runTask]);
 
   const onRefreshGithubRepositories = useCallback(async () => {
-    await runTask(
-      async () => {
-        await loadGithubRepositoriesInternal();
-      },
-      { fallbackMessage: 'github_repository_list_failed' },
-    );
-  }, [loadGithubRepositoriesInternal, runTask]);
+    await runGithubRepositoryDiscovery();
+  }, [runGithubRepositoryDiscovery]);
 
   const onChangeGithubRepository = useCallback(
     async (value: string) => {

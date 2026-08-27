@@ -65,6 +65,7 @@ vi.mock('@i18n', () => ({
 
 type Snapshot = ReturnType<typeof useSettingsSceneController>;
 type ApiResponse = { ok: boolean; data: any; error: any };
+type RepositoryResponse = ApiResponse | Promise<ApiResponse> | (() => ApiResponse | Promise<ApiResponse>);
 
 const ACCESS_TOKEN = 'sentinel_access_token';
 const REFRESH_TOKEN = 'sentinel_refresh_token';
@@ -85,6 +86,7 @@ let testConnectionResponse: ApiResponse;
 let initializeRepositoryResponse: ApiResponse;
 let saveSettingsResponse: ApiResponse | null;
 let pollResponses: Array<ApiResponse | (() => ApiResponse)> = [];
+let repositoryResponses: RepositoryResponse[] = [];
 
 const ok = (data: any): ApiResponse => ({ ok: true, data, error: null });
 const fail = (message: string, extra: any = null): ApiResponse => ({
@@ -92,6 +94,16 @@ const fail = (message: string, extra: any = null): ApiResponse => ({
   data: null,
   error: { message, extra },
 });
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 function githubSettings(auth: any, repository = 'owner/repo') {
   return {
@@ -234,6 +246,7 @@ beforeEach(() => {
   });
   saveSettingsResponse = null;
   pollResponses = [];
+  repositoryResponses = [];
 
   storageMocks.get.mockImplementation(async (keys: string[]) =>
     Object.fromEntries(keys.map((key) => [key, storageState[key]])),
@@ -267,7 +280,11 @@ beforeEach(() => {
       });
     }
     if (type === GITHUB_MESSAGE_TYPES.GET_SETTINGS) return ok(githubSettingsData);
-    if (type === GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES) return ok(githubRepositoryData);
+    if (type === GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES) {
+      const next = repositoryResponses.shift();
+      if (next != null) return typeof next === 'function' ? next() : next;
+      return ok(githubRepositoryData);
+    }
     if (type === GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW) return startResponse;
     if (type === GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW) {
       const next = pollResponses.shift();
@@ -427,6 +444,123 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubAccount).toBeNull();
     expect(latestSnapshot?.githubRepositories).toEqual([]);
     expect(callCount(GITHUB_MESSAGE_TYPES.DISCONNECT)).toBe(1);
+  });
+
+  it('keeps manual repository refresh outside global busy and the settings task queue', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    await renderController();
+
+    const refresh = deferred<ApiResponse>();
+    repositoryResponses = [refresh.promise];
+    let refreshPromise!: Promise<void>;
+    act(() => {
+      refreshPromise = latestSnapshot!.onRefreshGithubRepositories();
+    });
+    await flushReact();
+
+    expect(latestSnapshot?.busy).toBe(false);
+    await invoke(() => latestSnapshot!.onToggleGithubSyncEnabled(false));
+    expect(gateMocks.setSyncProviderEnabled).toHaveBeenCalledWith('github', false);
+    expect(latestSnapshot?.githubSyncEnabled).toBe(false);
+
+    await act(async () => {
+      refresh.resolve(ok(readyRepositories(['owner/refreshed'])));
+      await refreshPromise;
+    });
+    expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/refreshed']);
+  });
+
+  it('keeps only the latest overlapping repository discovery result and ignores stale errors', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    await renderController();
+
+    const first = deferred<ApiResponse>();
+    const second = deferred<ApiResponse>();
+    repositoryResponses = [first.promise, second.promise];
+    let firstPromise!: Promise<void>;
+    let secondPromise!: Promise<void>;
+    act(() => {
+      firstPromise = latestSnapshot!.onRefreshGithubRepositories();
+      secondPromise = latestSnapshot!.onRefreshGithubRepositories();
+    });
+    await flushReact();
+
+    await act(async () => {
+      second.resolve(ok(readyRepositories(['owner/latest'])));
+      await secondPromise;
+    });
+    expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/latest']);
+
+    await act(async () => {
+      first.resolve(fail('github_repository_list_failed'));
+      await firstPromise;
+    });
+    expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/latest']);
+    expect(latestSnapshot?.error).toBeNull();
+  });
+
+  it('invalidates pending repository discovery when GitHub disconnects', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    await renderController();
+
+    const refresh = deferred<ApiResponse>();
+    repositoryResponses = [refresh.promise];
+    let refreshPromise!: Promise<void>;
+    act(() => {
+      refreshPromise = latestSnapshot!.onRefreshGithubRepositories();
+    });
+    await flushReact();
+
+    await invoke(() => latestSnapshot!.onDisconnectGithub());
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'disconnected' });
+    expect(latestSnapshot?.githubAccount).toBeNull();
+    expect(latestSnapshot?.githubRepositories).toEqual([]);
+
+    await act(async () => {
+      refresh.resolve(ok(readyRepositories(['owner/stale'])));
+      await refreshPromise;
+    });
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'disconnected' });
+    expect(latestSnapshot?.githubAccount).toBeNull();
+    expect(latestSnapshot?.githubRepositories).toEqual([]);
+  });
+
+  it('fails closed on current repository auth failure but ignores stale auth failure', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    await renderController();
+
+    repositoryResponses = [fail('github_auth_required')];
+    await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'disconnected' });
+    expect(latestSnapshot?.githubRepositories).toEqual([]);
+
+    githubSettingsData = githubSettings({ state: 'connected' });
+    pollResponses = [ok({ auth: { state: 'connected' } })];
+    await invoke(() => latestSnapshot!.onPollGithubDeviceFlow());
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+
+    const stale = deferred<ApiResponse>();
+    const latest = deferred<ApiResponse>();
+    repositoryResponses = [stale.promise, latest.promise];
+    let stalePromise!: Promise<void>;
+    let latestPromise!: Promise<void>;
+    act(() => {
+      stalePromise = latestSnapshot!.onRefreshGithubRepositories();
+      latestPromise = latestSnapshot!.onRefreshGithubRepositories();
+    });
+    await flushReact();
+
+    await act(async () => {
+      latest.resolve(ok(readyRepositories(['owner/current'])));
+      await latestPromise;
+    });
+    await act(async () => {
+      stale.resolve(fail('github_auth_required'));
+      await stalePromise;
+    });
+
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+    expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/current']);
   });
 
   it('keeps a lost stored repository visible and never silently selects or accepts an unauthorized replacement', async () => {
