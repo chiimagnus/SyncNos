@@ -14,9 +14,19 @@ import type {
   ConversationListPage,
   ConversationListSummary,
 } from '@services/conversations/domain/list-pagination';
+import {
+  buildGithubCleanupOutboxRecord,
+  GITHUB_CLEANUP_OUTBOX_STORE,
+} from '@platform/idb/github-cleanup-outbox-record';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
-import { mergeSyncMappingForIdentityMove, mergeSyncMappingPatch } from '@platform/idb/sync-mapping-record';
+import {
+  mergeSyncMappingForIdentityMove,
+  mergeSyncMappingPatch,
+  readGithubContinuity,
+} from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
+import { stableConversationId10 } from '@services/conversations/domain/file-naming';
+import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -275,6 +285,14 @@ async function findExistingConversationForPayload(
   conversationsStore: IDBObjectStore,
   payload: any,
 ): Promise<any | null> {
+  if (payload && Object.prototype.hasOwnProperty.call(payload, 'id')) {
+    const explicitId = Number(payload.id);
+    if (!Number.isSafeInteger(explicitId) || explicitId <= 0) throw new Error('invalid conversation id');
+    const explicit = await reqToPromise<any>(conversationsStore.get(explicitId));
+    if (!explicit) throw new Error('conversation not found');
+    return explicit;
+  }
+
   const source = safeString(payload?.source);
   let conversationKey = safeString(payload?.conversationKey);
   if (!source) return null;
@@ -332,14 +350,76 @@ function mergeWarningFlags(preferred: unknown, fallback: unknown): string[] {
   return out;
 }
 
+function readOwnedGithubCleanupSnapshot(
+  mapping: unknown,
+  conversation: unknown,
+): { remoteKey: string; paths: string[] } | null {
+  const continuity = readGithubContinuity(mapping);
+  const remoteKey = safeString(continuity.githubRemoteKey);
+  const managedFiles =
+    continuity.githubManagedFiles && typeof continuity.githubManagedFiles === 'object'
+      ? (continuity.githubManagedFiles as Record<string, any>)
+      : {};
+  if (!remoteKey || !conversation) return null;
+  const stableId = stableConversationId10(conversation);
+  const paths = Object.entries(managedFiles)
+    .filter(([path, metadata]) => isGithubManagedPathOwnedByStableId(path, metadata?.kind, stableId))
+    .map(([path]) => path);
+  return paths.length ? { remoteKey, paths } : null;
+}
+
+async function enqueueGithubCleanupSnapshot(
+  outboxStore: IDBObjectStore,
+  snapshot: { remoteKey: string; paths: string[] } | null,
+  input: { reason: 'delete' | 'identity_move'; createdAt: number; replacementConversationId?: number },
+): Promise<void> {
+  if (!snapshot) return;
+  await reqToPromise(
+    outboxStore.add(
+      buildGithubCleanupOutboxRecord({
+        remoteKey: snapshot.remoteKey,
+        paths: snapshot.paths,
+        reason: input.reason,
+        createdAt: input.createdAt,
+        ...(input.reason === 'identity_move' ? { replacementConversationId: input.replacementConversationId } : {}),
+      }),
+    ),
+  );
+}
+
+async function migrateArticleCommentsForIdentityRewrite(
+  commentsStore: IDBObjectStore,
+  input: { conversationId: number; fromCanonicalUrl: string; toCanonicalUrl: string; updatedAt: number },
+): Promise<void> {
+  if (!input.fromCanonicalUrl || !input.toCanonicalUrl || input.fromCanonicalUrl === input.toCanonicalUrl) return;
+  const index = commentsStore.index('by_canonicalUrl_createdAt');
+  const range = globalThis.IDBKeyRange.bound(
+    [input.fromCanonicalUrl, -Infinity] as any,
+    [input.fromCanonicalUrl, Infinity] as any,
+  );
+  const rows = (await reqToPromise(index.getAll(range) as any)) as any[];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row) continue;
+    const currentConversationId = Number(row.conversationId);
+    const isOrphan =
+      row.conversationId == null || !Number.isFinite(currentConversationId) || currentConversationId <= 0;
+    if (!isOrphan && currentConversationId !== input.conversationId) continue;
+    await reqToPromise(commentsStore.put({ ...row, canonicalUrl: input.toCanonicalUrl, updatedAt: input.updatedAt }));
+  }
+}
+
 async function migrateSyncMappingKey(
   syncMappingsStore: IDBObjectStore,
+  outboxStore: IDBObjectStore,
   input: {
     legacySource: unknown;
     legacyConversationKey: unknown;
     nextSource: unknown;
     nextConversationKey: unknown;
     fallbackNotionPageId?: unknown;
+    legacyConversation?: unknown;
+    replacementConversationId?: number;
+    createdAt: number;
   },
 ): Promise<void> {
   const legacySource = safeString(input.legacySource);
@@ -377,6 +457,15 @@ async function migrateSyncMappingKey(
     return;
   }
 
+  const replacementConversationId = Number(input.replacementConversationId);
+  if (Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
+    await enqueueGithubCleanupSnapshot(outboxStore, readOwnedGithubCleanupSnapshot(legacy, input.legacyConversation), {
+      reason: 'identity_move',
+      replacementConversationId,
+      createdAt: input.createdAt,
+    });
+  }
+
   if (!target) {
     const moved = mergeSyncMappingForIdentityMove(null, legacy, identity) as any;
     await reqToPromise(syncMappingsStore.put(moved));
@@ -394,70 +483,100 @@ async function migrateSyncMappingKey(
 
 export async function upsertConversation(payload: any): Promise<Conversation> {
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
-  const existing = await findExistingConversationForPayload(stores.conversations, payload);
+  const { t, stores } = tx(
+    db,
+    ['conversations', 'sync_mappings', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+    'readwrite',
+  );
+  try {
+    const existing = await findExistingConversationForPayload(stores.conversations, payload);
 
-  const now = Date.now();
-  const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
-  const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
-  const isArticleSource = safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === 'web';
+    const now = Date.now();
+    const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
+    const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
+    const isArticleSource =
+      safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === 'web';
 
-  const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
-  const existingUrl = existing ? String(existing.url || '').trim() : '';
-  const nextUrlCandidate = payloadUrl || existingUrl;
-  const nextUrl = isArticleSource ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate : nextUrlCandidate;
+    const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+    const existingUrl = existing ? String(existing.url || '').trim() : '';
+    const nextUrlCandidate = payloadUrl || existingUrl;
+    const nextUrl = isArticleSource ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate : nextUrlCandidate;
 
-  const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
-  const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
-  const articleDerivedConversationKey = isArticleSource && nextUrl ? `article:${nextUrl}` : '';
-  const nextConversationKey = isArticleSource
-    ? normalizeArticleConversationKey(
-        articleDerivedConversationKey || payloadConversationKey || existingConversationKey,
-      )
-    : String(payloadConversationKey || existingConversationKey || '').trim();
+    const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
+    const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
+    const articleDerivedConversationKey = isArticleSource && nextUrl ? `article:${nextUrl}` : '';
+    const nextConversationKey = isArticleSource
+      ? normalizeArticleConversationKey(
+          articleDerivedConversationKey || payloadConversationKey || existingConversationKey,
+        )
+      : String(payloadConversationKey || existingConversationKey || '').trim();
 
-  const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
-  const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
+    const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
+    const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
 
-  const baseRecord = normalizeConversationListRecord({
-    sourceType: nextSourceType,
-    source: nextSource,
-    conversationKey: nextConversationKey,
-    title: nextTitle || (existing ? existing.title || '' : ''),
-    url: nextUrl || (existing ? existing.url || '' : ''),
-    author: payload.author || (existing ? existing.author || '' : ''),
-    publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
-    warningFlags: Array.isArray(payload.warningFlags)
-      ? payload.warningFlags
-      : existing
-        ? existing.warningFlags || []
-        : [],
-    notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
-    feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
-    lastCapturedAt: nextLastCapturedAt,
-  });
-
-  const record: any = withOptionalId(existing && existing.id, baseRecord);
-
-  if (existing) {
-    await migrateSyncMappingKey(stores.sync_mappings, {
-      legacySource: existing.source,
-      legacyConversationKey: existing.conversationKey,
-      nextSource: record.source,
-      nextConversationKey: record.conversationKey,
-      fallbackNotionPageId: record.notionPageId,
+    const baseRecord = normalizeConversationListRecord({
+      sourceType: nextSourceType,
+      source: nextSource,
+      conversationKey: nextConversationKey,
+      title: nextTitle || (existing ? existing.title || '' : ''),
+      url: nextUrl || (existing ? existing.url || '' : ''),
+      author: payload.author || (existing ? existing.author || '' : ''),
+      publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
+      warningFlags: Array.isArray(payload.warningFlags)
+        ? payload.warningFlags
+        : existing
+          ? existing.warningFlags || []
+          : [],
+      notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
+      feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
+      lastCapturedAt: nextLastCapturedAt,
     });
-    await reqToPromise(stores.conversations.put(record));
+
+    const record: any = withOptionalId(existing && existing.id, baseRecord);
+
+    if (existing) {
+      const replacementConversationId = Number(existing.id);
+      await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+        legacySource: existing.source,
+        legacyConversationKey: existing.conversationKey,
+        nextSource: record.source,
+        nextConversationKey: record.conversationKey,
+        fallbackNotionPageId: record.notionPageId,
+        legacyConversation: existing,
+        replacementConversationId,
+        createdAt: now,
+      });
+
+      if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
+        const fromCanonicalUrl = normalizeArticleUrl(existingUrl);
+        const toCanonicalUrl = normalizeArticleUrl(record.url);
+        await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
+          conversationId: replacementConversationId,
+          fromCanonicalUrl,
+          toCanonicalUrl,
+          updatedAt: now,
+        });
+      }
+
+      await reqToPromise(stores.conversations.put(record));
+      await txDone(t);
+      invalidateConversationListStatsCache();
+      return record;
+    }
+
+    const id = await reqToPromise(stores.conversations.add(record));
+    record.id = id as any;
     await txDone(t);
     invalidateConversationListStatsCache();
     return record;
+  } catch (error) {
+    try {
+      t.abort();
+    } catch (_abortError) {
+      // The transaction may already be aborted by the failing request.
+    }
+    throw error;
   }
-
-  const id = await reqToPromise(stores.conversations.add(record));
-  record.id = id as any;
-  await txDone(t);
-  invalidateConversationListStatsCache();
-  return record;
 }
 
 export async function mergeConversationsByIds(input: {
@@ -486,94 +605,134 @@ export async function mergeConversationsByIds(input: {
   }
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
-  const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
-  const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
-  if (!keep) {
+  const { t, stores } = tx(
+    db,
+    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+    'readwrite',
+  );
+  try {
+    const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
+    const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
+    if (!keep) {
+      await txDone(t);
+      throw new Error('keep conversation not found');
+    }
+    if (!remove) {
+      await txDone(t);
+      return {
+        keptConversationId: keepConversationId,
+        removedConversationId: removeConversationId,
+        movedMessages: 0,
+        movedImageCache: 0,
+        merged: false,
+      };
+    }
+
+    const now = Date.now();
+    const mergedConversation: any = normalizeConversationListRecord({
+      ...keep,
+      sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
+      title: mergeStringFallback(keep.title, remove.title),
+      url: mergeStringFallback(keep.url, remove.url),
+      author: mergeStringFallback(keep.author, remove.author),
+      publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
+      notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
+      feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
+      warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
+      lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || now,
+    });
+
+    await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+      legacySource: remove.source,
+      legacyConversationKey: remove.conversationKey,
+      nextSource: keep.source,
+      nextConversationKey: keep.conversationKey,
+      fallbackNotionPageId: mergedConversation.notionPageId,
+      legacyConversation: remove,
+      replacementConversationId: keepConversationId,
+      createdAt: now,
+    });
+
+    await reqToPromise(stores.conversations.put(mergedConversation));
+
+    // Move messages.
+    const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
+    const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
+    const msgRange = globalThis.IDBKeyRange.bound(
+      [removeConversationId, -Infinity] as any,
+      [removeConversationId, Infinity] as any,
+    );
+    const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
+    let movedMessages = 0;
+    for (const row of Array.isArray(msgRows) ? msgRows : []) {
+      if (!row) continue;
+      const rowId = Number(row.id);
+      const key = safeString(row.messageKey);
+      if (key) {
+        const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
+        if (exists) {
+          if (Number.isFinite(rowId) && rowId > 0) {
+            await reqToPromise(stores.messages.delete(rowId));
+          }
+          continue;
+        }
+      }
+      row.conversationId = keepConversationId;
+      await reqToPromise(stores.messages.put(row));
+      movedMessages += 1;
+    }
+
+    // Move cached images.
+    const imageCacheIdx = stores.image_cache.index('by_conversationId');
+    const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
+    const imgRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
+    let movedImageCache = 0;
+    for (const row of Array.isArray(imgRows) ? imgRows : []) {
+      if (!row) continue;
+      row.conversationId = keepConversationId;
+      await reqToPromise(stores.image_cache.put(row));
+      movedImageCache += 1;
+    }
+
+    const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
+    const mergedCanonicalUrl = mergedIsArticle ? normalizeArticleUrl(mergedConversation.url) : '';
+    const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
+    const commentRange = globalThis.IDBKeyRange.bound(
+      [removeConversationId, -Infinity] as any,
+      [removeConversationId, Infinity] as any,
+    );
+    const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
+    for (const row of Array.isArray(commentRows) ? commentRows : []) {
+      if (!row) continue;
+      await reqToPromise(
+        stores.article_comments.put({
+          ...row,
+          conversationId: keepConversationId,
+          ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
+          updatedAt: now,
+        }),
+      );
+    }
+
+    await reqToPromise(stores.conversations.delete(removeConversationId));
     await txDone(t);
-    throw new Error('keep conversation not found');
-  }
-  if (!remove) {
-    await txDone(t);
+    invalidateConversationListStatsCache();
+
     return {
       keptConversationId: keepConversationId,
       removedConversationId: removeConversationId,
-      movedMessages: 0,
-      movedImageCache: 0,
-      merged: false,
+      movedMessages,
+      movedImageCache,
+      merged: true,
     };
-  }
-
-  const mergedConversation: any = normalizeConversationListRecord({
-    ...keep,
-    sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
-    title: mergeStringFallback(keep.title, remove.title),
-    url: mergeStringFallback(keep.url, remove.url),
-    author: mergeStringFallback(keep.author, remove.author),
-    publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
-    notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
-    feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
-    warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
-    lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || Date.now(),
-  });
-
-  await migrateSyncMappingKey(stores.sync_mappings, {
-    legacySource: remove.source,
-    legacyConversationKey: remove.conversationKey,
-    nextSource: keep.source,
-    nextConversationKey: keep.conversationKey,
-    fallbackNotionPageId: mergedConversation.notionPageId,
-  });
-
-  await reqToPromise(stores.conversations.put(mergedConversation));
-
-  // Move messages.
-  const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
-  const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
-  const msgRange = IDBKeyRange.bound([removeConversationId, -Infinity] as any, [removeConversationId, Infinity] as any);
-  const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
-  let movedMessages = 0;
-  for (const row of Array.isArray(msgRows) ? msgRows : []) {
-    if (!row) continue;
-    const rowId = Number(row.id);
-    const key = safeString(row.messageKey);
-    if (key) {
-      const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
-      if (exists) {
-        if (Number.isFinite(rowId) && rowId > 0) {
-          await reqToPromise(stores.messages.delete(rowId));
-        }
-        continue;
-      }
+  } catch (error) {
+    try {
+      t.abort();
+    } catch (_abortError) {
+      // The transaction may already be aborted by the failing request.
     }
-    row.conversationId = keepConversationId;
-    await reqToPromise(stores.messages.put(row));
-    movedMessages += 1;
+    throw error;
   }
-
-  // Move cached images.
-  const imageCacheIdx = stores.image_cache.index('by_conversationId');
-  const imgRange = IDBKeyRange.only(removeConversationId);
-  const imgRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
-  let movedImageCache = 0;
-  for (const row of Array.isArray(imgRows) ? imgRows : []) {
-    if (!row) continue;
-    row.conversationId = keepConversationId;
-    await reqToPromise(stores.image_cache.put(row));
-    movedImageCache += 1;
-  }
-
-  await reqToPromise(stores.conversations.delete(removeConversationId));
-  await txDone(t);
-  invalidateConversationListStatsCache();
-
-  return {
-    keptConversationId: keepConversationId,
-    removedConversationId: removeConversationId,
-    movedMessages,
-    movedImageCache,
-    merged: true,
-  };
 }
 
 export async function syncConversationMessages(
@@ -1158,7 +1317,11 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   }
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
+  const { t, stores } = tx(
+    db,
+    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+    'readwrite',
+  );
 
   let deletedConversations = 0;
   let deletedMessages = 0;
@@ -1168,57 +1331,90 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   const msgIdx = stores.messages.index('by_conversationId_sequence');
   const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
   const imageCacheIdx = stores.image_cache.index('by_conversationId');
+  const articleCommentsIdx = stores.article_comments.index('by_conversationId_createdAt');
+  const now = Date.now();
 
-  for (const id of ids) {
-    const convo: any = await reqToPromise(stores.conversations.get(id));
-    if (!convo) continue;
+  try {
+    for (const id of ids) {
+      const convo: any = await reqToPromise(stores.conversations.get(id));
+      if (!convo) continue;
 
-    // Delete messages under this conversation.
-    const range = IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
-    const cursorReq = msgIdx.openCursor(range);
-
-    await new Promise<void>((resolve, reject) => {
-      cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-      cursorReq.onsuccess = () => {
-        const cursor = cursorReq.result;
-        if (!cursor) return resolve();
-        cursor.delete();
-        deletedMessages += 1;
-        cursor.continue();
-      };
-    });
-
-    // Delete notion mapping if present.
-    const source = convo.source || '';
-    const conversationKey = convo.conversationKey || '';
-    if (source && conversationKey) {
-      const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
-      if (mapping && mapping.id) {
-        await reqToPromise(stores.sync_mappings.delete(mapping.id));
-        deletedMappings += 1;
+      const source = safeString(convo.source);
+      const conversationKey = safeString(convo.conversationKey);
+      if (source && conversationKey) {
+        const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
+        if (mapping && mapping.id) {
+          await enqueueGithubCleanupSnapshot(
+            stores[GITHUB_CLEANUP_OUTBOX_STORE],
+            readOwnedGithubCleanupSnapshot(mapping, convo),
+            { reason: 'delete', createdAt: now },
+          );
+          await reqToPromise(stores.sync_mappings.delete(mapping.id));
+          deletedMappings += 1;
+        }
       }
+
+      if (safeString(convo.sourceType).toLowerCase() === 'article') {
+        const commentRange = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+        const commentCursor = articleCommentsIdx.openCursor(commentRange);
+        await new Promise<void>((resolve, reject) => {
+          commentCursor.onerror = () => reject(commentCursor.error || new Error('article comment cursor failed'));
+          commentCursor.onsuccess = () => {
+            const cursor = commentCursor.result;
+            if (!cursor) return resolve();
+            const row = cursor.value as Record<string, unknown>;
+            let updateRequest: IDBRequest;
+            try {
+              updateRequest = cursor.update({ ...row, conversationId: null });
+            } catch (error) {
+              reject(error);
+              return;
+            }
+            updateRequest.onerror = () => reject(updateRequest.error || new Error('article comment detach failed'));
+            updateRequest.onsuccess = () => cursor.continue();
+          };
+        });
+      }
+
+      const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+      const cursorReq = msgIdx.openCursor(range);
+      await new Promise<void>((resolve, reject) => {
+        cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return resolve();
+          cursor.delete();
+          deletedMessages += 1;
+          cursor.continue();
+        };
+      });
+
+      await reqToPromise(stores.conversations.delete(id));
+      deletedConversations += 1;
+
+      const imgRange = globalThis.IDBKeyRange.only(id);
+      const imgCursorReq = imageCacheIdx.openCursor(imgRange);
+      await new Promise<void>((resolve, reject) => {
+        imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
+        imgCursorReq.onsuccess = () => {
+          const cursor = imgCursorReq.result;
+          if (!cursor) return resolve();
+          cursor.delete();
+          deletedImageCache += 1;
+          cursor.continue();
+        };
+      });
     }
 
-    await reqToPromise(stores.conversations.delete(id));
-    deletedConversations += 1;
-
-    // Delete cached images under this conversation.
-    const imgRange = IDBKeyRange.only(id);
-    const imgCursorReq = imageCacheIdx.openCursor(imgRange);
-
-    await new Promise<void>((resolve, reject) => {
-      imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
-      imgCursorReq.onsuccess = () => {
-        const cursor = imgCursorReq.result;
-        if (!cursor) return resolve();
-        cursor.delete();
-        deletedImageCache += 1;
-        cursor.continue();
-      };
-    });
+    await txDone(t);
+  } catch (error) {
+    try {
+      t.abort();
+    } catch (_abortError) {
+      // The transaction may already be aborted by the failing request.
+    }
+    throw error;
   }
-
-  await txDone(t);
   invalidateConversationListStatsCache();
   return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
 }

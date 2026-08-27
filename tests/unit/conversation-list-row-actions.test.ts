@@ -46,7 +46,7 @@ vi.mock('../../src/services/sync/sync-provider-gate', () => ({
 
 vi.mock('../../src/services/sync/sync-provider-registry', () => ({
   getSyncProviderDefinition: (provider: string) => ({ id: provider, labelKey: `provider.${provider}` }),
-  listSyncProviders: () => [{ id: 'notion' }, { id: 'obsidian' }, { id: 'feishu' }],
+  listSyncProviders: () => [{ id: 'notion' }, { id: 'obsidian' }, { id: 'feishu' }, { id: 'github' }],
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -118,6 +118,7 @@ function buildState() {
       syncingNotion: false,
       syncingObsidian: false,
       syncingFeishu: false,
+      syncingGithub: false,
       deleting: false,
       listSourceFilterKey: 'all',
       listSiteFilterKey: 'all',
@@ -132,9 +133,10 @@ function buildState() {
       consumeListLocate: vi.fn(() => null),
       loadMoreList: vi.fn(async () => {}),
       exportSelectedMarkdown: vi.fn(),
-      syncSelectedNotion: vi.fn(),
-      syncSelectedObsidian: vi.fn(),
-      syncSelectedFeishu: vi.fn(),
+      syncSelectedNotion: vi.fn().mockResolvedValue(undefined),
+      syncSelectedObsidian: vi.fn().mockResolvedValue(undefined),
+      syncSelectedFeishu: vi.fn().mockResolvedValue(undefined),
+      syncSelectedGithub: vi.fn().mockResolvedValue(undefined),
       clearSyncFeedback: vi.fn(),
       deleteSelected: vi.fn(),
       refreshList: vi.fn(async () => {}),
@@ -251,6 +253,51 @@ describe('ConversationListPane row actions', () => {
     expect(openButton).toBeTruthy();
     expect(openButton?.disabled).toBe(true);
     expect(tabsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
+    currentState.selectedIds = [11];
+    getEnabledSyncProvidersMock.mockResolvedValue(['github']);
+    await renderPane();
+
+    const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement | null;
+    expect(githubShortcut).toBeTruthy();
+    expect(githubShortcut?.textContent).toBe('provider.github');
+
+    await act(async () => {
+      githubShortcut!.click();
+      await flushMicrotasks();
+    });
+
+    expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
+    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+  });
+
+  it('dispatches the GitHub sync menu item to the real GitHub context callback', async () => {
+    currentState.selectedIds = [11];
+    getEnabledSyncProvidersMock.mockResolvedValue(['notion', 'github']);
+    await renderPane();
+
+    const syncMenuButton = document.getElementById('btnSyncTo') as HTMLButtonElement | null;
+    expect(syncMenuButton).toBeTruthy();
+    await act(async () => {
+      syncMenuButton!.click();
+      await flushMicrotasks();
+    });
+
+    const githubMenuItem = document.getElementById('menuSyncToGithub') as HTMLButtonElement | null;
+    expect(githubMenuItem).toBeTruthy();
+    expect(githubMenuItem?.textContent).toBe('githubSync');
+
+    await act(async () => {
+      githubMenuItem!.click();
+      await flushMicrotasks();
+    });
+
+    expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
+    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+    expect(currentState.syncSelectedObsidian).not.toHaveBeenCalled();
+    expect(currentState.syncSelectedFeishu).not.toHaveBeenCalled();
   });
 
   it('reports clipboard failure without showing a copied state', async () => {

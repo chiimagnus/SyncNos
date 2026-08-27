@@ -69,7 +69,10 @@ function makeInlineResult(messages: any[]) {
   };
 }
 
-function createRouter() {
+function createRouter(deps?: {
+  onConversationChanged?: ReturnType<typeof vi.fn>;
+  onRemoteCleanupPending?: ReturnType<typeof vi.fn>;
+}) {
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
       ok: false,
@@ -77,7 +80,10 @@ function createRouter() {
       error: { message: `unknown message type: ${msg?.type}`, extra: null },
     }),
   });
-  registerConversationHandlers(router as any, { onConversationChanged: async () => {} });
+  registerConversationHandlers(router as any, {
+    onConversationChanged: deps?.onConversationChanged ?? vi.fn(async () => {}),
+    onRemoteCleanupPending: deps?.onRemoteCleanupPending ?? vi.fn(async () => {}),
+  });
   return router;
 }
 
@@ -314,24 +320,94 @@ describe('background-router conversations events', () => {
     });
   });
 
-  it('broadcasts conversationsChanged after deleteConversations', async () => {
+  it('marks the kept conversation dirty and wakes remote cleanup after a real merge', async () => {
+    const onConversationChanged = vi.fn(async () => {});
+    const onRemoteCleanupPending = vi.fn(async () => {});
+    storageMocks.mergeConversationsByIds.mockResolvedValue({
+      keptConversationId: 10,
+      removedConversationId: 11,
+      movedMessages: 2,
+      movedImageCache: 1,
+      merged: true,
+    });
+    const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
+
+    const res = await router.__handleMessageForTests({
+      type: 'mergeConversations',
+      keepConversationId: 10,
+      removeConversationId: 11,
+    });
+    await Promise.resolve();
+
+    expect(res.ok).toBe(true);
+    expect(onConversationChanged).toHaveBeenCalledWith(10, 'mergeConversation');
+    expect(onRemoteCleanupPending).toHaveBeenCalledTimes(1);
+    expect(onConversationChanged).not.toHaveBeenCalledWith(11, expect.anything());
+  });
+
+  it('does not emit dirty or cleanup signals when merge performs no local mutation', async () => {
+    const onConversationChanged = vi.fn(async () => {});
+    const onRemoteCleanupPending = vi.fn(async () => {});
+    storageMocks.mergeConversationsByIds.mockResolvedValue({
+      keptConversationId: 10,
+      removedConversationId: 11,
+      movedMessages: 0,
+      movedImageCache: 0,
+      merged: false,
+    });
+    const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
+
+    const res = await router.__handleMessageForTests({
+      type: 'mergeConversations',
+      keepConversationId: 10,
+      removeConversationId: 11,
+    });
+    await Promise.resolve();
+
+    expect(res.ok).toBe(true);
+    expect(onConversationChanged).not.toHaveBeenCalled();
+    expect(onRemoteCleanupPending).not.toHaveBeenCalled();
+  });
+
+  it('broadcasts delete and wakes durable remote cleanup without enqueueing deleted ids', async () => {
     const broadcast = vi.fn();
+    const onConversationChanged = vi.fn(async () => {});
+    const onRemoteCleanupPending = vi.fn(async () => {});
     storageMocks.deleteConversationsByIds.mockResolvedValue({
       deletedConversations: 2,
       deletedMessages: 0,
-      deletedMappings: 0,
+      deletedMappings: 1,
     });
 
-    const router = createRouter();
+    const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
     router.eventsHub.broadcast = broadcast;
 
     const res = await router.__handleMessageForTests({
       type: 'deleteConversations',
       conversationIds: [1, '2', 'bad', -1],
     });
+    await Promise.resolve();
 
     expect(res.ok).toBe(true);
     expect(storageMocks.deleteConversationsByIds).toHaveBeenCalled();
     expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'delete', conversationIds: [1, 2] });
+    expect(onRemoteCleanupPending).toHaveBeenCalledTimes(1);
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not wake remote cleanup when delete removes no conversation', async () => {
+    const onRemoteCleanupPending = vi.fn(async () => {});
+    storageMocks.deleteConversationsByIds.mockResolvedValue({
+      deletedConversations: 0,
+      deletedMessages: 0,
+      deletedMappings: 0,
+    });
+    const router = createRouter({ onRemoteCleanupPending });
+
+    const res = await router.__handleMessageForTests({ type: 'deleteConversations', conversationIds: [999] });
+    await Promise.resolve();
+
+    expect(res.ok).toBe(true);
+    expect(onRemoteCleanupPending).not.toHaveBeenCalled();
   });
 });

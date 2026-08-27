@@ -73,6 +73,21 @@ describe('backup service', () => {
       notion_oauth_client_id: 'client_id',
       notion_parent_page_id: 'page',
       notion_oauth_token_v1: { accessToken: 'secret' },
+      github_repository: 'owner/repo',
+      github_branch: 'main',
+      github_auth_state_v1: {
+        version: 1,
+        state: 'pending',
+        pending: {
+          deviceCode: 'DEVICE_SENTINEL_SECRET',
+          userCode: 'ABCD-EFGH',
+          verificationUri: 'https://github.com/login/device',
+          createdAt: 1,
+          expiresAt: 901_000,
+          intervalMs: 5_000,
+          nextPollAt: 6_000,
+        },
+      },
     });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -80,7 +95,10 @@ describe('backup service', () => {
     globalThis.browser = undefined;
 
     const db = await openDb();
-    const t = db.transaction(['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
+    const t = db.transaction(
+      ['conversations', 'messages', 'sync_mappings', 'image_cache', 'github_cleanup_outbox'],
+      'readwrite',
+    );
     const convId = await reqToPromise<number>(
       t.objectStore('conversations').add({
         sourceType: 'chat',
@@ -122,6 +140,15 @@ describe('backup service', () => {
         updatedAt: 1,
       }) as any,
     );
+    await reqToPromise(
+      t.objectStore('github_cleanup_outbox').add({
+        remoteKey: 'github.com/owner/repo@main',
+        paths: ['Chats/chatgpt-Hello-0123456789.md'],
+        reason: 'delete',
+        createdAt: 1,
+        nextAttemptAt: 1,
+      }) as any,
+    );
     await new Promise<void>((resolve, reject) => {
       t.oncomplete = () => resolve();
       t.onerror = () => reject(t.error);
@@ -139,13 +166,23 @@ describe('backup service', () => {
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
     expect(manifest.backupSchemaVersion).toBe(2);
     expect(manifest.counts.conversations).toBe(1);
+    expect(manifest.counts.github_cleanup_outbox).toBeUndefined();
     expect(manifest.assets.imageCacheIndexPath).toBe('assets/image-cache/index.json');
+    expect(
+      [...entries.keys()].some((name) => name.includes('github_cleanup_outbox') || name.includes('cleanup-outbox')),
+    ).toBe(false);
 
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
     expect(config.schemaVersion).toBe(1);
     expect(config.storageLocal.notion_oauth_client_id).toBe('client_id');
     expect(config.storageLocal.notion_parent_page_id).toBe('page');
     expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
+    expect(config.storageLocal).toMatchObject({
+      github_repository: 'owner/repo',
+      github_branch: 'main',
+    });
+    expect(config.storageLocal.github_auth_state_v1).toBeUndefined();
+    expect(JSON.stringify(config)).not.toContain('DEVICE_SENTINEL_SECRET');
 
     const bundlePath = manifest.sources[0].files[0];
     const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
@@ -163,6 +200,38 @@ describe('backup service', () => {
     expect(imageIndex.assets[0].assetId).toBe(imgId);
     expect(typeof imageIndex.assets[0].blobPath).toBe('string');
     expect(entries.has(imageIndex.assets[0].blobPath)).toBe(true);
+
+    chromeMock.__store.github_auth_state_v1 = {
+      version: 1,
+      state: 'connected',
+      token: { accessToken: 'BROWSER_B_ACCESS_SECRET', refreshToken: 'BROWSER_B_REFRESH_SECRET', createdAt: 2 },
+    };
+    delete chromeMock.__store.github_repository;
+    delete chromeMock.__store.github_branch;
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+    await importBackupZipV2Merge(entries);
+    const restoredDb = await openDb();
+    const restoredTx = restoredDb.transaction(['conversations', 'sync_mappings', 'github_cleanup_outbox'], 'readonly');
+    expect(await reqToPromise(restoredTx.objectStore('conversations').count())).toBe(1);
+    expect(await reqToPromise(restoredTx.objectStore('sync_mappings').count())).toBe(1);
+    expect(await reqToPromise(restoredTx.objectStore('github_cleanup_outbox').count())).toBe(0);
+    await new Promise<void>((resolve, reject) => {
+      restoredTx.oncomplete = () => resolve();
+      restoredTx.onerror = () => reject(restoredTx.error);
+      restoredTx.onabort = () => reject(restoredTx.error);
+    });
+    restoredDb.close();
+    expect(chromeMock.__store.github_auth_state_v1).toEqual({
+      version: 1,
+      state: 'connected',
+      token: { accessToken: 'BROWSER_B_ACCESS_SECRET', refreshToken: 'BROWSER_B_REFRESH_SECRET', createdAt: 2 },
+    });
+    expect(chromeMock.__store).toMatchObject({
+      github_repository: 'owner/repo',
+      github_branch: 'main',
+    });
   });
 
   it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {
@@ -833,6 +902,16 @@ describe('backup service', () => {
             updatedAt: 101,
           },
         ],
+        github_cleanup_outbox: [
+          {
+            id: 999,
+            remoteKey: 'github.com/attacker/injected@main',
+            paths: ['README.md'],
+            reason: 'delete',
+            createdAt: 1,
+            nextAttemptAt: 1,
+          },
+        ],
       },
       storageLocal: {
         notion_oauth_client_id: 'cid',
@@ -848,10 +927,11 @@ describe('backup service', () => {
     expect(stats.settingsApplied).toBeGreaterThanOrEqual(1);
 
     const db = await openDb();
-    const t = db.transaction(['conversations', 'messages', 'sync_mappings'], 'readonly');
+    const t = db.transaction(['conversations', 'messages', 'sync_mappings', 'github_cleanup_outbox'], 'readonly');
     const convs = await reqToPromise<any[]>(t.objectStore('conversations').getAll() as any);
     const msgs = await reqToPromise<any[]>(t.objectStore('messages').getAll() as any);
     const maps = await reqToPromise<any[]>(t.objectStore('sync_mappings').getAll() as any);
+    const cleanupRows = await reqToPromise<any[]>(t.objectStore('github_cleanup_outbox').getAll() as any);
     await new Promise<void>((resolve, reject) => {
       t.oncomplete = () => resolve();
       t.onerror = () => reject(t.error);
@@ -862,6 +942,7 @@ describe('backup service', () => {
     expect(convs.length).toBe(1);
     expect(msgs.length).toBe(1);
     expect(maps.length).toBe(1);
+    expect(cleanupRows).toEqual([]);
     expect(maps[0]).toMatchObject({
       source: 'chatgpt',
       conversationKey: 'c1',

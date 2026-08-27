@@ -7,6 +7,7 @@ export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
   notion: 'notion_sync_job_v1',
   obsidian: 'obsidian_sync_job_v1',
   feishu: 'feishu_sync_job_v1',
+  github: 'github_sync_job_v1',
 };
 
 function normalizeConversationIds(ids: unknown): number[] {

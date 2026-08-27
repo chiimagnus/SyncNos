@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   clearFeishuSyncStatus as defaultClearFeishuSyncStatus,
+  clearGithubSyncStatus as defaultClearGithubSyncStatus,
   clearNotionSyncJobStatus as defaultClearNotionSyncJobStatus,
   clearObsidianSyncStatus as defaultClearObsidianSyncStatus,
   getFeishuSyncStatus as defaultGetFeishuSyncStatus,
+  getGithubSyncStatus as defaultGetGithubSyncStatus,
   getNotionSyncJobStatus as defaultGetNotionSyncJobStatus,
   getObsidianSyncStatus as defaultGetObsidianSyncStatus,
   syncFeishuConversations as defaultSyncFeishuConversations,
+  syncGithubConversations as defaultSyncGithubConversations,
   syncNotionConversations as defaultSyncNotionConversations,
   syncObsidianConversations as defaultSyncObsidianConversations,
 } from '@services/sync/repo';
@@ -44,12 +47,15 @@ export type ConversationSyncFeedbackState = {
 
 type UseConversationSyncFeedbackDeps = {
   clearFeishuSyncStatus?: () => Promise<SyncJobStatusResponse>;
+  clearGithubSyncStatus?: () => Promise<SyncJobStatusResponse>;
   clearNotionSyncJobStatus?: () => Promise<SyncJobStatusResponse>;
   clearObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
   getFeishuSyncStatus?: () => Promise<SyncJobStatusResponse>;
+  getGithubSyncStatus?: () => Promise<SyncJobStatusResponse>;
   getNotionSyncJobStatus?: () => Promise<SyncJobStatusResponse>;
   getObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
   syncFeishuConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
+  syncGithubConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
   syncNotionConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
   syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
 };
@@ -260,13 +266,8 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
   );
 }
 
-function pickPrimaryJob(
-  notionJob: SyncJobSnapshot | null,
-  obsidianJob: SyncJobSnapshot | null,
-  feishuJob: SyncJobSnapshot | null,
-  preferredProvider?: SyncProvider | null,
-) {
-  const jobs = [notionJob, obsidianJob, feishuJob].filter(Boolean) as SyncJobSnapshot[];
+function pickPrimaryJob(jobsInput: Array<SyncJobSnapshot | null>, preferredProvider?: SyncProvider | null) {
+  const jobs = jobsInput.filter(Boolean) as SyncJobSnapshot[];
   if (!jobs.length) return null;
 
   const compare = (a: SyncJobSnapshot, b: SyncJobSnapshot) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
@@ -285,6 +286,10 @@ function pickPrimaryJob(
   return ordered[0];
 }
 
+function assertNever(value: never): never {
+  throw new Error(`unsupported sync provider: ${String(value)}`);
+}
+
 function errorCode(error: unknown): string {
   return String((error as any)?.extra?.code ?? (error as any)?.code ?? '')
     .trim()
@@ -293,12 +298,15 @@ function errorCode(error: unknown): string {
 
 export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDeps = {}) {
   const clearFeishuSyncStatus = deps.clearFeishuSyncStatus ?? defaultClearFeishuSyncStatus;
+  const clearGithubSyncStatus = deps.clearGithubSyncStatus ?? defaultClearGithubSyncStatus;
   const clearNotionSyncJobStatus = deps.clearNotionSyncJobStatus ?? defaultClearNotionSyncJobStatus;
   const clearObsidianSyncStatus = deps.clearObsidianSyncStatus ?? defaultClearObsidianSyncStatus;
   const getFeishuSyncStatus = deps.getFeishuSyncStatus ?? defaultGetFeishuSyncStatus;
+  const getGithubSyncStatus = deps.getGithubSyncStatus ?? defaultGetGithubSyncStatus;
   const getNotionSyncJobStatus = deps.getNotionSyncJobStatus ?? defaultGetNotionSyncJobStatus;
   const getObsidianSyncStatus = deps.getObsidianSyncStatus ?? defaultGetObsidianSyncStatus;
   const syncFeishuConversations = deps.syncFeishuConversations ?? defaultSyncFeishuConversations;
+  const syncGithubConversations = deps.syncGithubConversations ?? defaultSyncGithubConversations;
   const syncNotionConversations = deps.syncNotionConversations ?? defaultSyncNotionConversations;
   const syncObsidianConversations = deps.syncObsidianConversations ?? defaultSyncObsidianConversations;
 
@@ -319,17 +327,16 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
 
   const refreshFromBackground = useCallback(
     async (preferredProvider?: SyncProvider | null) => {
-      const [notionStatus, obsidianStatus, feishuStatus] = await Promise.all([
+      const [notionStatus, obsidianStatus, feishuStatus, githubStatus] = await Promise.all([
         getNotionSyncJobStatus().catch(() => ({ provider: 'notion', job: null }) as SyncJobStatusResponse),
         getObsidianSyncStatus().catch(() => ({ provider: 'obsidian', job: null }) as SyncJobStatusResponse),
         getFeishuSyncStatus().catch(() => ({ provider: 'feishu', job: null }) as SyncJobStatusResponse),
+        getGithubSyncStatus().catch(() => ({ provider: 'github', job: null }) as SyncJobStatusResponse),
       ]);
       if (disposedRef.current) return null;
 
       const job = pickPrimaryJob(
-        notionStatus?.job ?? null,
-        obsidianStatus?.job ?? null,
-        feishuStatus?.job ?? null,
+        [notionStatus?.job ?? null, obsidianStatus?.job ?? null, feishuStatus?.job ?? null, githubStatus?.job ?? null],
         preferredProvider,
       );
       if (job?.status === 'running') {
@@ -357,7 +364,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       });
       return job;
     },
-    [getNotionSyncJobStatus, getObsidianSyncStatus, getFeishuSyncStatus],
+    [getNotionSyncJobStatus, getObsidianSyncStatus, getFeishuSyncStatus, getGithubSyncStatus],
   );
 
   useEffect(() => {
@@ -382,12 +389,20 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     if (!activeRun) return;
     const token = activeRun.token;
     const provider = activeRun.provider;
-    const getStatus =
-      provider === 'notion'
-        ? getNotionSyncJobStatus
-        : provider === 'obsidian'
-          ? getObsidianSyncStatus
-          : getFeishuSyncStatus;
+    const getStatus = (() => {
+      switch (provider) {
+        case 'notion':
+          return getNotionSyncJobStatus;
+        case 'obsidian':
+          return getObsidianSyncStatus;
+        case 'feishu':
+          return getFeishuSyncStatus;
+        case 'github':
+          return getGithubSyncStatus;
+        default:
+          return assertNever(provider);
+      }
+    })();
     let disposed = false;
 
     const poll = async () => {
@@ -420,7 +435,14 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [activeRun, getNotionSyncJobStatus, getObsidianSyncStatus, getFeishuSyncStatus, refreshFromBackground]);
+  }, [
+    activeRun,
+    getNotionSyncJobStatus,
+    getObsidianSyncStatus,
+    getFeishuSyncStatus,
+    getGithubSyncStatus,
+    refreshFromBackground,
+  ]);
 
   const clearFeedback = useCallback(() => {
     const current = feedback;
@@ -431,16 +453,31 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     }
 
     setFeedback(IDLE_FEEDBACK);
-    const clear =
-      current.provider === 'notion'
-        ? clearNotionSyncJobStatus
-        : current.provider === 'obsidian'
-          ? clearObsidianSyncStatus
-          : clearFeishuSyncStatus;
+    const clear = (() => {
+      switch (current.provider) {
+        case 'notion':
+          return clearNotionSyncJobStatus;
+        case 'obsidian':
+          return clearObsidianSyncStatus;
+        case 'feishu':
+          return clearFeishuSyncStatus;
+        case 'github':
+          return clearGithubSyncStatus;
+        default:
+          return assertNever(current.provider);
+      }
+    })();
     void clear()
       .catch(() => undefined)
       .then(() => refreshFromBackground());
-  }, [clearNotionSyncJobStatus, clearObsidianSyncStatus, clearFeishuSyncStatus, feedback, refreshFromBackground]);
+  }, [
+    clearNotionSyncJobStatus,
+    clearObsidianSyncStatus,
+    clearFeishuSyncStatus,
+    clearGithubSyncStatus,
+    feedback,
+    refreshFromBackground,
+  ]);
 
   const startSync = useCallback(
     async (provider: SyncProvider, conversationIds: number[]): Promise<SyncStartAck | null> => {
@@ -517,73 +554,18 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         }
       }
 
-      if (provider === 'feishu') {
-        const token = runTokenRef.current + 1;
-        runTokenRef.current = token;
-        const nextRun: ActiveRun = { provider, token };
-        activeRunRef.current = nextRun;
-        setActiveRun(nextRun);
-
-        const runningFeedback: ConversationSyncFeedbackState = {
-          provider,
-          phase: 'running',
-          total: ids.length,
-          done: 0,
-          currentConversationId: ids[0] || null,
-          currentConversationTitle: '',
-          currentStage: 'preparing_queue',
-          failures: [],
-          warnings: [],
-          message: buildRunningMessage(provider, 0, ids.length),
-          updatedAt: Date.now(),
-          summary: null,
-        };
-        feedbackRef.current = runningFeedback;
-        setFeedback(runningFeedback);
-
-        try {
-          const ack = await syncFeishuConversations(ids);
-          if (disposedRef.current) return ack;
-          await refreshFromBackground(provider);
-          return ack;
-        } catch (error) {
-          if (disposedRef.current) throw error;
-
-          const code = errorCode(error);
-          if (code === 'sync_already_running') {
-            await refreshFromBackground(provider);
-            return null;
-          }
-
-          const disabledByGate = code === 'sync_provider_disabled';
-          const failureText = disabledByGate
-            ? t('syncProviderDisabled')
-            : error instanceof Error
-              ? error.message
-              : String(error || 'sync failed');
-          const message = disabledByGate
-            ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
-            : toErrorMessage(provider, error);
-
-          runTokenRef.current += 1;
-          setActiveRun((current) => (current?.token === token ? null : current));
-          setFeedback({
-            provider,
-            phase: 'failed',
-            total: 0,
-            done: 0,
-            currentConversationId: null,
-            currentConversationTitle: '',
-            currentStage: '',
-            failures: [{ conversationId: 0, error: failureText }],
-            warnings: [],
-            message,
-            updatedAt: Date.now(),
-            summary: null,
-          });
-          throw error;
+      const starter = (() => {
+        switch (provider) {
+          case 'notion':
+            return syncNotionConversations;
+          case 'feishu':
+            return syncFeishuConversations;
+          case 'github':
+            return syncGithubConversations;
+          default:
+            return assertNever(provider);
         }
-      }
+      })();
 
       const token = runTokenRef.current + 1;
       runTokenRef.current = token;
@@ -609,7 +591,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       setFeedback(runningFeedback);
 
       try {
-        const ack = await syncNotionConversations(ids);
+        const ack = await starter(ids);
         if (disposedRef.current) return ack;
         await refreshFromBackground(provider);
         return ack;
@@ -651,7 +633,13 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         throw error;
       }
     },
-    [refreshFromBackground, syncNotionConversations, syncObsidianConversations, syncFeishuConversations],
+    [
+      refreshFromBackground,
+      syncNotionConversations,
+      syncObsidianConversations,
+      syncFeishuConversations,
+      syncGithubConversations,
+    ],
   );
 
   return {
@@ -661,5 +649,6 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     syncingNotion: feedback.phase === 'running' && feedback.provider === 'notion',
     syncingObsidian: feedback.phase === 'running' && feedback.provider === 'obsidian',
     syncingFeishu: feedback.phase === 'running' && feedback.provider === 'feishu',
+    syncingGithub: feedback.phase === 'running' && feedback.provider === 'github',
   };
 }

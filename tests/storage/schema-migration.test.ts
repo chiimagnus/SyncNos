@@ -71,6 +71,45 @@ async function openV7DbWithoutPaginationIndexes() {
   return reqToPromise(req);
 }
 
+async function openV8Db() {
+  const req = indexedDB.open('webclipper', 8);
+  req.onupgradeneeded = () => {
+    const db = req.result;
+    const conversations = db.createObjectStore('conversations', { keyPath: 'id', autoIncrement: true });
+    conversations.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
+    conversations.createIndex('by_lastCapturedAt', 'lastCapturedAt', { unique: false });
+    conversations.createIndex('by_lastCapturedAt_id', ['lastCapturedAt', 'id'], { unique: false });
+    conversations.createIndex('by_listSourceKey_lastCapturedAt_id', ['listSourceKey', 'lastCapturedAt', 'id'], {
+      unique: false,
+    });
+    conversations.createIndex(
+      'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+      ['listSourceKey', 'listSiteKey', 'lastCapturedAt', 'id'],
+      { unique: false },
+    );
+    conversations.createIndex('by_listSiteKey_lastCapturedAt_id', ['listSiteKey', 'lastCapturedAt', 'id'], {
+      unique: false,
+    });
+
+    const messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+    messages.createIndex('by_conversationId_sequence', ['conversationId', 'sequence'], { unique: false });
+    messages.createIndex('by_conversationId_messageKey', ['conversationId', 'messageKey'], { unique: true });
+
+    const mappings = db.createObjectStore('sync_mappings', { keyPath: 'id', autoIncrement: true });
+    mappings.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
+    mappings.createIndex('by_notionPageId', 'notionPageId', { unique: false });
+
+    const imageCache = db.createObjectStore('image_cache', { keyPath: 'id', autoIncrement: true });
+    imageCache.createIndex('by_conversationId_url', ['conversationId', 'url'], { unique: true });
+    imageCache.createIndex('by_conversationId', 'conversationId', { unique: false });
+
+    const comments = db.createObjectStore('article_comments', { keyPath: 'id', autoIncrement: true });
+    comments.createIndex('by_canonicalUrl_createdAt', ['canonicalUrl', 'createdAt'], { unique: false });
+    comments.createIndex('by_conversationId_createdAt', ['conversationId', 'createdAt'], { unique: false });
+  };
+  return reqToPromise(req);
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -359,6 +398,79 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
     expect(article.listSiteKey).toBe('domain:example.com');
 
     db8.close();
+  });
+});
+
+describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
+  it('adds the cleanup store/index to a v8 database without changing existing store data', async () => {
+    const db8 = await openV8Db();
+    const tx8 = db8.transaction(
+      ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+      'readwrite',
+    );
+    await reqToPromise(
+      tx8.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'keep',
+        title: 'keep',
+        url: 'https://chatgpt.com/c/keep',
+        listSourceKey: 'chatgpt',
+        listSiteKey: 'domain:chatgpt.com',
+        lastCapturedAt: 1,
+      }),
+    );
+    await reqToPromise(
+      tx8.objectStore('messages').add({ conversationId: 1, messageKey: 'm1', sequence: 1, contentText: 'keep' }),
+    );
+    await reqToPromise(
+      tx8.objectStore('sync_mappings').add({ source: 'chatgpt', conversationKey: 'keep', sharedMetadata: 'keep' }),
+    );
+    await reqToPromise(
+      tx8.objectStore('image_cache').add({ conversationId: 1, url: 'https://example.com/image.png', byteSize: 1 }),
+    );
+    await reqToPromise(
+      tx8.objectStore('article_comments').add({
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/article',
+        createdAt: 1,
+        updatedAt: 1,
+        commentText: 'keep',
+      }),
+    );
+    await txDone(tx8);
+    db8.close();
+
+    const db9 = await openDb();
+    expect(db9.version).toBe(9);
+    expect(db9.objectStoreNames.contains('github_cleanup_outbox')).toBe(true);
+    const tx9 = db9.transaction(
+      ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', 'github_cleanup_outbox'],
+      'readonly',
+    );
+    const cleanup = tx9.objectStore('github_cleanup_outbox');
+    expect(cleanup.indexNames.contains('by_remoteKey_nextAttemptAt_createdAt')).toBe(true);
+    expect(await reqToPromise(tx9.objectStore('conversations').count())).toBe(1);
+    expect(await reqToPromise(tx9.objectStore('messages').count())).toBe(1);
+    expect(await reqToPromise(tx9.objectStore('sync_mappings').count())).toBe(1);
+    expect(await reqToPromise(tx9.objectStore('image_cache').count())).toBe(1);
+    expect(await reqToPromise(tx9.objectStore('article_comments').count())).toBe(1);
+    expect(await reqToPromise(cleanup.count())).toBe(0);
+    await txDone(tx9);
+    db9.close();
+  });
+
+  it('creates the cleanup store/index in a fresh database', async () => {
+    const db = await openDb();
+    expect(db.version).toBe(9);
+    expect(db.objectStoreNames.contains('github_cleanup_outbox')).toBe(true);
+    const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
+    const store = tx.objectStore('github_cleanup_outbox');
+    expect(store.indexNames.contains('by_remoteKey_nextAttemptAt_createdAt')).toBe(true);
+    expect(store.keyPath).toBe('id');
+    expect(store.autoIncrement).toBe(true);
+    await txDone(tx);
+    db.close();
   });
 });
 

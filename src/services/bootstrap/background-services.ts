@@ -21,6 +21,7 @@ import {
   getSyncStatus as getFeishuSyncStatus,
   syncConversations as feishuSyncConversations,
 } from '@services/sync/feishu/feishu-sync-orchestrator.ts';
+import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
 
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import {
@@ -36,8 +37,15 @@ import {
   type FeishuAutoSyncScheduler,
 } from '@services/sync/auto-sync/feishu-auto-sync-scheduler';
 import {
+  createGithubAutoSyncScheduler,
+  type GithubAutoSyncScheduler,
+} from '@services/sync/auto-sync/github-auto-sync-scheduler';
+import {
   FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
   FEISHU_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
+  GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME,
+  GITHUB_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
+  GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
   NOTION_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   OBSIDIAN_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
@@ -69,6 +77,8 @@ export type FeishuSyncOrchestrator = {
   clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
 };
 
+export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestrator>;
+
 export type BackgroundServices = {
   articleFetchService: typeof articleFetchService;
   conversationKinds: typeof conversationKinds;
@@ -76,11 +86,14 @@ export type BackgroundServices = {
   notionSyncOrchestrator: NotionSyncOrchestrator;
   obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
   feishuSyncOrchestrator: FeishuSyncOrchestrator;
+  githubSyncOrchestrator: GithubSyncOrchestrator;
   autoSync: {
     notionScheduler: NotionAutoSyncScheduler;
     obsidianScheduler: ObsidianAutoSyncScheduler;
     feishuScheduler: FeishuAutoSyncScheduler;
+    githubScheduler: GithubAutoSyncScheduler;
     onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => Promise<void>;
+    onRemoteCleanupPending: () => Promise<void>;
     handleAlarm: (name: string) => Promise<void>;
   };
 };
@@ -96,6 +109,8 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
     syncService: notionSyncService,
     jobStore: notionSyncJobStore,
   });
+
+  const githubSyncOrchestrator = createGithubSyncOrchestrator();
 
   const notionScheduler = createNotionAutoSyncScheduler({
     getInstanceId: deps.getInstanceId,
@@ -118,21 +133,25 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
       clearSyncStatus: async (input: { instanceId: string }) => clearFeishuSyncStatus(input as any),
     },
   });
+  const githubScheduler = createGithubAutoSyncScheduler({ getInstanceId: deps.getInstanceId, githubSyncOrchestrator });
 
   return {
     articleFetchService,
     conversationKinds,
     notionSyncJobStore,
     notionSyncOrchestrator,
+    githubSyncOrchestrator,
     autoSync: {
       notionScheduler,
       obsidianScheduler,
       feishuScheduler,
+      githubScheduler,
       onConversationChanged: async (conversationId: number, reason: AutoSyncConversationChangedReason) => {
         const local = await storageGet([
           NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
           OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
           FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
+          GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
         ]).catch(() => ({}));
         if ((local as any)?.[NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
           void notionScheduler.enqueue(conversationId, reason);
@@ -143,6 +162,12 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
         if ((local as any)?.[FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
           void feishuScheduler.enqueue(conversationId, reason);
         }
+        if ((local as any)?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
+          void githubScheduler.enqueue(conversationId, reason);
+        }
+      },
+      onRemoteCleanupPending: async () => {
+        await githubScheduler.scheduleCleanup();
       },
       handleAlarm: async (name: string) => {
         const alarmName = String(name || '').trim();
@@ -156,6 +181,14 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
         }
         if (alarmName === FEISHU_AUTO_SYNC_DEBOUNCE_ALARM_NAME) {
           await feishuScheduler.flush();
+          return;
+        }
+        if (alarmName === GITHUB_AUTO_SYNC_DEBOUNCE_ALARM_NAME) {
+          await githubScheduler.flush();
+          return;
+        }
+        if (alarmName === GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME) {
+          await githubScheduler.flushCleanup();
         }
       },
     },

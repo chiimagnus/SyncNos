@@ -10,6 +10,7 @@ const REGISTRY: ReadonlyArray<SyncProviderDefinition> = [
   { id: 'obsidian', labelKey: 'providerObsidian', settingsSectionKey: 'obsidian' },
   { id: 'notion', labelKey: 'providerNotion', settingsSectionKey: 'notion' },
   { id: 'feishu', labelKey: 'providerFeishu', settingsSectionKey: 'feishu' },
+  { id: 'github', labelKey: 'providerGithub', settingsSectionKey: 'github' },
 ] as const;
 
 export function listSyncProviders(): SyncProviderDefinition[] {

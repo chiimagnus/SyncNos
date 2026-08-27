@@ -16,7 +16,7 @@ import {
   buildStableNotePath as buildDefaultStableNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
 } from '@services/sync/obsidian/obsidian-note-path';
-import { readSyncnosObject as readDefaultSyncnosObject } from '@services/sync/obsidian/obsidian-sync-metadata';
+import { readSyncnosObject as readDefaultSyncnosObject } from '@services/sync/shared/remote-markdown-metadata';
 export const DEFAULT_OBSIDIAN_OPEN_RETRY_POLICY = Object.freeze({
   maxAttempts: 3,
   launchDelayMs: 1200,

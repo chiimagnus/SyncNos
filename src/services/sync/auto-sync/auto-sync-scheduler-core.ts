@@ -80,6 +80,7 @@ export function createAutoSyncSchedulerCore(config: {
   getInstanceId: () => string;
   isProviderEnabled: () => Promise<boolean>;
   syncConversations: (conversationIds: number[], instanceId: string) => Promise<void>;
+  getFailureRetryDelayMs?: (error: unknown) => number | null | undefined;
   onPreflightFailed?: (args: { conversationIds: number[]; instanceId: string; error: string }) => Promise<void>;
 }): AutoSyncScheduler {
   const {
@@ -92,6 +93,7 @@ export function createAutoSyncSchedulerCore(config: {
     getInstanceId,
     isProviderEnabled,
     syncConversations,
+    getFailureRetryDelayMs,
     onPreflightFailed,
   } = config;
 
@@ -183,6 +185,17 @@ export function createAutoSyncSchedulerCore(config: {
       if (isAlreadyRunningError(error)) {
         const delayedQueue: QueueMap = { ...queue };
         const delayedDueAt = now + debounceMs;
+        for (const conversationId of dueConversationIds) delayedQueue[String(conversationId)] = delayedDueAt;
+        const trimmed = trimQueue(delayedQueue, maxItems);
+        await writeQueue(trimmed);
+        await scheduleNextAlarm(trimmed);
+        return;
+      }
+
+      const retryDelayMs = Number(getFailureRetryDelayMs?.(error));
+      if (Number.isFinite(retryDelayMs) && retryDelayMs > 0) {
+        const delayedQueue: QueueMap = { ...restQueue };
+        const delayedDueAt = now + Math.floor(retryDelayMs);
         for (const conversationId of dueConversationIds) delayedQueue[String(conversationId)] = delayedDueAt;
         const trimmed = trimQueue(delayedQueue, maxItems);
         await writeQueue(trimmed);

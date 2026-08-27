@@ -1,4 +1,4 @@
-export type SyncProvider = 'notion' | 'obsidian' | 'feishu';
+export type SyncProvider = 'notion' | 'obsidian' | 'feishu' | 'github';
 
 export type SyncJobPhase = 'running' | 'done' | 'aborted';
 

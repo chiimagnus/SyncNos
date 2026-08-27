@@ -47,6 +47,32 @@ describe('normalizeSyncJobSnapshot', () => {
     expect(snapshot!.updatedAt).toBe(2);
   });
 
+  it('normalizes GitHub snapshots under the dedicated generic job key', async () => {
+    const { normalizeSyncJobSnapshot, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
+
+    expect(SYNC_JOB_STORAGE_KEYS.github).toBe('github_sync_job_v1');
+    const snapshot = normalizeSyncJobSnapshot('github', {
+      id: 'github_job_1',
+      provider: 'github',
+      status: 'running',
+      instanceId: 'background-github',
+      startedAt: 10,
+      updatedAt: 11,
+      conversationIds: [3, '4', 3, 0],
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    });
+
+    expect(snapshot).toMatchObject({
+      id: 'github_job_1',
+      provider: 'github',
+      status: 'running',
+      instanceId: 'background-github',
+      conversationIds: [3, 4],
+    });
+  });
+
   it('aborts a foreign running job immediately when forced', async () => {
     const { abortRunningSyncJobIfFromOtherInstance, SYNC_JOB_STORAGE_KEYS } =
       await import('@services/sync/sync-job-store');

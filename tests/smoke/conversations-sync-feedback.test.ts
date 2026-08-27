@@ -4,7 +4,8 @@ import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
 import { t } from '../../src/ui/i18n';
-import { ConversationsProvider } from '../../src/viewmodels/conversations/conversations-context';
+import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
+import { useConversationSyncFeedback } from '../../src/viewmodels/conversations/useConversationSyncFeedback';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
 const getConversationListBootstrap = vi.fn();
@@ -13,12 +14,15 @@ const deleteConversations = vi.fn();
 const syncNotionConversations = vi.fn();
 const syncObsidianConversations = vi.fn();
 const syncFeishuConversations = vi.fn();
+const syncGithubConversations = vi.fn();
 const clearNotionSyncJobStatus = vi.fn();
 const clearObsidianSyncStatus = vi.fn();
 const clearFeishuSyncStatus = vi.fn();
+const clearGithubSyncStatus = vi.fn();
 const getNotionSyncJobStatus = vi.fn();
 const getObsidianSyncStatus = vi.fn();
 const getFeishuSyncStatus = vi.fn();
+const getGithubSyncStatus = vi.fn();
 
 vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
   useIsNarrowScreen: () => true,
@@ -32,12 +36,15 @@ vi.mock('@services/conversations/client/repo', () => ({
 
 vi.mock('@services/sync/repo', () => ({
   clearFeishuSyncStatus: (...args: any[]) => clearFeishuSyncStatus(...args),
+  clearGithubSyncStatus: (...args: any[]) => clearGithubSyncStatus(...args),
   clearNotionSyncJobStatus: (...args: any[]) => clearNotionSyncJobStatus(...args),
   clearObsidianSyncStatus: (...args: any[]) => clearObsidianSyncStatus(...args),
   syncFeishuConversations: (...args: any[]) => syncFeishuConversations(...args),
+  syncGithubConversations: (...args: any[]) => syncGithubConversations(...args),
   syncNotionConversations: (...args: any[]) => syncNotionConversations(...args),
   syncObsidianConversations: (...args: any[]) => syncObsidianConversations(...args),
   getFeishuSyncStatus: (...args: any[]) => getFeishuSyncStatus(...args),
+  getGithubSyncStatus: (...args: any[]) => getGithubSyncStatus(...args),
   getNotionSyncJobStatus: (...args: any[]) => getNotionSyncJobStatus(...args),
   getObsidianSyncStatus: (...args: any[]) => getObsidianSyncStatus(...args),
 }));
@@ -106,11 +113,25 @@ const baseConversation = {
 
 describe('Conversations sync feedback', () => {
   let root: ReactDOM.Root | null = null;
+  let latestApp: ReturnType<typeof useConversationsApp> | null = null;
+  let latestFeedback: ReturnType<typeof useConversationSyncFeedback> | null = null;
+
+  function AppProbe() {
+    latestApp = useConversationsApp();
+    return null;
+  }
+
+  function FeedbackProbe() {
+    latestFeedback = useConversationSyncFeedback();
+    return null;
+  }
 
   beforeEach(() => {
     vi.useFakeTimers();
     setupDom();
     root = ReactDOM.createRoot(document.getElementById('root')!);
+    latestApp = null;
+    latestFeedback = null;
 
     getConversationListBootstrap.mockReset();
     getConversationDetail.mockReset();
@@ -118,12 +139,15 @@ describe('Conversations sync feedback', () => {
     syncNotionConversations.mockReset();
     syncObsidianConversations.mockReset();
     syncFeishuConversations.mockReset();
+    syncGithubConversations.mockReset();
     clearNotionSyncJobStatus.mockReset();
     clearObsidianSyncStatus.mockReset();
     clearFeishuSyncStatus.mockReset();
+    clearGithubSyncStatus.mockReset();
     getNotionSyncJobStatus.mockReset();
     getObsidianSyncStatus.mockReset();
     getFeishuSyncStatus.mockReset();
+    getGithubSyncStatus.mockReset();
 
     getConversationListBootstrap.mockResolvedValue({
       items: [baseConversation],
@@ -140,9 +164,11 @@ describe('Conversations sync feedback', () => {
     clearNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
     clearObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });
     clearFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', job: null, instanceId: 'feishu-test' });
+    clearGithubSyncStatus.mockResolvedValue({ provider: 'github', job: null, instanceId: 'github-test' });
     getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
     getObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });
     getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', job: null, instanceId: 'feishu-test' });
+    getGithubSyncStatus.mockResolvedValue({ provider: 'github', job: null, instanceId: 'github-test' });
   });
 
   afterEach(() => {
@@ -150,6 +176,8 @@ describe('Conversations sync feedback', () => {
       root?.unmount();
     });
     root = null;
+    latestApp = null;
+    latestFeedback = null;
     vi.useRealTimers();
     cleanupDom();
   });
@@ -159,6 +187,22 @@ describe('Conversations sync feedback', () => {
       root!.render(createElement(ConversationsProvider, null, createElement(ConversationListPane)));
       await flushMicrotasks();
     });
+  }
+
+  async function renderAppProbe() {
+    await act(async () => {
+      root!.render(createElement(ConversationsProvider, null, createElement(AppProbe)));
+      await flushMicrotasks();
+    });
+    expect(latestApp).toBeTruthy();
+  }
+
+  async function renderFeedbackProbe() {
+    await act(async () => {
+      root!.render(createElement(FeedbackProbe));
+      await flushMicrotasks();
+    });
+    expect(latestFeedback).toBeTruthy();
   }
 
   function selectFirstConversation() {
@@ -211,6 +255,24 @@ describe('Conversations sync feedback', () => {
       okCount: 1,
       failCount: 0,
       perConversation: [{ conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() }],
+      ...overrides,
+    };
+  }
+
+  function githubJob(overrides: Record<string, unknown> = {}) {
+    return {
+      provider: 'github',
+      status: 'running',
+      startedAt: Date.now() - 500,
+      updatedAt: Date.now(),
+      finishedAt: null,
+      conversationIds: [11],
+      currentConversationId: 11,
+      currentConversationTitle: 'GitHub sync target',
+      currentStage: 'committing_tree',
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
       ...overrides,
     };
   }
@@ -512,5 +574,148 @@ describe('Conversations sync feedback', () => {
     expect(failureNotice?.textContent).toContain(t('phaseFailed'));
     expect(failureNotice?.textContent).toContain(t('syncProviderDisabled'));
     expect(failureNotice?.textContent).not.toContain('sync provider disabled');
+  });
+
+  it('hydrates a running GitHub job through the shared feedback surface', async () => {
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      instanceId: 'github-test',
+      job: githubJob(),
+    });
+
+    await renderPane();
+
+    const notice = document.getElementById('conversationSyncFeedback');
+    expect(notice).toBeTruthy();
+    expect(notice?.getAttribute('data-phase')).toBe('running');
+    expect(notice?.textContent).toContain(t('providerGithub'));
+    expect(notice?.textContent).toContain('GitHub sync target');
+    expect(notice?.textContent).toContain('committing_tree');
+  });
+
+  it('hydrates a successful GitHub terminal job through the shared feedback surface', async () => {
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      instanceId: 'github-test',
+      job: githubJob({
+        status: 'done',
+        finishedAt: Date.now(),
+        currentConversationId: undefined,
+        currentConversationTitle: '',
+        currentStage: 'done',
+        okCount: 1,
+        perConversation: [{ conversationId: 11, ok: true, mode: 'synced', appended: 0, error: '', at: Date.now() }],
+      }),
+    });
+    await renderPane();
+
+    const notice = document.getElementById('conversationSyncFeedback');
+    expect(notice?.getAttribute('data-phase')).toBe('success');
+    expect(notice?.textContent).toContain(t('providerGithub'));
+  });
+
+  it('hydrates a failed GitHub terminal job and clears the GitHub job on dismiss', async () => {
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      instanceId: 'github-test',
+      job: githubJob({
+        status: 'done',
+        finishedAt: Date.now(),
+        currentConversationId: undefined,
+        currentConversationTitle: '',
+        currentStage: 'done',
+        okCount: 0,
+        failCount: 1,
+        perConversation: [
+          {
+            conversationId: 11,
+            conversationTitle: 'GitHub sync target',
+            ok: false,
+            mode: 'failed',
+            appended: 0,
+            error: 'github_repository_unavailable',
+            at: Date.now(),
+          },
+        ],
+      }),
+    });
+    await renderPane();
+
+    const notice = document.getElementById('conversationSyncFeedback');
+    expect(notice?.getAttribute('data-phase')).toBe('failed');
+    expect(notice?.textContent).toContain(t('providerGithub'));
+
+    clickDismissButton();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    expect(clearGithubSyncStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches the translated GitHub menu item through the production context callback', async () => {
+    syncGithubConversations.mockResolvedValue({ provider: 'github', started: true });
+    await renderPane();
+    selectFirstConversation();
+
+    const syncMenuButton = document.getElementById('btnSyncTo') as HTMLButtonElement | null;
+    expect(syncMenuButton).toBeTruthy();
+    await act(async () => {
+      syncMenuButton!.click();
+      await flushMicrotasks();
+    });
+
+    const githubMenuItem = document.getElementById('menuSyncToGithub') as HTMLButtonElement | null;
+    expect(githubMenuItem).toBeTruthy();
+    expect(githubMenuItem?.textContent).toBe(t('githubSync'));
+    expect(githubMenuItem?.textContent).toBe(t('providerGithub'));
+
+    await act(async () => {
+      githubMenuItem!.click();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(syncGithubConversations).toHaveBeenCalledWith([11]);
+  });
+
+  it('keeps GitHub as the preferred provider when another running job is newer', async () => {
+    await renderAppProbe();
+    syncGithubConversations.mockResolvedValue({ provider: 'github', started: true });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: notionRunningJob({ updatedAt: Date.now() + 10_000 }),
+    });
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      instanceId: 'github-test',
+      job: githubJob({ updatedAt: Date.now() }),
+    });
+
+    await act(async () => {
+      latestApp!.toggleSelected(11);
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      await latestApp!.syncSelectedGithub();
+      await flushMicrotasks();
+    });
+
+    expect(syncGithubConversations).toHaveBeenCalledWith([11]);
+    expect(latestApp!.syncFeedback.provider).toBe('github');
+    expect(latestApp!.syncingGithub).toBe(true);
+  });
+
+  it('rejects a synthetic unknown provider without falling back to the Notion starter', async () => {
+    await renderFeedbackProbe();
+
+    await expect((latestFeedback!.startSync as any)('future-provider', [11])).rejects.toThrow(
+      'unsupported sync provider: future-provider',
+    );
+
+    expect(syncNotionConversations).not.toHaveBeenCalled();
+    expect(syncObsidianConversations).not.toHaveBeenCalled();
+    expect(syncFeishuConversations).not.toHaveBeenCalled();
+    expect(syncGithubConversations).not.toHaveBeenCalled();
   });
 });

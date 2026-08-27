@@ -1,7 +1,11 @@
+import {
+  GITHUB_CLEANUP_OUTBOX_DUE_INDEX,
+  GITHUB_CLEANUP_OUTBOX_STORE,
+} from '@platform/idb/github-cleanup-outbox-record';
 import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 8;
+export const DB_VERSION = 9;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -929,6 +933,20 @@ function ensureArticleCommentsStore(db: IDBDatabase, tx: IDBTransaction | null):
   }
 }
 
+function ensureGithubCleanupOutboxStore(db: IDBDatabase, tx: IDBTransaction | null): void {
+  if (!db.objectStoreNames.contains(GITHUB_CLEANUP_OUTBOX_STORE)) {
+    const store = db.createObjectStore(GITHUB_CLEANUP_OUTBOX_STORE, { keyPath: 'id', autoIncrement: true });
+    store.createIndex(GITHUB_CLEANUP_OUTBOX_DUE_INDEX, ['remoteKey', 'nextAttemptAt', 'createdAt'], { unique: false });
+    return;
+  }
+
+  if (!tx) return;
+  const store = tx.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
+  if (!store.indexNames.contains(GITHUB_CLEANUP_OUTBOX_DUE_INDEX)) {
+    store.createIndex(GITHUB_CLEANUP_OUTBOX_DUE_INDEX, ['remoteKey', 'nextAttemptAt', 'createdAt'], { unique: false });
+  }
+}
+
 function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   const db = request.result;
   const tx = request.transaction;
@@ -938,6 +956,7 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureSyncMappingsStore(db, tx);
   ensureImageCacheStore(db, tx);
   ensureArticleCommentsStore(db, tx);
+  ensureGithubCleanupOutboxStore(db, tx);
 
   if (tx && oldVersion < 2) {
     try {

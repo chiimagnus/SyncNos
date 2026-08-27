@@ -8,9 +8,8 @@ SyncNos 欢迎聚焦明确的 Bug 修复、站点适配器、文档改进，以�
 
 1. 先搜索现有的 [Issues](https://github.com/chiimagnus/SyncNos/issues) 和 [Pull Requests](https://github.com/chiimagnus/SyncNos/pulls)。
 2. 修改代码前先阅读 [`AGENTS.md`](../AGENTS.md)。它是依赖方向、产品不变量和架构专项检查的事实真源。
-3. 长期维护的产品与数据模型文档从 [`overview.md`](overview.md) 开始阅读。
-4. 在投入实现之前，先讨论非平凡的行为变更。新增站点适配器/集成、存储或 schema 变更、权限变更、迁移以及发布行为，通常都应先有一个达成共识的 Issue。小型文档修改、拼写修正和明显的机械性维护，可以直接提交 PR。
-5. 保持改动范围聚焦。不要把无关的清理、格式化、本地化或重构混入功能补丁。
+3. 在投入实现之前，先讨论非平凡的行为变更。新增站点适配器/集成、存储或 schema 变更、权限变更、迁移以及发布行为，通常都应先有一个达成共识的 Issue。小型文档修改、拼写修正和明显的机械性维护，可以直接提交 PR。
+4. 保持改动范围聚焦。不要把无关的清理、格式化、本地化或重构混入功能补丁。
 
 即使一个补丁在技术上是正确的，如果它破坏产品不变量、增加不需要的兼容路径，或超出已约定范围，仍可能被拒绝。
 
@@ -43,7 +42,7 @@ npm run setup:safari:xcode
 
 不要在这里重复架构规则。依赖方向和产品不变量统一遵循 [`AGENTS.md`](../AGENTS.md)。
 
-长期产品事实应维护在 [`overview.md`](overview.md) 及其链接页面中。版本号、权限、schema、迁移以及其他容易漂移的事实，应保留在各自的 canonical 源文件或唯一的 canonical 文档中；其他文档只应链接过去。
+版本号、权限、schema、迁移以及其他容易漂移的事实，应保留在各自的 canonical 源文件或唯一的 canonical 文档中；其他文档只应链接过去。
 
 当文档与实现不一致时，先从代码和仓库脚本确认实际行为，然后在同一个 PR 中修正过时文档。
 
@@ -74,34 +73,6 @@ npm run setup:safari:xcode
 - 对存储、权限、隐私、迁移或兼容性的任何影响。
 
 对于站点适配器，请明确支持范围内的页面类型，以及必须采集哪些内容。不要让一个 Issue 覆盖一个边界开放、彼此无关的站点集合。
-
-## Commit
-
-使用 **Conventional Commits**。一个 commit 应只表达一个可验证的关注点。
-
-常见前缀包括：
-
-- `feat:` — 用户可见的新能力；
-- `fix:` — 缺陷修复；
-- `refactor:` — 不改变行为的结构调整；
-- `test:` — 仅测试变更；
-- `docs:` — 仅文档变更；
-- `chore:` — 仓库维护；
-- `ci:` / `build:` — 自动化或构建系统变更。
-
-当 scope 能提供有用上下文时可以添加，例如 `fix(collectors): ...` 或 `feat(settings): ...`。
-
-请写有意义的摘要，不要使用 `-` 之类的占位消息。只有明确的发布/版本自动化才应使用纯版本消息，普通开发 commit 不应如此。当修改原因、兼容性决策或取舍无法从 diff 中直接看出时，应补充 commit body。
-
-示例：
-
-```text
-fix(collectors): preserve complete virtualized chat capture
-feat(settings): add per-site capture toggle
-docs: clarify contributor validation workflow
-```
-
-中文或英文摘要都可以；清晰度和可审计性比语言本身更重要。
 
 ## Pull Request
 

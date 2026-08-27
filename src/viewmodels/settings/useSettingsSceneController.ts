@@ -23,6 +23,7 @@ import {
 import { normalizeNotionDatabaseIdInput } from '@services/sync/notion/notion-id-utils';
 import {
   FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
@@ -44,6 +45,7 @@ import {
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
   FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
+  GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
 } from '@services/sync/auto-sync/auto-sync-keys';
 import {
   DEFAULT_CHAT_WITH_PLATFORMS,
@@ -85,6 +87,7 @@ import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/sh
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
 const FEISHU_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('feishu');
+const GITHUB_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('github');
 const FALLBACK_NOTION_DB_STORAGE_KEYS = [
   'notion_db_id_syncnos_ai_chats',
   'notion_db_id_syncnos_web_articles',
@@ -186,6 +189,81 @@ export type UseSettingsSceneControllerArgs = {
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
+type GithubAuthSummary =
+  | { state: 'disconnected' }
+  | { state: 'connected' }
+  | { state: 'pending'; userCode: string; verificationUri: string; expiresAt: number; nextPollAt: number };
+
+type GithubRepositoryStatus = 'ready' | 'github_app_not_installed' | 'github_no_accessible_repositories' | null;
+
+type GithubRepositoryOption = {
+  owner: string;
+  repo: string;
+  fullName: string;
+  private: boolean;
+  installationId: number;
+  contentWriteCapable: boolean;
+};
+
+type GithubSafeAccount = { login: string; avatarUrl: string; url: string };
+
+type GithubConnectionTarget = {
+  repository: string;
+  branch: string;
+  remoteKey: string;
+  installationId: number | null;
+};
+
+type GithubConnectionTestState =
+  | { status: 'idle' }
+  | { status: 'testing' }
+  | { status: 'uninitialized' }
+  | { status: 'initializing' }
+  | { status: 'success'; target: GithubConnectionTarget }
+  | { status: 'error'; error: string };
+
+function normalizeGithubConnectionTarget(value: any): GithubConnectionTarget {
+  return {
+    repository: String(value?.repository || ''),
+    branch: String(value?.branch || ''),
+    remoteKey: String(value?.remoteKey || ''),
+    installationId:
+      Number.isSafeInteger(value?.installationId) && value.installationId > 0 ? value.installationId : null,
+  };
+}
+
+function normalizeGithubAuthSummary(value: unknown): GithubAuthSummary {
+  const raw = value as any;
+  if (raw?.state === 'connected') return { state: 'connected' };
+  if (raw?.state === 'pending') {
+    return {
+      state: 'pending',
+      userCode: String(raw.userCode || ''),
+      verificationUri: String(raw.verificationUri || ''),
+      expiresAt: Number(raw.expiresAt) || 0,
+      nextPollAt: Number(raw.nextPollAt) || 0,
+    };
+  }
+  return { state: 'disconnected' };
+}
+
+function normalizeGithubRepositoryOptions(value: unknown): GithubRepositoryOption[] {
+  return (Array.isArray(value) ? value : []).flatMap((row: any) => {
+    const fullName = String(row?.fullName || '').trim();
+    if (!fullName) return [];
+    return [
+      {
+        owner: String(row?.owner || '').trim(),
+        repo: String(row?.repo || '').trim(),
+        fullName,
+        private: row?.private === true,
+        installationId: Number.isSafeInteger(row?.installationId) && row.installationId > 0 ? row.installationId : 0,
+        contentWriteCapable: row?.contentWriteCapable === true,
+      },
+    ];
+  });
+}
+
 function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
   const raw = String(value || '')
     .trim()
@@ -247,6 +325,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianStatus, setObsidianStatus] = useState<string>(t('statusIdle'));
   const [obsidianSyncEnabled, setObsidianSyncEnabled] = useState(true);
   const [obsidianAutoSyncEnabled, setObsidianAutoSyncEnabled] = useState(false);
+
+  // GitHub
+  const [githubAuth, setGithubAuth] = useState<GithubAuthSummary>({ state: 'disconnected' });
+  const [githubAccount, setGithubAccount] = useState<GithubSafeAccount | null>(null);
+  const [githubRepositoryStatus, setGithubRepositoryStatus] = useState<GithubRepositoryStatus>(null);
+  const [githubRepositories, setGithubRepositories] = useState<GithubRepositoryOption[]>([]);
+  const [githubRepository, setGithubRepository] = useState('');
+  const [githubBranch, setGithubBranch] = useState('');
+  const [githubVerificationUrl, setGithubVerificationUrl] = useState('');
+  const [githubAppUrl, setGithubAppUrl] = useState('');
+  const [githubInstallUrl, setGithubInstallUrl] = useState('');
+  const [githubSyncEnabled, setGithubSyncEnabled] = useState(true);
+  const [githubAutoSyncEnabled, setGithubAutoSyncEnabled] = useState(false);
+  const [githubConnectionTest, setGithubConnectionTest] = useState<GithubConnectionTestState>({ status: 'idle' });
 
   // Backup
   const [exportStatus, setExportStatus] = useState<string>('');
@@ -331,8 +423,72 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setError(null);
   }, []);
 
+  const clearGithubRepositoryDiscovery = useCallback(() => {
+    setGithubAccount(null);
+    setGithubRepositoryStatus(null);
+    setGithubRepositories([]);
+  }, []);
+
+  const applyGithubAuth = useCallback(
+    (value: unknown) => {
+      const next = normalizeGithubAuthSummary(value);
+      setGithubAuth(next);
+      if (next.state !== 'connected') clearGithubRepositoryDiscovery();
+      return next;
+    },
+    [clearGithubRepositoryDiscovery],
+  );
+
+  const applyGithubSettingsResponse = useCallback(
+    (value: any) => {
+      const settings = value?.settings || {};
+      const app = value?.app || {};
+      setGithubRepository(String(settings.repository || ''));
+      setGithubBranch(String(settings.branch || ''));
+      setGithubVerificationUrl(String(app.verificationUrl || ''));
+      setGithubAppUrl(String(app.appUrl || ''));
+      setGithubInstallUrl(String(app.installUrl || ''));
+      setGithubConnectionTest({ status: 'idle' });
+      return applyGithubAuth(value?.auth);
+    },
+    [applyGithubAuth],
+  );
+
+  const loadGithubRepositoriesInternal = useCallback(async () => {
+    try {
+      const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES, {}));
+      const status: GithubRepositoryStatus =
+        data?.status === 'ready' ||
+        data?.status === 'github_app_not_installed' ||
+        data?.status === 'github_no_accessible_repositories'
+          ? data.status
+          : null;
+      const login = String(data?.account?.login || '').trim();
+      setGithubAccount(
+        login
+          ? {
+              login,
+              avatarUrl: String(data?.account?.avatarUrl || ''),
+              url: String(data?.account?.url || ''),
+            }
+          : null,
+      );
+      setGithubRepositoryStatus(status);
+      setGithubRepositories(normalizeGithubRepositoryOptions(data?.repositories));
+      if (data?.appUrl) setGithubAppUrl(String(data.appUrl));
+      if (data?.installUrl) setGithubInstallUrl(String(data.installUrl));
+      return data;
+    } catch (error) {
+      if (toErrorMessage(error, '') === 'github_auth_required') {
+        setGithubAuth({ state: 'disconnected' });
+        clearGithubRepositoryDiscovery();
+      }
+      throw error;
+    }
+  }, [clearGithubRepositoryDiscovery]);
+
   const refreshInternal = useCallback(async () => {
-    const [notionRes, feishuRes, local, obsidianRes, antiHotlinkRulesDraft] = await Promise.all([
+    const [notionRes, feishuRes, local, obsidianRes, githubRes, antiHotlinkRulesDraft] = await Promise.all([
       send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
       send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
       storageGet([
@@ -352,9 +508,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         NOTION_SYNC_PROVIDER_ENABLED_KEY,
         FEISHU_SYNC_PROVIDER_ENABLED_KEY,
         OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
+        GITHUB_SYNC_PROVIDER_ENABLED_KEY,
         NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
         OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
         FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
+        GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
         'inpage_display_mode',
         'inpage_supported_only',
         'ai_chat_auto_save_enabled',
@@ -369,6 +527,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         ABOUT_YOU_USER_NAME_STORAGE_KEY,
       ]),
       send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
+      send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}),
       loadAntiHotlinkRulesForSettings({ forceRefresh: true }),
     ]);
 
@@ -396,6 +555,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setFeishuAutoSyncEnabled(local?.[FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
     setObsidianSyncEnabled(local?.[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY] !== false);
     setObsidianAutoSyncEnabled(local?.[OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
+    setGithubSyncEnabled(local?.[GITHUB_SYNC_PROVIDER_ENABLED_KEY] !== false);
+    setGithubAutoSyncEnabled(local?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
 
     const feishuStatus = unwrap(feishuRes);
     const feishuIsConnected = !!feishuStatus?.connected;
@@ -440,13 +601,23 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianApiKeyDraft('');
     setObsidianStatus(t('statusIdle'));
 
+    const githubSettings = unwrap(githubRes);
+    const githubAuthState = applyGithubSettingsResponse(githubSettings);
+    if (githubAuthState.state === 'connected') await loadGithubRepositoriesInternal();
+
     const chatWith = await loadChatWithSettings();
     setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
     setChatWithPlatforms(
       Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
     );
     chatWithHydratedRef.current = true;
-  }, [articleDbSpec.storageKey, chatDbSpec.storageKey, videoDbSpec.storageKey]);
+  }, [
+    applyGithubSettingsResponse,
+    articleDbSpec.storageKey,
+    chatDbSpec.storageKey,
+    loadGithubRepositoriesInternal,
+    videoDbSpec.storageKey,
+  ]);
 
   const refresh = useCallback(async () => {
     await runTask(refreshInternal);
@@ -484,6 +655,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY)) {
         const nextValue = changes[FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY]?.newValue;
         setFeishuAutoSyncEnabled(nextValue === true);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, GITHUB_SYNC_PROVIDER_ENABLED_KEY)) {
+        const nextValue = changes[GITHUB_SYNC_PROVIDER_ENABLED_KEY]?.newValue;
+        setGithubSyncEnabled(nextValue !== false);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY)) {
+        const nextValue = changes[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]?.newValue;
+        setGithubAutoSyncEnabled(nextValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, READER_PREFS_STORAGE_KEY)) {
         const nextValue = changes[READER_PREFS_STORAGE_KEY]?.newValue;
@@ -741,6 +920,195 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     },
     [runTask],
   );
+
+  const onToggleGithubSyncEnabled = useCallback(
+    async (enabled: boolean) => {
+      await runTask(
+        async () => {
+          await setSyncProviderEnabled('github', enabled);
+          setGithubSyncEnabled(enabled);
+        },
+        { fallbackMessage: 'save github sync enabled failed' },
+      );
+    },
+    [runTask],
+  );
+
+  const onToggleGithubAutoSyncEnabled = useCallback(
+    async (enabled: boolean) => {
+      await runTask(
+        async () => {
+          await storageSet({ [GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]: enabled });
+          setGithubAutoSyncEnabled(enabled);
+        },
+        { fallbackMessage: 'save github auto sync enabled failed' },
+      );
+    },
+    [runTask],
+  );
+
+  const onGithubConnect = useCallback(async () => {
+    await runTask(
+      async () => {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW, {}));
+        const auth = applyGithubAuth(data?.auth);
+        if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+      },
+      { fallbackMessage: 'github_device_start_failed' },
+    );
+  }, [applyGithubAuth, loadGithubRepositoriesInternal, runTask]);
+
+  const onPollGithubDeviceFlow = useCallback(async () => {
+    await runTask(
+      async () => {
+        try {
+          const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, {}));
+          const auth = applyGithubAuth(data?.auth);
+          if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+        } catch (error) {
+          // P2 may have advanced nextPollAt or cleared a terminal flow before returning an error.
+          // Rehydrate only the safe local DTO so the timer follows the persisted state instead of stale React state.
+          try {
+            const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
+            const auth = applyGithubSettingsResponse(snapshot);
+            if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+          } catch (_refreshError) {
+            // Keep the original poll error; GET_SETTINGS is recovery, not a replacement failure surface.
+          }
+          throw error;
+        }
+      },
+      { useBusy: false, clearError: false, fallbackMessage: 'github_device_poll_failed' },
+    );
+  }, [applyGithubAuth, applyGithubSettingsResponse, loadGithubRepositoriesInternal, runTask]);
+
+  useEffect(() => {
+    if (githubAuth.state !== 'pending') return;
+    const delay = Math.max(0, githubAuth.nextPollAt - Date.now());
+    const timer = setTimeout(() => {
+      void onPollGithubDeviceFlow();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [githubAuth, onPollGithubDeviceFlow]);
+
+  const onCancelGithubDeviceFlow = useCallback(async () => {
+    await runTask(
+      async () => {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.CANCEL_DEVICE_FLOW, {}));
+        applyGithubAuth(data?.auth);
+      },
+      { fallbackMessage: 'github_device_cancel_failed' },
+    );
+  }, [applyGithubAuth, runTask]);
+
+  const onDisconnectGithub = useCallback(async () => {
+    await runTask(
+      async () => {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.DISCONNECT, {}));
+        applyGithubAuth(data?.auth ?? { state: 'disconnected' });
+        setGithubConnectionTest({ status: 'idle' });
+      },
+      { fallbackMessage: 'github_disconnect_failed' },
+    );
+  }, [applyGithubAuth, runTask]);
+
+  const onRefreshGithubRepositories = useCallback(async () => {
+    await runTask(
+      async () => {
+        await loadGithubRepositoriesInternal();
+      },
+      { fallbackMessage: 'github_repository_list_failed' },
+    );
+  }, [loadGithubRepositoriesInternal, runTask]);
+
+  const onChangeGithubRepository = useCallback(
+    async (value: string) => {
+      const next = String(value || '').trim();
+      const current = String(githubRepository || '').trim();
+      const allowed = githubRepositories.some(
+        (repository) => repository.fullName === next && repository.contentWriteCapable,
+      );
+      if (!next || (next !== current && !allowed)) return;
+
+      await runTask(
+        async () => {
+          const data = unwrap(
+            await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, {
+              repository: next,
+            }),
+          );
+          const settings = data?.settings || {};
+          setGithubRepository(String(settings.repository || ''));
+          setGithubBranch(String(settings.branch || ''));
+          setGithubConnectionTest({ status: 'idle' });
+        },
+        { fallbackMessage: 'github_settings_save_failed' },
+      );
+    },
+    [githubRepositories, githubRepository, runTask],
+  );
+
+  const onSaveGithubBranch = useCallback(async () => {
+    await runTask(
+      async () => {
+        const data = unwrap(
+          await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, {
+            branch: githubBranch,
+          }),
+        );
+        const settings = data?.settings || {};
+        setGithubRepository(String(settings.repository || ''));
+        setGithubBranch(String(settings.branch || ''));
+        setGithubConnectionTest({ status: 'idle' });
+      },
+      { fallbackMessage: 'github_settings_save_failed' },
+    );
+  }, [githubBranch, runTask]);
+
+  const onTestGithubConnection = useCallback(async () => {
+    setGithubConnectionTest({ status: 'testing' });
+    await runTask(
+      async () => {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.TEST_CONNECTION, {}));
+        setGithubConnectionTest({ status: 'success', target: normalizeGithubConnectionTarget(data?.target) });
+      },
+      {
+        fallbackMessage: 'github_connection_test_failed',
+        onError: (message) => {
+          if (message === 'github_repository_uninitialized') {
+            setError(null);
+            setGithubConnectionTest({ status: 'uninitialized' });
+            return;
+          }
+          setGithubConnectionTest({ status: 'error', error: message });
+        },
+      },
+    );
+  }, [runTask]);
+
+  const onInitializeGithubRepository = useCallback(async () => {
+    setGithubConnectionTest({ status: 'initializing' });
+    await runTask(
+      async () => {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY, {}));
+        setGithubConnectionTest({ status: 'success', target: normalizeGithubConnectionTarget(data?.target) });
+      },
+      {
+        fallbackMessage: 'github_repository_initialize_failed',
+        onError: (message) => setGithubConnectionTest({ status: 'error', error: message }),
+      },
+    );
+  }, [runTask]);
+
+  const githubTargetUnavailable = useMemo(() => {
+    const selected = String(githubRepository || '')
+      .trim()
+      .toLowerCase();
+    if (!selected || githubAuth.state !== 'connected' || githubRepositoryStatus == null) return false;
+    if (githubRepositoryStatus !== 'ready') return true;
+    const target = githubRepositories.find((repository) => repository.fullName.toLowerCase() === selected);
+    return !target?.contentWriteCapable;
+  }, [githubAuth.state, githubRepositories, githubRepository, githubRepositoryStatus]);
 
   const normalizeHttpsUrlOrEmpty = (raw: string) => {
     const value = String(raw || '').trim();
@@ -1535,6 +1903,32 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
     obsidianSetupGuideUrl,
+
+    githubAuth,
+    githubAccount,
+    githubRepositoryStatus,
+    githubRepositories,
+    githubTargetUnavailable,
+    githubRepository,
+    onChangeGithubRepository,
+    githubBranch,
+    setGithubBranch,
+    githubVerificationUrl,
+    githubAppUrl,
+    githubInstallUrl,
+    githubSyncEnabled,
+    onToggleGithubSyncEnabled,
+    githubAutoSyncEnabled,
+    onToggleGithubAutoSyncEnabled,
+    githubConnectionTest,
+    onGithubConnect,
+    onPollGithubDeviceFlow,
+    onCancelGithubDeviceFlow,
+    onDisconnectGithub,
+    onRefreshGithubRepositories,
+    onSaveGithubBranch,
+    onTestGithubConnection,
+    onInitializeGithubRepository,
 
     exportStatus,
     importStatus,

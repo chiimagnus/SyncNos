@@ -1,5 +1,6 @@
 import {
   FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
   UI_EVENT_TYPES,
@@ -19,6 +20,7 @@ type AnyRouter = {
 let notionDetachedRun: Promise<unknown> | null = null;
 let obsidianDetachedRun: Promise<unknown> | null = null;
 let feishuDetachedRun: Promise<unknown> | null = null;
+let githubDetachedRun: Promise<unknown> | null = null;
 
 type Deps = {
   getInstanceId: () => string;
@@ -41,6 +43,15 @@ type Deps = {
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
     getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
     clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+  };
+  githubSyncOrchestrator: {
+    sync: (input: {
+      conversationIds?: readonly unknown[];
+      mode?: 'incremental' | 'reconcile';
+      instanceId?: string;
+    }) => Promise<unknown>;
+    getSyncStatus: (input: { instanceId?: string }) => Promise<unknown>;
+    clearSyncStatus: (input: { instanceId?: string }) => Promise<unknown>;
   };
 };
 
@@ -298,6 +309,58 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(FEISHU_MESSAGE_TYPES.CLEAR_SYNC_STATUS, async () => {
     const data = await deps.feishuSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
+    return router.ok(data);
+  });
+
+  router.register(GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
+    let lock: Promise<unknown> | null = null;
+    const releaseLock = () => {
+      if (lock && githubDetachedRun === lock) githubDetachedRun = null;
+    };
+    try {
+      const gateError = await ensureSyncProviderEnabled('github');
+      if (gateError) return router.err('sync provider disabled', gateError);
+      if (githubDetachedRun) return router.err('sync already in progress', { code: 'sync_already_running' });
+
+      const conversationIds = normalizeIds(msg?.conversationIds);
+      if (!conversationIds.length) return router.err('no conversationIds');
+
+      lock = Promise.resolve();
+      githubDetachedRun = lock;
+      const instanceId = deps.getInstanceId();
+      const status = await deps.githubSyncOrchestrator.getSyncStatus({ instanceId });
+      if ((status as any)?.job?.status === 'running') {
+        releaseLock();
+        return router.err('sync already in progress', { code: 'sync_already_running' });
+      }
+
+      const hub = router.eventsHub;
+      const run = deps.githubSyncOrchestrator.sync({ conversationIds, mode: 'reconcile', instanceId });
+      githubDetachedRun = run;
+      void run
+        .finally(() => {
+          if (githubDetachedRun === run) githubDetachedRun = null;
+          try {
+            hub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: 'syncFinished', provider: 'github' });
+          } catch (_error) {
+            // ignore
+          }
+        })
+        .catch(() => {});
+      return router.ok({ started: true, provider: 'github' });
+    } catch (error) {
+      releaseLock();
+      return toSyncErrorResponse(router, error);
+    }
+  });
+
+  router.register(GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
+    const data = await deps.githubSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
+    return router.ok(data);
+  });
+
+  router.register(GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS, async () => {
+    const data = await deps.githubSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
     return router.ok(data);
   });
 }

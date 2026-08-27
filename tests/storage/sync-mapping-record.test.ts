@@ -4,6 +4,7 @@ import {
   mergeSyncMappingForIdentityMove,
   mergeSyncMappingForImport,
   mergeSyncMappingPatch,
+  readGithubContinuity,
   stripSyncMappingLocalId,
 } from '@platform/idb/sync-mapping-record';
 
@@ -32,6 +33,29 @@ function notionState(input: {
       },
     },
     notionSectionDigests: { article: { digest: input.digest, lastSyncedAt: input.syncedAt ?? 0 } },
+  };
+}
+
+function githubState(input: {
+  remoteKey?: string;
+  path?: string;
+  syncedAt?: number;
+  marker?: 'a' | 'b' | 'c' | 'd';
+  kind?: 'markdown' | 'asset';
+}) {
+  const marker = input.marker || 'a';
+  const path = input.path || 'SyncNos-AIChats/chat.md';
+  return {
+    githubRemoteKey: input.remoteKey || 'github.com/example/syncnos@main',
+    githubManagedFiles: {
+      [path]: {
+        sha: marker.repeat(40),
+        contentHash: marker.repeat(64),
+        kind: input.kind || 'markdown',
+      },
+    },
+    githubProjectionFingerprint: marker.repeat(64),
+    ...(input.syncedAt == null ? {} : { githubLastSyncedAt: input.syncedAt }),
   };
 }
 
@@ -154,6 +178,105 @@ describe('sync mapping persistence record', () => {
       unknownMetadata: 'keep-me',
     });
     expect(merged.feishuLastContentHash).toBeUndefined();
+  });
+
+  it('keeps GitHub continuity on the same remote and clears stale state when the remote changes', () => {
+    const existing = {
+      id: 7,
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      ...githubState({ syncedAt: 10, marker: 'a' }),
+    };
+
+    const sameRemote = mergeSyncMappingPatch(existing, {
+      githubRemoteKey: 'github.com/example/syncnos@main',
+      githubLastSyncedAt: 20,
+    });
+    expect(sameRemote.githubManagedFiles).toEqual(existing.githubManagedFiles);
+    expect(sameRemote.githubProjectionFingerprint).toBe('a'.repeat(64));
+    expect(sameRemote.githubLastSyncedAt).toBe(20);
+
+    const changedRemote = mergeSyncMappingPatch(existing, {
+      githubRemoteKey: 'github.com/example/other@main',
+    });
+    expect(changedRemote.githubRemoteKey).toBe('github.com/example/other@main');
+    expect(changedRemote.githubManagedFiles).toBeUndefined();
+    expect(changedRemote.githubProjectionFingerprint).toBeUndefined();
+    expect(changedRemote.githubLastSyncedAt).toBeUndefined();
+  });
+
+  it('normalizes GitHub managed files fail-closed before granting reuse or delete authority', () => {
+    const valid = githubState({ marker: 'a' });
+    const unsafeFiles = {
+      ...valid.githubManagedFiles,
+      '/absolute.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'back\\slash.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'empty//segment.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'dot/./segment.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'parent/../segment.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      '.github/workflows/publish.yml': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'asset' },
+      'control\u0001.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'bad-sha.md': { sha: 'not-a-sha', contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'padded-sha.md': { sha: ` ${'a'.repeat(40)} `, contentHash: 'b'.repeat(64), kind: 'markdown' },
+      'bad-hash.md': { sha: 'a'.repeat(40), contentHash: 'B'.repeat(64), kind: 'markdown' },
+      'padded-hash.md': { sha: 'a'.repeat(40), contentHash: ` ${'b'.repeat(64)} `, kind: 'markdown' },
+      'bad-kind.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'other' },
+      'padded-kind.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: ' markdown ' },
+    };
+
+    const merged = mergeSyncMappingPatch(
+      {},
+      {
+        ...valid,
+        githubManagedFiles: unsafeFiles,
+      },
+    );
+
+    expect(merged.githubManagedFiles).toEqual(valid.githubManagedFiles);
+
+    const invalidRemote = mergeSyncMappingPatch(
+      {},
+      {
+        ...valid,
+        githubRemoteKey: 'github.com/example/syncnos?access_token=secret@main',
+        githubProjectionFingerprint: ` ${'a'.repeat(64)} `,
+        githubLastSyncedAt: '100',
+      },
+    );
+    expect(invalidRemote.githubRemoteKey).toBeUndefined();
+    expect(invalidRemote.githubManagedFiles).toBeUndefined();
+    expect(invalidRemote.githubProjectionFingerprint).toBeUndefined();
+    expect(invalidRemote.githubLastSyncedAt).toBeUndefined();
+
+    const branchWithAt = mergeSyncMappingPatch(
+      {},
+      {
+        ...valid,
+        githubRemoteKey: 'github.com/example/syncnos@feature/user@topic',
+      },
+    );
+    expect(branchWithAt.githubRemoteKey).toBe('github.com/example/syncnos@feature/user@topic');
+  });
+
+  it('exposes the normalized GitHub continuity reader without granting authority to malformed fields', () => {
+    const normalized = readGithubContinuity({
+      ...githubState({ marker: 'A' as any }),
+      githubManagedFiles: {
+        'safe/note.md': { sha: 'A'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+        '../escape.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      },
+      githubProjectionFingerprint: 'c'.repeat(64),
+      githubLastSyncedAt: 20,
+    });
+    expect(normalized).toEqual({
+      githubRemoteKey: 'github.com/example/syncnos@main',
+      githubManagedFiles: {
+        'safe/note.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+      },
+      githubProjectionFingerprint: 'c'.repeat(64),
+      githubLastSyncedAt: 20,
+    });
+    expect(readGithubContinuity({ githubRemoteKey: 'not-a-remote', githubManagedFiles: {} })).toEqual({});
   });
 
   it('ignores invalid Notion nested field patches and does not mutate inputs', () => {
@@ -286,6 +409,55 @@ describe('sync mapping persistence record', () => {
       feishuLastContentHash: 'hash-legacy',
       targetOnly: true,
     });
+  });
+
+  it('preserves legacy GitHub continuity only when the identity itself is unchanged', () => {
+    const legacy = {
+      id: 31,
+      source: 'chatgpt',
+      conversationKey: 'same',
+      ...githubState({ syncedAt: 50, marker: 'a' }),
+    };
+
+    const unchanged = mergeSyncMappingForIdentityMove(null, legacy, {
+      source: 'chatgpt',
+      conversationKey: 'same',
+    });
+    expect(unchanged.githubRemoteKey).toBe('github.com/example/syncnos@main');
+    expect(unchanged.githubManagedFiles).toEqual(legacy.githubManagedFiles);
+
+    const changed = mergeSyncMappingForIdentityMove(null, legacy, {
+      source: 'web',
+      conversationKey: 'article:https://example.com',
+    });
+    expect(changed.githubRemoteKey).toBeUndefined();
+    expect(changed.githubManagedFiles).toBeUndefined();
+    expect(changed.githubProjectionFingerprint).toBeUndefined();
+    expect(changed.githubLastSyncedAt).toBeUndefined();
+  });
+
+  it('uses target GitHub continuity during an identity move instead of legacy state', () => {
+    const target = {
+      id: 40,
+      source: 'web',
+      conversationKey: 'canonical',
+      ...githubState({ remoteKey: 'github.com/example/target@main', syncedAt: 10, marker: 'b' }),
+    };
+    const legacy = {
+      id: 41,
+      source: 'article',
+      conversationKey: 'legacy',
+      ...githubState({ remoteKey: 'github.com/example/legacy@main', syncedAt: 999, marker: 'a' }),
+    };
+
+    const moved = mergeSyncMappingForIdentityMove(target, legacy, {
+      source: 'web',
+      conversationKey: 'canonical',
+    });
+
+    expect(moved.githubRemoteKey).toBe('github.com/example/target@main');
+    expect(moved.githubProjectionFingerprint).toBe('b'.repeat(64));
+    expect(moved.githubManagedFiles).toEqual(target.githubManagedFiles);
   });
 
   it('uses fallback Notion page only after provider-state selection leaves the page empty', () => {
@@ -447,6 +619,73 @@ describe('sync mapping persistence record', () => {
     expect(
       mergeSyncMappingForImport({}, { feishuDocId: 'doc-incoming', feishuLastContentHash: 'hash-incoming' }),
     ).toMatchObject({ feishuDocId: 'doc-incoming', feishuLastContentHash: 'hash-incoming' });
+  });
+
+  it('merges GitHub backup continuity atomically by remote target and sync time', () => {
+    const local = {
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      updatedAt: 300,
+      ...githubState({ syncedAt: 300, marker: 'a' }),
+    };
+    const olderSameTarget = {
+      updatedAt: 999,
+      ...githubState({ syncedAt: 200, marker: 'b' }),
+    };
+    const newerSameTarget = {
+      updatedAt: 1,
+      ...githubState({ syncedAt: 400, marker: 'c' }),
+    };
+    const differentTarget = {
+      updatedAt: 999,
+      ...githubState({ remoteKey: 'github.com/example/other@main', syncedAt: 999, marker: 'd' }),
+    };
+
+    const olderMerged = mergeSyncMappingForImport(local, olderSameTarget);
+    expect(olderMerged.githubProjectionFingerprint).toBe('a'.repeat(64));
+    expect(olderMerged.githubManagedFiles).toEqual(local.githubManagedFiles);
+
+    const newerMerged = mergeSyncMappingForImport(local, newerSameTarget);
+    expect(newerMerged.githubProjectionFingerprint).toBe('c'.repeat(64));
+    expect(newerMerged.githubManagedFiles).toEqual(newerSameTarget.githubManagedFiles);
+
+    const differentMerged = mergeSyncMappingForImport(local, differentTarget);
+    expect(differentMerged.githubRemoteKey).toBe('github.com/example/syncnos@main');
+    expect(differentMerged.githubProjectionFingerprint).toBe('a'.repeat(64));
+    expect(differentMerged.githubManagedFiles).toEqual(local.githubManagedFiles);
+  });
+
+  it('uses mapping updatedAt as GitHub backup tie-break fallback and restores incoming-only continuity', () => {
+    const local = { updatedAt: 500, ...githubState({ marker: 'a' }) };
+    const olderByFallback = { updatedAt: 400, ...githubState({ marker: 'b' }) };
+    const newerByFallback = { updatedAt: 600, ...githubState({ marker: 'c' }) };
+
+    expect(mergeSyncMappingForImport(local, olderByFallback).githubProjectionFingerprint).toBe('a'.repeat(64));
+    expect(mergeSyncMappingForImport(local, newerByFallback).githubProjectionFingerprint).toBe('c'.repeat(64));
+
+    const restored = mergeSyncMappingForImport({}, githubState({ marker: 'd', syncedAt: 700 }));
+    expect(restored.githubRemoteKey).toBe('github.com/example/syncnos@main');
+    expect(restored.githubProjectionFingerprint).toBe('d'.repeat(64));
+
+    const preserved = mergeSyncMappingForImport(local, { updatedAt: 999, custom: 'incoming' });
+    expect(preserved.githubRemoteKey).toBe('github.com/example/syncnos@main');
+    expect(preserved.githubProjectionFingerprint).toBe('a'.repeat(64));
+  });
+
+  it('sanitizes imported GitHub continuity instead of trusting backup metadata as delete authority', () => {
+    const incoming = {
+      ...githubState({ marker: 'a' }),
+      githubManagedFiles: {
+        'safe/note.md': { sha: 'A'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+        '../outside.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+        '.github/workflows/owned.yml': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'asset' },
+      },
+    };
+
+    const merged = mergeSyncMappingForImport({}, incoming);
+    expect(merged.githubManagedFiles).toEqual({
+      'safe/note.md': { sha: 'a'.repeat(40), contentHash: 'b'.repeat(64), kind: 'markdown' },
+    });
   });
 
   it('keeps local unknown metadata and only fills missing unknown keys from incoming', () => {

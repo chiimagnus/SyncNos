@@ -31,7 +31,10 @@ export function createTestBackgroundRouter() {
     }),
   });
 
-  registerConversationHandlers(router, { onConversationChanged: async () => {} });
+  registerConversationHandlers(router, {
+    onConversationChanged: async () => {},
+    onRemoteCleanupPending: async () => {},
+  });
   registerWebArticleHandlers(router);
   registerChatWithBackgroundHandlers(router);
   registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
@@ -48,6 +51,11 @@ export function createTestBackgroundRouter() {
       clearSyncStatus: clearObsidianSyncStatus,
       syncConversations: obsidianSyncConversations,
       getSyncStatus: getObsidianSyncStatus,
+    },
+    githubSyncOrchestrator: {
+      getSyncStatus: async () => ({ job: null }),
+      clearSyncStatus: async () => ({ job: null }),
+      sync: async () => ({ summary: { syncedCount: 0, failedCount: 0 } }),
     },
   });
 

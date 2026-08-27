@@ -38,6 +38,21 @@ export const FEISHU_MESSAGE_TYPES = {
   CLEAR_SYNC_STATUS: 'clearFeishuSyncStatus',
 } as const;
 
+export const GITHUB_MESSAGE_TYPES = {
+  GET_SETTINGS: 'githubGetSettings',
+  START_DEVICE_FLOW: 'githubStartDeviceFlow',
+  POLL_DEVICE_FLOW: 'githubPollDeviceFlow',
+  CANCEL_DEVICE_FLOW: 'githubCancelDeviceFlow',
+  DISCONNECT: 'githubDisconnect',
+  LIST_REPOSITORIES: 'githubListRepositories',
+  SAVE_SETTINGS: 'githubSaveSettings',
+  TEST_CONNECTION: 'githubTestConnection',
+  INITIALIZE_REPOSITORY: 'githubInitializeRepository',
+  SYNC_CONVERSATIONS: 'githubSyncConversations',
+  GET_SYNC_STATUS: 'getGithubSyncStatus',
+  CLEAR_SYNC_STATUS: 'clearGithubSyncStatus',
+} as const;
+
 export const ARTICLE_MESSAGE_TYPES = {
   FETCH_ACTIVE_TAB: 'fetchActiveTabArticle',
   RESOLVE_OR_CAPTURE_ACTIVE_TAB: 'resolveOrCaptureActiveTabArticle',
@@ -97,6 +112,7 @@ export const messageContracts = {
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
   FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
   CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
@@ -112,6 +128,7 @@ export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[keyof typeof CORE_MESS
 export type NotionMessageType = (typeof NOTION_MESSAGE_TYPES)[keyof typeof NOTION_MESSAGE_TYPES];
 export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof OBSIDIAN_MESSAGE_TYPES];
 export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISHU_MESSAGE_TYPES];
+export type GithubMessageType = (typeof GITHUB_MESSAGE_TYPES)[keyof typeof GITHUB_MESSAGE_TYPES];
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
 export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
@@ -127,6 +144,7 @@ export type MessageType =
   | NotionMessageType
   | ObsidianMessageType
   | FeishuMessageType
+  | GithubMessageType
   | ArticleMessageType
   | ChatgptMessageType
   | CurrentPageMessageType

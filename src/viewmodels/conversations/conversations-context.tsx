@@ -25,7 +25,6 @@ import {
   upsertConversation,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
-import { migrateArticleCommentsCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
@@ -393,6 +392,7 @@ type ConversationsAppState = {
   syncingNotion: boolean;
   syncingObsidian: boolean;
   syncingFeishu: boolean;
+  syncingGithub: boolean;
   deleting: boolean;
 
   listSourceFilterKey: string;
@@ -422,6 +422,7 @@ type ConversationsAppState = {
   syncSelectedNotion: () => Promise<void>;
   syncSelectedObsidian: () => Promise<void>;
   syncSelectedFeishu: () => Promise<void>;
+  syncSelectedGithub: () => Promise<void>;
   clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
 
@@ -491,6 +492,7 @@ export function ConversationsProvider({
     syncingNotion,
     syncingObsidian,
     syncingFeishu,
+    syncingGithub,
   } = useConversationSyncFeedback();
 
   const selectedConversation = useMemo(() => {
@@ -772,77 +774,49 @@ export function ConversationsProvider({
       const nextCanonical = canonicalizeHttpUrl(nextUrl);
       if (!nextCanonical) throw new Error('URL must be an http(s) page');
 
-      const currentCanonical = canonicalizeHttpUrl((convo as any)?.url);
       const sourceType = String((convo as any)?.sourceType || '')
         .trim()
         .toLowerCase();
       const isArticle = sourceType === 'article';
 
-      if (isArticle) {
-        const conflict = (Array.isArray(items) ? items : []).find((item) => {
-          if (!item) return false;
-          const id = Number((item as any).id);
-          if (!Number.isFinite(id) || id <= 0) return false;
-          if (id === Number((convo as any).id)) return false;
-          const itemSourceType = String((item as any).sourceType || '')
-            .trim()
-            .toLowerCase();
-          if (itemSourceType !== 'article') return false;
-          const itemCanonical = canonicalizeHttpUrl((item as any).url);
-          if (!itemCanonical) return false;
-          return itemCanonical === nextCanonical;
-        });
+      const conflict = isArticle
+        ? (Array.isArray(items) ? items : []).find((item) => {
+            if (!item) return false;
+            const id = Number((item as any).id);
+            if (!Number.isFinite(id) || id <= 0) return false;
+            if (id === Number((convo as any).id)) return false;
+            const itemSourceType = String((item as any).sourceType || '')
+              .trim()
+              .toLowerCase();
+            if (itemSourceType !== 'article') return false;
+            const itemCanonical = canonicalizeHttpUrl((item as any).url);
+            if (!itemCanonical) return false;
+            return itemCanonical === nextCanonical;
+          })
+        : undefined;
 
-        if (conflict) {
-          const confirmed =
-            typeof globalThis.window?.confirm === 'function'
-              ? globalThis.window.confirm(
-                  '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
-                )
-              : true;
-          if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
-        }
+      if (conflict) {
+        const confirmed =
+          typeof globalThis.window?.confirm === 'function'
+            ? globalThis.window.confirm(
+                '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
+              )
+            : true;
+        if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
+
+        await mergeConversations({
+          keepConversationId: Number((convo as any).id),
+          removeConversationId: Number((conflict as any).id),
+        });
       }
 
-      const payload: any = {
+      await upsertConversation({
+        id: Number((convo as any)?.id),
         source: (convo as any)?.source,
         conversationKey: (convo as any)?.conversationKey,
         sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
         url: nextCanonical,
-        lastCapturedAt: (convo as any)?.lastCapturedAt,
-      };
-      await upsertConversation(payload);
-
-      if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
-        await migrateArticleCommentsCanonicalUrl({
-          fromCanonicalUrl: currentCanonical,
-          toCanonicalUrl: nextCanonical,
-          conversationId: Number((convo as any)?.id) || null,
-        });
-      }
-
-      if (isArticle) {
-        const conflict = (Array.isArray(items) ? items : []).find((item) => {
-          if (!item) return false;
-          const id = Number((item as any).id);
-          if (!Number.isFinite(id) || id <= 0) return false;
-          if (id === Number((convo as any).id)) return false;
-          const itemSourceType = String((item as any).sourceType || '')
-            .trim()
-            .toLowerCase();
-          if (itemSourceType !== 'article') return false;
-          const itemCanonical = canonicalizeHttpUrl((item as any).url);
-          if (!itemCanonical) return false;
-          return itemCanonical === nextCanonical;
-        });
-
-        if (conflict) {
-          await mergeConversations({
-            keepConversationId: Number((convo as any).id),
-            removeConversationId: Number((conflict as any).id),
-          });
-        }
-      }
+      });
     },
     [items, selectedConversation],
   );
@@ -1206,6 +1180,12 @@ export function ConversationsProvider({
     await startSync('feishu', ids);
   }, [selectedIds, startSync]);
 
+  const syncSelectedGithub = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    await startSync('github', ids);
+  }, [selectedIds, startSync]);
+
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
     if (!ids.length) return;
@@ -1245,6 +1225,7 @@ export function ConversationsProvider({
     syncingNotion,
     syncingObsidian,
     syncingFeishu,
+    syncingGithub,
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
@@ -1270,6 +1251,7 @@ export function ConversationsProvider({
     syncSelectedNotion,
     syncSelectedObsidian,
     syncSelectedFeishu,
+    syncSelectedGithub,
     clearSyncFeedback,
     deleteSelected,
     updateSelectedConversationUrl,

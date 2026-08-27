@@ -7,20 +7,23 @@ const ARTICLE_HEADING = 'Article';
 const COMMENTS_HEADING = 'Comments';
 const DEFAULT_COMMENT_AUTHOR = 'You';
 
+type CommentTimeZone = 'local' | 'utc';
+
 function pad2(value: number): string {
   return String(Math.trunc(value)).padStart(2, '0');
 }
 
-function formatCommentTime(ts: unknown): string {
+function formatCommentTime(ts: unknown, timeZone: CommentTimeZone): string {
   const t = Number(ts);
   if (!Number.isFinite(t) || t <= 0) return '';
   try {
     const d = new Date(t);
-    const yyyy = d.getFullYear();
-    const mm = pad2(d.getMonth() + 1);
-    const dd = pad2(d.getDate());
-    const hh = pad2(d.getHours());
-    const min = pad2(d.getMinutes());
+    const utc = timeZone === 'utc';
+    const yyyy = utc ? d.getUTCFullYear() : d.getFullYear();
+    const mm = pad2((utc ? d.getUTCMonth() : d.getMonth()) + 1);
+    const dd = pad2(utc ? d.getUTCDate() : d.getDate());
+    const hh = pad2(utc ? d.getUTCHours() : d.getHours());
+    const min = pad2(utc ? d.getUTCMinutes() : d.getMinutes());
     return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
   } catch (_e) {
     return '';
@@ -132,9 +135,9 @@ function buildMarkdownQuote(text: string) {
     .join('\n');
 }
 
-function buildCommentMetaLine(input: { authorName?: unknown; createdAt: unknown }) {
+function buildCommentMetaLine(input: { authorName?: unknown; createdAt: unknown; timeZone: CommentTimeZone }) {
   const authorName = safeString(input?.authorName) || DEFAULT_COMMENT_AUTHOR;
-  const time = formatCommentTime(input?.createdAt);
+  const time = formatCommentTime(input?.createdAt, input.timeZone);
   if (!time) return authorName;
   return `${authorName} | ${time}`;
 }
@@ -156,14 +159,14 @@ function buildListItemParagraph(text: string, indentLevel: number): string[] {
     .filter((x) => !!x);
 }
 
-function buildObsidianCommentsMarkdown(comments: ArticleCommentDto[]) {
+function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentTimeZone) {
   const graph = normalizeCommentThreadGraph(comments);
   const output: string[] = [];
 
   const renderItem = (comment: ArticleCommentDto): string => {
     const lines: string[] = [];
     const head = buildListItemHead(
-      buildCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt }),
+      buildCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt, timeZone }),
       0,
     );
     if (head) lines.push(head);
@@ -191,11 +194,13 @@ function buildFullNoteMarkdown({
   messages,
   syncnosObject,
   comments,
+  commentTimeZone = 'local',
 }: {
   conversation?: any;
   messages?: any[];
   syncnosObject?: any;
   comments?: ArticleCommentDto[];
+  commentTimeZone?: CommentTimeZone;
 }) {
   const c = conversation || {};
   const url = safeString(c.url);
@@ -211,7 +216,7 @@ function buildFullNoteMarkdown({
     const commentsRootCount = normalizeCommentThreadGraph(comments || []).threads.length;
     frontmatter.comments_root_count = commentsRootCount;
     const articleMd = buildArticleBodyMarkdown(messages || []);
-    const commentsMd = buildObsidianCommentsMarkdown(comments || []);
+    const commentsMd = buildCommentsMarkdown(comments || [], commentTimeZone);
     const sections: string[] = [];
     sections.push(`## ${ARTICLE_HEADING}`, '', articleMd || '', '', `## ${COMMENTS_HEADING}`, '', commentsMd || '');
     return buildFrontmatterBlock(frontmatter) + `${sections.join('\n').trim()}\n`;
@@ -225,17 +230,8 @@ const api = {
   MESSAGES_HEADING,
   ARTICLE_HEADING,
   COMMENTS_HEADING,
-  buildArticleBodyMarkdown,
-  buildObsidianCommentsMarkdown,
   buildFullNoteMarkdown,
 };
 
-export {
-  MESSAGES_HEADING,
-  ARTICLE_HEADING,
-  COMMENTS_HEADING,
-  buildArticleBodyMarkdown,
-  buildObsidianCommentsMarkdown,
-  buildFullNoteMarkdown,
-};
+export { MESSAGES_HEADING, ARTICLE_HEADING, COMMENTS_HEADING, buildFullNoteMarkdown };
 export default api;

@@ -21,6 +21,8 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'notion_ai_preferred_model_index',
   // Obsidian Local REST API key is a secret even though base URL is safe to export.
   'obsidian_api_key',
+  // GitHub Device Flow/auth state contains access/refresh/device secrets.
+  'github_auth_state_v1',
 ]);
 
 function shouldIncludeStorageKeyInBackup(key: string): boolean {
@@ -30,6 +32,7 @@ function shouldIncludeStorageKeyInBackup(key: string): boolean {
   // Forward-compat: if token key changes versions, keep excluding it.
   if (k.startsWith('notion_oauth_token')) return false;
   if (k.startsWith('feishu_oauth_token')) return false;
+  if (k.startsWith('github_auth_')) return false;
   return true;
 }
 

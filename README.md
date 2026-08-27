@@ -4,7 +4,7 @@
 
 Never lose an AI conversation, a useful article, or a video transcript again.
 
-Capture supported AI conversations, web articles, and YouTube/Bilibili transcripts into local browser storage first, then optionally sync to Notion, Obsidian, or Feishu (Lark), or export as Markdown / Zip.
+Capture supported AI conversations, web articles, and YouTube/Bilibili transcripts into local browser storage first, then optionally sync to Notion, Obsidian, Feishu (Lark), or GitHub, or export as Markdown / Zip.
 
 [SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
 
@@ -18,7 +18,7 @@ Capture supported AI conversations, web articles, and YouTube/Bilibili transcrip
 
 ## What it does
 
-SyncNos is local-first: captured content is saved locally before any optional sync or export. Notion, Obsidian, Feishu, Markdown, and Zip are derived outputs rather than the source of truth.
+SyncNos is local-first: captured content is saved locally before any optional sync or export. Notion, Obsidian, Feishu, GitHub, Markdown, and Zip are derived outputs rather than the source of truth.
 
 ## Download & Install
 
@@ -69,9 +69,8 @@ YouTube and Bilibili pages can capture transcripts/subtitles that the page has a
 | **Notion** | Syncs local content through the Notion API after OAuth. Manual sync is always available; optional auto-sync can be enabled. |
 | **Obsidian** | Writes Markdown and local image attachments to your vault through the localhost Local REST API. See [setup](docs/guide/obsidian/LocalRestAPI.en.md). |
 | **Feishu (DocX)** | Syncs local content to Feishu DocX after OAuth. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/feishu/DocxSync.en.md). |
+| **GitHub (Markdown)** | Writes the local projection to an authorized repository/branch through the SyncNos GitHub App. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/github/GitHubSync.en.md). |
 | **Markdown / Zip** | Exports individual content or a local backup package. |
-
-For storage, backup, permission, and network behavior, see [Privacy Policy](PRIVACY.md) and the [documentation index](docs/overview.md).
 
 ## Screenshots
 

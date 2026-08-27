@@ -548,6 +548,49 @@ describe('ConversationsProvider pagination state', () => {
     expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(afterProviderChangeCalls);
   });
 
+  it('merges an article URL conflict before rewriting the kept conversation identity', async () => {
+    const selected = {
+      ...makeConversation(501, 'web', 'article-old'),
+      sourceType: 'article',
+      url: 'https://example.com/old',
+    };
+    const conflict = {
+      ...makeConversation(502, 'web', 'article-target'),
+      sourceType: 'article',
+      url: 'https://example.com/target',
+    };
+    getConversationListBootstrap.mockResolvedValue(makePage([selected, conflict]));
+    getConversationDetail.mockResolvedValue({ conversationId: 501, messages: [] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    try {
+      await renderProvider();
+      await act(async () => {
+        await flushMicrotasks();
+        await flushMicrotasks();
+      });
+
+      await act(async () => {
+        await latestState.updateSelectedConversationUrl('https://example.com/target');
+      });
+
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(mergeConversations).toHaveBeenCalledWith({ keepConversationId: 501, removeConversationId: 502 });
+      expect(upsertConversation).toHaveBeenCalledWith({
+        id: 501,
+        source: 'web',
+        conversationKey: 'article-old',
+        sourceType: 'article',
+        url: 'https://example.com/target',
+      });
+      expect(mergeConversations.mock.invocationCallOrder[0]).toBeLessThan(
+        upsertConversation.mock.invocationCallOrder[0]!,
+      );
+    } finally {
+      confirm.mockRestore();
+    }
+  });
+
   it('provides cache-images tools action for article conversations', async () => {
     getConversationListBootstrap.mockResolvedValue(
       makePage(
