@@ -572,7 +572,6 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     };
 
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       maxSteps: 4,
       stableSamples: 1,
       pollMs: 0,
@@ -581,6 +580,46 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
 
     expect(remainingMisses).toBe(0);
     expect(prepared.records.map((record: any) => record.payload.contentText)).toEqual(['retry me']);
+  });
+
+  it('waits for a visible virtualized shell within one top-to-bottom pass', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_question">
+          <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
+        </article>
+        <article data-testid="conversation-turn-2" data-turn-id="turn_late"></article>
+      `,
+      'https://chatgpt.com/c/conv_visible_shell',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const shell = dom.window.document.querySelector('[data-turn-id="turn_late"]') as HTMLElement;
+    shell.getBoundingClientRect = () =>
+      ({ top: 20, bottom: 120, height: 100, left: 0, right: 100, width: 100 }) as DOMRect;
+    const def = createChatgptCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    let waits = 0;
+
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+      sleep: async () => {
+        waits += 1;
+        if (waits !== 1) return;
+        shell.innerHTML = '<div data-message-author-role="assistant"><div class="markdown prose">answer</div></div>';
+      },
+    });
+
+    expect(waits).toBe(1);
+    expect(prepared.metrics).toMatchObject({ passes: 1, reachedTop: true, reachedBottom: true });
+    expect(prepared.records.map((record: any) => record.payload.contentText)).toEqual(['question', 'answer']);
   });
 
   it('bounds manual extraction to new or changed descriptor fingerprints', async () => {
@@ -604,7 +643,6 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     });
     const def = createChatgptCollectorDef(env) as any;
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       maxSteps: 4,
       stableSamples: 1,
       pollMs: 0,
@@ -653,7 +691,6 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     });
     const def = createChatgptCollectorDef(env) as any;
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       maxSteps: 4,
       stableSamples: 1,
       pollMs: 0,
@@ -692,7 +729,6 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     });
     const def = createChatgptCollectorDef(env) as any;
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       stableSamples: 1,
       pollMs: 0,
       stepTimeoutMs: 20,
@@ -794,6 +830,7 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
       stableSamples: 1,
     });
     expect(counter.hydrated).toBe(3);
+    expect(preparedCapture.metrics).toMatchObject({ passes: 1, reachedTop: true, reachedBottom: true });
 
     const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
     expect(snap.messages.length).toBe(12);
@@ -841,7 +878,6 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     };
 
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       maxSteps: 4,
       maxOverlapRecoveries: 0,
       stableSamples: 1,
@@ -884,7 +920,6 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     const def = createChatgptCollectorDef(buildEnv(dom)) as any;
 
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       maxSteps: 4,
       maxOverlapRecoveries: 0,
       stableSamples: 1,
@@ -918,7 +953,6 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     const def = createChatgptCollectorDef(buildEnv(dom)) as any;
 
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 2,
       maxSteps: 8,
       stableSamples: 1,
       pollMs: 0,

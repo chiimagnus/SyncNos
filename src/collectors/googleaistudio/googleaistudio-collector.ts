@@ -572,7 +572,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         },
         accumulator,
         {
-          maxPasses: options.maxPasses,
           totalDeadlineMs: options.totalDeadlineMs,
           maxSteps: options.maxSteps,
           stableSamples: options.stableSamples,

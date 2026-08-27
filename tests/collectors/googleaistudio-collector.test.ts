@@ -553,7 +553,6 @@ describe('googleaistudio-collector', () => {
       }),
     ) as any;
     const prepared = await def.collector.prepareManualCapture({
-      maxPasses: 3,
       maxSteps: 20,
       stableSamples: 1,
       pollMs: 0,
