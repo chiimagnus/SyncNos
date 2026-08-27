@@ -1,5 +1,17 @@
 import { sanitizeWechatMediaUrl } from '@collectors/web/article-extract/url';
 
+const WECHAT_EMBEDDED_VIDEO_CONTAINER_SELECTOR = [
+  '.video_iframe',
+  '[data-mpvid^="wxv_"]',
+  '[vid^="wxv_"]',
+  '[data-src*="video_player_tmpl"]',
+  '[src*="video_player_tmpl"]',
+  '.appmsg_video',
+  '.page_video_wrapper',
+].join(',');
+
+const WECHAT_VIDEO_ID_RE = /\bwxv_[A-Za-z0-9_-]+\b/;
+
 const WECHAT_RICH_MEDIA_NOISE_SELECTORS = [
   '#js_article_bottom_bar',
   '.bottom_bar_wrp',
@@ -19,8 +31,113 @@ const WECHAT_RICH_MEDIA_NOISE_SELECTORS = [
   '.wx_bottom_modal_msg_wrp',
 ];
 
-export function stripWechatRichMediaNoise(root: Element) {
+function decodeUriComponentSafe(value: unknown) {
+  const text = String(value || '').trim();
+  if (!text || !text.includes('%')) return text;
+  try {
+    return decodeURIComponent(text);
+  } catch (_e) {
+    return text;
+  }
+}
+
+function findWechatVideoId(container: Element) {
+  const nodes = [
+    container,
+    ...Array.from(container.querySelectorAll('[data-mpvid],[vid],[data-src],[src]')),
+  ] as Element[];
+  const attributes = ['data-mpvid', 'vid', 'data-src', 'src'];
+
+  for (const node of nodes) {
+    for (const attribute of attributes) {
+      const raw = String(node.getAttribute(attribute) || '').trim();
+      if (!raw) continue;
+      const direct = raw.match(WECHAT_VIDEO_ID_RE)?.[0];
+      if (direct) return direct;
+      const decoded = decodeUriComponentSafe(raw);
+      const decodedMatch = decoded.match(WECHAT_VIDEO_ID_RE)?.[0];
+      if (decodedMatch) return decodedMatch;
+    }
+  }
+  return '';
+}
+
+function findWechatVideoCoverUrl(container: Element, baseHref: string) {
+  const candidates = [
+    container.getAttribute('data-cover'),
+    container.querySelector('[data-cover]')?.getAttribute('data-cover'),
+    container.querySelector('video[poster]')?.getAttribute('poster'),
+  ];
+
+  for (const candidate of candidates) {
+    const decoded = decodeUriComponentSafe(candidate);
+    if (!decoded) continue;
+    const sanitized = sanitizeWechatMediaUrl(decoded, baseHref);
+    if (sanitized) return sanitized;
+  }
+  return '';
+}
+
+function buildWechatVideoPlayerUrl(videoId: string) {
+  if (!WECHAT_VIDEO_ID_RE.test(videoId)) return '';
+  return `https://mp.weixin.qq.com/mp/readtemplate?t=pages/video_player_tmpl&auto=0&vid=${encodeURIComponent(videoId)}`;
+}
+
+function createWechatVideoPlaceholder(container: Element, baseHref: string) {
+  const doc = container.ownerDocument || document;
+  const videoId = findWechatVideoId(container);
+  const playerUrl = buildWechatVideoPlayerUrl(videoId);
+  const coverUrl = findWechatVideoCoverUrl(container, baseHref);
+  const block = doc.createElement('span');
+  block.setAttribute('data-syncnos-origin', 'wechat-embedded-video');
+
+  if (coverUrl) {
+    const image = doc.createElement('img');
+    image.setAttribute('src', coverUrl);
+    image.setAttribute('alt', '微信视频');
+    block.appendChild(image);
+    block.appendChild(doc.createElement('br'));
+  }
+
+  if (playerUrl) {
+    const labelLink = doc.createElement('a');
+    labelLink.setAttribute('href', playerUrl);
+    labelLink.textContent = '微信视频';
+    block.appendChild(labelLink);
+  } else {
+    const label = doc.createElement('span');
+    label.textContent = '微信视频';
+    block.appendChild(label);
+  }
+
+  return block;
+}
+
+function listWechatArticleContentRoots(root: Element) {
+  const roots: Element[] = [];
+  if (typeof root.matches === 'function' && root.matches('#js_content')) roots.push(root);
+  roots.push(...Array.from(root.querySelectorAll('#js_content')));
+  return roots;
+}
+
+function normalizeWechatEmbeddedVideos(root: Element, baseHref: string) {
+  for (const articleRoot of listWechatArticleContentRoots(root)) {
+    const candidates = Array.from(articleRoot.querySelectorAll(WECHAT_EMBEDDED_VIDEO_CONTAINER_SELECTOR)) as Element[];
+    if (!candidates.length) continue;
+
+    const outermost = candidates.filter(
+      (candidate) => !candidates.some((other) => other !== candidate && other.contains(candidate)),
+    );
+    for (const container of outermost) {
+      container.replaceWith(createWechatVideoPlaceholder(container, baseHref));
+    }
+  }
+}
+
+export function normalizeWechatRichMediaContent(root: Element, baseHref: string) {
   const cloned = root.cloneNode(true) as Element;
+  normalizeWechatEmbeddedVideos(cloned, baseHref);
+
   const selector = WECHAT_RICH_MEDIA_NOISE_SELECTORS.join(',');
   if (selector) {
     try {

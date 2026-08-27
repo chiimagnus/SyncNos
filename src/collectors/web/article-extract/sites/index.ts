@@ -3,7 +3,7 @@ export {
   buildWechatShareMediaGalleryHtml,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
+  normalizeWechatRichMediaContent,
   prepareWechatRichMediaDom,
-  stripWechatRichMediaNoise,
 } from '@collectors/web/article-extract/sites/wechat';
 export { waitForXiaohongshuNoteHydrated } from '@collectors/web/article-extract/sites/xiaohongshu';
