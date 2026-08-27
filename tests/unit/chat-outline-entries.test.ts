@@ -43,6 +43,34 @@ describe('buildChatOutlineEntries', () => {
     expect(entries[0]?.previewText).toBe('from contentText');
   });
 
+  it('falls back to Markdown preview when contentText is whitespace-only', () => {
+    const entries = buildChatOutlineEntries([
+      msg({
+        id: 251,
+        messageKey: 'u-251',
+        role: 'user',
+        contentText: '  \n\t ',
+        contentMarkdown: '# Markdown fallback',
+      }),
+    ]);
+
+    expect(entries[0]?.previewText).toBe('Markdown fallback');
+  });
+
+  it('keeps the existing preview-specific image and link semantics for markdown-only messages', () => {
+    const entries = buildChatOutlineEntries([
+      msg({
+        id: 252,
+        messageKey: 'u-252',
+        role: 'user',
+        contentText: '',
+        contentMarkdown: '![Diagram](https://example.com/image.png) [OpenAI](https://openai.com) https://example.com',
+      }),
+    ]);
+
+    expect(entries[0]?.previewText).toBe('Diagram OpenAI');
+  });
+
   it('normalizes multiline whitespace to a single line', () => {
     const entries = buildChatOutlineEntries([
       msg({
