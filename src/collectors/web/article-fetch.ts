@@ -76,24 +76,6 @@ async function waitForTabUrl(targetTabId: number, expectedUrl: string, timeoutMs
   throw toError('timed out waiting for Discourse /1 navigation');
 }
 
-function countWords(text: string) {
-  const value = normalizeText(text);
-  if (!value) return 0;
-  try {
-    if ((globalThis as any).Intl && typeof (Intl as any).Segmenter === 'function') {
-      const segmenter = new (Intl as any).Segmenter(undefined, { granularity: 'word' });
-      let count = 0;
-      for (const token of segmenter.segment(value)) {
-        if (token && token.isWordLike) count += 1;
-      }
-      if (count > 0) return count;
-    }
-  } catch (_e) {
-    // ignore and fallback
-  }
-  return value.split(/\s+/).filter(Boolean).length;
-}
-
 function fallbackTitle(url: string, tabTitle: unknown) {
   const preferred = normalizeText(tabTitle);
   if (preferred) return preferred;
@@ -344,7 +326,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     author,
     publishedAt,
     warningFlags,
-    wordCount: countWords(body),
     lastCapturedAt: capturedAt,
   };
 }
@@ -371,7 +352,6 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
         author: normalizeText((existing as any)?.author || ''),
         publishedAt: normalizeText((existing as any)?.publishedAt || ''),
         warningFlags,
-        wordCount: null,
         lastCapturedAt: Number((existing as any)?.lastCapturedAt) || null,
       };
     }

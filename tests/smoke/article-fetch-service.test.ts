@@ -126,7 +126,6 @@ describe('article-fetch-service', () => {
     expect(data.conversationId).toBe(11);
     expect(data.url).toBe('https://example.com/post');
     expect(data.title).toBe('Readability Title');
-    expect(data.wordCount).toBeGreaterThan(0);
 
     expect(sendMessage.mock.calls[0][1]).toMatchObject({
       payload: { includeXiaohongshuComments: true },
