@@ -489,6 +489,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         data?.status === 'github_no_accessible_repositories'
           ? data.status
           : null;
+      if (status == null) throw new Error('github_repository_response_invalid');
+
       const login = String(data?.account?.login || '').trim();
       setGithubAccount(
         login

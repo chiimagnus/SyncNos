@@ -524,6 +524,32 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/retry']);
   });
 
+  it('treats an unknown discovery status as a scoped failure instead of auto-retrying forever', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    repositoryResponses = [ok({ ...readyRepositories(), status: 'unexpected_status' })];
+
+    await renderController('github');
+    expect(callCount(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES)).toBe(1);
+    expect(latestSnapshot?.githubRepositories).toEqual([]);
+    expect(latestSnapshot?.error).toBeNull();
+
+    await flushReact();
+    expect(callCount(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES)).toBe(1);
+  });
+
+  it('preserves the previous successful catalog when the current manual refresh fails', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    githubRepositoryData = readyRepositories(['owner/previous']);
+    await renderController();
+    expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/previous']);
+
+    repositoryResponses = [fail('github_repository_list_failed')];
+    await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
+
+    expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/previous']);
+    expect(latestSnapshot?.error).toBeNull();
+  });
+
   it('keeps manual repository refresh outside global busy and the settings task queue', async () => {
     githubSettingsData = githubSettings({ state: 'connected' });
     await renderController();
@@ -575,6 +601,35 @@ describe('Settings controller GitHub Device Flow', () => {
     });
     expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/latest']);
     expect(latestSnapshot?.error).toBeNull();
+  });
+
+  it('invalidates a pending repository discovery when the controller unmounts', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    await renderController();
+
+    const refresh = deferred<ApiResponse>();
+    repositoryResponses = [refresh.promise];
+    let refreshPromise!: Promise<void>;
+    act(() => {
+      refreshPromise = latestSnapshot!.onRefreshGithubRepositories();
+    });
+    await flushReact();
+
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(async () => {
+      root?.unmount();
+      await Promise.resolve();
+    });
+    root = null;
+
+    await act(async () => {
+      refresh.resolve(ok(readyRepositories(['owner/late-after-unmount'])));
+      await refreshPromise;
+    });
+
+    const errors = consoleError.mock.calls.flat().map(String).join(' ');
+    expect(errors.toLowerCase()).not.toContain('unmounted');
+    consoleError.mockRestore();
   });
 
   it('invalidates pending repository discovery when GitHub disconnects', async () => {
