@@ -139,12 +139,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeGithubRepository,
     githubBranch,
     setGithubBranch,
-    githubChatFolder,
-    setGithubChatFolder,
-    githubArticleFolder,
-    setGithubArticleFolder,
-    githubVideoFolder,
-    setGithubVideoFolder,
     githubVerificationUrl,
     githubAppUrl,
     githubInstallUrl,
@@ -157,7 +151,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onCancelGithubDeviceFlow,
     onDisconnectGithub,
     onRefreshGithubRepositories,
-    onSaveGithubSettings,
+    onSaveGithubBranch,
     onTestGithubConnection,
     onInitializeGithubRepository,
 
@@ -395,9 +389,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           targetUnavailable={githubTargetUnavailable}
           repository={githubRepository}
           branch={githubBranch}
-          chatFolder={githubChatFolder}
-          articleFolder={githubArticleFolder}
-          videoFolder={githubVideoFolder}
           verificationUrl={githubVerificationUrl}
           appUrl={githubAppUrl}
           installUrl={githubInstallUrl}
@@ -421,13 +412,12 @@ export function SettingsScene(props: SettingsSceneProps) {
           onRefreshRepositories={() => {
             void onRefreshGithubRepositories();
           }}
-          onChangeRepository={onChangeGithubRepository}
+          onChangeRepository={(repository) => {
+            void onChangeGithubRepository(repository);
+          }}
           onChangeBranch={setGithubBranch}
-          onChangeChatFolder={setGithubChatFolder}
-          onChangeArticleFolder={setGithubArticleFolder}
-          onChangeVideoFolder={setGithubVideoFolder}
-          onSaveTarget={() => {
-            void onSaveGithubSettings();
+          onSaveBranch={() => {
+            void onSaveGithubBranch();
           }}
           onTestConnection={() => {
             void onTestGithubConnection();

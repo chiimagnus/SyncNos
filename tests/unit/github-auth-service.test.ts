@@ -157,9 +157,6 @@ describe('github auth service', () => {
   it('clears invalid refresh auth while preserving non-secret GitHub target preferences', async () => {
     store.github_repository = 'owner/repo';
     store.github_branch = 'release/main';
-    store.github_chat_folder = 'Notes/Chats';
-    store.github_article_folder = 'Notes/Articles';
-    store.github_video_folder = 'Notes/Videos';
     const { replaceGithubAuthState, getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
     await replaceGithubAuthState(connectedState({ accessExpiresAt: 2_000 }));
     const fetchImpl = vi.fn(async () => jsonResponse({ error: 'invalid_grant' }, 401)) as unknown as typeof fetch;
@@ -172,9 +169,6 @@ describe('github auth service', () => {
     expect(store).toMatchObject({
       github_repository: 'owner/repo',
       github_branch: 'release/main',
-      github_chat_folder: 'Notes/Chats',
-      github_article_folder: 'Notes/Articles',
-      github_video_folder: 'Notes/Videos',
     });
   });
 

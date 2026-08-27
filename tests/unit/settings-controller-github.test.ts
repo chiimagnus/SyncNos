@@ -98,15 +98,9 @@ function githubSettings(auth: any, repository = 'owner/repo') {
     settings: {
       repository,
       branch: 'main',
-      chatFolder: 'SyncNos-AIChats',
-      articleFolder: 'SyncNos-WebArticles',
-      videoFolder: 'SyncNos-Videos',
       defaults: {
         repository: '',
         branch: '',
-        chatFolder: 'SyncNos-AIChats',
-        articleFolder: 'SyncNos-WebArticles',
-        videoFolder: 'SyncNos-Videos',
       },
     },
     auth,
@@ -284,11 +278,11 @@ beforeEach(() => {
       if (saveSettingsResponse) return saveSettingsResponse;
       const nextSettings = {
         ...githubSettingsData.settings,
-        repository: String(payload.repository || ''),
-        branch: String(payload.branch || ''),
-        chatFolder: String(payload.chatFolder || ''),
-        articleFolder: String(payload.articleFolder || ''),
-        videoFolder: String(payload.videoFolder || ''),
+        repository:
+          payload.repository == null
+            ? String(githubSettingsData.settings.repository || '')
+            : String(payload.repository),
+        branch: payload.branch == null ? String(githubSettingsData.settings.branch || '') : String(payload.branch),
       };
       githubSettingsData = { ...githubSettingsData, settings: nextSettings };
       return ok({ settings: nextSettings });
@@ -444,16 +438,16 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
     expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/other']);
 
-    act(() => latestSnapshot?.onChangeGithubRepository('owner/not-authorized'));
+    await invoke(() => latestSnapshot!.onChangeGithubRepository('owner/not-authorized'));
     expect(latestSnapshot?.githubRepository).toBe('owner/lost');
 
     githubRepositoryData = readyRepositories(['owner/other', 'owner/read-only']);
     githubRepositoryData.repositories[1].contentWriteCapable = false;
     await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
-    act(() => latestSnapshot?.onChangeGithubRepository('owner/read-only'));
+    await invoke(() => latestSnapshot!.onChangeGithubRepository('owner/read-only'));
     expect(latestSnapshot?.githubRepository).toBe('owner/lost');
 
-    act(() => latestSnapshot?.onChangeGithubRepository('owner/other'));
+    await invoke(() => latestSnapshot!.onChangeGithubRepository('owner/other'));
     expect(latestSnapshot?.githubRepository).toBe('owner/other');
     expect(latestSnapshot?.githubTargetUnavailable).toBe(false);
 
@@ -484,7 +478,7 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
   });
 
-  it('saves only the selected safe target, tests it, and emits provider/auto-sync storage changes', async () => {
+  it('auto-saves repository and branch, tests the target, and emits provider/auto-sync storage changes', async () => {
     storageState[GITHUB_PROVIDER_KEY] = false;
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = false;
     githubSettingsData = githubSettings({ state: 'connected' });
@@ -502,28 +496,24 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(storageMocks.set).toHaveBeenCalledWith({ [GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]: true });
     expect(latestSnapshot?.githubAutoSyncEnabled).toBe(true);
 
-    act(() => {
-      latestSnapshot?.onChangeGithubRepository('owner/other');
-      latestSnapshot?.setGithubBranch('release/v1');
-      latestSnapshot?.setGithubChatFolder('exports/chats');
-      latestSnapshot?.setGithubArticleFolder('exports/articles');
-      latestSnapshot?.setGithubVideoFolder('exports/videos');
-    });
-    await flushReact();
-    await invoke(() => latestSnapshot!.onSaveGithubSettings());
-
-    const saveCall = runtimeMocks.send.mock.calls.find(([type]) => type === GITHUB_MESSAGE_TYPES.SAVE_SETTINGS);
-    expect(saveCall?.[1]).toEqual({
+    await invoke(() => latestSnapshot!.onChangeGithubRepository('owner/other'));
+    expect(
+      runtimeMocks.send.mock.calls.filter(([type]) => type === GITHUB_MESSAGE_TYPES.SAVE_SETTINGS).at(-1)?.[1],
+    ).toEqual({
       repository: 'owner/other',
-      branch: 'release/v1',
-      chatFolder: 'exports/chats',
-      articleFolder: 'exports/articles',
-      videoFolder: 'exports/videos',
     });
+    expect(latestSnapshot?.githubRepository).toBe('owner/other');
+
+    act(() => latestSnapshot?.setGithubBranch('release/v1'));
+    await flushReact();
+    await invoke(() => latestSnapshot!.onSaveGithubBranch());
+    expect(
+      runtimeMocks.send.mock.calls.filter(([type]) => type === GITHUB_MESSAGE_TYPES.SAVE_SETTINGS).at(-1)?.[1],
+    ).toEqual({
+      branch: 'release/v1',
+    });
+    expect(latestSnapshot?.githubBranch).toBe('release/v1');
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
-    expect(latestSnapshot?.githubChatFolder).toBe('exports/chats');
-    expect(latestSnapshot?.githubArticleFolder).toBe('exports/articles');
-    expect(latestSnapshot?.githubVideoFolder).toBe('exports/videos');
 
     testConnectionResponse = ok({
       ok: true,
@@ -578,30 +568,24 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.error).toBeNull();
   });
 
-  it('preserves invalid folder drafts and auth when service validation rejects save', async () => {
+  it('preserves an invalid branch draft and auth when service validation rejects auto-save', async () => {
     githubSettingsData = githubSettings({ state: 'connected' });
     githubRepositoryData = readyRepositories();
     await renderController();
 
-    act(() => latestSnapshot?.setGithubChatFolder('.github/workflows/release'));
+    act(() => latestSnapshot?.setGithubBranch('../main'));
     await flushReact();
-    saveSettingsResponse = fail('github_settings_invalid:chatFolder', { code: 'github_settings_invalid' });
+    saveSettingsResponse = fail('github_settings_invalid:branch', { code: 'github_settings_invalid' });
 
-    await invoke(() => latestSnapshot!.onSaveGithubSettings());
+    await invoke(() => latestSnapshot!.onSaveGithubBranch());
 
     const saveCalls = runtimeMocks.send.mock.calls.filter(([type]) => type === GITHUB_MESSAGE_TYPES.SAVE_SETTINGS);
     expect(saveCalls).toHaveLength(1);
-    expect(saveCalls[0]?.[1]).toEqual({
-      repository: 'owner/repo',
-      branch: 'main',
-      chatFolder: '.github/workflows/release',
-      articleFolder: 'SyncNos-WebArticles',
-      videoFolder: 'SyncNos-Videos',
-    });
-    expect(latestSnapshot?.error).toBe('github_settings_invalid:chatFolder');
-    expect(latestSnapshot?.githubChatFolder).toBe('.github/workflows/release');
+    expect(saveCalls[0]?.[1]).toEqual({ branch: '../main' });
+    expect(latestSnapshot?.error).toBe('github_settings_invalid:branch');
+    expect(latestSnapshot?.githubBranch).toBe('../main');
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
-    expect(githubSettingsData.settings.chatFolder).toBe('SyncNos-AIChats');
+    expect(githubSettingsData.settings.branch).toBe('main');
   });
 
   it('never hydrates access, refresh, or device secrets into controller state', async () => {

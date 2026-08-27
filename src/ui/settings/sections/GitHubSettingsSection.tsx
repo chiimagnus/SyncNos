@@ -41,9 +41,6 @@ export function GitHubSettingsSection(props: {
   targetUnavailable: boolean;
   repository: string;
   branch: string;
-  chatFolder: string;
-  articleFolder: string;
-  videoFolder: string;
   verificationUrl: string;
   appUrl: string;
   installUrl: string;
@@ -57,10 +54,7 @@ export function GitHubSettingsSection(props: {
   onRefreshRepositories: () => void;
   onChangeRepository: (repository: string) => void;
   onChangeBranch: (branch: string) => void;
-  onChangeChatFolder: (folder: string) => void;
-  onChangeArticleFolder: (folder: string) => void;
-  onChangeVideoFolder: (folder: string) => void;
-  onSaveTarget: () => void;
+  onSaveBranch: () => void;
   onTestConnection: () => void;
   onInitializeRepository: () => void;
 }) {
@@ -75,9 +69,6 @@ export function GitHubSettingsSection(props: {
     targetUnavailable,
     repository,
     branch,
-    chatFolder,
-    articleFolder,
-    videoFolder,
     verificationUrl,
     appUrl,
     installUrl,
@@ -91,10 +82,7 @@ export function GitHubSettingsSection(props: {
     onRefreshRepositories,
     onChangeRepository,
     onChangeBranch,
-    onChangeChatFolder,
-    onChangeArticleFolder,
-    onChangeVideoFolder,
-    onSaveTarget,
+    onSaveBranch,
     onTestConnection,
     onInitializeRepository,
   } = props;
@@ -118,7 +106,7 @@ export function GitHubSettingsSection(props: {
   const onSaveKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    onSaveTarget();
+    onSaveBranch();
   };
 
   const connectedStatus = account?.login ? `${t('githubConnectedAs')} ${account.login}` : t('githubConnected');
@@ -225,23 +213,14 @@ export function GitHubSettingsSection(props: {
             </div>
           </div>
         ) : null}
-
-        <div className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-          {t('githubOneWayNotice')}
-        </div>
       </section>
 
       {auth.state === 'connected' ? (
         <>
           <section className={cardClassName} aria-label={t('githubRepositoryLabel')}>
-            <div className="tw-flex tw-items-center tw-gap-2">
-              <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-                {t('githubRepositoryLabel')}
-              </h2>
-              <button type="button" className={buttonClassName} onClick={onRefreshRepositories} disabled={busy}>
-                {t('githubRefreshRepositories')}
-              </button>
-            </div>
+            <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+              {t('githubRepositoryLabel')}
+            </h2>
 
             <div className="tw-mt-3 tw-grid tw-gap-2">
               {repositoryStatus === 'github_app_not_installed' ? (
@@ -255,17 +234,29 @@ export function GitHubSettingsSection(props: {
               ) : null}
 
               <SettingsFormRow label={t('githubRepositoryLabel')}>
-                <SelectMenu<string>
-                  buttonId="githubRepository"
-                  className="tw-min-w-0 tw-flex-1"
-                  buttonClassName={`${buttonClassName} tw-w-full`}
-                  value={repository}
-                  options={repositoryOptions}
-                  disabled={busy || repositoryStatus !== 'ready'}
-                  ariaLabel={t('githubRepositoryLabel')}
-                  maxHeight={360}
-                  onChange={onChangeRepository}
-                />
+                <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+                  <SelectMenu<string>
+                    buttonId="githubRepository"
+                    className="tw-min-w-0 tw-flex-1"
+                    buttonClassName={`${buttonClassName} tw-w-full`}
+                    value={repository}
+                    options={repositoryOptions}
+                    disabled={busy || repositoryStatus !== 'ready'}
+                    ariaLabel={t('githubRepositoryLabel')}
+                    maxHeight={360}
+                    onChange={onChangeRepository}
+                  />
+                  <button
+                    type="button"
+                    title={t('refresh')}
+                    onClick={onRefreshRepositories}
+                    disabled={busy}
+                    className="webclipper-btn webclipper-btn--icon"
+                    aria-label={t('githubRefreshRepositories')}
+                  >
+                    ↻
+                  </button>
+                </div>
               </SettingsFormRow>
 
               {targetUnavailable ? (
@@ -278,7 +269,7 @@ export function GitHubSettingsSection(props: {
                 <input
                   value={branch}
                   onChange={(event) => onChangeBranch(event.target.value)}
-                  onBlur={onSaveTarget}
+                  onBlur={onSaveBranch}
                   onKeyDown={onSaveKeyDown}
                   disabled={busy || !repository || targetUnavailable}
                   spellCheck={false}
@@ -289,14 +280,6 @@ export function GitHubSettingsSection(props: {
               </SettingsFormRow>
 
               <div className="tw-flex tw-flex-wrap tw-gap-2">
-                <button
-                  type="button"
-                  className={buttonClassName}
-                  onClick={onSaveTarget}
-                  disabled={busy || !repository || targetUnavailable}
-                >
-                  {t('githubSaveTarget')}
-                </button>
                 <button
                   type="button"
                   className={buttonClassName}
@@ -338,61 +321,6 @@ export function GitHubSettingsSection(props: {
                   {testStatus}
                 </div>
               ) : null}
-
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                {t('githubDisconnectLocalNote')}
-              </div>
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('githubRevokeHint')}</div>
-            </div>
-          </section>
-
-          <section className={cardClassName} aria-label={t('githubPaths')}>
-            <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('githubPaths')}</h2>
-            <div className="tw-mt-3 tw-grid tw-gap-2">
-              <SettingsFormRow label={t('aiChatsFolder')}>
-                <input
-                  value={chatFolder}
-                  onChange={(event) => onChangeChatFolder(event.target.value)}
-                  onBlur={onSaveTarget}
-                  onKeyDown={onSaveKeyDown}
-                  disabled={busy}
-                  spellCheck={false}
-                  placeholder="SyncNos-AIChats"
-                  className={textInputClassName}
-                  aria-label={t('aiChatsFolder')}
-                />
-              </SettingsFormRow>
-              <SettingsFormRow label={t('webClipperFolder')}>
-                <input
-                  value={articleFolder}
-                  onChange={(event) => onChangeArticleFolder(event.target.value)}
-                  onBlur={onSaveTarget}
-                  onKeyDown={onSaveKeyDown}
-                  disabled={busy}
-                  spellCheck={false}
-                  placeholder="SyncNos-WebArticles"
-                  className={textInputClassName}
-                  aria-label={t('webClipperFolder')}
-                />
-              </SettingsFormRow>
-              <SettingsFormRow label={t('videoScriptsFolder')}>
-                <input
-                  value={videoFolder}
-                  onChange={(event) => onChangeVideoFolder(event.target.value)}
-                  onBlur={onSaveTarget}
-                  onKeyDown={onSaveKeyDown}
-                  disabled={busy}
-                  spellCheck={false}
-                  placeholder="SyncNos-Videos"
-                  className={textInputClassName}
-                  aria-label={t('videoScriptsFolder')}
-                />
-              </SettingsFormRow>
-              <SettingsFormRow label={t('note')} align="start">
-                <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {t('githubPathsNote')}
-                </div>
-              </SettingsFormRow>
             </div>
           </section>
         </>

@@ -5,7 +5,6 @@ import { sha256Hex } from '@services/sync/github/github-content-hash';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
 
 const originalTz = process.env.TZ;
-const folders = { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' };
 
 function conversation(overrides: Record<string, unknown> = {}) {
   return {
@@ -43,9 +42,9 @@ describe('github markdown projection', () => {
   });
 
   it.each([
-    ['chat', 'Chats'],
-    ['article', 'Articles'],
-    ['video', 'Videos'],
+    ['chat', 'AIChats'],
+    ['article', 'WebArticles'],
+    ['video', 'VideosScripts'],
   ])('uses the %s folder and stable conversation basename', async (sourceType, expectedFolder) => {
     const current = conversation({
       sourceType,
@@ -64,7 +63,6 @@ describe('github markdown projection', () => {
           contentMarkdown: 'body',
         },
       ],
-      folders,
     });
     expect(projection.markdownPath).toBe(`${expectedFolder}/${buildConversationBasename(current)}.md`);
     expect(projection.markdownText).toContain(`url: "https://example.com/${sourceType}"`);
@@ -99,7 +97,6 @@ describe('github markdown projection', () => {
           updatedAt: Date.UTC(2026, 0, 2, 3, 4),
         },
       ],
-      folders,
     };
 
     process.env.TZ = 'America/Los_Angeles';
@@ -129,7 +126,6 @@ describe('github markdown projection', () => {
           contentMarkdown: '![one](syncnos-asset://1)\n\n![two](<syncnos-asset://2> "caption")',
         },
       ],
-      folders,
       remoteKey: 'github.com/owner/repo@main',
       imageLoader: loader,
       blobUploader: uploader,
@@ -139,7 +135,7 @@ describe('github markdown projection', () => {
     const relative = `${buildConversationBasename(current)}.assets/${hash}.png`;
     expect(projection.attachments).toEqual([
       {
-        path: `Chats/${relative}`,
+        path: `AIChats/${relative}`,
         relativeTarget: relative,
         contentHash: hash,
         sha: 'a'.repeat(40),
@@ -156,7 +152,7 @@ describe('github markdown projection', () => {
     const contentHash = await sha256Hex(new Uint8Array(bytes));
     const oldConversation = conversation({ title: 'Old title' });
     const oldRelative = `${buildConversationBasename(oldConversation)}.assets/${contentHash}.png`;
-    const oldPath = `Chats/${oldRelative}`;
+    const oldPath = `AIChats/${oldRelative}`;
     const continuity = {
       githubRemoteKey: 'github.com/owner/repo@main',
       githubManagedFiles: {
@@ -169,7 +165,6 @@ describe('github markdown projection', () => {
     const unchanged = await buildGithubMarkdownProjection({
       conversation: oldConversation,
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-      folders,
       remoteKey: 'github.com/owner/repo@main',
       continuity,
       imageLoader: loader,
@@ -178,7 +173,6 @@ describe('github markdown projection', () => {
     const renamed = await buildGithubMarkdownProjection({
       conversation: { ...oldConversation, title: 'New title' },
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-      folders: { ...folders, chatFolder: 'Renamed' },
       remoteKey: 'github.com/owner/repo@main',
       continuity,
       imageLoader: loader,
@@ -197,13 +191,12 @@ describe('github markdown projection', () => {
     const contentHash = await sha256Hex(new Uint8Array(bytes));
     const current = conversation({ title: 'Old title' });
     const relative = `${buildConversationBasename(current)}.assets/${contentHash}.png`;
-    const path = `Chats/${relative}`;
+    const path = `AIChats/${relative}`;
     const uploader = vi.fn(async () => ({ sha: 'c'.repeat(40) }));
 
     const projection = await buildGithubMarkdownProjection({
       conversation: current,
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-      folders,
       remoteKey: 'github.com/owner/other@main',
       continuity: {
         githubRemoteKey: 'github.com/owner/repo@main',
@@ -235,7 +228,6 @@ describe('github markdown projection', () => {
       messages: [
         { messageKey: 'm1', sequence: 1, contentMarkdown: '![a](syncnos-asset://1)\n![b](syncnos-asset://2)' },
       ],
-      folders,
       imageLoader: loader,
       blobUploader: uploader,
     });
@@ -248,7 +240,6 @@ describe('github markdown projection', () => {
           contentMarkdown: '![new](syncnos-asset://3)\n![b](syncnos-asset://2)\n![a](syncnos-asset://1)',
         },
       ],
-      folders,
       imageLoader: loader,
       blobUploader: uploader,
     });
@@ -269,7 +260,6 @@ describe('github markdown projection', () => {
     const projection = await buildGithubMarkdownProjection({
       conversation: conversation({ id: 7 }),
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: 'before ![secret](syncnos-asset://4) after' }],
-      folders,
       imageLoader: loader,
       blobUploader: uploader,
     });
@@ -300,7 +290,6 @@ describe('github markdown projection', () => {
           contentMarkdown: '![safe](syncnos-asset://1)\n![signed](syncnos-asset://2)\n![credential](syncnos-asset://3)',
         },
       ],
-      folders,
       imageLoader: loader,
       blobUploader: uploader,
     });
@@ -316,7 +305,6 @@ describe('github markdown projection', () => {
     const projection = await buildGithubMarkdownProjection({
       conversation: conversation(),
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-      folders,
       imageLoader: async () => imageAsset(1, [1], 'https://cdn.example.com/safe.png'),
       blobUploader: async () => {
         throw Object.assign(new Error('ambiguous mutation outcome'), { code: 'github_outcome_unknown' });
@@ -333,7 +321,6 @@ describe('github markdown projection', () => {
       buildGithubMarkdownProjection({
         conversation: conversation(),
         messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: 'raw syncnos-asset://99' }],
-        folders,
       }),
     ).rejects.toThrow('github_internal_asset_ref_unresolved');
   });

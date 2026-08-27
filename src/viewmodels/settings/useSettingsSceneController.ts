@@ -333,9 +333,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubRepositories, setGithubRepositories] = useState<GithubRepositoryOption[]>([]);
   const [githubRepository, setGithubRepository] = useState('');
   const [githubBranch, setGithubBranch] = useState('');
-  const [githubChatFolder, setGithubChatFolder] = useState('');
-  const [githubArticleFolder, setGithubArticleFolder] = useState('');
-  const [githubVideoFolder, setGithubVideoFolder] = useState('');
   const [githubVerificationUrl, setGithubVerificationUrl] = useState('');
   const [githubAppUrl, setGithubAppUrl] = useState('');
   const [githubInstallUrl, setGithubInstallUrl] = useState('');
@@ -448,9 +445,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const app = value?.app || {};
       setGithubRepository(String(settings.repository || ''));
       setGithubBranch(String(settings.branch || ''));
-      setGithubChatFolder(String(settings.chatFolder || ''));
-      setGithubArticleFolder(String(settings.articleFolder || ''));
-      setGithubVideoFolder(String(settings.videoFolder || ''));
       setGithubVerificationUrl(String(app.verificationUrl || ''));
       setGithubAppUrl(String(app.appUrl || ''));
       setGithubInstallUrl(String(app.installUrl || ''));
@@ -1028,42 +1022,48 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [loadGithubRepositoriesInternal, runTask]);
 
   const onChangeGithubRepository = useCallback(
-    (value: string) => {
+    async (value: string) => {
       const next = String(value || '').trim();
       const current = String(githubRepository || '').trim();
       const allowed = githubRepositories.some(
         (repository) => repository.fullName === next && repository.contentWriteCapable,
       );
       if (!next || (next !== current && !allowed)) return;
-      setGithubRepository(next);
-      setGithubConnectionTest({ status: 'idle' });
+
+      await runTask(
+        async () => {
+          const data = unwrap(
+            await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, {
+              repository: next,
+            }),
+          );
+          const settings = data?.settings || {};
+          setGithubRepository(String(settings.repository || ''));
+          setGithubBranch(String(settings.branch || ''));
+          setGithubConnectionTest({ status: 'idle' });
+        },
+        { fallbackMessage: 'github_settings_save_failed' },
+      );
     },
-    [githubRepositories, githubRepository],
+    [githubRepositories, githubRepository, runTask],
   );
 
-  const onSaveGithubSettings = useCallback(async () => {
+  const onSaveGithubBranch = useCallback(async () => {
     await runTask(
       async () => {
         const data = unwrap(
           await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, {
-            repository: githubRepository,
             branch: githubBranch,
-            chatFolder: githubChatFolder,
-            articleFolder: githubArticleFolder,
-            videoFolder: githubVideoFolder,
           }),
         );
         const settings = data?.settings || {};
         setGithubRepository(String(settings.repository || ''));
         setGithubBranch(String(settings.branch || ''));
-        setGithubChatFolder(String(settings.chatFolder || ''));
-        setGithubArticleFolder(String(settings.articleFolder || ''));
-        setGithubVideoFolder(String(settings.videoFolder || ''));
         setGithubConnectionTest({ status: 'idle' });
       },
       { fallbackMessage: 'github_settings_save_failed' },
     );
-  }, [githubArticleFolder, githubBranch, githubChatFolder, githubRepository, githubVideoFolder, runTask]);
+  }, [githubBranch, runTask]);
 
   const onTestGithubConnection = useCallback(async () => {
     setGithubConnectionTest({ status: 'testing' });
@@ -1913,12 +1913,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onChangeGithubRepository,
     githubBranch,
     setGithubBranch,
-    githubChatFolder,
-    setGithubChatFolder,
-    githubArticleFolder,
-    setGithubArticleFolder,
-    githubVideoFolder,
-    setGithubVideoFolder,
     githubVerificationUrl,
     githubAppUrl,
     githubInstallUrl,
@@ -1932,7 +1926,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onCancelGithubDeviceFlow,
     onDisconnectGithub,
     onRefreshGithubRepositories,
-    onSaveGithubSettings,
+    onSaveGithubBranch,
     onTestGithubConnection,
     onInitializeGithubRepository,
 

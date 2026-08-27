@@ -278,7 +278,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
   async function stageResolved(
     ids: readonly number[],
     mode: GithubSyncPlannerMode,
-    settings: GithubSettings,
     preflight: GithubRepositoryPreflight,
   ): Promise<GithubSyncStagedRun> {
     const items: GithubSyncStagedItem[] = [];
@@ -302,7 +301,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
           conversation,
           messages,
           comments,
-          folders: settings,
           remoteKey: preflight.remoteKey,
           continuity: row.mapping || undefined,
           imageLoader: services.loadImage,
@@ -360,7 +358,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
     const settings = await services.getSettings();
     const preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
-    return stageResolved(ids, mode, settings, preflight);
+    return stageResolved(ids, mode, preflight);
   }
 
   async function getSyncStatus(input: { instanceId?: string } = {}) {
@@ -467,7 +465,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         settings = await services.getSettings();
         preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
         await persistCurrentJob({ currentStage: 'staging_projection' });
-        staged = await stageResolved(ids, mode, settings, preflight);
+        staged = await stageResolved(ids, mode, preflight);
         await persistCurrentJob({ currentStage: 'cleaning_remote_files' });
       } else {
         settings = await services.getSettings();

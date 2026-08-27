@@ -41,7 +41,7 @@ function tree(entries: Array<{ path: string; type: 'blob' | 'tree'; sha: string 
 
 describe('github git transport staged path/delete resolver', () => {
   it('accepts safe relative paths and rejects traversal, absolute, control and workflows paths', () => {
-    expect(validateGithubGitPath('SyncNos-AIChats/chat.md')).toBe('SyncNos-AIChats/chat.md');
+    expect(validateGithubGitPath('AIChats/chat.md')).toBe('AIChats/chat.md');
     for (const invalid of [
       '',
       '/root.md',

@@ -88,55 +88,38 @@ describe('github settings store', () => {
     }
   });
 
-  it('rejects unsafe folders instead of cleaning them into a different path', async () => {
-    const { normalizeGithubFolderPath } = await import('@services/sync/github/settings-store');
-    expect(normalizeGithubFolderPath(undefined, 'SyncNos-AIChats', 'chatFolder')).toBe('SyncNos-AIChats');
-    expect(normalizeGithubFolderPath('notes/chat', 'fallback', 'chatFolder')).toBe('notes/chat');
-
-    for (const invalid of [
-      '',
-      '/notes',
-      'notes/',
-      'notes//chat',
-      'notes/./chat',
-      'notes/../chat',
-      'notes\\chat',
-      ' notes/chat',
-      'notes/chat ',
-      '.github/workflows',
-      '.GITHUB/WORKFLOWS/release',
-    ]) {
-      expect(() => normalizeGithubFolderPath(invalid, 'fallback', 'chatFolder')).toThrow(
-        'github_settings_invalid:chatFolder',
-      );
-    }
+  it('uses fixed output folders outside the persisted settings model', async () => {
+    const { GITHUB_OUTPUT_FOLDERS, getGithubSettings } = await import('@services/sync/github/settings-store');
+    expect(GITHUB_OUTPUT_FOLDERS).toEqual({
+      chat: 'AIChats',
+      article: 'WebArticles',
+      video: 'VideosScripts',
+    });
+    await expect(getGithubSettings()).resolves.toEqual({
+      repository: '',
+      branch: '',
+      defaults: { repository: '', branch: '' },
+    });
   });
 
-  it('persists only normalized non-sensitive provider settings', async () => {
+  it('persists only normalized repository and branch settings', async () => {
     const { GITHUB_STORAGE_KEYS, getGithubSettings, saveGithubSettings } =
       await import('@services/sync/github/settings-store');
     const defaults = await getGithubSettings();
-    expect(defaults).toMatchObject({
+    expect(defaults).toEqual({
       repository: '',
       branch: '',
-      chatFolder: 'SyncNos-AIChats',
-      articleFolder: 'SyncNos-WebArticles',
-      videoFolder: 'SyncNos-Videos',
+      defaults: { repository: '', branch: '' },
     });
 
     const saved = await saveGithubSettings({
       repository: ' chiimagnus / SyncNos-Webclipper ',
       branch: 'feature/github-sync',
-      chatFolder: 'sync/chats',
-      articleFolder: 'sync/articles',
-      videoFolder: 'sync/videos',
     });
-    expect(saved).toMatchObject({
+    expect(saved).toEqual({
       repository: 'chiimagnus/SyncNos-Webclipper',
       branch: 'feature/github-sync',
-      chatFolder: 'sync/chats',
-      articleFolder: 'sync/articles',
-      videoFolder: 'sync/videos',
+      defaults: { repository: '', branch: '' },
     });
     expect(Object.keys(store).sort()).toEqual(Object.values(GITHUB_STORAGE_KEYS).sort());
   });

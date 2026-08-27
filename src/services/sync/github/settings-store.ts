@@ -4,20 +4,20 @@ import { hasAsciiControlCharacter } from '@platform/validation/ascii-control';
 export const GITHUB_STORAGE_KEYS = Object.freeze({
   repository: 'github_repository',
   branch: 'github_branch',
-  chatFolder: 'github_chat_folder',
-  articleFolder: 'github_article_folder',
-  videoFolder: 'github_video_folder',
 });
 
 export const GITHUB_DEFAULTS = Object.freeze({
   repository: '',
   branch: '',
-  chatFolder: 'SyncNos-AIChats',
-  articleFolder: 'SyncNos-WebArticles',
-  videoFolder: 'SyncNos-Videos',
 });
 
-export type GithubSettingsField = 'repository' | 'branch' | 'chatFolder' | 'articleFolder' | 'videoFolder';
+export const GITHUB_OUTPUT_FOLDERS = Object.freeze({
+  chat: 'AIChats',
+  article: 'WebArticles',
+  video: 'VideosScripts',
+});
+
+export type GithubSettingsField = 'repository' | 'branch';
 
 export class GithubSettingsValidationError extends Error {
   readonly code = 'github_settings_invalid' as const;
@@ -94,27 +94,9 @@ export function encodeGithubBranchPath(branch: unknown): string {
     .join('/');
 }
 
-export function normalizeGithubFolderPath(
-  input: unknown,
-  fallbackFolder: string,
-  field: Exclude<GithubSettingsField, 'repository' | 'branch'>,
-): string {
-  const raw = input == null ? fallbackFolder : requireString(input, field);
-  if (!raw || raw !== raw.trim() || raw.startsWith('/') || raw.includes('\\') || hasAsciiControlCharacter(raw))
-    invalid(field);
-
-  const segments = raw.split('/');
-  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) invalid(field);
-  if (segments[0]?.toLowerCase() === '.github' && segments[1]?.toLowerCase() === 'workflows') invalid(field);
-  return raw;
-}
-
 export type GithubSettings = {
   repository: string;
   branch: string;
-  chatFolder: string;
-  articleFolder: string;
-  videoFolder: string;
   defaults: typeof GITHUB_DEFAULTS;
 };
 
@@ -123,21 +105,6 @@ export async function getGithubSettings(): Promise<GithubSettings> {
   return {
     repository: normalizeGithubRepository(values[GITHUB_STORAGE_KEYS.repository] ?? GITHUB_DEFAULTS.repository),
     branch: normalizeGithubBranch(values[GITHUB_STORAGE_KEYS.branch] ?? GITHUB_DEFAULTS.branch),
-    chatFolder: normalizeGithubFolderPath(
-      values[GITHUB_STORAGE_KEYS.chatFolder],
-      GITHUB_DEFAULTS.chatFolder,
-      'chatFolder',
-    ),
-    articleFolder: normalizeGithubFolderPath(
-      values[GITHUB_STORAGE_KEYS.articleFolder],
-      GITHUB_DEFAULTS.articleFolder,
-      'articleFolder',
-    ),
-    videoFolder: normalizeGithubFolderPath(
-      values[GITHUB_STORAGE_KEYS.videoFolder],
-      GITHUB_DEFAULTS.videoFolder,
-      'videoFolder',
-    ),
     defaults: GITHUB_DEFAULTS,
   };
 }
@@ -148,27 +115,6 @@ export async function saveGithubSettings(
   const payload: Record<string, unknown> = {};
   if (input.repository != null) payload[GITHUB_STORAGE_KEYS.repository] = normalizeGithubRepository(input.repository);
   if (input.branch != null) payload[GITHUB_STORAGE_KEYS.branch] = normalizeGithubBranch(input.branch);
-  if (input.chatFolder != null) {
-    payload[GITHUB_STORAGE_KEYS.chatFolder] = normalizeGithubFolderPath(
-      input.chatFolder,
-      GITHUB_DEFAULTS.chatFolder,
-      'chatFolder',
-    );
-  }
-  if (input.articleFolder != null) {
-    payload[GITHUB_STORAGE_KEYS.articleFolder] = normalizeGithubFolderPath(
-      input.articleFolder,
-      GITHUB_DEFAULTS.articleFolder,
-      'articleFolder',
-    );
-  }
-  if (input.videoFolder != null) {
-    payload[GITHUB_STORAGE_KEYS.videoFolder] = normalizeGithubFolderPath(
-      input.videoFolder,
-      GITHUB_DEFAULTS.videoFolder,
-      'videoFolder',
-    );
-  }
 
   if (Object.keys(payload).length > 0) await storageSet(payload);
   return getGithubSettings();

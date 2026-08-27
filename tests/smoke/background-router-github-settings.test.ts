@@ -209,11 +209,21 @@ describe('background-router GitHub settings routes', () => {
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
       repository: 'owner/repo',
       branch: 'main',
-      chatFolder: 'Chats',
     });
     expect(saved.ok).toBe(true);
-    expect(saveSettings).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main', chatFolder: 'Chats' });
+    expect(saveSettings).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main' });
     expectSecretFree(saved);
+
+    const unexpectedFieldRejected = await router.__handleMessageForTests({
+      type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
+      repository: 'owner/repo',
+      unexpectedField: 'not-supported',
+    });
+    expect(unexpectedFieldRejected).toMatchObject({
+      ok: false,
+      error: { extra: { code: 'github_settings_payload_invalid' } },
+    });
+    expectSecretFree(unexpectedFieldRejected);
 
     const rejected = await router.__handleMessageForTests({
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,

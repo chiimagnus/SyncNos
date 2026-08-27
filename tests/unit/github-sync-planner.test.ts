@@ -98,7 +98,7 @@ describe('github sync planner', () => {
     expect(plan.operations.some((operation) => operation.type === 'delete')).toBe(false);
   });
 
-  it('reuses the old markdown blob when a same-target title/folder rename keeps content unchanged', () => {
+  it('reuses the old markdown blob when a same-target title/path rename keeps content unchanged', () => {
     const p = projection();
     const oldPath = `Old/chatgpt-Old-${stableConversationId10(convo)}.md`;
     const plan = planGithubConversationSync({

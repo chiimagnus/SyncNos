@@ -32,9 +32,6 @@ describe('backup backup-utils', () => {
       obsidian_api_key: 'obsidian-key',
       github_repository: 'chiimagnus/SyncNos-Webclipper',
       github_branch: 'main',
-      github_chat_folder: 'SyncNos-AIChats',
-      github_article_folder: 'SyncNos-WebArticles',
-      github_video_folder: 'SyncNos-Videos',
       github_auth_state_v1: {
         version: 1,
         state: 'connected',
@@ -54,9 +51,6 @@ describe('backup backup-utils', () => {
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       github_repository: 'chiimagnus/SyncNos-Webclipper',
       github_branch: 'main',
-      github_chat_folder: 'SyncNos-AIChats',
-      github_article_folder: 'SyncNos-WebArticles',
-      github_video_folder: 'SyncNos-Videos',
     });
     expect(JSON.stringify(filtered)).not.toMatch(
       /ACCESS_SENTINEL_SECRET|REFRESH_SENTINEL_SECRET|DEVICE_SENTINEL_SECRET/,

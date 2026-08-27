@@ -69,7 +69,7 @@ describe('settings section definitions', () => {
       onDisconnect: vi.fn(),
       onRefreshRepositories: vi.fn(),
       onChangeRepository: vi.fn(),
-      onSaveTarget: vi.fn(),
+      onSaveBranch: vi.fn(),
       onTestConnection: vi.fn(),
       onInitializeRepository: vi.fn(),
     };
@@ -84,9 +84,6 @@ describe('settings section definitions', () => {
       targetUnavailable: false,
       repository: '',
       branch: 'main',
-      chatFolder: 'SyncNos-AIChats',
-      articleFolder: 'SyncNos-WebArticles',
-      videoFolder: 'SyncNos-Videos',
       verificationUrl: 'https://github.com/login/device',
       appUrl: 'https://github.com/apps/syncnos',
       installUrl: 'https://github.com/apps/syncnos/installations/new',
@@ -100,10 +97,7 @@ describe('settings section definitions', () => {
       onRefreshRepositories: callbacks.onRefreshRepositories,
       onChangeRepository: callbacks.onChangeRepository,
       onChangeBranch: () => {},
-      onChangeChatFolder: () => {},
-      onChangeArticleFolder: () => {},
-      onChangeVideoFolder: () => {},
-      onSaveTarget: callbacks.onSaveTarget,
+      onSaveBranch: callbacks.onSaveBranch,
       onTestConnection: callbacks.onTestConnection,
       onInitializeRepository: callbacks.onInitializeRepository,
     };
@@ -166,19 +160,16 @@ describe('settings section definitions', () => {
     });
     expect(document.body.textContent || '').toContain('Connected as octocat');
     expect(document.querySelector('input[aria-label="Repository"]')).toBeNull();
-    expect(document.querySelector('input[aria-label="Branch"]')).toBeTruthy();
-    expect((document.querySelector('input[aria-label="AI Chats Folder"]') as HTMLInputElement | null)?.value).toBe(
-      'SyncNos-AIChats',
-    );
-    expect((document.querySelector('input[aria-label="Web Clipper Folder"]') as HTMLInputElement | null)?.value).toBe(
-      'SyncNos-WebArticles',
-    );
-    expect((document.querySelector('input[aria-label="Video Scripts Folder"]') as HTMLInputElement | null)?.value).toBe(
-      'SyncNos-Videos',
-    );
-    expect(document.body.textContent || '').toContain(
-      'Changing repository or branch never cleans up the previous target.',
-    );
+    const branchInput = document.querySelector('input[aria-label="Branch"]') as HTMLInputElement | null;
+    expect(branchInput).toBeTruthy();
+    expect(document.querySelector('input[aria-label="AI Chats Folder"]')).toBeNull();
+    expect(document.querySelector('input[aria-label="Web Clipper Folder"]')).toBeNull();
+    expect(document.querySelector('input[aria-label="Video Scripts Folder"]')).toBeNull();
+    expect(document.body.textContent || '').not.toContain('GitHub Paths');
+    expect(document.body.textContent || '').not.toContain('Disconnect removes GitHub credentials');
+    expect(document.body.textContent || '').not.toContain('To revoke authorization completely');
+    expect(document.body.textContent || '').not.toContain('One-way output');
+    expect(document.body.textContent || '').not.toContain('Save target');
     expect(document.querySelector('a[href="https://github.com/apps/syncnos"]')).toBeTruthy();
 
     const repositoryTrigger = document.querySelector('button#githubRepository') as HTMLButtonElement | null;
@@ -191,20 +182,25 @@ describe('settings section definitions', () => {
     act(() => otherRepository!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(callbacks.onChangeRepository).toHaveBeenCalledWith('owner/other');
 
-    const chatFolderInput = document.querySelector('input[aria-label="AI Chats Folder"]') as HTMLInputElement;
+    const refreshButton = document.querySelector(
+      'button[aria-label="Refresh repositories"]',
+    ) as HTMLButtonElement | null;
+    expect(refreshButton).toBeTruthy();
+    expect(repositoryTrigger?.parentElement?.parentElement?.contains(refreshButton)).toBe(true);
+    act(() => refreshButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(callbacks.onRefreshRepositories).toHaveBeenCalledTimes(1);
+
     act(() =>
-      chatFolderInput.dispatchEvent(
+      branchInput!.dispatchEvent(
         new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
       ),
     );
-    expect(callbacks.onSaveTarget).toHaveBeenCalledTimes(1);
-    act(() => chatFolderInput.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true })));
-    expect(callbacks.onSaveTarget).toHaveBeenCalledTimes(2);
+    expect(callbacks.onSaveBranch).toHaveBeenCalledTimes(1);
+    act(() => branchInput!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true })));
+    expect(callbacks.onSaveBranch).toHaveBeenCalledTimes(2);
 
     for (const [label, callback] of [
       ['Disconnect', callbacks.onDisconnect],
-      ['Refresh repositories', callbacks.onRefreshRepositories],
-      ['Save target', callbacks.onSaveTarget],
       ['Test connection', callbacks.onTestConnection],
     ] as const) {
       const button = Array.from(document.querySelectorAll('button')).find(
@@ -212,7 +208,7 @@ describe('settings section definitions', () => {
       ) as HTMLButtonElement | undefined;
       expect(button).toBeTruthy();
       act(() => button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
-      expect(callback).toHaveBeenCalledTimes(callback === callbacks.onSaveTarget ? 3 : 1);
+      expect(callback).toHaveBeenCalledTimes(1);
     }
 
     act(() => {

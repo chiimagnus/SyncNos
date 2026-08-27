@@ -75,9 +75,6 @@ describe('backup service', () => {
       notion_oauth_token_v1: { accessToken: 'secret' },
       github_repository: 'owner/repo',
       github_branch: 'main',
-      github_chat_folder: 'Notes/Chats',
-      github_article_folder: 'Notes/Articles',
-      github_video_folder: 'Notes/Videos',
       github_auth_state_v1: {
         version: 1,
         state: 'pending',
@@ -183,9 +180,6 @@ describe('backup service', () => {
     expect(config.storageLocal).toMatchObject({
       github_repository: 'owner/repo',
       github_branch: 'main',
-      github_chat_folder: 'Notes/Chats',
-      github_article_folder: 'Notes/Articles',
-      github_video_folder: 'Notes/Videos',
     });
     expect(config.storageLocal.github_auth_state_v1).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain('DEVICE_SENTINEL_SECRET');
@@ -214,9 +208,6 @@ describe('backup service', () => {
     };
     delete chromeMock.__store.github_repository;
     delete chromeMock.__store.github_branch;
-    delete chromeMock.__store.github_chat_folder;
-    delete chromeMock.__store.github_article_folder;
-    delete chromeMock.__store.github_video_folder;
 
     await __closeDbForTests();
     await deleteDb('webclipper');
@@ -240,9 +231,6 @@ describe('backup service', () => {
     expect(chromeMock.__store).toMatchObject({
       github_repository: 'owner/repo',
       github_branch: 'main',
-      github_chat_folder: 'Notes/Chats',
-      github_article_folder: 'Notes/Articles',
-      github_video_folder: 'Notes/Videos',
     });
   });
 

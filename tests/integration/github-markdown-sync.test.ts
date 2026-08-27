@@ -575,9 +575,6 @@ describe('GitHub Markdown production-chain integration', () => {
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
       repository: REPOSITORY,
       branch: BRANCH,
-      chatFolder: 'Chats',
-      articleFolder: 'Articles',
-      videoFolder: 'Videos',
     });
     expect(saved).toMatchObject({ ok: true, data: { settings: { repository: REPOSITORY, branch: BRANCH } } });
     assertSecretFree(saved);
@@ -660,6 +657,8 @@ describe('GitHub Markdown production-chain integration', () => {
     const articlePath = markdownPath(articleAfterFirst?.mapping);
     const firstAssetPaths = assetPaths(chatAfterFirst?.mapping);
     expect(firstAssetPaths).toHaveLength(1);
+    expect(chatPath.startsWith('AIChats/')).toBe(true);
+    expect(articlePath.startsWith('WebArticles/')).toBe(true);
     expect(fakeGithub.hasPath('README.md')).toBe(true);
     expect(fakeGithub.readText('README.md')).toContain('Do not replace me.');
     expect(fakeGithub.hasPath(chatPath)).toBe(true);
@@ -700,7 +699,6 @@ describe('GitHub Markdown production-chain integration', () => {
       warningFlags: [],
       lastCapturedAt: 40,
     });
-    await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, chatFolder: 'Moved/Chats' });
     const renameCommitsBefore = fakeGithub.syncRefUpdates;
     const renamedChat = await orchestrator.sync({
       conversationIds: [chat.id],
@@ -734,7 +732,6 @@ describe('GitHub Markdown production-chain integration', () => {
       warningFlags: [],
       lastCapturedAt: 50,
     });
-    await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS, articleFolder: 'Moved/Articles' });
     const absentDelete = await orchestrator.sync({
       conversationIds: [article.id],
       mode: 'reconcile',

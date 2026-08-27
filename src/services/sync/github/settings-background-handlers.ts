@@ -52,13 +52,7 @@ const DEFAULT_DEPS: GithubSettingsHandlersDeps = {
   initializeRepository: initializeGithubRepository,
 };
 
-const SETTINGS_FIELDS = new Set<GithubSettingsField>([
-  'repository',
-  'branch',
-  'chatFolder',
-  'articleFolder',
-  'videoFolder',
-]);
+const SETTINGS_FIELDS = new Set<GithubSettingsField>(['repository', 'branch']);
 
 function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -94,15 +88,9 @@ function safeSettingsDto(value: GithubSettings | any) {
   return {
     repository: safeString(value?.repository),
     branch: safeString(value?.branch),
-    chatFolder: safeString(value?.chatFolder),
-    articleFolder: safeString(value?.articleFolder),
-    videoFolder: safeString(value?.videoFolder),
     defaults: {
       repository: safeString(defaults.repository),
       branch: safeString(defaults.branch),
-      chatFolder: safeString(defaults.chatFolder),
-      articleFolder: safeString(defaults.articleFolder),
-      videoFolder: safeString(defaults.videoFolder),
     },
   };
 }
@@ -261,9 +249,6 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
       const settings = await deps.saveSettings({
         ...(message.repository == null ? {} : { repository: message.repository }),
         ...(message.branch == null ? {} : { branch: message.branch }),
-        ...(message.chatFolder == null ? {} : { chatFolder: message.chatFolder }),
-        ...(message.articleFolder == null ? {} : { articleFolder: message.articleFolder }),
-        ...(message.videoFolder == null ? {} : { videoFolder: message.videoFolder }),
       });
       return router.ok({ settings: safeSettingsDto(settings) });
     } catch (error) {

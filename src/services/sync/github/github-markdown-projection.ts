@@ -3,7 +3,7 @@ import { buildConversationBasename } from '@services/conversations/domain/file-n
 import { getImageCacheAssetById, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
 import { sha256Hex } from '@services/sync/github/github-content-hash';
 import { createGithubBlob } from '@services/sync/github/github-git-transport';
-import { GITHUB_DEFAULTS, normalizeGithubFolderPath, type GithubSettings } from '@services/sync/github/settings-store';
+import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageReferences,
@@ -13,8 +13,6 @@ import { buildFullNoteMarkdown } from '@services/sync/shared/remote-markdown-wri
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
-
-export type GithubProjectionFolders = Pick<GithubSettings, 'chatFolder' | 'articleFolder' | 'videoFolder'>;
 
 export type GithubProjectionManagedFile = {
   kind: 'markdown' | 'asset';
@@ -51,15 +49,11 @@ export type GithubMarkdownProjection = {
 export type GithubImageLoader = (input: { id: number; conversationId: number }) => Promise<ImageCacheAsset | null>;
 export type GithubBlobUploader = (input: { content: Uint8Array }) => Promise<{ sha: string }>;
 
-function folderForConversation(conversation: any, folders: GithubProjectionFolders): string {
+function folderForConversation(conversation: any): string {
   const sourceType = String(conversation?.sourceType || '').trim();
-  if (sourceType === 'article') {
-    return normalizeGithubFolderPath(folders.articleFolder, GITHUB_DEFAULTS.articleFolder, 'articleFolder');
-  }
-  if (sourceType === 'video') {
-    return normalizeGithubFolderPath(folders.videoFolder, GITHUB_DEFAULTS.videoFolder, 'videoFolder');
-  }
-  return normalizeGithubFolderPath(folders.chatFolder, GITHUB_DEFAULTS.chatFolder, 'chatFolder');
+  if (sourceType === 'article') return GITHUB_OUTPUT_FOLDERS.article;
+  if (sourceType === 'video') return GITHUB_OUTPUT_FOLDERS.video;
+  return GITHUB_OUTPUT_FOLDERS.chat;
 }
 
 function normalizeImageExt(asset: Pick<ImageCacheAsset, 'contentType' | 'url'>): string {
@@ -160,7 +154,6 @@ export async function buildGithubMarkdownProjection(input: {
   conversation: any;
   messages: any[];
   comments?: ArticleCommentDto[];
-  folders?: Partial<GithubProjectionFolders>;
   remoteKey?: string;
   continuity?: GithubProjectionContinuity;
   repository?: string;
@@ -168,12 +161,7 @@ export async function buildGithubMarkdownProjection(input: {
   blobUploader?: GithubBlobUploader;
 }): Promise<GithubMarkdownProjection> {
   const conversation = input.conversation || {};
-  const folders: GithubProjectionFolders = {
-    chatFolder: input.folders?.chatFolder ?? GITHUB_DEFAULTS.chatFolder,
-    articleFolder: input.folders?.articleFolder ?? GITHUB_DEFAULTS.articleFolder,
-    videoFolder: input.folders?.videoFolder ?? GITHUB_DEFAULTS.videoFolder,
-  };
-  const folder = folderForConversation(conversation, folders);
+  const folder = folderForConversation(conversation);
   const markdownPath = `${folder}/${buildConversationBasename(conversation)}.md`;
   const rawMarkdown = buildFullNoteMarkdown({
     conversation,
