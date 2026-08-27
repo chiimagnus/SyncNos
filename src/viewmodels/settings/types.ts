@@ -5,6 +5,7 @@ export type SettingsSectionKey =
   | 'chat_with'
   | 'aboutyou'
   | 'obsidian'
+  | 'github'
   | 'general'
   | 'articles'
   | 'ai_chats'
