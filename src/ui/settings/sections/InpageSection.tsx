@@ -20,7 +20,7 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void; 
       </h2>
       <input
         className={[
-          'tw-mt-3 tw-w-full tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
+          'tw-mt-3 tw-w-full tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
           'tw-px-3 tw-py-2 tw-text-sm tw-font-semibold tw-text-[var(--text-primary)]',
           'focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-[var(--focus-ring)] focus-visible:tw-ring-offset-2',
           'focus-visible:tw-ring-offset-[var(--bg-card)]',

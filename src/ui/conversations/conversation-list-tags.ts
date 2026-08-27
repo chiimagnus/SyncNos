@@ -23,28 +23,6 @@ const SOURCE_LABEL_MAP: Record<string, SourceLabelMapItem> = {
   web: { key: 'web', i18nKey: 'sourceWeb' },
 };
 
-const SOURCE_TONE_CLASS_MAP: Record<string, string> = {
-  chatgpt:
-    'tw-border-[var(--brand-chatgpt)] tw-bg-[color-mix(in_srgb,var(--brand-chatgpt)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  deepseek:
-    'tw-border-[var(--brand-deepseek)] tw-bg-[color-mix(in_srgb,var(--brand-deepseek)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  notionai:
-    'tw-border-[var(--brand-notionai)] tw-bg-[color-mix(in_srgb,var(--brand-notionai)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  gemini:
-    'tw-border-[var(--brand-gemini)] tw-bg-[color-mix(in_srgb,var(--brand-gemini)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  googleaistudio:
-    'tw-border-[var(--brand-googleaistudio)] tw-bg-[color-mix(in_srgb,var(--brand-googleaistudio)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  kimi: 'tw-border-[var(--brand-kimi)] tw-bg-[color-mix(in_srgb,var(--brand-kimi)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  doubao:
-    'tw-border-[var(--brand-doubao)] tw-bg-[color-mix(in_srgb,var(--brand-doubao)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  yuanbao:
-    'tw-border-[var(--brand-yuanbao)] tw-bg-[color-mix(in_srgb,var(--brand-yuanbao)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  poe: 'tw-border-[var(--brand-poe)] tw-bg-[color-mix(in_srgb,var(--brand-poe)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  zai: 'tw-border-[var(--brand-zai)] tw-bg-[color-mix(in_srgb,var(--brand-zai)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  web: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
-  unknown: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
-};
-
 function safeString(value: unknown): string {
   return String(value ?? '').trim();
 }
@@ -108,10 +86,9 @@ export function resolveConversationSourceOptionLabel(input: {
 export function resolveConversationListTag(input: {
   conversation: Pick<Conversation, 'source' | 'listSourceKey' | 'listSiteKey' | 'url'>;
   translate: Translate;
-}): { sourceKey: string; label: string; toneClassName: string } {
+}): { sourceKey: string; label: string } {
   const conversation = input.conversation;
   const sourceKey = resolveConversationSourceKey(conversation);
   const label = resolveSourceLabel(sourceKey, conversation?.source, conversation, input.translate);
-  const toneClassName = SOURCE_TONE_CLASS_MAP[sourceKey] || SOURCE_TONE_CLASS_MAP.unknown;
-  return { sourceKey, label, toneClassName };
+  return { sourceKey, label };
 }

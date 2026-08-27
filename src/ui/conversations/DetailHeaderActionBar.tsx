@@ -165,7 +165,7 @@ export function DetailHeaderActionBar({
     <span
       role="status"
       aria-live="polite"
-      className="tw-absolute tw-right-0 tw-top-[calc(100%+6px)] tw-z-10 tw-whitespace-nowrap tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] tw-shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+      className="tw-absolute tw-right-0 tw-top-[calc(100%+6px)] tw-z-10 tw-whitespace-nowrap tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] tw-shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
     >
       {labelOverride}
     </span>

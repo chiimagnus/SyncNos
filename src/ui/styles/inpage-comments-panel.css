@@ -226,7 +226,7 @@
   max-width: min(300px, 76vw);
   padding: 4px;
   border: 1px solid color-mix(in srgb, var(--panel-border) 88%, transparent);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-inline);
   background: color-mix(in srgb, var(--panel-bg) 98%, transparent);
   box-shadow: 0 12px 30px rgb(0 0 0 / 16%);
 }
@@ -353,7 +353,7 @@
 .webclipper-inpage-comments-panel__notice {
   margin: 0 0 8px 0;
   padding: 6px 8px;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-inline);
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
   color: var(--panel-text-muted);
@@ -528,7 +528,7 @@
   height: 9px;
   border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 82%, transparent);
   border-left: 1px solid color-mix(in srgb, var(--panel-border) 82%, transparent);
-  border-bottom-left-radius: var(--radius-chip);
+  border-bottom-left-radius: var(--radius-inline);
 }
 
 .webclipper-inpage-comments-panel__icon-btn[data-confirm='1'] {
@@ -586,7 +586,7 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--panel-border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-inline);
   background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
   transition:
     border-color 120ms ease,

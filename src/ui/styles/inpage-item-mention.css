@@ -4,7 +4,7 @@
   --wm-muted: var(--color-text-2, #666666);
   --wm-border: var(--color-border-1, rgba(0, 0, 0, 0.12));
   --wm-accent: var(--color-accent-1, #2563eb);
-  --wm-radius: var(--radius-control, 12px);
+  --wm-radius: var(--radius-inline, 8px);
   --wm-shadow: 0 18px 46px rgba(0, 0, 0, 0.14);
 
   font-family:

@@ -222,6 +222,8 @@ describe('ConversationListPane row actions', () => {
     expect(sourceButton).toBeTruthy();
     expect(sourceButton?.textContent).toBe('sourceChatgpt');
     expect(sourceButton?.disabled).toBe(false);
+    expect(sourceButton?.classList.contains('webclipper-btn')).toBe(true);
+    expect(sourceButton?.classList.contains('webclipper-btn--compact')).toBe(true);
 
     await act(async () => {
       sourceButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -307,6 +309,8 @@ describe('ConversationListPane row actions', () => {
 
     expect(todayButton).toBeTruthy();
     expect(yesterdayButton).toBeTruthy();
+    expect(todayButton?.classList.contains('webclipper-btn')).toBe(true);
+    expect(todayButton?.classList.contains('webclipper-btn--compact')).toBe(true);
 
     await act(async () => {
       todayButton!.click();

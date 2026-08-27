@@ -59,36 +59,12 @@ describe('resolveConversationListTag', () => {
     expect(result.label).toBe('insightUnknownLabel');
   });
 
-  it('uses brand tone variables for non-web source keys', () => {
-    const chatgpt = resolveConversationListTag({
+  it('returns source identity and label without presentation classes', () => {
+    const result = resolveConversationListTag({
       conversation: { source: 'chatgpt' },
       translate: tr,
     });
-    const gemini = resolveConversationListTag({
-      conversation: { source: 'gemini' },
-      translate: tr,
-    });
-    const kimi = resolveConversationListTag({
-      conversation: { source: 'kimi' },
-      translate: tr,
-    });
 
-    expect(chatgpt.toneClassName).toContain('var(--brand-chatgpt)');
-    expect(gemini.toneClassName).toContain('var(--brand-gemini)');
-    expect(kimi.toneClassName).toContain('var(--brand-kimi)');
-  });
-
-  it('keeps web tone fixed and not brand-driven', () => {
-    const result = resolveConversationListTag({
-      conversation: {
-        source: 'web',
-        listSourceKey: 'web',
-        listSiteKey: 'domain:example.com',
-      },
-      translate: tr,
-    });
-
-    expect(result.toneClassName).toContain('var(--border)');
-    expect(result.toneClassName).not.toContain('--brand-');
+    expect(result).toEqual({ sourceKey: 'chatgpt', label: 'sourceChatgpt' });
   });
 });

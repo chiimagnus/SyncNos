@@ -12,7 +12,7 @@
   gap: 6px;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-inline);
   cursor: pointer;
 
   /* Typography */
@@ -151,6 +151,13 @@
   border-color: var(--border);
 }
 
+.webclipper-btn--compact {
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-inline);
+  font-size: 11px;
+}
+
 .webclipper-btn--icon {
   --btn-icon-size: 36px;
   width: var(--btn-icon-size);
@@ -225,7 +232,7 @@
 }
 
 .webclipper-menu-popover-panel {
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-inline);
 }
 
 .webclipper-menu-popover-backdrop {

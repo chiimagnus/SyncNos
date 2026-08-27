@@ -162,6 +162,7 @@ describe('settings section definitions', () => {
     expect(document.querySelector('input[aria-label="Repository"]')).toBeNull();
     const branchInput = document.querySelector('input[aria-label="Branch"]') as HTMLInputElement | null;
     expect(branchInput).toBeTruthy();
+    expect(branchInput?.className || '').toContain('tw-rounded-[var(--radius-inline)]');
     expect(document.querySelector('input[aria-label="AI Chats Folder"]')).toBeNull();
     expect(document.querySelector('input[aria-label="Web Clipper Folder"]')).toBeNull();
     expect(document.querySelector('input[aria-label="Video Scripts Folder"]')).toBeNull();

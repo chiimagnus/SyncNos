@@ -25,6 +25,7 @@ import {
   buttonDangerClassName,
   buttonDangerTintClassName,
   buttonFilledClassName,
+  buttonCompactMutedClassName,
   buttonMenuItemClassName,
   buttonMiniIconClassName,
   buttonTintClassName,
@@ -710,7 +711,7 @@ export function ConversationListPane({
                 >
                   <button
                     type="button"
-                    className="tw-inline-flex tw-cursor-pointer tw-appearance-none tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                    className={buttonCompactMutedClassName()}
                     data-conversation-section-select={entry.key}
                     aria-pressed={sectionAllSelected}
                     onClick={() => toggleAll(sectionIds)}
@@ -785,14 +786,7 @@ export function ConversationListPane({
 
                     <button
                       type="button"
-                      className={[
-                        'tw-relative tw-inline-flex tw-appearance-none tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
-                        'tw-rounded-[var(--radius-chip)]',
-                        safeUrl
-                          ? 'tw-cursor-pointer focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
-                          : 'tw-cursor-default',
-                        sourceTag.toneClassName,
-                      ].join(' ')}
+                      className={[buttonCompactMutedClassName(), 'tw-relative'].join(' ')}
                       aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
                       data-conversation-source-link={String(id)}
                       disabled={!safeUrl}
@@ -812,7 +806,7 @@ export function ConversationListPane({
 
                     {Number.isFinite(commentThreadCount) && commentThreadCount > 0 ? (
                       <span
-                        className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold"
+                        className="tw-inline-flex tw-items-center tw-text-[10px] tw-font-extrabold"
                         aria-label={`Comment threads ${commentThreadCount}`}
                       >
                         {'💬 '}

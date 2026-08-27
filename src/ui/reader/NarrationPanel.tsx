@@ -129,7 +129,7 @@ export function NarrationPanel({ prefs, update, error, webSpeechAvailable = true
       {error ? (
         <div
           role="alert"
-          className="tw-flex tw-flex-col tw-gap-2 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2 tw-text-xs tw-text-[var(--text-primary)]"
+          className="tw-flex tw-flex-col tw-gap-2 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2 tw-text-xs tw-text-[var(--text-primary)]"
         >
           <span>{error}</span>
           {tts.engine === 'ai' ? (
