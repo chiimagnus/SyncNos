@@ -672,6 +672,34 @@ describe('sync mapping persistence record', () => {
     expect(preserved.githubProjectionFingerprint).toBe('a'.repeat(64));
   });
 
+  it('ignores malformed GitHub sync timestamps when choosing same-target backup continuity', () => {
+    const localWithValidSyncTime = {
+      updatedAt: 500,
+      ...githubState({ syncedAt: 300, marker: 'a' }),
+    };
+    const importedWithStringSyncTime = {
+      updatedAt: 100,
+      ...githubState({ marker: 'b' }),
+      githubLastSyncedAt: '999',
+    };
+
+    const stringMerged = mergeSyncMappingForImport(localWithValidSyncTime, importedWithStringSyncTime);
+    expect(stringMerged.githubProjectionFingerprint).toBe('a'.repeat(64));
+    expect(stringMerged.githubManagedFiles).toEqual(localWithValidSyncTime.githubManagedFiles);
+
+    const localWithFallbackTime = { updatedAt: 500, ...githubState({ marker: 'a' }) };
+    const importedWithNegativeSyncTime = {
+      updatedAt: 999,
+      ...githubState({ marker: 'c' }),
+      githubLastSyncedAt: -1,
+    };
+
+    const negativeMerged = mergeSyncMappingForImport(localWithFallbackTime, importedWithNegativeSyncTime);
+    expect(negativeMerged.githubProjectionFingerprint).toBe('c'.repeat(64));
+    expect(negativeMerged.githubManagedFiles).toEqual(importedWithNegativeSyncTime.githubManagedFiles);
+    expect(negativeMerged.githubLastSyncedAt).toBeUndefined();
+  });
+
   it('sanitizes imported GitHub continuity instead of trusting backup metadata as delete authority', () => {
     const incoming = {
       ...githubState({ marker: 'a' }),

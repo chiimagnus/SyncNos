@@ -43,6 +43,10 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function validGithubLastSyncedAt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
 function replaceGroup(target: SyncMappingRecord, source: SyncMappingRecord, fields: readonly string[]): void {
   for (const field of fields) {
     delete target[field];
@@ -115,10 +119,8 @@ export function readGithubContinuity(source: unknown): SyncMappingRecord {
   if (typeof fingerprint === 'string' && /^[0-9a-f]{64}$/.test(fingerprint)) {
     normalized.githubProjectionFingerprint = fingerprint;
   }
-  const lastSyncedAt = record.githubLastSyncedAt;
-  if (typeof lastSyncedAt === 'number' && Number.isFinite(lastSyncedAt) && lastSyncedAt >= 0) {
-    normalized.githubLastSyncedAt = lastSyncedAt;
-  }
+  const lastSyncedAt = validGithubLastSyncedAt(record.githubLastSyncedAt);
+  if (lastSyncedAt != null) normalized.githubLastSyncedAt = lastSyncedAt;
   return normalized;
 }
 
@@ -131,7 +133,7 @@ function hasGithubContinuityField(record: SyncMappingRecord): boolean {
 }
 
 function githubContinuityTimestamp(record: SyncMappingRecord): number | null {
-  return finiteNumber(record.githubLastSyncedAt) ?? finiteNumber(record.updatedAt);
+  return validGithubLastSyncedAt(record.githubLastSyncedAt) ?? finiteNumber(record.updatedAt);
 }
 
 export function stripSyncMappingLocalId(record: unknown): SyncMappingRecord {
