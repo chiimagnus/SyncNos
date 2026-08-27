@@ -324,6 +324,37 @@ describe('github sync orchestrator staging', () => {
 });
 
 describe('github sync orchestrator job lifecycle', () => {
+  it('rejects a concurrent run before a second caller can enter the persisted job claim', async () => {
+    const { services, jobStore } = fakeServices({
+      rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
+    });
+    let releaseFirstClaimRead!: (value: SyncJobSnapshot | null) => void;
+    const firstClaimRead = new Promise<SyncJobSnapshot | null>((resolve) => {
+      releaseFirstClaimRead = resolve;
+    });
+    (jobStore.abortRunningJobIfFromOtherInstance as any)
+      .mockImplementationOnce(async () => await firstClaimRead)
+      .mockResolvedValue(null);
+
+    const orchestrator = createGithubSyncOrchestrator(services);
+    const firstRun = orchestrator.sync({ conversationIds: [1], instanceId: 'instance-a' });
+    await vi.waitFor(() => expect(jobStore.abortRunningJobIfFromOtherInstance).toHaveBeenCalledTimes(1));
+
+    const secondRun = orchestrator.sync({ conversationIds: [2], instanceId: 'instance-a' });
+    await Promise.resolve();
+    const claimReadsWhileFirstBlocked = (jobStore.abortRunningJobIfFromOtherInstance as any).mock.calls.length;
+
+    releaseFirstClaimRead(null);
+    const [firstResult, secondResult] = await Promise.allSettled([firstRun, secondRun]);
+
+    expect(claimReadsWhileFirstBlocked).toBe(1);
+    expect(firstResult.status).toBe('fulfilled');
+    expect(secondResult.status).toBe('rejected');
+    if (secondResult.status === 'rejected') {
+      expect(secondResult.reason).toMatchObject({ code: 'sync_already_running' });
+    }
+  });
+
   it('claims the generic job before preflight and persists the terminal conversation result', async () => {
     const { services, commit, jobStore, getPersistedJob } = fakeServices({
       rows: { 1: { conversation: chat(1) } },

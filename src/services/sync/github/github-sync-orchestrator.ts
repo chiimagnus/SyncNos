@@ -374,7 +374,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     return { provider: 'github' as const, job: null, instanceId: safeString(input.instanceId) };
   }
 
-  async function sync(input: {
+  let activeSyncRun: Promise<GithubSyncRunResult> | null = null;
+
+  async function runSync(input: {
     conversationIds?: readonly unknown[];
     mode?: GithubSyncPlannerMode;
     instanceId?: string;
@@ -754,6 +756,21 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       await persistFailedTerminalJob(error);
       throw error;
     }
+  }
+
+  function sync(input: {
+    conversationIds?: readonly unknown[];
+    mode?: GithubSyncPlannerMode;
+    instanceId?: string;
+  }): Promise<GithubSyncRunResult> {
+    if (activeSyncRun) return Promise.reject(buildAlreadyRunningError());
+    const run = runSync(input);
+    activeSyncRun = run;
+    const release = () => {
+      if (activeSyncRun === run) activeSyncRun = null;
+    };
+    void run.then(release, release);
+    return run;
   }
 
   return { stage, sync, getSyncStatus, clearSyncStatus };
