@@ -817,6 +817,112 @@ describe('chatgpt expanded COT manual capture', () => {
     const ownerRecord = prepared.records.find((record: any) => record.key === 'm_assistant_second');
     expect(ownerRecord.payload.contentText).toContain('Reasoning block one.');
   });
+
+  it('updates only the owner record when COT becomes expanded between prepare and final capture', async () => {
+    const dom = modernCotDom(false);
+    const def = buildCotDef(dom);
+    const adapter = def.collector.__test.manualAdapter;
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    expect(prepared.completeness).toBe('complete');
+    const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
+    expect(preparedOwner.payload.contentText).toBe('Final assistant answer.');
+    const extractionCountAfterPrepare = adapter.getExtractionCount();
+
+    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.insertAdjacentHTML('afterend', expandedCotBody());
+    const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
+    expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
+
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare + 1);
+    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
+    expect(owner.contentText).toContain('Reasoning block one.');
+    expect(owner.contentText).toMatch(/Visible tool summary two[\s\S]*Final assistant answer\./);
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
+    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
+  });
+
+  it('removes non-sticky COT when it becomes collapsed between prepare and final capture', async () => {
+    const dom = modernCotDom(true);
+    const def = buildCotDef(dom);
+    const adapter = def.collector.__test.manualAdapter;
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    expect(prepared.completeness).toBe('complete');
+    const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
+    expect(preparedOwner.payload.contentText).toContain('Reasoning block one.');
+    const extractionCountAfterPrepare = adapter.getExtractionCount();
+
+    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
+    toggle.setAttribute('aria-expanded', 'false');
+    const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
+    expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
+
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare + 1);
+    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
+    expect(owner.messageKey).toBe(preparedOwner.key);
+    expect(owner.contentText).toBe('Final assistant answer.');
+    expect(owner.contentMarkdown).toBe('Final assistant answer.');
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
+    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
+  });
+
+  it('does not create a final-live update for cosmetic or hidden-detail changes', async () => {
+    const dom = modernCotDom(true);
+    const def = buildCotDef(dom);
+    const adapter = def.collector.__test.manualAdapter;
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    expect(prepared.completeness).toBe('complete');
+    const extractionCountAfterPrepare = adapter.getExtractionCount();
+
+    const body = dom.window.document.querySelector('[data-testid="cot-top-body"]') as HTMLElement;
+    body.className = 'changed-transition-class';
+    body.style.cssText = '--transition-progress: 0.1; transform: translateY(1px)';
+    body.setAttribute('data-direction', 'out');
+    const hidden = dom.window.document.querySelector('#cot-hidden-tool-1 code') as HTMLElement;
+    hidden.textContent = `${'mutated hidden detail '.repeat(30)}\nconst shouldStayInvisible = true;`;
+
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare);
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'complete' });
+    expect(snapshot.captureMeta.reasons).not.toContain('final_live_changed');
+    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
+    expect(owner.contentText).toContain('Reasoning block one.');
+    expect(owner.contentText).not.toContain('mutated hidden detail');
+  });
+
+  it('never clicks or dispatches events on the live COT toggle', async () => {
+    const dom = modernCotDom(true);
+    const def = buildCotDef(dom);
+    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLButtonElement;
+    const clickSpy = vi.spyOn(toggle, 'click');
+    const dispatchSpy = vi.spyOn(toggle, 'dispatchEvent');
+
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+
+    expect(snapshot).toBeTruthy();
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
 });
 
 describe('chatgpt turn identity primitive', () => {
