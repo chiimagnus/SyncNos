@@ -66,6 +66,7 @@ vi.mock('../../src/ui/i18n', () => ({
       readerToolbarAria: 'Reader tools',
       saveButton: 'Save',
       cancelButton: 'Cancel',
+      detailTextCountLabel: 'Words',
     };
     return labels[key] || key;
   },
@@ -671,7 +672,7 @@ describe('ConversationDetailPane header actions', () => {
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
     expect(moreMenu?.className || '').toContain('tw-w-[214px]');
-    expect(document.querySelector('[data-detail-word-count-row="true"]')).toBeTruthy();
+    expect(document.querySelector('[data-detail-text-count-row="true"]')).toBeTruthy();
 
     await act(async () => {
       cacheButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));

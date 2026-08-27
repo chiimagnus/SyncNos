@@ -520,7 +520,7 @@ export const zh: { [K in TranslationKey]: string } = {
   detailHeaderCopyGithubLink: '复制 GitHub 链接',
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
   detailHeaderCacheImagesLabel: '缓存图片',
-  detailWordCountLabel: '字数',
+  detailTextCountLabel: '字数',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',
