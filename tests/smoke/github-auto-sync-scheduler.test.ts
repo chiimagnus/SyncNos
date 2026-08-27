@@ -189,4 +189,65 @@ describe('github-auto-sync-scheduler', () => {
     expect(sync).not.toHaveBeenCalled();
     expect(alarmsMocks.create).not.toHaveBeenCalled();
   });
+
+  it('never runs cleanup when the GitHub provider gate is disabled', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    gateMocks.isSyncProviderEnabled.mockResolvedValue(false);
+    const sync = vi.fn();
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.scheduleCleanup();
+    await scheduler.flushCleanup();
+
+    expect(sync).not.toHaveBeenCalled();
+    expect(alarmsMocks.create).not.toHaveBeenCalled();
+  });
+
+  it('recovers an identity-move crash window by syncing the replacement before cleanup rechecks', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    let now = 10_000;
+    const sync = vi
+      .fn()
+      .mockResolvedValueOnce({
+        transport: { status: 'not_needed' },
+        deferredReplacementConversationIds: [7],
+        cleanupHasMoreDue: false,
+        nextCleanupDueAt: 75_000,
+      })
+      .mockResolvedValueOnce({ transport: { status: 'committed' }, items: [{ conversationId: 7, status: 'synced' }] })
+      .mockResolvedValueOnce({
+        transport: { status: 'committed' },
+        deferredReplacementConversationIds: [],
+        cleanupHasMoreDue: false,
+        nextCleanupDueAt: null,
+      });
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'reloaded-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => now },
+    );
+
+    await scheduler.flushCleanup();
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({ '7': 70_000 });
+    expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, { when: 75_000 });
+
+    now = 70_000;
+    await scheduler.flush();
+    expect(sync).toHaveBeenNthCalledWith(2, {
+      conversationIds: [7],
+      mode: 'incremental',
+      instanceId: 'reloaded-instance',
+    });
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({});
+
+    now = 75_000;
+    await scheduler.flushCleanup();
+    expect(sync).toHaveBeenNthCalledWith(3, {
+      conversationIds: [],
+      mode: 'incremental',
+      instanceId: 'reloaded-instance',
+    });
+  });
 });

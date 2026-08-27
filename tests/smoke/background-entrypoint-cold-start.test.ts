@@ -22,9 +22,11 @@ const mocks = vi.hoisted(() => ({
   registerClipperContextMenu: vi.fn(),
   onInstalled: vi.fn(),
   onAlarm: vi.fn(),
+  storageOnChanged: vi.fn(),
   openOrFocusExtensionAppTab: vi.fn(),
   obsidianAbort: vi.fn(),
   feishuAbort: vi.fn(),
+  githubAbort: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -77,12 +79,16 @@ vi.mock('@services/sync/obsidian/obsidian-sync-job-store.ts', () => ({
 vi.mock('@services/sync/feishu/feishu-sync-job-store.ts', () => ({
   default: { abortRunningJobIfFromOtherInstance: mocks.feishuAbort },
 }));
+vi.mock('@services/sync/github/github-sync-job-store', () => ({
+  default: { abortRunningJobIfFromOtherInstance: mocks.githubAbort },
+}));
 vi.mock('@platform/runtime/runtime', () => ({ onInstalled: mocks.onInstalled }));
 vi.mock('@platform/webext/extension-app', () => ({ openOrFocusExtensionAppTab: mocks.openOrFocusExtensionAppTab }));
 vi.mock('@platform/context-menus/clipper-context-menu', () => ({
   registerClipperContextMenu: mocks.registerClipperContextMenu,
 }));
 vi.mock('@platform/alarms/alarms', () => ({ onAlarm: mocks.onAlarm }));
+vi.mock('@platform/storage/local', () => ({ storageOnChanged: mocks.storageOnChanged }));
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -102,12 +108,19 @@ function createServices() {
       notionScheduler: { flush: vi.fn().mockResolvedValue(undefined) },
       obsidianScheduler: { flush: vi.fn().mockResolvedValue(undefined) },
       feishuScheduler: { flush: vi.fn().mockResolvedValue(undefined) },
+      githubScheduler: {
+        flush: vi.fn().mockResolvedValue(undefined),
+        flushCleanup: vi.fn().mockResolvedValue(undefined),
+        scheduleCleanup: vi.fn().mockResolvedValue(undefined),
+      },
+      onRemoteCleanupPending: vi.fn().mockResolvedValue(undefined),
     },
     notionSyncJobStore: { abortRunningJobIfFromOtherInstance: vi.fn().mockResolvedValue(undefined) },
     conversationKinds: {},
     notionSyncOrchestrator: {},
     obsidianSyncOrchestrator: { testConnection: vi.fn() },
     feishuSyncOrchestrator: {},
+    githubSyncOrchestrator: {},
   };
 }
 
@@ -134,6 +147,8 @@ beforeEach(() => {
   mocks.ensureDefaultFeishuOAuthProxyUrl.mockResolvedValue(undefined);
   mocks.obsidianAbort.mockResolvedValue(undefined);
   mocks.feishuAbort.mockResolvedValue(undefined);
+  mocks.githubAbort.mockResolvedValue(undefined);
+  mocks.storageOnChanged.mockImplementation(() => () => {});
   mocks.createBackgroundServices.mockReturnValue(createServices());
   // @ts-expect-error test global cleanup
   delete globalThis.browser;
@@ -169,8 +184,18 @@ describe('background entrypoint cold start', () => {
     expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
     expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
+    expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
     expect(mocks.registerUiMessageHandlers.mock.calls[0]?.[1]?.localeReady).toBe(locale.promise);
     expect(mocks.registerClipperContextMenu.mock.calls[0]?.[0]?.localeReady).toBe(locale.promise);
+    expect(mocks.registerSyncHandlers.mock.calls[0]?.[1]?.githubSyncOrchestrator).toBe(
+      mocks.createBackgroundServices.mock.results[0]?.value.githubSyncOrchestrator,
+    );
+
+    const services = mocks.createBackgroundServices.mock.results[0]?.value;
+    await flushMicrotasks();
+    expect(mocks.githubAbort).toHaveBeenCalledWith(expect.any(String), { forceAbort: true });
+    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
 
     const sendResponse = vi.fn();
     expect(runtimeMessageListener).not.toBeNull();
@@ -208,5 +233,79 @@ describe('background entrypoint cold start', () => {
     expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
     expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
+    expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('wakes durable GitHub cleanup when auto-sync or provider gate becomes enabled', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+    let storageListener: ((changes: any, areaName: string) => void) | null = null;
+    mocks.storageOnChanged.mockImplementation((listener: any) => {
+      storageListener = listener;
+      return () => {};
+    });
+
+    const callback = await loadBackground();
+    callback();
+    expect(storageListener).not.toBeNull();
+
+    storageListener?.({ github_auto_sync_enabled_v1: { oldValue: false, newValue: true } }, 'local');
+    await flushMicrotasks();
+    expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(1);
+
+    storageListener?.(
+      { webclipper_sync_provider_github_enabled: { oldValue: false, newValue: undefined } },
+      'local',
+    );
+    await flushMicrotasks();
+    expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(2);
+
+    storageListener?.({ github_auto_sync_enabled_v1: { oldValue: true, newValue: false } }, 'local');
+    storageListener?.({ unrelated: { oldValue: false, newValue: true } }, 'local');
+    storageListener?.({ github_auto_sync_enabled_v1: { oldValue: false, newValue: true } }, 'sync');
+    await flushMicrotasks();
+    expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(2);
+  });
+
+  it('isolates storage-listener registration failure from startup recovery', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.storageOnChanged.mockImplementation(() => {
+      throw new Error('storage listener failed');
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    expect(() => callback()).not.toThrow();
+    await flushMicrotasks();
+
+    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
+    expect(mocks.githubAbort).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates each startup recovery failure from sibling jobs and schedulers', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    const services = createServices();
+    services.notionSyncJobStore.abortRunningJobIfFromOtherInstance.mockRejectedValue(new Error('notion recovery failed'));
+    services.autoSync.obsidianScheduler.flush.mockImplementation(() => {
+      throw new Error('obsidian flush failed');
+    });
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    expect(() => callback()).not.toThrow();
+    await flushMicrotasks();
+
+    expect(mocks.obsidianAbort).toHaveBeenCalledTimes(1);
+    expect(mocks.feishuAbort).toHaveBeenCalledTimes(1);
+    expect(mocks.githubAbort).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.notionScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.obsidianScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.feishuScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
   });
 });

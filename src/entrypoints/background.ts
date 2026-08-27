@@ -16,6 +16,7 @@ import {
 } from '@services/sync/feishu/auth/oauth';
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import feishuSyncJobStore from '@services/sync/feishu/feishu-sync-job-store.ts';
+import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerFeishuSettingsHandlers } from '@services/sync/feishu/settings-background-handlers';
@@ -24,6 +25,9 @@ import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 import { registerClipperContextMenu } from '@platform/context-menus/clipper-context-menu';
 import { onAlarm } from '@platform/alarms/alarms';
 import { initializeLocale } from '@i18n';
+import { storageOnChanged } from '@platform/storage/local';
+import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
+import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -33,6 +37,14 @@ function getBackgroundInstanceId(): string {
 
 async function openAboutSectionAfterInstall(): Promise<void> {
   await openOrFocusExtensionAppTab({ route: '/settings?section=aboutme' });
+}
+
+function runBestEffort(task: () => unknown | Promise<unknown>): void {
+  try {
+    void Promise.resolve(task()).catch(() => {});
+  } catch (_error) {
+    // Startup and optional listener recovery must stay isolated from siblings.
+  }
 }
 
 export default defineBackground(() => {
@@ -49,7 +61,7 @@ export default defineBackground(() => {
 
   registerConversationHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
-    onRemoteCleanupPending: () => services.autoSync.githubScheduler.scheduleCleanup(),
+    onRemoteCleanupPending: () => services.autoSync.onRemoteCleanupPending(),
   });
   registerItemMentionHandlers(router);
   registerChatWithBackgroundHandlers(router);
@@ -114,27 +126,37 @@ export default defineBackground(() => {
   } catch (_e) {
     // optional listener registration must not block sibling listeners
   }
+  try {
+    const githubProviderEnabledKey = syncProviderEnabledStorageKey('github');
+    storageOnChanged((changes, areaName) => {
+      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
+      const autoChange = (changes as any)[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY];
+      const providerChange = (changes as any)[githubProviderEnabledKey];
+      const autoBecameEnabled = Boolean(autoChange) && autoChange.newValue === true;
+      const providerBecameEnabled = Boolean(providerChange) && providerChange.newValue !== false;
+      if (!autoBecameEnabled && !providerBecameEnabled) return;
+      runBestEffort(() => services.autoSync.githubScheduler.scheduleCleanup());
+    });
+  } catch (_e) {
+    // optional listener registration must not block sibling listeners
+  }
 
   void ensureDefaultNotionOAuthClientId().catch(() => {});
   void ensureDefaultFeishuOAuthClientId().catch(() => {});
   void ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
 
-  try {
-    const id = getBackgroundInstanceId();
-    services?.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id, { forceAbort: true })?.catch?.(() => {});
-    obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }).catch(() => {});
-    feishuSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }).catch(() => {});
-  } catch (_e) {
-    // ignore best-effort startup recovery failures
-  }
+  const id = getBackgroundInstanceId();
+  runBestEffort(() => services.notionSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
+  runBestEffort(() => obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
+  runBestEffort(() => feishuSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
+  runBestEffort(() => githubSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
 
-  // Best-effort flush for any overdue auto-sync queue items. This complements
-  // alarms-based wakeups and helps after extension reload / background restart.
-  try {
-    void services.autoSync.notionScheduler.flush();
-    void services.autoSync.obsidianScheduler.flush();
-    void services.autoSync.feishuScheduler.flush();
-  } catch (_e) {
-    // ignore best-effort startup flush failures
-  }
+  // Best-effort recovery complements alarm wakeups after MV3 worker reloads.
+  // Each provider is isolated so one synchronous or asynchronous failure cannot
+  // prevent sibling queues from recovering.
+  runBestEffort(() => services.autoSync.notionScheduler.flush());
+  runBestEffort(() => services.autoSync.obsidianScheduler.flush());
+  runBestEffort(() => services.autoSync.feishuScheduler.flush());
+  runBestEffort(() => services.autoSync.githubScheduler.flush());
+  runBestEffort(() => services.autoSync.githubScheduler.flushCleanup());
 });

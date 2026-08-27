@@ -1,4 +1,5 @@
 import { backgroundStorage } from '@services/conversations/background/storage';
+import { GITHUB_AUTO_SYNC_DEBOUNCE_MS } from '@services/sync/auto-sync/auto-sync-keys';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import {
   ackGithubCleanupRows,
@@ -27,7 +28,8 @@ export type GithubOrchestratorStorage = {
   patchSyncMapping: (conversationId: number, patch: Record<string, unknown>) => Promise<unknown>;
 };
 
-export const DEFAULT_GITHUB_REPLACEMENT_DEFER_MS = 30_000;
+export const GITHUB_REPLACEMENT_DEFER_SAFETY_MS = 5_000;
+export const DEFAULT_GITHUB_REPLACEMENT_DEFER_MS = GITHUB_AUTO_SYNC_DEBOUNCE_MS + GITHUB_REPLACEMENT_DEFER_SAFETY_MS;
 
 export type GithubOrchestratorServices = {
   getSettings: () => Promise<GithubSettings>;

@@ -93,6 +93,7 @@ export type BackgroundServices = {
     feishuScheduler: FeishuAutoSyncScheduler;
     githubScheduler: GithubAutoSyncScheduler;
     onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => Promise<void>;
+    onRemoteCleanupPending: () => Promise<void>;
     handleAlarm: (name: string) => Promise<void>;
   };
 };
@@ -164,6 +165,9 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
         if ((local as any)?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
           void githubScheduler.enqueue(conversationId, reason);
         }
+      },
+      onRemoteCleanupPending: async () => {
+        await githubScheduler.scheduleCleanup();
       },
       handleAlarm: async (name: string) => {
         const alarmName = String(name || '').trim();
