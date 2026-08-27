@@ -764,5 +764,3 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
 
   return { sync, getSyncStatus, clearSyncStatus };
 }
-
-export const githubSyncOrchestrator = createGithubSyncOrchestrator();
