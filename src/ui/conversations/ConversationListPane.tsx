@@ -63,12 +63,21 @@ function isPopupUi() {
 }
 
 function syncMenuItemLabel(provider: SyncProvider, syncing: boolean) {
-  if (provider === 'notion') return syncing ? t('notionSyncing') : t('notionSync');
-  if (provider === 'obsidian') return syncing ? t('obsidianSyncing') : t('obsidianSync');
-  if (provider === 'feishu') return syncing ? t('feishuSyncing') : t('feishuSync');
-  const label = providerButtonLabel(provider);
-  return syncing ? `${label}...` : label;
+  const labels: Record<SyncProvider, { idle: string; busy: string }> = {
+    notion: { idle: t('notionSync'), busy: t('notionSyncing') },
+    obsidian: { idle: t('obsidianSync'), busy: t('obsidianSyncing') },
+    feishu: { idle: t('feishuSync'), busy: t('feishuSyncing') },
+    github: { idle: t('githubSync'), busy: t('githubSyncing') },
+  };
+  return syncing ? labels[provider].busy : labels[provider].idle;
 }
+
+const SYNC_MENU_ITEM_IDS: Record<SyncProvider, string> = {
+  obsidian: 'menuSyncToObsidian',
+  notion: 'menuSyncToNotion',
+  feishu: 'menuSyncToFeishu',
+  github: 'menuSyncToGithub',
+};
 
 export type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
@@ -108,6 +117,7 @@ export function ConversationListPane({
     syncingNotion,
     syncingObsidian,
     syncingFeishu,
+    syncingGithub,
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
@@ -125,6 +135,7 @@ export function ConversationListPane({
     syncSelectedNotion,
     syncSelectedObsidian,
     syncSelectedFeishu,
+    syncSelectedGithub,
     clearSyncFeedback,
     deleteSelected,
     refreshList,
@@ -249,7 +260,13 @@ export function ConversationListPane({
 
   const hasSelection = selectedTotalCount > 0;
   const actionBusy = exporting || deleting;
-  const syncingAny = syncingNotion || syncingObsidian || syncingFeishu;
+  const providerSyncing: Record<SyncProvider, boolean> = {
+    notion: syncingNotion,
+    obsidian: syncingObsidian,
+    feishu: syncingFeishu,
+    github: syncingGithub,
+  };
+  const syncingAny = Object.values(providerSyncing).some(Boolean);
 
   useEffect(() => {
     let disposed = false;
@@ -531,6 +548,27 @@ export function ConversationListPane({
       ? syncMenuItemLabel(singleSyncProvider, true)
       : providerButtonLabel(singleSyncProvider)
     : '';
+
+  const syncProviderActions: Record<SyncProvider, () => void> = {
+    obsidian: () => {
+      void syncSelectedObsidian().catch(() => {});
+    },
+    notion: () => {
+      void syncSelectedNotion().catch(() => {});
+      onPopupNotionSyncStarted?.();
+    },
+    feishu: () => {
+      void syncSelectedFeishu().catch(() => {});
+      onPopupFeishuSyncStarted?.();
+    },
+    github: () => {
+      void syncSelectedGithub().catch(() => {});
+    },
+  };
+
+  const startSyncProvider = (provider: SyncProvider) => {
+    syncProviderActions[provider]();
+  };
 
   const onNoticeJumpToConversation = (conversationId: number) => {
     const id = Number(conversationId);
@@ -966,27 +1004,8 @@ export function ConversationListPane({
                     id="btnSyncProvider"
                     className={actionButton}
                     type="button"
-                    disabled={
-                      !hasSelection ||
-                      exporting ||
-                      deleting ||
-                      actionBusy ||
-                      (singleSyncProvider === 'notion'
-                        ? syncingNotion
-                        : singleSyncProvider === 'obsidian'
-                          ? syncingObsidian
-                          : syncingFeishu)
-                    }
-                    onClick={() => {
-                      if (singleSyncProvider === 'obsidian') void syncSelectedObsidian().catch(() => {});
-                      else if (singleSyncProvider === 'feishu') {
-                        void syncSelectedFeishu().catch(() => {});
-                        onPopupFeishuSyncStarted?.();
-                      } else {
-                        void syncSelectedNotion().catch(() => {});
-                        onPopupNotionSyncStarted?.();
-                      }
-                    }}
+                    disabled={!hasSelection || exporting || deleting || actionBusy || providerSyncing[singleSyncProvider]}
+                    onClick={() => startSyncProvider(singleSyncProvider)}
                   >
                     <span className="tw-leading-none">{singleSyncLabel}</span>
                   </button>
@@ -1016,53 +1035,22 @@ export function ConversationListPane({
                     </span>
                   )}
                 >
-                  {enabledSyncProviders.includes('obsidian') ? (
+                  {enabledSyncProviders.map((provider) => (
                     <button
-                      id="menuSyncToObsidian"
+                      key={provider}
+                      id={SYNC_MENU_ITEM_IDS[provider]}
                       className={menuItemButtonClassName}
                       type="button"
                       role="menuitem"
                       onClick={() => {
                         setSyncOpen(false);
-                        void syncSelectedObsidian().catch(() => {});
+                        startSyncProvider(provider);
                       }}
-                      disabled={actionBusy || syncingObsidian}
+                      disabled={actionBusy || providerSyncing[provider]}
                     >
-                      {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
+                      {syncMenuItemLabel(provider, providerSyncing[provider])}
                     </button>
-                  ) : null}
-                  {enabledSyncProviders.includes('notion') ? (
-                    <button
-                      id="menuSyncToNotion"
-                      className={menuItemButtonClassName}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setSyncOpen(false);
-                        void syncSelectedNotion().catch(() => {});
-                        onPopupNotionSyncStarted?.();
-                      }}
-                      disabled={actionBusy || syncingNotion}
-                    >
-                      {syncingNotion ? t('notionSyncing') : t('notionSync')}
-                    </button>
-                  ) : null}
-                  {enabledSyncProviders.includes('feishu') ? (
-                    <button
-                      id="menuSyncToFeishu"
-                      className={menuItemButtonClassName}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setSyncOpen(false);
-                        void syncSelectedFeishu().catch(() => {});
-                        onPopupFeishuSyncStarted?.();
-                      }}
-                      disabled={actionBusy || syncingFeishu}
-                    >
-                      {syncingFeishu ? t('feishuSyncing') : t('feishuSync')}
-                    </button>
-                  ) : null}
+                  ))}
                   {enabledSyncProviders.length === 0 ? (
                     <button
                       id="menuSyncProvidersDisabled"

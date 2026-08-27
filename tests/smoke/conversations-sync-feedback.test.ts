@@ -591,7 +591,7 @@ describe('Conversations sync feedback', () => {
     const notice = document.getElementById('conversationSyncFeedback');
     expect(notice).toBeTruthy();
     expect(notice?.getAttribute('data-phase')).toBe('running');
-    expect(notice?.textContent).toContain('github');
+    expect(notice?.textContent).toContain(t('providerGithub'));
     expect(notice?.textContent).toContain('GitHub sync target');
     expect(notice?.textContent).toContain('committing_tree');
   });
@@ -616,7 +616,7 @@ describe('Conversations sync feedback', () => {
 
     const notice = document.getElementById('conversationSyncFeedback');
     expect(notice?.getAttribute('data-phase')).toBe('success');
-    expect(notice?.textContent).toContain('github');
+    expect(notice?.textContent).toContain(t('providerGithub'));
   });
 
   it('hydrates a failed GitHub terminal job and clears the GitHub job on dismiss', async () => {
@@ -648,13 +648,39 @@ describe('Conversations sync feedback', () => {
 
     const notice = document.getElementById('conversationSyncFeedback');
     expect(notice?.getAttribute('data-phase')).toBe('failed');
-    expect(notice?.textContent).toContain('github');
+    expect(notice?.textContent).toContain(t('providerGithub'));
 
     clickDismissButton();
     await act(async () => {
       await flushMicrotasks();
     });
     expect(clearGithubSyncStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches the translated GitHub menu item through the production context callback', async () => {
+    syncGithubConversations.mockResolvedValue({ provider: 'github', started: true });
+    await renderPane();
+    selectFirstConversation();
+
+    const syncMenuButton = document.getElementById('btnSyncTo') as HTMLButtonElement | null;
+    expect(syncMenuButton).toBeTruthy();
+    await act(async () => {
+      syncMenuButton!.click();
+      await flushMicrotasks();
+    });
+
+    const githubMenuItem = document.getElementById('menuSyncToGithub') as HTMLButtonElement | null;
+    expect(githubMenuItem).toBeTruthy();
+    expect(githubMenuItem?.textContent).toBe(t('githubSync'));
+    expect(githubMenuItem?.textContent).toBe(t('providerGithub'));
+
+    await act(async () => {
+      githubMenuItem!.click();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(syncGithubConversations).toHaveBeenCalledWith([11]);
   });
 
   it('keeps GitHub as the preferred provider when another running job is newer', async () => {
