@@ -504,7 +504,7 @@ describe('Settings controller GitHub Device Flow', () => {
     });
     expect(latestSnapshot?.githubRepository).toBe('owner/other');
 
-    act(() => latestSnapshot?.setGithubBranch('release/v1'));
+    act(() => latestSnapshot?.onChangeGithubBranch('release/v1'));
     await flushReact();
     await invoke(() => latestSnapshot!.onSaveGithubBranch());
     expect(
@@ -568,13 +568,17 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.error).toBeNull();
   });
 
-  it('preserves an invalid branch draft and auth when service validation rejects auto-save', async () => {
+  it('invalidates a tested target as soon as the branch draft changes and keeps it invalid after save rejection', async () => {
     githubSettingsData = githubSettings({ state: 'connected' });
     githubRepositoryData = readyRepositories();
     await renderController();
 
-    act(() => latestSnapshot?.setGithubBranch('../main'));
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest.status).toBe('success');
+
+    act(() => latestSnapshot?.onChangeGithubBranch('../main'));
     await flushReact();
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
     saveSettingsResponse = fail('github_settings_invalid:branch', { code: 'github_settings_invalid' });
 
     await invoke(() => latestSnapshot!.onSaveGithubBranch());
@@ -584,8 +588,30 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(saveCalls[0]?.[1]).toEqual({ branch: '../main' });
     expect(latestSnapshot?.error).toBe('github_settings_invalid:branch');
     expect(latestSnapshot?.githubBranch).toBe('../main');
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
     expect(githubSettingsData.settings.branch).toBe('main');
+  });
+
+  it('invalidates a successful connection test when repository access is refreshed', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    githubRepositoryData = readyRepositories();
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest.status).toBe('success');
+
+    githubRepositoryData = {
+      status: 'github_no_accessible_repositories',
+      account: { login: 'octocat', avatarUrl: '', url: 'https://github.com/octocat' },
+      repositories: [],
+      appUrl: 'https://github.com/apps/syncnos',
+      installUrl: 'https://github.com/apps/syncnos/installations/new',
+    };
+    await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
+
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
+    expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
   });
 
   it('never hydrates access, refresh, or device secrets into controller state', async () => {

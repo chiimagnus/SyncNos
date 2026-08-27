@@ -455,6 +455,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   );
 
   const loadGithubRepositoriesInternal = useCallback(async () => {
+    setGithubConnectionTest({ status: 'idle' });
     try {
       const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES, {}));
       const status: GithubRepositoryStatus =
@@ -1047,6 +1048,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     },
     [githubRepositories, githubRepository, runTask],
   );
+
+  const onChangeGithubBranch = useCallback((value: string) => {
+    setGithubBranch(value);
+    setGithubConnectionTest({ status: 'idle' });
+  }, []);
 
   const onSaveGithubBranch = useCallback(async () => {
     await runTask(
@@ -1912,7 +1918,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     githubRepository,
     onChangeGithubRepository,
     githubBranch,
-    setGithubBranch,
+    onChangeGithubBranch,
     githubVerificationUrl,
     githubAppUrl,
     githubInstallUrl,
