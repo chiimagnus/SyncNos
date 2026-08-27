@@ -226,6 +226,22 @@ export function ConversationListPane({
       }),
     [earlierGroupLabel, filteredItems, sidebarLocale, todayGroupLabel, yesterdayGroupLabel],
   );
+  const sectionIdsByKey = useMemo(() => {
+    const idsByKey = new Map<string, number[]>();
+    let activeSectionKey = '';
+    for (const entry of renderedItems) {
+      if (entry.type === 'section') {
+        activeSectionKey = entry.key;
+        idsByKey.set(activeSectionKey, []);
+        continue;
+      }
+      if (!activeSectionKey) continue;
+      const id = Number((entry.conversation as any)?.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      idsByKey.get(activeSectionKey)?.push(id);
+    }
+    return idsByKey;
+  }, [renderedItems]);
   const todayCount = Number((listSummary as any)?.todayCount) || 0;
   const totalCount = Number((listSummary as any)?.totalCount) || 0;
 
@@ -673,14 +689,23 @@ export function ConversationListPane({
 
           {renderedItems.map((entry) => {
             if (entry.type === 'section') {
+              const sectionIds = sectionIdsByKey.get(entry.key) || [];
+              const selectedInSection = sectionIds.filter((id) => selectedIds.includes(id)).length;
+              const sectionAllSelected = sectionIds.length > 0 && selectedInSection === sectionIds.length;
               return (
                 <div
                   key={entry.key}
                   className="tw-sticky tw-top-0 tw-z-10 -tw-mx-3 tw-w-auto tw-bg-[var(--bg-primary)] tw-px-3 tw-py-1.5"
                 >
-                  <div className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)]">
+                  <button
+                    type="button"
+                    className="tw-inline-flex tw-cursor-pointer tw-appearance-none tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                    data-conversation-section-select={entry.key}
+                    aria-pressed={sectionAllSelected}
+                    onClick={() => toggleAll(sectionIds)}
+                  >
                     {entry.label}
-                  </div>
+                  </button>
                 </div>
               );
             }

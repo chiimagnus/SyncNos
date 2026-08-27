@@ -273,6 +273,44 @@ describe('ConversationListPane row actions', () => {
     expect(onOpenConversation).not.toHaveBeenCalled();
   });
 
+  it('toggles only the conversations under the clicked date section', async () => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    currentState.items = [
+      { ...conversation, id: 11, lastCapturedAt: today.getTime() },
+      { ...conversation, id: 12, conversationKey: 'conv-12', lastCapturedAt: today.getTime() - 1000 },
+      { ...conversation, id: 13, conversationKey: 'conv-13', lastCapturedAt: yesterday.getTime() },
+    ];
+    currentState.listSummary = { totalCount: 3, todayCount: 2 };
+
+    await renderPane();
+    const todayButton = document.querySelector(
+      '[data-conversation-section-select="section:today"]',
+    ) as HTMLButtonElement | null;
+    const yesterdayButton = document.querySelector(
+      '[data-conversation-section-select="section:yesterday"]',
+    ) as HTMLButtonElement | null;
+
+    expect(todayButton).toBeTruthy();
+    expect(yesterdayButton).toBeTruthy();
+
+    await act(async () => {
+      todayButton!.click();
+      await flushMicrotasks();
+    });
+    expect(currentState.toggleAll).toHaveBeenLastCalledWith([11, 12]);
+
+    await act(async () => {
+      yesterdayButton!.click();
+      await flushMicrotasks();
+    });
+    expect(currentState.toggleAll).toHaveBeenLastCalledWith([13]);
+    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(onOpenConversation).not.toHaveBeenCalled();
+  });
+
   it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
     currentState.selectedIds = [11];
     getEnabledSyncProvidersMock.mockResolvedValue(['github']);
