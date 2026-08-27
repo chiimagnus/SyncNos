@@ -228,8 +228,19 @@ describe('ConversationListPane row actions', () => {
     });
 
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('https://example.com/path?x=1#section');
+    expect(sourceButton?.querySelector('[data-conversation-source-link-check="11"]')?.textContent).toBe('✓');
+    const sourceLabel = sourceButton?.querySelector('span:not([data-conversation-source-link-check])');
+    expect(sourceLabel?.textContent).toBe('sourceChatgpt');
+    expect(sourceLabel?.classList.contains('tw-invisible')).toBe(true);
     expect(currentState.setActiveId).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1100);
+      await flushMicrotasks();
+    });
+    expect(sourceButton?.querySelector('[data-conversation-source-link-check="11"]')).toBeNull();
+    expect(sourceLabel?.classList.contains('tw-invisible')).toBe(false);
   });
 
   it('copies http original URLs from the source badge', async () => {

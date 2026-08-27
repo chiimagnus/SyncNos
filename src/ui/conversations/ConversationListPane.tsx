@@ -151,6 +151,8 @@ export function ConversationListPane({
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null);
+  const copiedLinkTimerRef = useRef<number | null>(null);
   const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>(['obsidian', 'notion']);
 
   const [, forceDeleteConfirmRender] = useState(0);
@@ -317,6 +319,8 @@ export function ConversationListPane({
     return () => {
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = null;
+      if (copiedLinkTimerRef.current) window.clearTimeout(copiedLinkTimerRef.current);
+      copiedLinkTimerRef.current = null;
     };
   }, []);
 
@@ -539,14 +543,21 @@ export function ConversationListPane({
     }
   };
 
-  const onCopyConversationUrl = async (url: string, e: React.MouseEvent) => {
+  const onCopyConversationUrl = async (conversation: Conversation, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const safe = sanitizeHttpUrl(url);
+    const safe = sanitizeHttpUrl((conversation as any).url || '');
     if (!safe) return;
+    const id = Number((conversation as any).id);
     try {
       const copied = await writeTextToClipboard(safe);
       if (!copied) throw new Error(t('copyFailed'));
+      setCopiedLinkId(id);
+      if (copiedLinkTimerRef.current) window.clearTimeout(copiedLinkTimerRef.current);
+      copiedLinkTimerRef.current = window.setTimeout(() => {
+        setCopiedLinkId(null);
+        copiedLinkTimerRef.current = null;
+      }, 1100);
     } catch (err) {
       alert((err as any)?.message ?? t('copyFailed'));
     }
@@ -784,7 +795,7 @@ export function ConversationListPane({
                     <button
                       type="button"
                       className={[
-                        'tw-inline-flex tw-appearance-none tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
+                        'tw-relative tw-inline-flex tw-appearance-none tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
                         'tw-rounded-[var(--radius-chip)]',
                         safeUrl
                           ? 'tw-cursor-pointer focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
@@ -794,9 +805,18 @@ export function ConversationListPane({
                       aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
                       data-conversation-source-link={String(id)}
                       disabled={!safeUrl}
-                      onClick={(e) => void onCopyConversationUrl(String((conversation as any).url || ''), e)}
+                      onClick={(e) => void onCopyConversationUrl(conversation as any, e)}
                     >
-                      {sourceTag.label}
+                      <span className={copiedLinkId === id ? 'tw-invisible' : undefined}>{sourceTag.label}</span>
+                      {copiedLinkId === id ? (
+                        <span
+                          className="tw-absolute tw-inset-0 tw-flex tw-items-center tw-justify-center"
+                          data-conversation-source-link-check={String(id)}
+                          aria-hidden="true"
+                        >
+                          ✓
+                        </span>
+                      ) : null}
                     </button>
 
                     {Number.isFinite(commentThreadCount) && commentThreadCount > 0 ? (
