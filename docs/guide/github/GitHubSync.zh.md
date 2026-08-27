@@ -36,18 +36,14 @@ GitHub App 的 repository scope 就是 SyncNos 能看到哪些 repositories 的�
 
 当已保存的 repository 被移出 installation scope 后，SyncNos 不会自动改成列表里的第一个 repository。原目标会保留并明确显示为不可用，直到你恢复权限或主动选择另一个有写权限的 repository。
 
-## 3. 选择 repository、branch 与目录
+## 3. 选择 repository 与 branch
 
 在 WebClipper → `Settings` → `GitHub` 中：
 
-1. 选择一个已经授权且具备 contents 写权限的 repository。
-2. 填写目标 branch；对于已经初始化的 repository，该 branch 必须已经存在。空 repository 只允许初始化它在 GitHub 上配置的默认 branch。
-3. 按需配置 AI 对话、网页文章、视频字幕三个相对 repository 根目录的输出目录。
-4. 离开输入框或按 Enter 保存修改。
+1. 选择一个已经授权且具备 contents 写权限的 repository；选择后会立即保存。
+2. 填写目标 branch；对于已经初始化的 repository，该 branch 必须已经存在。空 repository 只允许初始化它在 GitHub 上配置的默认 branch。离开输入框或按 Enter 会保存 branch。
 
-目录支持嵌套，例如 `sync/chats`。目录必须保持为 repository 相对路径；absolute path、`..` traversal、反斜杠、空 path segment 和 `.github/workflows/**` 都会被明确拒绝，而不是被前端“清洗”为另一个路径。
-
-在同一 repository/branch 下修改目录后，下一次同步会写入新路径并清理旧的 SyncNos managed path。切换 repository 或 branch 会改变 target identity，因此 SyncNos 不会跨 repository 或 branch 去清理旧目标。
+GitHub 输出目录固定，无需配置：AI 对话写入 `AIChats/`，网页文章写入 `WebArticles/`，视频字幕写入 `VideosScripts/`。切换 repository 或 branch 会改变 target identity，因此 SyncNos 不会跨 repository 或 branch 去清理旧目标。
 
 ## 4. 测试连接
 
@@ -65,7 +61,7 @@ GitHub 是派生输出目标，SyncNos 本地数据始终是真源。
 - 可以在 Settings 中显式开启 GitHub auto-sync。
 - 本地 projection 未变化时不会产生新的 content commit。
 - 手动 reconcile 可以覆盖直接在 GitHub 上修改的 SyncNos managed Markdown，使远端重新与本地 projection 一致。
-- 在同一 repository/branch 下修改标题或目录时，可以在同一个 content commit 中删除旧 managed path 并写入新路径；如果旧远端路径已经不存在，会视为已经清理完成。
+- 在同一 repository/branch 下修改标题时，可以在同一个 content commit 中删除旧 managed path 并写入新路径；如果旧远端路径已经不存在，会视为已经清理完成。
 - 本地删除会转化为 managed remote cleanup。GitHub 暂时离线时，cleanup 会保留为可恢复状态，之后可以继续重试。
 - 本地缓存图片读取失败或上传失败只会产生 warning；Markdown 文本仍可成功同步。
 
@@ -75,7 +71,7 @@ GitHub 是派生输出目标，SyncNos 本地数据始终是真源。
 
 三种动作含义不同：
 
-- **SyncNos `断开连接`**：只清除此设备上该扩展保存的 GitHub 凭据；repository、branch 和目录偏好会保留。
+- **SyncNos `断开连接`**：只清除此设备上该扩展保存的 GitHub 凭据；repository 与 branch 偏好会保留。
 - **GitHub → Settings → Applications → Authorized GitHub Apps → Revoke**：在 GitHub 侧撤销用户授权，并使对应 user tokens 失效。
 - **GitHub → Settings → Applications → Installed GitHub Apps → Configure / Uninstall**：调整或移除 GitHub App installation 及其 repository 访问范围。
 

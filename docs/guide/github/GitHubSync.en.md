@@ -36,18 +36,14 @@ If Settings reports that the app is not installed, use `Install / Configure GitH
 
 SyncNos does not silently replace a saved repository when access is removed. The saved target remains visible as unavailable until you restore access or explicitly choose another authorized writable repository.
 
-## 3. Choose repository, branch, and folders
+## 3. Choose repository and branch
 
 In WebClipper → `Settings` → `GitHub`:
 
-1. Choose an authorized repository with content write access.
-2. Enter the target branch. For an initialized repository, the branch must already exist. An empty repository can be initialized only on its GitHub default branch.
-3. Configure the optional repository-relative folders for AI chats, web articles, and video scripts.
-4. Leave a field or press Enter to save changes.
+1. Choose an authorized repository with content write access. The selection is saved immediately.
+2. Enter the target branch. For an initialized repository, the branch must already exist. An empty repository can be initialized only on its GitHub default branch. Leaving the field or pressing Enter saves the branch.
 
-Folder paths can be nested, for example `sync/chats`. They must remain relative to the repository root. Absolute paths, traversal such as `..`, backslashes, empty path segments, and `.github/workflows/**` are rejected rather than rewritten into another path.
-
-Changing a folder while keeping the same repository and branch moves SyncNos-managed output on the next sync: the new path is written and the previous managed path is cleaned up. Changing repository or branch changes the target identity, so SyncNos does not clean the previous target across repositories or branches.
+GitHub output folders are fixed and require no configuration: AI chats use `AIChats/`, web articles use `WebArticles/`, and video transcripts use `VideosScripts/`. Changing repository or branch changes the target identity, so SyncNos does not clean the previous target across repositories or branches.
 
 ## 4. Test the connection
 
@@ -65,7 +61,7 @@ GitHub is a derived output. SyncNos remains the local source of truth.
 - Optional GitHub auto-sync can be enabled explicitly in Settings.
 - An unchanged projection produces no content commit.
 - Manual reconcile can overwrite edits made directly to SyncNos-managed Markdown files on GitHub so the remote projection matches local data again.
-- On the same repository/branch, title or folder changes can delete the previous managed path and write the replacement in the same content commit. A previously managed remote path that is already absent is treated as already cleaned up.
+- On the same repository/branch, title changes can delete the previous managed path and write the replacement in the same content commit. A previously managed remote path that is already absent is treated as already cleaned up.
 - Local deletion is represented as managed remote cleanup. If GitHub is temporarily unavailable, cleanup remains recoverable and can be retried later.
 - Cached-image read or upload failures are reported as warnings; Markdown text can still sync successfully.
 
@@ -75,7 +71,7 @@ Repository content outside SyncNos-managed paths, such as an unrelated `README.m
 
 These are different operations:
 
-- **SyncNos `Disconnect`**: removes the GitHub credentials stored by this extension on the current device. Repository, branch, and folder preferences are kept.
+- **SyncNos `Disconnect`**: removes the GitHub credentials stored by this extension on the current device. Repository and branch preferences are kept.
 - **GitHub → Settings → Applications → Authorized GitHub Apps → Revoke**: revokes the user authorization at GitHub and invalidates the associated user tokens.
 - **GitHub → Settings → Applications → Installed GitHub Apps → Configure / Uninstall**: changes or removes the GitHub App installation and its repository access.
 
