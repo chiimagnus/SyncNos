@@ -677,6 +677,60 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(services.ackCleanupRows).toHaveBeenCalledWith([1]);
   });
 
+  it('keeps the replacement current write when an identity-move row names the same path and acks only after transport', async () => {
+    const replacement = chat(19);
+    const messages = [message('replacement body')];
+    const projection = await buildGithubMarkdownProjection({ conversation: replacement, messages });
+    let committedOperations: readonly any[] = [];
+    let markCommitStarted!: () => void;
+    let releaseCommit!: () => void;
+    const commitStarted = new Promise<void>((resolve) => {
+      markCommitStarted = resolve;
+    });
+    const commitRelease = new Promise<void>((resolve) => {
+      releaseCommit = resolve;
+    });
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: { 19: { conversation: replacement, mapping: null } },
+      messages: { 19: messages },
+      cleanupRows: [
+        cleanupRow(19, {
+          paths: [projection.markdownPath],
+          reason: 'identity_move',
+          replacementConversationId: 19,
+        }),
+      ],
+      commitImpl: async ({ operations }) => {
+        committedOperations = operations;
+        markCommitStarted();
+        await commitRelease;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
+    });
+
+    const run = createGithubSyncOrchestrator(services).sync({ conversationIds: [19] });
+    await commitStarted;
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(committedOperations.filter((operation) => operation.path === projection.markdownPath)).toHaveLength(1);
+    expect(committedOperations.find((operation) => operation.path === projection.markdownPath)?.type).toBe('write');
+    expect(committedOperations.some((operation) => operation.type === 'delete')).toBe(false);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()).toHaveLength(1);
+
+    releaseCommit();
+    const result = await run;
+
+    expect(result.items[0]).toMatchObject({ conversationId: 19, status: 'synced' });
+    expect(services.ackCleanupRows).toHaveBeenCalledWith([19]);
+    expect(getCleanupRows()).toEqual([]);
+  });
+
   it('defers identity cleanup while the replacement exists without same-target success', async () => {
     const { services, commit, getCleanupRows } = fakeServices({
       rows: { 2: { conversation: chat(2), mapping: null } },
@@ -882,27 +936,54 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(result.deferredReplacementConversationIds).toEqual([5]);
   });
 
-  it('keeps a successful remote result when local cleanup acknowledgement fails', async () => {
-    const { services, getCleanupRows } = fakeServices({
+  it('re-drains the same cleanup after remote success is followed by a lost local acknowledgement', async () => {
+    let remotePresent = true;
+    let failAck = true;
+    const { services, commit, getCleanupRows } = fakeServices({
       rows: {},
       cleanupRows: [cleanupRow(12)],
-      commitImpl: async ({ operations }) => ({
-        status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
-        files: resolvedFiles(operations),
-      }),
+      commitImpl: async ({ operations }) => {
+        if (remotePresent) {
+          remotePresent = false;
+          return {
+            status: 'committed',
+            treeSha: 'f'.repeat(40),
+            commitSha: '1'.repeat(40),
+            files: resolvedFiles(operations),
+          };
+        }
+        return {
+          status: 'no_changes',
+          treeSha: 'f'.repeat(40),
+          files: operations.map((operation) =>
+            operation.type === 'delete'
+              ? { path: operation.path, status: 'absent' as const }
+              : { path: operation.path, status: 'written' as const, sha: 'e'.repeat(40) },
+          ),
+        };
+      },
     });
-    services.ackCleanupRows = vi.fn(async () => {
-      throw new Error('local ack failed');
+    const durableAck = services.ackCleanupRows;
+    services.ackCleanupRows = vi.fn(async (ids) => {
+      if (failAck) throw new Error('local ack failed');
+      return await durableAck(ids);
     });
+    const orchestrator = createGithubSyncOrchestrator(services);
 
-    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+    const first = await orchestrator.sync({ conversationIds: [] });
 
-    expect(result.transport).toEqual({ status: 'committed', commitSha: '1'.repeat(40) });
-    expect(result.cleanupWarnings).toContain('github_cleanup_ack_failed');
+    expect(first.transport).toEqual({ status: 'committed', commitSha: '1'.repeat(40) });
+    expect(first.cleanupWarnings).toContain('github_cleanup_ack_failed');
     expect(getCleanupRows()).toHaveLength(1);
-    expect(result.nextCleanupDueAt).toBe(1);
+    expect(first.nextCleanupDueAt).toBe(1);
+
+    failAck = false;
+    const second = await orchestrator.sync({ conversationIds: [] });
+
+    expect(commit).toHaveBeenCalledTimes(2);
+    expect(second.transport.status).toBe('no_changes');
+    expect(services.ackCleanupRows).toHaveBeenLastCalledWith([12]);
+    expect(getCleanupRows()).toEqual([]);
   });
 
   it('keeps deferred cleanup locally retryable when the defer write fails', async () => {
