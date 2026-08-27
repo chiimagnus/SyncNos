@@ -161,7 +161,7 @@ export function ChatMessageBubble({
   // NOTE: asset URLs are resolved before render via markdown-it env;
   // no post-render DOM hydration is needed, which avoids re-render race conditions.
 
-  const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[var(--radius-chip)] tw-p-3 tw-shadow-none';
+  const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[var(--radius-inline)] tw-p-3 tw-shadow-none';
 
   const bubbleRoleClass =
     bubbleRole === 'user'

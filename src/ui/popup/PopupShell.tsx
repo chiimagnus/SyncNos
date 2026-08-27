@@ -102,7 +102,7 @@ function PopupSyncNudgeDialog(props: PopupSyncNudgeDialogProps) {
         <div className="tw-text-sm tw-font-extrabold">{title}</div>
         <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{body}</div>
 
-        <label className="tw-mt-3 tw-flex tw-cursor-pointer tw-select-none tw-items-start tw-gap-2 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2.5">
+        <label className="tw-mt-3 tw-flex tw-cursor-pointer tw-select-none tw-items-start tw-gap-2 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2.5">
           <input
             type="checkbox"
             checked={dontShowAgain}

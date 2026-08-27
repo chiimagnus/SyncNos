@@ -268,7 +268,6 @@ export const zh: { [K in TranslationKey]: string } = {
   tooltipLoadedVisibleSelectionScope: '仅当前已加载可见项',
   copyFullMarkdown: '复制完整 Markdown',
   copied: '已复制',
-  tooltipCopyFullMarkdownDetailed: '将该对话完整复制为 Markdown',
   openChat: '打开原始对话',
   noLinkAvailable: '暂无链接',
   tooltipOpenChatDetailed: '在新标签页打开原始链接',

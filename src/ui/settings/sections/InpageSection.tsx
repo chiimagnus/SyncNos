@@ -1,6 +1,6 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import {
@@ -19,12 +19,7 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void; 
         {t('aboutYouUserNameSectionTitle')}
       </h2>
       <input
-        className={[
-          'tw-mt-3 tw-w-full tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
-          'tw-px-3 tw-py-2 tw-text-sm tw-font-semibold tw-text-[var(--text-primary)]',
-          'focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-[var(--focus-ring)] focus-visible:tw-ring-offset-2',
-          'focus-visible:tw-ring-offset-[var(--bg-card)]',
-        ].join(' ')}
+        className={`${textInputClassName} tw-mt-3 tw-w-full tw-px-3 tw-py-2 tw-font-semibold`}
         value={value}
         onChange={(e) => onChange(String((e.target as any)?.value || ''))}
         onBlur={onSave}

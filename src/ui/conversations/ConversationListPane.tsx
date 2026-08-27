@@ -6,7 +6,7 @@ import { formatConversationMarkdownForExternalOutput } from '@services/integrati
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
-import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageOnChanged } from '@services/shared/storage';
 import { buildConversationSidebarRenderItems } from '@services/conversations/domain/sidebar-time-groups';
 
@@ -25,6 +25,7 @@ import {
   buttonDangerClassName,
   buttonDangerTintClassName,
   buttonFilledClassName,
+  buttonCompactMutedClassName,
   buttonMenuItemClassName,
   buttonMiniIconClassName,
   buttonTintClassName,
@@ -151,6 +152,8 @@ export function ConversationListPane({
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null);
+  const copiedLinkTimerRef = useRef<number | null>(null);
   const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>(['obsidian', 'notion']);
 
   const [, forceDeleteConfirmRender] = useState(0);
@@ -226,6 +229,22 @@ export function ConversationListPane({
       }),
     [earlierGroupLabel, filteredItems, sidebarLocale, todayGroupLabel, yesterdayGroupLabel],
   );
+  const sectionIdsByKey = useMemo(() => {
+    const idsByKey = new Map<string, number[]>();
+    let activeSectionKey = '';
+    for (const entry of renderedItems) {
+      if (entry.type === 'section') {
+        activeSectionKey = entry.key;
+        idsByKey.set(activeSectionKey, []);
+        continue;
+      }
+      if (!activeSectionKey) continue;
+      const id = Number((entry.conversation as any)?.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      idsByKey.get(activeSectionKey)?.push(id);
+    }
+    return idsByKey;
+  }, [renderedItems]);
   const todayCount = Number((listSummary as any)?.todayCount) || 0;
   const totalCount = Number((listSummary as any)?.totalCount) || 0;
 
@@ -301,6 +320,8 @@ export function ConversationListPane({
     return () => {
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = null;
+      if (copiedLinkTimerRef.current) window.clearTimeout(copiedLinkTimerRef.current);
+      copiedLinkTimerRef.current = null;
     };
   }, []);
 
@@ -494,6 +515,10 @@ export function ConversationListPane({
   const onRowKeyDown = (e: React.KeyboardEvent, conversationId: number) => {
     if (!e) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as any;
+    if (target && target.closest) {
+      if (target.closest("input[type='checkbox'], label, button, a")) return;
+    }
     e.preventDefault();
     e.stopPropagation();
     activateRow(conversationId);
@@ -519,15 +544,23 @@ export function ConversationListPane({
     }
   };
 
-  const openConversationUrl = async (url: string, e: React.MouseEvent) => {
+  const onCopyConversationUrl = async (conversation: Conversation, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const safe = sanitizeHttpUrl(url);
+    const safe = sanitizeHttpUrl((conversation as any).url || '');
     if (!safe) return;
+    const id = Number((conversation as any).id);
     try {
-      await tabsCreate({ url: safe });
-    } catch (_e) {
-      // ignore
+      const copied = await writeTextToClipboard(safe);
+      if (!copied) throw new Error(t('copyFailed'));
+      setCopiedLinkId(id);
+      if (copiedLinkTimerRef.current) window.clearTimeout(copiedLinkTimerRef.current);
+      copiedLinkTimerRef.current = window.setTimeout(() => {
+        setCopiedLinkId(null);
+        copiedLinkTimerRef.current = null;
+      }, 1100);
+    } catch (err) {
+      alert((err as any)?.message ?? t('copyFailed'));
     }
   };
 
@@ -668,14 +701,23 @@ export function ConversationListPane({
 
           {renderedItems.map((entry) => {
             if (entry.type === 'section') {
+              const sectionIds = sectionIdsByKey.get(entry.key) || [];
+              const selectedInSection = sectionIds.filter((id) => selectedIds.includes(id)).length;
+              const sectionAllSelected = sectionIds.length > 0 && selectedInSection === sectionIds.length;
               return (
                 <div
                   key={entry.key}
                   className="tw-sticky tw-top-0 tw-z-10 -tw-mx-3 tw-w-auto tw-bg-[var(--bg-primary)] tw-px-3 tw-py-1.5"
                 >
-                  <div className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)]">
+                  <button
+                    type="button"
+                    className={buttonCompactMutedClassName()}
+                    data-conversation-section-select={entry.key}
+                    aria-pressed={sectionAllSelected}
+                    onClick={() => toggleAll(sectionIds)}
+                  >
                     {entry.label}
-                  </div>
+                  </button>
                 </div>
               );
             }
@@ -733,54 +775,38 @@ export function ConversationListPane({
                   </div>
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrs(
-                        copiedId === id
-                          ? `${t('copied')} · ${t('tooltipCopyFullMarkdownDetailed')}`
-                          : t('tooltipCopyFullMarkdownDetailed'),
-                      )}
+                    <button
+                      className={buttonMiniIconClassName(isActive)}
+                      type="button"
+                      aria-label={t('copyFullMarkdown')}
+                      onClick={(e) => void onCopyConversation(conversation as any, e)}
                     >
-                      <button
-                        className={buttonMiniIconClassName(isActive)}
-                        type="button"
-                        aria-label={t('copyFullMarkdown')}
-                        onClick={(e) => void onCopyConversation(conversation as any, e)}
-                      >
-                        {copiedId === id ? '✓' : '⧉'}
-                      </button>
-                    </span>
+                      {copiedId === id ? '✓' : '⧉'}
+                    </button>
 
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrs(
-                        safeUrl ? t('tooltipOpenChatDetailed') : t('tooltipOpenChatMissingLinkDetailed'),
-                      )}
+                    <button
+                      type="button"
+                      className={[buttonCompactMutedClassName(), 'tw-relative'].join(' ')}
+                      aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
+                      data-conversation-source-link={String(id)}
+                      disabled={!safeUrl}
+                      onClick={(e) => void onCopyConversationUrl(conversation as any, e)}
                     >
-                      <button
-                        className={buttonMiniIconClassName(isActive)}
-                        type="button"
-                        aria-label={t('openOriginalChat')}
-                        disabled={!safeUrl}
-                        onClick={(e) => void openConversationUrl(String((conversation as any).url || ''), e)}
-                      >
-                        ↗
-                      </button>
-                    </span>
-
-                    <span
-                      className={[
-                        'tw-inline-flex tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
-                        'tw-rounded-[var(--radius-chip)]',
-                        sourceTag.toneClassName,
-                      ].join(' ')}
-                    >
-                      {sourceTag.label}
-                    </span>
+                      <span className={copiedLinkId === id ? 'tw-invisible' : undefined}>{sourceTag.label}</span>
+                      {copiedLinkId === id ? (
+                        <span
+                          className="tw-absolute tw-inset-0 tw-flex tw-items-center tw-justify-center"
+                          data-conversation-source-link-check={String(id)}
+                          aria-hidden="true"
+                        >
+                          ✓
+                        </span>
+                      ) : null}
+                    </button>
 
                     {Number.isFinite(commentThreadCount) && commentThreadCount > 0 ? (
                       <span
-                        className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold"
+                        className="tw-inline-flex tw-items-center tw-text-[10px] tw-font-extrabold"
                         aria-label={`Comment threads ${commentThreadCount}`}
                       >
                         {'💬 '}

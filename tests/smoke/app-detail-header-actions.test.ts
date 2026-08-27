@@ -247,7 +247,8 @@ describe('ConversationDetailPane header actions', () => {
     });
     expect(copyTrigger).toHaveBeenCalledTimes(1);
     expect(openTrigger).not.toHaveBeenCalled();
-    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+    expect(copyButton?.querySelector('[data-detail-header-copy-check="copy-notion-link"]')?.textContent).toBe('✓');
+    expect(document.querySelector('[role="status"]')).toBeFalsy();
     expect(document.body.textContent || '').not.toContain('Copied Notion link');
   });
 
@@ -294,6 +295,8 @@ describe('ConversationDetailPane header actions', () => {
     const primaryButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
     expect(trigger).toBeTruthy();
     expect(primaryButton).toBeTruthy();
+    expect(trigger?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(primaryButton?.getAttribute('data-tooltip-id')).toBeNull();
     expect(document.querySelectorAll('[aria-label="Copy destinations"][aria-haspopup="menu"]')).toHaveLength(1);
     expect(trigger?.closest('.tw-order-1')).toBeTruthy();
 
@@ -364,7 +367,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.querySelector('[role="status"]')).toBeFalsy();
   });
 
-  it('clears Copied feedback when the same copy action id points to a new href', async () => {
+  it('clears copy success feedback when the same copy action id points to a new href', async () => {
     const firstTrigger = vi.fn(async () => {});
     currentState.detailHeaderActions = [
       {
@@ -388,7 +391,7 @@ describe('ConversationDetailPane header actions', () => {
       await Promise.resolve();
     });
     expect(firstTrigger).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+    expect(firstButton.querySelector('[data-detail-header-copy-check="copy-notion-link"]')?.textContent).toBe('✓');
 
     const nextTrigger = vi.fn(async () => {});
     currentState.detailHeaderActions = [
@@ -407,6 +410,7 @@ describe('ConversationDetailPane header actions', () => {
       root!.render(createElement(ConversationDetailPane));
     });
 
+    expect(document.querySelector('[data-detail-header-copy-check="copy-notion-link"]')).toBeFalsy();
     expect(document.querySelector('[role="status"]')).toBeFalsy();
     const nextButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement;
     await act(async () => {
@@ -439,7 +443,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.querySelector('[aria-label="Copy Notion link"]')).toBeFalsy();
   });
 
-  it('clears Copied feedback when the copy action set or selected conversation changes', async () => {
+  it('clears copy success feedback when the copy action set or selected conversation changes', async () => {
     vi.useFakeTimers();
     try {
       const copyNotion = {
@@ -461,7 +465,7 @@ describe('ConversationDetailPane header actions', () => {
         button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
         await Promise.resolve();
       });
-      expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+      expect(button.querySelector('[data-detail-header-copy-check="copy-notion-link"]')?.textContent).toBe('✓');
 
       currentState.detailHeaderActions = [
         copyNotion,
@@ -478,6 +482,7 @@ describe('ConversationDetailPane header actions', () => {
       act(() => {
         root!.render(createElement(ConversationDetailPane));
       });
+      expect(document.querySelector('[data-detail-header-copy-check]')).toBeFalsy();
       expect(document.querySelector('[role="status"]')).toBeFalsy();
 
       const multiTrigger = document.querySelector('[aria-label="Copy destinations"]') as HTMLButtonElement;
@@ -492,7 +497,7 @@ describe('ConversationDetailPane header actions', () => {
         notionItem.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
         await Promise.resolve();
       });
-      expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+      expect(document.querySelector('[data-detail-header-copy-check="copy-notion-link"]')?.textContent).toBe('✓');
 
       currentState.activeId = 12;
       currentState.selectedConversation = {
@@ -504,6 +509,7 @@ describe('ConversationDetailPane header actions', () => {
       act(() => {
         root!.render(createElement(ConversationDetailPane));
       });
+      expect(document.querySelector('[data-detail-header-copy-check]')).toBeFalsy();
       expect(document.querySelector('[role="status"]')).toBeFalsy();
     } finally {
       vi.useRealTimers();

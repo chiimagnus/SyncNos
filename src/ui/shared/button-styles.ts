@@ -47,6 +47,10 @@ export function buttonIconCircleGhostClassName(): string {
   return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--tone-muted';
 }
 
+export function buttonCompactMutedClassName(): string {
+  return 'webclipper-btn webclipper-btn--compact webclipper-btn--tone-muted';
+}
+
 export function buttonMiniIconClassName(active: boolean): string {
   if (active) return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs';
   return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--tone-muted';

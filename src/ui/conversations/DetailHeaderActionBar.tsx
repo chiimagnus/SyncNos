@@ -56,19 +56,30 @@ export function DetailHeaderActionBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [primaryActionId, setPrimaryActionId] = useState('');
+  const [copiedActionId, setCopiedActionId] = useState('');
   const [labelOverride, setLabelOverride] = useState<string>('');
+  const copiedResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const labelResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTrigger = async (action: DetailHeaderAction) => {
     if (busy || action.disabled) return;
+    if (copiedResetTimerRef.current != null) globalThis.clearTimeout(copiedResetTimerRef.current);
+    copiedResetTimerRef.current = null;
     if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
     labelResetTimerRef.current = null;
+    setCopiedActionId('');
     setLabelOverride('');
     setPrimaryActionId(action.id);
     setBusy(true);
     try {
       await action.onTrigger();
-      if (action.afterTriggerLabel) {
+      if (action.kind === 'copy-text' && !inlineMenuItems) {
+        setCopiedActionId(action.id);
+        copiedResetTimerRef.current = globalThis.setTimeout(() => {
+          setCopiedActionId('');
+          copiedResetTimerRef.current = null;
+        }, 1_100);
+      } else if (action.afterTriggerLabel) {
         setLabelOverride(String(action.afterTriggerLabel));
         labelResetTimerRef.current = globalThis.setTimeout(() => {
           setLabelOverride('');
@@ -90,6 +101,8 @@ export function DetailHeaderActionBar({
 
   useEffect(() => {
     return () => {
+      if (copiedResetTimerRef.current != null) globalThis.clearTimeout(copiedResetTimerRef.current);
+      copiedResetTimerRef.current = null;
       if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
       labelResetTimerRef.current = null;
     };
@@ -97,7 +110,22 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
-  const resolveInlineActionIcon = (action: DetailHeaderAction) => {
+  const copyOnly = actions.every((action) => action.kind === 'copy-text');
+  const resolveActionTooltipAttrs = (action: DetailHeaderAction) =>
+    action.kind === 'copy-text' ? {} : tooltipAttrs(action.label);
+
+  const resolveActionIcon = (action: DetailHeaderAction) => {
+    if (action.kind === 'copy-text' && copiedActionId === action.id) {
+      return (
+        <span
+          className="tw-inline-flex tw-h-4 tw-w-4 tw-items-center tw-justify-center"
+          data-detail-header-copy-check={action.id}
+          aria-hidden="true"
+        >
+          ✓
+        </span>
+      );
+    }
     const logo = providerLogo(action);
     if (logo) return logo;
     if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
@@ -124,7 +152,7 @@ export function DetailHeaderActionBar({
             }}
           >
             <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-              {resolveInlineActionIcon(action)}
+              {resolveActionIcon(action)}
               <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
             </span>
           </button>
@@ -137,20 +165,20 @@ export function DetailHeaderActionBar({
     <span
       role="status"
       aria-live="polite"
-      className="tw-absolute tw-right-0 tw-top-[calc(100%+6px)] tw-z-10 tw-whitespace-nowrap tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] tw-shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+      className="tw-absolute tw-right-0 tw-top-[calc(100%+6px)] tw-z-10 tw-whitespace-nowrap tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] tw-shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
     >
       {labelOverride}
     </span>
   ) : null;
   if (actions.length === 1) {
     const action = actions[0]!;
-    const resolvedTriggerIcon = providerLogo(action) || <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
+    const resolvedTriggerIcon = resolveActionIcon(action);
     return (
       <div className={['tw-relative tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
         <button
           key={action.id}
           type="button"
-          {...tooltipAttrs(action.label)}
+          {...resolveActionTooltipAttrs(action)}
           onClick={() => {
             void handleTrigger(action);
             closeMenuOnActionTrigger?.();
@@ -168,9 +196,7 @@ export function DetailHeaderActionBar({
   }
 
   const primaryAction = actions.find((action) => action.id === primaryActionId) || actions[0]!;
-  const resolvedTriggerIcon = providerLogo(primaryAction) || (
-    <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
-  );
+  const resolvedTriggerIcon = resolveActionIcon(primaryAction);
   const resolvedMenuTriggerLabel = String(menuTriggerLabel || '').trim() || 'Open in...';
   const resolvedMenuTriggerAriaLabel = String(menuTriggerAriaLabel || '').trim() || 'Open destinations';
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
@@ -182,7 +208,7 @@ export function DetailHeaderActionBar({
         <button
           key={primaryAction.id}
           type="button"
-          {...tooltipAttrs(primaryAction.label)}
+          {...resolveActionTooltipAttrs(primaryAction)}
           onClick={() => {
             void handleTrigger(primaryAction);
             closeMenuOnActionTrigger?.();
@@ -206,7 +232,7 @@ export function DetailHeaderActionBar({
           trigger={(triggerProps) => (
             <button
               {...triggerProps}
-              {...tooltipAttrs(resolvedMenuTriggerLabel)}
+              {...(copyOnly ? {} : tooltipAttrs(resolvedMenuTriggerLabel))}
               aria-label={resolvedMenuTriggerAriaLabel}
               className={buttonClassName}
             >

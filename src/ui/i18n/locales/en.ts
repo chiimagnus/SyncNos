@@ -272,7 +272,6 @@ export const en = {
   tooltipLoadedVisibleSelectionScope: 'Only currently loaded visible items',
   copyFullMarkdown: 'Copy full markdown',
   copied: 'Copied',
-  tooltipCopyFullMarkdownDetailed: 'Copy the full conversation as Markdown',
   openChat: 'Open chat',
   noLinkAvailable: 'No link available',
   tooltipOpenChatDetailed: 'Open the original link in a new tab',

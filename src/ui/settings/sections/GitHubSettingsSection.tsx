@@ -127,7 +127,7 @@ export function GitHubSettingsSection(props: {
     <>
       <section className={cardClassName} aria-label={t('githubSettingsTitle')}>
         <div className="tw-flex tw-items-center tw-gap-2">
-          <span className="tw-inline-flex tw-h-6 tw-w-6 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-control)] tw-bg-white tw-p-0.5">
+          <span className="tw-inline-flex tw-h-6 tw-w-6 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-bg-white tw-p-0.5">
             <img className="tw-h-5 tw-w-5" src={githubLogoUrl} alt="" aria-hidden="true" />
           </span>
           <div className="tw-min-w-0 tw-flex-1">
