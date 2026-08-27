@@ -81,6 +81,7 @@ let startResponse: ApiResponse;
 let cancelResponse: ApiResponse;
 let disconnectResponse: ApiResponse;
 let testConnectionResponse: ApiResponse;
+let initializeRepositoryResponse: ApiResponse;
 let saveSettingsResponse: ApiResponse | null;
 let pollResponses: Array<ApiResponse | (() => ApiResponse)> = [];
 
@@ -231,6 +232,11 @@ beforeEach(() => {
     ok: true,
     target: { repository: 'owner/repo', branch: 'main', remoteKey: 'github.com/owner/repo@main', installationId: 1 },
   });
+  initializeRepositoryResponse = ok({
+    ok: true,
+    initialized: true,
+    target: { repository: 'owner/repo', branch: 'main', remoteKey: 'github.com/owner/repo@main', installationId: 1 },
+  });
   saveSettingsResponse = null;
   pollResponses = [];
 
@@ -288,6 +294,7 @@ beforeEach(() => {
       return ok({ settings: nextSettings });
     }
     if (type === GITHUB_MESSAGE_TYPES.TEST_CONNECTION) return testConnectionResponse;
+    if (type === GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY) return initializeRepositoryResponse;
     return fail(`unexpected message: ${type}`);
   });
 
@@ -545,6 +552,30 @@ describe('Settings controller GitHub Device Flow', () => {
     });
     expect(latestSnapshot?.githubSyncEnabled).toBe(false);
     expect(latestSnapshot?.githubAutoSyncEnabled).toBe(false);
+  });
+
+  it('turns an empty-repository preflight into an explicit initialize action and clears the expected error banner', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    githubRepositoryData = readyRepositories();
+    testConnectionResponse = fail('github_repository_uninitialized', { code: 'github_repository_uninitialized' });
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'uninitialized' });
+    expect(latestSnapshot?.error).toBeNull();
+
+    await invoke(() => latestSnapshot!.onInitializeGithubRepository());
+    expect(callCount(GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY)).toBe(1);
+    expect(latestSnapshot?.githubConnectionTest).toEqual({
+      status: 'success',
+      target: {
+        repository: 'owner/repo',
+        branch: 'main',
+        remoteKey: 'github.com/owner/repo@main',
+        installationId: 1,
+      },
+    });
+    expect(latestSnapshot?.error).toBeNull();
   });
 
   it('preserves invalid folder drafts and auth when service validation rejects save', async () => {

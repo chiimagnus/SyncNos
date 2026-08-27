@@ -207,14 +207,30 @@ type GithubRepositoryOption = {
 
 type GithubSafeAccount = { login: string; avatarUrl: string; url: string };
 
+type GithubConnectionTarget = {
+  repository: string;
+  branch: string;
+  remoteKey: string;
+  installationId: number | null;
+};
+
 type GithubConnectionTestState =
   | { status: 'idle' }
   | { status: 'testing' }
-  | {
-      status: 'success';
-      target: { repository: string; branch: string; remoteKey: string; installationId: number | null };
-    }
+  | { status: 'uninitialized' }
+  | { status: 'initializing' }
+  | { status: 'success'; target: GithubConnectionTarget }
   | { status: 'error'; error: string };
+
+function normalizeGithubConnectionTarget(value: any): GithubConnectionTarget {
+  return {
+    repository: String(value?.repository || ''),
+    branch: String(value?.branch || ''),
+    remoteKey: String(value?.remoteKey || ''),
+    installationId:
+      Number.isSafeInteger(value?.installationId) && value.installationId > 0 ? value.installationId : null,
+  };
+}
 
 function normalizeGithubAuthSummary(value: unknown): GithubAuthSummary {
   const raw = value as any;
@@ -1054,20 +1070,31 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     await runTask(
       async () => {
         const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.TEST_CONNECTION, {}));
-        const target = data?.target || {};
-        setGithubConnectionTest({
-          status: 'success',
-          target: {
-            repository: String(target.repository || ''),
-            branch: String(target.branch || ''),
-            remoteKey: String(target.remoteKey || ''),
-            installationId:
-              Number.isSafeInteger(target.installationId) && target.installationId > 0 ? target.installationId : null,
-          },
-        });
+        setGithubConnectionTest({ status: 'success', target: normalizeGithubConnectionTarget(data?.target) });
       },
       {
         fallbackMessage: 'github_connection_test_failed',
+        onError: (message) => {
+          if (message === 'github_repository_uninitialized') {
+            setError(null);
+            setGithubConnectionTest({ status: 'uninitialized' });
+            return;
+          }
+          setGithubConnectionTest({ status: 'error', error: message });
+        },
+      },
+    );
+  }, [runTask]);
+
+  const onInitializeGithubRepository = useCallback(async () => {
+    setGithubConnectionTest({ status: 'initializing' });
+    await runTask(
+      async () => {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY, {}));
+        setGithubConnectionTest({ status: 'success', target: normalizeGithubConnectionTarget(data?.target) });
+      },
+      {
+        fallbackMessage: 'github_repository_initialize_failed',
         onError: (message) => setGithubConnectionTest({ status: 'error', error: message }),
       },
     );
@@ -1907,6 +1934,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onRefreshGithubRepositories,
     onSaveGithubSettings,
     onTestGithubConnection,
+    onInitializeGithubRepository,
 
     exportStatus,
     importStatus,
