@@ -1,9 +1,5 @@
 import { GITHUB_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import {
-  cancelDeviceFlow,
-  pollDeviceFlowOnce,
-  startDeviceFlow,
-} from '@services/sync/github/auth/device-flow';
+import { cancelDeviceFlow, pollDeviceFlowOnce, startDeviceFlow } from '@services/sync/github/auth/device-flow';
 import {
   clearGithubAuthState,
   getGithubSafeAuthSummary,
@@ -72,7 +68,8 @@ function safeTimestamp(value: unknown): number | null {
 function safeAuthDto(value: GithubSafeAuthSummary | unknown) {
   const state = safeString((value as any)?.state);
   if (state === 'disconnected' || state === 'connected') return { state } as const;
-  if (state !== 'pending') throw Object.assign(new Error('github_auth_summary_invalid'), { code: 'github_auth_summary_invalid' });
+  if (state !== 'pending')
+    throw Object.assign(new Error('github_auth_summary_invalid'), { code: 'github_auth_summary_invalid' });
 
   const userCode = safeString((value as any)?.userCode);
   const verificationUri = safeString((value as any)?.verificationUri);
@@ -127,7 +124,9 @@ function safeDiscoveryDto(value: GithubRepositoryDiscovery | any) {
     fullName: safeString(repository?.fullName),
     private: repository?.private === true,
     installationId:
-      typeof repository?.installationId === 'number' && Number.isSafeInteger(repository.installationId) && repository.installationId > 0
+      typeof repository?.installationId === 'number' &&
+      Number.isSafeInteger(repository.installationId) &&
+      repository.installationId > 0
         ? repository.installationId
         : 0,
     userPermissions: {
@@ -158,7 +157,9 @@ function safePreflightDto(value: GithubRepositoryPreflight | any) {
     branch: safeString(value?.branch),
     remoteKey: safeString(value?.remoteKey),
     installationId:
-      typeof value?.installationId === 'number' && Number.isSafeInteger(value.installationId) && value.installationId > 0
+      typeof value?.installationId === 'number' &&
+      Number.isSafeInteger(value.installationId) &&
+      value.installationId > 0
         ? value.installationId
         : null,
   };
@@ -185,10 +186,7 @@ function safeErrorResponse(router: AnyRouter, error: unknown, fallbackCode: stri
   });
 }
 
-export function registerGithubSettingsHandlers(
-  router: AnyRouter,
-  deps: GithubSettingsHandlersDeps = DEFAULT_DEPS,
-) {
+export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSettingsHandlersDeps = DEFAULT_DEPS) {
   router.register(GITHUB_MESSAGE_TYPES.GET_SETTINGS, async () => {
     try {
       const [settings, auth] = await Promise.all([deps.getSettings(), deps.getSafeAuthSummary()]);

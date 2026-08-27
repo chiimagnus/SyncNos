@@ -1004,7 +1004,9 @@ export function ConversationListPane({
                     id="btnSyncProvider"
                     className={actionButton}
                     type="button"
-                    disabled={!hasSelection || exporting || deleting || actionBusy || providerSyncing[singleSyncProvider]}
+                    disabled={
+                      !hasSelection || exporting || deleting || actionBusy || providerSyncing[singleSyncProvider]
+                    }
                     onClick={() => startSyncProvider(singleSyncProvider)}
                   >
                     <span className="tw-leading-none">{singleSyncLabel}</span>

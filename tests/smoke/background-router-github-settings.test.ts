@@ -225,17 +225,23 @@ describe('background-router GitHub settings routes', () => {
       ok: true,
       data: {
         ok: true,
-        target: { repository: 'owner/repo', branch: 'main', remoteKey: 'github.com/owner/repo@main', installationId: 7 },
+        target: {
+          repository: 'owner/repo',
+          branch: 'main',
+          remoteKey: 'github.com/owner/repo@main',
+          installationId: 7,
+        },
       },
     });
     expectSecretFree(tested);
   });
 
   it('returns stable safe error metadata without reflecting secret-bearing error messages', async () => {
-    const authRequired = Object.assign(
-      new Error(`failed with ${ACCESS_TOKEN} ${REFRESH_TOKEN} ${DEVICE_CODE}`),
-      { code: 'github_auth_required', status: 401, requestId: 'REQ-123' },
-    );
+    const authRequired = Object.assign(new Error(`failed with ${ACCESS_TOKEN} ${REFRESH_TOKEN} ${DEVICE_CODE}`), {
+      code: 'github_auth_required',
+      status: 401,
+      requestId: 'REQ-123',
+    });
     const startFailure = new Error(`network body ${ACCESS_TOKEN} ${REFRESH_TOKEN} ${DEVICE_CODE}`);
     const { router } = createHarness({
       discoverRepositories: vi.fn(async () => {
@@ -249,7 +255,10 @@ describe('background-router GitHub settings routes', () => {
     const listResponse = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
     expect(listResponse).toMatchObject({
       ok: false,
-      error: { message: 'github_auth_required', extra: { code: 'github_auth_required', status: 401, requestId: 'REQ-123' } },
+      error: {
+        message: 'github_auth_required',
+        extra: { code: 'github_auth_required', status: 401, requestId: 'REQ-123' },
+      },
     });
     expectSecretFree(listResponse);
 

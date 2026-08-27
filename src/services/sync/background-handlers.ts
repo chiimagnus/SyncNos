@@ -45,7 +45,11 @@ type Deps = {
     clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
   };
   githubSyncOrchestrator: {
-    sync: (input: { conversationIds?: readonly unknown[]; mode?: 'incremental' | 'reconcile'; instanceId?: string }) => Promise<unknown>;
+    sync: (input: {
+      conversationIds?: readonly unknown[];
+      mode?: 'incremental' | 'reconcile';
+      instanceId?: string;
+    }) => Promise<unknown>;
     getSyncStatus: (input: { instanceId?: string }) => Promise<unknown>;
     clearSyncStatus: (input: { instanceId?: string }) => Promise<unknown>;
   };

@@ -279,10 +279,7 @@ describe('background entrypoint cold start', () => {
     await flushMicrotasks();
     expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(1);
 
-    storageListener?.(
-      { webclipper_sync_provider_github_enabled: { oldValue: false, newValue: undefined } },
-      'local',
-    );
+    storageListener?.({ webclipper_sync_provider_github_enabled: { oldValue: false, newValue: undefined } }, 'local');
     await flushMicrotasks();
     expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(2);
 
@@ -314,7 +311,9 @@ describe('background entrypoint cold start', () => {
   it('isolates each startup recovery failure from sibling jobs and schedulers', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     const services = createServices();
-    services.notionSyncJobStore.abortRunningJobIfFromOtherInstance.mockRejectedValue(new Error('notion recovery failed'));
+    services.notionSyncJobStore.abortRunningJobIfFromOtherInstance.mockRejectedValue(
+      new Error('notion recovery failed'),
+    );
     services.autoSync.obsidianScheduler.flush.mockImplementation(() => {
       throw new Error('obsidian flush failed');
     });

@@ -69,7 +69,10 @@ function makeInlineResult(messages: any[]) {
   };
 }
 
-function createRouter(deps?: { onConversationChanged?: ReturnType<typeof vi.fn>; onRemoteCleanupPending?: ReturnType<typeof vi.fn> }) {
+function createRouter(deps?: {
+  onConversationChanged?: ReturnType<typeof vi.fn>;
+  onRemoteCleanupPending?: ReturnType<typeof vi.fn>;
+}) {
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
       ok: false,

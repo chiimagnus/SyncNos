@@ -226,7 +226,9 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       removedConversationId: removeConversationId,
     });
     if (res?.merged === true) {
-      fireAndForget(deps.onConversationChanged(keepConversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.mergeConversation));
+      fireAndForget(
+        deps.onConversationChanged(keepConversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.mergeConversation),
+      );
       fireAndForget(deps.onRemoteCleanupPending());
     }
     return router.ok(res);

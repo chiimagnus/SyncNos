@@ -34,7 +34,9 @@ beforeEach(() => {
   storageMocks.storageGet.mockImplementation(async (keys: string[]) =>
     Object.fromEntries(keys.map((key) => [key, storageState[key]])),
   );
-  storageMocks.storageSet.mockImplementation(async (patch: Record<string, unknown>) => Object.assign(storageState, patch));
+  storageMocks.storageSet.mockImplementation(async (patch: Record<string, unknown>) =>
+    Object.assign(storageState, patch),
+  );
   gateMocks.isSyncProviderEnabled.mockResolvedValue(true);
   alarmsMocks.isAlarmsAvailable.mockReturnValue(true);
   alarmsMocks.create.mockReset();
@@ -56,7 +58,11 @@ describe('github-auto-sync-scheduler', () => {
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '7': 9_999 };
     await scheduler.flush();
 
-    expect(sync).toHaveBeenCalledWith({ conversationIds: [7], mode: 'incremental', instanceId: 'github-auto-instance' });
+    expect(sync).toHaveBeenCalledWith({
+      conversationIds: [7],
+      mode: 'incremental',
+      instanceId: 'github-auto-instance',
+    });
     expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({});
   });
 
@@ -191,7 +197,11 @@ describe('github-auto-sync-scheduler', () => {
     await scheduler.flushCleanup();
 
     expect(sync).toHaveBeenCalledTimes(1);
-    expect(sync).toHaveBeenCalledWith({ conversationIds: [], mode: 'incremental', instanceId: 'github-cleanup-instance' });
+    expect(sync).toHaveBeenCalledWith({
+      conversationIds: [],
+      mode: 'incremental',
+      instanceId: 'github-cleanup-instance',
+    });
     expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({ '7': 70_000, '8': 70_000 });
     expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, {
       when: 10_000 + GITHUB_CLEANUP_BATCH_CONTINUE_DELAY_MS,
@@ -218,7 +228,9 @@ describe('github-auto-sync-scheduler', () => {
 
   it('reschedules cleanup in the future when the shared GitHub job is busy', async () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
-    const sync = vi.fn().mockRejectedValue(Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' }));
+    const sync = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' }));
     const scheduler = createGithubAutoSyncScheduler(
       { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
       { now: () => 10_000 },

@@ -36,7 +36,11 @@ function installStorage(store: Record<string, unknown>) {
 
 function createRouter(githubSyncOrchestrator: any, instanceId = 'github-background-instance') {
   const router = createBackgroundRouter({
-    fallback: (msg: any) => ({ ok: false, data: null, error: { message: `unknown message type: ${msg?.type}`, extra: null } }),
+    fallback: (msg: any) => ({
+      ok: false,
+      data: null,
+      error: { message: `unknown message type: ${msg?.type}`, extra: null },
+    }),
   });
   registerSyncHandlers(router as any, {
     getInstanceId: () => instanceId,
@@ -74,7 +78,10 @@ describe('background-router github sync routes', () => {
     };
     const router = createRouter(githubSyncOrchestrator);
 
-    const disabled = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, conversationIds: [1] });
+    const disabled = await router.__handleMessageForTests({
+      type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
+      conversationIds: [1],
+    });
     expect(disabled.ok).toBe(false);
     expect(disabled.error?.extra).toMatchObject({ code: 'sync_provider_disabled', provider: 'github' });
     expect(githubSyncOrchestrator.getSyncStatus).not.toHaveBeenCalled();
@@ -93,7 +100,10 @@ describe('background-router github sync routes', () => {
       instanceId: 'github-background-instance',
     });
 
-    const concurrent = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, conversationIds: [3] });
+    const concurrent = await router.__handleMessageForTests({
+      type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
+      conversationIds: [3],
+    });
     expect(concurrent.ok).toBe(false);
     expect(concurrent.error?.extra?.code).toBe('sync_already_running');
     expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(1);
@@ -115,14 +125,21 @@ describe('background-router github sync routes', () => {
   it('delegates status and clear through the production sync contract', async () => {
     installStorage({});
     const githubSyncOrchestrator = {
-      getSyncStatus: vi.fn(async ({ instanceId }: any) => ({ provider: 'github', job: { status: 'done' }, instanceId })),
+      getSyncStatus: vi.fn(async ({ instanceId }: any) => ({
+        provider: 'github',
+        job: { status: 'done' },
+        instanceId,
+      })),
       clearSyncStatus: vi.fn(async ({ instanceId }: any) => ({ provider: 'github', job: null, instanceId })),
       sync: vi.fn(async () => ({})),
     };
     const router = createRouter(githubSyncOrchestrator, 'instance-status');
 
     const status = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
-    expect(status).toMatchObject({ ok: true, data: { provider: 'github', job: { status: 'done' }, instanceId: 'instance-status' } });
+    expect(status).toMatchObject({
+      ok: true,
+      data: { provider: 'github', job: { status: 'done' }, instanceId: 'instance-status' },
+    });
 
     const cleared = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
     expect(cleared).toMatchObject({ ok: true, data: { provider: 'github', job: null, instanceId: 'instance-status' } });

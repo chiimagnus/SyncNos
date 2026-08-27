@@ -4,10 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
 import { t } from '../../src/ui/i18n';
-import {
-  ConversationsProvider,
-  useConversationsApp,
-} from '../../src/viewmodels/conversations/conversations-context';
+import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
 import { useConversationSyncFeedback } from '../../src/viewmodels/conversations/useConversationSyncFeedback';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
@@ -607,9 +604,7 @@ describe('Conversations sync feedback', () => {
         currentConversationTitle: '',
         currentStage: 'done',
         okCount: 1,
-        perConversation: [
-          { conversationId: 11, ok: true, mode: 'synced', appended: 0, error: '', at: Date.now() },
-        ],
+        perConversation: [{ conversationId: 11, ok: true, mode: 'synced', appended: 0, error: '', at: Date.now() }],
       }),
     });
     await renderPane();

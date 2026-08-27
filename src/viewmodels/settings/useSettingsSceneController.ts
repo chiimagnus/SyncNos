@@ -210,7 +210,10 @@ type GithubSafeAccount = { login: string; avatarUrl: string; url: string };
 type GithubConnectionTestState =
   | { status: 'idle' }
   | { status: 'testing' }
-  | { status: 'success'; target: { repository: string; branch: string; remoteKey: string; installationId: number | null } }
+  | {
+      status: 'success';
+      target: { repository: string; branch: string; remoteKey: string; installationId: number | null };
+    }
   | { status: 'error'; error: string };
 
 function normalizeGithubAuthSummary(value: unknown): GithubAuthSummary {
@@ -1071,7 +1074,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [runTask]);
 
   const githubTargetUnavailable = useMemo(() => {
-    const selected = String(githubRepository || '').trim().toLowerCase();
+    const selected = String(githubRepository || '')
+      .trim()
+      .toLowerCase();
     if (!selected || githubAuth.state !== 'connected' || githubRepositoryStatus == null) return false;
     if (githubRepositoryStatus !== 'ready') return true;
     const target = githubRepositories.find((repository) => repository.fullName.toLowerCase() === selected);

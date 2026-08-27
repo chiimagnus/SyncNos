@@ -87,7 +87,8 @@ function fakeServices(input: {
     getJob: vi.fn(async () => cloneJob(persistedJob)),
     setJob: vi.fn(async (job) => {
       jobSetCalls += 1;
-      if (input.jobSetFailureCalls?.has(jobSetCalls) || (input.failJobWritesAfterInitial && jobSetCalls > 1)) return false;
+      if (input.jobSetFailureCalls?.has(jobSetCalls) || (input.failJobWritesAfterInitial && jobSetCalls > 1))
+        return false;
       persistedJob = cloneJob(job);
       return true;
     }),
@@ -101,7 +102,13 @@ function fakeServices(input: {
       const staleMs = typeof options === 'number' ? options : options?.staleMs;
       if (!forceAbort && isRunningJob(current, staleMs)) return current;
       const now = Date.now();
-      persistedJob = { ...current, status: 'aborted', updatedAt: now, finishedAt: now, abortedReason: 'extension reloaded' };
+      persistedJob = {
+        ...current,
+        status: 'aborted',
+        updatedAt: now,
+        finishedAt: now,
+        abortedReason: 'extension reloaded',
+      };
       return cloneJob(persistedJob);
     }),
   };
@@ -328,7 +335,10 @@ describe('github sync orchestrator job lifecycle', () => {
       }),
     });
 
-    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1], instanceId: 'instance-a' });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1],
+      instanceId: 'instance-a',
+    });
 
     expect(result.items[0]?.status).toBe('synced');
     expect(jobStore.setJob).toHaveBeenCalled();
@@ -474,7 +484,10 @@ describe('github sync orchestrator job lifecycle', () => {
       }),
     });
 
-    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1], instanceId: 'instance-a' });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1],
+      instanceId: 'instance-a',
+    });
 
     expect(commit).toHaveBeenCalledTimes(1);
     expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(1);
