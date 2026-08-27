@@ -257,7 +257,7 @@ describe('settings section definitions', () => {
     });
 
     expect(document.querySelector(`a[href="${setupGuideUrl}"]`)).toBeTruthy();
-    const section = document.querySelector('section[aria-label="Obsidian Local REST API"]');
+    const section = document.querySelector('section[aria-label="Obsidian"]');
     const header = section?.firstElementChild;
     const testButton = Array.from(header?.querySelectorAll('button') || []).find(
       (button) => button.textContent?.trim() === 'Test',
