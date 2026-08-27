@@ -332,6 +332,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubAccount, setGithubAccount] = useState<GithubSafeAccount | null>(null);
   const [githubRepositoryStatus, setGithubRepositoryStatus] = useState<GithubRepositoryStatus>(null);
   const [githubRepositories, setGithubRepositories] = useState<GithubRepositoryOption[]>([]);
+  const [githubRepositoriesLoading, setGithubRepositoriesLoading] = useState(false);
+  const [githubRepositoryDiscoveryError, setGithubRepositoryDiscoveryError] = useState('');
+  const githubRepositoryDiscoveryGenerationRef = useRef(0);
   const [githubRepository, setGithubRepository] = useState('');
   const [githubBranch, setGithubBranch] = useState('');
   const githubPersistedBranchRef = useRef('');
@@ -426,9 +429,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const clearGithubRepositoryDiscovery = useCallback(() => {
+    githubRepositoryDiscoveryGenerationRef.current += 1;
     setGithubAccount(null);
     setGithubRepositoryStatus(null);
     setGithubRepositories([]);
+    setGithubRepositoriesLoading(false);
+    setGithubRepositoryDiscoveryError('');
   }, []);
 
   const applyGithubAuth = useCallback(
@@ -466,16 +472,25 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [applyGithubAuth, applyGithubTargetSettings],
   );
 
-  const loadGithubRepositoriesInternal = useCallback(async () => {
+  const runGithubRepositoryDiscovery = useCallback(async () => {
+    const requestGeneration = githubRepositoryDiscoveryGenerationRef.current + 1;
+    githubRepositoryDiscoveryGenerationRef.current = requestGeneration;
     setGithubConnectionTest({ status: 'idle' });
+    setGithubRepositoryDiscoveryError('');
+    setGithubRepositoriesLoading(true);
+
     try {
       const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES, {}));
+      if (githubRepositoryDiscoveryGenerationRef.current !== requestGeneration) return;
+
       const status: GithubRepositoryStatus =
         data?.status === 'ready' ||
         data?.status === 'github_app_not_installed' ||
         data?.status === 'github_no_accessible_repositories'
           ? data.status
           : null;
+      if (status == null) throw new Error('github_repository_response_invalid');
+
       const login = String(data?.account?.login || '').trim();
       setGithubAccount(
         login
@@ -490,15 +505,26 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setGithubRepositories(normalizeGithubRepositoryOptions(data?.repositories));
       if (data?.appUrl) setGithubAppUrl(String(data.appUrl));
       if (data?.installUrl) setGithubInstallUrl(String(data.installUrl));
-      return data;
     } catch (error) {
-      if (toErrorMessage(error, '') === 'github_auth_required') {
-        setGithubAuth({ state: 'disconnected' });
-        clearGithubRepositoryDiscovery();
+      if (githubRepositoryDiscoveryGenerationRef.current !== requestGeneration) return;
+      const message = toErrorMessage(error, 'github_repository_list_failed');
+      if (message === 'github_auth_required') {
+        applyGithubAuth({ state: 'disconnected' });
+        return;
       }
-      throw error;
+      setGithubRepositoryDiscoveryError(message);
+    } finally {
+      if (githubRepositoryDiscoveryGenerationRef.current === requestGeneration) {
+        setGithubRepositoriesLoading(false);
+      }
     }
-  }, [clearGithubRepositoryDiscovery]);
+  }, [applyGithubAuth]);
+
+  useEffect(() => {
+    return () => {
+      githubRepositoryDiscoveryGenerationRef.current += 1;
+    };
+  }, []);
 
   const refreshGithubAuthFromStorageSignal = useCallback(async () => {
     try {
@@ -624,8 +650,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianStatus(t('statusIdle'));
 
     const githubSettings = unwrap(githubRes);
-    const githubAuthState = applyGithubSettingsResponse(githubSettings);
-    if (githubAuthState.state === 'connected') await loadGithubRepositoriesInternal();
+    applyGithubSettingsResponse(githubSettings);
 
     const chatWith = await loadChatWithSettings();
     setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
@@ -633,13 +658,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
     );
     chatWithHydratedRef.current = true;
-  }, [
-    applyGithubSettingsResponse,
-    articleDbSpec.storageKey,
-    chatDbSpec.storageKey,
-    loadGithubRepositoriesInternal,
-    videoDbSpec.storageKey,
-  ]);
+  }, [applyGithubSettingsResponse, articleDbSpec.storageKey, chatDbSpec.storageKey, videoDbSpec.storageKey]);
 
   const refresh = useCallback(async () => {
     await runTask(refreshInternal);
@@ -648,6 +667,22 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (activeSection !== 'github') return;
+    if (githubAuth.state !== 'connected') return;
+    if (githubRepositoryStatus != null) return;
+    if (githubRepositoriesLoading) return;
+    if (githubRepositoryDiscoveryError) return;
+    void runGithubRepositoryDiscovery();
+  }, [
+    activeSection,
+    githubAuth.state,
+    githubRepositoriesLoading,
+    githubRepositoryDiscoveryError,
+    githubRepositoryStatus,
+    runGithubRepositoryDiscovery,
+  ]);
 
   useEffect(() => {
     return storageOnChanged((changes: any, areaName: string) => {
@@ -976,27 +1011,24 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     await runTask(
       async () => {
         const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW, {}));
-        const auth = applyGithubAuth(data?.auth);
-        if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+        applyGithubAuth(data?.auth);
       },
       { fallbackMessage: 'github_device_start_failed' },
     );
-  }, [applyGithubAuth, loadGithubRepositoriesInternal, runTask]);
+  }, [applyGithubAuth, runTask]);
 
   const onPollGithubDeviceFlow = useCallback(async () => {
     await runTask(
       async () => {
         try {
           const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, {}));
-          const auth = applyGithubAuth(data?.auth);
-          if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+          applyGithubAuth(data?.auth);
         } catch (error) {
           // P2 may have advanced nextPollAt or cleared a terminal flow before returning an error.
           // Rehydrate only the safe local DTO so the timer follows the persisted state instead of stale React state.
           try {
             const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
-            const auth = applyGithubSettingsResponse(snapshot);
-            if (auth.state === 'connected') await loadGithubRepositoriesInternal();
+            applyGithubSettingsResponse(snapshot);
           } catch (_refreshError) {
             // Keep the original poll error; GET_SETTINGS is recovery, not a replacement failure surface.
           }
@@ -1005,7 +1037,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       },
       { useBusy: false, clearError: false, fallbackMessage: 'github_device_poll_failed' },
     );
-  }, [applyGithubAuth, applyGithubSettingsResponse, loadGithubRepositoriesInternal, runTask]);
+  }, [applyGithubAuth, applyGithubSettingsResponse, runTask]);
 
   useEffect(() => {
     if (githubAuth.state !== 'pending') return;
@@ -1038,13 +1070,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [applyGithubAuth, runTask]);
 
   const onRefreshGithubRepositories = useCallback(async () => {
-    await runTask(
-      async () => {
-        await loadGithubRepositoriesInternal();
-      },
-      { fallbackMessage: 'github_repository_list_failed' },
-    );
-  }, [loadGithubRepositoriesInternal, runTask]);
+    await runGithubRepositoryDiscovery();
+  }, [runGithubRepositoryDiscovery]);
 
   const onChangeGithubRepository = useCallback(
     async (value: string) => {
@@ -1944,6 +1971,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     githubAccount,
     githubRepositoryStatus,
     githubRepositories,
+    githubRepositoriesLoading,
+    githubRepositoryDiscoveryError,
     githubTargetUnavailable,
     githubRepository,
     onChangeGithubRepository,

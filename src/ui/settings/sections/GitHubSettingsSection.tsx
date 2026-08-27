@@ -38,6 +38,8 @@ export function GitHubSettingsSection(props: {
   account: { login: string; avatarUrl: string; url: string } | null;
   repositoryStatus: 'ready' | 'github_app_not_installed' | 'github_no_accessible_repositories' | null;
   repositories: GithubRepositoryOption[];
+  repositoriesLoading: boolean;
+  repositoryDiscoveryError: string;
   targetUnavailable: boolean;
   repository: string;
   branch: string;
@@ -66,6 +68,8 @@ export function GitHubSettingsSection(props: {
     account,
     repositoryStatus,
     repositories,
+    repositoriesLoading,
+    repositoryDiscoveryError,
     targetUnavailable,
     repository,
     branch,
@@ -241,7 +245,7 @@ export function GitHubSettingsSection(props: {
                     buttonClassName={`${buttonClassName} tw-w-full`}
                     value={repository}
                     options={repositoryOptions}
-                    disabled={busy || repositoryStatus !== 'ready'}
+                    disabled={busy || repositoriesLoading || repositoryStatus !== 'ready'}
                     ariaLabel={t('githubRepositoryLabel')}
                     maxHeight={360}
                     onChange={onChangeRepository}
@@ -250,14 +254,25 @@ export function GitHubSettingsSection(props: {
                     type="button"
                     title={t('refresh')}
                     onClick={onRefreshRepositories}
-                    disabled={busy}
+                    disabled={busy || repositoriesLoading}
                     className="webclipper-btn webclipper-btn--icon"
                     aria-label={t('githubRefreshRepositories')}
+                    aria-busy={repositoriesLoading}
                   >
-                    ↻
+                    {repositoriesLoading ? '⏳' : '↻'}
                   </button>
                 </div>
               </SettingsFormRow>
+
+              {repositoryDiscoveryError ? (
+                <div
+                  className="tw-text-xs tw-font-semibold tw-text-[var(--error)]"
+                  role="status"
+                  data-github-repository-discovery-error="true"
+                >
+                  {t('statusError')}: {repositoryDiscoveryError}
+                </div>
+              ) : null}
 
               {targetUnavailable ? (
                 <div className="tw-text-xs tw-font-semibold tw-text-[var(--error)]" role="status">
