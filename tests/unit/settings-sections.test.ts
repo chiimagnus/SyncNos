@@ -71,6 +71,7 @@ describe('settings section definitions', () => {
       onChangeRepository: vi.fn(),
       onSaveTarget: vi.fn(),
       onTestConnection: vi.fn(),
+      onInitializeRepository: vi.fn(),
     };
     const baseProps: Parameters<typeof GitHubSettingsSection>[0] = {
       busy: false,
@@ -104,6 +105,7 @@ describe('settings section definitions', () => {
       onChangeVideoFolder: () => {},
       onSaveTarget: callbacks.onSaveTarget,
       onTestConnection: callbacks.onTestConnection,
+      onInitializeRepository: callbacks.onInitializeRepository,
     };
 
     act(() => {
@@ -212,6 +214,29 @@ describe('settings section definitions', () => {
       act(() => button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
       expect(callback).toHaveBeenCalledTimes(callback === callbacks.onSaveTarget ? 3 : 1);
     }
+
+    act(() => {
+      root.render(
+        createElement(GitHubSettingsSection, {
+          ...baseProps,
+          auth: { state: 'connected' },
+          account: { login: 'octocat', avatarUrl: '', url: 'https://github.com/octocat' },
+          repositoryStatus: 'ready',
+          repositories: [{ fullName: 'owner/repo', contentWriteCapable: true }],
+          repository: 'owner/repo',
+          connectionTest: { status: 'uninitialized' },
+        }),
+      );
+    });
+    expect(document.body.textContent || '').toContain(
+      'This repository is empty. Initialize it to create README.md and the first commit.',
+    );
+    const initializeButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Initialize repository',
+    ) as HTMLButtonElement | undefined;
+    expect(initializeButton).toBeTruthy();
+    act(() => initializeButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(callbacks.onInitializeRepository).toHaveBeenCalledTimes(1);
 
     act(() => root.unmount());
     cleanupDom();

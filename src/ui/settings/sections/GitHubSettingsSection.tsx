@@ -25,6 +25,8 @@ type GithubRepositoryOption = {
 type GithubConnectionTestState =
   | { status: 'idle' }
   | { status: 'testing' }
+  | { status: 'uninitialized' }
+  | { status: 'initializing' }
   | { status: 'success'; target: { repository: string; branch: string; remoteKey: string } }
   | { status: 'error'; error: string };
 
@@ -60,6 +62,7 @@ export function GitHubSettingsSection(props: {
   onChangeVideoFolder: (folder: string) => void;
   onSaveTarget: () => void;
   onTestConnection: () => void;
+  onInitializeRepository: () => void;
 }) {
   const {
     busy,
@@ -93,6 +96,7 @@ export function GitHubSettingsSection(props: {
     onChangeVideoFolder,
     onSaveTarget,
     onTestConnection,
+    onInitializeRepository,
   } = props;
 
   const repositoryOptions = [
@@ -121,11 +125,15 @@ export function GitHubSettingsSection(props: {
   const testStatus =
     connectionTest.status === 'testing'
       ? t('statusTesting')
-      : connectionTest.status === 'success'
-        ? `${t('githubTestSuccess')} · ${connectionTest.target.remoteKey}`
-        : connectionTest.status === 'error'
-          ? `${t('statusError')}: ${connectionTest.error}`
-          : '';
+      : connectionTest.status === 'initializing'
+        ? t('githubInitializingRepository')
+        : connectionTest.status === 'uninitialized'
+          ? t('githubRepositoryUninitializedHint')
+          : connectionTest.status === 'success'
+            ? `${t('githubTestSuccess')} · ${connectionTest.target.remoteKey}`
+            : connectionTest.status === 'error'
+              ? `${t('statusError')}: ${connectionTest.error}`
+              : '';
 
   return (
     <>
@@ -293,10 +301,28 @@ export function GitHubSettingsSection(props: {
                   type="button"
                   className={buttonClassName}
                   onClick={onTestConnection}
-                  disabled={busy || !repository || targetUnavailable || connectionTest.status === 'testing'}
+                  disabled={
+                    busy ||
+                    !repository ||
+                    targetUnavailable ||
+                    connectionTest.status === 'testing' ||
+                    connectionTest.status === 'initializing'
+                  }
                 >
                   {t('githubTestConnection')}
                 </button>
+                {connectionTest.status === 'uninitialized' || connectionTest.status === 'initializing' ? (
+                  <button
+                    type="button"
+                    className={primaryButtonClassName}
+                    onClick={onInitializeRepository}
+                    disabled={busy || connectionTest.status === 'initializing'}
+                  >
+                    {connectionTest.status === 'initializing'
+                      ? t('githubInitializingRepository')
+                      : t('githubInitializeRepository')}
+                  </button>
+                ) : null}
                 <a
                   className={buttonClassName}
                   href={repositoryStatus === 'github_app_not_installed' ? installUrl : appUrl || installUrl}

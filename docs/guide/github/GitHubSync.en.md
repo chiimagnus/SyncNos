@@ -8,7 +8,7 @@ This guide covers the user-facing setup for syncing SyncNos WebClipper content t
 
 - Content should already be saved locally in SyncNos WebClipper.
 - Sign in to the GitHub account that should authorize SyncNos.
-- The target repository must already contain at least one commit.
+- The target repository may be empty. SyncNos can initialize its default branch from Settings when needed.
 - If the repository belongs to an organization, you may need permission to install or configure the SyncNos GitHub App for that organization.
 
 ## 1. Connect GitHub with Device Flow
@@ -41,7 +41,7 @@ SyncNos does not silently replace a saved repository when access is removed. The
 In WebClipper → `Settings` → `GitHub`:
 
 1. Choose an authorized repository with content write access.
-2. Enter the target branch. The branch must already exist.
+2. Enter the target branch. For an initialized repository, the branch must already exist. An empty repository can be initialized only on its GitHub default branch.
 3. Configure the optional repository-relative folders for AI chats, web articles, and video scripts.
 4. Leave a field or press Enter to save changes.
 
@@ -53,7 +53,7 @@ Changing a folder while keeping the same repository and branch moves SyncNos-man
 
 Click `Test connection` after choosing the target.
 
-The test validates the current GitHub account, GitHub App installation access, repository, and branch preflight. It does **not** create a test file or a test commit.
+The test validates the current GitHub account, GitHub App installation access, repository, and branch preflight. It does **not** create a test file or a test commit. If the selected repository is empty, Settings offers an explicit `Initialize repository` action. That action creates `README.md` with a link to the [SyncNos project](https://github.com/chiimagnus/SyncNos) and the repository's first commit, then reruns preflight.
 
 A successful preflight does not guarantee that every future write is allowed by branch protection or repository rulesets. A real sync can still receive GitHub `403` or `422` responses when the final ref update is blocked. In that case, choose a branch the GitHub App is allowed to update or adjust the repository ruleset. Do not use force push or protection-bypass workarounds as a SyncNos fix.
 
@@ -97,7 +97,7 @@ The existing selection is intentionally preserved instead of being silently repl
 
 ### Branch preflight fails
 
-Confirm that the branch already exists and that the repository already has at least one commit. Then verify that the GitHub App installation can access the repository.
+For an initialized repository, confirm that the branch already exists. If the repository is empty and the configured branch is its GitHub default branch, use `Initialize repository` in SyncNos Settings. Then verify that the GitHub App installation can access the repository.
 
 ### Sync fails with 403 or 422 after Test Connection succeeded
 

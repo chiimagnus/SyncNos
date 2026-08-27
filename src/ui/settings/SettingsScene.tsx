@@ -159,6 +159,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onRefreshGithubRepositories,
     onSaveGithubSettings,
     onTestGithubConnection,
+    onInitializeGithubRepository,
 
     exportStatus,
     importStatus,
@@ -430,6 +431,9 @@ export function SettingsScene(props: SettingsSceneProps) {
           }}
           onTestConnection={() => {
             void onTestGithubConnection();
+          }}
+          onInitializeRepository={() => {
+            void onInitializeGithubRepository();
           }}
         />
       ) : null}

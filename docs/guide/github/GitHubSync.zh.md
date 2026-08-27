@@ -8,7 +8,7 @@
 
 - 待同步内容应已经先保存到 SyncNos WebClipper 本地。
 - 登录需要授权给 SyncNos 的 GitHub 账号。
-- 目标 repository 必须至少已经有一个 commit。
+- 目标 repository 可以是空仓库；需要时可直接在 SyncNos Settings 中初始化它的默认 branch。
 - 如果目标 repository 属于组织，你可能需要具备为该组织安装或配置 SyncNos GitHub App 的权限。
 
 ## 1. 使用 Device Flow 连接 GitHub
@@ -41,7 +41,7 @@ GitHub App 的 repository scope 就是 SyncNos 能看到哪些 repositories 的�
 在 WebClipper → `Settings` → `GitHub` 中：
 
 1. 选择一个已经授权且具备 contents 写权限的 repository。
-2. 填写目标 branch；该 branch 必须已经存在。
+2. 填写目标 branch；对于已经初始化的 repository，该 branch 必须已经存在。空 repository 只允许初始化它在 GitHub 上配置的默认 branch。
 3. 按需配置 AI 对话、网页文章、视频字幕三个相对 repository 根目录的输出目录。
 4. 离开输入框或按 Enter 保存修改。
 
@@ -53,7 +53,7 @@ GitHub App 的 repository scope 就是 SyncNos 能看到哪些 repositories 的�
 
 选择目标后点击 `测试连接`。
 
-Test Connection 只验证当前 GitHub 账号、GitHub App installation access、repository 和 branch preflight，**不会**创建测试文件，也不会制造试写 commit。
+Test Connection 只验证当前 GitHub 账号、GitHub App installation access、repository 和 branch preflight，**不会**创建测试文件，也不会制造试写 commit。如果选中的 repository 还是空仓库，Settings 会明确显示 `初始化 repository`；只有点击这个动作后，SyncNos 才会创建带有 [SyncNos 项目链接](https://github.com/chiimagnus/SyncNos) 的 `README.md` 和第一个 commit，并重新执行 preflight。
 
 preflight 成功并不代表未来所有写入都必然被 branch protection 或 repository ruleset 允许。真实同步在最终更新 ref 时仍可能收到 GitHub `403` 或 `422`。此时应选择允许 GitHub App 写入的 branch，或调整 repository ruleset；不要把 force push 或绕过保护当成 SyncNos 的修复方案。
 
@@ -97,7 +97,7 @@ GitHub 是派生输出目标，SyncNos 本地数据始终是真源。
 
 ### Branch preflight 失败
 
-确认目标 branch 已经存在，并且 repository 至少已经有一个 commit；然后确认 GitHub App installation 可以访问该 repository。
+对于已经初始化的 repository，确认目标 branch 已经存在。如果 repository 还是空的，并且当前配置的是 GitHub 默认 branch，请在 SyncNos Settings 中使用 `初始化 repository`。然后确认 GitHub App installation 可以访问该 repository。
 
 ### Test Connection 成功，但同步时出现 403 / 422
 
