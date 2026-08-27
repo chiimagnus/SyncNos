@@ -6,7 +6,7 @@ import { formatConversationMarkdownForExternalOutput } from '@services/integrati
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
-import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageOnChanged } from '@services/shared/storage';
 import { buildConversationSidebarRenderItems } from '@services/conversations/domain/sidebar-time-groups';
 
@@ -494,6 +494,10 @@ export function ConversationListPane({
   const onRowKeyDown = (e: React.KeyboardEvent, conversationId: number) => {
     if (!e) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as any;
+    if (target && target.closest) {
+      if (target.closest("input[type='checkbox'], label, button, a")) return;
+    }
     e.preventDefault();
     e.stopPropagation();
     activateRow(conversationId);
@@ -519,15 +523,16 @@ export function ConversationListPane({
     }
   };
 
-  const openConversationUrl = async (url: string, e: React.MouseEvent) => {
+  const onCopyConversationUrl = async (url: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const safe = sanitizeHttpUrl(url);
     if (!safe) return;
     try {
-      await tabsCreate({ url: safe });
-    } catch (_e) {
-      // ignore
+      const copied = await writeTextToClipboard(safe);
+      if (!copied) throw new Error(t('copyFailed'));
+    } catch (err) {
+      alert((err as any)?.message ?? t('copyFailed'));
     }
   };
 
@@ -751,32 +756,23 @@ export function ConversationListPane({
                       </button>
                     </span>
 
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrs(
-                        safeUrl ? t('tooltipOpenChatDetailed') : t('tooltipOpenChatMissingLinkDetailed'),
-                      )}
-                    >
-                      <button
-                        className={buttonMiniIconClassName(isActive)}
-                        type="button"
-                        aria-label={t('openOriginalChat')}
-                        disabled={!safeUrl}
-                        onClick={(e) => void openConversationUrl(String((conversation as any).url || ''), e)}
-                      >
-                        ↗
-                      </button>
-                    </span>
-
-                    <span
+                    <button
+                      type="button"
                       className={[
-                        'tw-inline-flex tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
+                        'tw-inline-flex tw-appearance-none tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
                         'tw-rounded-[var(--radius-chip)]',
+                        safeUrl
+                          ? 'tw-cursor-pointer focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
+                          : 'tw-cursor-default',
                         sourceTag.toneClassName,
                       ].join(' ')}
+                      aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
+                      data-conversation-source-link={String(id)}
+                      disabled={!safeUrl}
+                      onClick={(e) => void onCopyConversationUrl(String((conversation as any).url || ''), e)}
                     >
                       {sourceTag.label}
-                    </span>
+                    </button>
 
                     {Number.isFinite(commentThreadCount) && commentThreadCount > 0 ? (
                       <span

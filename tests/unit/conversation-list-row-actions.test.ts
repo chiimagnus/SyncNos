@@ -8,7 +8,6 @@ import { ConversationListPane } from '../../src/ui/conversations/ConversationLis
 const getConversationDetailMock = vi.fn();
 const formatConversationMarkdownMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
-const tabsCreateMock = vi.fn();
 const getEnabledSyncProvidersMock = vi.fn();
 let currentState: any = null;
 
@@ -31,7 +30,6 @@ vi.mock('../../src/services/shared/clipboard', () => ({
 }));
 
 vi.mock('../../src/services/shared/webext', () => ({
-  tabsCreate: (...args: any[]) => tabsCreateMock(...args),
   openOrFocusExtensionAppTab: vi.fn(),
 }));
 
@@ -189,7 +187,8 @@ describe('ConversationListPane row actions', () => {
     await renderPane();
     const copyButton = document.querySelector('[aria-label="copyFullMarkdown"]') as HTMLButtonElement | null;
     expect(copyButton).toBeTruthy();
-    expect(document.querySelector('[aria-label="openOriginalChat"]')).toBeTruthy();
+    expect(document.querySelector('[data-conversation-source-link="11"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="openOriginalChat"]')).toBeNull();
     expect(copyButton?.textContent).toBe('⧉');
 
     await act(async () => {
@@ -215,44 +214,63 @@ describe('ConversationListPane row actions', () => {
     expect(copyButton?.textContent).toBe('⧉');
   });
 
-  it('opens the exact trimmed original https URL without activating the row', async () => {
+  it('copies the exact trimmed original https URL from the source badge without activating the row', async () => {
     currentState.items[0].url = '  https://example.com/path?x=1#section  ';
     await renderPane();
-    const openButton = document.querySelector('[aria-label="openOriginalChat"]') as HTMLButtonElement | null;
-    expect(openButton).toBeTruthy();
-    expect(openButton?.disabled).toBe(false);
+    const sourceButton = document.querySelector('[data-conversation-source-link="11"]') as HTMLButtonElement | null;
+    expect(sourceButton).toBeTruthy();
+    expect(sourceButton?.textContent).toBe('sourceChatgpt');
+    expect(sourceButton?.disabled).toBe(false);
 
     await act(async () => {
-      openButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      sourceButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
 
-    expect(tabsCreateMock).toHaveBeenCalledWith({ url: 'https://example.com/path?x=1#section' });
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('https://example.com/path?x=1#section');
     expect(currentState.setActiveId).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
   });
 
-  it('keeps http original URLs available', async () => {
+  it('copies http original URLs from the source badge', async () => {
     currentState.items[0].url = ' http://example.com/path#hash ';
     await renderPane();
-    const openButton = document.querySelector('[aria-label="openOriginalChat"]') as HTMLButtonElement | null;
+    const sourceButton = document.querySelector('[data-conversation-source-link="11"]') as HTMLButtonElement | null;
 
     await act(async () => {
-      openButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      sourceButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
 
-    expect(tabsCreateMock).toHaveBeenCalledWith({ url: 'http://example.com/path#hash' });
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('http://example.com/path#hash');
   });
 
-  it.each(['', 'javascript:alert(1)', 'obsidian://open?vault=x'])('disables Open original for %s', async (url) => {
-    currentState.items[0].url = url;
-    await renderPane();
-    const openButton = document.querySelector('[aria-label="openOriginalChat"]') as HTMLButtonElement | null;
+  it.each(['', 'javascript:alert(1)', 'obsidian://open?vault=x'])(
+    'disables source-link copying for %s',
+    async (url) => {
+      currentState.items[0].url = url;
+      await renderPane();
+      const sourceButton = document.querySelector('[data-conversation-source-link="11"]') as HTMLButtonElement | null;
 
-    expect(openButton).toBeTruthy();
-    expect(openButton?.disabled).toBe(true);
-    expect(tabsCreateMock).not.toHaveBeenCalled();
+      expect(sourceButton).toBeTruthy();
+      expect(sourceButton?.disabled).toBe(true);
+      expect(writeTextToClipboardMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not let the row Enter handler consume source-badge keyboard interaction', async () => {
+    await renderPane();
+    const sourceButton = document.querySelector('[data-conversation-source-link="11"]') as HTMLButtonElement | null;
+
+    await act(async () => {
+      sourceButton!.dispatchEvent(
+        new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      );
+      await flushMicrotasks();
+    });
+
+    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(onOpenConversation).not.toHaveBeenCalled();
   });
 
   it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
