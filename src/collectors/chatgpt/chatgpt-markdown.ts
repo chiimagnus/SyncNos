@@ -276,8 +276,7 @@ function getAssistantContentRoot(wrapper: any): any {
   return wrapper;
 }
 
-function sanitizeAssistantClone(wrapper: any): any {
-  const root = getAssistantContentRoot(wrapper);
+function sanitizeRenderedClone(root: any): any {
   if (!root || !root.cloneNode) return null;
   try {
     const cloned = root.cloneNode(true);
@@ -545,16 +544,24 @@ function htmlToMarkdown(root: any): any {
   return normalizeMarkdown(renderNode(root, { listDepth: 0 }));
 }
 
-function extractAssistantMarkdown(wrapper: any): any {
-  const cloned = sanitizeAssistantClone(wrapper);
+function extractRenderedMarkdown(root: any): any {
+  const cloned = sanitizeRenderedClone(root);
   if (!cloned) return '';
   return htmlToMarkdown(cloned) || '';
 }
 
-function extractAssistantText(wrapper: any): any {
-  const cloned = sanitizeAssistantClone(wrapper);
+function extractRenderedText(root: any): any {
+  const cloned = sanitizeRenderedClone(root);
   if (!cloned) return '';
   return normalizeText(extractTextFromSanitizedClone(cloned));
+}
+
+function extractAssistantMarkdown(wrapper: any): any {
+  return extractRenderedMarkdown(getAssistantContentRoot(wrapper));
+}
+
+function extractAssistantText(wrapper: any): any {
+  return extractRenderedText(getAssistantContentRoot(wrapper));
 }
 
 const api = {
@@ -562,6 +569,8 @@ const api = {
   normalizeMarkdown,
   extractTextFromSanitizedClone,
   htmlToMarkdown,
+  extractRenderedMarkdown,
+  extractRenderedText,
   extractAssistantMarkdown,
   extractAssistantText,
 };

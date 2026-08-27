@@ -39,6 +39,7 @@ export function turnKeyOf(el: any): string {
 
 export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinition {
   const consumePreparedCapture = createPreparedCaptureConsumer<any>('chatgpt');
+  const MODERN_TURN_SELECTOR = "[data-testid^='conversation-turn-'], [data-testid='conversation-turn']";
 
   function findDeepResearchIframe(wrapper: any): any | null {
     if (!wrapper || !wrapper.querySelector) return null;
@@ -126,9 +127,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function readTurnShells(root: any): any[] {
     if (!root?.querySelectorAll) return [];
-    return Array.from(
-      root.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
-    ) as any[];
+    return Array.from(root.querySelectorAll(MODERN_TURN_SELECTOR)) as any[];
   }
 
   function sampleIdentityGuard(root: any): PreparedIdentityGuard {
@@ -273,13 +272,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return env.document.querySelector('main') || env.document.querySelector("[role='main']") || env.document.body;
   }
 
-  function inEditMode(root: any): any {
-    if (!root) return false;
-    const ta = root.querySelector('textarea');
-    if (!ta) return false;
-    return env.document.activeElement === ta || ta.contains(env.document.activeElement);
-  }
-
   function userContentNode(element: any): any {
     return element.querySelector('.whitespace-pre-wrap') || element;
   }
@@ -307,6 +299,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     outerHtml: string;
     imageUrls: string[];
     iframeUrl: string;
+    cotOuterHtml: string;
   };
 
   function getTurnWrappers(root: any): any {
@@ -329,9 +322,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
     const roleNodes = Array.from(scope.querySelectorAll('[data-message-author-role]')) as any[];
     // Modern ChatGPT wraps each turn with `data-testid="conversation-turn-N"` but the tag varies (`article`, `section`, etc).
-    const turnNodes = Array.from(
-      scope.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
-    ) as any[];
+    const turnNodes = Array.from(scope.querySelectorAll(MODERN_TURN_SELECTOR)) as any[];
 
     // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple assistant
     // messages inside a single `.agent-turn` container; keeping `.agent-turn` as the wrapper would
@@ -368,52 +359,221 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return 'assistant';
   }
 
-  // Extract a single message from one turn wrapper. Returns null when the wrapper has no
-  // textual content and no images (e.g. virtualized empty shells), so callers can skip it.
-  async function extractMessageFromWrapper(el: any, i: number, { messageKeyOverride }: any = {}): Promise<any | null> {
-    const role = roleFromWrapper(el);
-    const messageId =
-      (el.getAttribute && (el.getAttribute('data-message-id') || el.getAttribute('data-turn-id') || el.id)) || '';
-    const node = role === 'user' ? userContentNode(el) : assistantContentNode(el);
-    const raw = node ? node.innerText || node.textContent || '' : '';
-    const fallbackText = env.normalize.normalizeText(raw);
-    let contentText =
-      role === 'assistant' && typeof chatgptMarkdown.extractAssistantText === 'function'
-        ? chatgptMarkdown.extractAssistantText(el) || fallbackText
-        : fallbackText;
-    const imageUrls = (() => {
-      const primary = extractChatgptImageUrls(node || el);
-      if (!node || node === el) return primary;
-      const secondary = extractChatgptImageUrls(el);
-      return Array.from(new Set(primary.concat(secondary)));
-    })();
+  const COT_REASONING_SELECTOR = '.markdown.prose, .markdown';
+  const COT_TOOL_ICON_SELECTOR = "[data-testid='cot-v5-tool-icon-pile']";
 
-    let baseMarkdown =
-      role === 'assistant' && typeof chatgptMarkdown.extractAssistantMarkdown === 'function'
-        ? chatgptMarkdown.extractAssistantMarkdown(el) || contentText || ''
-        : contentText || '';
+  type CotContent = {
+    text: string;
+    markdown: string;
+  };
 
-    const deepResearchIframe = role === 'assistant' ? findDeepResearchIframe(el) : null;
-    if (role === 'assistant' && deepResearchIframe) {
-      const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
-      const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
-      contentText = placeholder;
-      baseMarkdown = placeholder;
+  type CotAssociation = {
+    semanticText: string;
+    semanticMarkdown: string;
+    outerHtml: string;
+  };
+
+  function compareDocumentOrder(left: any, right: any): number {
+    if (left === right) return 0;
+    if (!left?.compareDocumentPosition || !right) return 0;
+    const position = left.compareDocumentPosition(right);
+    const following = env.window?.Node?.DOCUMENT_POSITION_FOLLOWING ?? 4;
+    const preceding = env.window?.Node?.DOCUMENT_POSITION_PRECEDING ?? 2;
+    if (position & following) return -1;
+    if (position & preceding) return 1;
+    return 0;
+  }
+
+  function joinContentBlocks(values: unknown[]): string {
+    return values
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  function isExplicitlyHiddenWithin(node: any, root: any): boolean {
+    let current = node;
+    while (current) {
+      if (current.hasAttribute?.('hidden') || String(current.getAttribute?.('aria-hidden') || '') === 'true') {
+        return true;
+      }
+      if (current === root) break;
+      current = current.parentElement;
+    }
+    return false;
+  }
+
+  function collectCotContentBlocks(root: any): Array<{ kind: 'reasoning' | 'tool'; node: any }> {
+    if (!root?.querySelectorAll) return [];
+    const candidates: Array<{ kind: 'reasoning' | 'tool'; node: any }> = [];
+    const seen = new Set<any>();
+    const push = (kind: 'reasoning' | 'tool', node: any) => {
+      if (!node || seen.has(node) || isExplicitlyHiddenWithin(node, root)) return;
+      seen.add(node);
+      candidates.push({ kind, node });
+    };
+
+    if (root.matches?.(COT_REASONING_SELECTOR)) push('reasoning', root);
+    for (const node of Array.from(root.querySelectorAll(COT_REASONING_SELECTOR)) as any[]) {
+      push('reasoning', node);
+    }
+    for (const marker of Array.from(root.querySelectorAll(COT_TOOL_ICON_SELECTOR)) as any[]) {
+      push('tool', marker?.parentElement || null);
     }
 
-    if (!contentText && !imageUrls.length) return null;
-    const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
-    const messageKey =
-      String(messageKeyOverride || '').trim() ||
-      messageId ||
-      env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
+    candidates.sort((left, right) => compareDocumentOrder(left.node, right.node));
+    return candidates.filter(
+      (candidate) =>
+        !candidates.some(
+          (other) => other !== candidate && other.node?.contains?.(candidate.node) && other.node !== candidate.node,
+        ),
+    );
+  }
+
+  function extractCotContent(root: any): CotContent {
+    const blocks = collectCotContentBlocks(root);
+    if (!blocks.length) return { text: '', markdown: '' };
+
+    const textBlocks: string[] = [];
+    const markdownBlocks: string[] = [];
+    for (const block of blocks) {
+      const text = String(chatgptMarkdown.extractRenderedText?.(block.node) || '').trim();
+      const markdown =
+        block.kind === 'reasoning'
+          ? String(chatgptMarkdown.extractRenderedMarkdown?.(block.node) || text).trim()
+          : text;
+      if (!text && !markdown) continue;
+      if (text) textBlocks.push(text);
+      if (markdown) markdownBlocks.push(markdown);
+    }
     return {
-      messageKey,
-      role,
-      contentText,
-      contentMarkdown,
-      sequence: i,
-      updatedAt: Date.now(),
+      text: joinContentBlocks(textBlocks),
+      markdown: joinContentBlocks(markdownBlocks),
+    };
+  }
+
+  function pruneCotBodyClone(body: any): any | null {
+    if (!body?.cloneNode) return null;
+    let clone: any = null;
+    try {
+      clone = body.cloneNode(true);
+    } catch (_error) {
+      return null;
+    }
+    if (!clone?.querySelectorAll) return clone;
+
+    for (const toggle of Array.from(clone.querySelectorAll("button[aria-controls][aria-expanded='false']")) as any[]) {
+      const controlledId = String(toggle?.getAttribute?.('aria-controls') || '').trim();
+      if (!controlledId) continue;
+      const controlled = (Array.from(clone.querySelectorAll('[id]')) as any[]).find(
+        (node) => String(node?.getAttribute?.('id') || '') === controlledId,
+      );
+      try {
+        controlled?.remove?.();
+      } catch (_error) {
+        // ignore
+      }
+      try {
+        toggle?.remove?.();
+      } catch (_error) {
+        // ignore
+      }
+    }
+
+    return clone;
+  }
+
+  function hasReliableCotBodySignal(body: any): boolean {
+    if (!body?.querySelector) return false;
+    return (
+      String(body.getAttribute?.('data-item-anchor') || '') !== '' &&
+      String(body.getAttribute?.('data-dimension') || '') === 'height'
+    );
+  }
+
+  function snapshotCotBody(body: any, includeOuterHtml: boolean): CotAssociation | null {
+    if (!hasReliableCotBodySignal(body)) return null;
+    const clone = pruneCotBodyClone(body);
+    if (!clone) return null;
+    const content = extractCotContent(clone);
+    const semanticText = String(content.text || '').trim();
+    const semanticMarkdown = String(content.markdown || '').trim();
+    if (!semanticText && !semanticMarkdown) return null;
+    return {
+      semanticText,
+      semanticMarkdown,
+      outerHtml: includeOuterHtml ? String(clone.outerHTML || '') : '',
+    };
+  }
+
+  function messageGroupRoot(wrapper: any): any | null {
+    const modern = wrapper?.closest?.(MODERN_TURN_SELECTOR);
+    if (modern) return modern;
+    return wrapper?.closest?.('.agent-turn') || null;
+  }
+
+  function buildCotAssociations(wrappers: any[], includeOuterHtml: boolean): Map<any, CotAssociation> {
+    const wrappersByGroup = new Map<any, any[]>();
+    for (const wrapper of wrappers) {
+      const group = messageGroupRoot(wrapper);
+      if (!group) continue;
+      const groupWrappers = wrappersByGroup.get(group) || [];
+      groupWrappers.push(wrapper);
+      wrappersByGroup.set(group, groupWrappers);
+    }
+
+    const pending = new Map<any, { textParts: string[]; markdownParts: string[]; htmlParts: string[] }>();
+    for (const [group, groupWrappers] of wrappersByGroup) {
+      const assistants = groupWrappers.filter((wrapper) => roleFromWrapper(wrapper) === 'assistant');
+      if (!assistants.length || !group?.querySelectorAll) continue;
+      const candidates = (Array.from(group.querySelectorAll("button[aria-expanded='true']")) as any[])
+        .filter((button) => !String(button?.getAttribute?.('aria-controls') || '').trim())
+        .filter((button) => !button?.closest?.('[data-message-author-role]'))
+        .filter(
+          (button) =>
+            !groupWrappers.some(
+              (wrapper) => wrapper !== group && typeof wrapper?.contains === 'function' && wrapper.contains(button),
+            ),
+        )
+        .sort(compareDocumentOrder);
+
+      for (const button of candidates) {
+        const body = button?.nextElementSibling;
+        if (!body || body?.closest?.('[data-message-author-role]')) continue;
+        const owner = assistants.find(
+          (wrapper) => wrapper !== group && !body?.contains?.(wrapper) && compareDocumentOrder(body, wrapper) < 0,
+        );
+        if (!owner) continue;
+        const snapshot = snapshotCotBody(body, includeOuterHtml);
+        if (!snapshot) continue;
+        const bucket = pending.get(owner) || { textParts: [], markdownParts: [], htmlParts: [] };
+        if (snapshot.semanticText) bucket.textParts.push(snapshot.semanticText);
+        if (snapshot.semanticMarkdown) bucket.markdownParts.push(snapshot.semanticMarkdown);
+        if (includeOuterHtml && snapshot.outerHtml) bucket.htmlParts.push(snapshot.outerHtml);
+        pending.set(owner, bucket);
+      }
+    }
+
+    const result = new Map<any, CotAssociation>();
+    for (const [owner, bucket] of pending) {
+      result.set(owner, {
+        semanticText: joinContentBlocks(bucket.textParts),
+        semanticMarkdown: joinContentBlocks(bucket.markdownParts),
+        outerHtml: includeOuterHtml ? bucket.htmlParts.join('\n') : '',
+      });
+    }
+    return result;
+  }
+
+  function extractCotContentFromHtml(html: string): CotContent {
+    const holder = env.document.createElement('div');
+    holder.innerHTML = String(html || '');
+    const roots = Array.from(holder.children) as any[];
+    if (!roots.length) return { text: '', markdown: '' };
+    const parts = roots.map((root) => extractCotContent(root));
+    return {
+      text: joinContentBlocks(parts.map((part) => part.text)),
+      markdown: joinContentBlocks(parts.map((part) => part.markdown)),
     };
   }
 
@@ -426,13 +586,17 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     role: string;
     key: string;
     text: string;
+    cotText: string;
+    cotMarkdown: string;
     imageUrls: string[];
     iframeUrl: string;
   }): string {
     const imageRefs = input.imageUrls.join('|');
     const source = `${input.role}|${input.key}|${input.text.length}|${compactFingerprintPart(input.text)}|${
-      input.imageUrls.length
-    }|${compactFingerprintPart(imageRefs)}|${compactFingerprintPart(input.iframeUrl)}`;
+      input.cotText.length
+    }|${compactFingerprintPart(input.cotText)}|${input.cotMarkdown.length}|${compactFingerprintPart(
+      input.cotMarkdown,
+    )}|${input.imageUrls.length}|${compactFingerprintPart(imageRefs)}|${compactFingerprintPart(input.iframeUrl)}`;
     return compactFingerprintPart(source);
   }
 
@@ -463,6 +627,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const inputsByKey = new Map<string, ChatgptExtractionInput>();
     if (!root) return { descriptors, inputsByKey };
     const wrappers = getTurnWrappers(root);
+    const cotByOwner = buildCotAssociations(wrappers, includeInputs);
     const perTurn = new Map<string, number>();
     for (const wrapper of wrappers) {
       const role = roleFromWrapper(wrapper);
@@ -476,12 +641,15 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const imageUrls = extractChatgptImageUrls(wrapper);
       const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
       const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
+      const cot = role === 'assistant' && !iframe ? cotByOwner.get(wrapper) || null : null;
+      const cotText = String(cot?.semanticText || '');
+      const cotMarkdown = String(cot?.semanticMarkdown || '');
       const descriptor: ChatgptDescriptor = {
         key,
         turnKey,
         withinTurn,
         role,
-        fingerprint: descriptorFingerprint({ role, key, text, imageUrls, iframeUrl }),
+        fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
         hasDeepResearch: !!iframe,
         rendered: !!text || imageUrls.length > 0 || !!iframe,
         visible: isVisibleWindow(wrapper),
@@ -493,6 +661,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           outerHtml: String(wrapper?.outerHTML || ''),
           imageUrls,
           iframeUrl,
+          cotOuterHtml: cot?.outerHtml || '',
         });
       }
     }
@@ -526,6 +695,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const placeholder = input.iframeUrl ? `Deep Research (iframe): ${input.iframeUrl}` : 'Deep Research (iframe)';
       contentText = placeholder;
       baseMarkdown = placeholder;
+    } else if (input.role === 'assistant' && input.cotOuterHtml) {
+      const cot = extractCotContentFromHtml(input.cotOuterHtml);
+      contentText = joinContentBlocks([cot.text, contentText]);
+      baseMarkdown = joinContentBlocks([cot.markdown || cot.text, baseMarkdown]);
     }
     if (!contentText && !input.imageUrls.length) return null;
     return {
@@ -551,21 +724,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     readWindow: () => readCurrentManualWindow(true),
     getExtractionCount: () => manualExtractionCount,
   };
-
-  async function collectMessages({ allowEditing }: any = {}): Promise<any[]> {
-    const root = getConversationRoot();
-    if (!root) return [];
-    if (!allowEditing && inEditMode(root)) return [];
-
-    const wrappers = getTurnWrappers(root);
-    const out: any[] = [];
-    for (let i = 0; i < wrappers.length; i += 1) {
-      const msg = await extractMessageFromWrapper(wrappers[i], i);
-      if (msg) out.push(msg);
-    }
-
-    return out;
-  }
 
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
@@ -743,7 +901,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       identityConversationKey,
       manualAdapter,
       getRoot: getConversationRoot,
-      collectMessages,
     },
   };
 
