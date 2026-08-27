@@ -332,8 +332,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubAccount, setGithubAccount] = useState<GithubSafeAccount | null>(null);
   const [githubRepositoryStatus, setGithubRepositoryStatus] = useState<GithubRepositoryStatus>(null);
   const [githubRepositories, setGithubRepositories] = useState<GithubRepositoryOption[]>([]);
-  const [, setGithubRepositoriesLoading] = useState(false);
-  const [, setGithubRepositoryDiscoveryError] = useState('');
+  const [githubRepositoriesLoading, setGithubRepositoriesLoading] = useState(false);
+  const [githubRepositoryDiscoveryError, setGithubRepositoryDiscoveryError] = useState('');
   const githubRepositoryDiscoveryGenerationRef = useRef(0);
   const [githubRepository, setGithubRepository] = useState('');
   const [githubBranch, setGithubBranch] = useState('');
@@ -648,8 +648,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianStatus(t('statusIdle'));
 
     const githubSettings = unwrap(githubRes);
-    const githubAuthState = applyGithubSettingsResponse(githubSettings);
-    if (githubAuthState.state === 'connected') await runGithubRepositoryDiscovery();
+    applyGithubSettingsResponse(githubSettings);
 
     const chatWith = await loadChatWithSettings();
     setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
@@ -661,7 +660,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     applyGithubSettingsResponse,
     articleDbSpec.storageKey,
     chatDbSpec.storageKey,
-    runGithubRepositoryDiscovery,
     videoDbSpec.storageKey,
   ]);
 
@@ -672,6 +670,22 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (activeSection !== 'github') return;
+    if (githubAuth.state !== 'connected') return;
+    if (githubRepositoryStatus != null) return;
+    if (githubRepositoriesLoading) return;
+    if (githubRepositoryDiscoveryError) return;
+    void runGithubRepositoryDiscovery();
+  }, [
+    activeSection,
+    githubAuth.state,
+    githubRepositoriesLoading,
+    githubRepositoryDiscoveryError,
+    githubRepositoryStatus,
+    runGithubRepositoryDiscovery,
+  ]);
 
   useEffect(() => {
     return storageOnChanged((changes: any, areaName: string) => {
@@ -1000,27 +1014,24 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     await runTask(
       async () => {
         const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW, {}));
-        const auth = applyGithubAuth(data?.auth);
-        if (auth.state === 'connected') await runGithubRepositoryDiscovery();
+        applyGithubAuth(data?.auth);
       },
       { fallbackMessage: 'github_device_start_failed' },
     );
-  }, [applyGithubAuth, runGithubRepositoryDiscovery, runTask]);
+  }, [applyGithubAuth, runTask]);
 
   const onPollGithubDeviceFlow = useCallback(async () => {
     await runTask(
       async () => {
         try {
           const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, {}));
-          const auth = applyGithubAuth(data?.auth);
-          if (auth.state === 'connected') await runGithubRepositoryDiscovery();
+          applyGithubAuth(data?.auth);
         } catch (error) {
           // P2 may have advanced nextPollAt or cleared a terminal flow before returning an error.
           // Rehydrate only the safe local DTO so the timer follows the persisted state instead of stale React state.
           try {
             const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
-            const auth = applyGithubSettingsResponse(snapshot);
-            if (auth.state === 'connected') await runGithubRepositoryDiscovery();
+            applyGithubSettingsResponse(snapshot);
           } catch (_refreshError) {
             // Keep the original poll error; GET_SETTINGS is recovery, not a replacement failure surface.
           }
@@ -1029,7 +1040,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       },
       { useBusy: false, clearError: false, fallbackMessage: 'github_device_poll_failed' },
     );
-  }, [applyGithubAuth, applyGithubSettingsResponse, runGithubRepositoryDiscovery, runTask]);
+  }, [applyGithubAuth, applyGithubSettingsResponse, runTask]);
 
   useEffect(() => {
     if (githubAuth.state !== 'pending') return;
