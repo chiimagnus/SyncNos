@@ -748,12 +748,12 @@ describe('chatgpt expanded COT manual capture', () => {
     expect(snap.messages[0].contentText).not.toContain('INTERNAL_ACCORDION_CONTENT');
   });
 
-  it('supports the verified transition-body fallback without broad accordion matching', async () => {
+  it('fails safe for markerless transition bodies instead of treating generic transition UI as COT', async () => {
     const dom = setupChatgptDom(
       `
         <article data-testid="conversation-turn-1" data-turn-id="turn_fallback_cot">
-          <button type="button" aria-expanded="true">Top COT chrome</button>
-          <div data-item-anchor="start" data-dimension="height"><p>Markerless reasoning summary.</p></div>
+          <button type="button" aria-expanded="true">Unconfirmed transition accordion</button>
+          <div data-item-anchor="start" data-dimension="height"><p>MARKERLESS_TRANSITION_CONTENT</p></div>
           <div data-message-author-role="assistant" data-message-id="m_fallback_cot">
             <div class="markdown prose"><p>Fallback final answer.</p></div>
           </div>
@@ -762,7 +762,89 @@ describe('chatgpt expanded COT manual capture', () => {
       'https://chatgpt.com/c/conv_fallback_cot',
     );
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap.messages[0].contentText).toBe('Markerless reasoning summary.\n\nFallback final answer.');
+    expect(snap.messages[0].contentText).toBe('Fallback final answer.');
+    expect(snap.messages[0].contentMarkdown).toBe('Fallback final answer.');
+    expect(snap.messages[0].contentText).not.toContain('MARKERLESS_TRANSITION_CONTENT');
+  });
+
+  it('updates COT fingerprint and final markdown when only a visible link target changes', async () => {
+    const dom = modernCotDom(true);
+    const reasoning = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown p') as HTMLElement;
+    reasoning.innerHTML = 'Reasoning <a href="https://example.com/source-a">same source</a>.';
+    const def = buildCotDef(dom);
+    const adapter = def.collector.__test.manualAdapter;
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
+    expect(preparedOwner.payload.contentText).toContain('Reasoning same source.');
+    expect(preparedOwner.payload.contentMarkdown).toContain('[same source](https://example.com/source-a)');
+
+    const link = dom.window.document.querySelector(
+      '[data-testid="cot-top-body"] .markdown a',
+    ) as HTMLAnchorElement;
+    link.setAttribute('href', 'https://example.com/source-b');
+    const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
+    expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
+
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
+    expect(owner.contentText).toContain('Reasoning same source.');
+    expect(owner.contentMarkdown).toContain('[same source](https://example.com/source-b)');
+    expect(owner.contentMarkdown).not.toContain('https://example.com/source-a');
+    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
+  });
+
+  it('keeps image-only reasoning in COT markdown even when it has no text contribution', async () => {
+    const imageUrl = 'https://example.com/cot-diagram.png';
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_cot_image_only">
+          <button type="button" aria-expanded="true">Top COT chrome</button>
+          <div data-item-anchor="start" data-dimension="height">
+            <div class="markdown prose"><img src="${imageUrl}" /></div>
+          </div>
+          <div data-message-author-role="assistant" data-message-id="m_cot_image_only">
+            <div class="markdown prose"><p>Final image answer.</p></div>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_cot_image_only',
+    );
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    expect(snap.messages[0].contentText).toBe('Final image answer.');
+    expect(snap.messages[0].contentMarkdown).toBe(`![](${imageUrl})\n\nFinal image answer.`);
+  });
+
+  it('keeps COT math and code-source recovery on the shared rendered-content sanitizer path', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_cot_rich_content">
+          <button type="button" aria-expanded="true">Top COT chrome</button>
+          <div data-item-anchor="start" data-dimension="height">
+            <div class="markdown prose">
+              <p>Formula <mjx-container class="MathJax"><svg><text>SVG_ONLY_FORMULA</text></svg></mjx-container></p>
+              <div class="mermaid">
+                <svg aria-hidden="true"><path d="M0 0" /></svg>
+                <button type="button" data-code="graph TD&#10;  A[Start] --> B[Done]">Copy source</button>
+              </div>
+            </div>
+          </div>
+          <div data-message-author-role="assistant" data-message-id="m_cot_rich_content">
+            <div class="markdown prose"><p>Final rich answer.</p></div>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_cot_rich_content',
+    );
+    const snap = (await capturePrepared(buildCotDef(dom))) as any;
+    expect(snap.messages[0].contentText).toContain('SVG_ONLY_FORMULA');
+    expect(snap.messages[0].contentMarkdown).toContain('SVG_ONLY_FORMULA');
+    expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
+    expect(snap.messages[0].contentMarkdown).toContain('A[Start] --> B[Done]');
+    expect(snap.messages[0].contentMarkdown).toContain('Final rich answer.');
   });
 
   it('keeps COT snapshot and fingerprint empty for Deep Research placeholders', async () => {

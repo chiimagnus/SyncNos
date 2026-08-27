@@ -369,6 +369,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   type CotAssociation = {
     semanticText: string;
+    semanticMarkdown: string;
     outerHtml: string;
   };
 
@@ -431,43 +432,24 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function extractCotContent(root: any): CotContent {
     const blocks = collectCotContentBlocks(root);
-    if (!blocks.length) {
-      const text = String(chatgptMarkdown.extractRenderedText?.(root) || '').trim();
-      const markdown = String(chatgptMarkdown.extractRenderedMarkdown?.(root) || text).trim();
-      return { text, markdown };
-    }
+    if (!blocks.length) return { text: '', markdown: '' };
 
     const textBlocks: string[] = [];
     const markdownBlocks: string[] = [];
     for (const block of blocks) {
       const text = String(chatgptMarkdown.extractRenderedText?.(block.node) || '').trim();
-      if (!text) continue;
-      textBlocks.push(text);
       const markdown =
         block.kind === 'reasoning'
           ? String(chatgptMarkdown.extractRenderedMarkdown?.(block.node) || text).trim()
           : text;
-      markdownBlocks.push(markdown || text);
+      if (!text && !markdown) continue;
+      if (text) textBlocks.push(text);
+      if (markdown) markdownBlocks.push(markdown);
     }
     return {
       text: joinContentBlocks(textBlocks),
       markdown: joinContentBlocks(markdownBlocks),
     };
-  }
-
-  function buttonCarriesRenderedSource(button: any): boolean {
-    const values = [
-      button?.getAttribute?.('data-clipboard-text'),
-      button?.getAttribute?.('data-copy-text'),
-      button?.getAttribute?.('data-code'),
-      button?.getAttribute?.('data-source'),
-      button?.getAttribute?.('data-mermaid'),
-      button?.getAttribute?.('data-mermaid-source'),
-    ];
-    return values.some((value) => {
-      const text = String(value || '');
-      return !!text && (text.includes('\n') || text.length > 120);
-    });
   }
 
   function pruneCotBodyClone(body: any): any | null {
@@ -491,23 +473,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       } catch (_error) {
         // ignore
       }
+      try {
+        toggle?.remove?.();
+      } catch (_error) {
+        // ignore
+      }
     }
 
-    for (const node of Array.from(clone.querySelectorAll('svg, path')) as any[]) {
-      try {
-        node.remove?.();
-      } catch (_error) {
-        // ignore
-      }
-    }
-    for (const button of Array.from(clone.querySelectorAll('button')) as any[]) {
-      if (buttonCarriesRenderedSource(button)) continue;
-      try {
-        button.remove?.();
-      } catch (_error) {
-        // ignore
-      }
-    }
     return clone;
   }
 
@@ -525,9 +497,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (!clone) return null;
     const content = extractCotContent(clone);
     const semanticText = String(content.text || '').trim();
-    if (!semanticText) return null;
+    const semanticMarkdown = String(content.markdown || '').trim();
+    if (!semanticText && !semanticMarkdown) return null;
     return {
       semanticText,
+      semanticMarkdown,
       outerHtml: includeOuterHtml ? String(clone.outerHTML || '') : '',
     };
   }
@@ -548,7 +522,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       wrappersByGroup.set(group, groupWrappers);
     }
 
-    const pending = new Map<any, { semanticParts: string[]; htmlParts: string[] }>();
+    const pending = new Map<any, { textParts: string[]; markdownParts: string[]; htmlParts: string[] }>();
     for (const [group, groupWrappers] of wrappersByGroup) {
       const assistants = groupWrappers.filter((wrapper) => roleFromWrapper(wrapper) === 'assistant');
       if (!assistants.length || !group?.querySelectorAll) continue;
@@ -575,8 +549,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         if (!owner) continue;
         const snapshot = snapshotCotBody(body, includeOuterHtml);
         if (!snapshot) continue;
-        const bucket = pending.get(owner) || { semanticParts: [], htmlParts: [] };
-        bucket.semanticParts.push(snapshot.semanticText);
+        const bucket = pending.get(owner) || { textParts: [], markdownParts: [], htmlParts: [] };
+        if (snapshot.semanticText) bucket.textParts.push(snapshot.semanticText);
+        if (snapshot.semanticMarkdown) bucket.markdownParts.push(snapshot.semanticMarkdown);
         if (includeOuterHtml && snapshot.outerHtml) bucket.htmlParts.push(snapshot.outerHtml);
         pending.set(owner, bucket);
       }
@@ -585,7 +560,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const result = new Map<any, CotAssociation>();
     for (const [owner, bucket] of pending) {
       result.set(owner, {
-        semanticText: joinContentBlocks(bucket.semanticParts),
+        semanticText: joinContentBlocks(bucket.textParts),
+        semanticMarkdown: joinContentBlocks(bucket.markdownParts),
         outerHtml: includeOuterHtml ? bucket.htmlParts.join('\n') : '',
       });
     }
@@ -614,15 +590,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     key: string;
     text: string;
     cotText: string;
+    cotMarkdown: string;
     imageUrls: string[];
     iframeUrl: string;
   }): string {
     const imageRefs = input.imageUrls.join('|');
     const source = `${input.role}|${input.key}|${input.text.length}|${compactFingerprintPart(input.text)}|${
       input.cotText.length
-    }|${compactFingerprintPart(input.cotText)}|${input.imageUrls.length}|${compactFingerprintPart(
-      imageRefs,
-    )}|${compactFingerprintPart(input.iframeUrl)}`;
+    }|${compactFingerprintPart(input.cotText)}|${input.cotMarkdown.length}|${compactFingerprintPart(
+      input.cotMarkdown,
+    )}|${input.imageUrls.length}|${compactFingerprintPart(imageRefs)}|${compactFingerprintPart(input.iframeUrl)}`;
     return compactFingerprintPart(source);
   }
 
@@ -669,12 +646,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
       const cot = role === 'assistant' && !iframe ? cotByOwner.get(wrapper) || null : null;
       const cotText = String(cot?.semanticText || '');
+      const cotMarkdown = String(cot?.semanticMarkdown || '');
       const descriptor: ChatgptDescriptor = {
         key,
         turnKey,
         withinTurn,
         role,
-        fingerprint: descriptorFingerprint({ role, key, text, cotText, imageUrls, iframeUrl }),
+        fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
         hasDeepResearch: !!iframe,
         rendered: !!text || imageUrls.length > 0 || !!iframe,
         visible: isVisibleWindow(wrapper),
