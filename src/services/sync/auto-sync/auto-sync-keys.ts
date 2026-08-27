@@ -46,6 +46,7 @@ export const AUTO_SYNC_CONVERSATION_CHANGED_REASONS = {
   syncConversationMessages: 'syncConversationMessages',
   backfillImages: 'backfillImages',
   articleCommentChanged: 'articleCommentChanged',
+  mergeConversation: 'mergeConversation',
 } as const;
 
 export type AutoSyncConversationChangedReason =

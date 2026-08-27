@@ -43,6 +43,7 @@ import {
 import {
   FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
   FEISHU_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
+  GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME,
   GITHUB_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
   GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
   NOTION_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
@@ -180,6 +181,10 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
         }
         if (alarmName === GITHUB_AUTO_SYNC_DEBOUNCE_ALARM_NAME) {
           await githubScheduler.flush();
+          return;
+        }
+        if (alarmName === GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME) {
+          await githubScheduler.flushCleanup();
         }
       },
     },

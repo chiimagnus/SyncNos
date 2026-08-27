@@ -33,6 +33,7 @@ type AnyRouter = {
 
 type ConversationHandlersDeps = {
   onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  onRemoteCleanupPending: () => void | Promise<void>;
 };
 
 function fireAndForget(task: void | Promise<void>) {
@@ -224,6 +225,10 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       conversationId: keepConversationId,
       removedConversationId: removeConversationId,
     });
+    if (res?.merged === true) {
+      fireAndForget(deps.onConversationChanged(keepConversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.mergeConversation));
+      fireAndForget(deps.onRemoteCleanupPending());
+    }
     return router.ok(res);
   });
 
@@ -359,6 +364,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       reason: 'delete',
       conversationIds: normalizedIds,
     });
+    if (Number((res as any)?.deletedConversations) > 0) fireAndForget(deps.onRemoteCleanupPending());
     return router.ok(res);
   });
 }

@@ -49,6 +49,7 @@ export default defineBackground(() => {
 
   registerConversationHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
+    onRemoteCleanupPending: () => services.autoSync.githubScheduler.scheduleCleanup(),
   });
   registerItemMentionHandlers(router);
   registerChatWithBackgroundHandlers(router);

@@ -1,10 +1,13 @@
 import {
   GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS,
   GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS,
+  GITHUB_CLEANUP_BATCH_CONTINUE_DELAY_MS,
+  GITHUB_CLEANUP_BUSY_RETRY_MS,
   createGithubAutoSyncScheduler,
   getGithubAutoSyncFailureRetryDelayMs,
 } from '@services/sync/auto-sync/github-auto-sync-scheduler';
 import {
+  GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME,
   GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
   GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY,
 } from '@services/sync/auto-sync/auto-sync-keys';
@@ -99,5 +102,91 @@ describe('github-auto-sync-scheduler', () => {
       GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS,
     );
     expect(getGithubAutoSyncFailureRetryDelayMs(new Error('local failure'))).toBeUndefined();
+  });
+
+  it('schedules cleanup wake without resolving repository state or calling the orchestrator', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    const sync = vi.fn();
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.scheduleCleanup(25_000);
+
+    expect(sync).not.toHaveBeenCalled();
+    expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, { when: 25_000 });
+  });
+
+  it('drains cleanup-only work, re-dirties replacements, and schedules a future batch without recursion', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    const sync = vi.fn().mockResolvedValue({
+      transport: { status: 'committed' },
+      deferredReplacementConversationIds: [7, 7, '8', 0],
+      cleanupHasMoreDue: true,
+      nextCleanupDueAt: null,
+    });
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flushCleanup();
+
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(sync).toHaveBeenCalledWith({ conversationIds: [], mode: 'incremental', instanceId: 'github-cleanup-instance' });
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({ '7': 70_000, '8': 70_000 });
+    expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, {
+      when: 10_000 + GITHUB_CLEANUP_BATCH_CONTINUE_DELAY_MS,
+    });
+  });
+
+  it('uses the orchestrator nextCleanupDueAt exactly when no cleanup batch remains due', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    const sync = vi.fn().mockResolvedValue({
+      transport: { status: 'not_needed' },
+      deferredReplacementConversationIds: [],
+      cleanupHasMoreDue: false,
+      nextCleanupDueAt: 45_678,
+    });
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flushCleanup();
+
+    expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, { when: 45_678 });
+  });
+
+  it('reschedules cleanup in the future when the shared GitHub job is busy', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    const sync = vi.fn().mockRejectedValue(Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' }));
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flushCleanup();
+
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, {
+      when: 10_000 + GITHUB_CLEANUP_BUSY_RETRY_MS,
+    });
+  });
+
+  it('never runs cleanup when GitHub auto-sync is disabled', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = false;
+    const sync = vi.fn();
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.scheduleCleanup();
+    await scheduler.flushCleanup();
+
+    expect(sync).not.toHaveBeenCalled();
+    expect(alarmsMocks.create).not.toHaveBeenCalled();
   });
 });
