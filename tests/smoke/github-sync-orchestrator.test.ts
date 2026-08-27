@@ -198,21 +198,33 @@ function cleanupRow(id: number, overrides: Partial<GithubCleanupOutboxRecord> = 
   };
 }
 
-describe('github sync orchestrator staging', () => {
+describe('github sync orchestrator staging through production sync', () => {
   it('dedupes candidate ids and resolves the target exactly once', async () => {
-    const { services } = fakeServices({ rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } } });
-    const result = await createGithubSyncOrchestrator(services).stage({ conversationIds: [1, 1, 2, 0, 'bad'] });
+    const { services } = fakeServices({
+      rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
+      commitImpl: async ({ operations }) => ({
+        status: 'committed',
+        treeSha: 'f'.repeat(40),
+        commitSha: '1'.repeat(40),
+        files: resolvedFiles(operations),
+      }),
+    });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1, 1, 2, 0, 'bad'],
+      instanceId: 'staging-dedupe',
+    });
 
     expect(services.preflight).toHaveBeenCalledTimes(1);
     expect(services.preflight).toHaveBeenCalledWith({ repository: settings.repository, branch: settings.branch });
     expect(services.getSettings).toHaveBeenCalledTimes(1);
     expect(services.storage.getSyncMappingByConversation).toHaveBeenCalledTimes(2);
     expect(result.summary.candidateCount).toBe(2);
-    expect(result.summary.stagedCount).toBe(2);
+    expect(result.summary.syncedCount).toBe(2);
   });
 
   it('reattaches article orphans before reading comments by conversation id only', async () => {
     const order: string[] = [];
+    let stagedOperations: readonly any[] = [];
     const article = chat(3, {
       source: 'web',
       sourceType: 'article',
@@ -238,26 +250,52 @@ describe('github sync orchestrator staging', () => {
         ],
       },
       order,
+      commitImpl: async ({ operations }) => {
+        stagedOperations = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
     });
-    const result = await createGithubSyncOrchestrator(services).stage({ conversationIds: [3] });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [3],
+      instanceId: 'article-stage',
+    });
 
+    expect(result.items[0]?.status).toBe('synced');
     expect(order).toEqual(['attach:3', 'comments:3']);
     expect(services.storage.attachOrphanArticleCommentsToConversation).toHaveBeenCalledWith(article.url, 3);
     expect(services.storage.getArticleCommentsByConversationId).toHaveBeenCalledWith(3);
-    const write = result.operations.find((operation) => operation.type === 'write');
+    const write = stagedOperations.find((operation) => operation.type === 'write');
     expect(write?.type === 'write' ? String(write.content) : '').toContain('Owned comment');
   });
 
   it('isolates one local projection failure and keeps other safe staged rows', async () => {
+    let stagedOperations: readonly any[] = [];
     const { services } = fakeServices({
       rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
       messages: { 1: new Error('broken local read'), 2: [message('safe body')] },
+      commitImpl: async ({ operations }) => {
+        stagedOperations = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
     });
-    const result = await createGithubSyncOrchestrator(services).stage({ conversationIds: [1, 2] });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1, 2],
+      instanceId: 'local-failure',
+    });
 
     expect(result.items.find((item) => item.conversationId === 1)?.status).toBe('failed');
-    expect(result.items.find((item) => item.conversationId === 2)?.status).toBe('staged');
-    expect(result.operations).toHaveLength(1);
+    expect(result.items.find((item) => item.conversationId === 2)?.status).toBe('synced');
+    expect(stagedOperations).toHaveLength(1);
   });
 
   it('dedupes identical content staged to the same path', async () => {
@@ -267,17 +305,30 @@ describe('github sync orchestrator staging', () => {
       title: 'Same title',
       url: 'https://example.com/same',
     };
+    let stagedOperations: readonly any[] = [];
     const { services } = fakeServices({
       rows: {
         1: { conversation: chat(1, sharedIdentity) },
         2: { conversation: chat(2, sharedIdentity) },
       },
       messages: { 1: [message('same body')], 2: [message('same body')] },
+      commitImpl: async ({ operations }) => {
+        stagedOperations = operations;
+        return {
+          status: 'committed',
+          treeSha: 'f'.repeat(40),
+          commitSha: '1'.repeat(40),
+          files: resolvedFiles(operations),
+        };
+      },
     });
-    const result = await createGithubSyncOrchestrator(services).stage({ conversationIds: [1, 2] });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1, 2],
+      instanceId: 'dedupe-path',
+    });
 
-    expect(result.items.every((item) => item.status === 'staged')).toBe(true);
-    expect(result.operations).toHaveLength(1);
+    expect(result.items.map((item) => item.status)).toEqual(['synced', 'synced']);
+    expect(stagedOperations).toHaveLength(1);
   });
 
   it('fails every conversation participating in a conflicting staged path and removes their whole rows', async () => {
@@ -287,16 +338,20 @@ describe('github sync orchestrator staging', () => {
       title: 'Same title',
       url: 'https://example.com/same',
     };
-    const { services } = fakeServices({
+    const { services, commit } = fakeServices({
       rows: {
         1: { conversation: chat(1, sharedIdentity) },
         2: { conversation: chat(2, sharedIdentity) },
       },
       messages: { 1: [message('first body')], 2: [message('second body')] },
     });
-    const result = await createGithubSyncOrchestrator(services).stage({ conversationIds: [1, 2] });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1, 2],
+      instanceId: 'collision',
+    });
 
-    expect(result.operations).toEqual([]);
+    expect(result.transport.status).toBe('not_needed');
+    expect(commit).not.toHaveBeenCalled();
     expect(result.items.map((item) => [item.conversationId, item.status, item.error])).toEqual([
       [1, 'failed', 'github_staged_path_collision'],
       [2, 'failed', 'github_staged_path_collision'],
@@ -306,7 +361,7 @@ describe('github sync orchestrator staging', () => {
   it('returns all-local-no-op without invoking transport', async () => {
     const conversation = chat(1);
     const messages = [message('same body')];
-    const p = await buildGithubMarkdownProjection({ conversation, messages, folders: settings });
+    const p = await buildGithubMarkdownProjection({ conversation, messages });
     const mapping = {
       githubRemoteKey: preflight.remoteKey,
       githubProjectionFingerprint: p.projectionFingerprint,
@@ -315,9 +370,12 @@ describe('github sync orchestrator staging', () => {
       },
     };
     const { services, commit } = fakeServices({ rows: { 1: { conversation, mapping } }, messages: { 1: messages } });
-    const result = await createGithubSyncOrchestrator(services).stage({ conversationIds: [1] });
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1],
+      instanceId: 'local-no-op',
+    });
 
-    expect(result.operations).toEqual([]);
+    expect(result.transport.status).toBe('not_needed');
     expect(result.items[0]?.status).toBe('no_changes');
     expect(commit).not.toHaveBeenCalled();
   });

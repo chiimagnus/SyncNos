@@ -23,7 +23,7 @@ import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@s
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
-export type GithubSyncStagedItem = {
+type GithubSyncStagedItem = {
   conversationId: number;
   conversationTitle: string;
   status: 'no_changes' | 'staged' | 'failed';
@@ -33,7 +33,7 @@ export type GithubSyncStagedItem = {
   operations: GithubStagedOperation[];
 };
 
-export type GithubSyncStagedRun = {
+type GithubSyncStagedRun = {
   target: {
     repository: string;
     branch: string;
@@ -348,17 +348,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       items,
       summary,
     };
-  }
-
-  async function stage(input: {
-    conversationIds?: readonly unknown[];
-    mode?: GithubSyncPlannerMode;
-  }): Promise<GithubSyncStagedRun> {
-    const ids = normalizeIds(input.conversationIds);
-    const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
-    const settings = await services.getSettings();
-    const preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
-    return stageResolved(ids, mode, preflight);
   }
 
   async function getSyncStatus(input: { instanceId?: string } = {}) {
@@ -773,7 +762,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     return run;
   }
 
-  return { stage, sync, getSyncStatus, clearSyncStatus };
+  return { sync, getSyncStatus, clearSyncStatus };
 }
 
 export const githubSyncOrchestrator = createGithubSyncOrchestrator();
