@@ -73,6 +73,24 @@ describe('backup service', () => {
       notion_oauth_client_id: 'client_id',
       notion_parent_page_id: 'page',
       notion_oauth_token_v1: { accessToken: 'secret' },
+      github_repository: 'owner/repo',
+      github_branch: 'main',
+      github_chat_folder: 'Notes/Chats',
+      github_article_folder: 'Notes/Articles',
+      github_video_folder: 'Notes/Videos',
+      github_auth_state_v1: {
+        version: 1,
+        state: 'pending',
+        pending: {
+          deviceCode: 'DEVICE_SENTINEL_SECRET',
+          userCode: 'ABCD-EFGH',
+          verificationUri: 'https://github.com/login/device',
+          createdAt: 1,
+          expiresAt: 901_000,
+          intervalMs: 5_000,
+          nextPollAt: 6_000,
+        },
+      },
     });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -162,6 +180,15 @@ describe('backup service', () => {
     expect(config.storageLocal.notion_oauth_client_id).toBe('client_id');
     expect(config.storageLocal.notion_parent_page_id).toBe('page');
     expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
+    expect(config.storageLocal).toMatchObject({
+      github_repository: 'owner/repo',
+      github_branch: 'main',
+      github_chat_folder: 'Notes/Chats',
+      github_article_folder: 'Notes/Articles',
+      github_video_folder: 'Notes/Videos',
+    });
+    expect(config.storageLocal.github_auth_state_v1).toBeUndefined();
+    expect(JSON.stringify(config)).not.toContain('DEVICE_SENTINEL_SECRET');
 
     const bundlePath = manifest.sources[0].files[0];
     const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
@@ -180,6 +207,17 @@ describe('backup service', () => {
     expect(typeof imageIndex.assets[0].blobPath).toBe('string');
     expect(entries.has(imageIndex.assets[0].blobPath)).toBe(true);
 
+    chromeMock.__store.github_auth_state_v1 = {
+      version: 1,
+      state: 'connected',
+      token: { accessToken: 'BROWSER_B_ACCESS_SECRET', refreshToken: 'BROWSER_B_REFRESH_SECRET', createdAt: 2 },
+    };
+    delete chromeMock.__store.github_repository;
+    delete chromeMock.__store.github_branch;
+    delete chromeMock.__store.github_chat_folder;
+    delete chromeMock.__store.github_article_folder;
+    delete chromeMock.__store.github_video_folder;
+
     await __closeDbForTests();
     await deleteDb('webclipper');
     await importBackupZipV2Merge(entries);
@@ -194,6 +232,18 @@ describe('backup service', () => {
       restoredTx.onabort = () => reject(restoredTx.error);
     });
     restoredDb.close();
+    expect(chromeMock.__store.github_auth_state_v1).toEqual({
+      version: 1,
+      state: 'connected',
+      token: { accessToken: 'BROWSER_B_ACCESS_SECRET', refreshToken: 'BROWSER_B_REFRESH_SECRET', createdAt: 2 },
+    });
+    expect(chromeMock.__store).toMatchObject({
+      github_repository: 'owner/repo',
+      github_branch: 'main',
+      github_chat_folder: 'Notes/Chats',
+      github_article_folder: 'Notes/Articles',
+      github_video_folder: 'Notes/Videos',
+    });
   });
 
   it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {

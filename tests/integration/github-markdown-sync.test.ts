@@ -98,6 +98,7 @@ type TreeNode = {
 class FakeGithubServer {
   now = 1_000_000;
   repositoryAccessible = true;
+  networkOffline = false;
   failNextBlobUpload = false;
   refreshGrantCalls = 0;
   devicePollCalls = 0;
@@ -289,6 +290,7 @@ class FakeGithubServer {
     }
 
     if (url.origin !== 'https://api.github.com') return this.json({ message: 'unexpected destination' }, 404);
+    if (this.networkOffline) throw new TypeError('fake GitHub offline');
     const authFailure = this.requireApiAuth(init);
     if (authFailure) return authFailure;
 
@@ -470,7 +472,7 @@ const orchestrator = createGithubSyncOrchestrator({
   ackCleanupRows: ackGithubCleanupRows,
   jobStore: githubSyncJobStore,
   replacementDeferMs: 5_000,
-  now: () => fakeGithub.now,
+  now: Date.now,
 });
 
 const router = createBackgroundRouter({
@@ -541,7 +543,21 @@ describe('GitHub Markdown production-chain integration', () => {
     });
     assertSecretFree(startedAuth);
 
-    const pending = startedAuth.data.auth;
+    const restoredPending = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS });
+    expect(restoredPending).toMatchObject({
+      ok: true,
+      data: {
+        auth: {
+          state: 'pending',
+          userCode: USER_CODE,
+          verificationUri: 'https://github.com/login/device',
+          nextPollAt: startedAuth.data.auth.nextPollAt,
+        },
+      },
+    });
+    assertSecretFree(restoredPending);
+
+    const pending = restoredPending.data.auth;
     fakeGithub.now = pending.nextPollAt;
     const polled = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW });
     expect(polled).toMatchObject({ ok: true, data: { auth: { state: 'connected' } } });
@@ -632,8 +648,10 @@ describe('GitHub Markdown production-chain integration', () => {
       conversationIds: [chat.id, article.id],
     });
     expect(manualStart).toMatchObject({ ok: true, data: { started: true, provider: 'github' } });
+    assertSecretFree(manualStart);
     const firstStatus = await waitForDone(router);
     expect(firstStatus.data.job).toMatchObject({ status: 'done', okCount: 2, failCount: 0 });
+    assertSecretFree(firstStatus);
     expect(fakeGithub.syncRefUpdates - refUpdatesBeforeFirstSync).toBe(1);
 
     const chatAfterFirst = await backgroundStorage.getSyncMappingByConversation(Number(chat.id));
@@ -817,5 +835,37 @@ describe('GitHub Markdown production-chain integration', () => {
     expect(finalRun.summary.failedCount).toBe(0);
     expect(fakeGithub.hasPath('README.md')).toBe(true);
     assertSecretFree(finalRun);
+
+    const chatBeforeDelete = await backgroundStorage.getSyncMappingByConversation(Number(chat.id));
+    const deletedRemotePaths = Object.keys(chatBeforeDelete?.mapping?.githubManagedFiles ?? {});
+    expect(deletedRemotePaths.length).toBeGreaterThan(0);
+    expect(deletedRemotePaths.every((path) => fakeGithub.hasPath(path))).toBe(true);
+
+    const localDelete = await backgroundStorage.deleteConversationsByIds([chat.id]);
+    expect(localDelete).toMatchObject({ deletedConversations: 1, deletedMappings: 1 });
+    expect(await backgroundStorage.getConversationById(Number(chat.id))).toBeNull();
+    const pendingCleanup = await listDueGithubCleanupRows(REMOTE_KEY, Date.now(), 100);
+    expect(pendingCleanup.rows).toHaveLength(1);
+    expect(pendingCleanup.rows[0]?.paths).toEqual(expect.arrayContaining(deletedRemotePaths));
+
+    fakeGithub.networkOffline = true;
+    await expect(
+      orchestrator.sync({ conversationIds: [], instanceId: 'github-integration-instance' }),
+    ).rejects.toMatchObject({
+      code: 'github_network_error',
+    });
+    expect((await listDueGithubCleanupRows(REMOTE_KEY, Date.now(), 100)).rows).toHaveLength(1);
+    expect(deletedRemotePaths.every((path) => fakeGithub.hasPath(path))).toBe(true);
+
+    fakeGithub.networkOffline = false;
+    const cleanupRecovered = await orchestrator.sync({
+      conversationIds: [],
+      instanceId: 'github-integration-instance',
+    });
+    expect(cleanupRecovered.transport.status).toMatch(/^(committed|no_changes)$/);
+    expect((await listDueGithubCleanupRows(REMOTE_KEY, Date.now(), 100)).rows).toEqual([]);
+    expect(deletedRemotePaths.every((path) => !fakeGithub.hasPath(path))).toBe(true);
+    expect(fakeGithub.hasPath('README.md')).toBe(true);
+    assertSecretFree(cleanupRecovered);
   });
 });

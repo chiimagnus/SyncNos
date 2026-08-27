@@ -206,6 +206,20 @@ describe('github device flow', () => {
     expect(JSON.stringify(store)).not.toContain('pending');
   });
 
+  it('clears locally expired pending state without issuing another poll request', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(deviceStartBody())) as unknown as typeof fetch;
+    const { pollDeviceFlowOnce, startDeviceFlow } = await import('@services/sync/github/auth/device-flow');
+    const { getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
+
+    await startDeviceFlow({ fetchImpl, now: () => 1_000 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await expect(pollDeviceFlowOnce({ fetchImpl, now: () => 901_000 })).rejects.toMatchObject({
+      code: 'github_device_expired',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await getGithubAuthState()).toEqual({ version: 1, state: 'disconnected' });
+  });
+
   it.each([
     ['expired_token', 'github_device_expired'],
     ['access_denied', 'github_device_denied'],

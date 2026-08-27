@@ -154,6 +154,30 @@ describe('github auth service', () => {
     expect(await getGithubAuthState()).toEqual({ version: 1, state: 'disconnected' });
   });
 
+  it('clears invalid refresh auth while preserving non-secret GitHub target preferences', async () => {
+    store.github_repository = 'owner/repo';
+    store.github_branch = 'release/main';
+    store.github_chat_folder = 'Notes/Chats';
+    store.github_article_folder = 'Notes/Articles';
+    store.github_video_folder = 'Notes/Videos';
+    const { replaceGithubAuthState, getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
+    await replaceGithubAuthState(connectedState({ accessExpiresAt: 2_000 }));
+    const fetchImpl = vi.fn(async () => jsonResponse({ error: 'invalid_grant' }, 401)) as unknown as typeof fetch;
+    const { getValidAccessToken } = await import('@services/sync/github/auth/github-auth-service');
+
+    await expect(getValidAccessToken({ fetchImpl, now: () => 1_000 })).rejects.toMatchObject({
+      code: 'github_auth_required',
+    });
+    expect(await getGithubAuthState()).toEqual({ version: 1, state: 'disconnected' });
+    expect(store).toMatchObject({
+      github_repository: 'owner/repo',
+      github_branch: 'release/main',
+      github_chat_folder: 'Notes/Chats',
+      github_article_folder: 'Notes/Articles',
+      github_video_folder: 'Notes/Videos',
+    });
+  });
+
   it('clears only the auth record that matches the access token rejected by GitHub', async () => {
     const { replaceGithubAuthState, getGithubAuthState } = await import('@services/sync/github/auth/auth-store');
     const { clearGithubAuthForAccessToken } = await import('@services/sync/github/auth/github-auth-service');
