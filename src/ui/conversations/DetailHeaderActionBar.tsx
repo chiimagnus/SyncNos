@@ -56,19 +56,30 @@ export function DetailHeaderActionBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [primaryActionId, setPrimaryActionId] = useState('');
+  const [copiedActionId, setCopiedActionId] = useState('');
   const [labelOverride, setLabelOverride] = useState<string>('');
+  const copiedResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const labelResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTrigger = async (action: DetailHeaderAction) => {
     if (busy || action.disabled) return;
+    if (copiedResetTimerRef.current != null) globalThis.clearTimeout(copiedResetTimerRef.current);
+    copiedResetTimerRef.current = null;
     if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
     labelResetTimerRef.current = null;
+    setCopiedActionId('');
     setLabelOverride('');
     setPrimaryActionId(action.id);
     setBusy(true);
     try {
       await action.onTrigger();
-      if (action.afterTriggerLabel) {
+      if (action.kind === 'copy-text' && !inlineMenuItems) {
+        setCopiedActionId(action.id);
+        copiedResetTimerRef.current = globalThis.setTimeout(() => {
+          setCopiedActionId('');
+          copiedResetTimerRef.current = null;
+        }, 1_100);
+      } else if (action.afterTriggerLabel) {
         setLabelOverride(String(action.afterTriggerLabel));
         labelResetTimerRef.current = globalThis.setTimeout(() => {
           setLabelOverride('');
@@ -90,6 +101,8 @@ export function DetailHeaderActionBar({
 
   useEffect(() => {
     return () => {
+      if (copiedResetTimerRef.current != null) globalThis.clearTimeout(copiedResetTimerRef.current);
+      copiedResetTimerRef.current = null;
       if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
       labelResetTimerRef.current = null;
     };
@@ -97,7 +110,18 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
-  const resolveInlineActionIcon = (action: DetailHeaderAction) => {
+  const resolveActionIcon = (action: DetailHeaderAction) => {
+    if (action.kind === 'copy-text' && copiedActionId === action.id) {
+      return (
+        <span
+          className="tw-inline-flex tw-h-4 tw-w-4 tw-items-center tw-justify-center"
+          data-detail-header-copy-check={action.id}
+          aria-hidden="true"
+        >
+          ✓
+        </span>
+      );
+    }
     const logo = providerLogo(action);
     if (logo) return logo;
     if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
@@ -124,7 +148,7 @@ export function DetailHeaderActionBar({
             }}
           >
             <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-              {resolveInlineActionIcon(action)}
+              {resolveActionIcon(action)}
               <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
             </span>
           </button>
@@ -144,7 +168,7 @@ export function DetailHeaderActionBar({
   ) : null;
   if (actions.length === 1) {
     const action = actions[0]!;
-    const resolvedTriggerIcon = providerLogo(action) || <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
+    const resolvedTriggerIcon = resolveActionIcon(action);
     return (
       <div className={['tw-relative tw-flex tw-items-center tw-gap-2', className || ''].join(' ').trim()}>
         <button
@@ -168,9 +192,7 @@ export function DetailHeaderActionBar({
   }
 
   const primaryAction = actions.find((action) => action.id === primaryActionId) || actions[0]!;
-  const resolvedTriggerIcon = providerLogo(primaryAction) || (
-    <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
-  );
+  const resolvedTriggerIcon = resolveActionIcon(primaryAction);
   const resolvedMenuTriggerLabel = String(menuTriggerLabel || '').trim() || 'Open in...';
   const resolvedMenuTriggerAriaLabel = String(menuTriggerAriaLabel || '').trim() || 'Open destinations';
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;

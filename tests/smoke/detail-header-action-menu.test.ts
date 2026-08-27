@@ -272,7 +272,7 @@ describe('DetailHeaderActionBar', () => {
     expect(alertSpy).toHaveBeenCalledWith('Failed to open Notion page');
   });
 
-  it('shows transient icon-only success status without changing the button into a text action', async () => {
+  it('shows a transient check for copy actions without changing the icon slot size', async () => {
     vi.useFakeTimers();
     try {
       const onTrigger = vi.fn(async () => {});
@@ -298,22 +298,24 @@ describe('DetailHeaderActionBar', () => {
       const button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
       expect(button).toBeTruthy();
       expect(button?.textContent || '').not.toContain('Copy Notion link');
+      expect(button?.querySelector('[data-provider-logo="notion"]')?.className || '').toContain('tw-h-4 tw-w-4');
 
       await act(async () => {
         button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
         await Promise.resolve();
       });
 
-      const status = document.querySelector('[role="status"]') as HTMLElement | null;
-      expect(status?.textContent).toBe('Copied');
-      expect(status?.className || '').toContain('tw-absolute');
-      expect(button?.textContent || '').not.toContain('Copied');
+      const check = button?.querySelector('[data-detail-header-copy-check="copy-notion-link"]') as HTMLElement | null;
+      expect(check?.textContent).toBe('✓');
+      expect(check?.className || '').toContain('tw-h-4 tw-w-4');
+      expect(document.querySelector('[role="status"]')).toBeFalsy();
 
       await act(async () => {
-        vi.advanceTimersByTime(2_600);
+        vi.advanceTimersByTime(1_100);
         await Promise.resolve();
       });
-      expect(document.querySelector('[role="status"]')).toBeFalsy();
+      expect(button?.querySelector('[data-detail-header-copy-check="copy-notion-link"]')).toBeFalsy();
+      expect(button?.querySelector('[data-provider-logo="notion"]')).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
@@ -348,13 +350,14 @@ describe('DetailHeaderActionBar', () => {
       button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
-    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+    expect(button.querySelector('[data-detail-header-copy-check="copy-notion-link"]')?.textContent).toBe('✓');
 
     await act(async () => {
       button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
     expect(alertSpy).toHaveBeenCalledWith('copy denied');
+    expect(button.querySelector('[data-detail-header-copy-check="copy-notion-link"]')).toBeFalsy();
     expect(document.querySelector('[role="status"]')).toBeFalsy();
   });
 
