@@ -77,6 +77,49 @@ describe('current page capture integrity routing', () => {
     });
   });
 
+  it('preserves COT plus answer through final-live partial append with default replace semantics', async () => {
+    const contentText = 'Visible reasoning summary\n\nFinal assistant answer';
+    const contentMarkdown = '**Visible reasoning summary**\n\nFinal assistant answer';
+    const snapshot = {
+      ...chatSnapshot({ completeness: 'partial' }),
+      messages: [
+        {
+          messageKey: 'assistant-stable-key',
+          role: 'assistant',
+          contentText,
+          contentMarkdown,
+          sequence: 4,
+        },
+      ],
+      captureMeta: {
+        completeness: 'partial' as const,
+        identityVerified: true,
+        reasons: ['final_live_changed'],
+      },
+    };
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot });
+
+    const result = await harness.service.captureCurrentPage();
+
+    expect(result).toMatchObject({
+      captureCompleteness: 'partial',
+      captureReasons: ['final_live_changed'],
+    });
+    const sync = harness.calls.find((call) => call.type === 'syncConversationMessages');
+    expect(sync?.payload).toMatchObject({
+      mode: 'append',
+      diff: { added: ['assistant-stable-key'], updated: [], removed: [] },
+    });
+    expect(sync?.payload.messages).toHaveLength(1);
+    expect(sync?.payload.messages[0]).toMatchObject({
+      messageKey: 'assistant-stable-key',
+      contentText,
+      contentMarkdown,
+      captureSequencePolicy: 'preserve-existing-tail',
+      captureMergePolicy: 'replace',
+    });
+  });
+
   it.each([
     ['unverified', chatSnapshot({ verified: false })],
     ['missing metadata', { ...chatSnapshot(), captureMeta: undefined }],
