@@ -2,7 +2,7 @@ import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { getImageCacheAssetById, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
 import { sha256Hex } from '@services/sync/github/github-content-hash';
-import { createGithubBlob } from '@services/sync/github/github-git-transport';
+import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
 import {
   collectOrderedSyncnosAssetIds,
@@ -121,9 +121,12 @@ function findReusableAssetSha(
   remoteKey: string,
   path: string,
   contentHash: string,
+  conversation: any,
 ): string | null {
   if (!remoteKey || !continuity || continuity.githubRemoteKey !== remoteKey) return null;
-  const entries = managedFileEntries(continuity);
+  const entries = managedFileEntries(continuity).filter(([candidatePath]) =>
+    isGithubManagedPathOwnedByConversation(candidatePath, 'asset', conversation),
+  );
   const exact = entries.find(([candidatePath, row]) => candidatePath === path && row.contentHash === contentHash);
   if (exact) return exact[1].sha.toLowerCase();
   const sameContent = entries.find(([, row]) => row.contentHash === contentHash);
@@ -156,7 +159,6 @@ export async function buildGithubMarkdownProjection(input: {
   comments?: ArticleCommentDto[];
   remoteKey?: string;
   continuity?: GithubProjectionContinuity;
-  repository?: string;
   imageLoader?: GithubImageLoader;
   blobUploader?: GithubBlobUploader;
 }): Promise<GithubMarkdownProjection> {
@@ -178,11 +180,7 @@ export async function buildGithubMarkdownProjection(input: {
   }
 
   const imageLoader = input.imageLoader ?? getImageCacheAssetById;
-  const blobUploader =
-    input.blobUploader ??
-    (input.repository
-      ? async ({ content }: { content: Uint8Array }) => createGithubBlob({ repository: input.repository!, content })
-      : null);
+  const blobUploader = input.blobUploader ?? null;
   if (assetIds.length && !blobUploader) throw new Error('github_blob_uploader_required');
 
   const remoteKey = String(input.remoteKey || '');
@@ -210,7 +208,7 @@ export async function buildGithubMarkdownProjection(input: {
       continue;
     }
 
-    let sha = findReusableAssetSha(input.continuity, remoteKey, path, contentHash);
+    let sha = findReusableAssetSha(input.continuity, remoteKey, path, contentHash, conversation);
     if (!sha) {
       try {
         sha = requireBlobSha((await blobUploader!({ content })).sha);

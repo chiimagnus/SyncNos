@@ -111,6 +111,16 @@ describe('github markdown projection', () => {
     expect(pacific.markdownText).toContain('> Quote');
   });
 
+  it('requires an injected blob uploader whenever the projection contains internal assets', async () => {
+    await expect(
+      buildGithubMarkdownProjection({
+        conversation: conversation(),
+        messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
+        imageLoader: async () => imageAsset(1, [1]),
+      }),
+    ).rejects.toThrow('github_blob_uploader_required');
+  });
+
   it('materializes content-addressed attachments and reuses same bytes within one projection', async () => {
     const loader = vi.fn(async ({ id }: { id: number; conversationId: number }) =>
       id === 1 ? imageAsset(1, [1, 2, 3]) : imageAsset(2, [1, 2, 3]),
@@ -184,6 +194,61 @@ describe('github markdown projection', () => {
     expect(renamed.attachments[0]?.sha).toBe('b'.repeat(40));
     expect(renamed.attachments[0]?.path).not.toBe(oldPath);
     expect(renamed.projectionFingerprint).not.toBe(unchanged.projectionFingerprint);
+  });
+
+  it('does not reuse same-content asset metadata from an unowned continuity path', async () => {
+    const bytes = [9, 8, 7];
+    const contentHash = await sha256Hex(new Uint8Array(bytes));
+    const current = conversation({ title: 'New title' });
+    const uploader = vi.fn(async () => ({ sha: 'c'.repeat(40) }));
+
+    const projection = await buildGithubMarkdownProjection({
+      conversation: current,
+      messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
+      remoteKey: 'github.com/owner/repo@main',
+      continuity: {
+        githubRemoteKey: 'github.com/owner/repo@main',
+        githubManagedFiles: {
+          [`OtherFolder/chatgpt-Old-${buildConversationBasename(current).slice(-10)}.assets/${contentHash}.png`]: {
+            kind: 'asset',
+            contentHash,
+            sha: 'b'.repeat(40),
+          },
+        },
+      },
+      imageLoader: async () => imageAsset(1, bytes),
+      blobUploader: uploader,
+    });
+
+    expect(uploader).toHaveBeenCalledTimes(1);
+    expect(projection.attachments[0]?.sha).toBe('c'.repeat(40));
+  });
+
+  it('does not reuse blob authority from an unsafe managed-file path', async () => {
+    const bytes = [9, 8, 7];
+    const contentHash = await sha256Hex(new Uint8Array(bytes));
+    const uploader = vi.fn(async () => ({ sha: 'c'.repeat(40) }));
+
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
+      remoteKey: 'github.com/owner/repo@main',
+      continuity: {
+        githubRemoteKey: 'github.com/owner/repo@main',
+        githubManagedFiles: {
+          '.github/workflows/poison.yml': {
+            kind: 'asset',
+            contentHash,
+            sha: 'b'.repeat(40),
+          },
+        },
+      },
+      imageLoader: async () => imageAsset(1, bytes),
+      blobUploader: uploader,
+    });
+
+    expect(uploader).toHaveBeenCalledTimes(1);
+    expect(projection.attachments[0]?.sha).toBe('c'.repeat(40));
   });
 
   it('does not reuse continuity from a different remote target', async () => {

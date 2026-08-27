@@ -8,7 +8,8 @@ import {
   normalizeGithubCleanupOutboxRecord,
 } from '@platform/idb/github-cleanup-outbox-record';
 import { openDb } from '@platform/idb/schema';
-import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
+import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import {
   ackGithubCleanupRows,
   deferGithubCleanupRows,
@@ -144,21 +145,64 @@ describe('github cleanup outbox record', () => {
 });
 
 describe('github managed path ownership', () => {
-  it('uses the same stable-id and asset-namespace grammar for cleanup authority', () => {
-    const stableId = '1234567890';
-    expect(isGithubManagedPathOwnedByStableId(`Chats/chat-title-${stableId}.md`, 'markdown', stableId)).toBe(true);
-    expect(
-      isGithubManagedPathOwnedByStableId(
-        `Chats/chat-title-${stableId}.assets/${'a'.repeat(64)}.png`,
-        'asset',
-        stableId,
-      ),
-    ).toBe(true);
-    expect(isGithubManagedPathOwnedByStableId('README.md', 'markdown', stableId)).toBe(false);
-    expect(isGithubManagedPathOwnedByStableId('Chats/chat-title-0000000000.md', 'markdown', stableId)).toBe(false);
-    expect(isGithubManagedPathOwnedByStableId(`Chats/chat-title-${stableId}.assets/image.png`, 'asset', stableId)).toBe(
-      false,
-    );
+  it('requires the conversation-specific fixed folder and generated identity namespace for cleanup authority', () => {
+    const cases = [
+      {
+        folder: 'AIChats',
+        conversation: { source: 'chatgpt', sourceType: 'chat', conversationKey: 'chat-key', title: 'Chat title' },
+      },
+      {
+        folder: 'WebArticles',
+        conversation: { source: 'web', sourceType: 'article', conversationKey: 'article-key', title: 'Article title' },
+      },
+      {
+        folder: 'VideosScripts',
+        conversation: { source: 'youtube', sourceType: 'video', conversationKey: 'video-key', title: 'Video title' },
+      },
+    ] as const;
+
+    for (const { folder, conversation } of cases) {
+      const basename = buildConversationBasename(conversation);
+      const asset = `${'a'.repeat(64)}.png`;
+      expect(isGithubManagedPathOwnedByConversation(`${folder}/${basename}.md`, 'markdown', conversation)).toBe(true);
+      expect(
+        isGithubManagedPathOwnedByConversation(`${folder}/${basename}.assets/${asset}`, 'asset', conversation),
+      ).toBe(true);
+
+      for (const wrongFolder of ['AIChats', 'WebArticles', 'VideosScripts', 'Chats', 'OtherFolder']) {
+        if (wrongFolder === folder) continue;
+        expect(isGithubManagedPathOwnedByConversation(`${wrongFolder}/${basename}.md`, 'markdown', conversation)).toBe(
+          false,
+        );
+        expect(
+          isGithubManagedPathOwnedByConversation(`${wrongFolder}/${basename}.assets/${asset}`, 'asset', conversation),
+        ).toBe(false);
+      }
+
+      expect(isGithubManagedPathOwnedByConversation(`${folder}/nested/${basename}.md`, 'markdown', conversation)).toBe(
+        false,
+      );
+      const stableId = basename.slice(-10);
+      const sourcePrefix = basename.slice(0, basename.indexOf('-'));
+      expect(
+        isGithubManagedPathOwnedByConversation(
+          `${folder}/${sourcePrefix}-bad?title-${stableId}.md`,
+          'markdown',
+          conversation,
+        ),
+      ).toBe(false);
+      expect(
+        isGithubManagedPathOwnedByConversation(
+          `${folder}/${sourcePrefix}-${'x'.repeat(81)}-${stableId}.md`,
+          'markdown',
+          conversation,
+        ),
+      ).toBe(false);
+      expect(
+        isGithubManagedPathOwnedByConversation(`${folder}/${basename}.assets/image.png`, 'asset', conversation),
+      ).toBe(false);
+      expect(isGithubManagedPathOwnedByConversation('README.md', 'markdown', conversation)).toBe(false);
+    }
   });
 });
 

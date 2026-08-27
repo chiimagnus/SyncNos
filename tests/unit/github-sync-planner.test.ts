@@ -14,12 +14,12 @@ const assetSha = 'b'.repeat(40);
 function projection(overrides: Partial<GithubMarkdownProjection> = {}): GithubMarkdownProjection {
   const basename = buildConversationBasename(convo);
   return {
-    markdownPath: `Chats/${basename}.md`,
+    markdownPath: `AIChats/${basename}.md`,
     markdownText: '# body\n',
     markdownContentHash: markdownHash,
     attachments: [
       {
-        path: `Chats/${basename}.assets/${assetHash}.png`,
+        path: `AIChats/${basename}.assets/${assetHash}.png`,
         relativeTarget: `${basename}.assets/${assetHash}.png`,
         contentHash: assetHash,
         sha: assetSha,
@@ -80,7 +80,7 @@ describe('github sync planner', () => {
 
   it('writes all current paths to a new target and never deletes old-target paths', () => {
     const p = projection();
-    const oldPath = `Old/chatgpt-Old-${stableConversationId10(convo)}.md`;
+    const oldPath = `AIChats/chatgpt-Old-${stableConversationId10(convo)}.md`;
     const plan = planGithubConversationSync({
       conversation: convo,
       remoteKey: 'github.com/owner/other@main',
@@ -100,7 +100,7 @@ describe('github sync planner', () => {
 
   it('reuses the old markdown blob when a same-target title/path rename keeps content unchanged', () => {
     const p = projection();
-    const oldPath = `Old/chatgpt-Old-${stableConversationId10(convo)}.md`;
+    const oldPath = `AIChats/chatgpt-Old-${stableConversationId10(convo)}.md`;
     const plan = planGithubConversationSync({
       conversation: convo,
       remoteKey,
@@ -121,7 +121,7 @@ describe('github sync planner', () => {
   it('deletes stale same-identity attachments only on the same target', () => {
     const p = projection({ attachments: [] });
     const basename = buildConversationBasename(convo);
-    const oldAsset = `Chats/${basename}.assets/${assetHash}.png`;
+    const oldAsset = `AIChats/${basename}.assets/${assetHash}.png`;
     const plan = planGithubConversationSync({
       conversation: convo,
       remoteKey,
@@ -141,9 +141,13 @@ describe('github sync planner', () => {
 
   it.each([
     ['README.md', 'markdown'],
-    [`Chats/chatgpt-Other-${'9'.repeat(10)}.md`, 'markdown'],
-    [`Chats/not-owned.assets/${assetHash}.png`, 'asset'],
-    [`Chats/${buildConversationBasename(convo)}.assets/not-a-hash.png`, 'asset'],
+    [`AIChats/chatgpt-Other-${'9'.repeat(10)}.md`, 'markdown'],
+    [`OtherFolder/${buildConversationBasename(convo)}.md`, 'markdown'],
+    [`AIChats/nested/${buildConversationBasename(convo)}.md`, 'markdown'],
+    [`AIChats/chatgpt-${stableConversationId10(convo)}.md`, 'markdown'],
+    [`AIChats/not-owned.assets/${assetHash}.png`, 'asset'],
+    [`OtherFolder/${buildConversationBasename(convo)}.assets/${assetHash}.png`, 'asset'],
+    [`AIChats/${buildConversationBasename(convo)}.assets/not-a-hash.png`, 'asset'],
     ['.github/workflows/sync.yml', 'markdown'],
   ] as const)('does not derive delete authority from corrupt managed metadata: %s', (path, kind) => {
     const p = projection({ attachments: [] });

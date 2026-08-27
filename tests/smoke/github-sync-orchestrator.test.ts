@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GithubCleanupOutboxRecord } from '@platform/idb/github-cleanup-outbox-record';
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { GithubApiError } from '@services/sync/github/github-api-client';
 import { commitGithubStagedOperations, GithubGitTransportError } from '@services/sync/github/github-git-transport';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
@@ -11,15 +12,9 @@ import type { SyncJobSnapshot } from '@services/sync/models';
 const settings = {
   repository: 'owner/repo',
   branch: 'main',
-  chatFolder: 'Chats',
-  articleFolder: 'Articles',
-  videoFolder: 'Videos',
   defaults: {
     repository: '',
     branch: '',
-    chatFolder: 'SyncNos-AIChats',
-    articleFolder: 'SyncNos-WebArticles',
-    videoFolder: 'SyncNos-Videos',
   },
 } as const;
 
@@ -195,6 +190,21 @@ function cleanupRow(id: number, overrides: Partial<GithubCleanupOutboxRecord> = 
     createdAt: 1,
     nextAttemptAt: 1,
     ...overrides,
+  };
+}
+
+function successfulChatGithubMapping(conversation: any, syncedAt = 100) {
+  const path = `AIChats/${buildConversationBasename(conversation)}.md`;
+  return {
+    githubRemoteKey: preflight.remoteKey,
+    githubLastSyncedAt: syncedAt,
+    githubManagedFiles: {
+      [path]: {
+        kind: 'markdown' as const,
+        contentHash: 'd'.repeat(64),
+        sha: 'e'.repeat(40),
+      },
+    },
   };
 }
 
@@ -696,7 +706,7 @@ describe('github sync orchestrator cleanup outbox', () => {
       rows: {
         7: {
           conversation: chat(7),
-          mapping: { githubRemoteKey: preflight.remoteKey, githubLastSyncedAt: -1, githubManagedFiles: {} },
+          mapping: successfulChatGithubMapping(chat(7), -1),
         },
       },
       cleanupRows: [cleanupRow(15, { reason: 'identity_move', replacementConversationId: 7 })],
@@ -713,13 +723,105 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(result.deferredReplacementConversationIds).toEqual([7]);
   });
 
+  it('defers identity cleanup when same-target replacement continuity has no owned managed files', async () => {
+    const replacement = chat(16);
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: {
+        16: {
+          conversation: replacement,
+          mapping: { githubRemoteKey: preflight.remoteKey, githubLastSyncedAt: 100, githubManagedFiles: {} },
+        },
+      },
+      cleanupRows: [cleanupRow(16, { reason: 'identity_move', replacementConversationId: 16 })],
+      now: 6_000,
+      replacementDeferMs: 1_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).toHaveBeenCalledWith([16], 7_000);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(7_000);
+    expect(result.deferredReplacementConversationIds).toEqual([16]);
+  });
+
+  it('defers identity cleanup when same-target replacement continuity contains only an owned asset', async () => {
+    const replacement = chat(17);
+    const basename = buildConversationBasename(replacement);
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: {
+        17: {
+          conversation: replacement,
+          mapping: {
+            githubRemoteKey: preflight.remoteKey,
+            githubLastSyncedAt: 100,
+            githubManagedFiles: {
+              [`AIChats/${basename}.assets/${'a'.repeat(64)}.png`]: {
+                kind: 'asset',
+                contentHash: 'd'.repeat(64),
+                sha: 'e'.repeat(40),
+              },
+            },
+          },
+        },
+      },
+      cleanupRows: [cleanupRow(17, { reason: 'identity_move', replacementConversationId: 17 })],
+      now: 7_000,
+      replacementDeferMs: 1_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).toHaveBeenCalledWith([17], 8_000);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(8_000);
+    expect(result.deferredReplacementConversationIds).toEqual([17]);
+  });
+
+  it('defers identity cleanup when same-target replacement continuity contains only unowned managed files', async () => {
+    const replacement = chat(18);
+    const basename = buildConversationBasename(replacement);
+    const { services, commit, getCleanupRows } = fakeServices({
+      rows: {
+        18: {
+          conversation: replacement,
+          mapping: {
+            githubRemoteKey: preflight.remoteKey,
+            githubLastSyncedAt: 100,
+            githubManagedFiles: {
+              [`OtherFolder/${basename}.md`]: {
+                kind: 'markdown',
+                contentHash: 'd'.repeat(64),
+                sha: 'e'.repeat(40),
+              },
+            },
+          },
+        },
+      },
+      cleanupRows: [cleanupRow(18, { reason: 'identity_move', replacementConversationId: 18 })],
+      now: 8_000,
+      replacementDeferMs: 1_000,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(services.deferCleanupRows).toHaveBeenCalledWith([18], 9_000);
+    expect(services.ackCleanupRows).not.toHaveBeenCalled();
+    expect(getCleanupRows()[0]?.nextAttemptAt).toBe(9_000);
+    expect(result.deferredReplacementConversationIds).toEqual([18]);
+  });
+
   it('allows identity cleanup after same-target replacement success or local replacement deletion', async () => {
     let committedOperations: readonly any[] = [];
+    const replacement = chat(2);
     const { services, getCleanupRows } = fakeServices({
       rows: {
         2: {
-          conversation: chat(2),
-          mapping: { githubRemoteKey: preflight.remoteKey, githubLastSyncedAt: 100, githubManagedFiles: {} },
+          conversation: replacement,
+          mapping: successfulChatGithubMapping(replacement),
         },
       },
       cleanupRows: [
