@@ -49,6 +49,14 @@ function createHarness(overrides: Partial<GithubSettingsHandlersDeps> = {}) {
       headSha: 'a'.repeat(40),
       treeSha: 'b'.repeat(40),
     })),
+    initializeRepository: vi.fn(async () => ({
+      repository: 'owner/repo',
+      branch: 'main',
+      remoteKey: 'github.com/owner/repo@main',
+      installationId: 7,
+      headSha: 'c'.repeat(40),
+      treeSha: 'd'.repeat(40),
+    })),
     ...overrides,
   } as GithubSettingsHandlersDeps;
   const router = createBackgroundRouter({
@@ -155,7 +163,7 @@ describe('background-router GitHub settings routes', () => {
       treeSha: 'b'.repeat(40),
       accessToken: ACCESS_TOKEN,
     })) as any;
-    const { router } = createHarness({
+    const { router, deps } = createHarness({
       saveSettings,
       preflightRepository,
       discoverRepositories: vi.fn(async () => ({
@@ -235,6 +243,24 @@ describe('background-router GitHub settings routes', () => {
       },
     });
     expectSecretFree(tested);
+
+    const initialized = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY });
+    expect(deps.initializeRepository).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main' });
+    expect(saveSettings).toHaveBeenCalledTimes(1);
+    expect(initialized).toMatchObject({
+      ok: true,
+      data: {
+        ok: true,
+        initialized: true,
+        target: {
+          repository: 'owner/repo',
+          branch: 'main',
+          remoteKey: 'github.com/owner/repo@main',
+          installationId: 7,
+        },
+      },
+    });
+    expectSecretFree(initialized);
   });
 
   it('returns stable safe error metadata without reflecting secret-bearing error messages', async () => {

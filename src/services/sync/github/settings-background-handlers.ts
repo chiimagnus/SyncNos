@@ -8,6 +8,7 @@ import {
 import { GITHUB_APP_CONFIG } from '@services/sync/github/github-app-config';
 import {
   discoverGithubRepositories,
+  initializeGithubRepository,
   preflightGithubRepository,
   type GithubRepositoryDiscovery,
   type GithubRepositoryPreflight,
@@ -35,6 +36,7 @@ export type GithubSettingsHandlersDeps = {
   clearAuthState: typeof clearGithubAuthState;
   discoverRepositories: typeof discoverGithubRepositories;
   preflightRepository: typeof preflightGithubRepository;
+  initializeRepository: typeof initializeGithubRepository;
 };
 
 const DEFAULT_DEPS: GithubSettingsHandlersDeps = {
@@ -47,6 +49,7 @@ const DEFAULT_DEPS: GithubSettingsHandlersDeps = {
   clearAuthState: clearGithubAuthState,
   discoverRepositories: discoverGithubRepositories,
   preflightRepository: preflightGithubRepository,
+  initializeRepository: initializeGithubRepository,
 };
 
 const SETTINGS_FIELDS = new Set<GithubSettingsField>([
@@ -278,6 +281,19 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
       return router.ok({ ok: true, target: safePreflightDto(preflight) });
     } catch (error) {
       return safeErrorResponse(router, error, 'github_connection_test_failed');
+    }
+  });
+
+  router.register(GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY, async () => {
+    try {
+      const settings = await deps.getSettings();
+      const preflight = await deps.initializeRepository({
+        repository: settings.repository,
+        branch: settings.branch,
+      });
+      return router.ok({ ok: true, initialized: true, target: safePreflightDto(preflight) });
+    } catch (error) {
+      return safeErrorResponse(router, error, 'github_repository_initialize_failed');
     }
   });
 }

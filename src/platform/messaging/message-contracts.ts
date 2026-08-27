@@ -47,6 +47,7 @@ export const GITHUB_MESSAGE_TYPES = {
   LIST_REPOSITORIES: 'githubListRepositories',
   SAVE_SETTINGS: 'githubSaveSettings',
   TEST_CONNECTION: 'githubTestConnection',
+  INITIALIZE_REPOSITORY: 'githubInitializeRepository',
   SYNC_CONVERSATIONS: 'githubSyncConversations',
   GET_SYNC_STATUS: 'getGithubSyncStatus',
   CLEAR_SYNC_STATUS: 'clearGithubSyncStatus',
