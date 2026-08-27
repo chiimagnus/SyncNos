@@ -138,7 +138,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     githubRepository,
     onChangeGithubRepository,
     githubBranch,
-    setGithubBranch,
+    onChangeGithubBranch,
     githubVerificationUrl,
     githubAppUrl,
     githubInstallUrl,
@@ -415,7 +415,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeRepository={(repository) => {
             void onChangeGithubRepository(repository);
           }}
-          onChangeBranch={setGithubBranch}
+          onChangeBranch={onChangeGithubBranch}
           onSaveBranch={() => {
             void onSaveGithubBranch();
           }}

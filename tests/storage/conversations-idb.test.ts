@@ -8,7 +8,7 @@ import {
   attachOrphanCommentsToConversation,
   listArticleCommentsByConversationId,
 } from '@services/comments/data/storage-idb';
-import { stableConversationId10 } from '@services/conversations/domain/file-naming';
+import { buildConversationBasename, stableConversationId10 } from '@services/conversations/domain/file-naming';
 import {
   __closeDbForTests,
   deleteConversationsByIds,
@@ -1036,9 +1036,9 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 1,
     });
     const id = Number(convo.id);
-    const stableId = stableConversationId10(convo);
-    const notePath = `Chats/debug-GitHub delete-${stableId}.md`;
-    const assetPath = `Chats/debug-GitHub delete-${stableId}.assets/${'a'.repeat(64)}.png`;
+    const basename = buildConversationBasename(convo);
+    const notePath = `AIChats/${basename}.md`;
+    const assetPath = `AIChats/${basename}.assets/${'a'.repeat(64)}.png`;
     const metadata = { sha: 'b'.repeat(40), contentHash: 'c'.repeat(64) };
     await patchSyncMapping(id, {
       githubRemoteKey: 'github.com/owner/repo@main',
@@ -1046,8 +1046,9 @@ describe('conversations storage-idb', () => {
         [notePath]: { ...metadata, kind: 'markdown' },
         [assetPath]: { ...metadata, kind: 'asset' },
         'README.md': { ...metadata, kind: 'markdown' },
-        'Chats/other-0000000000.md': { ...metadata, kind: 'markdown' },
-        [`Chats/debug-GitHub delete-${stableId}.assets/not-a-content-hash.png`]: { ...metadata, kind: 'asset' },
+        [`OtherFolder/${basename}.md`]: { ...metadata, kind: 'markdown' },
+        'AIChats/other-0000000000.md': { ...metadata, kind: 'markdown' },
+        [`AIChats/${basename}.assets/not-a-content-hash.png`]: { ...metadata, kind: 'asset' },
       },
       githubProjectionFingerprint: 'd'.repeat(64),
       githubLastSyncedAt: 10,
@@ -1158,8 +1159,8 @@ describe('conversations storage-idb', () => {
       githubRemoteKey: 'github.com/owner/repo@main',
       githubManagedFiles: {
         'README.md': { ...metadata, kind: 'markdown' },
-        'Chats/another-0000000000.md': { ...metadata, kind: 'markdown' },
-        [`Chats/debug-Corrupt-${stableId}.assets/image.png`]: { ...metadata, kind: 'asset' },
+        'AIChats/another-0000000000.md': { ...metadata, kind: 'markdown' },
+        [`AIChats/debug-Corrupt-${stableId}.assets/image.png`]: { ...metadata, kind: 'asset' },
       },
     });
 
@@ -1182,11 +1183,10 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 1,
     });
     const id = Number(convo.id);
-    const stableId = stableConversationId10(convo);
     await patchSyncMapping(id, {
       githubRemoteKey: 'github.com/owner/repo@main',
       githubManagedFiles: {
-        [`Articles/web-Abort delete-${stableId}.md`]: {
+        [`WebArticles/${buildConversationBasename(convo)}.md`]: {
           kind: 'markdown',
           sha: 'a'.repeat(40),
           contentHash: 'b'.repeat(64),
@@ -1256,8 +1256,7 @@ describe('conversations storage-idb', () => {
     });
     const existingId = Number(existing.id);
     const otherId = Number(other.id);
-    const oldStableId = stableConversationId10(existing);
-    const oldPath = `Articles/web-Old identity-${oldStableId}.md`;
+    const oldPath = `WebArticles/${buildConversationBasename(existing)}.md`;
     await patchSyncMapping(existingId, {
       githubRemoteKey: 'github.com/owner/repo@main',
       githubManagedFiles: {
@@ -1373,8 +1372,7 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 1,
     });
     const existingId = Number(existing.id);
-    const oldStableId = stableConversationId10(existing);
-    const oldPath = `Articles/web-Rewrite abort-${oldStableId}.md`;
+    const oldPath = `WebArticles/${buildConversationBasename(existing)}.md`;
     await patchSyncMapping(existingId, {
       githubRemoteKey: 'github.com/owner/repo@main',
       githubManagedFiles: {
@@ -1556,8 +1554,7 @@ describe('conversations storage-idb', () => {
       { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
     ]);
 
-    const removeStableId = stableConversationId10(remove);
-    const ownedLegacyPath = `Articles/web-From remove-${removeStableId}.md`;
+    const ownedLegacyPath = `WebArticles/${buildConversationBasename(remove)}.md`;
     const db = await openDb();
     const t = db.transaction(['sync_mappings', 'article_comments'], 'readwrite');
     await reqToPromise(
@@ -1695,8 +1692,8 @@ describe('conversations storage-idb', () => {
     const removeId = Number(remove.id);
     const keepKey = String(keep.conversationKey || '');
     const removeKey = String(remove.conversationKey || '');
-    const keepGithubPath = `Articles/web-keep-${stableConversationId10(keep)}.md`;
-    const removeGithubPath = `Articles/web-remove-${stableConversationId10(remove)}.md`;
+    const keepGithubPath = `WebArticles/${buildConversationBasename(keep)}.md`;
+    const removeGithubPath = `WebArticles/${buildConversationBasename(remove)}.md`;
 
     const db = await openDb();
     const tx = db.transaction(['sync_mappings'], 'readwrite');
@@ -1807,7 +1804,7 @@ describe('conversations storage-idb', () => {
     });
     const keepId = Number(keep.id);
     const removeId = Number(remove.id);
-    const removePath = `Articles/web-remove-${stableConversationId10(remove)}.md`;
+    const removePath = `WebArticles/${buildConversationBasename(remove)}.md`;
     await patchSyncMapping(removeId, {
       githubRemoteKey: 'github.com/owner/repo@main',
       githubManagedFiles: {

@@ -25,8 +25,7 @@ import {
   readGithubContinuity,
 } from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
-import { stableConversationId10 } from '@services/conversations/domain/file-naming';
-import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
+import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -361,9 +360,8 @@ function readOwnedGithubCleanupSnapshot(
       ? (continuity.githubManagedFiles as Record<string, any>)
       : {};
   if (!remoteKey || !conversation) return null;
-  const stableId = stableConversationId10(conversation);
   const paths = Object.entries(managedFiles)
-    .filter(([path, metadata]) => isGithubManagedPathOwnedByStableId(path, metadata?.kind, stableId))
+    .filter(([path, metadata]) => isGithubManagedPathOwnedByConversation(path, metadata?.kind, conversation))
     .map(([path]) => path);
   return paths.length ? { remoteKey, paths } : null;
 }

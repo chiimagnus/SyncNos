@@ -2,44 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from '@ui/shared/markdown-core';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { collectOrderedSyncnosAssetIds } from '@services/sync/shared/markdown-asset-refs';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
 
 type BubbleRole = 'user' | 'assistant';
-
-const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
-
-function stripAngleBrackets(url: string): string {
-  const text = String(url || '').trim();
-  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
-  return text;
-}
-
-function parseSyncnosAssetId(url: unknown): number | null {
-  const text = String(url || '').trim();
-  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
-  if (!matched) return null;
-  const id = Number(matched[1]);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
-}
-
-function collectOrderedSyncnosAssetIds(markdown: string): number[] {
-  const raw = String(markdown || '');
-  if (!raw) return [];
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  const seen = new Set<number>();
-  const out: number[] = [];
-  let match: RegExpExecArray | null = null;
-  while ((match = MARKDOWN_IMAGE_RE.exec(raw)) != null) {
-    const urlPart = match[2] ? String(match[2]) : '';
-    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
-    if (!assetId) continue;
-    if (seen.has(assetId)) continue;
-    seen.add(assetId);
-    out.push(assetId);
-  }
-  return out;
-}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {

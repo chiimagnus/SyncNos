@@ -6,6 +6,7 @@ import type {
   GithubGitTransactionResult,
   GithubStagedOperation,
 } from '@services/sync/github/github-git-transport';
+import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
 import {
   defaultGithubOrchestratorServices,
@@ -23,7 +24,7 @@ import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@s
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
-export type GithubSyncStagedItem = {
+type GithubSyncStagedItem = {
   conversationId: number;
   conversationTitle: string;
   status: 'no_changes' | 'staged' | 'failed';
@@ -33,7 +34,7 @@ export type GithubSyncStagedItem = {
   operations: GithubStagedOperation[];
 };
 
-export type GithubSyncStagedRun = {
+type GithubSyncStagedRun = {
   target: {
     repository: string;
     branch: string;
@@ -225,15 +226,16 @@ function positiveId(value: unknown): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-function managedPathSet(mapping: any): Set<string> {
-  const files = mapping?.githubManagedFiles;
-  if (!files || typeof files !== 'object' || Array.isArray(files)) return new Set();
-  return new Set(Object.keys(files));
-}
-
-function hasSuccessfulSameTargetMapping(mapping: any, remoteKey: string): boolean {
+function successfulSameTargetOwnedPaths(mapping: any, remoteKey: string, conversation: any): Set<string> | null {
   const continuity = readGithubContinuity(mapping);
-  return continuity.githubRemoteKey === remoteKey && typeof continuity.githubLastSyncedAt === 'number';
+  if (continuity.githubRemoteKey !== remoteKey || typeof continuity.githubLastSyncedAt !== 'number') return null;
+  const files = continuity.githubManagedFiles;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return null;
+  const ownedEntries = Object.entries(files).filter(([path, file]) =>
+    isGithubManagedPathOwnedByConversation(path, file.kind, conversation),
+  );
+  if (!ownedEntries.some(([, file]) => file.kind === 'markdown')) return null;
+  return new Set(ownedEntries.map(([path]) => path));
 }
 
 function mergeCleanupDeletes(
@@ -350,17 +352,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     };
   }
 
-  async function stage(input: {
-    conversationIds?: readonly unknown[];
-    mode?: GithubSyncPlannerMode;
-  }): Promise<GithubSyncStagedRun> {
-    const ids = normalizeIds(input.conversationIds);
-    const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
-    const settings = await services.getSettings();
-    const preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
-    return stageResolved(ids, mode, preflight);
-  }
-
   async function getSyncStatus(input: { instanceId?: string } = {}) {
     return {
       provider: 'github' as const,
@@ -374,7 +365,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     return { provider: 'github' as const, job: null, instanceId: safeString(input.instanceId) };
   }
 
-  async function sync(input: {
+  let activeSyncRun: Promise<GithubSyncRunResult> | null = null;
+
+  async function runSync(input: {
     conversationIds?: readonly unknown[];
     mode?: GithubSyncPlannerMode;
     instanceId?: string;
@@ -522,11 +515,11 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
             replacementChecks.set(conversationId, result);
             return result;
           }
-          const safe = hasSuccessfulSameTargetMapping(row.mapping, staged.target.remoteKey);
+          const protectedPaths = successfulSameTargetOwnedPaths(row.mapping, staged.target.remoteKey, row.conversation);
           const result = {
-            safe,
+            safe: protectedPaths != null,
             dependsOnCurrentTransport: false,
-            protectedPaths: safe ? managedPathSet(row.mapping) : new Set<string>(),
+            protectedPaths: protectedPaths ?? new Set<string>(),
           };
           replacementChecks.set(conversationId, result);
           return result;
@@ -756,7 +749,20 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     }
   }
 
-  return { stage, sync, getSyncStatus, clearSyncStatus };
-}
+  function sync(input: {
+    conversationIds?: readonly unknown[];
+    mode?: GithubSyncPlannerMode;
+    instanceId?: string;
+  }): Promise<GithubSyncRunResult> {
+    if (activeSyncRun) return Promise.reject(buildAlreadyRunningError());
+    const run = runSync(input);
+    activeSyncRun = run;
+    const release = () => {
+      if (activeSyncRun === run) activeSyncRun = null;
+    };
+    void run.then(release, release);
+    return run;
+  }
 
-export const githubSyncOrchestrator = createGithubSyncOrchestrator();
+  return { sync, getSyncStatus, clearSyncStatus };
+}

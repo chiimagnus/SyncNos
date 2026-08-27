@@ -111,6 +111,76 @@ describe('github device flow', () => {
     });
   });
 
+  it('shares one in-flight device-code request across concurrent start callers', async () => {
+    let release: (() => void) | null = null;
+    let markStarted: (() => void) | null = null;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const fetchImpl = vi.fn(async () => {
+      markStarted?.();
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return jsonResponse(deviceStartBody());
+    }) as unknown as typeof fetch;
+    const { startDeviceFlow } = await import('@services/sync/github/auth/device-flow');
+
+    const first = startDeviceFlow({ fetchImpl, now: () => 1_000 });
+    const second = startDeviceFlow({ fetchImpl, now: () => 1_000 });
+    await started;
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    release?.();
+    const [firstSummary, secondSummary] = await Promise.all([first, second]);
+    expect(firstSummary).toEqual(secondSummary);
+    expect(firstSummary).toMatchObject({ state: 'pending', userCode: 'ABCD-EFGH', nextPollAt: 6_000 });
+  });
+
+  it('persists a due-poll claim before HTTP so concurrent and reloaded callers cannot poll twice', async () => {
+    let now = 1_000;
+    let pollRequests = 0;
+    let releasePoll: (() => void) | null = null;
+    let markPollStarted: (() => void) | null = null;
+    const pollStarted = new Promise<void>((resolve) => {
+      markPollStarted = resolve;
+    });
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).endsWith('/login/device/code')) return jsonResponse(deviceStartBody());
+      pollRequests += 1;
+      markPollStarted?.();
+      await new Promise<void>((resolve) => {
+        releasePoll = resolve;
+      });
+      return jsonResponse({ error: 'authorization_pending' });
+    }) as unknown as typeof fetch;
+
+    let mod = await import('@services/sync/github/auth/device-flow');
+    const authStore = await import('@services/sync/github/auth/auth-store');
+    await mod.startDeviceFlow({ fetchImpl, now: () => now });
+
+    now = 6_000;
+    const firstPoll = mod.pollDeviceFlowOnce({ fetchImpl, now: () => now });
+    await pollStarted;
+    let state = await authStore.getGithubAuthState();
+    expect(state.state === 'pending' && state.pending.nextPollAt).toBe(11_000);
+    expect(pollRequests).toBe(1);
+
+    vi.resetModules();
+    mod = await import('@services/sync/github/auth/device-flow');
+    now = 6_001;
+    await expect(mod.pollDeviceFlowOnce({ fetchImpl, now: () => now })).resolves.toMatchObject({
+      state: 'pending',
+      nextPollAt: 11_000,
+    });
+    expect(pollRequests).toBe(1);
+
+    releasePoll?.();
+    await expect(firstPoll).resolves.toMatchObject({ state: 'pending', nextPollAt: 11_000 });
+    state = await authStore.getGithubAuthState();
+    expect(state.state === 'pending' && state.pending.nextPollAt).toBe(11_000);
+  });
+
   it('accumulates slow_down by five seconds and never falls back to the old interval', async () => {
     let now = 1_000;
     const responses = [deviceStartBody(), { error: 'slow_down' }, { error: 'slow_down' }];

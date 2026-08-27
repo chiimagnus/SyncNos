@@ -1,10 +1,9 @@
-import { stableConversationId10 } from '@services/conversations/domain/file-naming';
 import type {
   GithubMarkdownProjection,
   GithubProjectionManagedFile,
 } from '@services/sync/github/github-markdown-projection';
 import { validateGithubGitPath, type GithubStagedOperation } from '@services/sync/github/github-git-transport';
-import { isGithubManagedPathOwnedByStableId } from '@services/sync/github/github-managed-path-ownership';
+import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
@@ -95,7 +94,6 @@ export function planGithubConversationSync(input: {
   const current = currentFiles(projection);
   const previous = safeManagedFiles(input.mapping?.githubManagedFiles);
   const sameTarget = input.mapping?.githubRemoteKey === remoteKey;
-  const stableId = stableConversationId10(input.conversation || {});
   const warnings: string[] = [];
 
   const nextContinuity: GithubSyncContinuityDraft = {
@@ -133,7 +131,7 @@ export function planGithubConversationSync(input: {
               ([oldPath, candidate]) =>
                 candidate.kind === 'markdown' &&
                 candidate.contentHash === row.contentHash &&
-                isGithubManagedPathOwnedByStableId(oldPath, 'markdown', stableId),
+                isGithubManagedPathOwnedByConversation(oldPath, 'markdown', input.conversation),
             )
           : undefined;
         if (renamed) {
@@ -154,7 +152,7 @@ export function planGithubConversationSync(input: {
   if (sameTarget) {
     for (const [path, old] of Object.entries(previous)) {
       if (current[path]) continue;
-      if (!isGithubManagedPathOwnedByStableId(path, old.kind, stableId)) {
+      if (!isGithubManagedPathOwnedByConversation(path, old.kind, input.conversation)) {
         warnings.push('github_managed_path_ignored');
         continue;
       }

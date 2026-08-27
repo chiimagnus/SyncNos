@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GITHUB_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
+import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 
 const runtimeMocks = vi.hoisted(() => ({ send: vi.fn() }));
@@ -504,7 +505,7 @@ describe('Settings controller GitHub Device Flow', () => {
     });
     expect(latestSnapshot?.githubRepository).toBe('owner/other');
 
-    act(() => latestSnapshot?.setGithubBranch('release/v1'));
+    act(() => latestSnapshot?.onChangeGithubBranch('release/v1'));
     await flushReact();
     await invoke(() => latestSnapshot!.onSaveGithubBranch());
     expect(
@@ -568,13 +569,17 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.error).toBeNull();
   });
 
-  it('preserves an invalid branch draft and auth when service validation rejects auto-save', async () => {
+  it('reverts a rejected branch draft to the persisted target before later target actions can run', async () => {
     githubSettingsData = githubSettings({ state: 'connected' });
     githubRepositoryData = readyRepositories();
     await renderController();
 
-    act(() => latestSnapshot?.setGithubBranch('../main'));
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest.status).toBe('success');
+
+    act(() => latestSnapshot?.onChangeGithubBranch('../main'));
     await flushReact();
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
     saveSettingsResponse = fail('github_settings_invalid:branch', { code: 'github_settings_invalid' });
 
     await invoke(() => latestSnapshot!.onSaveGithubBranch());
@@ -583,9 +588,78 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(saveCalls).toHaveLength(1);
     expect(saveCalls[0]?.[1]).toEqual({ branch: '../main' });
     expect(latestSnapshot?.error).toBe('github_settings_invalid:branch');
-    expect(latestSnapshot?.githubBranch).toBe('../main');
+    expect(latestSnapshot?.githubBranch).toBe('main');
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
     expect(githubSettingsData.settings.branch).toBe('main');
+
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest).toEqual({
+      status: 'success',
+      target: {
+        repository: 'owner/repo',
+        branch: 'main',
+        remoteKey: 'github.com/owner/repo@main',
+        installationId: 1,
+      },
+    });
+  });
+
+  it('invalidates a successful connection test when repository access is refreshed', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    githubRepositoryData = readyRepositories();
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest.status).toBe('success');
+
+    githubRepositoryData = {
+      status: 'github_no_accessible_repositories',
+      account: { login: 'octocat', avatarUrl: '', url: 'https://github.com/octocat' },
+      repositories: [],
+      appUrl: 'https://github.com/apps/syncnos',
+      installUrl: 'https://github.com/apps/syncnos/installations/new',
+    };
+    await invoke(() => latestSnapshot!.onRefreshGithubRepositories());
+
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
+    expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
+  });
+
+  it('rehydrates a safe disconnected auth summary when GitHub secret storage changes externally', async () => {
+    githubSettingsData = githubSettings({ state: 'connected' });
+    githubRepositoryData = readyRepositories();
+    await renderController();
+    await invoke(() => latestSnapshot!.onTestGithubConnection());
+    expect(latestSnapshot?.githubConnectionTest.status).toBe('success');
+
+    const settingsReadsBefore = callCount(GITHUB_MESSAGE_TYPES.GET_SETTINGS);
+    githubSettingsData = githubSettings({ state: 'disconnected' });
+    act(() => {
+      storageListener?.(
+        {
+          [GITHUB_AUTH_STATE_KEY]: {
+            oldValue: {
+              state: 'connected',
+              token: { accessToken: ACCESS_TOKEN, refreshToken: REFRESH_TOKEN },
+            },
+            newValue: { state: 'disconnected', deviceCode: DEVICE_CODE },
+          },
+        },
+        'local',
+      );
+    });
+    await flushReact();
+
+    expect(callCount(GITHUB_MESSAGE_TYPES.GET_SETTINGS)).toBe(settingsReadsBefore + 1);
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'disconnected' });
+    expect(latestSnapshot?.githubAccount).toBeNull();
+    expect(latestSnapshot?.githubRepositories).toEqual([]);
+    expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
+    const serialized = JSON.stringify(latestSnapshot);
+    expect(serialized).not.toContain(ACCESS_TOKEN);
+    expect(serialized).not.toContain(REFRESH_TOKEN);
+    expect(serialized).not.toContain(DEVICE_CODE);
   });
 
   it('never hydrates access, refresh, or device secrets into controller state', async () => {
