@@ -85,6 +85,32 @@ describe('DetailHeaderActionBar', () => {
     expect(button?.textContent).not.toContain('▾');
   });
 
+  it('renders the GitHub provider logo for GitHub actions', () => {
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'open-in-github',
+              label: 'Open in GitHub',
+              provider: 'github',
+              kind: 'external-link',
+              slot: 'open',
+              href: 'https://github.com/octocat/sync-notes/blob/main/AIChats/example.md',
+              onTrigger: vi.fn(async () => {}),
+            },
+          ],
+          buttonClassName,
+        }),
+      );
+    });
+
+    const button = document.querySelector('[aria-label="Open in GitHub"]') as HTMLButtonElement | null;
+    const logo = button?.querySelector('[data-provider-logo="github"]') as HTMLImageElement | null;
+    expect(button).toBeTruthy();
+    expect(logo?.getAttribute('src')).toBe('/icons/github.svg');
+  });
+
   it('renders a split button and promotes a selected menu action', async () => {
     const notionTrigger = vi.fn(async () => {});
     const obsidianTrigger = vi.fn(async () => {});

@@ -22,6 +22,7 @@ const PROVIDER_LOGO_SRC: Record<string, string> = {
   notion: '/icons/notion.svg',
   obsidian: '/icons/obsidian.svg',
   feishu: '/icons/feishu.svg',
+  github: '/icons/github.svg',
 };
 
 function providerLogo(action: DetailHeaderAction) {

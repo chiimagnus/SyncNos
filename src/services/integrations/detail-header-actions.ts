@@ -86,6 +86,7 @@ async function buildCopyLinkActions(openActions: DetailHeaderAction[]): Promise<
   const copyTargets = {
     notion: { id: 'copy-notion-link', label: t('detailHeaderCopyNotionLink') },
     feishu: { id: 'copy-feishu-link', label: t('detailHeaderCopyFeishuLink') },
+    github: { id: 'copy-github-link', label: t('detailHeaderCopyGithubLink') },
   } as const;
   const actions: DetailHeaderAction[] = [];
 

@@ -4,6 +4,7 @@ import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integ
 import { getSyncMappingByConversation } from '@services/conversations/data/storage-idb';
 import { isSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 import { buildFeishuOpenInAction } from '@services/integrations/openin/feishu-openin';
+import { buildGithubOpenInAction } from '@services/integrations/openin/github-openin';
 import {
   buildNotionOpenInAction,
   buildNotionPageUrl,
@@ -15,6 +16,7 @@ export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: t('detailHeaderOpenInNotion'),
   openInObsidian: t('detailHeaderOpenInObsidian'),
   openInFeishu: t('detailHeaderOpenInFeishu'),
+  openInGithub: t('detailHeaderOpenInGithub'),
   obsidianApiNotConnected: t('detailHeaderObsidianApiNotConnected'),
 } as const;
 
@@ -83,10 +85,11 @@ export async function resolveOpenInDetailHeaderActions({
   const hydratedValue = (mappingRes: any, field: string) =>
     safeString(mappingRes?.mapping?.[field]) || safeString(mappingRes?.conversation?.[field]);
 
-  const [notionEnabled, obsidianEnabled, feishuEnabled] = await Promise.all([
+  const [notionEnabled, obsidianEnabled, feishuEnabled, githubEnabled] = await Promise.all([
     isSyncProviderEnabled('notion').catch(() => true),
     isSyncProviderEnabled('obsidian').catch(() => true),
     isSyncProviderEnabled('feishu').catch(() => true),
+    isSyncProviderEnabled('github').catch(() => true),
   ]);
 
   if (notionEnabled) {
@@ -131,6 +134,17 @@ export async function resolveOpenInDetailHeaderActions({
     }
     const feishuAction = buildFeishuOpenInAction({ conversation: convo, port, labels: DETAIL_HEADER_ACTION_LABELS });
     if (feishuAction) actions.push(feishuAction);
+  }
+
+  if (githubEnabled) {
+    const mappingRes = await resolveSyncMapping();
+    const githubAction = buildGithubOpenInAction({
+      conversation,
+      mapping: mappingRes?.mapping,
+      port,
+      labels: DETAIL_HEADER_ACTION_LABELS,
+    });
+    if (githubAction) actions.push(githubAction);
   }
 
   try {
