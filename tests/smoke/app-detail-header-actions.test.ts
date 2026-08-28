@@ -159,6 +159,7 @@ describe('ConversationDetailPane header actions', () => {
 
   beforeEach(() => {
     setupDom();
+    currentState.activeId = 11;
     currentState.selectedConversation = {
       id: 11,
       title: 'Conversation',
