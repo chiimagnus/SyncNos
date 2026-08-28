@@ -77,9 +77,6 @@ YouTube and Bilibili pages can capture transcripts/subtitles that the page has a
 WebClipper Popup: save and browse conversations
 ![WebClipper Popup](docs/assets/popup-screenshots.png)
 
-WebClipper Settings: backup and sync
-![WebClipper Settings](docs/assets/setting-screenshots.png)
-
 Article discussion sidebar: exact quotes, compact threads, and one active reply composer
 ![Article discussion sidebar](docs/assets/comments-discussion.png)
 
