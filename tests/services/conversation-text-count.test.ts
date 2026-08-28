@@ -31,6 +31,13 @@ describe('countTextUnits', () => {
     ['https://example.com/path?x=中文 后', 1],
     ['https://example.com/path）测试', 2],
     ['https://a.com,word', 1],
+    ['https://en.wikipedia.org/wiki/Function_(mathematics)', 0],
+    ['See https://en.wikipedia.org/wiki/Function_(mathematics) now', 2],
+    ['https://example.com/a_(b_(c)) tail', 1],
+    ['http://[::1]/', 0],
+    ['See http://[::1]/ now', 2],
+    ['(https://example.com)', 0],
+    ['https://example.com/test)word', 1],
     ['example.com', 1],
     ['   \n\t', 0],
   ])('counts %j deterministically as %i', (text, expected) => {

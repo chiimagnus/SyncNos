@@ -15,10 +15,6 @@ const URL_HARD_TERMINATORS = new Set([
   '"',
   "'",
   '`',
-  '(',
-  ')',
-  '[',
-  ']',
   '{',
   '}',
   ',',
@@ -87,6 +83,33 @@ function isUrlTerminator(char: string): boolean {
   return !char || /\s/u.test(char) || URL_HARD_TERMINATORS.has(char);
 }
 
+function httpUrlSpanEnd(text: string, start: number, schemeLength: number): number {
+  let end = start + schemeLength;
+  let parenDepth = 0;
+  let bracketDepth = 0;
+
+  while (end < text.length) {
+    const char = codePointAt(text, end);
+    if (isUrlTerminator(char)) break;
+
+    if (char === '(') {
+      parenDepth += 1;
+    } else if (char === ')') {
+      if (parenDepth === 0) break;
+      parenDepth -= 1;
+    } else if (char === '[') {
+      bracketDepth += 1;
+    } else if (char === ']') {
+      if (bracketDepth === 0) break;
+      bracketDepth -= 1;
+    }
+
+    end += char.length || 1;
+  }
+
+  return end;
+}
+
 function stripHttpUrlSpans(text: string): string {
   let output = '';
   let index = 0;
@@ -100,15 +123,8 @@ function stripHttpUrlSpans(text: string): string {
       continue;
     }
 
-    let end = index + schemeLength;
-    while (end < text.length) {
-      const char = codePointAt(text, end);
-      if (isUrlTerminator(char)) break;
-      end += char.length || 1;
-    }
-
     output += ' ';
-    index = end;
+    index = httpUrlSpanEnd(text, index, schemeLength);
   }
 
   return output;
