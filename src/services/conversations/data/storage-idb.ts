@@ -1162,7 +1162,9 @@ async function readConversationListPage(input: {
     cursor,
   });
   const summaryPromise = (async () => {
-    if (conversationListStatsCacheKey === statsKey && conversationListStatsCacheValue) {
+    // A bootstrap starts a fresh list snapshot and must observe IndexedDB writes from other extension contexts
+    // (for example backup import). Reuse cached stats only while continuing the same paginated snapshot.
+    if (cursor && conversationListStatsCacheKey === statsKey && conversationListStatsCacheValue) {
       return conversationListStatsCacheValue;
     }
     const computed = await readConversationListSummaryAndFacets({ store: stores.conversations, query });
