@@ -17,12 +17,14 @@ describe('createThreadedCommentChatWithConfig', () => {
 
     const config = createThreadedCommentChatWithConfig({
       resolveContext: async () => ({
+        conversationId: 42,
         articleTitle: '  Example Article  ',
         canonicalUrl: '  https://example.com/article  ',
       }),
     });
 
     await expect(config.resolveContext?.()).resolves.toEqual({
+      conversationId: 42,
       articleTitle: 'Example Article',
       canonicalUrl: 'https://example.com/article',
     });
@@ -43,12 +45,17 @@ describe('createThreadedCommentChatWithConfig', () => {
     ];
     resolveChatWithCommentActionsMock.mockResolvedValue(expectedActions);
 
+    const resolveSyncedUrls = vi.fn(async () => ({
+      githubUrl: 'https://github.com/owner/repo/blob/main/WebArticles/article.md',
+    }));
     const config = createThreadedCommentChatWithConfig({
       resolveContext: async () => ({
+        conversationId: 7,
         articleTitle: 'Article from resolver',
         canonicalUrl: 'https://example.com/resolver',
       }),
       resolveOpenPort: async () => openPort,
+      resolveSyncedUrls,
     });
 
     const actions = await config.resolveActions(
@@ -59,6 +66,7 @@ describe('createThreadedCommentChatWithConfig', () => {
         commentText: 'Root comment',
       },
       {
+        conversationId: 7,
         articleTitle: ' Article from context ',
         canonicalUrl: ' https://example.com/context ',
       },
@@ -72,6 +80,14 @@ describe('createThreadedCommentChatWithConfig', () => {
       articleTitle: 'Article from context',
       canonicalUrl: 'https://example.com/context',
       openPort,
+      syncedUrls: {
+        githubUrl: 'https://github.com/owner/repo/blob/main/WebArticles/article.md',
+      },
+    });
+    expect(resolveSyncedUrls).toHaveBeenCalledWith({
+      conversationId: 7,
+      articleTitle: 'Article from context',
+      canonicalUrl: 'https://example.com/context',
     });
   });
 

@@ -74,7 +74,7 @@ export const ITEM_MENTION_MESSAGE_TYPES = {
 
 export const CHATWITH_MESSAGE_TYPES = {
   OPEN_PLATFORM_TAB: 'chatwithOpenPlatformTab',
-  OPEN_OR_FOCUS_GROUPED_CHAT_TAB: 'chatwithOpenOrFocusGroupedChatTab',
+  RESOLVE_SYNCED_URLS: 'chatwithResolveSyncedUrls',
 } as const;
 
 // Messages sent to content scripts (not handled by background router).

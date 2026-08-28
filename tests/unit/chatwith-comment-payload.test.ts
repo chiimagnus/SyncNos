@@ -55,17 +55,33 @@ describe('buildChatWithCommentPayloadV1', () => {
     expect(payload).toBe('');
   });
 
-  it('supports custom template rendering', () => {
+  it('supports custom template rendering with synced destination URLs', () => {
     const payload = buildChatWithCommentPayloadV1({
       quoteText: 'Q',
       commentText: `Reply 1:\n${'C'.repeat(200)}`,
       articleTitle: 'T',
       canonicalUrl: 'https://example.com/x',
-      promptTemplate: 'Title={{article_title}}\nURL={{article_url}}\n---\n{{article_content}}',
+      promptTemplate: [
+        'Title={{article_title}}',
+        'URL={{article_url}}',
+        'Notion={{notion_url}}',
+        'Feishu={{feishu_url}}',
+        'GitHub={{github_url}}',
+        '---',
+        '{{article_content}}',
+      ].join('\n'),
+      syncedUrls: {
+        notionUrl: 'https://www.notion.so/example',
+        feishuUrl: 'https://www.feishu.cn/docx/example',
+        githubUrl: 'https://github.com/owner/repo/blob/main/WebArticles/example.md',
+      },
     });
 
     expect(payload).toContain('Title=T');
     expect(payload).toContain('URL=https://example.com/x');
+    expect(payload).toContain('Notion=https://www.notion.so/example');
+    expect(payload).toContain('Feishu=https://www.feishu.cn/docx/example');
+    expect(payload).toContain('GitHub=https://github.com/owner/repo/blob/main/WebArticles/example.md');
     expect(payload).toContain('Reply 1:');
     expect(payload.endsWith('\n')).toBe(true);
   });

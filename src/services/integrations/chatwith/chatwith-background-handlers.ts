@@ -1,7 +1,10 @@
 import { CHATWITH_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { tabsCreate } from '@platform/webext/tabs';
+import { getSyncMappingByConversation } from '@services/conversations/data/storage-idb';
+import { buildFeishuDocUrl } from '@services/integrations/openin/feishu-openin';
+import { buildGithubSyncedMarkdownUrl } from '@services/integrations/openin/github-openin';
+import { buildNotionPageUrl } from '@services/integrations/openin/notion-openin';
 import { loadChatWithSettings } from '@services/integrations/chatwith/chatwith-settings';
-import { openOrFocusGroupedChatTab } from '@services/integrations/chatwith/tabgroup-runner';
 import { normalizePositiveInt } from '@services/shared/numbers';
 
 type AnyRouter = {
@@ -16,10 +19,6 @@ function safeText(value: unknown): string {
 
 function normalizePlatformId(value: unknown): string {
   return safeText(value).toLowerCase();
-}
-
-function normalizeArticleKey(value: unknown): string {
-  return safeText(value);
 }
 
 function normalizeHttpUrl(raw: unknown): string {
@@ -138,46 +137,31 @@ export function registerChatWithBackgroundHandlers(router: AnyRouter) {
     }
   });
 
-  router.register(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, async (msg, sender) => {
-    const resolved = await resolveEnabledPlatform({
-      platformId: msg?.platformId,
-      fallbackUrl: msg?.fallbackUrl,
+  router.register(CHATWITH_MESSAGE_TYPES.RESOLVE_SYNCED_URLS, async (msg) => {
+    const conversationId = normalizePositiveInt(msg?.conversationId);
+    if (!conversationId) {
+      return router.err('invalid conversationId', { code: 'CHATWITH_CONVERSATION_ID_REQUIRED' });
+    }
+
+    const row = await getSyncMappingByConversation(conversationId);
+    if (!row?.conversation) {
+      return router.err('conversation not found', {
+        code: 'CHATWITH_CONVERSATION_NOT_FOUND',
+        conversationId,
+      });
+    }
+
+    const mapping = row.mapping || null;
+    const conversation = row.conversation;
+    const mappedValue = (field: string) => safeText(mapping?.[field]) || safeText((conversation as any)?.[field]);
+    const notionPageId = mappedValue('notionPageId');
+    const notionUrl = buildNotionPageUrl(notionPageId, {
+      workspaceSlug: mappedValue('notionWorkspaceSlug'),
+      pageUrl: mappedValue('notionPageUrl'),
     });
-    if (resolved.error) {
-      return router.err(resolved.error.message, resolved.error.extra);
-    }
+    const feishuUrl = buildFeishuDocUrl(mappedValue('feishuDocId'));
+    const githubUrl = buildGithubSyncedMarkdownUrl({ conversation, mapping });
 
-    const platformId = resolved.platformId;
-    const resolvedUrl = resolved.resolvedUrl;
-    const articleKey = normalizeArticleKey(msg?.articleKey);
-    if (!articleKey) {
-      return router.err('invalid articleKey', { code: 'CHATWITH_ARTICLE_KEY_REQUIRED', platformId });
-    }
-
-    const articleTabId = normalizePositiveInt(sender?.tab?.id) || normalizePositiveInt(msg?.articleTabId) || null;
-    const articleWindowId =
-      normalizePositiveInt(sender?.tab?.windowId) || normalizePositiveInt(msg?.articleWindowId) || null;
-
-    try {
-      const data = await openOrFocusGroupedChatTab({
-        platformId,
-        articleKey,
-        platformUrl: resolvedUrl,
-        articleTabId,
-        articleWindowId,
-      });
-      return router.ok(data);
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : String(error || `failed to open grouped chat tab: ${platformId}`);
-      return router.err(message, {
-        code: 'CHATWITH_OPEN_OR_FOCUS_GROUPED_TAB_FAILED',
-        platformId,
-        articleKey,
-        url: resolvedUrl,
-      });
-    }
+    return router.ok({ notionUrl, feishuUrl, githubUrl });
   });
 }

@@ -4,34 +4,13 @@ import {
   buildChatWithPayload,
   loadChatWithSettings,
   type ChatWithAiPlatform,
+  type ChatWithSyncedUrls,
 } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import {
   openChatWithPlatform,
   type ChatWithOpenPlatformPort,
 } from '@services/integrations/chatwith/chatwith-open-port';
-import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-
-function safeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function resolveArticleKeyForChatWith(conversation: Conversation): string | null {
-  if (!conversation) return null;
-  const sourceType = safeText((conversation as any)?.sourceType);
-  const conversationKey = safeText((conversation as any)?.conversationKey);
-  if (sourceType !== 'article' && !conversationKey.startsWith('article:')) return null;
-
-  const url = canonicalizeArticleUrl((conversation as any)?.url);
-  if (url) return url;
-
-  if (conversationKey.startsWith('article:')) {
-    const raw = conversationKey.slice('article:'.length);
-    const canonical = canonicalizeArticleUrl(raw);
-    return canonical || safeText(raw) || null;
-  }
-  return null;
-}
 
 function buildChatWithPlatformAction(input: {
   conversation: Conversation | null | undefined;
@@ -61,7 +40,6 @@ function buildChatWithPlatformAction(input: {
     },
   };
   const openPort = input.openPort || adapterOpenPort;
-  const articleKey = resolveArticleKeyForChatWith(conversation);
 
   return {
     id: `chat-with-${String(platform.id || '').trim()}`,
@@ -74,15 +52,7 @@ function buildChatWithPlatformAction(input: {
     onTrigger: async () => {
       const copied = await writeTextToClipboard(payload);
       if (!copied) throw new Error('Failed to copy content to clipboard');
-      const opened = await openChatWithPlatform({
-        platform,
-        port: openPort,
-        context: articleKey
-          ? {
-              articleKey,
-            }
-          : null,
-      });
+      const opened = await openChatWithPlatform({ platform, port: openPort });
       if (!opened) throw new Error(`Failed to open ${String(platform.name || '').trim()}`);
     },
   };
@@ -93,17 +63,19 @@ export async function resolveChatWithCommentsHeaderActions({
   detail,
   port,
   openPort,
+  syncedUrls,
 }: {
   conversation: Conversation | null | undefined;
   detail: ConversationDetail | null | undefined;
   port: DetailHeaderActionPort;
   openPort?: ChatWithOpenPlatformPort | null;
+  syncedUrls?: ChatWithSyncedUrls | null;
 }): Promise<DetailHeaderAction[]> {
   try {
     if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return [];
 
     const settings = await loadChatWithSettings();
-    const payload = await buildChatWithPayload(conversation, detail as any, settings.promptTemplate);
+    const payload = await buildChatWithPayload(conversation, detail as any, settings.promptTemplate, syncedUrls || {});
 
     const actions: DetailHeaderAction[] = [];
     for (const platform of settings.platforms || []) {

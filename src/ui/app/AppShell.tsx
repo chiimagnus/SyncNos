@@ -24,6 +24,7 @@ import {
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import { resolveChatWithSyncedUrlsFromRuntime } from '@services/integrations/chatwith/chatwith-synced-urls-client';
 import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { createRuntimeClient } from '@services/shared/runtime-client';
@@ -238,32 +239,14 @@ export default function AppShell() {
 
     const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
       () => ({
-        openPlatform: async (platformId, fallbackUrl, context) => {
+        openPlatform: async (platformId, fallbackUrl) => {
           const normalizedPlatformId = safeString(platformId).toLowerCase();
           const normalizedFallbackUrl = safeString(fallbackUrl);
-          const normalizedArticleKey = safeString(context?.articleKey);
           if (!normalizedPlatformId) return false;
 
           const rt = runtimeClientRef.current;
           if (!rt?.send) {
             return openUrlFallback(normalizedFallbackUrl);
-          }
-
-          let groupedErrorMessage = '';
-          if (normalizedArticleKey) {
-            try {
-              const groupedResponse = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
-                platformId: normalizedPlatformId,
-                articleKey: normalizedArticleKey,
-                fallbackUrl: normalizedFallbackUrl,
-              })) as any;
-              if (groupedResponse?.ok) return true;
-              groupedErrorMessage =
-                safeString(groupedResponse?.error?.message) ||
-                `Failed to open grouped platform tab: ${normalizedPlatformId}`;
-            } catch (error) {
-              groupedErrorMessage = safeString((error as any)?.message);
-            }
           }
 
           try {
@@ -273,10 +256,7 @@ export default function AppShell() {
             })) as any;
             if (response?.ok) return true;
 
-            const message =
-              safeString(response?.error?.message) ||
-              groupedErrorMessage ||
-              `Failed to open platform: ${normalizedPlatformId}`;
+            const message = safeString(response?.error?.message) || `Failed to open platform: ${normalizedPlatformId}`;
             throw new Error(message);
           } catch (error) {
             if (openUrlFallback(normalizedFallbackUrl)) return true;
@@ -302,12 +282,14 @@ export default function AppShell() {
     const commentsSidebarCommentChatWithRuntimeRef = useRef<{
       showCommentsSidebar: boolean;
       hasConversation: boolean;
+      conversationId: number | null;
       articleTitle: string;
       canonicalUrl: string;
       openPort: ChatWithOpenPlatformPort | null;
     }>({
       showCommentsSidebar: false,
       hasConversation: false,
+      conversationId: null,
       articleTitle: '',
       canonicalUrl: '',
       openPort: null,
@@ -316,6 +298,7 @@ export default function AppShell() {
     commentsSidebarCommentChatWithRuntimeRef.current = {
       showCommentsSidebar,
       hasConversation: Boolean(selectedConversation),
+      conversationId: selectedConversationId,
       articleTitle: String((selectedConversation as any)?.title || '').trim(),
       canonicalUrl: canonicalUrl || '',
       openPort: appCommentChatWithOpenPort,
@@ -325,12 +308,15 @@ export default function AppShell() {
       () =>
         createThreadedCommentChatWithConfig({
           resolveContext: () => ({
+            conversationId: commentsSidebarCommentChatWithRuntimeRef.current.conversationId,
             articleTitle: commentsSidebarCommentChatWithRuntimeRef.current.articleTitle,
             canonicalUrl: commentsSidebarCommentChatWithRuntimeRef.current.canonicalUrl,
           }),
           isEnabled: () => commentsSidebarCommentChatWithRuntimeRef.current.showCommentsSidebar,
           hasConversation: () => commentsSidebarCommentChatWithRuntimeRef.current.hasConversation,
           resolveOpenPort: () => commentsSidebarCommentChatWithRuntimeRef.current.openPort,
+          resolveSyncedUrls: (context) =>
+            resolveChatWithSyncedUrlsFromRuntime(runtimeClientRef.current, context.conversationId),
         }),
       [],
     );
@@ -494,11 +480,14 @@ export default function AppShell() {
         throw new Error('Conversation detail is not ready yet');
       }
 
+      const syncedUrls = await resolveChatWithSyncedUrlsFromRuntime(runtimeClientRef.current, conversationId);
+
       const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
         conversation: selectedConversation,
         detail: currentDetail,
         port: defaultDetailHeaderActionPort,
         openPort: appCommentChatWithOpenPort,
+        syncedUrls,
       });
 
       const mapped: ThreadedCommentsPanelChatWithAction[] = [];

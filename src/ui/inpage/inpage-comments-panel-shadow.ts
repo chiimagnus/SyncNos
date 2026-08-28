@@ -17,6 +17,7 @@ import {
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import { resolveChatWithSyncedUrlsFromRuntime } from '@services/integrations/chatwith/chatwith-synced-urls-client';
 import {
   resolveChatWithCommentsHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -52,27 +53,14 @@ function openUrlFallback(url: string): boolean {
 
 function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
   return {
-    openPlatform: async (platformId, fallbackUrl, context) => {
+    openPlatform: async (platformId, fallbackUrl) => {
       const normalizedPlatformId = safeString(platformId).toLowerCase();
       const normalizedFallbackUrl = safeString(fallbackUrl);
-      const normalizedArticleKey = safeString(context?.articleKey);
       if (!normalizedPlatformId) return false;
 
       const rt = runtimeClient;
       if (!rt?.send) {
         return openUrlFallback(normalizedFallbackUrl);
-      }
-
-      let groupedErrorMessage = '';
-      if (normalizedArticleKey) {
-        const groupedResponse = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
-          platformId: normalizedPlatformId,
-          articleKey: normalizedArticleKey,
-          fallbackUrl: normalizedFallbackUrl,
-        });
-        if (groupedResponse?.ok) return true;
-        groupedErrorMessage =
-          safeString(groupedResponse?.error?.message) || `Failed to open grouped platform tab: ${normalizedPlatformId}`;
       }
 
       const response = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
@@ -81,10 +69,7 @@ function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
       });
       if (response?.ok) return true;
 
-      const message =
-        safeString(response?.error?.message) ||
-        groupedErrorMessage ||
-        `Failed to open platform: ${normalizedPlatformId}`;
+      const message = safeString(response?.error?.message) || `Failed to open platform: ${normalizedPlatformId}`;
       throw new Error(message);
     },
   };
@@ -144,11 +129,14 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     publishedAt: resolved?.data?.publishedAt,
   });
 
+  const syncedUrls = await resolveChatWithSyncedUrlsFromRuntime(rt, conversationId);
+
   const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
     conversation,
     detail,
     port: defaultDetailHeaderActionPort,
     openPort: createInpageChatWithOpenPort(),
+    syncedUrls,
   });
 
   const mapped: ThreadedCommentsPanelChatWithAction[] = [];
@@ -179,6 +167,7 @@ async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPa
   }
 
   return {
+    conversationId: normalizePositiveInt(resolved?.data?.conversationId),
     articleTitle: safeString(resolved?.data?.title),
     canonicalUrl: canonicalizeArticleUrl(resolved?.data?.url) || canonicalizeArticleUrl(globalThis.location?.href),
   };
@@ -187,6 +176,7 @@ async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPa
 const inpageCommentChatWithConfig = createThreadedCommentChatWithConfig({
   resolveContext: resolveInpageCommentChatWithContext,
   resolveOpenPort: () => createInpageChatWithOpenPort(),
+  resolveSyncedUrls: (context) => resolveChatWithSyncedUrlsFromRuntime(runtimeClient, context.conversationId),
 });
 
 function isCommentsSelectionDebugEnabled(): boolean {

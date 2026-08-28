@@ -1,4 +1,8 @@
-import { loadChatWithSettings, type ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
+import {
+  loadChatWithSettings,
+  type ChatWithAiPlatform,
+  type ChatWithSyncedUrls,
+} from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import { buildChatWithCommentPayloadV1 } from '@services/integrations/chatwith/chatwith-comment-payload';
@@ -13,6 +17,7 @@ export type ResolveChatWithCommentActionsInput = {
   articleTitle?: string | null;
   canonicalUrl?: string | null;
   openPort?: ChatWithOpenPlatformPort | null;
+  syncedUrls?: ChatWithSyncedUrls | null;
 };
 
 export type ChatWithCommentAction = {
@@ -49,7 +54,6 @@ export async function resolveChatWithCommentActions(
 ): Promise<ChatWithCommentAction[]> {
   const commentText = safeText(input?.commentText);
   if (!commentText) return [];
-  const articleKey = safeText(input?.canonicalUrl);
 
   const settings = await loadChatWithSettings();
   const enabledPlatforms = pickEnabledPlatforms(settings.platforms || []);
@@ -61,6 +65,7 @@ export async function resolveChatWithCommentActions(
     articleTitle: input?.articleTitle,
     canonicalUrl: input?.canonicalUrl,
     promptTemplate: settings.promptTemplate,
+    syncedUrls: input?.syncedUrls || {},
   });
   if (!safeText(payload)) return [];
 
@@ -81,11 +86,6 @@ export async function resolveChatWithCommentActions(
         const opened = await openChatWithPlatform({
           platform,
           port: input?.openPort || null,
-          context: articleKey
-            ? {
-                articleKey,
-              }
-            : null,
         });
         if (!opened) throw new Error(`Failed to open ${platformName}`);
         return `✅ 已复制，正在跳转 ${platformName}…`;

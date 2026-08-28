@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildChatWithPayload } from '../../src/services/integrations/chatwith/chatwith-settings';
 
 describe('buildChatWithPayload', () => {
-  it('renders notion_url and feishu_url when ids exist', async () => {
+  it('renders synced Notion, Feishu, and GitHub URLs', async () => {
     const payload = await buildChatWithPayload(
       {
         id: 1,
@@ -27,16 +27,20 @@ describe('buildChatWithPayload', () => {
           },
         ],
       },
-      'Notion={{notion_url}}\nFeishu={{feishu_url}}\nURL={{article_url}}',
+      'Notion={{notion_url}}\nFeishu={{feishu_url}}\nGitHub={{github_url}}\nURL={{article_url}}',
+      {
+        githubUrl: 'https://github.com/owner/repo/blob/main/Articles/test.md',
+      },
     );
 
     expect(payload).toContain('Notion=https://www.notion.so/0123456789abcdef0123456789abcdef');
     expect(payload).toContain('Feishu=https://www.feishu.cn/docx/docxToken');
+    expect(payload).toContain('GitHub=https://github.com/owner/repo/blob/main/Articles/test.md');
     expect(payload).toContain('URL=https://example.com/x');
     expect(payload.endsWith('\n')).toBe(true);
   });
 
-  it('renders empty notion_url/feishu_url when ids are missing', async () => {
+  it('renders empty synced URLs when targets are missing', async () => {
     const payload = await buildChatWithPayload(
       {
         id: 1,
@@ -58,11 +62,12 @@ describe('buildChatWithPayload', () => {
           },
         ],
       },
-      'Notion={{notion_url}}\nFeishu={{feishu_url}}',
+      'Notion={{notion_url}}\nFeishu={{feishu_url}}\nGitHub={{github_url}}',
     );
 
     expect(payload).toContain('Notion=');
     expect(payload).toContain('Feishu=');
+    expect(payload).toContain('GitHub=');
     expect(payload.endsWith('\n')).toBe(true);
   });
 });

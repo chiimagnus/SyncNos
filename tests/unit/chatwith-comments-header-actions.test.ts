@@ -34,7 +34,7 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     openChatWithPlatformMock.mockResolvedValue(true);
   });
 
-  it('passes articleKey context to openPort when conversation is an article', async () => {
+  it('passes synced URLs into the payload and opens without tab-group context', async () => {
     const { resolveChatWithCommentsHeaderActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
@@ -57,20 +57,31 @@ describe('resolveChatWithCommentsHeaderActions', () => {
       openPort: {
         openPlatform: vi.fn().mockResolvedValue(true),
       },
+      syncedUrls: {
+        githubUrl: 'https://github.com/owner/repo/blob/main/Articles/test.md',
+      },
     });
 
     expect(actions).toHaveLength(1);
     await actions[0].onTrigger();
 
+    expect(buildChatWithPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ conversationId: 1 }),
+      '',
+      expect.objectContaining({ githubUrl: 'https://github.com/owner/repo/blob/main/Articles/test.md' }),
+    );
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload\n');
     expect(openChatWithPlatformMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: expect.objectContaining({ articleKey: 'https://example.com/a' }),
+        platform: expect.objectContaining({ id: 'chatgpt' }),
+        port: expect.any(Object),
       }),
     );
+    expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
   });
 
-  it('does not pass articleKey context for non-article conversations', async () => {
+  it('keeps ChatWith available when synced URL metadata is absent', async () => {
     const { resolveChatWithCommentsHeaderActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
@@ -98,10 +109,12 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     expect(actions).toHaveLength(1);
     await actions[0].onTrigger();
 
-    expect(openChatWithPlatformMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: null,
-      }),
+    expect(buildChatWithPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.any(Object),
+      '',
+      {},
     );
+    expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
   });
 });

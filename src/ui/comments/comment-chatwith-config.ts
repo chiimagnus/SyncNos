@@ -1,5 +1,6 @@
 import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import type { ChatWithSyncedUrls } from '@services/integrations/chatwith/chatwith-settings';
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { ThreadedCommentsPanelCommentChatWithConfig, ThreadedCommentsPanelCommentChatWithContext } from './types';
 
@@ -9,6 +10,9 @@ type ResolveOpenPortLike = () =>
   | null
   | undefined
   | Promise<ChatWithOpenPlatformPort | null | undefined>;
+type ResolveSyncedUrlsLike = (
+  context: ThreadedCommentsPanelCommentChatWithContext,
+) => ChatWithSyncedUrls | null | undefined | Promise<ChatWithSyncedUrls | null | undefined>;
 
 export type CreateThreadedCommentChatWithConfigInput = {
   resolveContext: () =>
@@ -17,6 +21,7 @@ export type CreateThreadedCommentChatWithConfigInput = {
   isEnabled?: ResolveBooleanLike;
   hasConversation?: ResolveBooleanLike;
   resolveOpenPort?: ResolveOpenPortLike;
+  resolveSyncedUrls?: ResolveSyncedUrlsLike;
 };
 
 function safeText(value: unknown): string {
@@ -25,7 +30,9 @@ function safeText(value: unknown): string {
 
 function normalizeContext(input: unknown): ThreadedCommentsPanelCommentChatWithContext {
   const context = (input || {}) as Partial<ThreadedCommentsPanelCommentChatWithContext>;
+  const conversationId = Number(context.conversationId);
   return {
+    ...(Number.isSafeInteger(conversationId) && conversationId > 0 ? { conversationId } : {}),
     articleTitle: safeText(context.articleTitle),
     canonicalUrl: safeText(context.canonicalUrl),
   };
@@ -67,6 +74,15 @@ async function resolveOpenPort(resolver: ResolveOpenPortLike | undefined): Promi
   return resolved || null;
 }
 
+async function resolveSyncedUrls(
+  resolver: ResolveSyncedUrlsLike | undefined,
+  context: ThreadedCommentsPanelCommentChatWithContext,
+): Promise<ChatWithSyncedUrls | null> {
+  if (typeof resolver !== 'function') return null;
+  const resolved = await resolver(context);
+  return resolved || {};
+}
+
 export function createThreadedCommentChatWithConfig(
   input: CreateThreadedCommentChatWithConfigInput,
 ): ThreadedCommentsPanelCommentChatWithConfig {
@@ -84,12 +100,14 @@ export function createThreadedCommentChatWithConfig(
       const effectiveContext =
         normalizedContext.articleTitle || normalizedContext.canonicalUrl ? normalizedContext : await resolveContext();
 
+      const syncedUrls = await resolveSyncedUrls(input.resolveSyncedUrls, effectiveContext);
       return await resolveChatWithCommentActions({
         quoteText: String(rootComment?.quoteText || ''),
         commentText: buildThreadText(rootComment, replies),
         articleTitle: safeText(effectiveContext.articleTitle),
         canonicalUrl: safeText(effectiveContext.canonicalUrl),
         openPort: await resolveOpenPort(input.resolveOpenPort),
+        ...(syncedUrls ? { syncedUrls } : {}),
       });
     },
   };

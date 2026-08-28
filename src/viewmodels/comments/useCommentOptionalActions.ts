@@ -14,6 +14,7 @@ export type CommentPanelOptionalActionConfig = {
 };
 
 export type CommentThreadOptionalActionContext = {
+  conversationId?: number | null;
   articleTitle?: string | null;
   canonicalUrl?: string | null;
 };
