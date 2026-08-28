@@ -5,18 +5,6 @@ export type ThreadedCommentsPanelApi = CommentSidebarPanelApi & {
   refreshLocatorRoots: () => void;
 };
 
-import type {
-  CommentOptionalAction,
-  CommentPanelOptionalActionConfig,
-  CommentThreadOptionalActionConfig,
-  CommentThreadOptionalActionContext,
-} from '@viewmodels/comments/useCommentOptionalActions';
-
-export type ThreadedCommentsPanelChatWithAction = CommentOptionalAction;
-export type ThreadedCommentsPanelChatWithConfig = CommentPanelOptionalActionConfig;
-export type ThreadedCommentsPanelCommentChatWithContext = CommentThreadOptionalActionContext;
-export type ThreadedCommentsPanelCommentChatWithConfig = CommentThreadOptionalActionConfig;
-
 export type CommentLocatorSurfaceRoots = {
   sourceRoot: Element;
   scrollRoot: Element;
@@ -36,7 +24,5 @@ export type MountOptions = {
   locatorEnv?: 'inpage' | 'app' | null;
   getLocatorSurfaceRoots?: () => CommentLocatorSurfaceRoots | null;
   getLocatorRoots?: (locator: ArticleCommentLocator) => readonly Element[];
-  chatWith?: ThreadedCommentsPanelChatWithConfig | null;
-  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   deferReactUpdates?: boolean;
 };

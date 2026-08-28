@@ -72,11 +72,6 @@ export const ITEM_MENTION_MESSAGE_TYPES = {
   BUILD_MENTION_INSERT_TEXT: 'buildMentionInsertText',
 } as const;
 
-export const CHATWITH_MESSAGE_TYPES = {
-  OPEN_PLATFORM_TAB: 'chatwithOpenPlatformTab',
-  RESOLVE_SYNCED_URLS: 'chatwithResolveSyncedUrls',
-} as const;
-
 // Messages sent to content scripts (not handled by background router).
 export const CONTENT_MESSAGE_TYPES = {
   OPEN_INPAGE_COMMENTS_PANEL: 'openInpageCommentsPanel',
@@ -117,7 +112,6 @@ export const messageContracts = {
   CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
-  CHATWITH_MESSAGE_TYPES,
   COMMENTS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
   UI_EVENT_TYPES,
@@ -133,7 +127,6 @@ export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ART
 export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
 export type ItemMentionMessageType = (typeof ITEM_MENTION_MESSAGE_TYPES)[keyof typeof ITEM_MENTION_MESSAGE_TYPES];
-export type ChatWithMessageType = (typeof CHATWITH_MESSAGE_TYPES)[keyof typeof CHATWITH_MESSAGE_TYPES];
 export type CommentsMessageType = (typeof COMMENTS_MESSAGE_TYPES)[keyof typeof COMMENTS_MESSAGE_TYPES];
 export type UiMessageType = (typeof UI_MESSAGE_TYPES)[keyof typeof UI_MESSAGE_TYPES];
 export type UiEventType = (typeof UI_EVENT_TYPES)[keyof typeof UI_EVENT_TYPES];
@@ -149,6 +142,5 @@ export type MessageType =
   | ChatgptMessageType
   | CurrentPageMessageType
   | ItemMentionMessageType
-  | ChatWithMessageType
   | CommentsMessageType
   | UiMessageType;
