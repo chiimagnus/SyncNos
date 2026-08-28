@@ -77,9 +77,6 @@ YouTube 和 Bilibili 页面可采集页面已经加载的字幕 / 转录内容�
 WebClipper Popup：保存与浏览对话
 ![WebClipper Popup](docs/assets/popup-screenshots.png)
 
-WebClipper Settings：备份与同步
-![WebClipper Settings](docs/assets/setting-screenshots.png)
-
 文章讨论侧栏：精确引用、紧凑线程与单 active reply composer
 ![文章讨论侧栏](docs/assets/comments-discussion.png)
 
