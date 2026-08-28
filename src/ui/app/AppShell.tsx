@@ -238,32 +238,14 @@ export default function AppShell() {
 
     const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
       () => ({
-        openPlatform: async (platformId, fallbackUrl, context) => {
+        openPlatform: async (platformId, fallbackUrl) => {
           const normalizedPlatformId = safeString(platformId).toLowerCase();
           const normalizedFallbackUrl = safeString(fallbackUrl);
-          const normalizedArticleKey = safeString(context?.articleKey);
           if (!normalizedPlatformId) return false;
 
           const rt = runtimeClientRef.current;
           if (!rt?.send) {
             return openUrlFallback(normalizedFallbackUrl);
-          }
-
-          let groupedErrorMessage = '';
-          if (normalizedArticleKey) {
-            try {
-              const groupedResponse = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
-                platformId: normalizedPlatformId,
-                articleKey: normalizedArticleKey,
-                fallbackUrl: normalizedFallbackUrl,
-              })) as any;
-              if (groupedResponse?.ok) return true;
-              groupedErrorMessage =
-                safeString(groupedResponse?.error?.message) ||
-                `Failed to open grouped platform tab: ${normalizedPlatformId}`;
-            } catch (error) {
-              groupedErrorMessage = safeString((error as any)?.message);
-            }
           }
 
           try {
@@ -273,10 +255,7 @@ export default function AppShell() {
             })) as any;
             if (response?.ok) return true;
 
-            const message =
-              safeString(response?.error?.message) ||
-              groupedErrorMessage ||
-              `Failed to open platform: ${normalizedPlatformId}`;
+            const message = safeString(response?.error?.message) || `Failed to open platform: ${normalizedPlatformId}`;
             throw new Error(message);
           } catch (error) {
             if (openUrlFallback(normalizedFallbackUrl)) return true;

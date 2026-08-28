@@ -98,9 +98,9 @@ describe('resolveChatWithCommentActions', () => {
     expect(openChatWithPlatformMock).toHaveBeenCalledWith(
       expect.objectContaining({
         platform: expect.objectContaining({ id: 'chatgpt', name: 'ChatGPT' }),
-        context: expect.objectContaining({ articleKey: 'https://example.com/article' }),
       }),
     );
+    expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
     expect(String(notice || '')).toContain('已复制');
     expect(String(notice || '')).toContain('ChatGPT');
 

@@ -34,7 +34,7 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     openChatWithPlatformMock.mockResolvedValue(true);
   });
 
-  it('passes articleKey context to openPort when conversation is an article', async () => {
+  it('opens article ChatWith action without tab-group context', async () => {
     const { resolveChatWithCommentsHeaderActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
@@ -65,12 +65,14 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload\n');
     expect(openChatWithPlatformMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: expect.objectContaining({ articleKey: 'https://example.com/a' }),
+        platform: expect.objectContaining({ id: 'chatgpt' }),
+        port: expect.any(Object),
       }),
     );
+    expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
   });
 
-  it('does not pass articleKey context for non-article conversations', async () => {
+  it('opens non-article ChatWith action without tab-group context', async () => {
     const { resolveChatWithCommentsHeaderActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
@@ -98,10 +100,6 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     expect(actions).toHaveLength(1);
     await actions[0].onTrigger();
 
-    expect(openChatWithPlatformMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: null,
-      }),
-    );
+    expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
   });
 });

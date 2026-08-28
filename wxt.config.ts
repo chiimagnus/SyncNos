@@ -54,8 +54,6 @@ const resolveManifest: UserManifestFn = (env) => {
     permissions.push('declarativeNetRequest');
   } else {
     permissions.push('declarativeNetRequestWithHostAccess');
-    // `tabGroups` is Chrome-only; the runtime already feature-detects it.
-    permissions.push('tabGroups');
   }
 
   return {

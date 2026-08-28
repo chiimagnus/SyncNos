@@ -1,8 +1,6 @@
 import { CHATWITH_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { tabsCreate } from '@platform/webext/tabs';
 import { loadChatWithSettings } from '@services/integrations/chatwith/chatwith-settings';
-import { openOrFocusGroupedChatTab } from '@services/integrations/chatwith/tabgroup-runner';
-import { normalizePositiveInt } from '@services/shared/numbers';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -16,10 +14,6 @@ function safeText(value: unknown): string {
 
 function normalizePlatformId(value: unknown): string {
   return safeText(value).toLowerCase();
-}
-
-function normalizeArticleKey(value: unknown): string {
-  return safeText(value);
 }
 
 function normalizeHttpUrl(raw: unknown): string {
@@ -138,46 +132,4 @@ export function registerChatWithBackgroundHandlers(router: AnyRouter) {
     }
   });
 
-  router.register(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, async (msg, sender) => {
-    const resolved = await resolveEnabledPlatform({
-      platformId: msg?.platformId,
-      fallbackUrl: msg?.fallbackUrl,
-    });
-    if (resolved.error) {
-      return router.err(resolved.error.message, resolved.error.extra);
-    }
-
-    const platformId = resolved.platformId;
-    const resolvedUrl = resolved.resolvedUrl;
-    const articleKey = normalizeArticleKey(msg?.articleKey);
-    if (!articleKey) {
-      return router.err('invalid articleKey', { code: 'CHATWITH_ARTICLE_KEY_REQUIRED', platformId });
-    }
-
-    const articleTabId = normalizePositiveInt(sender?.tab?.id) || normalizePositiveInt(msg?.articleTabId) || null;
-    const articleWindowId =
-      normalizePositiveInt(sender?.tab?.windowId) || normalizePositiveInt(msg?.articleWindowId) || null;
-
-    try {
-      const data = await openOrFocusGroupedChatTab({
-        platformId,
-        articleKey,
-        platformUrl: resolvedUrl,
-        articleTabId,
-        articleWindowId,
-      });
-      return router.ok(data);
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : String(error || `failed to open grouped chat tab: ${platformId}`);
-      return router.err(message, {
-        code: 'CHATWITH_OPEN_OR_FOCUS_GROUPED_TAB_FAILED',
-        platformId,
-        articleKey,
-        url: resolvedUrl,
-      });
-    }
-  });
 }
