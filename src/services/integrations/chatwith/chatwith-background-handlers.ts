@@ -1,6 +1,11 @@
 import { CHATWITH_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { tabsCreate } from '@platform/webext/tabs';
+import { getSyncMappingByConversation } from '@services/conversations/data/storage-idb';
+import { buildFeishuDocUrl } from '@services/integrations/openin/feishu-openin';
+import { buildGithubSyncedMarkdownUrl } from '@services/integrations/openin/github-openin';
+import { buildNotionPageUrl } from '@services/integrations/openin/notion-openin';
 import { loadChatWithSettings } from '@services/integrations/chatwith/chatwith-settings';
+import { normalizePositiveInt } from '@services/shared/numbers';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -132,4 +137,31 @@ export function registerChatWithBackgroundHandlers(router: AnyRouter) {
     }
   });
 
+  router.register(CHATWITH_MESSAGE_TYPES.RESOLVE_SYNCED_URLS, async (msg) => {
+    const conversationId = normalizePositiveInt(msg?.conversationId);
+    if (!conversationId) {
+      return router.err('invalid conversationId', { code: 'CHATWITH_CONVERSATION_ID_REQUIRED' });
+    }
+
+    const row = await getSyncMappingByConversation(conversationId);
+    if (!row?.conversation) {
+      return router.err('conversation not found', {
+        code: 'CHATWITH_CONVERSATION_NOT_FOUND',
+        conversationId,
+      });
+    }
+
+    const mapping = row.mapping || null;
+    const conversation = row.conversation;
+    const mappedValue = (field: string) => safeText(mapping?.[field]) || safeText((conversation as any)?.[field]);
+    const notionPageId = mappedValue('notionPageId');
+    const notionUrl = buildNotionPageUrl(notionPageId, {
+      workspaceSlug: mappedValue('notionWorkspaceSlug'),
+      pageUrl: mappedValue('notionPageUrl'),
+    });
+    const feishuUrl = buildFeishuDocUrl(mappedValue('feishuDocId'));
+    const githubUrl = buildGithubSyncedMarkdownUrl({ conversation, mapping });
+
+    return router.ok({ notionUrl, feishuUrl, githubUrl });
+  });
 }

@@ -17,6 +17,7 @@ import {
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import { resolveChatWithSyncedUrlsFromRuntime } from '@services/integrations/chatwith/chatwith-synced-urls-client';
 import {
   resolveChatWithCommentsHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -128,11 +129,14 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     publishedAt: resolved?.data?.publishedAt,
   });
 
+  const syncedUrls = await resolveChatWithSyncedUrlsFromRuntime(rt, conversationId);
+
   const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
     conversation,
     detail,
     port: defaultDetailHeaderActionPort,
     openPort: createInpageChatWithOpenPort(),
+    syncedUrls,
   });
 
   const mapped: ThreadedCommentsPanelChatWithAction[] = [];
@@ -163,6 +167,7 @@ async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPa
   }
 
   return {
+    conversationId: normalizePositiveInt(resolved?.data?.conversationId),
     articleTitle: safeString(resolved?.data?.title),
     canonicalUrl: canonicalizeArticleUrl(resolved?.data?.url) || canonicalizeArticleUrl(globalThis.location?.href),
   };
@@ -171,6 +176,7 @@ async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPa
 const inpageCommentChatWithConfig = createThreadedCommentChatWithConfig({
   resolveContext: resolveInpageCommentChatWithContext,
   resolveOpenPort: () => createInpageChatWithOpenPort(),
+  resolveSyncedUrls: (context) => resolveChatWithSyncedUrlsFromRuntime(runtimeClient, context.conversationId),
 });
 
 function isCommentsSelectionDebugEnabled(): boolean {

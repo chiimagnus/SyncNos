@@ -4,6 +4,7 @@ import {
   buildChatWithPayload,
   loadChatWithSettings,
   type ChatWithAiPlatform,
+  type ChatWithSyncedUrls,
 } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import {
@@ -62,17 +63,19 @@ export async function resolveChatWithCommentsHeaderActions({
   detail,
   port,
   openPort,
+  syncedUrls,
 }: {
   conversation: Conversation | null | undefined;
   detail: ConversationDetail | null | undefined;
   port: DetailHeaderActionPort;
   openPort?: ChatWithOpenPlatformPort | null;
+  syncedUrls?: ChatWithSyncedUrls | null;
 }): Promise<DetailHeaderAction[]> {
   try {
     if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return [];
 
     const settings = await loadChatWithSettings();
-    const payload = await buildChatWithPayload(conversation, detail as any, settings.promptTemplate);
+    const payload = await buildChatWithPayload(conversation, detail as any, settings.promptTemplate, syncedUrls || {});
 
     const actions: DetailHeaderAction[] = [];
     for (const platform of settings.platforms || []) {

@@ -1,4 +1,4 @@
-import { renderChatWithTemplate } from '@services/integrations/chatwith/chatwith-settings';
+import { renderChatWithTemplate, type ChatWithSyncedUrls } from '@services/integrations/chatwith/chatwith-settings';
 
 export type BuildChatWithCommentPayloadV1Input = {
   quoteText?: string | null;
@@ -6,6 +6,7 @@ export type BuildChatWithCommentPayloadV1Input = {
   articleTitle?: string | null;
   canonicalUrl?: string | null;
   promptTemplate?: string | null;
+  syncedUrls?: ChatWithSyncedUrls | null;
 };
 
 const DEFAULT_COMMENT_CHAT_WITH_TEMPLATE = [
@@ -39,11 +40,15 @@ export function buildChatWithCommentPayloadV1(input: BuildChatWithCommentPayload
   const rawPromptTemplate = String(input?.promptTemplate ?? '');
   const promptTemplate = rawPromptTemplate.trim() ? rawPromptTemplate : DEFAULT_COMMENT_CHAT_WITH_TEMPLATE;
 
+  const syncedUrls = input?.syncedUrls || {};
   const rendered = renderChatWithTemplate(promptTemplate, {
     article_title: articleTitle,
     article_url: canonicalUrl,
     article_content: articleContent,
     conversation_markdown: articleContent,
+    notion_url: safeText(syncedUrls.notionUrl),
+    feishu_url: safeText(syncedUrls.feishuUrl),
+    github_url: safeText(syncedUrls.githubUrl),
   });
 
   // Keep a trailing newline for better paste behavior across chat platforms.

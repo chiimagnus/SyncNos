@@ -444,6 +444,7 @@ export const en = {
     '- {{conversation_markdown}}: full Markdown (title, metadata, messages)',
     '- {{notion_url}}: synced Notion page URL (empty if not synced)',
     '- {{feishu_url}}: synced Feishu doc URL (empty if not synced)',
+    '- {{github_url}}: synced GitHub Markdown URL (empty if not synced)',
   ].join('\n'),
   chatWithPlatformsLabel: 'Platforms',
   chatWithPlatformsEnabled: 'Enabled',

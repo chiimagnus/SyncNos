@@ -18,6 +18,12 @@ export type ChatWithSettings = {
   platforms: ChatWithAiPlatform[];
 };
 
+export type ChatWithSyncedUrls = {
+  notionUrl?: string | null;
+  feishuUrl?: string | null;
+  githubUrl?: string | null;
+};
+
 export const CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY = 'chat_with_prompt_template_v1';
 export const CHAT_WITH_PLATFORMS_STORAGE_KEY = 'chat_with_ai_platforms_v1';
 
@@ -317,19 +323,25 @@ export async function buildChatWithPayload(
   conversation: Conversation,
   detail: ConversationDetail,
   promptTemplate: string,
+  syncedUrls: ChatWithSyncedUrls = {},
 ): Promise<string> {
   const articleContent = await getArticleContent(conversation, detail);
   const conversationMarkdown = await formatConversationMarkdownForExternalOutput(conversation, detail);
+  const notionUrl =
+    String(syncedUrls.notionUrl || '').trim() ||
+    buildNotionPageUrl(conversation?.notionPageId, {
+      workspaceSlug: conversation?.notionWorkspaceSlug,
+      pageUrl: conversation?.notionPageUrl,
+    });
+  const feishuUrl = String(syncedUrls.feishuUrl || '').trim() || buildFeishuDocUrl(conversation?.feishuDocId);
   const vars: Record<string, string> = {
     article_title: String(conversation?.title || ''),
     article_url: getConversationUrl(conversation),
     article_content: articleContent,
     conversation_markdown: conversationMarkdown,
-    notion_url: buildNotionPageUrl(conversation?.notionPageId, {
-      workspaceSlug: conversation?.notionWorkspaceSlug,
-      pageUrl: conversation?.notionPageUrl,
-    }),
-    feishu_url: buildFeishuDocUrl(conversation?.feishuDocId),
+    notion_url: notionUrl,
+    feishu_url: feishuUrl,
+    github_url: String(syncedUrls.githubUrl || '').trim(),
   };
 
   const rendered = renderChatWithTemplate(String(promptTemplate || ''), vars);

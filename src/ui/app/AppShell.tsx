@@ -24,6 +24,7 @@ import {
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import { resolveChatWithSyncedUrlsFromRuntime } from '@services/integrations/chatwith/chatwith-synced-urls-client';
 import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { createRuntimeClient } from '@services/shared/runtime-client';
@@ -281,12 +282,14 @@ export default function AppShell() {
     const commentsSidebarCommentChatWithRuntimeRef = useRef<{
       showCommentsSidebar: boolean;
       hasConversation: boolean;
+      conversationId: number | null;
       articleTitle: string;
       canonicalUrl: string;
       openPort: ChatWithOpenPlatformPort | null;
     }>({
       showCommentsSidebar: false,
       hasConversation: false,
+      conversationId: null,
       articleTitle: '',
       canonicalUrl: '',
       openPort: null,
@@ -295,6 +298,7 @@ export default function AppShell() {
     commentsSidebarCommentChatWithRuntimeRef.current = {
       showCommentsSidebar,
       hasConversation: Boolean(selectedConversation),
+      conversationId: selectedConversationId,
       articleTitle: String((selectedConversation as any)?.title || '').trim(),
       canonicalUrl: canonicalUrl || '',
       openPort: appCommentChatWithOpenPort,
@@ -304,12 +308,15 @@ export default function AppShell() {
       () =>
         createThreadedCommentChatWithConfig({
           resolveContext: () => ({
+            conversationId: commentsSidebarCommentChatWithRuntimeRef.current.conversationId,
             articleTitle: commentsSidebarCommentChatWithRuntimeRef.current.articleTitle,
             canonicalUrl: commentsSidebarCommentChatWithRuntimeRef.current.canonicalUrl,
           }),
           isEnabled: () => commentsSidebarCommentChatWithRuntimeRef.current.showCommentsSidebar,
           hasConversation: () => commentsSidebarCommentChatWithRuntimeRef.current.hasConversation,
           resolveOpenPort: () => commentsSidebarCommentChatWithRuntimeRef.current.openPort,
+          resolveSyncedUrls: (context) =>
+            resolveChatWithSyncedUrlsFromRuntime(runtimeClientRef.current, context.conversationId),
         }),
       [],
     );
@@ -473,11 +480,14 @@ export default function AppShell() {
         throw new Error('Conversation detail is not ready yet');
       }
 
+      const syncedUrls = await resolveChatWithSyncedUrlsFromRuntime(runtimeClientRef.current, conversationId);
+
       const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
         conversation: selectedConversation,
         detail: currentDetail,
         port: defaultDetailHeaderActionPort,
         openPort: appCommentChatWithOpenPort,
+        syncedUrls,
       });
 
       const mapped: ThreadedCommentsPanelChatWithAction[] = [];

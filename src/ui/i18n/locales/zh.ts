@@ -440,6 +440,7 @@ export const zh: { [K in TranslationKey]: string } = {
     '- {{conversation_markdown}}：完整 Markdown（包含标题、元信息与消息）',
     '- {{notion_url}}：同步到 Notion 后的页面 URL（未同步则为空）',
     '- {{feishu_url}}：同步到飞书后文档 URL（未同步则为空）',
+    '- {{github_url}}：同步到 GitHub 后的 Markdown 文件 URL（未同步则为空）',
   ].join('\n'),
   chatWithPlatformsLabel: '平台',
   chatWithPlatformsEnabled: '启用',

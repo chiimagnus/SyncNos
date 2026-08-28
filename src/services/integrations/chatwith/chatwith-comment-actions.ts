@@ -1,4 +1,8 @@
-import { loadChatWithSettings, type ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
+import {
+  loadChatWithSettings,
+  type ChatWithAiPlatform,
+  type ChatWithSyncedUrls,
+} from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import { buildChatWithCommentPayloadV1 } from '@services/integrations/chatwith/chatwith-comment-payload';
@@ -13,6 +17,7 @@ export type ResolveChatWithCommentActionsInput = {
   articleTitle?: string | null;
   canonicalUrl?: string | null;
   openPort?: ChatWithOpenPlatformPort | null;
+  syncedUrls?: ChatWithSyncedUrls | null;
 };
 
 export type ChatWithCommentAction = {
@@ -60,6 +65,7 @@ export async function resolveChatWithCommentActions(
     articleTitle: input?.articleTitle,
     canonicalUrl: input?.canonicalUrl,
     promptTemplate: settings.promptTemplate,
+    syncedUrls: input?.syncedUrls || {},
   });
   if (!safeText(payload)) return [];
 

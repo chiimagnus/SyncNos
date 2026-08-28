@@ -34,7 +34,7 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     openChatWithPlatformMock.mockResolvedValue(true);
   });
 
-  it('opens article ChatWith action without tab-group context', async () => {
+  it('passes synced URLs into the payload and opens without tab-group context', async () => {
     const { resolveChatWithCommentsHeaderActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
@@ -57,11 +57,20 @@ describe('resolveChatWithCommentsHeaderActions', () => {
       openPort: {
         openPlatform: vi.fn().mockResolvedValue(true),
       },
+      syncedUrls: {
+        githubUrl: 'https://github.com/owner/repo/blob/main/Articles/test.md',
+      },
     });
 
     expect(actions).toHaveLength(1);
     await actions[0].onTrigger();
 
+    expect(buildChatWithPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ conversationId: 1 }),
+      '',
+      expect.objectContaining({ githubUrl: 'https://github.com/owner/repo/blob/main/Articles/test.md' }),
+    );
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload\n');
     expect(openChatWithPlatformMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -72,7 +81,7 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
   });
 
-  it('opens non-article ChatWith action without tab-group context', async () => {
+  it('keeps ChatWith available when synced URL metadata is absent', async () => {
     const { resolveChatWithCommentsHeaderActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
@@ -100,6 +109,12 @@ describe('resolveChatWithCommentsHeaderActions', () => {
     expect(actions).toHaveLength(1);
     await actions[0].onTrigger();
 
+    expect(buildChatWithPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.any(Object),
+      '',
+      {},
+    );
     expect(openChatWithPlatformMock.mock.calls[0]?.[0]).not.toHaveProperty('context');
   });
 });
