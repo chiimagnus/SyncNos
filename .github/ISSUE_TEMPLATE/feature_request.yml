@@ -1,7 +1,7 @@
 name: Feature request
 description: Suggest an idea
-title: "[Feature]: "
-labels: ["enhancement"]
+title: '[Feature]: '
+labels: ['enhancement']
 body:
   - type: textarea
     id: what
@@ -9,7 +9,6 @@ body:
       label: What should it do?
     validations:
       required: true
-
   - type: textarea
     id: why
     attributes:

@@ -186,6 +186,39 @@ describe('conversations pagination storage-idb', () => {
     expect(filtered.items.every((item) => item.listSiteKey === 'domain:example.com')).toBe(true);
   });
 
+  it('recomputes summary on a fresh bootstrap after an external IndexedDB write', async () => {
+    const initial = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(initial.items).toEqual([]);
+    expect(initial.summary).toEqual({ totalCount: 0, todayCount: 0 });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    rawTx.objectStore('conversations').add({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'externally-imported',
+      title: 'Externally imported',
+      url: 'https://chatgpt.com/c/externally-imported',
+      lastCapturedAt: Date.now(),
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'chatgpt',
+    });
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+    rawDb.close();
+
+    const refreshed = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(refreshed.items.map((item) => item.conversationKey)).toEqual(['externally-imported']);
+    expect(refreshed.summary).toEqual({ totalCount: 1, todayCount: 1 });
+  });
+
   it('finds open target by source+conversationKey and by id', async () => {
     const inserted = await upsertConversation({
       sourceType: 'chat',
