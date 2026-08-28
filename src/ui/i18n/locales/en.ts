@@ -524,7 +524,7 @@ export const en = {
   detailHeaderCopyGithubLink: 'Copy GitHub link',
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
   detailHeaderCacheImagesLabel: 'Cache images',
-  detailWordCountLabel: 'Words',
+  detailTextCountLabel: 'Words',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',

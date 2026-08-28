@@ -1,4 +1,5 @@
 import type { ConversationMessage } from '@services/conversations/domain/models';
+import { resolveConversationMessageTextSource } from '@services/conversations/domain/message-text-source';
 
 export type ChatOutlineEntry = {
   index: number;
@@ -36,9 +37,10 @@ function markdownToReadableText(markdown: string): string {
 }
 
 export function extractMessagePlainText(message: ConversationMessage): string {
-  const contentText = normalizeSingleLine(String(message?.contentText || ''));
-  if (contentText) return contentText;
-  return markdownToReadableText(String(message?.contentMarkdown || ''));
+  const source = resolveConversationMessageTextSource(message);
+  if (source.kind === 'text') return normalizeSingleLine(source.value);
+  if (source.kind === 'markdown') return markdownToReadableText(source.value);
+  return '';
 }
 
 export function buildChatOutlineEntries(messages: ConversationMessage[]): ChatOutlineEntry[] {

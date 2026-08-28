@@ -18,7 +18,7 @@ import {
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { countWordsFromMessages } from '@services/shared/word-count';
+import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 
@@ -176,18 +176,18 @@ export function ConversationDetailPane({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
-  const wordCount = useMemo(() => {
+  const textCount = useMemo(() => {
     if (!selected) return null;
     if (!Array.isArray(detail?.messages) || !detail.messages.length) return null;
-    return countWordsFromMessages(detail.messages);
+    return countConversationMessageTextUnits(detail.messages);
   }, [detail?.messages, selected]);
-  const wordCountLabel = t('detailWordCountLabel');
-  const wordCountText =
-    wordCount != null && Number.isFinite(wordCount)
-      ? `${wordCountLabel} ${Math.max(0, Math.floor(wordCount)).toLocaleString()}`
+  const textCountLabel = t('detailTextCountLabel');
+  const textCountText =
+    textCount != null && Number.isFinite(textCount)
+      ? `${textCountLabel} ${Math.max(0, Math.floor(textCount)).toLocaleString()}`
       : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
-  const hasMoreMenuContent = Boolean(wordCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
+  const hasMoreMenuContent = Boolean(textCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
   const moreMenuPanelClassName = 'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
   const closeMoreMenu = useCallback(() => {
     setMoreMenuOpen(false);
@@ -473,7 +473,7 @@ export function ConversationDetailPane({
                       </div>
                     ) : null}
 
-                    {wordCountText ? (
+                    {textCountText ? (
                       <div
                         className={[
                           hasReaderMoreMenuContent || moreActions.length
@@ -483,10 +483,10 @@ export function ConversationDetailPane({
                         ]
                           .filter(Boolean)
                           .join(' ')}
-                        data-detail-word-count-row="true"
-                        {...tooltipAttrs(wordCountText)}
+                        data-detail-text-count-row="true"
+                        {...tooltipAttrs(textCountText)}
                       >
-                        {wordCountText}
+                        {textCountText}
                       </div>
                     ) : null}
                   </div>

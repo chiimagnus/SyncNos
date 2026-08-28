@@ -66,6 +66,7 @@ vi.mock('../../src/ui/i18n', () => ({
       readerToolbarAria: 'Reader tools',
       saveButton: 'Save',
       cancelButton: 'Cancel',
+      detailTextCountLabel: 'Words',
     };
     return labels[key] || key;
   },
@@ -139,11 +140,26 @@ function findTextNodeContaining(root: ParentNode, needle: string): Text | null {
   return null;
 }
 
+async function openMoreAndReadTextCount(): Promise<string> {
+  const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
+  expect(moreButton).toBeTruthy();
+
+  await act(async () => {
+    moreButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+  });
+
+  const countRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
+  expect(countRow).toBeTruthy();
+  return String(countRow?.textContent || '').trim();
+}
+
 describe('ConversationDetailPane header actions', () => {
   let root: ReactDOM.Root | null = null;
 
   beforeEach(() => {
     setupDom();
+    currentState.activeId = 11;
     currentState.selectedConversation = {
       id: 11,
       title: 'Conversation',
@@ -671,7 +687,7 @@ describe('ConversationDetailPane header actions', () => {
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
     expect(moreMenu?.className || '').toContain('tw-w-[214px]');
-    expect(document.querySelector('[data-detail-word-count-row="true"]')).toBeTruthy();
+    expect(document.querySelector('[data-detail-text-count-row="true"]')).toBeTruthy();
 
     await act(async () => {
       cacheButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -679,6 +695,160 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows exact Chat text count and refreshes it after switching conversations', async () => {
+    currentState.detailHeaderActions = [];
+    currentState.selectedConversation = {
+      id: 21,
+      title: 'Chat one',
+      source: 'chatgpt',
+      conversationKey: 'chat-21',
+    } as any;
+    currentState.activeId = 21;
+    currentState.detail = {
+      conversationId: 21,
+      messages: [
+        {
+          id: 2101,
+          conversationId: 21,
+          messageKey: 'chat-21-user',
+          role: 'user',
+          contentText: '这是一个测试。 Hello world',
+          contentMarkdown: '这是一个测试。 Hello world',
+        },
+      ],
+    } as any;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(await openMoreAndReadTextCount()).toBe('Words 8');
+
+    await act(async () => {
+      currentState.activeId = 22;
+      currentState.selectedConversation = {
+        id: 22,
+        title: 'Chat two',
+        source: 'chatgpt',
+        conversationKey: 'chat-22',
+      } as any;
+      currentState.detail = {
+        conversationId: 22,
+        messages: [
+          {
+            id: 2201,
+            conversationId: 22,
+            messageKey: 'chat-22-user',
+            role: 'user',
+            contentText: 'ChatGPT-5.6 works',
+            contentMarkdown: 'ChatGPT-5.6 works',
+          },
+        ],
+      } as any;
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+
+    expect(document.querySelector('[data-detail-text-count-row="true"]')).toBeFalsy();
+    expect(await openMoreAndReadTextCount()).toBe('Words 2');
+  });
+
+  it('keeps a pure-image Article count row visible at Words 0', async () => {
+    currentState.detailHeaderActions = [];
+    currentState.selectedConversation = {
+      id: 31,
+      title: 'Image article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-31',
+      url: 'https://example.com/article',
+    } as any;
+    currentState.activeId = 31;
+    currentState.detail = {
+      conversationId: 31,
+      messages: [
+        {
+          id: 3101,
+          conversationId: 31,
+          messageKey: 'article_body',
+          role: 'article',
+          contentText: 'https://example.com/image.png',
+          contentMarkdown: '![图片说明](https://example.com/image.png)',
+        },
+      ],
+    } as any;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(await openMoreAndReadTextCount()).toBe('Words 0');
+  });
+
+  it('counts Video transcript semantic text without Markdown timestamps', async () => {
+    currentState.detailHeaderActions = [];
+    currentState.selectedConversation = {
+      id: 41,
+      title: 'Video transcript',
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video-41',
+      url: 'https://example.com/video',
+    } as any;
+    currentState.activeId = 41;
+    currentState.detail = {
+      conversationId: 41,
+      messages: [
+        {
+          id: 4101,
+          conversationId: 41,
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentText: '你好 world',
+          contentMarkdown: '00:01 你好 world',
+        },
+      ],
+    } as any;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(await openMoreAndReadTextCount()).toBe('Words 3');
+  });
+
+  it('uses semantic Markdown fallback for legacy detail messages', async () => {
+    currentState.detailHeaderActions = [];
+    currentState.selectedConversation = {
+      id: 51,
+      title: 'Legacy article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-51',
+      url: 'https://example.com/legacy',
+    } as any;
+    currentState.activeId = 51;
+    currentState.detail = {
+      conversationId: 51,
+      messages: [
+        {
+          id: 5101,
+          conversationId: 51,
+          messageKey: 'legacy-body',
+          role: 'article',
+          contentText: '',
+          contentMarkdown: '**测试** [OpenAI](https://openai.com) ![图片说明](https://example.com/a.png)',
+        },
+      ],
+    } as any;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(await openMoreAndReadTextCount()).toBe('Words 3');
   });
 
   it('renders multiple More tool actions as first-level menu items and closes after trigger', async () => {
