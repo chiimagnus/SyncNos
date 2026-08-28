@@ -1,117 +1,57 @@
-name: 'Bug report / 缺陷报告'
-description: 'Report reproducible SyncNos WebClipper behavior that does not match expectations'
-title: '[Bug] '
-labels:
-  - webclipper
+name: Bug report
+description: Report something that isn't working in SyncNos
+title: "[Bug]: "
+labels: ["bug"]
 body:
   - type: checkboxes
-    id: existing_search
+    id: existing-search
     attributes:
-      label: Existing reports / 已有问题
+      label: Existing issues
       options:
-        - label: 'I searched open and closed issues and did not find the same problem. / 我已搜索 open 和 closed issues，没有找到同一问题。'
-          required: true
+        - label: I searched open and closed issues and didn't find this already reported
+          required: false
 
-  - type: dropdown
-    id: area
+  - type: textarea
+    id: what-happened
     attributes:
-      label: Affected area / 影响范围
-      options:
-        - collectors / content scripts（采集、提取、站点适配）
-        - background / runtime / messaging（后台、运行时、消息通信）
-        - local storage / backup / restore（本地存储、备份、恢复）
-        - sync / export（Notion、Obsidian、Feishu、Markdown、Zip）
-        - UI（app、popup、inpage、settings）
-        - build / release（构建、权限、打包、发布）
-        - Not sure / 不确定
+      label: What happened?
+      placeholder: |
+        What you did, what you expected, and what happened instead.
+        A short recording beats a paragraph.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recording
+      description: Drag and drop images or a screen recording here. Optional but speeds up triage.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: SyncNos version
+      placeholder: 1.9.0 or commit SHA
     validations:
       required: true
 
   - type: input
-    id: site
-    attributes:
-      label: Site or target / 站点或目标（如适用）
-      description: 'Use a hostname or target name when possible; leave blank if this is not site-specific.'
-      placeholder: 'chatgpt.com / bilibili.com / Notion / Obsidian / Feishu'
-    validations:
-      required: false
-
-  - type: textarea
-    id: summary
-    attributes:
-      label: Summary / 问题概述
-      description: 'Describe the failure in one short, testable statement.'
-      placeholder: 'Example: Capturing a long ChatGPT conversation saves only part of the loaded turns.'
-    validations:
-      required: true
-
-  - type: textarea
-    id: reproduction
-    attributes:
-      label: Steps to reproduce / 复现步骤
-      description: 'Start from a known state and list the smallest sequence that reproduces the problem.'
-      placeholder: |-
-        1. Open ...
-        2. Enable/disable ...
-        3. Capture/sync ...
-        4. Observe ...
-    validations:
-      required: true
-
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior / 实际表现
-      description: 'What happened? Include the exact error or incorrect result when available.'
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior / 期望行为
-      description: 'What should have happened instead?'
-    validations:
-      required: true
-
-  - type: textarea
     id: environment
     attributes:
-      label: Environment / 环境信息
-      description: 'Use the extension version shown in SyncNos, or the commit SHA when built from source.'
-      placeholder: |-
-        - OS: macOS 15.6
-        - Browser + version: Chrome 140 / Firefox 142 / Safari 18
-        - SyncNos version or commit: 1.9.x / abc1234
-        - Install source: store / release / source build
+      label: Browser + OS
+      placeholder: Chrome 140 on macOS 15.6
     validations:
       required: true
-
-  - type: dropdown
-    id: data_safety
-    attributes:
-      label: Local data impact / 本地数据影响
-      description: 'SyncNos is local-first. Tell us whether existing local data was affected.'
-      options:
-        - Existing local data remained intact / 现有本地数据未受影响
-        - New capture or sync failed, but existing data remained intact / 新采集或同步失败，但现有数据未受影响
-        - Existing local data was modified or lost / 现有本地数据被修改或丢失
-        - Unknown / 不确定
-    validations:
-      required: true
-
-  - type: textarea
-    id: evidence
-    attributes:
-      label: Evidence / 截图、录屏或日志（可选）
-      description: 'Attach only what helps reproduce or diagnose the issue. Redact private conversations, account identifiers, cookies, tokens, API keys, OAuth secrets, and backup contents.'
-    validations:
-      required: false
-
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional context / 补充信息（可选）
-      description: 'Mention regressions, related issues/PRs, or whether the problem reproduces on current main.'
-    validations:
-      required: false
