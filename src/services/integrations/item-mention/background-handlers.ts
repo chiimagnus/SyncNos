@@ -6,7 +6,7 @@ import {
 } from '@services/conversations/data/storage';
 import { normalizeMentionSearchLimit } from '@services/integrations/item-mention/mention-contract';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
-import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

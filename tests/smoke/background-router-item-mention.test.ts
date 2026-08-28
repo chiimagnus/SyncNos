@@ -10,7 +10,7 @@ const storageMocks = vi.hoisted(() => ({
   getConversationDetail: vi.fn(),
 }));
 
-const chatwithMocks = vi.hoisted(() => ({
+const externalMarkdownMocks = vi.hoisted(() => ({
   formatConversationMarkdownForExternalOutput: vi.fn(),
 }));
 
@@ -20,8 +20,8 @@ vi.mock('@services/conversations/data/storage', () => ({
   getConversationDetail: storageMocks.getConversationDetail,
 }));
 
-vi.mock('@services/integrations/chatwith/chatwith-settings', () => ({
-  formatConversationMarkdownForExternalOutput: chatwithMocks.formatConversationMarkdownForExternalOutput,
+vi.mock('@services/conversations/external-markdown', () => ({
+  formatConversationMarkdownForExternalOutput: externalMarkdownMocks.formatConversationMarkdownForExternalOutput,
 }));
 
 function createRouter() {
@@ -41,7 +41,7 @@ afterEach(() => {
   storageMocks.searchConversationMentionCandidates.mockReset();
   storageMocks.getConversationById.mockReset();
   storageMocks.getConversationDetail.mockReset();
-  chatwithMocks.formatConversationMarkdownForExternalOutput.mockReset();
+  externalMarkdownMocks.formatConversationMarkdownForExternalOutput.mockReset();
 });
 
 describe('background-router item mention', () => {
@@ -97,7 +97,7 @@ describe('background-router item mention', () => {
       conversationId: 123,
       messages: [{ id: 1, conversationId: 123, messageKey: 'm1', role: 'user', contentText: 'hi' }],
     });
-    chatwithMocks.formatConversationMarkdownForExternalOutput.mockResolvedValue('MARKDOWN');
+    externalMarkdownMocks.formatConversationMarkdownForExternalOutput.mockResolvedValue('MARKDOWN');
 
     const router = createRouter();
     const res = await router.__handleMessageForTests({
@@ -107,7 +107,7 @@ describe('background-router item mention', () => {
 
     expect(res.ok).toBe(true);
     expect(res.data?.markdown).toBe('MARKDOWN');
-    expect(chatwithMocks.formatConversationMarkdownForExternalOutput).toHaveBeenCalled();
+    expect(externalMarkdownMocks.formatConversationMarkdownForExternalOutput).toHaveBeenCalled();
   });
 
   it('rejects invalid conversationId', async () => {

@@ -1,7 +1,7 @@
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { t } from '@i18n';
 import { writeTextToClipboard } from '@services/shared/clipboard';
-import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import {
   prioritizeDetailHeaderCopyLinkActions,
   readLastDetailHeaderCopyLinkActionId,

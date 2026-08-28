@@ -21,7 +21,7 @@ vi.mock('../../src/services/conversations/client/repo', () => ({
   getConversationDetail: (...args: any[]) => getConversationDetailMock(...args),
 }));
 
-vi.mock('../../src/services/integrations/chatwith/chatwith-settings', () => ({
+vi.mock('../../src/services/conversations/external-markdown', () => ({
   formatConversationMarkdownForExternalOutput: (...args: any[]) => formatConversationMarkdownMock(...args),
 }));
 

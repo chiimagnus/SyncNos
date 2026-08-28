@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
-import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';

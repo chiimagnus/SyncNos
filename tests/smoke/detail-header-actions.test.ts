@@ -25,7 +25,7 @@ vi.mock('@services/shared/clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),
 }));
 
-vi.mock('@services/integrations/chatwith/chatwith-settings', () => ({
+vi.mock('@services/conversations/external-markdown', () => ({
   formatConversationMarkdownForExternalOutput: (...args: any[]) => formatConversationMarkdownMock(...args),
 }));
 

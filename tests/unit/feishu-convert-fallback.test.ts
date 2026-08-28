@@ -40,7 +40,7 @@ vi.mock('@services/sync/feishu/feishu-sync-job-store.ts', () => ({
   },
 }));
 
-vi.mock('@services/integrations/chatwith/chatwith-settings', () => ({
+vi.mock('@services/conversations/external-markdown', () => ({
   formatConversationMarkdownForExternalOutput: vi.fn(async () => '# Title\n\nhello'),
 }));
 
