@@ -19,7 +19,6 @@ const gateMocks = vi.hoisted(() => ({
   setSyncProviderEnabled: vi.fn(),
   syncProviderEnabledStorageKey: vi.fn((id: string) => `webclipper_sync_provider_${id}_enabled`),
 }));
-const chatWithMocks = vi.hoisted(() => ({ loadSettings: vi.fn() }));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
 vi.mock('@services/shared/storage', () => ({
@@ -38,13 +37,6 @@ vi.mock('@services/integrations/anti-hotlink/anti-hotlink-settings', () => ({
   loadAntiHotlinkRulesForSettings: async () => [],
   resetAntiHotlinkRulesForSettings: async () => [],
   saveAntiHotlinkRulesForSettings: async () => [],
-}));
-vi.mock('@services/integrations/chatwith/chatwith-settings', () => ({
-  DEFAULT_CHAT_WITH_PLATFORMS: [],
-  DEFAULT_CHAT_WITH_PROMPT_TEMPLATE: '',
-  loadChatWithSettings: chatWithMocks.loadSettings,
-  resetChatWithPlatforms: async () => [],
-  saveChatWithSettings: async () => ({ promptTemplate: '', platforms: [] }),
 }));
 vi.mock('@services/sync/feishu/settings-store', () => ({
   FEISHU_DEFAULTS: { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' },
@@ -273,7 +265,6 @@ beforeEach(() => {
     };
   });
   gateMocks.setSyncProviderEnabled.mockResolvedValue(undefined);
-  chatWithMocks.loadSettings.mockResolvedValue({ promptTemplate: '', platforms: [] });
 
   runtimeMocks.send.mockImplementation(async (type: string, payload: Record<string, unknown> = {}) => {
     if (type === 'getNotionAuthStatus') return ok({ connected: false });
@@ -485,7 +476,6 @@ describe('Settings controller GitHub Device Flow', () => {
 
   it('finishes base hydration and unrelated settings actions while automatic GitHub discovery is pending', async () => {
     githubSettingsData = githubSettings({ state: 'connected' });
-    chatWithMocks.loadSettings.mockResolvedValue({ promptTemplate: 'hydrated-before-github-network', platforms: [] });
     const discovery = deferred<ApiResponse>();
     repositoryResponses = [discovery.promise];
 
@@ -493,7 +483,6 @@ describe('Settings controller GitHub Device Flow', () => {
 
     expect(callCount(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES)).toBe(1);
     expect(latestSnapshot?.busy).toBe(false);
-    expect(latestSnapshot?.chatWithPromptTemplate).toBe('hydrated-before-github-network');
     expect(latestSnapshot?.error).toBeNull();
 
     await invoke(() => latestSnapshot!.onToggleGithubSyncEnabled(false));

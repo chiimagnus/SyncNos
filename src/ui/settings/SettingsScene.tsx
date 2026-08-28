@@ -11,7 +11,6 @@ import { type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
 import { AiChatsSection } from '@ui/settings/sections/AiChatsSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
-import { ChatWithAiSection } from '@ui/settings/sections/ChatWithAiSection';
 import { InsightSection } from '@ui/settings/sections/InsightSection';
 import { InpageSection } from '@ui/settings/sections/InpageSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
@@ -97,13 +96,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onFeishuConnectOrDisconnect,
     onOpenFeishuSetupGuide,
     feishuSetupGuideUrl,
-
-    chatWithPromptTemplate,
-    setChatWithPromptTemplate,
-    chatWithPlatforms,
-    setChatWithPlatforms,
-    onSaveChatWithSettings,
-    onResetChatWithPlatforms,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,
@@ -319,22 +311,6 @@ export function SettingsScene(props: SettingsSceneProps) {
             void onFeishuConnectOrDisconnect();
           }}
           onOpenSetupGuide={onOpenFeishuSetupGuide}
-        />
-      ) : null}
-
-      {activeSection === 'chat_with' ? (
-        <ChatWithAiSection
-          busy={busy}
-          promptTemplate={chatWithPromptTemplate}
-          onChangePromptTemplate={setChatWithPromptTemplate}
-          platforms={chatWithPlatforms as any}
-          onChangePlatforms={setChatWithPlatforms as any}
-          onSave={() => {
-            void onSaveChatWithSettings();
-          }}
-          onResetPlatforms={() => {
-            void onResetChatWithPlatforms();
-          }}
         />
       ) : null}
 

@@ -2,7 +2,6 @@ import { t } from '@i18n';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useDiscussionPanel } from '@viewmodels/comments/useDiscussionPanel';
-import { useCommentOptionalActions } from '@viewmodels/comments/useCommentOptionalActions';
 import { flushSync } from 'react-dom';
 
 import { resolveTargetRootIdForReply, resolveTargetRootIdFromSaveResult } from './focus-rules';
@@ -12,7 +11,7 @@ import { RootCommentComposer } from './RootCommentComposer';
 import { CommentQuotePreview } from './CommentQuotePreview';
 import { CommentThread } from './CommentThread';
 import { ReplyComposer } from './ReplyComposer';
-import { CommentOverflowMenu, type CommentOverflowAction } from './CommentOverflowMenu';
+import type { CommentOverflowAction } from './CommentOverflowMenu';
 import { useCommentNotice } from './use-comment-notice';
 import { useCommentFocusIntent } from './use-comment-focus-intent';
 import { CommentsSidebarHeader } from './CommentsSidebarHeader';
@@ -23,7 +22,6 @@ export function ThreadedCommentsPanel({
   fullWidth,
   showHeader,
   showCollapseButton,
-  chatWith,
   snapshot,
   actions,
   onRequestClose,
@@ -31,7 +29,6 @@ export function ThreadedCommentsPanel({
   locateThreadRoot,
   onActiveRootChange,
   onLocateFailed,
-  commentChatWith,
   showNotice,
   onNoticeExpired,
 }: ThreadedCommentsPanelProps) {
@@ -45,11 +42,6 @@ export function ThreadedCommentsPanel({
     open: snapshot.open,
     panelRootRef: panelSurfaceRef,
     requestSelection: (input) => actions.requestComposerSelection(input),
-  });
-  const optionalActions = useCommentOptionalActions({
-    panelConfig: chatWith,
-    commentConfig: commentChatWith,
-    showNotice,
   });
   const unmountedRef = useRef(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -199,32 +191,14 @@ export function ThreadedCommentsPanel({
 
   const getReplyMenuActions = (reply: { id: number }): CommentOverflowAction[] => [deleteMenuAction(Number(reply.id))];
 
-  const getRootMenuActions = (rootId: number): CommentOverflowAction[] => [
-    ...optionalActions.getActions(rootId).map((action) => ({
-      id: action.id,
-      label: action.label,
-      disabled: action.disabled,
-    })),
-    deleteMenuAction(rootId),
-  ];
+  const getRootMenuActions = (rootId: number): CommentOverflowAction[] => [deleteMenuAction(rootId)];
 
-  const togglePanelMenu = async () => {
-    if (discussion.state.openMenu === 'panel') {
-      discussion.setOpenMenu(null);
-      return;
-    }
-    await optionalActions.preparePanel();
-    discussion.setOpenMenu('panel');
-    discussion.dispatch({ type: 'focus-menu', target: 'panel' });
-  };
-
-  const toggleRootMenu = async (root: (typeof roots)[number], replies: readonly (typeof roots)[number][]) => {
+  const toggleRootMenu = (root: (typeof roots)[number]) => {
     const rootId = Number(root.id);
     if (discussion.state.openMenu === rootId) {
       discussion.setOpenMenu(null);
       return;
     }
-    await optionalActions.prepareComment(root, replies);
     discussion.setOpenMenu(rootId);
     discussion.dispatch({ type: 'focus-menu', target: rootId });
   };
@@ -239,21 +213,10 @@ export function ThreadedCommentsPanel({
   };
 
   const runMenuAction = async (id: number, action: CommentOverflowAction) => {
-    if (action.id === 'delete') {
-      const wasConfirming = armedDeleteId === id;
-      await handleDelete(id);
-      if (wasConfirming) discussion.setOpenMenu(null);
-      return;
-    }
-    const resolved = optionalActions.getActions(id).find((candidate) => candidate.id === action.id);
-    if (resolved) await optionalActions.trigger(resolved);
-    discussion.setOpenMenu(null);
-  };
-
-  const runPanelMenuAction = async (action: CommentOverflowAction) => {
-    const resolved = optionalActions.getActions('panel').find((candidate) => candidate.id === action.id);
-    if (resolved) await optionalActions.trigger(resolved);
-    discussion.setOpenMenu(null);
+    if (action.id !== 'delete') return;
+    const wasConfirming = armedDeleteId === id;
+    await handleDelete(id);
+    if (wasConfirming) discussion.setOpenMenu(null);
   };
 
   const effectiveActiveRootId = discussion.state.activeRootId ?? (roots.length === 1 ? Number(roots[0]?.id) : null);
@@ -303,23 +266,6 @@ export function ThreadedCommentsPanel({
           showCollapseButton={Boolean(showCollapseButton)}
           collapseLabel={t('closeCommentsSidebar')}
           onCollapse={onRequestClose}
-          actions={
-            chatWith ? (
-              <CommentOverflowMenu
-                targetLabel={optionalActions.panelLabel}
-                open={discussion.state.openMenu === 'panel'}
-                disabled={busy}
-                actions={optionalActions.getActions('panel').map((action) => ({
-                  id: action.id,
-                  label: action.label,
-                  disabled: action.disabled,
-                }))}
-                triggerRef={focusController.registerMenuTrigger('panel')}
-                onToggle={togglePanelMenu}
-                onAction={runPanelMenuAction}
-              />
-            ) : null
-          }
         />
       ) : null}
       <div className="webclipper-inpage-comments-panel__body">

@@ -26,14 +26,14 @@ export type InpageCommentsPanelDeps = {
   domSource: InpageCommentsDomSource;
   // Injected from the entrypoint (UI layer) so that `services` never imports `ui`
   // directly, preserving the one-way layering rule in AGENTS.md.
-  createPanelApi: (runtime: RuntimeClient | null) => CommentSidebarPanelApi;
+  createPanelApi: () => CommentSidebarPanelApi;
 };
 
 export function createInpageCommentsPanelController(
   runtime: RuntimeClient | null,
   deps: InpageCommentsPanelDeps,
 ): InpageCommentsPanelController {
-  const sidebarSession = createCommentSidebarSession(deps.createPanelApi(runtime));
+  const sidebarSession = createCommentSidebarSession(deps.createPanelApi());
   const controller = createArticleCommentsSidebarController({
     session: sidebarSession,
     adapter: createArticleCommentsSidebarInpageAdapter(runtime),

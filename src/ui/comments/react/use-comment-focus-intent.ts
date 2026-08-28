@@ -2,7 +2,7 @@ import type { DiscussionAction, DiscussionFocusIntent } from '@viewmodels/commen
 import { useLayoutEffect, useRef, type Dispatch, type MutableRefObject, type RefCallback } from 'react';
 import { resolvePendingFocusTarget } from './focus-rules';
 
-type MenuTarget = 'panel' | number;
+type MenuTarget = number;
 
 type UseCommentFocusIntentInput = {
   open: boolean;

@@ -49,13 +49,6 @@ import {
   GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
 } from '@services/sync/auto-sync/auto-sync-keys';
 import {
-  DEFAULT_CHAT_WITH_PLATFORMS,
-  DEFAULT_CHAT_WITH_PROMPT_TEMPLATE,
-  loadChatWithSettings,
-  resetChatWithPlatforms,
-  saveChatWithSettings,
-} from '@services/integrations/chatwith/chatwith-settings';
-import {
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
   getDefaultAntiHotlinkRulesForSettings,
   loadAntiHotlinkRulesForSettings,
@@ -378,11 +371,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   readerPrefsRef.current = readerPrefs;
   const [localePreference, setLocalePreference] = useState<LocalePreference>(() => getLocalePreference());
 
-  // Chat with AI
-  const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
-  const [chatWithPlatforms, setChatWithPlatforms] = useState<any[]>(DEFAULT_CHAT_WITH_PLATFORMS.slice());
-  const chatWithHydratedRef = useRef(false);
-
   // Insight
   const [insightStats, setInsightStats] = useState<InsightStats | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
@@ -651,13 +639,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     const githubSettings = unwrap(githubRes);
     applyGithubSettingsResponse(githubSettings);
-
-    const chatWith = await loadChatWithSettings();
-    setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
-    setChatWithPlatforms(
-      Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
-    );
-    chatWithHydratedRef.current = true;
   }, [applyGithubSettingsResponse, articleDbSpec.storageKey, chatDbSpec.storageKey, videoDbSpec.storageKey]);
 
   const refresh = useCallback(async () => {
@@ -1648,25 +1629,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
-  const onSaveChatWithSettings = useCallback(async () => {
-    if (!chatWithHydratedRef.current) return;
-
-    // Save on explicit UI boundaries (onBlur / Enter), instead of debounced write-through.
-    await runTask(
-      async () => {
-        await saveChatWithSettings({
-          promptTemplate: String(chatWithPromptTemplate || ''),
-          platforms: Array.isArray(chatWithPlatforms) ? (chatWithPlatforms as any) : [],
-        } as any);
-      },
-      {
-        useBusy: false,
-        clearError: false,
-        fallbackMessage: 'save chat with settings failed',
-      },
-    );
-  }, [chatWithPlatforms, chatWithPromptTemplate, runTask]);
-
   useEffect(() => {
     if (activeSection !== 'aboutyou') return;
     if (hasLoadedInsight || insightLoading) return;
@@ -1697,13 +1659,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const window = getInsightTimeRangeWindow(insightRange);
     setInsightStats(buildInsightStats(data, window));
   }, [activeSection, insightRange]);
-
-  const onResetChatWithPlatforms = useCallback(async () => {
-    await runTask(async () => {
-      await resetChatWithPlatforms();
-      setChatWithPlatforms(DEFAULT_CHAT_WITH_PLATFORMS.slice());
-    });
-  }, [runTask]);
 
   const handleBackupExport = useCallback(async () => {
     if (busy) return;
@@ -2041,12 +1996,5 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     aboutYouUserName,
     onChangeAboutYouUserName,
     onSaveAboutYouUserName,
-
-    chatWithPromptTemplate,
-    setChatWithPromptTemplate,
-    chatWithPlatforms,
-    setChatWithPlatforms,
-    onSaveChatWithSettings,
-    onResetChatWithPlatforms,
   };
 }

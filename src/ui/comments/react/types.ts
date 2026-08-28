@@ -2,7 +2,6 @@ import type {
   CommentSidebarHostActions,
   CommentSidebarHostSnapshot,
 } from '@services/comments/sidebar/comment-sidebar-contract';
-import type { ThreadedCommentsPanelChatWithConfig, ThreadedCommentsPanelCommentChatWithConfig } from '../types';
 
 export type ThreadedCommentsPanelSnapshot = CommentSidebarHostSnapshot & {
   noticeMessage: string;
@@ -19,7 +18,6 @@ export type ThreadedCommentsPanelProps = {
   surfaceBg?: string;
   showHeader: boolean;
   showCollapseButton: boolean;
-  chatWith?: ThreadedCommentsPanelChatWithConfig | null;
   snapshot: ThreadedCommentsPanelSnapshot;
   actions: CommentSidebarHostActions;
   onRequestClose: () => void;
@@ -27,7 +25,6 @@ export type ThreadedCommentsPanelProps = {
   locateThreadRoot?: (rootId: number) => Promise<ThreadLocateResult>;
   onActiveRootChange?: (rootId: number | null) => void;
   onLocateFailed?: (reason: string) => void;
-  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   showNotice?: (message: string) => void;
   onNoticeExpired?: () => void;
 };

@@ -19,7 +19,6 @@ describe('settings section definitions', () => {
       'articles',
       'ai_chats',
       'videos',
-      'chat_with',
       'backup',
       'notion',
       'feishu',
@@ -32,7 +31,7 @@ describe('settings section definitions', () => {
 
   it('groups sections into integrations, behavior, and about areas', () => {
     expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
-      ['general', 'articles', 'ai_chats', 'videos', 'chat_with'],
+      ['general', 'articles', 'ai_chats', 'videos'],
       ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
@@ -49,7 +48,7 @@ describe('settings section definitions', () => {
     const groupList = document.querySelector('nav')?.firstElementChild;
     const groups = groupList ? Array.from(groupList.children) : [];
     expect(groups).toHaveLength(3);
-    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 5, 2]);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([4, 5, 2]);
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
     expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
       true,

@@ -41,7 +41,7 @@ export default defineContentScript({
     });
     registerInpageCommentsPanelContentHandlers(runtime, {
       localeReady,
-      createPanelApi: (rt) => getInpageCommentsPanelApi(rt),
+      createPanelApi: () => getInpageCommentsPanelApi(),
       domSource: createInpageCommentsDomSource({
         window,
         document,

@@ -7,7 +7,6 @@ import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
-import { registerChatWithBackgroundHandlers } from '@services/integrations/chatwith/chatwith-background-handlers';
 import { ensureDefaultNotionOAuthClientId, setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
 import {
   ensureDefaultFeishuOAuthClientId,
@@ -65,7 +64,6 @@ export default defineBackground(() => {
     onRemoteCleanupPending: () => services.autoSync.onRemoteCleanupPending(),
   });
   registerItemMentionHandlers(router);
-  registerChatWithBackgroundHandlers(router);
   registerArticleCommentsHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });

@@ -6,11 +6,7 @@ import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowList
 import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import type {
-  CommentLocatorSurfaceRoots,
-  ThreadedCommentsPanelChatWithAction,
-  ThreadedCommentsPanelCommentChatWithConfig,
-} from '@ui/comments';
+import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
@@ -40,9 +36,6 @@ export type ConversationsSceneProps = {
   subscribeCommentsLocatorSurfaceRoots?: (listener: () => void) => () => void;
   onCommentsLocatorSurfaceRootsChange?: (roots: CommentLocatorSurfaceRoots | null) => void;
   narrowCommentsOpenSource?: 'popup' | 'app';
-  resolveCommentsSidebarChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
-  resolveCommentsSidebarSingleChatWithLabel?: () => Promise<string | null>;
-  commentsSidebarCommentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   listShell?: ConversationsSceneListShellConfig;
   wideDetail?: ReactNode;
   wideHideList?: boolean;
@@ -61,9 +54,6 @@ export function ConversationsScene({
   subscribeCommentsLocatorSurfaceRoots,
   onCommentsLocatorSurfaceRootsChange,
   narrowCommentsOpenSource = 'popup',
-  resolveCommentsSidebarChatWithActions,
-  resolveCommentsSidebarSingleChatWithLabel,
-  commentsSidebarCommentChatWith,
   listShell,
   wideDetail,
   wideHideList = false,
@@ -181,9 +171,6 @@ export function ConversationsScene({
             containerClassName="tw-h-full tw-min-h-0"
             getLocatorSurfaceRoots={() => getCommentsLocatorSurfaceRoots?.() || null}
             subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
-            resolveChatWithActions={resolveCommentsSidebarChatWithActions}
-            resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
-            commentChatWith={commentsSidebarCommentChatWith}
             fullWidth
           />
         </div>

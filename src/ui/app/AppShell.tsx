@@ -16,40 +16,10 @@ import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticl
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { createThreadedCommentChatWithConfig } from '@ui/comments';
-import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
-import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
-import {
-  resolveChatWithCommentsHeaderActions,
-  resolveSingleEnabledChatWithActionLabel,
-} from '@services/integrations/chatwith/chatwith-comments-header-actions';
-import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
-import { resolveChatWithSyncedUrlsFromRuntime } from '@services/integrations/chatwith/chatwith-synced-urls-client';
-import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
-import { createRuntimeClient } from '@services/shared/runtime-client';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
-
-function safeString(value: unknown): string {
-  return String(value || '').trim();
-}
-
-function isHttpUrl(raw: unknown): boolean {
-  return /^https?:\/\//i.test(safeString(raw));
-}
-
-function openUrlFallback(url: string): boolean {
-  const target = safeString(url);
-  if (!target || !isHttpUrl(target)) return false;
-  try {
-    globalThis.window?.open(target, '_blank', 'noopener,noreferrer');
-    return true;
-  } catch (_e) {
-    return false;
-  }
-}
 
 function readBrowserLocalStorageValue(key: string): string {
   try {
@@ -209,13 +179,9 @@ export default function AppShell() {
       commentsLocatorSurfaceRootsListenersRef.current.add(listener);
       return () => commentsLocatorSurfaceRootsListenersRef.current.delete(listener);
     }, []);
-    const runtimeClientRef = useRef<ReturnType<typeof createRuntimeClient> | null>(null);
-    if (!runtimeClientRef.current) {
-      runtimeClientRef.current = createRuntimeClient();
-    }
     const location = useLocation();
     const navigate = useNavigate();
-    const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
+    const { openConversationExternalByLoc, selectedConversation } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
     const locMountedRef = useRef(false);
@@ -237,38 +203,6 @@ export default function AppShell() {
     const commentsSidebarCollapsed = isMedium ? mediumCommentsSidebarCollapsed : wideCommentsSidebarCollapsed;
     const canAutoOpenCommentsSidebarInWide = isWide && canToggleCommentsSidebar;
 
-    const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
-      () => ({
-        openPlatform: async (platformId, fallbackUrl) => {
-          const normalizedPlatformId = safeString(platformId).toLowerCase();
-          const normalizedFallbackUrl = safeString(fallbackUrl);
-          if (!normalizedPlatformId) return false;
-
-          const rt = runtimeClientRef.current;
-          if (!rt?.send) {
-            return openUrlFallback(normalizedFallbackUrl);
-          }
-
-          try {
-            const response = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
-              platformId: normalizedPlatformId,
-              fallbackUrl: normalizedFallbackUrl,
-            })) as any;
-            if (response?.ok) return true;
-
-            const message = safeString(response?.error?.message) || `Failed to open platform: ${normalizedPlatformId}`;
-            throw new Error(message);
-          } catch (error) {
-            if (openUrlFallback(normalizedFallbackUrl)) return true;
-            throw error instanceof Error
-              ? error
-              : new Error(String(error || `Failed to open platform: ${normalizedPlatformId}`));
-          }
-        },
-      }),
-      [],
-    );
-
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? (state?.backgroundLocation ?? null) : null;
@@ -278,48 +212,6 @@ export default function AppShell() {
       !showSettingsSheet &&
       !commentsSidebarCollapsed &&
       (isMedium || commentsSidebarSnapshot.open);
-
-    const commentsSidebarCommentChatWithRuntimeRef = useRef<{
-      showCommentsSidebar: boolean;
-      hasConversation: boolean;
-      conversationId: number | null;
-      articleTitle: string;
-      canonicalUrl: string;
-      openPort: ChatWithOpenPlatformPort | null;
-    }>({
-      showCommentsSidebar: false,
-      hasConversation: false,
-      conversationId: null,
-      articleTitle: '',
-      canonicalUrl: '',
-      openPort: null,
-    });
-
-    commentsSidebarCommentChatWithRuntimeRef.current = {
-      showCommentsSidebar,
-      hasConversation: Boolean(selectedConversation),
-      conversationId: selectedConversationId,
-      articleTitle: String((selectedConversation as any)?.title || '').trim(),
-      canonicalUrl: canonicalUrl || '',
-      openPort: appCommentChatWithOpenPort,
-    };
-
-    const commentsSidebarCommentChatWithConfig = useMemo(
-      () =>
-        createThreadedCommentChatWithConfig({
-          resolveContext: () => ({
-            conversationId: commentsSidebarCommentChatWithRuntimeRef.current.conversationId,
-            articleTitle: commentsSidebarCommentChatWithRuntimeRef.current.articleTitle,
-            canonicalUrl: commentsSidebarCommentChatWithRuntimeRef.current.canonicalUrl,
-          }),
-          isEnabled: () => commentsSidebarCommentChatWithRuntimeRef.current.showCommentsSidebar,
-          hasConversation: () => commentsSidebarCommentChatWithRuntimeRef.current.hasConversation,
-          resolveOpenPort: () => commentsSidebarCommentChatWithRuntimeRef.current.openPort,
-          resolveSyncedUrls: (context) =>
-            resolveChatWithSyncedUrlsFromRuntime(runtimeClientRef.current, context.conversationId),
-        }),
-      [],
-    );
 
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
@@ -461,54 +353,6 @@ export default function AppShell() {
         ensureContext: false,
       });
     };
-
-    const resolveCommentsSidebarChatWithActions = useCallback(async (): Promise<
-      ThreadedCommentsPanelChatWithAction[]
-    > => {
-      if (!selectedConversation) return [];
-      if (!showCommentsSidebar) return [];
-
-      const conversationId = Number((selectedConversation as any)?.id || 0);
-      if (!Number.isFinite(conversationId) || conversationId <= 0) return [];
-
-      const currentDetail = detail && Number((detail as any)?.conversationId || 0) === conversationId ? detail : null;
-      if (
-        !currentDetail ||
-        !Array.isArray((currentDetail as any)?.messages) ||
-        !(currentDetail as any)?.messages.length
-      ) {
-        throw new Error('Conversation detail is not ready yet');
-      }
-
-      const syncedUrls = await resolveChatWithSyncedUrlsFromRuntime(runtimeClientRef.current, conversationId);
-
-      const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
-        conversation: selectedConversation,
-        detail: currentDetail,
-        port: defaultDetailHeaderActionPort,
-        openPort: appCommentChatWithOpenPort,
-        syncedUrls,
-      });
-
-      const mapped: ThreadedCommentsPanelChatWithAction[] = [];
-      for (const action of actions) {
-        const id = String((action as any)?.id || '').trim();
-        const label = String((action as any)?.label || '').trim();
-        const onTrigger = (action as any)?.onTrigger;
-        if (!id || !label || typeof onTrigger !== 'function') continue;
-        mapped.push({
-          id,
-          label,
-          disabled: Boolean((action as any)?.disabled),
-          onTrigger: () => onTrigger(),
-        });
-      }
-      return mapped;
-    }, [appCommentChatWithOpenPort, detail, selectedConversation, showCommentsSidebar]);
-
-    const resolveCommentsSidebarSingleChatWithLabel = useCallback(async (): Promise<string | null> => {
-      return resolveSingleEnabledChatWithActionLabel();
-    }, []);
 
     useEffect(() => {
       if (!showSettingsSheet) return;
@@ -654,9 +498,6 @@ export default function AppShell() {
                         subscribeCommentsLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
                         onCommentsLocatorSurfaceRootsChange={setCommentsLocatorSurfaceRoots}
                         narrowCommentsOpenSource="app"
-                        resolveCommentsSidebarChatWithActions={resolveCommentsSidebarChatWithActions}
-                        resolveCommentsSidebarSingleChatWithLabel={resolveCommentsSidebarSingleChatWithLabel}
-                        commentsSidebarCommentChatWith={commentsSidebarCommentChatWithConfig}
                       />
                     }
                   />
@@ -746,9 +587,6 @@ export default function AppShell() {
                     containerClassName="tw-h-full tw-min-h-0"
                     getLocatorSurfaceRoots={getCommentsLocatorSurfaceRoots}
                     subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
-                    resolveChatWithActions={resolveCommentsSidebarChatWithActions}
-                    resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
-                    commentChatWith={commentsSidebarCommentChatWithConfig}
                   />
                 </div>
               ) : null}

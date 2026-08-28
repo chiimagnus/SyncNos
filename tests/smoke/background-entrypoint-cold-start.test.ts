@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   registerUiMessageHandlers: vi.fn(),
   registerArticleCommentsHandlers: vi.fn(),
   registerItemMentionHandlers: vi.fn(),
-  registerChatWithBackgroundHandlers: vi.fn(),
   registerNotionSettingsHandlers: vi.fn(),
   registerObsidianSettingsHandlers: vi.fn(),
   registerFeishuSettingsHandlers: vi.fn(),
@@ -52,9 +51,6 @@ vi.mock('@services/comments/background/handlers', () => ({
 }));
 vi.mock('@services/integrations/item-mention/background-handlers', () => ({
   registerItemMentionHandlers: mocks.registerItemMentionHandlers,
-}));
-vi.mock('@services/integrations/chatwith/chatwith-background-handlers', () => ({
-  registerChatWithBackgroundHandlers: mocks.registerChatWithBackgroundHandlers,
 }));
 vi.mock('@services/sync/notion/settings-background-handlers', () => ({
   registerNotionSettingsHandlers: mocks.registerNotionSettingsHandlers,

@@ -1,8 +1,5 @@
-import type { ReactNode } from 'react';
-
 type CommentsSidebarHeaderProps = {
   title: string;
-  actions?: ReactNode;
   showCollapseButton: boolean;
   collapseLabel: string;
   onCollapse: () => void;
@@ -10,7 +7,6 @@ type CommentsSidebarHeaderProps = {
 
 export function CommentsSidebarHeader({
   title,
-  actions,
   showCollapseButton,
   collapseLabel,
   onCollapse,
@@ -19,7 +15,6 @@ export function CommentsSidebarHeader({
     <header className="webclipper-inpage-comments-panel__header">
       <h2 className="webclipper-inpage-comments-panel__header-title">{title}</h2>
       <div className="webclipper-inpage-comments-panel__header-actions">
-        {actions}
         {showCollapseButton ? (
           <button
             type="button"

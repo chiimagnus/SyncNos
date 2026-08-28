@@ -26,8 +26,6 @@ type ThreadedCommentsPanelReactBridgeProps = {
   surfaceBg?: string;
   showHeader: boolean;
   showCollapseButton: boolean;
-  chatWith: MountOptions['chatWith'];
-  commentChatWith: MountOptions['commentChatWith'];
   onRequestClose: () => void;
   locateThreadRoot?: (rootId: number) => Promise<ThreadLocateResult>;
   onActiveRootChange?: (rootId: number | null) => void;
@@ -44,7 +42,6 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
     surfaceBg: props.surfaceBg,
     showHeader: props.showHeader,
     showCollapseButton: props.showCollapseButton,
-    chatWith: props.chatWith || null,
     snapshot,
     actions: props.actions,
     onRequestClose: props.onRequestClose,
@@ -52,7 +49,6 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
     locateThreadRoot: props.locateThreadRoot,
     onActiveRootChange: props.onActiveRootChange,
     onLocateFailed: props.onLocateFailed,
-    commentChatWith: props.commentChatWith || null,
     showNotice: props.showNotice,
     onNoticeExpired: props.onNoticeExpired,
   });
@@ -227,12 +223,6 @@ export function mountThreadedCommentsPanel(
   const showHeader = options.showHeader !== false;
   const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
   const dockPage = options.dockPage === true && options.overlay === true;
-  const chatWithConfig =
-    options.chatWith && typeof options.chatWith.resolveActions === 'function' ? options.chatWith : null;
-  const commentChatWithConfig =
-    options.commentChatWith && typeof options.commentChatWith.resolveActions === 'function'
-      ? options.commentChatWith
-      : null;
   const surfaceBg = String(options.surfaceBg || '').trim();
   let disposed = false;
   const runReactUpdate =
@@ -367,8 +357,6 @@ export function mountThreadedCommentsPanel(
         surfaceBg: surfaceBg || undefined,
         showHeader,
         showCollapseButton,
-        chatWith: chatWithConfig,
-        commentChatWith: commentChatWithConfig,
         onRequestClose: () => panelController.actions.close(),
         locateThreadRoot: async (rootId) => {
           const root = panelStore

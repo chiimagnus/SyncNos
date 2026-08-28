@@ -1,4 +1,4 @@
-export type DiscussionMenuTarget = 'panel' | number | null;
+export type DiscussionMenuTarget = number | null;
 
 export type DiscussionFocusIntent =
   | { kind: 'root'; epoch: number }
@@ -124,15 +124,13 @@ export function discussionReducer(state: DiscussionState, action: DiscussionActi
       const replyDrafts = Object.fromEntries(
         Object.entries(state.replyDrafts).filter(([rootId]) => rootIds.has(Number(rootId))),
       );
-      const openMenu = typeof state.openMenu === 'number' && !commentIds.has(state.openMenu) ? null : state.openMenu;
+      const openMenu = state.openMenu != null && !commentIds.has(state.openMenu) ? null : state.openMenu;
       const confirmDelete =
         state.confirmDelete != null && !commentIds.has(state.confirmDelete) ? null : state.confirmDelete;
       const focusIntent =
         state.focusIntent?.kind === 'reply' && !rootIds.has(state.focusIntent.rootId)
           ? null
-          : state.focusIntent?.kind === 'menu' &&
-              typeof state.focusIntent.target === 'number' &&
-              !commentIds.has(state.focusIntent.target)
+          : state.focusIntent?.kind === 'menu' && !commentIds.has(state.focusIntent.target)
             ? null
             : state.focusIntent;
       const submit =
