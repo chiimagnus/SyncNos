@@ -146,6 +146,15 @@ describe('backup backup-utils', () => {
     expect(merged.lastCapturedAt).toBe(9);
   });
 
+  it('mergeConversationRecord leaves an absent notionPageId absent', () => {
+    const merged = mergeConversationRecord(
+      { source: 'chatgpt', conversationKey: 'c1', title: 'Local', url: 'https://a', lastCapturedAt: 5 },
+      { source: 'chatgpt', conversationKey: 'c1', title: 'Backup', url: 'https://b', lastCapturedAt: 9 },
+    );
+
+    expect(merged).not.toHaveProperty('notionPageId');
+  });
+
   it('compares backup values with stable object keys, ordered arrays, and real timestamps', () => {
     expect(
       areBackupValuesEqual(

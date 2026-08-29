@@ -1105,6 +1105,61 @@ describe('backup service', () => {
     expect(changed.messagesUpdated).toBe(1);
   });
 
+  it('skips equivalent Legacy mappings without losing conversation mirrors', async () => {
+    const doc = {
+      schemaVersion: 1,
+      stores: {
+        conversations: [
+          {
+            id: 99,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            conversationKey: 'legacy-mapping-noop',
+            title: 'Stable',
+            url: 'https://chatgpt.com/c/legacy-mapping-noop',
+            warningFlags: [],
+            lastCapturedAt: 10,
+          },
+        ],
+        messages: [],
+        sync_mappings: [
+          {
+            id: 500,
+            source: 'chatgpt',
+            conversationKey: 'legacy-mapping-noop',
+            notionPageId: 'page-stable',
+            notionPageUrl: 'https://notion.so/page-stable',
+            notionWorkspaceSlug: 'workspace',
+            lastSyncedAt: 10,
+          },
+        ],
+      },
+      storageLocal: {},
+    };
+
+    const first = await importBackupLegacyJsonMerge(doc);
+    expect(first.mappingsAdded).toBe(1);
+
+    const repeated = await importBackupLegacyJsonMerge(doc);
+    expect(repeated.mappingsAdded).toBe(0);
+    expect(repeated.mappingsUpdated).toBe(0);
+
+    const db = await openDb();
+    const verifyTx = db.transaction(['conversations'], 'readonly');
+    const conversation = await reqToPromise<any>(verifyTx.objectStore('conversations').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      verifyTx.oncomplete = () => resolve();
+      verifyTx.onerror = () => reject(verifyTx.error);
+      verifyTx.onabort = () => reject(verifyTx.error);
+    });
+    expect(conversation).toHaveLength(1);
+    expect(conversation[0]).toMatchObject({
+      notionPageId: 'page-stable',
+      notionPageUrl: 'https://notion.so/page-stable',
+      notionWorkspaceSlug: 'workspace',
+    });
+  });
+
   it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

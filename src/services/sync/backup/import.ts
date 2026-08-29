@@ -147,24 +147,22 @@ const CONVERSATION_MAPPING_MIRROR_FIELDS = [
   'feishuDocId',
 ] as const;
 
-async function upsertImportedSyncMappings(input: {
-  db: IDBDatabase;
+async function applyImportedSyncMappings(input: {
+  stores: { sync_mappings: IDBObjectStore; conversations: IDBObjectStore };
   mappings: AnyRecord[];
   stats: ImportStats;
-  stage: string;
-  bump: (delta: number, stage: string) => void;
-}): Promise<void> {
-  const { t, stores } = tx(input.db, ['sync_mappings', 'conversations'], 'readwrite');
-  const mappingIndex = stores.sync_mappings.index('by_source_conversationKey');
-  const conversationIndex = stores.conversations.index('by_source_conversationKey');
+}): Promise<{ processed: number; syncMappingsChanged: boolean; conversationsChanged: boolean }> {
+  const mappingIndex = input.stores.sync_mappings.index('by_source_conversationKey');
+  const conversationIndex = input.stores.conversations.index('by_source_conversationKey');
+  let processed = 0;
+  let syncMappingsChanged = false;
+  let conversationsChanged = false;
 
   for (const incoming of input.mappings) {
+    processed += 1;
     const source = safeString(incoming?.source);
     const conversationKey = safeString(incoming?.conversationKey);
-    if (!source || !conversationKey) {
-      input.bump(1, input.stage);
-      continue;
-    }
+    if (!source || !conversationKey) continue;
 
     const existing = (await reqToPromise(mappingIndex.get([source, conversationKey]) as any)) as AnyRecord;
     const merged = mergeSyncMappingForImport(existing, incoming) as AnyRecord;
@@ -173,12 +171,16 @@ async function upsertImportedSyncMappings(input: {
 
     if (existing?.id) {
       merged.id = existing.id;
-      await reqToPromise(stores.sync_mappings.put(merged as any));
-      input.stats.mappingsUpdated += 1;
+      if (!areBackupValuesEqual(merged, existing)) {
+        await reqToPromise(input.stores.sync_mappings.put(merged as any));
+        input.stats.mappingsUpdated += 1;
+        syncMappingsChanged = true;
+      }
     } else {
       delete merged.id;
-      await reqToPromise(stores.sync_mappings.add(merged as any));
+      await reqToPromise(input.stores.sync_mappings.add(merged as any));
       input.stats.mappingsAdded += 1;
+      syncMappingsChanged = true;
     }
 
     const conversation = (await reqToPromise(conversationIndex.get([source, conversationKey]) as any)) as AnyRecord;
@@ -190,13 +192,14 @@ async function upsertImportedSyncMappings(input: {
         conversation[field] = value;
         changed = true;
       }
-      if (changed) await reqToPromise(stores.conversations.put(conversation));
+      if (changed) {
+        await reqToPromise(input.stores.conversations.put(conversation));
+        conversationsChanged = true;
+      }
     }
-
-    input.bump(1, input.stage);
   }
 
-  await txDone(t);
+  return { processed, syncMappingsChanged, conversationsChanged };
 }
 
 export async function importBackupLegacyJsonMerge(
@@ -345,13 +348,20 @@ export async function importBackupLegacyJsonMerge(
 
   progress.stage = 'mappings';
   report();
-  await upsertImportedSyncMappings({
-    db,
-    mappings: backupMappings,
-    stats,
-    stage: 'mappings',
-    bump,
-  });
+  const mappingResult = await runTrackedTransaction(
+    { db, stores: ['sync_mappings', 'conversations'], revisionScopes: ['sync_mappings', 'conversations'] },
+    async ({ stores: s, markChanged }) => {
+      const result = await applyImportedSyncMappings({
+        stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
+        mappings: backupMappings,
+        stats,
+      });
+      if (result.syncMappingsChanged) markChanged('sync_mappings');
+      if (result.conversationsChanged) markChanged('conversations');
+      return result;
+    },
+  );
+  bump(mappingResult.processed, 'mappings');
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'settings';
@@ -894,13 +904,17 @@ export async function importBackupZipV2Merge(
 
   progress.stage = 'Mappings';
   report();
-  await upsertImportedSyncMappings({
-    db,
-    mappings: incomingMappings,
-    stats,
-    stage: 'Mappings',
-    bump,
-  });
+  {
+    const { t, stores: s } = tx(db, ['sync_mappings', 'conversations'], 'readwrite');
+    const mappingResult = await applyImportedSyncMappings({
+      stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
+      mappings: incomingMappings,
+      stats,
+    });
+    await txDone(t);
+    bump(mappingResult.processed, 'Mappings');
+    report();
+  }
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'Settings';

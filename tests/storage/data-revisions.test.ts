@@ -685,6 +685,61 @@ describe('data revision storage', () => {
     expect(await readDataRevision('messages')).toBe(2);
   });
 
+  it('tracks Legacy mapping and mirror mutations independently', async () => {
+    const conversation = {
+      id: 99,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'legacy-mapping-revision',
+      title: 'Legacy',
+      url: 'https://chatgpt.com/c/legacy-mapping-revision',
+      lastCapturedAt: 10,
+    };
+    const mapping = {
+      id: 500,
+      source: 'chatgpt',
+      conversationKey: 'legacy-mapping-revision',
+      notionPageId: 'page-legacy',
+      notionPageUrl: 'https://notion.so/page-legacy',
+      notionWorkspaceSlug: 'workspace',
+      lastSyncedAt: 10,
+    };
+    const buildBackup = (mappings: unknown[]) => ({
+      schemaVersion: 1,
+      stores: { conversations: [conversation], messages: [], sync_mappings: mappings },
+      storageLocal: {},
+    });
+
+    await importBackupLegacyJsonMerge(buildBackup([]));
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+
+    const first = await importBackupLegacyJsonMerge(buildBackup([mapping]));
+    expect(first.mappingsAdded).toBe(1);
+    expect(await readDataRevision('conversations')).toBe(2);
+    expect(await readDataRevision('sync_mappings')).toBe(1);
+
+    const repeated = await importBackupLegacyJsonMerge(buildBackup([mapping]));
+    expect(repeated.mappingsAdded).toBe(0);
+    expect(repeated.mappingsUpdated).toBe(0);
+    expect(await readDataRevision('conversations')).toBe(2);
+    expect(await readDataRevision('sync_mappings')).toBe(1);
+
+    const db = await openDb();
+    const repairTx = db.transaction(['conversations'], 'readwrite');
+    const conversationStore = repairTx.objectStore('conversations');
+    const persisted = await requestResult<any>(conversationStore.getAll());
+    delete persisted[0].notionPageId;
+    await requestResult(conversationStore.put(persisted[0]));
+    await txDone(repairTx);
+
+    const repaired = await importBackupLegacyJsonMerge(buildBackup([mapping]));
+    expect(repaired.mappingsAdded).toBe(0);
+    expect(repaired.mappingsUpdated).toBe(0);
+    expect(await readDataRevision('conversations')).toBe(3);
+    expect(await readDataRevision('sync_mappings')).toBe(1);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 

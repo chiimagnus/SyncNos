@@ -115,7 +115,9 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
   next.warningFlags = mergeWarningFlags(a.warningFlags, b.warningFlags);
 
   // notionPageId: never overwrite a non-empty local mapping.
-  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
+  const notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
+  if (notionPageId) next.notionPageId = notionPageId;
+  else delete next.notionPageId;
 
   const aCaptured = Number(a.lastCapturedAt) || 0;
   const bCaptured = Number(b.lastCapturedAt) || 0;
