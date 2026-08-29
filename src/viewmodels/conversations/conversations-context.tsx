@@ -28,9 +28,11 @@ import { backfillConversationImages } from '@services/conversations/client/repo'
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import {
+  requestDataRevisionRetry,
   subscribeDataRevisionChanges,
   whenDataRevisionObserverReady,
 } from '@services/data-revisions/observer';
+import type { DataRevisionScope } from '@services/data-revisions/client';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
 import { storageOnChanged } from '@services/shared/storage';
@@ -50,6 +52,7 @@ const LIST_BOOTSTRAP_LIMIT = 100;
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 const EMPTY_LIST_SUMMARY: ConversationListSummary = { totalCount: 0, todayCount: 0 };
 const EMPTY_LIST_FACETS: ConversationListFacets = { sources: [], sites: [] };
+const LIST_REVISION_SCOPES: readonly DataRevisionScope[] = ['conversations', 'article_comments'];
 
 function stripAngleBrackets(url: string): string {
   const text = String(url || '').trim();
@@ -284,6 +287,10 @@ function normalizeConversationListFacets(input: unknown): ConversationListFacets
   return { sources, sites };
 }
 
+function listFilterScopeKey(sourceKey: string, siteKey: string): string {
+  return `${sourceKey}::${siteKey}`;
+}
+
 function toOpenTargetFromConversation(
   conversation: Conversation | null | undefined,
 ): ConversationListOpenTarget | null {
@@ -465,7 +472,7 @@ export function ConversationsProvider({
   const pendingRevisionScopesRef = useRef(new Set<string>());
   const providerGenerationRef = useRef(0);
   const flushPendingRevisionListRef = useRef<() => void>(() => {});
-  const refreshListRef = useRef<() => Promise<void>>(async () => {});
+  const refreshListRef = useRef<(retryScopes?: readonly DataRevisionScope[]) => Promise<void>>(async () => {});
   const openConversationExternalByLocRef = useRef<(input: { source: string; conversationKey: string }) => Promise<void>>(
     async () => {},
   );
@@ -500,6 +507,7 @@ export function ConversationsProvider({
   const [pendingListLocateId, setPendingListLocateId] = useState<number | null>(null);
   const pendingListLocateIdRef = useRef<number | null>(null);
   const listFilterScopeRef = useRef<string | null>(null);
+  const listCommittedFilterScopeRef = useRef<string | null>(null);
 
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -673,19 +681,28 @@ export function ConversationsProvider({
     [applyOpenTarget, items],
   );
 
-  const refreshList = useCallback(async () => {
+  const refreshList = useCallback(async (retryScopes: readonly DataRevisionScope[] = LIST_REVISION_SCOPES) => {
     const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
     const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
     const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
+    const scope = listFilterScopeKey(sourceKey, siteKey);
+    const scopedRetries = retryScopes.filter((retryScope) => LIST_REVISION_SCOPES.includes(retryScope));
 
     const requestSeq = listRequestSeqRef.current + 1;
     listRequestSeqRef.current = requestSeq;
 
+    if (listCommittedFilterScopeRef.current !== scope) {
+      listCommittedFilterScopeRef.current = scope;
+      setItems([]);
+      setListCursor(null);
+      setListHasMore(false);
+      setListSummary(EMPTY_LIST_SUMMARY);
+      setListFacets(EMPTY_LIST_FACETS);
+      setSelectedIds([]);
+    }
     setLoadingInitialList(true);
     setLoadingMoreList(false);
     setListError(null);
-    setListCursor(null);
-    setListHasMore(false);
     try {
       const page = await getConversationListBootstrap(
         { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
@@ -694,6 +711,7 @@ export function ConversationsProvider({
       if (requestSeq !== listRequestSeqRef.current) return;
 
       const list = Array.isArray(page?.items) ? page.items : [];
+      listCommittedFilterScopeRef.current = scope;
       setItems(list);
       setListCursor(page?.cursor ?? null);
       setListHasMore(Boolean(page?.hasMore));
@@ -735,10 +753,7 @@ export function ConversationsProvider({
     } catch (e) {
       if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
-      setListCursor(null);
-      setListHasMore(false);
-      setListSummary(EMPTY_LIST_SUMMARY);
-      setListFacets(EMPTY_LIST_FACETS);
+      requestDataRevisionRetry(scopedRetries.length ? scopedRetries : LIST_REVISION_SCOPES);
     } finally {
       if (requestSeq === listRequestSeqRef.current) {
         setLoadingInitialList(false);
@@ -779,6 +794,7 @@ export function ConversationsProvider({
     } catch (e) {
       if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+      requestDataRevisionRetry(LIST_REVISION_SCOPES);
     } finally {
       if (requestSeq === listRequestSeqRef.current) {
         setLoadingMoreList(false);
@@ -852,11 +868,14 @@ export function ConversationsProvider({
       if (!revisionReadinessSettledRef.current || !initialListSettledRef.current || revisionRefreshInFlight) return;
       if (!pendingListRefreshRef.current && !pendingRevisionScopesRef.current.size) return;
 
+      const retryScopes = pendingRevisionScopesRef.current.size
+        ? LIST_REVISION_SCOPES.filter((scope) => pendingRevisionScopesRef.current.has(scope))
+        : LIST_REVISION_SCOPES;
       pendingListRefreshRef.current = false;
       pendingRevisionScopesRef.current.clear();
       revisionRefreshInFlight = true;
       void refreshListRef
-        .current()
+        .current(retryScopes)
         .catch(() => {})
         .finally(() => {
           if (disposed || providerGenerationRef.current !== generation) return;

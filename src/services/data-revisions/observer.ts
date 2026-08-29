@@ -9,6 +9,7 @@ import { DATA_REVISION_WAKE_STORAGE_KEY, subscribeDataRevisionWake } from '@serv
 
 export const DATA_REVISION_READINESS_TIMEOUT_MS = 2_000;
 export const DATA_REVISION_SAFETY_RECONCILE_MS = 30_000;
+export const DATA_REVISION_RETRY_RECONCILE_MS = 5_000;
 
 export type DataRevisionObserverReadiness = { baselineAvailable: boolean };
 export type DataRevisionChangeListener = (scopes: readonly DataRevisionScope[]) => void;
@@ -25,6 +26,7 @@ type DataRevisionObserverDeps = {
   clearInterval?: typeof globalThis.clearInterval;
   readinessTimeoutMs?: number;
   safetyReconcileMs?: number;
+  retryReconcileMs?: number;
 };
 
 type ObserverEpoch = {
@@ -38,6 +40,8 @@ type ObserverEpoch = {
   ready: Promise<DataRevisionObserverReadiness>;
   readinessTimer: ReturnType<typeof setTimeout> | null;
   safetyTimer: ReturnType<typeof setInterval> | null;
+  retryTimer: ReturnType<typeof setTimeout> | null;
+  retryScopes: Set<DataRevisionScope>;
   disposeListeners: Array<() => void>;
 };
 
@@ -47,6 +51,11 @@ function changedScopes(previous: DataRevisionSnapshot, next: DataRevisionSnapsho
 
 function allScopes(): DataRevisionScope[] {
   return [...DATA_REVISION_SCOPES];
+}
+
+function orderedScopes(scopes: Iterable<DataRevisionScope>): DataRevisionScope[] {
+  const wanted = new Set(scopes);
+  return DATA_REVISION_SCOPES.filter((scope) => wanted.has(scope));
 }
 
 function safeDelay(value: unknown, fallback: number): number {
@@ -66,6 +75,7 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
   const clearSafetyTimer = deps.clearInterval || globalThis.clearInterval.bind(globalThis);
   const readinessTimeoutMs = safeDelay(deps.readinessTimeoutMs, DATA_REVISION_READINESS_TIMEOUT_MS);
   const safetyReconcileMs = safeDelay(deps.safetyReconcileMs, DATA_REVISION_SAFETY_RECONCILE_MS);
+  const retryReconcileMs = safeDelay(deps.retryReconcileMs, DATA_REVISION_RETRY_RECONCILE_MS);
 
   const listeners = new Set<{ listener: DataRevisionChangeListener }>();
   let activeEpoch: ObserverEpoch | null = null;
@@ -91,6 +101,19 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
     }
   };
 
+  const clearRetryReconcile = (epoch: ObserverEpoch) => {
+    if (epoch.retryTimer == null) return;
+    clearTimer(epoch.retryTimer);
+    epoch.retryTimer = null;
+  };
+
+  const takeRetryScopes = (epoch: ObserverEpoch): DataRevisionScope[] => {
+    const captured = orderedScopes(epoch.retryScopes);
+    epoch.retryScopes.clear();
+    clearRetryReconcile(epoch);
+    return captured;
+  };
+
   const reconcile = (epoch: ObserverEpoch) => {
     if (!isActiveEpoch(epoch)) return;
     if (epoch.inFlight) {
@@ -109,14 +132,17 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
 
           const previous = epoch.checkpoint;
           const catchUp = epoch.baselineUncertain;
+          const retries = takeRetryScopes(epoch);
           epoch.checkpoint = snapshot;
           if (isBaseline) settleReadiness(epoch, true);
+          const notificationScopes = new Set<DataRevisionScope>(retries);
           if (catchUp) {
             epoch.baselineUncertain = false;
-            notify(allScopes());
+            for (const scope of allScopes()) notificationScopes.add(scope);
           } else if (previous) {
-            notify(changedScopes(previous, snapshot));
+            for (const scope of changedScopes(previous, snapshot)) notificationScopes.add(scope);
           }
+          notify(orderedScopes(notificationScopes));
         },
         () => {
           if (!isActiveEpoch(epoch)) return;
@@ -129,9 +155,12 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
       .finally(() => {
         if (!isActiveEpoch(epoch)) return;
         epoch.inFlight = false;
-        if (!epoch.trailing) return;
-        epoch.trailing = false;
-        reconcile(epoch);
+        if (epoch.trailing) {
+          epoch.trailing = false;
+          reconcile(epoch);
+        } else {
+          scheduleRetryReconcile(epoch);
+        }
       });
   };
 
@@ -146,6 +175,16 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
     return !documentLike || documentLike.visibilityState !== 'hidden';
   };
 
+  const scheduleRetryReconcile = (epoch: ObserverEpoch) => {
+    if (!isActiveEpoch(epoch) || !listeners.size || !isVisible() || !epoch.retryScopes.size || epoch.retryTimer != null) {
+      return;
+    }
+    epoch.retryTimer = setTimer(() => {
+      epoch.retryTimer = null;
+      reconcile(epoch);
+    }, retryReconcileMs);
+  };
+
   const startSafetyReconcile = (epoch: ObserverEpoch) => {
     if (!isActiveEpoch(epoch) || !isVisible() || epoch.safetyTimer != null) return;
     epoch.safetyTimer = setSafetyTimer(() => reconcile(epoch), safetyReconcileMs);
@@ -157,6 +196,8 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
     if (epoch.readinessTimer != null) clearTimer(epoch.readinessTimer);
     epoch.readinessTimer = null;
     clearSafetyReconcile(epoch);
+    clearRetryReconcile(epoch);
+    epoch.retryScopes.clear();
     for (const dispose of epoch.disposeListeners.splice(0)) {
       try {
         dispose();
@@ -177,6 +218,8 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
       ready: Promise.resolve({ baselineAvailable: false }),
       readinessTimer: null,
       safetyTimer: null,
+      retryTimer: null,
+      retryScopes: new Set(),
       disposeListeners: [],
     };
     epoch.ready = new Promise<DataRevisionObserverReadiness>((resolve) => {
@@ -202,6 +245,7 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
         reconcile(epoch);
       } else {
         clearSafetyReconcile(epoch);
+        clearRetryReconcile(epoch);
       }
     };
     const onLifecycleSignal = () => reconcile(epoch);
@@ -248,6 +292,13 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
     requestReconcile(): void {
       if (activeEpoch) reconcile(activeEpoch);
     },
+    requestRetry(scopes: readonly DataRevisionScope[]): void {
+      if (!activeEpoch || !listeners.size || !Array.isArray(scopes)) return;
+      for (const scope of scopes) {
+        if (DATA_REVISION_SCOPES.includes(scope)) activeEpoch.retryScopes.add(scope);
+      }
+      scheduleRetryReconcile(activeEpoch);
+    },
   };
 }
 
@@ -256,3 +307,4 @@ const defaultObserver = createDataRevisionObserver();
 export const subscribeDataRevisionChanges = defaultObserver.subscribe;
 export const whenDataRevisionObserverReady = defaultObserver.whenReady;
 export const requestDataRevisionReconcile = defaultObserver.requestReconcile;
+export const requestDataRevisionRetry = defaultObserver.requestRetry;

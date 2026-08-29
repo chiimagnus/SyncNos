@@ -18,6 +18,7 @@ const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
 const subscribeDataRevisionChanges = vi.fn();
 const whenDataRevisionObserverReady = vi.fn();
+const requestDataRevisionRetry = vi.fn();
 let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
 let portMessageListener: ((message: any) => void) | null = null;
 let portDisconnectListener: (() => void) | null = null;
@@ -70,6 +71,7 @@ vi.mock('@services/integrations/detail-header-actions', () => ({
 vi.mock('@services/data-revisions/observer', () => ({
   subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => subscribeDataRevisionChanges(listener),
   whenDataRevisionObserverReady: () => whenDataRevisionObserverReady(),
+  requestDataRevisionRetry: (scopes: readonly string[]) => requestDataRevisionRetry(scopes),
 }));
 
 vi.mock('@services/shared/storage', () => ({
@@ -209,6 +211,7 @@ describe('ConversationsProvider pagination state', () => {
     subscribeDataRevisionChanges.mockImplementation(() => () => {});
     whenDataRevisionObserverReady.mockReset();
     whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    requestDataRevisionRetry.mockReset();
     storageChangeListener = null;
     portMessageListener = null;
     portDisconnectListener = null;
@@ -307,6 +310,33 @@ describe('ConversationsProvider pagination state', () => {
 
     expect(String(latestState.listSourceFilterKey)).toBe('chatgpt');
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([201]);
+  });
+
+  it('keeps the committed page bundle when loading more fails', async () => {
+    const firstPage = {
+      ...makePage(
+        [makeConversation(1, 'chatgpt', 'conv-1')],
+        { sources: [{ key: 'chatgpt', label: 'chatgpt', count: 2 }] },
+      ),
+      cursor: { lastCapturedAt: 100, id: 1 },
+      hasMore: true,
+      summary: { totalCount: 2, todayCount: 1 },
+    };
+    getConversationListBootstrap.mockResolvedValue(firstPage);
+    getConversationListPage.mockRejectedValue(new Error('page read failed'));
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
+    expect(latestState.listCursor).toEqual({ lastCapturedAt: 100, id: 1 });
+    expect(latestState.listHasMore).toBe(true);
+    expect(latestState.listSummary).toEqual({ totalCount: 2, todayCount: 1 });
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations', 'article_comments']);
   });
 
   it('supports open by source+key even when target is not in loaded items', async () => {

@@ -15,6 +15,7 @@ const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
 const subscribeDataRevisionChanges = vi.fn();
 const whenDataRevisionObserverReady = vi.fn();
+const requestDataRevisionRetry = vi.fn();
 let revisionListener: ((scopes: readonly string[]) => void) | null = null;
 let revisionUnsubscribe = vi.fn();
 
@@ -33,6 +34,7 @@ vi.mock('@services/conversations/client/repo', () => ({
 vi.mock('@services/data-revisions/observer', () => ({
   subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => subscribeDataRevisionChanges(listener),
   whenDataRevisionObserverReady: () => whenDataRevisionObserverReady(),
+  requestDataRevisionRetry: (scopes: readonly string[]) => requestDataRevisionRetry(scopes),
 }));
 
 vi.mock('@viewmodels/conversations/useConversationSyncFeedback', () => ({
@@ -102,13 +104,14 @@ function makeConversation(id: number, source = 'chatgpt') {
   };
 }
 
-function makePage(items: any[]) {
+function makePage(items: any[], overrides: Record<string, unknown> = {}) {
   return {
     items,
     cursor: null,
     hasMore: false,
     summary: { totalCount: items.length, todayCount: items.length },
     facets: { sources: [], sites: [] },
+    ...overrides,
   };
 }
 
@@ -157,6 +160,7 @@ describe('ConversationsProvider data revisions', () => {
       return revisionUnsubscribe;
     });
     whenDataRevisionObserverReady.mockReset();
+    requestDataRevisionRetry.mockReset();
     getConversationListBootstrap.mockReset();
     getConversationListPage.mockReset();
     findConversationBySourceAndKey.mockReset();
@@ -262,6 +266,98 @@ describe('ConversationsProvider data revisions', () => {
       expect.objectContaining({ sourceKey: 'web' }),
     );
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([3]);
+  });
+
+  it('keeps the committed list bundle on a same-scope revision read failure and replays the next revision', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap
+      .mockResolvedValueOnce(
+        makePage([makeConversation(1)], {
+          cursor: { lastCapturedAt: 10, id: 1 },
+          hasMore: true,
+          summary: { totalCount: 7, todayCount: 3 },
+          facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] },
+        }),
+      )
+      .mockRejectedValueOnce(new Error('temporary background failure'))
+      .mockResolvedValueOnce(makePage([makeConversation(2)], { summary: { totalCount: 8, todayCount: 4 } }));
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => item.id)).toEqual([1]);
+    expect(latestState.listCursor).toEqual({ lastCapturedAt: 10, id: 1 });
+    expect(latestState.listHasMore).toBe(true);
+    expect(latestState.listSummary).toEqual({ totalCount: 7, todayCount: 3 });
+    expect(latestState.listFacets).toEqual({ sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] });
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => item.id)).toEqual([2]);
+    expect(latestState.listSummary).toEqual({ totalCount: 8, todayCount: 4 });
+  });
+
+  it('clears the entire old bundle before a new filter read fails', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockImplementation((query: any) => {
+      if (String(query?.sourceKey || 'all') === 'web') return Promise.reject(new Error('web read failed'));
+      return Promise.resolve(
+        makePage([makeConversation(1)], {
+          cursor: { lastCapturedAt: 10, id: 1 },
+          hasMore: true,
+          summary: { totalCount: 7, todayCount: 3 },
+          facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] },
+        }),
+      );
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      latestState.setListSourceFilterKeyPersistent('web');
+      await flushMicrotasks();
+    });
+
+    expect(latestState.items).toEqual([]);
+    expect(latestState.listCursor).toBeNull();
+    expect(latestState.listHasMore).toBe(false);
+    expect(latestState.listSummary).toEqual({ totalCount: 0, todayCount: 0 });
+    expect(latestState.listFacets).toEqual({ sources: [], sites: [] });
+    expect(latestState.listError).toBe('web read failed');
+  });
+
+  it('does not register a retry for a stale rejected list request', async () => {
+    const readiness = deferred<{ baselineAvailable: boolean }>();
+    const firstPage = deferred<any>();
+    whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
+    getConversationListBootstrap.mockImplementationOnce(() => firstPage.promise).mockResolvedValueOnce(makePage([makeConversation(2)]));
+
+    await renderProvider();
+    await act(async () => {
+      readiness.resolve({ baselineAvailable: true });
+      await flushMicrotasks();
+    });
+    expect(getConversationListBootstrap).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      firstPage.reject(new Error('stale failure'));
+      await flushMicrotasks();
+    });
+
+    expect(requestDataRevisionRetry).not.toHaveBeenCalled();
+    expect((latestState.items as any[]).map((item) => item.id)).toEqual([2]);
   });
 
   it('unsubscribes the stable observer when the Provider unmounts', async () => {

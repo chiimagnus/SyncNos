@@ -324,4 +324,101 @@ describe('data revision observer', () => {
     stop();
     expect(storageListener()).toBeNull();
   });
+
+  it('replays requested scopes after an equal authoritative snapshot and coalesces retries', async () => {
+    vi.useFakeTimers();
+    const readSnapshot = vi.fn().mockResolvedValue(snapshot());
+    const { observer } = createObserver(readSnapshot, { retryReconcileMs: 20 });
+    const listener = vi.fn();
+    const stop = observer.subscribe(listener);
+
+    await observer.whenReady();
+    await flushMicrotasks();
+    observer.requestRetry(['conversations']);
+    observer.requestRetry(['conversations']);
+    await vi.advanceTimersByTimeAsync(20);
+    await flushMicrotasks();
+
+    expect(readSnapshot).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenCalledWith(['conversations']);
+    stop();
+  });
+
+  it('defers a retry requested from a subscriber callback to the next snapshot', async () => {
+    vi.useFakeTimers();
+    const readSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce(snapshot({ conversations: 1 }))
+      .mockResolvedValueOnce(snapshot({ conversations: 1 }));
+    const { observer } = createObserver(readSnapshot, { retryReconcileMs: 20 });
+    const notifications: string[][] = [];
+    const stop = observer.subscribe((scopes) => {
+      notifications.push([...scopes]);
+      if (notifications.length === 1) observer.requestRetry(['article_comments']);
+    });
+
+    await observer.whenReady();
+    await flushMicrotasks();
+    observer.requestReconcile();
+    await flushMicrotasks();
+    expect(notifications).toEqual([['conversations']]);
+
+    await vi.advanceTimersByTimeAsync(20);
+    await flushMicrotasks();
+    expect(notifications).toEqual([['conversations'], ['article_comments']]);
+    stop();
+  });
+
+  it('retains retry scopes after a failed snapshot and retries them later', async () => {
+    vi.useFakeTimers();
+    const readSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockRejectedValueOnce(new Error('snapshot read failed'))
+      .mockResolvedValueOnce(snapshot());
+    const { observer } = createObserver(readSnapshot, { retryReconcileMs: 20 });
+    const listener = vi.fn();
+    const stop = observer.subscribe(listener);
+
+    await observer.whenReady();
+    await flushMicrotasks();
+    observer.requestRetry(['image_cache']);
+    await vi.advanceTimersByTimeAsync(20);
+    await flushMicrotasks();
+    expect(listener).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(20);
+    await flushMicrotasks();
+    expect(listener).toHaveBeenCalledWith(['image_cache']);
+    stop();
+  });
+
+  it('holds retries while hidden and cancels them after the final unsubscribe', async () => {
+    vi.useFakeTimers();
+    const documentLike = { ...createEventTarget(), visibilityState: 'hidden' };
+    const readSnapshot = vi.fn().mockResolvedValue(snapshot());
+    const { observer } = createObserver(readSnapshot, {
+      getDocument: () => documentLike as any,
+      retryReconcileMs: 20,
+    });
+    const listener = vi.fn();
+    const stop = observer.subscribe(listener);
+
+    await observer.whenReady();
+    await flushMicrotasks();
+    observer.requestRetry(['messages']);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(readSnapshot).toHaveBeenCalledTimes(1);
+
+    documentLike.visibilityState = 'visible';
+    documentLike.dispatch('visibilitychange');
+    await flushMicrotasks();
+    expect(listener).toHaveBeenCalledWith(['messages']);
+
+    observer.requestRetry(['messages']);
+    stop();
+    await vi.advanceTimersByTimeAsync(40);
+    expect(readSnapshot).toHaveBeenCalledTimes(2);
+  });
 });
