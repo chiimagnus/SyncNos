@@ -8,6 +8,7 @@ import { addArticleComment } from '@services/comments/data/storage';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
 import {
   clearGithubAuthState,
   getGithubAuthState,
@@ -24,6 +25,12 @@ import {
 } from '@services/sync/github/github-cleanup-outbox-store';
 import { commitGithubStagedOperations, createGithubBlob } from '@services/sync/github/github-git-transport';
 import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
+import { createGithubAutoSyncScheduler } from '@services/sync/auto-sync/github-auto-sync-scheduler';
+import {
+  GITHUB_AUTO_SYNC_DEBOUNCE_MS,
+  GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
+} from '@services/sync/auto-sync/auto-sync-keys';
+import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
 import { discoverGithubRepositories, preflightGithubRepository } from '@services/sync/github/github-repository-service';
 import { registerGithubSettingsHandlers } from '@services/sync/github/settings-background-handlers';
@@ -57,8 +64,15 @@ function txDone(transaction: IDBTransaction): Promise<void> {
 
 function mockChromeStorage(initial: Record<string, unknown> = {}) {
   const store: Record<string, unknown> = { ...initial };
+  let connectCalls = 0;
   return {
-    runtime: { lastError: null as any },
+    runtime: {
+      lastError: null as any,
+      connect() {
+        connectCalls += 1;
+        return {};
+      },
+    },
     storage: {
       local: {
         get(keys: string[] | string | null, callback: (result: Record<string, unknown>) => void) {
@@ -84,6 +98,7 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
       },
     },
     __store: store,
+    __connectCalls: () => connectCalls,
   };
 }
 
@@ -648,6 +663,7 @@ describe('GitHub Markdown production-chain integration', () => {
     const firstStatus = await waitForGithubSyncTerminalStatus(router);
     expect(firstStatus.data.job).toMatchObject({ status: 'done', okCount: 2, failCount: 0 });
     assertSecretFree(firstStatus);
+    expect(chromeMock.__connectCalls()).toBe(0);
     expect(fakeGithub.syncRefUpdates - refUpdatesBeforeFirstSync).toBe(1);
 
     const chatAfterFirst = await backgroundStorage.getSyncMappingByConversation(Number(chat.id));
@@ -665,6 +681,50 @@ describe('GitHub Markdown production-chain integration', () => {
     expect(fakeGithub.hasPath(firstAssetPaths[0]!)).toBe(true);
     expect(fakeGithub.readText(articlePath)).toContain('E2E owned comment');
     expect(fakeGithub.readText(chatPath)).not.toContain('syncnos-asset://');
+
+    chromeMock.__store[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    chromeMock.__store[syncProviderEnabledStorageKey('github')] = true;
+    await backgroundStorage.syncConversationMessages(Number(chat.id), [
+      {
+        messageKey: 'chat-1',
+        role: 'assistant',
+        contentText: 'Chat body updated by auto-sync',
+        contentMarkdown: 'Chat body updated by auto-sync\n\n![cached](syncnos-asset://1)',
+        sequence: 1,
+        updatedAt: 30,
+      },
+    ]);
+    const mappingRevisionBeforeAuto = await readDataRevision('sync_mappings');
+    const refUpdatesBeforeAuto = fakeGithub.syncRefUpdates;
+    let autoNow = 2_000_000;
+    const autoSync = createGithubAutoSyncScheduler(
+      {
+        getInstanceId: () => 'github-auto-integration-instance',
+        githubSyncOrchestrator: orchestrator,
+      },
+      {
+        now: () => autoNow,
+        storage: {
+          get: async (keys) => Object.fromEntries(keys.map((key) => [key, chromeMock.__store[key]])),
+          set: async (patch) => {
+            Object.assign(chromeMock.__store, patch);
+          },
+        },
+        alarms: {
+          isAvailable: () => true,
+          create: () => true,
+          clear: async () => true,
+        },
+      },
+    );
+    await autoSync.enqueue(Number(chat.id), 'integration-message-change');
+    autoNow += GITHUB_AUTO_SYNC_DEBOUNCE_MS;
+    await autoSync.flush();
+
+    expect(await readDataRevision('sync_mappings')).toBeGreaterThan(mappingRevisionBeforeAuto);
+    expect(fakeGithub.syncRefUpdates - refUpdatesBeforeAuto).toBe(1);
+    expect(fakeGithub.readText(chatPath)).toContain('Chat body updated by auto-sync');
+    expect(chromeMock.__connectCalls()).toBe(0);
 
     const commitsBeforeNoOp = fakeGithub.syncRefUpdates;
     const unchanged = await orchestrator.sync({
