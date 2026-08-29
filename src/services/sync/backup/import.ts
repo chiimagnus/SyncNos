@@ -893,17 +893,20 @@ export async function importBackupZipV2Merge(
 
   progress.stage = 'Mappings';
   report();
-  {
-    const { t, stores: s } = tx(db, ['sync_mappings', 'conversations'], 'readwrite');
-    const mappingResult = await applyImportedSyncMappings({
-      stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
-      mappings: incomingMappings,
-      stats,
-    });
-    await txDone(t);
-    bump(mappingResult.processed, 'Mappings');
-    report();
-  }
+  const mappingResult = await runTrackedTransaction(
+    { db, stores: ['sync_mappings', 'conversations'], revisionScopes: ['sync_mappings', 'conversations'] },
+    async ({ stores: s, markChanged }) => {
+      const result = await applyImportedSyncMappings({
+        stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
+        mappings: incomingMappings,
+        stats,
+      });
+      if (result.syncMappingsChanged) markChanged('sync_mappings');
+      if (result.conversationsChanged) markChanged('conversations');
+      return result;
+    },
+  );
+  reportCommittedStage(mappingResult.processed, 'Mappings');
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'Settings';
