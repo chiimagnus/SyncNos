@@ -359,6 +359,25 @@ describe('data revision storage', () => {
     await done;
   });
 
+  it('advances the messages revision only for actual message row mutations', async () => {
+    const { syncConversationMessages } = await import('@services/conversations/data/storage-idb');
+    const message = { messageKey: 'm1', role: 'user', contentText: 'stable', sequence: 1 };
+
+    await syncConversationMessages(42, [{ ...message, updatedAt: 10 }]);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    await syncConversationMessages(42, [{ ...message }]);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    await syncConversationMessages(42, [{ ...message, updatedAt: 11 }]);
+    expect(await readDataRevision('messages')).toBe(2);
+
+    await syncConversationMessages(42, []);
+    expect(await readDataRevision('messages')).toBe(3);
+    await syncConversationMessages(42, []);
+    expect(await readDataRevision('messages')).toBe(3);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 

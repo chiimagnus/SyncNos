@@ -257,6 +257,84 @@ describe('conversations storage-idb', () => {
     expect(after.map((m) => m.messageKey)).toEqual(['m1']);
   });
 
+  it('keeps equivalent message rows revision-stable when incoming timestamps are missing or invalid', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'message_timestamp_noop',
+      title: 'Timestamp no-op',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    const stableMessage = {
+      messageKey: 'm1',
+      role: 'user',
+      authorName: 'User',
+      contentText: 'same',
+      contentMarkdown: 'same',
+      sequence: 1,
+    };
+
+    await syncConversationMessages(id, [{ ...stableMessage, updatedAt: 100 }]);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    const db = await openDb();
+    const probeTx = db.transaction(['messages'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('messages')) as any;
+    const originalPut = prototype.put;
+    await txDone(probeTx);
+    prototype.put = function put(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'messages') throw new DOMException('equivalent message must not be put', 'DataError');
+      return originalPut.call(this, value, key);
+    };
+
+    try {
+      for (const updatedAt of [undefined, '100', Number.NaN, Number.POSITIVE_INFINITY]) {
+        const snapshotResult = await syncConversationMessages(id, [{ ...stableMessage, updatedAt }]);
+        expect(snapshotResult).toEqual({ upserted: 1, deleted: 0 });
+      }
+      const incrementalResult = await syncConversationMessages(
+        id,
+        [{ ...stableMessage }],
+        { mode: 'incremental', diff: { added: [], updated: ['m1'], removed: [] } },
+      );
+      expect(incrementalResult).toEqual({ upserted: 1, deleted: 0 });
+      const appendResult = await syncConversationMessages(
+        id,
+        [{ ...stableMessage }],
+        { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
+      );
+      expect(appendResult).toEqual({ upserted: 1, deleted: 0 });
+    } finally {
+      prototype.put = originalPut;
+    }
+
+    expect(await readDataRevision('messages')).toBe(1);
+    const preserved = await getMessagesByConversationId(id);
+    expect(preserved[0]?.updatedAt).toBe(100);
+
+    await syncConversationMessages(id, [{ ...stableMessage, updatedAt: 101 }]);
+    expect(await readDataRevision('messages')).toBe(2);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(101);
+  });
+
+  it('uses a current timestamp only when inserting a new message without a finite timestamp', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'message_timestamp_new',
+      title: 'Timestamp new',
+      lastCapturedAt: 1,
+    });
+    const before = Date.now();
+    await syncConversationMessages(Number(convo.id), [
+      { messageKey: 'm1', role: 'user', contentText: 'new', sequence: 1, updatedAt: 'invalid' },
+    ]);
+    const stored = await getMessagesByConversationId(Number(convo.id));
+    expect(Number(stored[0]?.updatedAt)).toBeGreaterThanOrEqual(before);
+    expect(Number(stored[0]?.updatedAt)).toBeLessThanOrEqual(Date.now());
+  });
+
   it('syncs messages incrementally without snapshot cleanup', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

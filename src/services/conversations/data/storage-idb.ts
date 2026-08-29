@@ -107,8 +107,28 @@ function conversationRecordsEquivalent(left: unknown, right: unknown): boolean {
   return storedValueEqual(leftRecord, rightRecord);
 }
 
-function normalizeMessageTimestamp(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : Date.now();
+type ResolvedMessageTimestamp = { present: false } | { present: true; value: unknown };
+
+function resolveMessageTimestamp(
+  existing: Record<string, unknown> | null | undefined,
+  incoming: unknown,
+  preserveExisting: boolean,
+): ResolvedMessageTimestamp {
+  const hasExistingTimestamp = !!existing && Object.prototype.hasOwnProperty.call(existing, 'updatedAt');
+  if (preserveExisting && existing) {
+    return hasExistingTimestamp ? { present: true, value: existing.updatedAt } : { present: false };
+  }
+  if (typeof incoming === 'number' && Number.isFinite(incoming)) return { present: true, value: incoming };
+  if (existing) return hasExistingTimestamp ? { present: true, value: existing.updatedAt } : { present: false };
+  return { present: true, value: Date.now() };
+}
+
+function messageRecordsEquivalent(left: unknown, right: unknown): boolean {
+  const leftRecord = { ...((left && typeof left === 'object' ? left : {}) as Record<string, unknown>) };
+  const rightRecord = { ...((right && typeof right === 'object' ? right : {}) as Record<string, unknown>) };
+  delete leftRecord.id;
+  delete rightRecord.id;
+  return storedValueEqual(leftRecord, rightRecord);
 }
 
 function normalizeListKey(value: unknown, fallback: string): string {
@@ -681,159 +701,159 @@ export async function syncConversationMessages(
   }
   const mode = requestedMode || 'snapshot';
   const db = await openDb();
-  const { t, stores } = tx(db, ['messages'], 'readwrite');
-  const idx = stores.messages.index('by_conversationId_messageKey');
 
-  const diff = options?.diff || null;
+  return runTrackedTransaction(
+    { db, stores: ['messages'], revisionScopes: ['messages'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.messages.index('by_conversationId_messageKey');
+      const diff = options?.diff || null;
+      const normalizeKeys = (value: unknown): string[] => {
+        if (!Array.isArray(value)) return [];
+        return value.map((x) => String(x || '').trim()).filter(Boolean);
+      };
 
-  const normalizeKeys = (value: unknown): string[] => {
-    if (!Array.isArray(value)) return [];
-    return value.map((x) => String(x || '').trim()).filter(Boolean);
-  };
+      if (mode !== 'snapshot') {
+        const byKey = new Map<string, any>();
+        for (const m of messages || []) {
+          const key = m && m.messageKey ? String(m.messageKey).trim() : '';
+          if (!key) continue;
+          byKey.set(key, m);
+        }
 
-  if (mode !== 'snapshot') {
-    const byKey = new Map<string, any>();
-    for (const m of messages || []) {
-      const key = m && m.messageKey ? String(m.messageKey).trim() : '';
-      if (!key) continue;
-      byKey.set(key, m);
-    }
+        const requestedKeys = Array.from(new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)]));
+        const requestedKeySet = new Set(requestedKeys);
+        const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
+        const hasEffectiveDiff =
+          !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
+        if (!hasEffectiveDiff) return { upserted: 0, deleted: 0 };
+        const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
 
-    const requestedKeys = Array.from(new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)]));
-    const requestedKeySet = new Set(requestedKeys);
-    const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
-    const hasEffectiveDiff =
-      !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
-    if (!hasEffectiveDiff) {
-      await txDone(t);
-      return { upserted: 0, deleted: 0 };
-    }
-    const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
+        const hasTailPolicy =
+          mode === 'append' && upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
+        let nextTailSequence = 0;
+        if (hasTailPolicy) {
+          const seqIdx = stores.messages.index('by_conversationId_sequence');
+          const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+          const lastCursor = await reqToPromise(seqIdx.openCursor(range, 'prev') as any);
+          const maxSequence = Number((lastCursor as any)?.value?.sequence);
+          nextTailSequence = Number.isFinite(maxSequence) ? maxSequence + 1 : 0;
+        }
 
-    const hasTailPolicy =
-      mode === 'append' && upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
-    let nextTailSequence = 0;
-    if (hasTailPolicy) {
+        let upserted = 0;
+        for (const key of upsertKeys) {
+          const m = byKey.get(key);
+          if (!m) continue;
+
+          const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+          const preserveSequence = mode === 'append' && m.captureSequencePolicy === 'preserve-existing-tail';
+          const sequence = preserveSequence
+            ? existing && Number.isFinite(existing.sequence)
+              ? existing.sequence
+              : nextTailSequence++
+            : Number.isFinite(m.sequence)
+              ? m.sequence
+              : 0;
+          const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
+          const mergePolicy: CaptureMessageMergePolicy =
+            rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
+              ? rawMergePolicy
+              : 'replace';
+          const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+          const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
+          const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
+          const preserveExistingMarkdown =
+            !!existing &&
+            (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
+            !!String(existing.contentMarkdown || '').trim();
+          const timestamp = resolveMessageTimestamp(existing, m.updatedAt, preserveExistingContent);
+          const baseRecord: Record<string, unknown> = {
+            conversationId,
+            messageKey: key,
+            role: m.role || 'assistant',
+            authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
+            contentText: preserveExistingContent ? existing.contentText || '' : m.contentText || '',
+            contentMarkdown: preserveExistingMarkdown ? existing.contentMarkdown || '' : incomingMarkdown,
+            sequence,
+            ...(timestamp.present ? { updatedAt: timestamp.value } : null),
+          };
+          const record: any = withOptionalId(existing && existing.id, baseRecord);
+          if (existing) {
+            if (!messageRecordsEquivalent(existing, record)) {
+              await reqToPromise(stores.messages.put(record));
+              markChanged('messages');
+            }
+          } else {
+            const id = await reqToPromise(stores.messages.add(record));
+            record.id = id as any;
+            markChanged('messages');
+          }
+          upserted += 1;
+        }
+
+        let deleted = 0;
+        for (const key of removedKeys) {
+          const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+          const id = Number(existing && existing.id);
+          if (!Number.isFinite(id) || id <= 0) continue;
+          await reqToPromise(stores.messages.delete(id));
+          markChanged('messages');
+          deleted += 1;
+        }
+
+        return { upserted, deleted };
+      }
+
+      const presentKeys = new Set<string>();
+      let upserted = 0;
+
+      for (const m of messages || []) {
+        if (!m || !m.messageKey) continue;
+        presentKeys.add(String(m.messageKey));
+
+        const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
+        const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+        const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
+        const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
+        const baseRecord: Record<string, unknown> = {
+          conversationId,
+          messageKey: m.messageKey,
+          role: m.role || 'assistant',
+          authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
+          contentText: m.contentText || '',
+          contentMarkdown: incomingMarkdown,
+          sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
+          ...(timestamp.present ? { updatedAt: timestamp.value } : null),
+        };
+        const record: any = withOptionalId(existing && existing.id, baseRecord);
+        if (existing) {
+          if (!messageRecordsEquivalent(existing, record)) {
+            await reqToPromise(stores.messages.put(record));
+            markChanged('messages');
+          }
+        } else {
+          const id = await reqToPromise(stores.messages.add(record));
+          record.id = id as any;
+          markChanged('messages');
+        }
+        upserted += 1;
+      }
+
       const seqIdx = stores.messages.index('by_conversationId_sequence');
       const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
-      const lastCursor = await reqToPromise(seqIdx.openCursor(range, 'prev') as any);
-      const maxSequence = Number((lastCursor as any)?.value?.sequence);
-      nextTailSequence = Number.isFinite(maxSequence) ? maxSequence + 1 : 0;
-    }
-
-    let upserted = 0;
-    for (const key of upsertKeys) {
-      const m = byKey.get(key);
-      if (!m) continue;
-
-      const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
-      const preserveSequence = mode === 'append' && m.captureSequencePolicy === 'preserve-existing-tail';
-      const sequence = preserveSequence
-        ? existing && Number.isFinite(existing.sequence)
-          ? existing.sequence
-          : nextTailSequence++
-        : Number.isFinite(m.sequence)
-          ? m.sequence
-          : 0;
-      const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
-      const mergePolicy: CaptureMessageMergePolicy =
-        rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
-          ? rawMergePolicy
-          : 'replace';
-      const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
-      const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-      const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
-      const preserveExistingMarkdown =
-        !!existing &&
-        (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
-        !!String(existing.contentMarkdown || '').trim();
-      const baseRecord = {
-        conversationId,
-        messageKey: key,
-        role: m.role || 'assistant',
-        authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-        contentText: preserveExistingContent ? existing.contentText || '' : m.contentText || '',
-        contentMarkdown: preserveExistingMarkdown ? existing.contentMarkdown || '' : incomingMarkdown,
-        sequence,
-        updatedAt: preserveExistingContent
-          ? normalizeMessageTimestamp(existing.updatedAt)
-          : normalizeMessageTimestamp(m.updatedAt),
-      };
-      const record: any = withOptionalId(existing && existing.id, baseRecord);
-      if (existing) {
-        await reqToPromise(stores.messages.put(record));
-      } else {
-        const id = await reqToPromise(stores.messages.add(record));
-        record.id = id as any;
-      }
-      upserted += 1;
-    }
-
-    let deleted = 0;
-    for (const key of removedKeys) {
-      const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
-      const id = Number(existing && existing.id);
-      if (!Number.isFinite(id) || id <= 0) continue;
-
-      await reqToPromise(stores.messages.delete(id));
-      deleted += 1;
-    }
-
-    await txDone(t);
-    return { upserted, deleted };
-  }
-
-  const presentKeys = new Set<string>();
-  let upserted = 0;
-
-  for (const m of messages || []) {
-    if (!m || !m.messageKey) continue;
-    presentKeys.add(String(m.messageKey));
-
-    const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
-    const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
-    const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-    const baseRecord = {
-      conversationId,
-      messageKey: m.messageKey,
-      role: m.role || 'assistant',
-      authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-      contentText: m.contentText || '',
-      contentMarkdown: incomingMarkdown,
-      sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-      updatedAt: normalizeMessageTimestamp(m.updatedAt),
-    };
-    const record: any = withOptionalId(existing && existing.id, baseRecord);
-    if (existing) {
-      await reqToPromise(stores.messages.put(record));
-    } else {
-      const id = await reqToPromise(stores.messages.add(record));
-      record.id = id as any;
-    }
-    upserted += 1;
-  }
-
-  // Cleanup: delete messages not present in snapshot.
-  let deleted = 0;
-  const seqIdx = stores.messages.index('by_conversationId_sequence');
-  const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
-  const cursorReq = seqIdx.openCursor(range);
-  await new Promise<void>((resolve, reject) => {
-    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-    cursorReq.onsuccess = () => {
-      const cursor = cursorReq.result;
-      if (!cursor) return resolve();
-      const v: any = cursor.value;
-      if (v && v.messageKey && !presentKeys.has(String(v.messageKey))) {
-        cursor.delete();
+      const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
+      let deleted = 0;
+      for (const row of Array.isArray(storedRows) ? storedRows : []) {
+        if (!row?.messageKey || presentKeys.has(String(row.messageKey))) continue;
+        const id = Number(row.id);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        await reqToPromise(stores.messages.delete(id));
+        markChanged('messages');
         deleted += 1;
       }
-      cursor.continue();
-    };
-  });
 
-  await txDone(t);
-  return { upserted, deleted };
+      return { upserted, deleted };
+    },
+  );
 }
 
 function normalizeConversationListSiteFilterKey(value: unknown): string {
