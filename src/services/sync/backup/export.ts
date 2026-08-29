@@ -221,14 +221,8 @@ export async function exportBackupZipV2(
     if (!m || typeof m !== 'object') continue;
     const uk = uniqueConversationKey(m);
     if (!uk) continue;
-    const existing = mappingByUniqueKey.get(uk) || null;
-    if (!existing) {
-      mappingByUniqueKey.set(uk, m);
-      continue;
-    }
-    const aUpdated = Number(existing.updatedAt) || 0;
-    const bUpdated = Number(m.updatedAt) || 0;
-    if (bUpdated > aUpdated) mappingByUniqueKey.set(uk, m);
+    if (mappingByUniqueKey.has(uk)) throw new Error(`duplicate sync mapping identity: ${uk}`);
+    mappingByUniqueKey.set(uk, m);
   }
 
   const sources = new Map<string, AnyRecord[]>();

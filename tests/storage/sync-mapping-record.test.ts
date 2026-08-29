@@ -652,7 +652,7 @@ describe('sync mapping persistence record', () => {
     expect(merged.updatedAt).toBe(999);
   });
 
-  it('same Notion page uses incoming as the stable tie-break when time is equal or missing', () => {
+  it('same Notion page imports continuity only when both provider timestamps are valid and imported is newer', () => {
     const local = notionState({
       pageId: 'page-a',
       syncedAt: 100,
@@ -669,22 +669,34 @@ describe('sync mapping persistence record', () => {
       heading: 'h-equal',
       digest: 'd-equal',
     });
+    const incomingNewer = notionState({
+      pageId: 'page-a',
+      syncedAt: 101,
+      key: 'incoming-newer',
+      sequence: 3,
+      heading: 'h-newer',
+      digest: 'd-newer',
+    });
     const incomingMissing = notionState({
       pageId: 'page-a',
       key: 'incoming-missing',
-      sequence: 3,
+      sequence: 4,
       heading: 'h-missing',
       digest: 'd-missing',
     });
-    const incomingNull = { ...incomingMissing, lastSyncedAt: null };
-    const incomingEmpty = { ...incomingMissing, lastSyncedAt: '' };
 
-    expect(mergeSyncMappingForImport(local, incomingEqual).lastSyncedMessageKey).toBe('incoming-equal');
-    const missingMerged = mergeSyncMappingForImport(local, incomingMissing);
-    expect(missingMerged.lastSyncedMessageKey).toBe('incoming-missing');
-    expect(missingMerged.notionSections).toEqual({ conversations: { headingBlockId: 'h-missing' } });
-    expect(mergeSyncMappingForImport(local, incomingNull).lastSyncedMessageKey).toBe('incoming-missing');
-    expect(mergeSyncMappingForImport(local, incomingEmpty).lastSyncedMessageKey).toBe('incoming-missing');
+    expect(mergeSyncMappingForImport(local, incomingEqual).lastSyncedMessageKey).toBe('local');
+    expect(mergeSyncMappingForImport(local, incomingNewer).lastSyncedMessageKey).toBe('incoming-newer');
+    expect(mergeSyncMappingForImport(local, incomingMissing).lastSyncedMessageKey).toBe('local');
+    expect(mergeSyncMappingForImport(local, { ...incomingNewer, lastSyncedAt: null }).lastSyncedMessageKey).toBe(
+      'local',
+    );
+    expect(mergeSyncMappingForImport(local, { ...incomingNewer, lastSyncedAt: '101' }).lastSyncedMessageKey).toBe(
+      'local',
+    );
+    expect(
+      mergeSyncMappingForImport({ ...local, lastSyncedAt: undefined }, incomingNewer).lastSyncedMessageKey,
+    ).toBe('local');
   });
 
   it('different Notion pages keep the complete local provider state', () => {
@@ -715,16 +727,52 @@ describe('sync mapping persistence record', () => {
     expect(merged.notionSectionDigests).toEqual(local.notionSectionDigests);
   });
 
-  it('keeps Feishu doc/hash atomic across same and different targets', () => {
-    const local = { feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local' };
+  it('keeps Feishu continuity atomic and uses provider freshness instead of mapping updatedAt', () => {
+    const local = {
+      feishuDocId: 'doc-local',
+      feishuLastContentHash: 'hash-local',
+      feishuLastSyncedAt: 20,
+      updatedAt: 1,
+    };
 
     expect(
-      mergeSyncMappingForImport(local, { feishuDocId: 'doc-local', feishuLastContentHash: 'hash-incoming' }),
-    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-incoming' });
+      mergeSyncMappingForImport(local, {
+        feishuDocId: 'doc-local',
+        feishuLastContentHash: 'hash-local',
+        feishuLastSyncedAt: 30,
+        updatedAt: 0,
+      }),
+    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local', feishuLastSyncedAt: 30 });
 
     expect(
-      mergeSyncMappingForImport(local, { feishuDocId: 'doc-other', feishuLastContentHash: 'hash-other' }),
-    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local' });
+      mergeSyncMappingForImport(local, {
+        feishuDocId: 'doc-local',
+        feishuLastContentHash: 'hash-incoming',
+        feishuLastSyncedAt: 30,
+        updatedAt: 0,
+      }),
+    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-incoming', feishuLastSyncedAt: 30 });
+
+    expect(
+      mergeSyncMappingForImport(local, {
+        feishuDocId: 'doc-local',
+        feishuLastContentHash: 'hash-incoming',
+        feishuLastSyncedAt: 20,
+        updatedAt: 999,
+      }),
+    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local', feishuLastSyncedAt: 20 });
+
+    expect(
+      mergeSyncMappingForImport(local, {
+        feishuDocId: 'doc-local',
+        feishuLastContentHash: 'hash-incoming',
+        updatedAt: 999,
+      }),
+    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local', feishuLastSyncedAt: 20 });
+
+    expect(
+      mergeSyncMappingForImport(local, { feishuDocId: 'doc-other', feishuLastContentHash: 'hash-other', feishuLastSyncedAt: 999 }),
+    ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local', feishuLastSyncedAt: 20 });
 
     expect(
       mergeSyncMappingForImport({}, { feishuDocId: 'doc-incoming', feishuLastContentHash: 'hash-incoming' }),
@@ -765,13 +813,14 @@ describe('sync mapping persistence record', () => {
     expect(differentMerged.githubManagedFiles).toEqual(local.githubManagedFiles);
   });
 
-  it('uses mapping updatedAt as GitHub backup tie-break fallback and restores incoming-only continuity', () => {
+  it('never uses mapping updatedAt as GitHub continuity freshness', () => {
     const local = { updatedAt: 500, ...githubState({ marker: 'a' }) };
-    const olderByFallback = { updatedAt: 400, ...githubState({ marker: 'b' }) };
-    const newerByFallback = { updatedAt: 600, ...githubState({ marker: 'c' }) };
+    const newerAuditOnly = { updatedAt: 600, ...githubState({ marker: 'c' }) };
 
-    expect(mergeSyncMappingForImport(local, olderByFallback).githubProjectionFingerprint).toBe('a'.repeat(64));
-    expect(mergeSyncMappingForImport(local, newerByFallback).githubProjectionFingerprint).toBe('c'.repeat(64));
+    expect(mergeSyncMappingForImport(local, newerAuditOnly).githubProjectionFingerprint).toBe('a'.repeat(64));
+
+    const importedProviderFreshness = { updatedAt: 1, ...githubState({ marker: 'c', syncedAt: 700 }) };
+    expect(mergeSyncMappingForImport(local, importedProviderFreshness).githubProjectionFingerprint).toBe('c'.repeat(64));
 
     const restored = mergeSyncMappingForImport({}, githubState({ marker: 'd', syncedAt: 700 }));
     expect(restored.githubRemoteKey).toBe('github.com/example/syncnos@main');
@@ -797,16 +846,16 @@ describe('sync mapping persistence record', () => {
     expect(stringMerged.githubProjectionFingerprint).toBe('a'.repeat(64));
     expect(stringMerged.githubManagedFiles).toEqual(localWithValidSyncTime.githubManagedFiles);
 
-    const localWithFallbackTime = { updatedAt: 500, ...githubState({ marker: 'a' }) };
+    const localWithoutProviderTime = { updatedAt: 500, ...githubState({ marker: 'a' }) };
     const importedWithNegativeSyncTime = {
       updatedAt: 999,
       ...githubState({ marker: 'c' }),
       githubLastSyncedAt: -1,
     };
 
-    const negativeMerged = mergeSyncMappingForImport(localWithFallbackTime, importedWithNegativeSyncTime);
-    expect(negativeMerged.githubProjectionFingerprint).toBe('c'.repeat(64));
-    expect(negativeMerged.githubManagedFiles).toEqual(importedWithNegativeSyncTime.githubManagedFiles);
+    const negativeMerged = mergeSyncMappingForImport(localWithoutProviderTime, importedWithNegativeSyncTime);
+    expect(negativeMerged.githubProjectionFingerprint).toBe('a'.repeat(64));
+    expect(negativeMerged.githubManagedFiles).toEqual(localWithoutProviderTime.githubManagedFiles);
     expect(negativeMerged.githubLastSyncedAt).toBeUndefined();
   });
 

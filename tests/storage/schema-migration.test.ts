@@ -584,6 +584,7 @@ describe('storage schema migration (v10 data revisions)', () => {
     });
     expect(await reqToPromise(tx10.objectStore('messages').count())).toBe(1);
     expect(await reqToPromise(tx10.objectStore('sync_mappings').count())).toBe(1);
+    expect(tx10.objectStore('sync_mappings').index('by_source_conversationKey').unique).toBe(true);
     expect(await reqToPromise(tx10.objectStore('image_cache').count())).toBe(1);
     expect(await reqToPromise(tx10.objectStore('article_comments').count())).toBe(1);
     const cleanup = tx10.objectStore('github_cleanup_outbox');

@@ -100,6 +100,65 @@ describe('backup zip v2 schema', () => {
     expect(openedTransactions.flat().some((storeName) => revisionStores.has(storeName))).toBe(false);
   });
 
+  it('fails export instead of choosing a duplicate sync mapping when the schema invariant is broken', async () => {
+    closeDbForTests();
+    // @ts-expect-error fake IndexedDB test global
+    globalThis.indexedDB = indexedDB;
+    // @ts-expect-error fake IndexedDB test global
+    globalThis.IDBKeyRange = IDBKeyRange;
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase('webclipper');
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper', 10);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        db.createObjectStore('conversations', { keyPath: 'id', autoIncrement: true });
+        db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        const mappings = db.createObjectStore('sync_mappings', { keyPath: 'id', autoIncrement: true });
+        mappings.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: false });
+        db.createObjectStore('image_cache', { keyPath: 'id', autoIncrement: true });
+        db.createObjectStore('article_comments', { keyPath: 'id', autoIncrement: true });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const seed = rawDb.transaction(['conversations', 'sync_mappings'], 'readwrite');
+    seed.objectStore('conversations').add({ source: 'chatgpt', conversationKey: 'c1', title: 'Conversation' });
+    seed.objectStore('sync_mappings').add({ source: 'chatgpt', conversationKey: 'c1', updatedAt: 1 });
+    seed.objectStore('sync_mappings').add({ source: 'chatgpt', conversationKey: 'c1', updatedAt: 2 });
+    await new Promise<void>((resolve, reject) => {
+      seed.oncomplete = () => resolve();
+      seed.onerror = () => reject(seed.error);
+      seed.onabort = () => reject(seed.error);
+    });
+    rawDb.close();
+
+    (globalThis as any).chrome = {
+      runtime: {},
+      storage: {
+        local: {
+          get(_keys: unknown, callback: (value: Record<string, unknown>) => void) {
+            callback({});
+          },
+          set(_payload: Record<string, unknown>, callback: () => void) {
+            callback();
+          },
+        },
+      },
+    };
+
+    try {
+      await expect(exportBackupZipV2()).rejects.toThrow('duplicate sync mapping identity: chatgpt||c1');
+    } finally {
+      closeDbForTests();
+      delete (globalThis as any).chrome;
+    }
+  });
+
   it('validateConversationBundle accepts a minimal bundle with null mapping', () => {
     const ok = backupUtils.validateConversationBundle({
       schemaVersion: 1,

@@ -43,6 +43,10 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function validNotionLastSyncedAt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
 function validGithubLastSyncedAt(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
@@ -169,10 +173,6 @@ function replaceGithubGroup(target: SyncMappingRecord, source: unknown): void {
 
 function hasGithubContinuityField(record: SyncMappingRecord): boolean {
   return GITHUB_CONTINUITY_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(record, field));
-}
-
-function githubContinuityTimestamp(record: SyncMappingRecord): number | null {
-  return validGithubLastSyncedAt(record.githubLastSyncedAt) ?? finiteNumber(record.updatedAt);
 }
 
 function syncMappingBusinessValueEqual(left: unknown, right: unknown): boolean {
@@ -340,18 +340,34 @@ export function mergeSyncMappingForImport(existing: unknown, incoming: unknown):
   } else if (localNotionPageId !== importedNotionPageId) {
     notionSource = local;
   } else {
-    const localSyncedAt = finiteNumber(local.lastSyncedAt);
-    const importedSyncedAt = finiteNumber(imported.lastSyncedAt);
+    const localSyncedAt = validNotionLastSyncedAt(local.lastSyncedAt);
+    const importedSyncedAt = validNotionLastSyncedAt(imported.lastSyncedAt);
     notionSource =
-      localSyncedAt != null && importedSyncedAt != null && localSyncedAt > importedSyncedAt ? local : imported;
+      localSyncedAt != null && importedSyncedAt != null && importedSyncedAt > localSyncedAt ? imported : local;
   }
   replaceGroup(next, notionSource, NOTION_CONTINUITY_FIELDS);
 
   const localFeishuDocId = safeString(local.feishuDocId);
   const importedFeishuDocId = safeString(imported.feishuDocId);
-  const feishuSource =
-    !localFeishuDocId || (importedFeishuDocId && importedFeishuDocId === localFeishuDocId) ? imported : local;
-  replaceFeishuGroup(next, feishuSource);
+  if (!localFeishuDocId) {
+    replaceFeishuGroup(next, imported);
+  } else if (!importedFeishuDocId || importedFeishuDocId !== localFeishuDocId) {
+    replaceFeishuGroup(next, local);
+  } else if (safeString(local.feishuLastContentHash) === safeString(imported.feishuLastContentHash)) {
+    replaceFeishuGroup(next, local);
+    const localSyncedAt = validFeishuLastSyncedAt(local.feishuLastSyncedAt);
+    const importedSyncedAt = validFeishuLastSyncedAt(imported.feishuLastSyncedAt);
+    const maxSyncedAt = Math.max(localSyncedAt ?? -1, importedSyncedAt ?? -1);
+    if (maxSyncedAt >= 0) next.feishuLastSyncedAt = maxSyncedAt;
+    else delete next.feishuLastSyncedAt;
+  } else {
+    const localSyncedAt = validFeishuLastSyncedAt(local.feishuLastSyncedAt);
+    const importedSyncedAt = validFeishuLastSyncedAt(imported.feishuLastSyncedAt);
+    replaceFeishuGroup(
+      next,
+      localSyncedAt != null && importedSyncedAt != null && importedSyncedAt > localSyncedAt ? imported : local,
+    );
+  }
 
   const localGithubRemoteKey = normalizeGithubRemoteKey(local.githubRemoteKey);
   const importedGithubRemoteKey = normalizeGithubRemoteKey(imported.githubRemoteKey);
@@ -361,12 +377,9 @@ export function mergeSyncMappingForImport(existing: unknown, incoming: unknown):
   } else if (!importedGithubRemoteKey || localGithubRemoteKey !== importedGithubRemoteKey) {
     githubSource = local;
   } else {
-    const localSyncedAt = githubContinuityTimestamp(local);
-    const importedSyncedAt = githubContinuityTimestamp(imported);
-    if (localSyncedAt != null && importedSyncedAt != null)
-      githubSource = localSyncedAt > importedSyncedAt ? local : imported;
-    else if (localSyncedAt != null) githubSource = local;
-    else githubSource = imported;
+    const localSyncedAt = validGithubLastSyncedAt(local.githubLastSyncedAt);
+    const importedSyncedAt = validGithubLastSyncedAt(imported.githubLastSyncedAt);
+    githubSource = importedSyncedAt != null && (localSyncedAt == null || importedSyncedAt > localSyncedAt) ? imported : local;
   }
   replaceGithubGroup(next, githubSource);
   normalizeObsidianRemoteWriteGeneration(next, local, imported);
