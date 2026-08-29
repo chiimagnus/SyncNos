@@ -1,6 +1,7 @@
-import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
+import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain/article-identity';
 import {
   ArticleCommentsSidebarAdapterError,
   filterArticleCommentsForListIdentity,
@@ -75,6 +76,59 @@ export function createArticleCommentsSidebarInpageAdapter(
         ? filterArticleCommentsForListIdentity(await listFromRuntime({ canonicalUrl: query.canonicalUrl }), query)
         : [];
       return mergeArticleCommentsByIdentity(byConversation, byCanonicalUrl);
+    },
+    async findExistingContext(input) {
+      const identity = buildCanonicalWebArticleIdentity(input?.canonicalUrl);
+      if (!identity) {
+        throw new ArticleCommentsSidebarAdapterError('invalid_query', 'missing canonical article URL');
+      }
+      if (!rt?.send) {
+        throw new ArticleCommentsSidebarAdapterError(
+          'runtime_unavailable',
+          'runtime is unavailable for article identity lookup',
+        );
+      }
+      if (input?.signal?.aborted) {
+        const error = new Error('article identity lookup aborted');
+        error.name = 'AbortError';
+        throw error;
+      }
+
+      let response: any;
+      try {
+        response = await rt.send(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, {
+          source: identity.source,
+          conversationKey: identity.conversationKey,
+        });
+      } catch (error) {
+        if (input?.signal?.aborted) {
+          const abortError = new Error('article identity lookup aborted');
+          abortError.name = 'AbortError';
+          throw abortError;
+        }
+        throw new ArticleCommentsSidebarAdapterError('request_failed', 'failed to find existing article context', {
+          cause: error,
+        });
+      }
+      if (input?.signal?.aborted) {
+        const error = new Error('article identity lookup aborted');
+        error.name = 'AbortError';
+        throw error;
+      }
+      if (!response || typeof response.ok !== 'boolean') {
+        throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article identity runtime response');
+      }
+      if (!response.ok) {
+        throw new ArticleCommentsSidebarAdapterError(
+          'request_failed',
+          String(response?.error?.message || 'failed to find existing article context'),
+        );
+      }
+
+      return {
+        canonicalUrl: identity.url,
+        conversationId: normalizeConversationId(response?.data?.id),
+      };
     },
     async ensureContext(input) {
       const ensureArticle = input?.ensureArticle !== false;

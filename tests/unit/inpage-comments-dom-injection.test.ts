@@ -5,8 +5,9 @@ const disposeSession = vi.fn();
 vi.mock('../../src/services/comments/sidebar/comment-sidebar-session', () => ({
   createCommentSidebarSession: () => ({ dispose: disposeSession }),
 }));
+const createInpageAdapter = vi.fn((_runtime: any) => ({ findExistingContext: vi.fn() }));
 vi.mock('../../src/services/comments/sidebar/article-comments-sidebar-inpage-adapter', () => ({
-  createArticleCommentsSidebarInpageAdapter: () => ({}),
+  createArticleCommentsSidebarInpageAdapter: (runtime: any) => createInpageAdapter(runtime),
 }));
 const open = vi.fn(async () => {});
 const disposeController = vi.fn();
@@ -19,9 +20,10 @@ vi.mock('../../src/services/comments/sidebar/article-comments-sidebar-controller
 }));
 
 describe('inpage comments DOM injection', () => {
-  it('uses the injected DOM source without reading page globals', async () => {
+  it('uses the injected DOM source without reading page globals and wires runtime into the readonly adapter', async () => {
     const resolveComposerSelection = vi.fn(() => ({ selectionText: 'quote', locator: { v: 2 } }));
-    const controller = createInpageCommentsPanelController(null, {
+    const runtime = { send: vi.fn() };
+    const controller = createInpageCommentsPanelController(runtime, {
       createPanelApi: () => ({}) as any,
       domSource: {
         resolveComposerSelection,
@@ -32,6 +34,7 @@ describe('inpage comments DOM injection', () => {
 
     await controller.open({ tabId: 7, focusComposer: true });
 
+    expect(createInpageAdapter).toHaveBeenCalledWith(runtime);
     expect(open).toHaveBeenCalledWith(
       expect.objectContaining({
         focusComposer: true,

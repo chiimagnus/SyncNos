@@ -936,6 +936,198 @@ describe('article-comments-sidebar-controller', () => {
     expect(controller.getLoadSnapshot().status).toBe('idle');
   });
 
+  it('ignores conversations revisions for adapters without a readonly identity lookup', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
+
+    revisionListener?.(['conversations']);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(adapter.list).not.toHaveBeenCalled();
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
+  it('does a readonly conversations reconcile and skips refresh when identity is unchanged', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      findExistingContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
+    adapter.migrateCanonicalUrl.mockClear();
+
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(adapter.findExistingContext).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+
+    expect(adapter.findExistingContext).toHaveBeenCalledWith({
+      canonicalUrl: 'https://example.com/a',
+      signal: expect.any(AbortSignal),
+    });
+    expect(adapter.list).not.toHaveBeenCalled();
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+  });
+
+  it('applies found and missing readonly identities and refreshes without migrating comments', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const adapter = {
+      list: vi.fn(async ({ conversationId }: { conversationId: number | null }) => [
+        { id: conversationId ?? 99, parentId: null, commentText: String(conversationId), quoteText: '', createdAt: 1 },
+      ]),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      findExistingContext: vi
+        .fn()
+        .mockResolvedValueOnce({ canonicalUrl: 'https://example.com/a', conversationId: 2 })
+        .mockResolvedValueOnce({ canonicalUrl: 'https://example.com/a', conversationId: null }),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
+    adapter.migrateCanonicalUrl.mockClear();
+
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(controller.getContext()?.conversationId).toBe(2));
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(controller.getContext()?.conversationId).toBeNull());
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(2));
+    expect(controller.getContext()?.canonicalUrl).toBe('https://example.com/a');
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+  });
+
+  it('retries a current FIND rejection without refreshing, then converges on same-revision replay', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      findExistingContext: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('find unavailable'))
+        .mockResolvedValueOnce({ canonicalUrl: 'https://example.com/a', conversationId: 2 }),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
+    revisionMocks.requestDataRevisionRetry.mockClear();
+
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(revisionMocks.requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']));
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    expect(adapter.list).not.toHaveBeenCalled();
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+
+    revisionMocks.requestDataRevisionRetry.mockClear();
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(controller.getContext()?.conversationId).toBe(2));
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
+  it('orders combined conversations and article_comments batches as FIND then one comments refresh', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const order: string[] = [];
+    const adapter = {
+      list: vi.fn(async () => {
+        order.push('list');
+        return [];
+      }),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      findExistingContext: vi.fn(async () => {
+        order.push('find');
+        return { canonicalUrl: 'https://example.com/a', conversationId: 1 };
+      }),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    order.length = 0;
+    adapter.list.mockClear();
+
+    revisionListener?.(['article_comments', 'conversations']);
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
+
+    expect(order).toEqual(['find', 'list']);
+    expect(adapter.findExistingContext).toHaveBeenCalledTimes(1);
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+  });
+
+  it('drops old-context and closed-activation FIND completions without retry or state changes', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const oldFind = createDeferred<{ canonicalUrl: string; conversationId: number | null }>();
+    const closedFind = createDeferred<{ canonicalUrl: string; conversationId: number | null }>();
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      findExistingContext: vi.fn().mockImplementationOnce(() => oldFind.promise).mockImplementationOnce(() => closedFind.promise),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
+    revisionMocks.requestDataRevisionRetry.mockClear();
+
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(adapter.findExistingContext).toHaveBeenCalledTimes(1));
+    controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 7 });
+    oldFind.resolve({ canonicalUrl: 'https://example.com/a', conversationId: 2 });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 7 });
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('ready'));
+    adapter.list.mockClear();
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(adapter.findExistingContext).toHaveBeenCalledTimes(2));
+    session.requestClose();
+    closedFind.reject(new Error('late find failure'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 7 });
+    expect(adapter.list).not.toHaveBeenCalled();
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
   it('close is idempotent and does not notify after the first transition', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);

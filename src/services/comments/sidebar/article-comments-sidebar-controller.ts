@@ -146,9 +146,11 @@ export function createArticleCommentsSidebarController(input: {
   let resolveActivationReady: (() => void) | null = null;
   let revisionUnsubscribe: (() => void) | null = null;
   let sessionUnsubscribe: (() => void) | null = null;
-  let pendingRevisionRefresh = false;
-  let revisionRefreshDraining = false;
-  let drainPendingRevisionRefresh: () => void = () => {};
+  let pendingRevisionScopes = new Set<'article_comments' | 'conversations'>();
+  let revisionBatchDraining = false;
+  let identityReconcileGeneration = 0;
+  let identityAbortController: AbortController | null = null;
+  let drainPendingRevisionBatch: () => void = () => {};
   const loadListeners = new Set<() => void>();
   let loadSnapshot: ArticleCommentsSidebarLoadSnapshot = {
     status: 'idle',
@@ -221,7 +223,7 @@ export function createArticleCommentsSidebarController(input: {
     if (!isCurrentOperation(operation)) return;
     activeOperation = null;
     publishLoadState(status, operation, error);
-    void Promise.resolve().then(() => drainPendingRevisionRefresh());
+    void Promise.resolve().then(() => drainPendingRevisionBatch());
   };
 
   const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
@@ -329,29 +331,102 @@ export function createArticleCommentsSidebarController(input: {
     await loadComments(operation);
   };
 
-  drainPendingRevisionRefresh = () => {
+  const invalidateIdentityReconcile = () => {
+    identityReconcileGeneration += 1;
+    identityAbortController?.abort();
+    identityAbortController = null;
+  };
+
+  const reconcileExistingContext = async (): Promise<boolean> => {
+    if (typeof adapter.findExistingContext !== 'function') return false;
+    const canonicalUrl = getCanonicalUrl();
+    if (!canonicalUrl) return false;
+
+    const generation = identityReconcileGeneration;
+    const expectedActivationGeneration = activationGeneration;
+    const expectedContextKey = getContextKey();
+    const abortController = new AbortController();
+    identityAbortController = abortController;
+
+    try {
+      const resolved = await adapter.findExistingContext({ canonicalUrl, signal: abortController.signal });
+      if (
+        disposed ||
+        !sessionOpen ||
+        !activationReady ||
+        generation !== identityReconcileGeneration ||
+        expectedActivationGeneration !== activationGeneration ||
+        expectedContextKey !== getContextKey() ||
+        abortController.signal.aborted
+      ) {
+        return false;
+      }
+
+      const normalized = normalizeContext(resolved);
+      if (!normalized || canonicalizeArticleUrl(normalized.canonicalUrl) !== canonicalUrl) {
+        requestDataRevisionRetry(['conversations']);
+        return false;
+      }
+      if (buildCommentContextIdentityKey(normalized) === getContextKey()) return false;
+
+      assignContext(normalized);
+      return true;
+    } catch (_error) {
+      if (
+        disposed ||
+        !sessionOpen ||
+        !activationReady ||
+        generation !== identityReconcileGeneration ||
+        expectedActivationGeneration !== activationGeneration ||
+        expectedContextKey !== getContextKey() ||
+        abortController.signal.aborted
+      ) {
+        return false;
+      }
+      requestDataRevisionRetry(['conversations']);
+      return false;
+    } finally {
+      if (identityAbortController === abortController) identityAbortController = null;
+    }
+  };
+
+  drainPendingRevisionBatch = () => {
     if (
       disposed ||
       !sessionOpen ||
       !activationReady ||
-      !pendingRevisionRefresh ||
+      !pendingRevisionScopes.size ||
       activeOperation ||
-      revisionRefreshDraining
+      revisionBatchDraining
     ) {
       return;
     }
-    pendingRevisionRefresh = false;
-    revisionRefreshDraining = true;
-    void refresh().finally(() => {
-      revisionRefreshDraining = false;
-      drainPendingRevisionRefresh();
+
+    const batch = new Set(pendingRevisionScopes);
+    pendingRevisionScopes.clear();
+    revisionBatchDraining = true;
+    void (async () => {
+      let shouldRefreshComments = batch.has('article_comments');
+      if (batch.has('conversations') && typeof adapter.findExistingContext === 'function') {
+        const identityChanged = await reconcileExistingContext();
+        if (disposed || !sessionOpen || !activationReady) return;
+        if (pendingRevisionScopes.has('conversations')) {
+          if (shouldRefreshComments) pendingRevisionScopes.add('article_comments');
+          return;
+        }
+        if (identityChanged) shouldRefreshComments = true;
+      }
+      if (shouldRefreshComments) await refresh();
+    })().finally(() => {
+      revisionBatchDraining = false;
+      drainPendingRevisionBatch();
     });
   };
 
-  const scheduleRevisionRefresh = () => {
+  const scheduleRevisionBatch = (scopes: readonly ('article_comments' | 'conversations')[]) => {
     if (disposed || !sessionOpen) return;
-    pendingRevisionRefresh = true;
-    drainPendingRevisionRefresh();
+    for (const scope of scopes) pendingRevisionScopes.add(scope);
+    drainPendingRevisionBatch();
   };
 
   const deactivateRevisionActivation = () => {
@@ -361,7 +436,8 @@ export function createArticleCommentsSidebarController(input: {
     activationReady = false;
     revisionUnsubscribe?.();
     revisionUnsubscribe = null;
-    pendingRevisionRefresh = false;
+    pendingRevisionScopes.clear();
+    invalidateIdentityReconcile();
     operationGeneration += 1;
     mutationGeneration += 1;
     abortActiveOperation();
@@ -376,15 +452,21 @@ export function createArticleCommentsSidebarController(input: {
     });
     revisionUnsubscribe = subscribeDataRevisionChanges((scopes) => {
       if (disposed || !sessionOpen || generation !== activationGeneration) return;
-      if (!scopes.includes('article_comments')) return;
-      scheduleRevisionRefresh();
+      const nextScopes: Array<'article_comments' | 'conversations'> = [];
+      if (scopes.includes('article_comments')) nextScopes.push('article_comments');
+      if (typeof adapter.findExistingContext === 'function' && scopes.includes('conversations')) {
+        invalidateIdentityReconcile();
+        nextScopes.push('conversations');
+      }
+      if (!nextScopes.length) return;
+      scheduleRevisionBatch(nextScopes);
     });
     void whenDataRevisionObserverReady().then(() => {
       if (disposed || !sessionOpen || generation !== activationGeneration) return;
       activationReady = true;
       resolveActivationReady?.();
       resolveActivationReady = null;
-      drainPendingRevisionRefresh();
+      drainPendingRevisionBatch();
     });
   };
 
@@ -575,6 +657,7 @@ export function createArticleCommentsSidebarController(input: {
 
   const setContext = (next: ArticleCommentsSidebarContext | null) => {
     if (disposed) return;
+    invalidateIdentityReconcile();
     const transition = assignContext(next);
     if (transition.kind === 'same') return;
 
@@ -604,6 +687,8 @@ export function createArticleCommentsSidebarController(input: {
     resolveActivationReady = null;
     revisionUnsubscribe?.();
     revisionUnsubscribe = null;
+    pendingRevisionScopes.clear();
+    invalidateIdentityReconcile();
     sessionUnsubscribe?.();
     sessionUnsubscribe = null;
     session.updateHost({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '', actionCallbacks: {} });

@@ -325,6 +325,40 @@ describe('article comments sidebar adapters', () => {
     expect(result.map((item) => item.id)).toEqual([1, 2]);
   });
 
+  it('uses only the readonly FIND route to reconcile an existing in-page article context', async () => {
+    const send = vi.fn(async (type: string) => {
+      if (type === 'findConversationBySourceAndKey') {
+        return { ok: true, data: { id: 21, source: 'web', conversationKey: 'article:https://example.com/article' } };
+      }
+      throw new Error(`unexpected runtime call: ${type}`);
+    });
+    const adapter = createArticleCommentsSidebarInpageAdapter({ send });
+
+    await expect(
+      adapter.findExistingContext?.({ canonicalUrl: 'https://example.com/article#fragment' }),
+    ).resolves.toEqual({ canonicalUrl: 'https://example.com/article', conversationId: 21 });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith('findConversationBySourceAndKey', {
+      source: 'web',
+      conversationKey: 'article:https://example.com/article',
+    });
+    expect(send).not.toHaveBeenCalledWith('resolveOrCaptureActiveTabArticle', expect.anything());
+    expect(send).not.toHaveBeenCalledWith('attachOrphanArticleComments', expect.anything());
+  });
+
+  it('treats readonly FIND missing as authoritative null without capture or attach side effects', async () => {
+    const send = vi.fn(async () => ({ ok: true, data: null }));
+    const adapter = createArticleCommentsSidebarInpageAdapter({ send });
+
+    await expect(adapter.findExistingContext?.({ canonicalUrl: 'https://example.com/article' })).resolves.toEqual({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: null,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toBe('findConversationBySourceAndKey');
+  });
+
   it('treats a successful runtime envelope with data.ok=false as a failed delete', async () => {
     const adapter = createArticleCommentsSidebarInpageAdapter({
       send: vi.fn(async () => ({ ok: true, data: { ok: false } })),
