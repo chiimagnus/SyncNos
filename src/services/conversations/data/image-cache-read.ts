@@ -1,4 +1,4 @@
-import { openDb as openSchemaDb } from '@platform/idb/schema';
+import { openDb } from '@platform/idb/schema';
 
 type ImageCacheRow = {
   id?: number;
@@ -18,9 +18,6 @@ export type ImageCacheAsset = {
   byteSize: number;
   contentType: string;
 };
-
-let cachedDb: IDBDatabase | null = null;
-let openingDb: Promise<IDBDatabase> | null = null;
 
 function parseContentType(value: unknown): string {
   const raw = String(value || '').trim();
@@ -97,20 +94,6 @@ function decodeDataImageUrlToBlob(dataUrl: string): Blob | null {
 
   if ((bytes.byteLength || 0) <= 0) return null;
   return new Blob([Uint8Array.from(bytes)], { type: contentType });
-}
-
-async function openDb(): Promise<IDBDatabase> {
-  if (cachedDb) return cachedDb;
-  if (openingDb) return openingDb;
-  openingDb = openSchemaDb()
-    .then((db) => {
-      cachedDb = db;
-      return db;
-    })
-    .finally(() => {
-      openingDb = null;
-    });
-  return openingDb;
 }
 
 function tx(
