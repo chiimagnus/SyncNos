@@ -15,7 +15,7 @@ const NOTION_CONTINUITY_FIELDS = [
   'notionSectionDigests',
 ] as const;
 
-const FEISHU_CONTINUITY_FIELDS = ['feishuDocId', 'feishuLastContentHash'] as const;
+const FEISHU_CONTINUITY_FIELDS = ['feishuDocId', 'feishuLastContentHash', 'feishuLastSyncedAt'] as const;
 const GITHUB_CONTINUITY_FIELDS = [
   'githubRemoteKey',
   'githubManagedFiles',
@@ -44,6 +44,10 @@ function finiteNumber(value: unknown): number | null {
 }
 
 function validGithubLastSyncedAt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function validFeishuLastSyncedAt(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
@@ -124,6 +128,26 @@ export function readGithubContinuity(source: unknown): SyncMappingRecord {
   return normalized;
 }
 
+function readFeishuContinuity(source: unknown): SyncMappingRecord {
+  const record = asRecord(source);
+  const normalized: SyncMappingRecord = {};
+  if (Object.prototype.hasOwnProperty.call(record, 'feishuDocId')) normalized.feishuDocId = record.feishuDocId;
+  if (Object.prototype.hasOwnProperty.call(record, 'feishuLastContentHash')) {
+    normalized.feishuLastContentHash = record.feishuLastContentHash;
+  }
+  const lastSyncedAt = validFeishuLastSyncedAt(record.feishuLastSyncedAt);
+  if (lastSyncedAt != null) normalized.feishuLastSyncedAt = lastSyncedAt;
+  return normalized;
+}
+
+function replaceFeishuGroup(target: SyncMappingRecord, source: unknown): void {
+  replaceGroup(target, readFeishuContinuity(source), FEISHU_CONTINUITY_FIELDS);
+}
+
+function hasFeishuContinuityField(record: SyncMappingRecord): boolean {
+  return FEISHU_CONTINUITY_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(record, field));
+}
+
 function replaceGithubGroup(target: SyncMappingRecord, source: unknown): void {
   replaceGroup(target, readGithubContinuity(source), GITHUB_CONTINUITY_FIELDS);
 }
@@ -159,6 +183,7 @@ function syncMappingBusinessRecord(value: unknown): SyncMappingRecord {
   const next = { ...asRecord(value) };
   delete next.id;
   delete next.updatedAt;
+  replaceFeishuGroup(next, value);
   replaceGithubGroup(next, value);
   return next;
 }
@@ -181,6 +206,7 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
     hasNotionTargetPatch && safeString(base.notionPageId) !== safeString(incoming.notionPageId);
   const hasFeishuTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'feishuDocId');
   const feishuTargetChanged = hasFeishuTargetPatch && safeString(base.feishuDocId) !== safeString(incoming.feishuDocId);
+  const hasFeishuPatch = hasFeishuContinuityField(incoming);
   const hasGithubTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'githubRemoteKey');
   const githubTargetChanged =
     hasGithubTargetPatch &&
@@ -197,6 +223,9 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
     for (const field of GITHUB_CONTINUITY_FIELDS) delete next[field];
   }
   Object.assign(next, incoming);
+  if (hasFeishuPatch) {
+    replaceFeishuGroup(next, feishuTargetChanged ? incoming : { ...base, ...incoming });
+  }
   if (hasGithubPatch) {
     replaceGithubGroup(next, githubTargetChanged ? incoming : { ...base, ...incoming });
   }
@@ -249,7 +278,7 @@ export function mergeSyncMappingForIdentityMove(
   const targetFeishuDocId = safeString(current.feishuDocId);
   const legacyFeishuDocId = safeString(previous.feishuDocId);
   const feishuSource = targetFeishuDocId ? current : legacyFeishuDocId ? previous : hasTarget ? current : previous;
-  replaceGroup(next, feishuSource, FEISHU_CONTINUITY_FIELDS);
+  replaceFeishuGroup(next, feishuSource);
 
   const desiredSource = safeString(identity?.source);
   const desiredConversationKey = safeString(identity?.conversationKey);
@@ -301,7 +330,7 @@ export function mergeSyncMappingForImport(existing: unknown, incoming: unknown):
   const importedFeishuDocId = safeString(imported.feishuDocId);
   const feishuSource =
     !localFeishuDocId || (importedFeishuDocId && importedFeishuDocId === localFeishuDocId) ? imported : local;
-  replaceGroup(next, feishuSource, FEISHU_CONTINUITY_FIELDS);
+  replaceFeishuGroup(next, feishuSource);
 
   const localGithubRemoteKey = normalizeGithubRemoteKey(local.githubRemoteKey);
   const importedGithubRemoteKey = normalizeGithubRemoteKey(imported.githubRemoteKey);

@@ -228,6 +228,7 @@ describe('sync mapping persistence record', () => {
       conversationKey: 'c1',
       feishuDocId: 'doc-old',
       feishuLastContentHash: 'hash-old',
+      feishuLastSyncedAt: 40,
       notionPageId: 'page-1',
       unknownMetadata: 'keep-me',
     };
@@ -243,7 +244,21 @@ describe('sync mapping persistence record', () => {
       unknownMetadata: 'keep-me',
     });
     expect(merged.feishuLastContentHash).toBeUndefined();
+    expect(merged.feishuLastSyncedAt).toBeUndefined();
   });
+
+  it.each([[-1], [Number.NaN], [Number.POSITIVE_INFINITY], ['50']])(
+    'drops invalid Feishu provider freshness %p',
+    (invalidFreshness) => {
+      const merged = mergeSyncMappingPatch(
+        { feishuDocId: 'doc-1', feishuLastContentHash: 'hash-1', feishuLastSyncedAt: 40 },
+        { feishuLastSyncedAt: invalidFreshness },
+      );
+      expect(merged.feishuDocId).toBe('doc-1');
+      expect(merged.feishuLastContentHash).toBe('hash-1');
+      expect(merged.feishuLastSyncedAt).toBeUndefined();
+    },
+  );
 
   it('keeps GitHub continuity on the same remote and clears stale state when the remote changes', () => {
     const existing = {

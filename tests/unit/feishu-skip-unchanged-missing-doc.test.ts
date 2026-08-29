@@ -129,9 +129,39 @@ describe('feishu skip unchanged missing doc', () => {
 
     expect(res.okCount).toBe(1);
     expect(res.results?.[0]?.mode).toBe('create');
-    expect(backgroundStorageMocks.patchSyncMapping).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({ feishuDocId: 'doc_new' }),
-    );
+    expect(backgroundStorageMocks.patchSyncMapping).toHaveBeenCalledWith(1, {
+      feishuDocId: 'doc_new',
+      feishuLastContentHash: hash,
+      feishuLastSyncedAt: res.results?.[0]?.at,
+    });
+    expect(Number(res.results?.[0]?.at)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('does not record provider freshness when remote content upload fails', async () => {
+    setupChromeStorage();
+    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
+    jobStoreMocks.isRunningJob.mockReturnValue(false);
+    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+      conversation: { id: 2, title: 'fail upload' },
+      mapping: null,
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+
+    fetchFeishuJsonMock.mockImplementation(async (path: string, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (path === '/docx/v1/documents' && method === 'POST') {
+        return { document: { document_id: 'doc_fail' } };
+      }
+      if (method === 'POST') throw new Error('forced remote upload failure');
+      return {};
+    });
+
+    const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
+    const res = await orch.syncConversations({ conversationIds: [2], instanceId: 'x' });
+
+    expect(res.failCount).toBe(1);
+    expect(res.results?.[0]?.mode).toBe('failed');
+    expect(backgroundStorageMocks.patchSyncMapping).not.toHaveBeenCalled();
   });
 });

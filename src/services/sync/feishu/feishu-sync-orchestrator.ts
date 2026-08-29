@@ -782,9 +782,11 @@ async function syncConversations({
             docId = '';
             mode = 'create';
           } else {
+            const syncedAt = Date.now();
             await defaultBackgroundStorage.patchSyncMapping(conversationId, {
               feishuDocId: existingDocId,
               feishuLastContentHash: contentHash,
+              feishuLastSyncedAt: syncedAt,
             });
 
             row = buildPerConversationResult({
@@ -795,7 +797,7 @@ async function syncConversations({
               appended: 0,
               error: '',
               warnings: [],
-              at: Date.now(),
+              at: syncedAt,
             });
             results.push(row);
             currentJob.perConversation.push(row);
@@ -856,9 +858,11 @@ async function syncConversations({
           }
         }
 
+        const syncedAt = Date.now();
         await defaultBackgroundStorage.patchSyncMapping(conversationId, {
           feishuDocId: docId,
           feishuLastContentHash: contentHash,
+          feishuLastSyncedAt: syncedAt,
         });
 
         row = buildPerConversationResult({
@@ -869,7 +873,7 @@ async function syncConversations({
           appended,
           error: '',
           warnings: limitWarnings([...createWarnings, ...appendWarnings], 20),
-          at: Date.now(),
+          at: syncedAt,
         });
       }
     } catch (e: any) {
