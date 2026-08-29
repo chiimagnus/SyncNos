@@ -1,5 +1,6 @@
 import { openDb } from '@platform/idb/schema';
 import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
 const SYNCNOS_ASSET_PREFIX = 'syncnos-asset://';
@@ -223,33 +224,46 @@ async function upsertCachedImageAsset(input: {
   const safeUrl = String(input.url || '').trim();
   if (!safeUrl) throw new Error('image cache url required');
 
-  const db = await openDb();
-  const { t, stores } = tx(db, ['image_cache'], 'readwrite');
-  const idx = stores.image_cache.index('by_conversationId_url');
-
-  const existing = (await reqToPromise(idx.get([input.conversationId, safeUrl]) as any)) as ImageCacheRow | undefined;
-  const now = Date.now();
   const byteSize = Number(input.byteSize) || input.blob.size || 0;
   const contentType = parseContentType(input.contentType || input.blob.type);
   const dataUrl = String(input.dataUrl || '').trim();
-  const record: ImageCacheRow = {
-    ...(existing && existing.id ? { id: existing.id } : {}),
-    conversationId: input.conversationId,
-    url: safeUrl,
-    ...(dataUrl ? { dataUrl } : existing?.dataUrl ? { dataUrl: existing.dataUrl } : {}),
-    blob: input.blob,
-    byteSize,
-    contentType,
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-  };
+  const db = await openDb();
 
-  const putResult = await reqToPromise(stores.image_cache.put(record as any));
-  await txDone(t);
+  return runTrackedTransaction(
+    { db, stores: ['image_cache'], revisionScopes: ['image_cache'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.image_cache.index('by_conversationId_url');
+      const existing = (await reqToPromise(
+        idx.get([input.conversationId, safeUrl]) as any,
+      )) as ImageCacheRow | undefined;
+      const existingByteSize = reusableImageCacheByteSize(existing);
+      if (existing && existingByteSize > 0) {
+        const existingId = Number(existing.id);
+        if (!Number.isFinite(existingId) || existingId <= 0) throw new Error('invalid image cache id');
+        return { id: existingId, byteSize: existingByteSize };
+      }
 
-  const nextId = Number(putResult ?? existing?.id);
-  if (!Number.isFinite(nextId) || nextId <= 0) throw new Error('invalid image cache id');
-  return { id: nextId, byteSize };
+      const now = Date.now();
+      const existingId = Number(existing?.id);
+      const record: ImageCacheRow = {
+        ...(Number.isFinite(existingId) && existingId > 0 ? { id: existingId } : {}),
+        conversationId: input.conversationId,
+        url: safeUrl,
+        ...(dataUrl ? { dataUrl } : existing?.dataUrl ? { dataUrl: existing.dataUrl } : {}),
+        blob: input.blob,
+        byteSize,
+        contentType,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+      };
+
+      const putResult = await reqToPromise(stores.image_cache.put(record as any));
+      markChanged('image_cache');
+      const nextId = Number(putResult ?? existingId);
+      if (!Number.isFinite(nextId) || nextId <= 0) throw new Error('invalid image cache id');
+      return { id: nextId, byteSize };
+    },
+  );
 }
 
 async function ensureCachedAssetRecord(row: ImageCacheRow): Promise<CachedAsset | null> {

@@ -378,6 +378,22 @@ describe('data revision storage', () => {
     expect(await readDataRevision('messages')).toBe(3);
   });
 
+  it('advances image_cache only for the first persistent asset write', async () => {
+    const { inlineChatImagesInMessages } = await import('@services/conversations/data/image-inline');
+    const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([1, 3, 5, 7])).toString('base64')}`;
+    const makeMessages = () => [
+      { messageKey: 'm-image', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 1 },
+    ];
+
+    const first = makeMessages();
+    await inlineChatImagesInMessages({ conversationId: 43, messages: first, enableHttpImages: false });
+    expect(await readDataRevision('image_cache')).toBe(1);
+
+    const second = makeMessages();
+    await inlineChatImagesInMessages({ conversationId: 43, messages: second, enableHttpImages: false });
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
   it('keeps all five revisions stable for merge self-target and missing-remove no-ops', async () => {
     const { mergeConversationsByIds, upsertConversation } = await import('@services/conversations/data/storage-idb');
     const keep = await upsertConversation({
