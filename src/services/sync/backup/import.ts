@@ -732,116 +732,84 @@ export async function importBackupZipV2Merge(
   }
 
   if (imageCacheAssets.length) {
-    const { t, stores: s } = tx(db, ['image_cache'], 'readwrite');
-    const idx = s.image_cache.index('by_conversationId_url');
-    const now = Date.now();
-
     progress.stage = 'Assets';
     report();
+    await runTrackedTransaction(
+      { db, stores: ['image_cache'], revisionScopes: ['image_cache'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.image_cache.index('by_conversationId_url');
+        const now = Date.now();
 
-    for (let i = 0; i < imageCacheAssets.length; i += 1) {
-      const asset = imageCacheAssets[i];
-      const assetId = Number(asset && asset.assetId);
-      if (!Number.isFinite(assetId) || assetId <= 0) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-      const uniqueKey = asset && asset.uniqueKey ? String(asset.uniqueKey) : '';
-      if (!uniqueKey.trim()) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-      const localConversationId = uniqueToLocalId.get(uniqueKey);
-      if (!localConversationId) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+        for (const asset of imageCacheAssets) {
+          const assetId = Number(asset?.assetId);
+          if (!Number.isFinite(assetId) || assetId <= 0) continue;
+          const uniqueKey = asset?.uniqueKey ? String(asset.uniqueKey) : '';
+          if (!uniqueKey.trim()) continue;
+          const localConversationId = uniqueToLocalId.get(uniqueKey);
+          if (!localConversationId) continue;
 
-      const url = asset && asset.url ? String(asset.url) : '';
-      const safeUrl = url.trim();
-      if (!safeUrl) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+          const safeUrl = asset?.url ? String(asset.url).trim() : '';
+          if (!safeUrl) continue;
+          const contentType = parseContentType(asset?.contentType);
+          if (!contentType.startsWith('image/')) continue;
 
-      const contentType = parseContentType(asset && asset.contentType ? asset.contentType : '');
-      if (!contentType.startsWith('image/')) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+          const blobPath = asset?.blobPath ? String(asset.blobPath) : '';
+          const bytes = blobPath ? entries.get(blobPath) : null;
+          if (!bytes) {
+            fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
+            continue;
+          }
+          const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
+          const byteSize = Number(asset.byteSize) || blob.size || 0;
+          if (byteSize <= 0) {
+            fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
+            continue;
+          }
 
-      const blobPath = asset && asset.blobPath ? String(asset.blobPath) : '';
-      const bytes = blobPath ? entries.get(blobPath) : null;
-      if (!bytes) {
-        fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-      const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
-      const byteSize = Number(asset.byteSize) || blob.size || 0;
-      if (byteSize <= 0) {
-        fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+          const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
+          if (existing?.id) {
+            const existingId = Number(existing.id);
+            if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
 
-      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
-      if (existing && existing.id) {
-        const existingId = Number(existing.id);
-        if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
+            const existingBlob = existing.blob as unknown;
+            const existingSize = Number(existing.byteSize) || (existingBlob instanceof Blob ? existingBlob.size : 0) || 0;
+            if (existingBlob instanceof Blob && existingSize > 0) continue;
 
-        const existingBlob = (existing as any).blob as unknown;
-        const existingSize =
-          Number((existing as any).byteSize) || (existingBlob instanceof Blob ? existingBlob.size : 0) || 0;
-        if (existingBlob instanceof Blob && existingSize > 0) {
-          if (i % 20 === 0) report();
-          bump(1, 'Assets');
-          continue;
+            await reqToPromise(
+              s.image_cache.put({
+                ...existing,
+                conversationId: localConversationId,
+                url: safeUrl,
+                blob,
+                byteSize,
+                contentType,
+                createdAt: Number(existing.createdAt) || Number(asset.createdAt) || now,
+                updatedAt: now,
+              } as any),
+            );
+            markChanged('image_cache');
+            continue;
+          }
+
+          const nextId = Number(
+            await reqToPromise(
+              s.image_cache.add({
+                conversationId: localConversationId,
+                url: safeUrl,
+                blob,
+                byteSize,
+                contentType,
+                createdAt: Number(asset.createdAt) || now,
+                updatedAt: now,
+              } as any) as any,
+            ),
+          );
+          if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
+          markChanged('image_cache');
         }
-
-        const next = {
-          ...existing,
-          conversationId: localConversationId,
-          url: safeUrl,
-          blob,
-          byteSize,
-          contentType,
-          createdAt: Number(existing.createdAt) || Number(asset.createdAt) || now,
-          updatedAt: now,
-        };
-
-        await reqToPromise(s.image_cache.put(next as any));
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-
-      const record = {
-        conversationId: localConversationId,
-        url: safeUrl,
-        blob,
-        byteSize,
-        contentType,
-        createdAt: Number(asset.createdAt) || now,
-        updatedAt: now,
-      };
-
-      const newId = await reqToPromise(s.image_cache.add(record as any) as any);
-      const nextId = Number(newId);
-      if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
-
-      if (i % 20 === 0) report();
-      bump(1, 'Assets');
-    }
-
-    await txDone(t);
+      },
+    );
+    reportCommittedStage(imageCacheAssets.length, 'Assets');
   }
 
   // If we restored some assets, rewrite `syncnos-asset://<oldId>` references to the local asset ids.
