@@ -231,27 +231,27 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
           triggerEnd: session.triggerEnd,
         };
         const editorElSnapshot = editor.el;
+        const isCurrentPickSession = () =>
+          !stopped &&
+          pickId === pickSeq &&
+          session?.open === true &&
+          session.query === sessionSnapshot.query &&
+          session.triggerStart === sessionSnapshot.triggerStart &&
+          session.triggerEnd === sessionSnapshot.triggerEnd;
 
         const index = clamp(session.highlightIndex || 0, 0, items.length - 1);
         const picked = items[index];
         const conversationId = Number(picked?.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return;
 
+        let inserted = false;
         pickInFlight = true;
         deactivateMentionActivation();
 
         try {
           const payload = await buildMentionInsertText(rt, { conversationId });
-          if (stopped) return;
-          if (pickId !== pickSeq) return;
-          if (!session || !session.open) return;
-          if (
-            session.query !== sessionSnapshot.query ||
-            session.triggerStart !== sessionSnapshot.triggerStart ||
-            session.triggerEnd !== sessionSnapshot.triggerEnd
-          ) {
-            return;
-          }
+          if (!isCurrentPickSession()) return;
+
           const currentEditor = adapter.detectActiveEditor();
           if (!currentEditor || currentEditor.el !== editorElSnapshot) return;
 
@@ -260,26 +260,18 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
           const range = { start: sessionSnapshot.triggerStart, end: sessionSnapshot.triggerEnd };
           adapter.replaceRange(currentEditor, range, markdown);
+          inserted = true;
           adapter.focus(currentEditor);
-
-          pickInFlight = false;
-          deactivateMentionActivation();
-          session = null;
-          items = [];
-          hidePopup();
         } catch (error) {
-          if (rt.isInvalidContextError?.(error)) {
-            stop();
-            return;
-          }
-          if (
-            !stopped &&
-            pickId === pickSeq &&
-            session?.open &&
-            session.query === sessionSnapshot.query &&
-            session.triggerStart === sessionSnapshot.triggerStart &&
-            session.triggerEnd === sessionSnapshot.triggerEnd
-          ) {
+          if (rt.isInvalidContextError?.(error)) stop();
+        } finally {
+          if (inserted) {
+            pickInFlight = false;
+            deactivateMentionActivation();
+            session = null;
+            items = [];
+            hidePopup();
+          } else if (isCurrentPickSession()) {
             pickInFlight = false;
             activateMentionSession();
           }

@@ -518,6 +518,85 @@ describe('item mention chatgpt controller', () => {
     active?.stop?.();
   });
 
+  it('resumes the current mention activation when BUILD resolves with empty markdown', async () => {
+    const send = vi.fn(async (type: string) => {
+      if (type === ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES) {
+        return { ok: true, data: { candidates: [candidate(1)] }, error: null };
+      }
+      if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) {
+        return { ok: true, data: { conversationId: 1, markdown: '' }, error: null };
+      }
+      return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
+    });
+    const active = createItemMentionController({
+      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      ui: uiMocks,
+    }).start();
+    const el = document.querySelector('#prompt-textarea') as HTMLElement;
+    (el as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    el.textContent = '$a';
+    (el as any).focus?.();
+    setCaretToEnd(el);
+    el.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
+    await runDebounce();
+
+    el.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(el.textContent).toBe('$a');
+    expect(revisionUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(revisionMocks.subscribe).toHaveBeenCalledTimes(2);
+    expect(latestRender()?.open).toBe(true);
+
+    active?.stop?.();
+  });
+
+  it('resumes the current mention activation when the editor identity changes during BUILD', async () => {
+    const build = deferred<any>();
+    const send = vi.fn(async (type: string) => {
+      if (type === ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES) {
+        return { ok: true, data: { candidates: [candidate(1)] }, error: null };
+      }
+      if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) return build.promise;
+      return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
+    });
+    const active = createItemMentionController({
+      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      ui: uiMocks,
+    }).start();
+    const oldEditor = document.querySelector('#prompt-textarea') as HTMLElement;
+    (oldEditor as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    oldEditor.textContent = '$a';
+    (oldEditor as any).focus?.();
+    setCaretToEnd(oldEditor);
+    oldEditor.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
+    await runDebounce();
+
+    oldEditor.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    const replacement = document.createElement('div');
+    replacement.id = 'prompt-textarea';
+    replacement.setAttribute('role', 'textbox');
+    replacement.setAttribute('contenteditable', 'true');
+    (replacement as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    replacement.textContent = '$a';
+    oldEditor.replaceWith(replacement);
+    (replacement as any).focus?.();
+    setCaretToEnd(replacement);
+
+    build.resolve({ ok: true, data: { conversationId: 1, markdown: 'MD' }, error: null });
+    await build.promise;
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(replacement.textContent).toBe('$a');
+    expect(revisionUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(revisionMocks.subscribe).toHaveBeenCalledTimes(2);
+    expect(latestRender()?.open).toBe(true);
+
+    active?.stop?.();
+  });
+
   it('unsubscribes immediately on pick and stop while keeping BUILD_MENTION_INSERT_TEXT one-shot', async () => {
     const build = deferred<any>();
     const send = vi.fn(async (type: string) => {
