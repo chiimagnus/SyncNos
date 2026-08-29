@@ -213,7 +213,12 @@ describe('backup service', () => {
     await importBackupZipV2Merge(entries);
     const restoredDb = await openDb();
     const restoredTx = restoredDb.transaction(['conversations', 'sync_mappings', 'github_cleanup_outbox'], 'readonly');
-    expect(await reqToPromise(restoredTx.objectStore('conversations').count())).toBe(1);
+    const restoredConversations = await reqToPromise<any[]>(restoredTx.objectStore('conversations').getAll());
+    expect(restoredConversations).toHaveLength(1);
+    expect(restoredConversations[0]).toMatchObject({
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'domain:x',
+    });
     expect(await reqToPromise(restoredTx.objectStore('sync_mappings').count())).toBe(1);
     expect(await reqToPromise(restoredTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await new Promise<void>((resolve, reject) => {
@@ -926,6 +931,10 @@ describe('backup service', () => {
     });
 
     expect(convs.length).toBe(1);
+    expect(convs[0]).toMatchObject({
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'domain:x',
+    });
     expect(msgs.length).toBe(1);
     expect(maps.length).toBe(1);
     expect(cleanupRows).toEqual([]);

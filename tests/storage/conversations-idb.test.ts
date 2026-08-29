@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 
 import {
@@ -44,6 +45,43 @@ async function deleteDb(name: string) {
   const req = indexedDB.deleteDatabase(name);
   await reqToPromise(req as unknown as IDBRequest<unknown>);
 }
+
+describe('conversation list stored-key normalization', () => {
+  it('normalizes source/site keys and only falls back to stored keys when source/url cannot derive them', () => {
+    expect(
+      normalizeConversationListRecord({
+        source: ' Web ',
+        url: 'HTTPS://Example.COM/path#fragment',
+        listSourceKey: 'stale-source',
+        listSiteKey: 'stale.example',
+      }),
+    ).toMatchObject({ listSourceKey: 'web', listSiteKey: 'domain:example.com' });
+
+    expect(
+      normalizeConversationListRecord({
+        source: ' ',
+        url: 'mailto:test@example.com',
+        listSourceKey: ' ChatGPT ',
+        listSiteKey: ' Example.COM ',
+      }),
+    ).toMatchObject({ listSourceKey: 'chatgpt', listSiteKey: 'domain:example.com' });
+
+    expect(normalizeConversationListRecord({ source: '', url: 'not a url' })).toMatchObject({
+      listSourceKey: 'unknown',
+      listSiteKey: 'unknown',
+    });
+  });
+
+  it('preserves object identity when the stored keys are already canonical', () => {
+    const record = {
+      source: 'web',
+      url: 'https://example.com/post',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
+    };
+    expect(normalizeConversationListRecord(record)).toBe(record);
+  });
+});
 
 beforeEach(async () => {
   __resetConversationStorageStateForTests();

@@ -181,7 +181,7 @@ describe('conversations pagination storage-idb', () => {
 
     const filtered = await getConversationListBootstrap({
       sourceKey: 'web',
-      siteKey: 'domain:example.com',
+      siteKey: 'Example.COM',
       limit: 20,
     });
     expect(filtered.summary.totalCount).toBe(2);

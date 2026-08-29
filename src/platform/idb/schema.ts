@@ -1,3 +1,4 @@
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import {
   GITHUB_CLEANUP_OUTBOX_DUE_INDEX,
   GITHUB_CLEANUP_OUTBOX_STORE,
@@ -50,26 +51,6 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   return Array.from(values);
 }
 
-function parseSiteKeyFromUrl(url: unknown): string {
-  const normalizedUrl = normalizeHttpUrl(url);
-  if (!normalizedUrl) return 'unknown';
-  try {
-    const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
-    return host ? `domain:${host}` : 'unknown';
-  } catch (_e) {
-    return 'unknown';
-  }
-}
-
-function deriveConversationListSourceKey(row: Record<string, unknown> | undefined): string {
-  const source = safeString(row?.source).toLowerCase();
-  return source || 'unknown';
-}
-
-function deriveConversationListSiteKey(row: Record<string, unknown> | undefined): string {
-  return parseSiteKeyFromUrl(row?.url);
-}
-
 function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void {
   if (!db.objectStoreNames.contains('conversations')) return;
   const conversationsStore = tx.objectStore('conversations');
@@ -78,19 +59,10 @@ function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void
     const cursor = req.result;
     if (!cursor) return;
     const value = (cursor.value || {}) as Record<string, unknown>;
-    const nextSourceKey = deriveConversationListSourceKey(value);
-    const nextSiteKey = deriveConversationListSiteKey(value);
+    const normalized = normalizeConversationListRecord(value);
     const hasLegacyDescription = Object.prototype.hasOwnProperty.call(value, 'description');
-    if (
-      safeString(value.listSourceKey) !== nextSourceKey ||
-      safeString(value.listSiteKey) !== nextSiteKey ||
-      hasLegacyDescription
-    ) {
-      const next = {
-        ...value,
-        listSourceKey: nextSourceKey,
-        listSiteKey: nextSiteKey,
-      } as Record<string, unknown>;
+    if (normalized !== value || hasLegacyDescription) {
+      const next = { ...normalized } as Record<string, unknown>;
       if (hasLegacyDescription) delete (next as any).description;
       cursor.update(next as any);
     }

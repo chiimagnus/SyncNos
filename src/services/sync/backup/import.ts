@@ -1,3 +1,4 @@
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
 import {
@@ -137,41 +138,6 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
-function deriveConversationListSourceKey(record: AnyRecord): string {
-  const source = safeString(record?.source).toLowerCase();
-  return source || 'unknown';
-}
-
-function deriveConversationListSiteKey(record: AnyRecord): string {
-  const normalizedUrl = normalizeHttpUrl(record?.url);
-  if (!normalizedUrl) return 'unknown';
-  try {
-    const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
-    return host ? `domain:${host}` : 'unknown';
-  } catch (_e) {
-    return 'unknown';
-  }
-}
-
-function normalizeListDerivedKeys(record: AnyRecord): AnyRecord {
-  if (!record || typeof record !== 'object') return record;
-  const existingListSourceKey = safeString(record?.listSourceKey);
-  const existingListSiteKey = safeString(record?.listSiteKey);
-
-  const derivedSourceKey = deriveConversationListSourceKey(record);
-  const nextListSourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : existingListSourceKey || 'unknown';
-
-  const derivedSiteKey = deriveConversationListSiteKey(record);
-  const nextListSiteKey = derivedSiteKey !== 'unknown' ? derivedSiteKey : existingListSiteKey || 'unknown';
-
-  if (existingListSourceKey === nextListSourceKey && existingListSiteKey === nextListSiteKey) return record;
-  return {
-    ...(record as any),
-    listSourceKey: nextListSourceKey,
-    listSiteKey: nextListSiteKey,
-  };
-}
-
 const CONVERSATION_MAPPING_MIRROR_FIELDS = [
   'notionPageId',
   'notionPageUrl',
@@ -292,7 +258,7 @@ export async function importBackupLegacyJsonMerge(
       }
 
       const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = normalizeListDerivedKeys(mergeConversationRecord(existing, incoming));
+      const merged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
 
       if (existing && existing.id) {
         merged.id = existing.id;
@@ -559,7 +525,7 @@ export async function importBackupZipV2Merge(
       const merged = mergeConversationRecord(existing, incoming);
       merged.source = source;
       merged.conversationKey = conversationKey;
-      const normalizedMerged = normalizeListDerivedKeys(merged);
+      const normalizedMerged = normalizeConversationListRecord(merged);
 
       const uk = uniqueConversationKey(normalizedMerged);
       if (existing && existing.id) {

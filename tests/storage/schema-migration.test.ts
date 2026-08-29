@@ -459,6 +459,19 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
         lastCapturedAt: 20,
       }),
     );
+    await reqToPromise(
+      conversations.add({
+        sourceType: 'chat',
+        source: '',
+        conversationKey: 'legacy-fallback',
+        title: 'legacy fallback',
+        url: 'not-a-http-url',
+        listSourceKey: ' ChatGPT ',
+        listSiteKey: ' Example.COM ',
+        description: 'legacy description',
+        lastCapturedAt: 30,
+      }),
+    );
     await txDone(tx7);
     db7.close();
 
@@ -482,6 +495,12 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
     expect(article).toBeTruthy();
     expect(article.listSourceKey).toBe('web');
     expect(article.listSiteKey).toBe('domain:example.com');
+
+    const legacyFallback = rows.find((row) => row.conversationKey === 'legacy-fallback');
+    expect(legacyFallback).toBeTruthy();
+    expect(legacyFallback.listSourceKey).toBe('chatgpt');
+    expect(legacyFallback.listSiteKey).toBe('domain:example.com');
+    expect(Object.prototype.hasOwnProperty.call(legacyFallback, 'description')).toBe(false);
   });
 });
 

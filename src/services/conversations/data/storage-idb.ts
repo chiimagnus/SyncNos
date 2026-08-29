@@ -18,6 +18,7 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
 import {
   mergeSyncMappingForIdentityMove,
@@ -82,51 +83,6 @@ function normalizeMessageTimestamp(value: unknown): number {
 function normalizeListKey(value: unknown, fallback: string): string {
   const text = safeString(value).toLowerCase();
   return text || fallback;
-}
-
-function parseListSiteKeyFromUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return 'unknown';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return 'unknown';
-    const host = normalizeListKey(url.hostname, '');
-    return host ? `domain:${host}` : 'unknown';
-  } catch (_e) {
-    return 'unknown';
-  }
-}
-
-function deriveConversationListSourceKey(record: any): string {
-  return normalizeListKey(record?.source, 'unknown');
-}
-
-function deriveConversationListSiteKey(record: any): string {
-  return parseListSiteKeyFromUrl(record?.url);
-}
-
-function normalizeConversationListRecord<T extends Record<string, any>>(record: T): T {
-  const existingSourceKey = safeString(record?.listSourceKey);
-  const existingSiteKey = safeString(record?.listSiteKey);
-  const derivedSourceKey = deriveConversationListSourceKey(record);
-  const sourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : normalizeListKey(existingSourceKey, 'unknown');
-
-  const derivedSiteKey = normalizeConversationListSiteFilterKey(deriveConversationListSiteKey(record));
-  // When url is present and valid, derivedSiteKey wins. Only fall back to the stored key
-  // when we cannot derive a stable domain value.
-  const siteKey =
-    derivedSiteKey !== 'unknown'
-      ? derivedSiteKey
-      : existingSiteKey
-        ? normalizeConversationListSiteFilterKey(existingSiteKey)
-        : 'unknown';
-  if (existingSourceKey === sourceKey && existingSiteKey === siteKey) return record;
-  return {
-    ...record,
-    listSourceKey: sourceKey,
-    listSiteKey: siteKey,
-  } as T;
 }
 
 function toComparableCursor(cursor: ConversationListCursor | null | undefined): ConversationListCursor | null {
@@ -1078,10 +1034,9 @@ async function readConversationListSummaryAndFacets(input: {
       const cursor = request.result;
       if (!cursor) return resolve();
       const raw = (cursor.value || {}) as any;
-      const rowSourceKey = normalizeListKey(safeString(raw.listSourceKey) || safeString(raw.source), 'unknown');
-      const rowSiteKey = normalizeConversationListSiteFilterKey(
-        safeString(raw.listSiteKey) || deriveConversationListSiteKey(raw),
-      );
+      const normalized = normalizeConversationListRecord(raw);
+      const rowSourceKey = normalizeListKey(normalized.listSourceKey, 'unknown');
+      const rowSiteKey = normalizeConversationListSiteFilterKey(normalized.listSiteKey);
       const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
 
       const sourceFacet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
@@ -1476,8 +1431,7 @@ export async function searchConversationMentionCandidates(input?: {
       const source = safeString(record?.source);
       const url = safeString(record?.url);
       const sourceType = safeString(record?.sourceType) || 'chat';
-      const domain =
-        stripDomainPrefix(safeString(record?.listSiteKey)) || stripDomainPrefix(deriveConversationListSiteKey(record));
+      const domain = stripDomainPrefix(safeString(record?.listSiteKey));
 
       const shouldKeep = (() => {
         if (!Number.isFinite(conversationId) || conversationId <= 0) return false;
