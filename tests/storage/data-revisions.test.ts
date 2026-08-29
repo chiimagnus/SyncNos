@@ -399,6 +399,18 @@ describe('data revision storage', () => {
     expect(await readDataRevisionSnapshot()).toEqual(before);
   });
 
+  it('keeps the snapshot stable when delete receives valid ids with no matching conversation', async () => {
+    const { deleteConversationsByIds } = await import('@services/conversations/data/storage-idb');
+    const before = await readDataRevisionSnapshot();
+    expect(await deleteConversationsByIds([999_999])).toEqual({
+      deletedConversations: 0,
+      deletedMessages: 0,
+      deletedMappings: 0,
+      deletedImageCache: 0,
+    });
+    expect(await readDataRevisionSnapshot()).toEqual(before);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 

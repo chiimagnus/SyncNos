@@ -1290,6 +1290,77 @@ describe('conversations storage-idb', () => {
     await txDone(verifyTx);
   });
 
+  it('advances each affected scope once when deleting an article with messages, mapping, image, and comments', async () => {
+    const canonicalUrl = 'https://example.com/delete-revisions';
+    const convo = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${canonicalUrl}`,
+      title: 'Delete revisions',
+      url: canonicalUrl,
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'delete me', sequence: 1, updatedAt: 1 },
+    ]);
+    await seedImageCacheRow({
+      conversationId: id,
+      url: 'https://example.com/delete.png',
+      blob: new Blob(['image'], { type: 'image/png' }),
+      byteSize: 5,
+    });
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings', 'article_comments'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'web',
+        conversationKey: `article:${canonicalUrl}`,
+        notionPageId: 'page-delete',
+      }),
+    );
+    const commentId = await reqToPromise<number>(
+      seedTx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId: id,
+        canonicalUrl,
+        quoteText: '',
+        commentText: 'detach me',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await txDone(seedTx);
+
+    const before = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
+
+    const result = await deleteConversationsByIds([id]);
+    expect(result).toEqual({
+      deletedConversations: 1,
+      deletedMessages: 1,
+      deletedMappings: 1,
+      deletedImageCache: 1,
+    });
+    expect(await readDataRevision('conversations')).toBe(before.conversations + 1);
+    expect(await readDataRevision('messages')).toBe(before.messages + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(before.sync_mappings + 1);
+    expect(await readDataRevision('image_cache')).toBe(before.image_cache + 1);
+    expect(await readDataRevision('article_comments')).toBe(before.article_comments + 1);
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['article_comments'], 'readonly');
+    const detached = await reqToPromise<any>(verifyTx.objectStore('article_comments').get(commentId));
+    await txDone(verifyTx);
+    expect(detached).toMatchObject({ id: commentId, conversationId: null, canonicalUrl });
+  });
+
   it('atomically enqueues only identity-owned GitHub managed paths before deleting local facts', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
@@ -1466,6 +1537,13 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(commentTx);
+    const revisionsBeforeFailure = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
     const probeTx = db.transaction(['github_cleanup_outbox'], 'readonly');
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
@@ -1490,6 +1568,11 @@ describe('conversations storage-idb', () => {
     expect(comments[0]?.conversationId).toBe(id);
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
+    expect(await readDataRevision('conversations')).toBe(revisionsBeforeFailure.conversations);
+    expect(await readDataRevision('messages')).toBe(revisionsBeforeFailure.messages);
+    expect(await readDataRevision('sync_mappings')).toBe(revisionsBeforeFailure.sync_mappings);
+    expect(await readDataRevision('image_cache')).toBe(revisionsBeforeFailure.image_cache);
+    expect(await readDataRevision('article_comments')).toBe(revisionsBeforeFailure.article_comments);
   });
 
   it('rewrites an explicit article identity atomically while migrating owned and orphan comments', async () => {

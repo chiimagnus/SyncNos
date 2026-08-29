@@ -1309,106 +1309,88 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   }
 
   const db = await openDb();
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-    'readwrite',
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+      revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+    },
+    async ({ stores, markChanged }) => {
+      let deletedConversations = 0;
+      let deletedMessages = 0;
+      let deletedMappings = 0;
+      let deletedImageCache = 0;
+
+      const msgIdx = stores.messages.index('by_conversationId_sequence');
+      const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
+      const imageCacheIdx = stores.image_cache.index('by_conversationId');
+      const articleCommentsIdx = stores.article_comments.index('by_conversationId_createdAt');
+      const now = Date.now();
+
+      for (const id of ids) {
+        const convo: any = await reqToPromise(stores.conversations.get(id));
+        if (!convo) continue;
+
+        const source = safeString(convo.source);
+        const conversationKey = safeString(convo.conversationKey);
+        if (source && conversationKey) {
+          const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
+          if (mapping && mapping.id) {
+            await enqueueGithubCleanupSnapshot(
+              stores[GITHUB_CLEANUP_OUTBOX_STORE],
+              readOwnedGithubCleanupSnapshot(mapping, convo),
+              { reason: 'delete', createdAt: now },
+            );
+            await reqToPromise(stores.sync_mappings.delete(mapping.id));
+            markChanged('sync_mappings');
+            deletedMappings += 1;
+          }
+        }
+
+        if (safeString(convo.sourceType).toLowerCase() === 'article') {
+          const commentRange = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+          const commentRows = (await reqToPromise(articleCommentsIdx.getAll(commentRange) as any)) as any[];
+          for (const row of Array.isArray(commentRows) ? commentRows : []) {
+            if (!row || row.conversationId == null) continue;
+            await reqToPromise(stores.article_comments.put({ ...row, conversationId: null }));
+            markChanged('article_comments');
+          }
+        }
+
+        const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+        const messageRows = (await reqToPromise(msgIdx.getAll(range) as any)) as any[];
+        for (const row of Array.isArray(messageRows) ? messageRows : []) {
+          const rowId = Number(row?.id);
+          if (!Number.isFinite(rowId) || rowId <= 0) continue;
+          await reqToPromise(stores.messages.delete(rowId));
+          markChanged('messages');
+          deletedMessages += 1;
+        }
+
+        const imgRange = globalThis.IDBKeyRange.only(id);
+        const imageRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
+        for (const row of Array.isArray(imageRows) ? imageRows : []) {
+          const rowId = Number(row?.id);
+          if (!Number.isFinite(rowId) || rowId <= 0) continue;
+          await reqToPromise(stores.image_cache.delete(rowId));
+          markChanged('image_cache');
+          deletedImageCache += 1;
+        }
+
+        await reqToPromise(stores.conversations.delete(id));
+        markChanged('conversations');
+        deletedConversations += 1;
+      }
+
+      return {
+        result: { deletedConversations, deletedMessages, deletedMappings, deletedImageCache },
+        conversationChanged: deletedConversations > 0,
+      };
+    },
   );
 
-  let deletedConversations = 0;
-  let deletedMessages = 0;
-  let deletedMappings = 0;
-  let deletedImageCache = 0;
-
-  const msgIdx = stores.messages.index('by_conversationId_sequence');
-  const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
-  const imageCacheIdx = stores.image_cache.index('by_conversationId');
-  const articleCommentsIdx = stores.article_comments.index('by_conversationId_createdAt');
-  const now = Date.now();
-
-  try {
-    for (const id of ids) {
-      const convo: any = await reqToPromise(stores.conversations.get(id));
-      if (!convo) continue;
-
-      const source = safeString(convo.source);
-      const conversationKey = safeString(convo.conversationKey);
-      if (source && conversationKey) {
-        const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
-        if (mapping && mapping.id) {
-          await enqueueGithubCleanupSnapshot(
-            stores[GITHUB_CLEANUP_OUTBOX_STORE],
-            readOwnedGithubCleanupSnapshot(mapping, convo),
-            { reason: 'delete', createdAt: now },
-          );
-          await reqToPromise(stores.sync_mappings.delete(mapping.id));
-          deletedMappings += 1;
-        }
-      }
-
-      if (safeString(convo.sourceType).toLowerCase() === 'article') {
-        const commentRange = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
-        const commentCursor = articleCommentsIdx.openCursor(commentRange);
-        await new Promise<void>((resolve, reject) => {
-          commentCursor.onerror = () => reject(commentCursor.error || new Error('article comment cursor failed'));
-          commentCursor.onsuccess = () => {
-            const cursor = commentCursor.result;
-            if (!cursor) return resolve();
-            const row = cursor.value as Record<string, unknown>;
-            let updateRequest: IDBRequest;
-            try {
-              updateRequest = cursor.update({ ...row, conversationId: null });
-            } catch (error) {
-              reject(error);
-              return;
-            }
-            updateRequest.onerror = () => reject(updateRequest.error || new Error('article comment detach failed'));
-            updateRequest.onsuccess = () => cursor.continue();
-          };
-        });
-      }
-
-      const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
-      const cursorReq = msgIdx.openCursor(range);
-      await new Promise<void>((resolve, reject) => {
-        cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-        cursorReq.onsuccess = () => {
-          const cursor = cursorReq.result;
-          if (!cursor) return resolve();
-          cursor.delete();
-          deletedMessages += 1;
-          cursor.continue();
-        };
-      });
-
-      await reqToPromise(stores.conversations.delete(id));
-      deletedConversations += 1;
-
-      const imgRange = globalThis.IDBKeyRange.only(id);
-      const imgCursorReq = imageCacheIdx.openCursor(imgRange);
-      await new Promise<void>((resolve, reject) => {
-        imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
-        imgCursorReq.onsuccess = () => {
-          const cursor = imgCursorReq.result;
-          if (!cursor) return resolve();
-          cursor.delete();
-          deletedImageCache += 1;
-          cursor.continue();
-        };
-      });
-    }
-
-    await txDone(t);
-  } catch (error) {
-    try {
-      t.abort();
-    } catch (_abortError) {
-      // The transaction may already be aborted by the failing request.
-    }
-    throw error;
-  }
-  invalidateConversationListStatsCache();
-  return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.result;
 }
 
 export async function getConversationById(conversationId: number): Promise<Conversation | null> {
