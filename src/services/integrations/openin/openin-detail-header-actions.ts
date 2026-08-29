@@ -26,6 +26,45 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
+function hasOwnProperty(record: unknown, field: string): boolean {
+  return !!record && typeof record === 'object' && Object.prototype.hasOwnProperty.call(record, field);
+}
+
+function resolveFreshProviderConversation(
+  conversation: Conversation | null | undefined,
+  mappingRes: any,
+  field: string,
+): Conversation | null | undefined {
+  if (!conversation || !mappingRes) return conversation;
+
+  const target = hasOwnProperty(mappingRes.mapping, field)
+    ? safeString(mappingRes.mapping?.[field])
+    : safeString(mappingRes.conversation?.[field]);
+  return { ...(conversation as any), [field]: target } as Conversation;
+}
+
+function resolveFreshNotionConversation(
+  conversation: Conversation | null | undefined,
+  mappingRes: any,
+): Conversation | null | undefined {
+  if (!conversation || !mappingRes) return conversation;
+
+  const pageId = normalizeNotionPageId(
+    hasOwnProperty(mappingRes.mapping, 'notionPageId')
+      ? safeString(mappingRes.mapping?.notionPageId)
+      : safeString(mappingRes.conversation?.notionPageId),
+  );
+  const freshPageId = normalizeNotionPageId(safeString(mappingRes.conversation?.notionPageId));
+  const usesFreshTargetMetadata = !!pageId && freshPageId === pageId;
+
+  return {
+    ...(conversation as any),
+    notionPageId: pageId,
+    notionPageUrl: usesFreshTargetMetadata ? safeString(mappingRes.conversation?.notionPageUrl) : '',
+    notionWorkspaceSlug: usesFreshTargetMetadata ? safeString(mappingRes.conversation?.notionWorkspaceSlug) : '',
+  } as Conversation;
+}
+
 async function buildObsidianOpenInAction({
   conversation,
   port,
@@ -82,9 +121,6 @@ export async function resolveOpenInDetailHeaderActions({
     if (!mappingPromise) mappingPromise = getSyncMappingByConversation(conversationId).catch(() => null);
     return mappingPromise;
   };
-  const hydratedValue = (mappingRes: any, field: string) =>
-    safeString(mappingRes?.mapping?.[field]) || safeString(mappingRes?.conversation?.[field]);
-
   const [notionEnabled, obsidianEnabled, feishuEnabled, githubEnabled] = await Promise.all([
     isSyncProviderEnabled('notion').catch(() => true),
     isSyncProviderEnabled('obsidian').catch(() => true),
@@ -93,45 +129,13 @@ export async function resolveOpenInDetailHeaderActions({
   ]);
 
   if (notionEnabled) {
-    let convo = conversation;
-    const currentNotionPageId = normalizeNotionPageId(safeString((convo as any)?.notionPageId));
-    if (
-      convo &&
-      (!currentNotionPageId ||
-        !safeString((convo as any).notionPageUrl) ||
-        !safeString((convo as any).notionWorkspaceSlug))
-    ) {
-      const mappingRes = await resolveSyncMapping();
-      const currentPageId = normalizeNotionPageId(safeString((convo as any).notionPageId));
-      const hydratedPageId = normalizeNotionPageId(hydratedValue(mappingRes, 'notionPageId'));
-      const canHydrateTargetMetadata = Boolean(hydratedPageId) && (!currentPageId || currentPageId === hydratedPageId);
-      const pageId = currentPageId || hydratedPageId;
-      const pageUrl =
-        (currentPageId ? safeString((convo as any).notionPageUrl) : '') ||
-        (canHydrateTargetMetadata ? hydratedValue(mappingRes, 'notionPageUrl') : '');
-      const workspaceSlug =
-        (currentPageId ? safeString((convo as any).notionWorkspaceSlug) : '') ||
-        (canHydrateTargetMetadata ? hydratedValue(mappingRes, 'notionWorkspaceSlug') : '');
-      if (pageId || pageUrl || workspaceSlug) {
-        convo = {
-          ...(convo as any),
-          ...(pageId ? { notionPageId: pageId } : null),
-          ...(pageUrl ? { notionPageUrl: pageUrl } : null),
-          ...(workspaceSlug ? { notionWorkspaceSlug: workspaceSlug } : null),
-        } as any;
-      }
-    }
+    const convo = resolveFreshNotionConversation(conversation, await resolveSyncMapping());
     const notionAction = buildNotionOpenInAction({ conversation: convo, port, labels: DETAIL_HEADER_ACTION_LABELS });
     if (notionAction) actions.push(notionAction);
   }
 
   if (feishuEnabled) {
-    let convo = conversation;
-    if (convo && !safeString((convo as any).feishuDocId)) {
-      const mappingRes = await resolveSyncMapping();
-      const docId = hydratedValue(mappingRes, 'feishuDocId');
-      if (docId) convo = { ...(convo as any), feishuDocId: docId } as any;
-    }
+    const convo = resolveFreshProviderConversation(conversation, await resolveSyncMapping(), 'feishuDocId');
     const feishuAction = buildFeishuOpenInAction({ conversation: convo, port, labels: DETAIL_HEADER_ACTION_LABELS });
     if (feishuAction) actions.push(feishuAction);
   }

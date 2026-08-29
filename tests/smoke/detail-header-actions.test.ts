@@ -353,6 +353,8 @@ describe('detail-header-actions', () => {
         conversationKey: 'conv-5',
         title: 'Conversation',
         notionPageId: NOTION_PAGE_ID,
+        notionPageUrl: 'https://app.notion.com/p/chiimagnus/0123456789abcdef0123456789abcdef',
+        notionWorkspaceSlug: 'chiimagnus',
       },
       mapping: {
         notionPageId: NOTION_PAGE_ID,
@@ -382,9 +384,14 @@ describe('detail-header-actions', () => {
     expect(getSyncMappingByConversationMock).toHaveBeenCalledWith(5);
   });
 
-  it('recovers a valid hydrated Notion target when the conversation mirror has an invalid page id', async () => {
+  it('recovers a valid fresh Notion target when the conversation mirror has an invalid page id', async () => {
     getSyncMappingByConversationMock.mockResolvedValue({
-      conversation: { id: 6, notionPageId: NOTION_PAGE_ID },
+      conversation: {
+        id: 6,
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'mapping-workspace',
+        notionPageUrl: 'https://app.notion.com/p/mapping-workspace/0123456789abcdef0123456789abcdef',
+      },
       mapping: {
         notionPageId: NOTION_PAGE_ID,
         notionWorkspaceSlug: 'mapping-workspace',
@@ -412,7 +419,7 @@ describe('detail-header-actions', () => {
     expect(getSyncMappingByConversationMock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not hydrate unverifiable Notion URL metadata when the mapping has no valid page id', async () => {
+  it('does not revive a caller Notion target when fresh mapping data has no target', async () => {
     getSyncMappingByConversationMock.mockResolvedValue({
       conversation: { id: 7, notionPageId: '' },
       mapping: {
@@ -432,11 +439,11 @@ describe('detail-header-actions', () => {
       port: createPort(),
     });
 
-    expect(byId(actions, 'open-in-notion')?.href).toBe('https://www.notion.so/0123456789abcdef0123456789abcdef');
-    expect(byId(actions, 'copy-notion-link')?.href).toBe(byId(actions, 'open-in-notion')?.href);
+    expect(byId(actions, 'open-in-notion')).toBeUndefined();
+    expect(byId(actions, 'copy-notion-link')).toBeUndefined();
   });
 
-  it('preserves caller Notion metadata and never mixes metadata from a different hydrated target', async () => {
+  it('uses the fresh mapping target instead of a stale caller Notion mirror', async () => {
     getSyncMappingByConversationMock.mockResolvedValue({
       conversation: { id: 6, notionPageId: OTHER_NOTION_PAGE_ID },
       mapping: {
@@ -457,9 +464,178 @@ describe('detail-header-actions', () => {
       port: createPort(),
     });
 
-    expect(byId(actions, 'open-in-notion')?.href).toBe('https://www.notion.so/0123456789abcdef0123456789abcdef');
+    expect(byId(actions, 'open-in-notion')?.href).toBe('https://www.notion.so/aaaaaaaabbbbccccddddeeeeeeeeeeee');
     expect(byId(actions, 'copy-notion-link')?.href).toBe(byId(actions, 'open-in-notion')?.href);
     expect(getSyncMappingByConversationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses fresh mapping targets instead of stale Notion and Feishu mirrors', async () => {
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: {
+        id: 61,
+        notionPageId: OTHER_NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'fresh-workspace',
+        notionPageUrl: 'https://app.notion.com/p/fresh-workspace/aaaaaaaabbbbccccddddeeeeeeeeeeee',
+        feishuDocId: 'fresh-doc',
+      },
+      mapping: {
+        notionPageId: OTHER_NOTION_PAGE_ID,
+        feishuDocId: 'fresh-doc',
+      },
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 61,
+        source: 'chatgpt',
+        conversationKey: 'conv-61',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'stale-workspace',
+        notionPageUrl: 'https://app.notion.com/p/stale-workspace/0123456789abcdef0123456789abcdef',
+        feishuDocId: 'stale-doc',
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')?.href).toBe(
+      'https://app.notion.com/p/fresh-workspace/aaaaaaaabbbbccccddddeeeeeeeeeeee',
+    );
+    expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/fresh-doc');
+  });
+
+  it('honors explicit mapped target clears over stale caller mirrors', async () => {
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: { id: 62, notionPageId: NOTION_PAGE_ID, feishuDocId: 'fresh-doc' },
+      mapping: { notionPageId: '', feishuDocId: '' },
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 62,
+        source: 'chatgpt',
+        conversationKey: 'conv-62',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+        feishuDocId: 'stale-doc',
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')).toBeUndefined();
+    expect(byId(actions, 'open-in-feishu')).toBeUndefined();
+  });
+
+  it('uses fresh mirrors when mapping omits provider targets', async () => {
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: {
+        id: 625,
+        notionPageId: OTHER_NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'fresh-workspace',
+        feishuDocId: 'fresh-doc',
+      },
+      mapping: {},
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 625,
+        source: 'chatgpt',
+        conversationKey: 'conv-625',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+        feishuDocId: 'stale-doc',
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')?.href).toBe(
+      'https://app.notion.com/p/fresh-workspace/aaaaaaaabbbbccccddddeeeeeeeeeeee',
+    );
+    expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/fresh-doc');
+  });
+
+  it('falls back to the caller mirrors only when the mapping read fails', async () => {
+    getSyncMappingByConversationMock.mockRejectedValue(new Error('IDB unavailable'));
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 626,
+        source: 'chatgpt',
+        conversationKey: 'conv-626',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'caller-workspace',
+        feishuDocId: 'caller-doc',
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')?.href).toBe(
+      'https://app.notion.com/p/caller-workspace/0123456789abcdef0123456789abcdef',
+    );
+    expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/caller-doc');
+  });
+
+  it('does not combine Notion metadata from a fresh conversation with a different mapped target', async () => {
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: {
+        id: 63,
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'old-workspace',
+        notionPageUrl: 'https://app.notion.com/p/old-workspace/0123456789abcdef0123456789abcdef',
+      },
+      mapping: {
+        notionPageId: OTHER_NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'wrong-workspace',
+        notionPageUrl: 'https://app.notion.com/p/wrong-workspace/aaaaaaaabbbbccccddddeeeeeeeeeeee',
+      },
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 63,
+        source: 'chatgpt',
+        conversationKey: 'conv-63',
+        title: 'Conversation',
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'stale-workspace',
+      },
+      port: createPort(),
+    });
+
+    expect(byId(actions, 'open-in-notion')?.href).toBe('https://www.notion.so/aaaaaaaabbbbccccddddeeeeeeeeeeee');
+  });
+
+  it('shares one fresh mapping read across Notion, Feishu, and GitHub targets', async () => {
+    const conversation = {
+      id: 64,
+      source: 'chatgpt',
+      conversationKey: 'conv-64',
+      title: 'Conversation',
+    };
+    const { mapping } = githubMapping(conversation, {
+      notionPageId: NOTION_PAGE_ID,
+      feishuDocId: 'fresh-doc',
+    });
+    getSyncMappingByConversationMock.mockResolvedValue({
+      conversation: {
+        ...conversation,
+        notionPageId: NOTION_PAGE_ID,
+        notionWorkspaceSlug: 'fresh-workspace',
+        notionPageUrl: 'https://app.notion.com/p/fresh-workspace/0123456789abcdef0123456789abcdef',
+        feishuDocId: 'fresh-doc',
+      },
+      mapping,
+    });
+
+    const actions = await resolveDetailHeaderActions({ conversation, port: createPort() });
+
+    expect(byId(actions, 'open-in-notion')).toBeDefined();
+    expect(byId(actions, 'open-in-feishu')).toBeDefined();
+    expect(byId(actions, 'open-in-github')).toBeDefined();
+    expect(getSyncMappingByConversationMock).toHaveBeenCalledTimes(1);
+    expect(getSyncMappingByConversationMock).toHaveBeenCalledWith(64);
   });
 
   it('resolves an Obsidian-only destination without producing a copy action', async () => {
