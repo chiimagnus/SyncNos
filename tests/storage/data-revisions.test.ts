@@ -378,6 +378,59 @@ describe('data revision storage', () => {
     expect(await readDataRevision('messages')).toBe(3);
   });
 
+  it('advances article_comments once per successful mutator and stays stable on clean no-ops', async () => {
+    const {
+      addArticleComment,
+      attachOrphanCommentsToConversation,
+      deleteArticleCommentById,
+      migrateArticleCommentsCanonicalUrl,
+    } = await import('@services/comments/data/storage-idb');
+    const url = 'https://example.com/revision-comments';
+
+    const root = await addArticleComment({ conversationId: null, canonicalUrl: url, commentText: 'root' });
+    expect(await readDataRevision('article_comments')).toBe(1);
+    const reply = await addArticleComment({
+      parentId: root.id,
+      conversationId: null,
+      canonicalUrl: url,
+      commentText: 'reply',
+    });
+    expect(Number(reply.id)).toBeGreaterThan(0);
+    expect(await readDataRevision('article_comments')).toBe(2);
+
+    await expect(
+      addArticleComment({
+        parentId: reply.id,
+        conversationId: null,
+        canonicalUrl: url,
+        commentText: 'invalid nested reply',
+      }),
+    ).rejects.toThrow('parent_not_root');
+    expect(await readDataRevision('article_comments')).toBe(2);
+    expect(await deleteArticleCommentById(999_999)).toBe(false);
+    expect(await readDataRevision('article_comments')).toBe(2);
+
+    expect(await deleteArticleCommentById(root.id)).toBe(true);
+    expect(await readDataRevision('article_comments')).toBe(3);
+
+    await addArticleComment({ conversationId: null, canonicalUrl: url, commentText: 'orphan' });
+    expect(await readDataRevision('article_comments')).toBe(4);
+    expect(await attachOrphanCommentsToConversation(url, 77)).toEqual({ updated: 1 });
+    expect(await readDataRevision('article_comments')).toBe(5);
+    expect(await attachOrphanCommentsToConversation(url, 77)).toEqual({ updated: 0 });
+    expect(await readDataRevision('article_comments')).toBe(5);
+
+    const nextUrl = 'https://example.com/revision-comments-next';
+    expect(
+      await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl: url, toCanonicalUrl: nextUrl, conversationId: 77 }),
+    ).toEqual({ updated: 1 });
+    expect(await readDataRevision('article_comments')).toBe(6);
+    expect(
+      await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl: url, toCanonicalUrl: nextUrl, conversationId: 77 }),
+    ).toEqual({ updated: 0 });
+    expect(await readDataRevision('article_comments')).toBe(6);
+  });
+
   it('advances image_cache only for the first persistent asset write', async () => {
     const { inlineChatImagesInMessages } = await import('@services/conversations/data/image-inline');
     const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([1, 3, 5, 7])).toString('base64')}`;

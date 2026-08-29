@@ -3,6 +3,7 @@ import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { serializeArticleCommentDto } from '@services/comments/domain/comment-dto';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export class ArticleCommentInvariantError extends Error {
   constructor(public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch') {
@@ -89,9 +90,6 @@ function toComment(row: any): ArticleComment {
 }
 
 export async function addArticleComment(input: AddArticleCommentInput): Promise<ArticleComment> {
-  const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
-
   const now = Date.now();
   const canonicalUrl = normalizeCanonicalUrl(input?.canonicalUrl);
   const commentText = normalizeCommentText(input?.commentText);
@@ -103,18 +101,6 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const updatedAt = normalizeTimestamp(input?.updatedAt, createdAt);
   const parentId = normalizeParentId(input?.parentId);
   const conversationId = normalizeConversationId(input?.conversationId);
-  if (parentId != null) {
-    const parent = await reqToPromise<any>(stores.article_comments.get(parentId));
-    if (!parent) throw new ArticleCommentInvariantError('parent_not_found');
-    if (normalizeParentId(parent.parentId) != null) throw new ArticleCommentInvariantError('parent_not_root');
-    if (
-      normalizeCanonicalUrl(parent.canonicalUrl) !== canonicalUrl ||
-      normalizeConversationId(parent.conversationId) !== conversationId
-    ) {
-      throw new ArticleCommentInvariantError('parent_context_mismatch');
-    }
-  }
-
   const row: any = {
     parentId,
     conversationId,
@@ -127,9 +113,27 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
     updatedAt,
   };
 
-  const id = await reqToPromise<number>(stores.article_comments.add(row) as any);
-  await txDone(t);
-  return toComment({ ...row, id });
+  const db = await openDb();
+  return runTrackedTransaction(
+    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    async ({ stores, markChanged }) => {
+      if (parentId != null) {
+        const parent = await reqToPromise<any>(stores.article_comments.get(parentId));
+        if (!parent) throw new ArticleCommentInvariantError('parent_not_found');
+        if (normalizeParentId(parent.parentId) != null) throw new ArticleCommentInvariantError('parent_not_root');
+        if (
+          normalizeCanonicalUrl(parent.canonicalUrl) !== canonicalUrl ||
+          normalizeConversationId(parent.conversationId) !== conversationId
+        ) {
+          throw new ArticleCommentInvariantError('parent_context_mismatch');
+        }
+      }
+
+      const id = await reqToPromise<number>(stores.article_comments.add(row) as any);
+      markChanged('article_comments');
+      return toComment({ ...row, id });
+    },
+  );
 }
 
 export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string): Promise<ArticleComment[]> {
@@ -218,29 +222,31 @@ export async function deleteArticleCommentById(id: number): Promise<boolean> {
   if (!Number.isFinite(commentId) || commentId <= 0) return false;
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
-  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
-  const targetExists = rows.some((row) => Number(row?.id) === commentId);
-  if (!targetExists) {
-    t.abort();
-    return false;
-  }
-  const descendants = new Set<number>([commentId]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const row of rows) {
-      const rowId = Number(row?.id);
-      const parentId = normalizeParentId(row?.parentId);
-      if (!Number.isFinite(rowId) || rowId <= 0 || parentId == null) continue;
-      if (!descendants.has(parentId) || descendants.has(rowId)) continue;
-      descendants.add(rowId);
-      changed = true;
-    }
-  }
-  for (const rowId of descendants) stores.article_comments.delete(rowId);
-  await txDone(t);
-  return true;
+  return runTrackedTransaction(
+    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    async ({ stores, markChanged }) => {
+      const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
+      const targetExists = rows.some((row) => Number(row?.id) === commentId);
+      if (!targetExists) return false;
+
+      const descendants = new Set<number>([commentId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const row of rows) {
+          const rowId = Number(row?.id);
+          const parentId = normalizeParentId(row?.parentId);
+          if (!Number.isFinite(rowId) || rowId <= 0 || parentId == null) continue;
+          if (!descendants.has(parentId) || descendants.has(rowId)) continue;
+          descendants.add(rowId);
+          changed = true;
+        }
+      }
+      for (const rowId of descendants) await reqToPromise(stores.article_comments.delete(rowId) as any);
+      markChanged('article_comments');
+      return true;
+    },
+  );
 }
 
 export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string): Promise<boolean> {
@@ -273,35 +279,32 @@ export async function attachOrphanCommentsToConversation(
   if (!normalizedUrl || !normalizedConversationId) return { updated: 0 };
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
-  const store = stores.article_comments;
+  return runTrackedTransaction(
+    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    async ({ stores, markChanged }) => {
+      const store = stores.article_comments;
+      const idx = store.index('by_canonicalUrl_createdAt');
+      const range = globalThis.IDBKeyRange?.bound
+        ? globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any)
+        : null;
+      if (!range) return { updated: 0 };
 
-  const idx = store.index('by_canonicalUrl_createdAt');
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any)
-    : null;
-  if (!range) {
-    await txDone(t);
-    return { updated: 0 };
-  }
-
-  const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
-  let updated = 0;
-  const now = Date.now();
-
-  for (const row of rows) {
-    if (!row) continue;
-    const current = normalizeConversationId(row?.conversationId);
-    if (current) continue;
-    row.conversationId = normalizedConversationId;
-    row.updatedAt = now;
-
-    await reqToPromise(store.put(row));
-    updated += 1;
-  }
-
-  await txDone(t);
-  return { updated };
+      const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
+      let updated = 0;
+      const now = Date.now();
+      for (const row of rows) {
+        if (!row) continue;
+        const current = normalizeConversationId(row?.conversationId);
+        if (current) continue;
+        row.conversationId = normalizedConversationId;
+        row.updatedAt = now;
+        await reqToPromise(store.put(row));
+        updated += 1;
+      }
+      if (updated > 0) markChanged('article_comments');
+      return { updated };
+    },
+  );
 }
 
 export async function migrateArticleCommentsCanonicalUrl(input: {
@@ -318,36 +321,30 @@ export async function migrateArticleCommentsCanonicalUrl(input: {
   if (from === to) return { updated: 0 };
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
-  const store = stores.article_comments;
+  return runTrackedTransaction(
+    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    async ({ stores, markChanged }) => {
+      const store = stores.article_comments;
+      const idx = store.index('by_canonicalUrl_createdAt');
+      const range = globalThis.IDBKeyRange?.bound
+        ? globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any)
+        : null;
+      if (!range) return { updated: 0 };
 
-  const idx = store.index('by_canonicalUrl_createdAt');
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any)
-    : null;
-  if (!range) {
-    await txDone(t);
-    return { updated: 0 };
-  }
-
-  const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
-  if (!rows.length) {
-    await txDone(t);
-    return { updated: 0 };
-  }
-
-  const now = Date.now();
-  let updated = 0;
-  for (const row of rows) {
-    if (!row) continue;
-    const rowConversationId = normalizeConversationId(row.conversationId);
-    if (rowConversationId != null && rowConversationId !== conversationId) continue;
-    row.canonicalUrl = to;
-    row.updatedAt = now;
-    await reqToPromise(store.put(row));
-    updated += 1;
-  }
-
-  await txDone(t);
-  return { updated };
+      const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
+      const now = Date.now();
+      let updated = 0;
+      for (const row of rows) {
+        if (!row) continue;
+        const rowConversationId = normalizeConversationId(row.conversationId);
+        if (rowConversationId != null && rowConversationId !== conversationId) continue;
+        row.canonicalUrl = to;
+        row.updatedAt = now;
+        await reqToPromise(store.put(row));
+        updated += 1;
+      }
+      if (updated > 0) markChanged('article_comments');
+      return { updated };
+    },
+  );
 }
