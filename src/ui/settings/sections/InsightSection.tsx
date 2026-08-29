@@ -1,5 +1,6 @@
 import { t } from '@i18n';
 import type { InsightStats, InsightTimeRange } from '@viewmodels/settings/insight-stats';
+import type { InsightLoadStatus } from '@viewmodels/settings/useSettingsSceneController';
 import { hasInsightData } from '@viewmodels/settings/insight-stats';
 import { InsightPanel } from '@ui/settings/sections/InsightPanel';
 import { cardClassName } from '@ui/settings/ui';
@@ -36,16 +37,15 @@ function InsightStateCard(props: { title: string; detail?: string; tone?: 'defau
 }
 
 export function InsightSection(props: {
-  loading: boolean;
+  status: InsightLoadStatus;
   error: string;
   stats: InsightStats | null;
-  hasLoaded: boolean;
   range: InsightTimeRange;
   onChangeRange: (next: InsightTimeRange) => void;
 }) {
-  const { loading, error, stats, hasLoaded, range, onChangeRange } = props;
+  const { status, error, stats, range, onChangeRange } = props;
 
-  if (loading || !hasLoaded) {
+  if ((status === 'idle' || status === 'loading') && !stats) {
     return (
       <div className="tw-grid tw-gap-4">
         <InsightStateCard title={t('insightLoadingTitle')} />
@@ -53,7 +53,7 @@ export function InsightSection(props: {
     );
   }
 
-  if (error) {
+  if (status === 'error' && !stats) {
     return (
       <div className="tw-grid tw-gap-4">
         <InsightStateCard title={t('insightErrorTitle')} detail={error} tone="error" />
@@ -71,6 +71,11 @@ export function InsightSection(props: {
 
   return (
     <div className="tw-grid tw-gap-4">
+      {status === 'error' && error ? (
+        <div className="tw-text-xs tw-font-semibold tw-text-[var(--error)]" role="alert">
+          {error}
+        </div>
+      ) : null}
       <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />
     </div>
   );

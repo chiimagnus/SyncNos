@@ -59,6 +59,11 @@ import {
 import type { AntiHotlinkRuleValidationIssue } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
 import { getInsightStatsSourceData, type InsightStatsSourceData } from '@services/insight/insight-stats-source';
 import {
+  requestDataRevisionRetry,
+  subscribeDataRevisionChanges,
+  whenDataRevisionObserverReady,
+} from '@services/data-revisions/observer';
+import {
   buildInsightStats,
   getInsightTimeRangeWindow,
   type InsightStats,
@@ -179,6 +184,14 @@ export type UseSettingsSceneControllerArgs = {
   activeSection: SettingsSectionKey;
   focusKey?: string;
 };
+
+export type InsightLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+type InsightRevisionScope = 'conversations' | 'messages' | 'article_comments';
+const INSIGHT_REVISION_SCOPES: readonly InsightRevisionScope[] = [
+  'conversations',
+  'messages',
+  'article_comments',
+];
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
@@ -372,11 +385,23 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   // Insight
   const [insightStats, setInsightStats] = useState<InsightStats | null>(null);
-  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightLoadStatus, setInsightLoadStatus] = useState<InsightLoadStatus>('idle');
   const [insightError, setInsightError] = useState('');
-  const [hasLoadedInsight, setHasLoadedInsight] = useState(false);
   const [insightRange, setInsightRange] = useState<InsightTimeRange>('7d');
   const insightSourceDataRef = useRef<InsightStatsSourceData | null>(null);
+  const insightSourceRevisionGenerationRef = useRef(0);
+  const insightActivationGenerationRef = useRef(0);
+  const insightObservedSectionRef = useRef(activeSection);
+  const insightReadinessSettledRef = useRef(false);
+  const insightSourceStaleRef = useRef(true);
+  const insightStaleScopesRef = useRef(new Set<InsightRevisionScope>(INSIGHT_REVISION_SCOPES));
+  const insightSourceReadInFlightRef = useRef(false);
+  const insightDisposedRef = useRef(false);
+  const activeSectionRef = useRef(activeSection);
+  activeSectionRef.current = activeSection;
+  const insightRangeRef = useRef(insightRange);
+  insightRangeRef.current = insightRange;
+  const startInsightSourceReadRef = useRef<() => void>(() => {});
   const [aboutYouUserName, setAboutYouUserName] = useState<string>('');
 
   const isPopup = useMemo(() => isPopupUi(), []);
@@ -1628,35 +1653,120 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
-  useEffect(() => {
-    if (activeSection !== 'aboutyou') return;
-    if (hasLoadedInsight || insightLoading) return;
+  const startInsightSourceRead = useCallback(() => {
+    if (
+      insightDisposedRef.current ||
+      activeSectionRef.current !== 'aboutyou' ||
+      !insightReadinessSettledRef.current ||
+      !insightSourceStaleRef.current ||
+      insightSourceReadInFlightRef.current
+    ) {
+      return;
+    }
 
-    setInsightLoading(true);
+    const sourceGeneration = insightSourceRevisionGenerationRef.current;
+    const activationGeneration = insightActivationGenerationRef.current;
+    const retryScopes = insightStaleScopesRef.current.size
+      ? Array.from(insightStaleScopesRef.current)
+      : [...INSIGHT_REVISION_SCOPES];
+    insightSourceReadInFlightRef.current = true;
+    setInsightLoadStatus('loading');
     setInsightError('');
 
     void getInsightStatsSourceData()
       .then((data) => {
+        if (
+          insightDisposedRef.current ||
+          activeSectionRef.current !== 'aboutyou' ||
+          sourceGeneration !== insightSourceRevisionGenerationRef.current ||
+          activationGeneration !== insightActivationGenerationRef.current
+        ) {
+          return;
+        }
+
+        const rangeWindow = getInsightTimeRangeWindow(insightRangeRef.current);
+        const nextStats = buildInsightStats(data, rangeWindow);
         insightSourceDataRef.current = data;
-        const window = getInsightTimeRangeWindow(insightRange);
-        setInsightStats(buildInsightStats(data, window));
+        insightSourceStaleRef.current = false;
+        insightStaleScopesRef.current.clear();
+        setInsightStats(nextStats);
+        setInsightError('');
+        setInsightLoadStatus('ready');
       })
       .catch((error) => {
+        if (
+          insightDisposedRef.current ||
+          activeSectionRef.current !== 'aboutyou' ||
+          sourceGeneration !== insightSourceRevisionGenerationRef.current ||
+          activationGeneration !== insightActivationGenerationRef.current
+        ) {
+          return;
+        }
+
         setInsightError(toErrorMessage(error, t('insightLoadFailed')));
+        setInsightLoadStatus('error');
+        requestDataRevisionRetry(retryScopes);
       })
       .finally(() => {
-        setInsightLoading(false);
-        setHasLoadedInsight(true);
+        insightSourceReadInFlightRef.current = false;
+        if (insightDisposedRef.current) return;
+        const becameStaleDuringRead = sourceGeneration !== insightSourceRevisionGenerationRef.current;
+        const activationChangedDuringRead = activationGeneration !== insightActivationGenerationRef.current;
+        if (
+          (becameStaleDuringRead || activationChangedDuringRead) &&
+          activeSectionRef.current === 'aboutyou' &&
+          insightReadinessSettledRef.current &&
+          insightSourceStaleRef.current
+        ) {
+          void Promise.resolve().then(() => startInsightSourceReadRef.current());
+        }
       });
-  }, [activeSection, hasLoadedInsight, insightLoading, insightRange]);
+  }, []);
+  startInsightSourceReadRef.current = startInsightSourceRead;
+
+  useEffect(() => {
+    insightDisposedRef.current = false;
+    const unsubscribe = subscribeDataRevisionChanges((scopes) => {
+      const relevantScopes = INSIGHT_REVISION_SCOPES.filter((scope) => scopes.includes(scope));
+      if (!relevantScopes.length || insightDisposedRef.current) return;
+
+      insightSourceRevisionGenerationRef.current += 1;
+      insightSourceStaleRef.current = true;
+      for (const scope of relevantScopes) insightStaleScopesRef.current.add(scope);
+      startInsightSourceReadRef.current();
+    });
+
+    void whenDataRevisionObserverReady().then(() => {
+      if (insightDisposedRef.current) return;
+      insightReadinessSettledRef.current = true;
+      startInsightSourceReadRef.current();
+    });
+
+    return () => {
+      insightDisposedRef.current = true;
+      insightActivationGenerationRef.current += 1;
+      insightSourceRevisionGenerationRef.current += 1;
+      insightReadinessSettledRef.current = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (insightObservedSectionRef.current !== activeSection) {
+      insightObservedSectionRef.current = activeSection;
+      insightActivationGenerationRef.current += 1;
+    }
+    if (activeSection !== 'aboutyou') return;
+    startInsightSourceReadRef.current();
+  }, [activeSection]);
 
   useEffect(() => {
     if (activeSection !== 'aboutyou') return;
     const data = insightSourceDataRef.current;
-    if (!data) return;
+    if (!data || insightSourceStaleRef.current) return;
 
-    const window = getInsightTimeRangeWindow(insightRange);
-    setInsightStats(buildInsightStats(data, window));
+    const rangeWindow = getInsightTimeRangeWindow(insightRange);
+    setInsightStats(buildInsightStats(data, rangeWindow));
   }, [activeSection, insightRange]);
 
   const handleBackupExport = useCallback(async () => {
@@ -1987,9 +2097,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     updateReaderPrefs,
 
     insightStats,
-    insightLoading,
+    insightLoadStatus,
     insightError,
-    hasLoadedInsight,
     insightRange,
     setInsightRange,
     aboutYouUserName,
