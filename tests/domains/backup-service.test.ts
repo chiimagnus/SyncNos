@@ -5,8 +5,7 @@ import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
-import { __closeDbForTests } from '@services/sync/backup/idb';
-import { openDb } from '../../src/platform/idb/schema';
+import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -55,6 +54,7 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
 }
 
 beforeEach(async () => {
+  closeDbForTests();
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
@@ -63,7 +63,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
+  closeDbForTests();
   await deleteDb('webclipper');
 });
 
@@ -154,7 +154,6 @@ describe('backup service', () => {
       t.onerror = () => reject(t.error);
       t.onabort = () => reject(t.error);
     });
-    db.close();
 
     const out = await exportBackupZipV2();
     expect(out.filename.endsWith('.zip')).toBe(true);
@@ -209,7 +208,7 @@ describe('backup service', () => {
     delete chromeMock.__store.github_repository;
     delete chromeMock.__store.github_branch;
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
     await importBackupZipV2Merge(entries);
     const restoredDb = await openDb();
@@ -222,7 +221,6 @@ describe('backup service', () => {
       restoredTx.onerror = () => reject(restoredTx.error);
       restoredTx.onabort = () => reject(restoredTx.error);
     });
-    restoredDb.close();
     expect(chromeMock.__store.github_auth_state_v1).toEqual({
       version: 1,
       state: 'connected',
@@ -313,7 +311,6 @@ describe('backup service', () => {
       txA.onerror = () => reject(txA.error);
       txA.onabort = () => reject(txA.error);
     });
-    dbA.close();
 
     expect(conversationIdA).toBe(100);
     expect(mappingIdA).toBe(200);
@@ -334,7 +331,7 @@ describe('backup service', () => {
     delete chromeMock.__store.notion_oauth_client_id;
     delete chromeMock.__store.notion_parent_page_id;
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
 
     const stats = await importBackupZipV2Merge(entries);
@@ -352,7 +349,6 @@ describe('backup service', () => {
       txB.onerror = () => reject(txB.error);
       txB.onabort = () => reject(txB.error);
     });
-    dbB.close();
 
     expect(conversations).toHaveLength(1);
     expect(messages).toHaveLength(1);
@@ -450,12 +446,11 @@ describe('backup service', () => {
       t.onerror = () => reject(t.error);
       t.onabort = () => reject(t.error);
     });
-    db.close();
 
     const exported = await exportBackupZipV2();
     const entries = await extractZipEntries(exported.blob);
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
 
     const stats = await importBackupZipV2Merge(entries);
@@ -470,7 +465,6 @@ describe('backup service', () => {
       t2.onerror = () => reject(t2.error);
       t2.onabort = () => reject(t2.error);
     });
-    db2.close();
 
     expect(msgs.length).toBe(1);
     expect(assets.length).toBe(1);
@@ -528,7 +522,6 @@ describe('backup service', () => {
       t.onerror = () => reject(t.error);
       t.onabort = () => reject(t.error);
     });
-    db.close();
 
     const exported = await exportBackupZipV2();
     const entries = await extractZipEntries(exported.blob);
@@ -541,7 +534,7 @@ describe('backup service', () => {
     entries.delete(indexPath);
     if (blobPath) entries.delete(blobPath);
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
 
     await importBackupZipV2Merge(entries);
@@ -555,7 +548,6 @@ describe('backup service', () => {
       t2.onerror = () => reject(t2.error);
       t2.onabort = () => reject(t2.error);
     });
-    db2.close();
 
     expect(assets.length).toBe(0);
     expect(String(msgs[0].contentMarkdown || '')).not.toContain('syncnos-asset://');
@@ -611,7 +603,6 @@ describe('backup service', () => {
       t.onerror = () => reject(t.error);
       t.onabort = () => reject(t.error);
     });
-    db.close();
 
     const exported = await exportBackupZipV2();
     const entries = await extractZipEntries(exported.blob);
@@ -622,7 +613,7 @@ describe('backup service', () => {
     const blobPath = String(indexDoc.assets?.[0]?.blobPath || '');
     if (blobPath) entries.delete(blobPath);
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
 
     await importBackupZipV2Merge(entries);
@@ -636,7 +627,6 @@ describe('backup service', () => {
       t2.onerror = () => reject(t2.error);
       t2.onabort = () => reject(t2.error);
     });
-    db2.close();
 
     expect(assets.length).toBe(0);
     expect(String(msgs[0].contentMarkdown || '')).toContain('https://img.example/x.png');
@@ -700,7 +690,6 @@ describe('backup service', () => {
       t.onerror = () => reject(t.error);
       t.onabort = () => reject(t.error);
     });
-    db.close();
 
     const exported = await exportBackupZipV2();
     const entries = await extractZipEntries(exported.blob);
@@ -710,7 +699,7 @@ describe('backup service', () => {
     const firstBundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
     if (firstBundlePath) entries.delete(firstBundlePath);
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
 
     const stats = await importBackupZipV2Merge(entries);
@@ -724,7 +713,6 @@ describe('backup service', () => {
       t2.onerror = () => reject(t2.error);
       t2.onabort = () => reject(t2.error);
     });
-    db2.close();
     expect(convs.length).toBe(1);
   });
 
@@ -735,7 +723,7 @@ describe('backup service', () => {
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    await __closeDbForTests();
+    closeDbForTests();
     await deleteDb('webclipper');
 
     const manifest = {
@@ -840,7 +828,6 @@ describe('backup service', () => {
     const db = await openDb();
     const tx = db.transaction(['article_comments'], 'readonly');
     const rows = await reqToPromise<any[]>(tx.objectStore('article_comments').getAll());
-    db.close();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.conversationId ?? null).toBeNull();
   });
@@ -937,7 +924,6 @@ describe('backup service', () => {
       t.onerror = () => reject(t.error);
       t.onabort = () => reject(t.error);
     });
-    db.close();
 
     expect(convs.length).toBe(1);
     expect(msgs.length).toBe(1);
@@ -1035,7 +1021,6 @@ describe('backup service', () => {
       seedTx.onerror = () => reject(seedTx.error);
       seedTx.onabort = () => reject(seedTx.error);
     });
-    db.close();
 
     const bundles = [
       {
@@ -1124,7 +1109,6 @@ describe('backup service', () => {
       verifyTx.onerror = () => reject(verifyTx.error);
       verifyTx.onabort = () => reject(verifyTx.error);
     });
-    verifyDb.close();
 
     const sameMapping = mappings.find((row) => row.conversationKey === 'same');
     expect(sameMapping).toMatchObject({

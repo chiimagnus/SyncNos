@@ -11,7 +11,8 @@ import {
   validateConversationBundle,
   validateStorageLocalDocument,
 } from '@services/sync/backup/backup-utils';
-import { openDb, reqToPromise, tx, txDone } from '@services/sync/backup/idb';
+import { openDb } from '@platform/idb/schema';
+import { reqToPromise, tx, txDone } from '@services/sync/backup/idb';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,

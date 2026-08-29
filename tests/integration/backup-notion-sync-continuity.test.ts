@@ -13,7 +13,6 @@ import { backgroundStorage } from '@services/conversations/background/storage';
 import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
 import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { importBackupZipV2Merge } from '@services/sync/backup/import';
-import { __closeDbForTests as closeBackupDbForTests } from '@services/sync/backup/idb';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
@@ -69,7 +68,6 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
 }
 
 async function closeDbCaches(): Promise<void> {
-  await closeBackupDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 }
