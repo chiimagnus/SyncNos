@@ -126,13 +126,15 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     if (!canonicalUrl) return router.err('missing canonicalUrl');
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const res = await attachOrphanCommentsToConversation(canonicalUrl, conversationId);
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'articleCommentAttached',
-      conversationId,
-    });
-    fireAndForget(
-      deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
-    );
+    if (Number(res.updated) > 0) {
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'articleCommentAttached',
+        conversationId,
+      });
+      fireAndForget(
+        deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
+      );
+    }
     return router.ok(res);
   });
 
@@ -147,15 +149,17 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
       return router.err('invalid conversationId');
     }
     const res = await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl, toCanonicalUrl, conversationId });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'articleCommentsMigrated',
-      conversationId,
-      fromCanonicalUrl,
-      toCanonicalUrl,
-    });
-    fireAndForget(
-      deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
-    );
+    if (Number(res.updated) > 0) {
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'articleCommentsMigrated',
+        conversationId,
+        fromCanonicalUrl,
+        toCanonicalUrl,
+      });
+      fireAndForget(
+        deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
+      );
+    }
     return router.ok(res);
   });
 }

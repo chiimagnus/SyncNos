@@ -332,6 +332,11 @@ describe('conversations pagination storage-idb', () => {
       lastCapturedAt: Date.now() - 1,
     });
 
+    const beforeComments = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 10 });
+    expect(beforeComments.items.find((item) => item.sourceType === 'article')?.commentThreadCount).toBe(0);
+
+    // Write directly through the storage service: no handler event is emitted here.
+    // The next bootstrap must derive its count from current article_comments state.
     const root = await addArticleComment({
       conversationId: Number(article.id),
       canonicalUrl: 'https://example.com/thread?utm_source=x',
