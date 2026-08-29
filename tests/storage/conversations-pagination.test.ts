@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
 import {
-  __closeDbForTests,
+  __resetConversationStorageStateForTests,
   findConversationById,
   findConversationBySourceAndKey,
   getConversationListBootstrap,
   getConversationListPage,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
-import { addArticleComment } from '@services/comments/data/storage-idb';
+import { __closeDbForTests as closeCommentsDbForTests, addArticleComment } from '@services/comments/data/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -24,7 +25,9 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
+  await closeCommentsDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
@@ -33,7 +36,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
+  await closeCommentsDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 });
 
 describe('conversations pagination storage-idb', () => {

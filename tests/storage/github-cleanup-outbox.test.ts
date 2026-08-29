@@ -7,7 +7,7 @@ import {
   GITHUB_CLEANUP_OUTBOX_STORE,
   normalizeGithubCleanupOutboxRecord,
 } from '@platform/idb/github-cleanup-outbox-record';
-import { openDb } from '@platform/idb/schema';
+import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import {
@@ -41,31 +41,24 @@ async function deleteDb(): Promise<void> {
 
 async function seedRows(rows: Array<Record<string, unknown>>): Promise<number[]> {
   const db = await openDb();
-  try {
-    const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readwrite');
-    const store = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
-    const ids: number[] = [];
-    for (const row of rows) ids.push(await requestResult<number>(store.add(row) as IDBRequest<number>));
-    await txDone(transaction);
-    return ids;
-  } finally {
-    db.close();
-  }
+  const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readwrite');
+  const store = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
+  const ids: number[] = [];
+  for (const row of rows) ids.push(await requestResult<number>(store.add(row) as IDBRequest<number>));
+  await txDone(transaction);
+  return ids;
 }
 
 async function readAllRows(): Promise<any[]> {
   const db = await openDb();
-  try {
-    const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readonly');
-    const rows = await requestResult<any[]>(transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE).getAll());
-    await txDone(transaction);
-    return rows;
-  } finally {
-    db.close();
-  }
+  const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readonly');
+  const rows = await requestResult<any[]>(transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE).getAll());
+  await txDone(transaction);
+  return rows;
 }
 
 beforeEach(async () => {
+  closeDbForTests();
   // @ts-expect-error fake IndexedDB test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error fake IndexedDB test global

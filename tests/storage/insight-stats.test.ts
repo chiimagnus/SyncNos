@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
 
 import {
-  __closeDbForTests,
+  __resetConversationStorageStateForTests,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
@@ -64,8 +65,9 @@ async function seedConversation(input: {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
   await closeCommentsDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -76,8 +78,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
   await closeCommentsDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 });
 
 describe('insight stats', () => {

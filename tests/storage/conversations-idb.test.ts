@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { openDb } from '../../src/platform/idb/schema';
+import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 
 import {
   __closeDbForTests as __closeCommentDbForTests,
@@ -10,7 +10,7 @@ import {
 } from '@services/comments/data/storage-idb';
 import { buildConversationBasename, stableConversationId10 } from '@services/conversations/domain/file-naming';
 import {
-  __closeDbForTests,
+  __resetConversationStorageStateForTests,
   deleteConversationsByIds,
   getConversationById,
   getConversationTailWindowBySourceAndKey,
@@ -47,7 +47,9 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
+  await __closeCommentDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -57,8 +59,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
   await __closeCommentDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 });
 
 async function listAllConversationsForTests() {
@@ -766,7 +769,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(seedTx);
-    db.close();
 
     await patchSyncMapping(conversationId, {
       notionSections: { conversations: { headingBlockId: 'h-new' } },
@@ -931,7 +933,6 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(tx);
-    db.close();
 
     await setConversationNotionPageId(conversationId, 'page-new');
 
@@ -1010,7 +1011,6 @@ describe('conversations storage-idb', () => {
       t.onerror = () => reject(t.error || new Error('tx failed'));
       t.onabort = () => reject(t.error || new Error('tx aborted'));
     });
-    db.close();
 
     const res = await deleteConversationsByIds([id]);
     expect(res.deletedConversations).toBe(1);
@@ -1024,7 +1024,6 @@ describe('conversations storage-idb', () => {
     const verifyTx = verifyDb.transaction(['github_cleanup_outbox'], 'readonly');
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
   });
 
   it('atomically enqueues only identity-owned GitHub managed paths before deleting local facts', async () => {
@@ -1062,7 +1061,6 @@ describe('conversations storage-idb', () => {
     const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
     const rows = await reqToPromise<any[]>(tx.objectStore('github_cleanup_outbox').getAll());
     await txDone(tx);
-    db.close();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       remoteKey: 'github.com/owner/repo@main',
@@ -1110,7 +1108,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(tx);
-    db.close();
 
     await deleteConversationsByIds([id]);
 
@@ -1118,7 +1115,6 @@ describe('conversations storage-idb', () => {
     const orphanTx = orphanDb.transaction(['article_comments'], 'readonly');
     const orphans = await reqToPromise<any[]>(orphanTx.objectStore('article_comments').getAll());
     await txDone(orphanTx);
-    orphanDb.close();
     expect(orphans).toHaveLength(2);
     expect(orphans.map((row) => row.conversationId)).toEqual([null, null]);
     expect(orphans.find((row) => row.id === replyId)?.parentId).toBe(parentId);
@@ -1169,7 +1165,6 @@ describe('conversations storage-idb', () => {
     const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
     expect(await reqToPromise(tx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(tx);
-    db.close();
   });
 
   it('aborts conversation delete if cleanup enqueue fails, preserving conversation mapping and comments', async () => {
@@ -1211,7 +1206,6 @@ describe('conversations storage-idb', () => {
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
     await txDone(probeTx);
-    db.close();
 
     prototype.add = function add(value: unknown, key?: IDBValidKey) {
       if (this.name === 'github_cleanup_outbox') throw new DOMException('forced outbox failure', 'DataError');
@@ -1232,7 +1226,6 @@ describe('conversations storage-idb', () => {
     expect(comments[0]?.conversationId).toBe(id);
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
   });
 
   it('rewrites an explicit article identity atomically while migrating owned and orphan comments', async () => {
@@ -1308,7 +1301,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(commentTx);
-    db.close();
 
     const rewritten = await upsertConversation({
       id: existingId,
@@ -1332,7 +1324,6 @@ describe('conversations storage-idb', () => {
     const commentRows = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
     const cleanupRows = await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll());
     await txDone(verifyTx);
-    verifyDb.close();
 
     expect(commentRows.find((row) => row.id === ownedId)).toMatchObject({
       conversationId: existingId,
@@ -1397,7 +1388,6 @@ describe('conversations storage-idb', () => {
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
     await txDone(probeTx);
-    db.close();
 
     prototype.add = function add(value: unknown, key?: IDBValidKey) {
       if (this.name === 'github_cleanup_outbox') throw new DOMException('forced identity outbox failure', 'DataError');
@@ -1432,7 +1422,6 @@ describe('conversations storage-idb', () => {
     expect(rows[0]).toMatchObject({ conversationId: existingId, canonicalUrl: oldUrl, commentText: 'must stay old' });
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
   });
 
   it('reuses and rewrites legacy article conversation rows by normalized url', async () => {
@@ -1475,7 +1464,6 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(t);
-    db.close();
 
     const conversation = await upsertConversation({
       sourceType: 'article',
@@ -1496,7 +1484,6 @@ describe('conversations storage-idb', () => {
     const verifyConversations = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll());
     const verifyMappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
     await txDone(verifyTx);
-    reopened.close();
 
     expect(verifyConversations).toHaveLength(1);
     expect(verifyConversations[0]).toMatchObject({
@@ -1604,7 +1591,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(t);
-    db.close();
 
     const res = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
     expect(res.keptConversationId).toBe(keepId);
@@ -1630,7 +1616,6 @@ describe('conversations storage-idb', () => {
     const verifyComments = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
     const cleanupRows = await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll());
     await txDone(verifyTx);
-    reopened.close();
 
     expect(verifyMappings).toHaveLength(1);
     expect(verifyMappings[0]).toMatchObject({
@@ -1744,7 +1729,6 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(tx);
-    db.close();
 
     await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
 
@@ -1753,7 +1737,6 @@ describe('conversations storage-idb', () => {
     const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
     const cleanupRows = await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll());
     await txDone(verifyTx);
-    reopened.close();
 
     expect(mappings).toHaveLength(1);
     expect(mappings[0]).toMatchObject({
@@ -1830,7 +1813,6 @@ describe('conversations storage-idb', () => {
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
     await txDone(probeTx);
-    db.close();
 
     prototype.add = function add(value: unknown, key?: IDBValidKey) {
       if (this.name === 'github_cleanup_outbox') throw new DOMException('forced merge outbox failure', 'DataError');
@@ -1858,7 +1840,6 @@ describe('conversations storage-idb', () => {
     });
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
   });
 
   it('maintains listSourceKey/listSiteKey on upsert and merge writes', async () => {

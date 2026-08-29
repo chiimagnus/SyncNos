@@ -18,7 +18,7 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
-import { openDb as openSchemaDb } from '@platform/idb/schema';
+import { openDb } from '@platform/idb/schema';
 import {
   mergeSyncMappingForIdentityMove,
   mergeSyncMappingPatch,
@@ -27,41 +27,16 @@ import {
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 
-let cachedDb: IDBDatabase | null = null;
-let openingDb: Promise<IDBDatabase> | null = null;
 let conversationListStatsCacheKey: string | null = null;
 let conversationListStatsCacheValue: { summary: ConversationListSummary; facets: ConversationListFacets } | null = null;
 let conversationListDerivedKeysBackfilled = false;
 let conversationListDerivedKeysBackfillPromise: Promise<void> | null = null;
 
-async function openDb(): Promise<IDBDatabase> {
-  if (cachedDb) return cachedDb;
-  if (openingDb) return openingDb;
-  openingDb = openSchemaDb()
-    .then((db) => {
-      cachedDb = db;
-      return db;
-    })
-    .finally(() => {
-      openingDb = null;
-    });
-  return openingDb;
-}
-
-export async function __closeDbForTests(): Promise<void> {
-  try {
-    const db = cachedDb || (openingDb ? await openingDb : null);
-    db?.close?.();
-  } catch (_e) {
-    // ignore
-  } finally {
-    cachedDb = null;
-    openingDb = null;
-    conversationListStatsCacheKey = null;
-    conversationListStatsCacheValue = null;
-    conversationListDerivedKeysBackfilled = false;
-    conversationListDerivedKeysBackfillPromise = null;
-  }
+export function __resetConversationStorageStateForTests(): void {
+  conversationListStatsCacheKey = null;
+  conversationListStatsCacheValue = null;
+  conversationListDerivedKeysBackfilled = false;
+  conversationListDerivedKeysBackfillPromise = null;
 }
 
 function tx(

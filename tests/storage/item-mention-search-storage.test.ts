@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
 import {
-  __closeDbForTests,
+  __resetConversationStorageStateForTests,
   searchConversationMentionCandidates,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
@@ -20,7 +21,8 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
@@ -29,7 +31,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 });
 
 describe('item mention storage search', () => {

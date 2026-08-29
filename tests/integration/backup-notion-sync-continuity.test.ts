@@ -11,14 +11,14 @@ import { __closeDbForTests as closeCommentsDbForTests } from '@services/comments
 import { computeNotionCommentsDigest } from '@services/comments/sync/notion-comments-renderer';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { backgroundStorage } from '@services/conversations/background/storage';
-import { __closeDbForTests as closeConversationDbForTests } from '@services/conversations/data/storage-idb';
+import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
 import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { importBackupZipV2Merge } from '@services/sync/backup/import';
 import { __closeDbForTests as closeBackupDbForTests } from '@services/sync/backup/idb';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
-import { openDb } from '../../src/platform/idb/schema';
+import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -71,8 +71,9 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
 
 async function closeDbCaches(): Promise<void> {
   await closeCommentsDbForTests();
-  await closeConversationDbForTests();
   await closeBackupDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 }
 
 function fnv1a32(input: unknown): string {
@@ -103,7 +104,6 @@ async function getOnlyConversationId(): Promise<number> {
   const transaction = db.transaction(['conversations'], 'readonly');
   const rows = await reqToPromise<any[]>(transaction.objectStore('conversations').getAll() as any);
   await txDone(transaction);
-  db.close();
   expect(rows).toHaveLength(1);
   return Number(rows[0]?.id);
 }
@@ -214,7 +214,6 @@ describe('backup -> Notion sync continuity', () => {
       }) as any,
     );
     await txDone(txA);
-    dbA.close();
 
     await transferCurrentDbToEmptyDb();
 
@@ -376,7 +375,6 @@ describe('backup -> Notion sync continuity', () => {
       }) as any,
     );
     await txDone(txA);
-    dbA.close();
 
     const discardedA = await addArticleComment({
       canonicalUrl: articleUrl,
@@ -448,7 +446,6 @@ describe('backup -> Notion sync continuity', () => {
       }) as any,
     );
     await txDone(mappingTx);
-    dbAMapping.close();
 
     await transferCurrentDbToEmptyDb();
 

@@ -409,23 +409,19 @@ export function buildInsightStats(
 
 export async function getInsightStatsSourceData(): Promise<InsightStatsSourceData> {
   const db = await openDb();
-  try {
-    const t = db.transaction(['conversations', 'messages', 'article_comments'], 'readonly');
-    const conversationsStore = t.objectStore('conversations');
-    const messagesStore = t.objectStore('messages');
-    const commentsStore = t.objectStore('article_comments');
+  const t = db.transaction(['conversations', 'messages', 'article_comments'], 'readonly');
+  const conversationsStore = t.objectStore('conversations');
+  const messagesStore = t.objectStore('messages');
+  const commentsStore = t.objectStore('article_comments');
 
-    const [conversations, messageCounts, commentCounts] = await Promise.all([
-      readAllConversations(conversationsStore),
-      readCountsByConversationId(messagesStore),
-      readCountsByConversationId(commentsStore),
-    ]);
-    await txDone(t);
+  const [conversations, messageCounts, commentCounts] = await Promise.all([
+    readAllConversations(conversationsStore),
+    readCountsByConversationId(messagesStore),
+    readCountsByConversationId(commentsStore),
+  ]);
+  await txDone(t);
 
-    return { conversations, messageCounts, commentCounts };
-  } finally {
-    db.close();
-  }
+  return { conversations, messageCounts, commentCounts };
 }
 
 export async function getInsightStats(options?: { since?: number; until?: number }): Promise<InsightStats> {
