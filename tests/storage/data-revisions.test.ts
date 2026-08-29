@@ -865,6 +865,140 @@ describe('data revision storage', () => {
     expect(await readDataRevision('article_comments')).toBe(1);
   });
 
+  it('keeps every revision scope stable after an identical ZIP re-import', async () => {
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/web/all-scopes.json';
+    const uniqueKey = 'web||all-scopes';
+    const entries = new Map<string, Uint8Array>([
+      [
+        'manifest.json',
+        encoder.encode(
+          JSON.stringify({
+            backupSchemaVersion: 2,
+            exportedAt: '2026-08-29T00:00:00.000Z',
+            db: { name: 'webclipper', version: 10 },
+            counts: { conversations: 1, messages: 1, sync_mappings: 1, image_cache: 1, article_comments: 1 },
+            config: { storageLocalPath: 'config/storage-local.json' },
+            index: { conversationsCsvPath: 'sources/conversations.csv' },
+            sources: [{ source: 'web', conversationCount: 1, files: [entryPath] }],
+            assets: {
+              imageCacheIndexPath: 'assets/image-cache/index.json',
+              articleCommentsIndexPath: 'assets/article-comments/index.json',
+            },
+          }),
+        ),
+      ],
+      ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+      ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      [
+        entryPath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              id: 99,
+              sourceType: 'article',
+              source: 'web',
+              conversationKey: 'all-scopes',
+              title: 'All scopes',
+              url: 'https://example.com/all-scopes',
+              lastCapturedAt: 10,
+            },
+            messages: [
+              {
+                id: 500,
+                messageKey: 'm1',
+                role: 'assistant',
+                contentText: 'Asset',
+                contentMarkdown: '![asset](syncnos-asset://7)',
+                sequence: 1,
+                updatedAt: 10,
+              },
+            ],
+            syncMapping: {
+              source: 'web',
+              conversationKey: 'all-scopes',
+              notionPageId: 'page-all-scopes',
+              notionPageUrl: 'https://notion.so/page-all-scopes',
+              notionWorkspaceSlug: 'workspace',
+              lastSyncedAt: 10,
+            },
+          }),
+        ),
+      ],
+      [
+        'assets/image-cache/index.json',
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            assets: [
+              {
+                assetId: 7,
+                uniqueKey,
+                url: 'https://example.com/asset.png',
+                contentType: 'image/png',
+                byteSize: 3,
+                blobPath: 'assets/image-cache/blobs/7.png',
+              },
+            ],
+          }),
+        ),
+      ],
+      ['assets/image-cache/blobs/7.png', Uint8Array.from([1, 2, 3])],
+      [
+        'assets/article-comments/index.json',
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            comments: [
+              {
+                commentId: 1,
+                parentCommentId: null,
+                uniqueKey,
+                canonicalUrl: 'https://example.com/all-scopes',
+                authorName: 'Author',
+                quoteText: 'Quote',
+                commentText: 'Comment',
+                locator: null,
+                createdAt: 1,
+                updatedAt: 2,
+              },
+            ],
+          }),
+        ),
+      ],
+    ]);
+
+    const first = await importBackupZipV2Merge(entries);
+    expect(first).toMatchObject({
+      conversationsAdded: 1,
+      messagesAdded: 1,
+      mappingsAdded: 1,
+      commentsAdded: 1,
+    });
+    const baseline = await readDataRevisionSnapshot();
+    expect(baseline).toEqual({
+      conversations: 2,
+      messages: 1,
+      sync_mappings: 1,
+      article_comments: 1,
+      image_cache: 1,
+    });
+
+    const repeated = await importBackupZipV2Merge(entries);
+    expect(repeated).toMatchObject({
+      conversationsAdded: 0,
+      conversationsUpdated: 0,
+      messagesAdded: 0,
+      messagesUpdated: 0,
+      mappingsAdded: 0,
+      mappingsUpdated: 0,
+      commentsAdded: 0,
+      commentsUpdated: 0,
+    });
+    expect(await readDataRevisionSnapshot()).toEqual(baseline);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 
