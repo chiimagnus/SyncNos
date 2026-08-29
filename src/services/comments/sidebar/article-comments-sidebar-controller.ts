@@ -10,6 +10,11 @@ import { normalizeArticleCommentLocator } from '@services/comments/domain/commen
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
+  requestDataRevisionRetry,
+  subscribeDataRevisionChanges,
+  whenDataRevisionObserverReady,
+} from '@services/data-revisions/observer';
+import {
   buildCommentContextIdentityKey,
   classifyCommentContextTransition,
   normalizeCommentContextIdentity,
@@ -58,6 +63,7 @@ export type ArticleCommentsSidebarController = {
 
 type ControllerOperation = {
   generation: number;
+  activationGeneration: number;
   abortController: AbortController;
 };
 
@@ -126,12 +132,23 @@ export function createArticleCommentsSidebarController(input: {
   const onClose = input.onClose;
 
   let activeContext: ArticleCommentsSidebarContext | null = null;
+  let lastLoadedContext: ArticleCommentsSidebarContext | null = null;
   let lastEnsureContextInput: ArticleCommentsSidebarEnsureContextInput | undefined;
   let composerSelectionRequestSeq = 0;
   let operationGeneration = 0;
   let mutationGeneration = 0;
   let activeOperation: ControllerOperation | null = null;
   let disposed = false;
+  let sessionOpen = session.getSnapshot().open === true;
+  let activationGeneration = 0;
+  let activationReady = false;
+  let activationReadyPromise: Promise<void> = Promise.resolve();
+  let resolveActivationReady: (() => void) | null = null;
+  let revisionUnsubscribe: (() => void) | null = null;
+  let sessionUnsubscribe: (() => void) | null = null;
+  let pendingRevisionRefresh = false;
+  let revisionRefreshDraining = false;
+  let drainPendingRevisionRefresh: () => void = () => {};
   const loadListeners = new Set<() => void>();
   let loadSnapshot: ArticleCommentsSidebarLoadSnapshot = {
     status: 'idle',
@@ -180,6 +197,7 @@ export function createArticleCommentsSidebarController(input: {
     abortActiveOperation();
     const operation = {
       generation: ++operationGeneration,
+      activationGeneration,
       abortController: new AbortController(),
     };
     activeOperation = operation;
@@ -189,8 +207,10 @@ export function createArticleCommentsSidebarController(input: {
 
   const isCurrentOperation = (operation: ControllerOperation) =>
     !disposed &&
+    sessionOpen &&
     activeOperation === operation &&
     operation.generation === operationGeneration &&
+    operation.activationGeneration === activationGeneration &&
     !operation.abortController.signal.aborted;
 
   const finishOperation = (
@@ -201,6 +221,7 @@ export function createArticleCommentsSidebarController(input: {
     if (!isCurrentOperation(operation)) return;
     activeOperation = null;
     publishLoadState(status, operation, error);
+    void Promise.resolve().then(() => drainPendingRevisionRefresh());
   };
 
   const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
@@ -252,9 +273,11 @@ export function createArticleCommentsSidebarController(input: {
       );
       if (!isCurrentOperation(operation)) return;
       session.updateHost({ comments: Array.isArray(items) ? items : [] });
+      lastLoadedContext = context;
       finishOperation(operation, 'ready');
     } catch (error) {
       if (error instanceof ControllerOperationAbortedError || !isCurrentOperation(operation)) return;
+      requestDataRevisionRetry(['article_comments']);
       finishOperation(operation, 'stale_error', toLoadError(error));
     }
   };
@@ -287,8 +310,16 @@ export function createArticleCommentsSidebarController(input: {
     await loadComments(operation);
   };
 
+  const waitForCurrentActivationReadiness = async (): Promise<boolean> => {
+    const generation = activationGeneration;
+    const ready = activationReadyPromise;
+    await ready;
+    return !disposed && sessionOpen && activationReady && generation === activationGeneration;
+  };
+
   const refresh = async () => {
-    if (disposed) return;
+    if (disposed || !sessionOpen) return;
+    if (!(await waitForCurrentActivationReadiness())) return;
     if (!normalizeContext(activeContext)) {
       abortActiveOperation();
       publishLoadState('idle', null);
@@ -297,6 +328,76 @@ export function createArticleCommentsSidebarController(input: {
     const operation = beginOperation();
     await loadComments(operation);
   };
+
+  drainPendingRevisionRefresh = () => {
+    if (
+      disposed ||
+      !sessionOpen ||
+      !activationReady ||
+      !pendingRevisionRefresh ||
+      activeOperation ||
+      revisionRefreshDraining
+    ) {
+      return;
+    }
+    pendingRevisionRefresh = false;
+    revisionRefreshDraining = true;
+    void refresh().finally(() => {
+      revisionRefreshDraining = false;
+      drainPendingRevisionRefresh();
+    });
+  };
+
+  const scheduleRevisionRefresh = () => {
+    if (disposed || !sessionOpen) return;
+    pendingRevisionRefresh = true;
+    drainPendingRevisionRefresh();
+  };
+
+  const deactivateRevisionActivation = () => {
+    resolveActivationReady?.();
+    resolveActivationReady = null;
+    activationGeneration += 1;
+    activationReady = false;
+    revisionUnsubscribe?.();
+    revisionUnsubscribe = null;
+    pendingRevisionRefresh = false;
+    operationGeneration += 1;
+    mutationGeneration += 1;
+    abortActiveOperation();
+    publishLoadState('idle', null);
+  };
+
+  const activateRevisionActivation = () => {
+    const generation = ++activationGeneration;
+    activationReady = false;
+    activationReadyPromise = new Promise<void>((resolve) => {
+      resolveActivationReady = resolve;
+    });
+    revisionUnsubscribe = subscribeDataRevisionChanges((scopes) => {
+      if (disposed || !sessionOpen || generation !== activationGeneration) return;
+      if (!scopes.includes('article_comments')) return;
+      scheduleRevisionRefresh();
+    });
+    void whenDataRevisionObserverReady().then(() => {
+      if (disposed || !sessionOpen || generation !== activationGeneration) return;
+      activationReady = true;
+      resolveActivationReady?.();
+      resolveActivationReady = null;
+      drainPendingRevisionRefresh();
+    });
+  };
+
+  const handleSessionOpenState = () => {
+    const nextOpen = session.getSnapshot().open === true;
+    if (nextOpen === sessionOpen) return;
+    sessionOpen = nextOpen;
+    if (sessionOpen) activateRevisionActivation();
+    else deactivateRevisionActivation();
+  };
+
+  sessionUnsubscribe = session.subscribe(handleSessionOpenState);
+  if (sessionOpen) activateRevisionActivation();
 
   const isMutationCurrent = (generation: number) => !disposed && generation === mutationGeneration;
 
@@ -434,10 +535,17 @@ export function createArticleCommentsSidebarController(input: {
       applyComposerSelection({ selectionText, locator: openInput?.locator });
     }
     session.requestOpen({ focusComposer: openInput?.focusComposer === true, source: openInput?.source });
+    if (!(await waitForCurrentActivationReadiness())) return;
 
     const shouldEnsureContext = openInput?.ensureContext !== false;
     if (!shouldEnsureContext || typeof adapter.ensureContext !== 'function') {
-      await refresh();
+      const context = normalizeContext(activeContext);
+      if (!context) {
+        publishLoadState('idle', null);
+        return;
+      }
+      const operation = beginOperation();
+      await migrateThenLoad(operation, classifyCommentContextTransition(lastLoadedContext, context));
       return;
     }
 
@@ -449,13 +557,14 @@ export function createArticleCommentsSidebarController(input: {
         operation.abortController.signal,
       );
       if (!isCurrentOperation(operation)) return;
-      const transition = assignContext(resolved, { clearComposer: false });
-      if (transition.kind === 'invalid') {
+      assignContext(resolved, { clearComposer: false, invalidateMutations: false });
+      const context = normalizeContext(activeContext);
+      if (!context) {
         finishOperation(operation, 'idle');
         return;
       }
       publishLoadState('loading', operation);
-      await migrateThenLoad(operation, transition);
+      await migrateThenLoad(operation, classifyCommentContextTransition(lastLoadedContext, context));
     } catch (error) {
       if (error instanceof ControllerOperationAbortedError || !isCurrentOperation(operation)) return;
       finishOperation(operation, 'stale_error', toLoadError(error));
@@ -469,19 +578,34 @@ export function createArticleCommentsSidebarController(input: {
     const transition = assignContext(next);
     if (transition.kind === 'same') return;
 
+    operationGeneration += 1;
+    abortActiveOperation();
     if (transition.kind === 'invalid') {
-      abortActiveOperation();
-      publishLoadState('idle', null);
+      if (sessionOpen) publishLoadState('idle', null);
       return;
     }
+    if (!sessionOpen) return;
 
-    const operation = beginOperation();
-    void migrateThenLoad(operation, transition);
+    const expectedContextKey = getContextKey();
+    void (async () => {
+      if (!(await waitForCurrentActivationReadiness())) return;
+      if (getContextKey() !== expectedContextKey) return;
+      const context = normalizeContext(activeContext);
+      if (!context) return;
+      const operation = beginOperation();
+      await migrateThenLoad(operation, classifyCommentContextTransition(lastLoadedContext, context));
+    })();
   };
 
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    resolveActivationReady?.();
+    resolveActivationReady = null;
+    revisionUnsubscribe?.();
+    revisionUnsubscribe = null;
+    sessionUnsubscribe?.();
+    sessionUnsubscribe = null;
     session.updateHost({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '', actionCallbacks: {} });
     composerSelectionRequestSeq += 1;
     mutationGeneration += 1;

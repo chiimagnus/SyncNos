@@ -1,4 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const revisionMocks = vi.hoisted(() => ({
+  subscribeDataRevisionChanges: vi.fn(),
+  whenDataRevisionObserverReady: vi.fn(),
+  requestDataRevisionRetry: vi.fn(),
+}));
+
+let revisionListener: ((scopes: readonly string[]) => void) | null = null;
+
+vi.mock('@services/data-revisions/observer', () => ({
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) =>
+    revisionMocks.subscribeDataRevisionChanges(listener),
+  whenDataRevisionObserverReady: () => revisionMocks.whenDataRevisionObserverReady(),
+  requestDataRevisionRetry: (scopes: readonly string[]) => revisionMocks.requestDataRevisionRetry(scopes),
+}));
 
 import { createArticleCommentsSidebarController } from '../../src/services/comments/sidebar/article-comments-sidebar-controller';
 import { createCommentSidebarSession } from '../../src/services/comments/sidebar/comment-sidebar-session';
@@ -59,6 +74,12 @@ function createMockPanel() {
   };
 }
 
+async function activateSession(session: ReturnType<typeof createCommentSidebarSession>) {
+  session.requestOpen();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error?: unknown) => void;
@@ -70,6 +91,20 @@ function createDeferred<T>() {
 }
 
 describe('article-comments-sidebar-controller', () => {
+  beforeEach(() => {
+    revisionListener = null;
+    revisionMocks.subscribeDataRevisionChanges.mockReset();
+    revisionMocks.subscribeDataRevisionChanges.mockImplementation((listener) => {
+      revisionListener = listener;
+      return () => {
+        if (revisionListener === listener) revisionListener = null;
+      };
+    });
+    revisionMocks.whenDataRevisionObserverReady.mockReset();
+    revisionMocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    revisionMocks.requestDataRevisionRetry.mockReset();
+  });
+
   it('opens: sets quote, requests open, ensures context, and refreshes comments', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
@@ -122,7 +157,9 @@ describe('article-comments-sidebar-controller', () => {
       ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
     };
 
-    createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
 
     session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
 
@@ -374,6 +411,7 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
@@ -418,8 +456,10 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
 
     expect(seenSignals[0]?.aborted).toBe(true);
@@ -452,6 +492,7 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
 
     await vi.waitFor(() => {
@@ -484,6 +525,7 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 9 });
     await vi.waitFor(() => {
       expect(controller.getLoadSnapshot().status).toBe('ready');
@@ -491,6 +533,7 @@ describe('article-comments-sidebar-controller', () => {
     expect(adapter.list).toHaveBeenCalledTimes(1);
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
+    await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(1));
     expect(controller.getLoadSnapshot().status).toBe('loading');
     expect(adapter.list).toHaveBeenCalledTimes(1);
     const migrationSignal = adapter.migrateCanonicalUrl.mock.calls[0]?.[0]?.signal as AbortSignal;
@@ -527,17 +570,19 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 9 });
     await vi.waitFor(() => {
       expect(controller.getLoadSnapshot().status).toBe('ready');
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
+    await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(1));
     const migrationToBSignal = adapter.migrateCanonicalUrl.mock.calls[0]?.[0]?.signal as AbortSignal;
     controller.setContext({ canonicalUrl: 'https://example.com/c', conversationId: 9 });
+    await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(2));
 
     expect(migrationToBSignal.aborted).toBe(true);
-    expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(2);
 
     migrationToB.resolve();
     await Promise.resolve();
@@ -562,13 +607,14 @@ describe('article-comments-sidebar-controller', () => {
       delete: vi.fn(async () => {}),
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
     const states: string[] = [controller.getLoadSnapshot().status];
     const unsubscribe = controller.subscribeLoadState(() => {
       states.push(controller.getLoadSnapshot().status);
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
-    expect(panel.getState().busy).toBe(true);
+    await vi.waitFor(() => expect(panel.getState().busy).toBe(true));
     deferred.resolve([]);
     await vi.waitFor(() => {
       expect(controller.getLoadSnapshot().status).toBe('ready');
@@ -592,6 +638,7 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
 
     controller.setContext({ canonicalUrl: 'https://linux.do/t/topic-slug/123/20', conversationId: 9 });
     await vi.waitFor(() => {
@@ -623,8 +670,10 @@ describe('article-comments-sidebar-controller', () => {
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
     const listener = vi.fn();
     controller.subscribeLoadState(listener);
+    await activateSession(session);
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
     const signal = adapter.list.mock.calls[0]?.[0]?.signal as AbortSignal;
     expect(signal.aborted).toBe(false);
     expect(panel.getState().busy).toBe(true);
@@ -645,7 +694,7 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     await controller.open({ focusComposer: true });
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(session.getSnapshot().open).toBe(false);
+    expect(session.getSnapshot().open).toBe(true);
   });
 
   it('dispose drops late save and composer-selection completions', async () => {
@@ -665,6 +714,7 @@ describe('article-comments-sidebar-controller', () => {
       adapter: adapter as any,
       resolveComposerSelection: () => selection.promise,
     });
+    await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
       expect(controller.getLoadSnapshot().status).toBe('ready');
@@ -700,6 +750,7 @@ describe('article-comments-sidebar-controller', () => {
       delete: vi.fn(async () => {}),
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
       expect(controller.getLoadSnapshot().status).toBe('ready');
@@ -720,6 +771,169 @@ describe('article-comments-sidebar-controller', () => {
     expect(adapter.list).toHaveBeenCalledTimes(2);
     expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     expect(session.getSnapshot().contextKey).toContain('/b');
+  });
+
+  it('subscribes before the first open read and allows degraded readiness to proceed', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const readiness = createDeferred<{ baselineAvailable: boolean }>();
+    revisionMocks.whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+
+    const opening = controller.open({ ensureContext: true });
+    expect(revisionMocks.subscribeDataRevisionChanges).toHaveBeenCalledTimes(1);
+    expect(adapter.ensureContext).not.toHaveBeenCalled();
+    expect(adapter.list).not.toHaveBeenCalled();
+
+    readiness.resolve({ baselineAvailable: false });
+    await opening;
+
+    expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
+    expect(adapter.list).toHaveBeenCalledTimes(1);
+    expect(controller.getLoadSnapshot().status).toBe('ready');
+  });
+
+  it('keeps closed setContext side-effect free and defers A-to-B migration until reopen', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const adapter = {
+      list: vi.fn(async ({ canonicalUrl }: { canonicalUrl: string }) => [
+        { id: 1, parentId: null, commentText: canonicalUrl, quoteText: '', createdAt: 1 },
+      ]),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 9 })),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    expect(adapter.list).toHaveBeenCalledTimes(1);
+
+    session.requestClose();
+    expect(revisionListener).toBeNull();
+    controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(adapter.list).toHaveBeenCalledTimes(1);
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+
+    await controller.open({ ensureContext: false });
+    expect(adapter.migrateCanonicalUrl).toHaveBeenCalledWith({
+      fromCanonicalUrl: 'https://example.com/a',
+      toCanonicalUrl: 'https://example.com/b',
+      conversationId: 9,
+      signal: expect.any(AbortSignal),
+    });
+    expect(adapter.list).toHaveBeenCalledTimes(2);
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
+  });
+
+  it('refreshes only comments on article_comments revisions and coalesces in-flight diffs to one trailing read', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const firstRevisionRead = createDeferred<any[]>();
+    const adapter = {
+      list: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: 1, parentId: null, commentText: 'initial', quoteText: '', createdAt: 1 }])
+        .mockImplementationOnce(() => firstRevisionRead.promise)
+        .mockResolvedValueOnce([{ id: 2, parentId: null, commentText: 'latest', quoteText: '', createdAt: 2 }]),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 9 })),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.migrateCanonicalUrl.mockClear();
+
+    revisionListener?.(['article_comments']);
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(2));
+    revisionListener?.(['article_comments']);
+    revisionListener?.(['article_comments']);
+    await Promise.resolve();
+    expect(adapter.list).toHaveBeenCalledTimes(2);
+
+    firstRevisionRead.resolve([{ id: 10, parentId: null, commentText: 'intermediate', quoteText: '', createdAt: 10 }]);
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(panel.getState().comments[0]?.commentText).toBe('latest'));
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+  });
+
+  it('preserves last-good comments on list reject, requests retry, and accepts authoritative empty on replay', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const failure = Object.assign(new Error('temporary read failure'), { code: 'request_failed' });
+    const adapter = {
+      list: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: 1, parentId: null, commentText: 'ready', quoteText: '', createdAt: 1 }])
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce([]),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    revisionMocks.requestDataRevisionRetry.mockClear();
+
+    revisionListener?.(['article_comments']);
+    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('stale_error'));
+    expect(panel.getState().comments[0]?.commentText).toBe('ready');
+    expect(revisionMocks.requestDataRevisionRetry).toHaveBeenCalledWith(['article_comments']);
+
+    revisionMocks.requestDataRevisionRetry.mockClear();
+    revisionListener?.(['article_comments']);
+    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('ready'));
+    expect(panel.getState().comments).toEqual([]);
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
+  it('cancels pending readiness and late read failures on close without retrying or committing', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const readiness = createDeferred<{ baselineAvailable: boolean }>();
+    revisionMocks.whenDataRevisionObserverReady.mockReturnValueOnce(readiness.promise);
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+
+    const opening = controller.open({ ensureContext: true });
+    session.requestClose();
+    readiness.resolve({ baselineAvailable: true });
+    await opening;
+    expect(adapter.ensureContext).not.toHaveBeenCalled();
+    expect(adapter.list).not.toHaveBeenCalled();
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+
+    revisionMocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    const lateRead = createDeferred<any[]>();
+    adapter.ensureContext.mockResolvedValue({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    adapter.list.mockImplementationOnce(() => lateRead.promise);
+    const reopened = controller.open({ ensureContext: true });
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
+    session.requestClose();
+    lateRead.reject(new Error('late read failure'));
+    await reopened;
+    await Promise.resolve();
+    expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+    expect(controller.getLoadSnapshot().status).toBe('idle');
   });
 
   it('close is idempotent and does not notify after the first transition', async () => {
