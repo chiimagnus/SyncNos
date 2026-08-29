@@ -378,6 +378,27 @@ describe('data revision storage', () => {
     expect(await readDataRevision('messages')).toBe(3);
   });
 
+  it('keeps all five revisions stable for merge self-target and missing-remove no-ops', async () => {
+    const { mergeConversationsByIds, upsertConversation } = await import('@services/conversations/data/storage-idb');
+    const keep = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'merge-noop',
+      title: 'No-op',
+      lastCapturedAt: 1,
+    });
+    const keepId = Number(keep.id);
+    const before = await readDataRevisionSnapshot();
+
+    expect(await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: keepId })).toMatchObject({
+      merged: false,
+    });
+    expect(await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: keepId + 999 })).toMatchObject({
+      merged: false,
+    });
+    expect(await readDataRevisionSnapshot()).toEqual(before);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 

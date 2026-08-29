@@ -1,4 +1,5 @@
 import { openDb } from '@platform/idb/schema';
+import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
 
 const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
 const SYNCNOS_ASSET_PREFIX = 'syncnos-asset://';
@@ -255,10 +256,8 @@ async function ensureCachedAssetRecord(row: ImageCacheRow): Promise<CachedAsset 
   const id = Number(row?.id);
   if (!Number.isFinite(id) || id <= 0) return null;
 
-  if (row.blob instanceof Blob) {
-    const byteSize = Number(row.byteSize) || row.blob.size || 0;
-    if (byteSize > 0) return { id, byteSize };
-  }
+  const reusableByteSize = reusableImageCacheByteSize(row);
+  if (reusableByteSize > 0) return { id, byteSize: reusableByteSize };
 
   if (!row.dataUrl || !isDataImageUrl(row.dataUrl)) return null;
   const parsed = parseDataImageUrl({ dataUrl: row.dataUrl, maxBytes: NO_IMAGE_SIZE_LIMIT });

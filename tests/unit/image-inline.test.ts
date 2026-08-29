@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import {
+  hasReusableImageCachePayload,
+  reusableImageCacheByteSize,
+} from '@services/conversations/data/image-cache-record';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
@@ -40,6 +44,15 @@ afterEach(() => {
 });
 
 describe('image-inline', () => {
+  it('shares one persisted reusable-payload rule with conversation merge', () => {
+    const valid = { blob: new Blob(['data'], { type: 'image/png' }), byteSize: 4 };
+    expect(hasReusableImageCachePayload(valid)).toBe(true);
+    expect(reusableImageCacheByteSize(valid)).toBe(4);
+    expect(reusableImageCacheByteSize({ blob: valid.blob, byteSize: 0 })).toBe(valid.blob.size);
+    expect(hasReusableImageCachePayload({ blob: new Blob([]), byteSize: 0 })).toBe(false);
+    expect(hasReusableImageCachePayload({ byteSize: 10 })).toBe(false);
+  });
+
   it('replaces http(s)/data images with internal asset refs and reuses cache', async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(Uint8Array.from([1, 2, 3, 4]), {

@@ -1,5 +1,9 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import {
+  hasReusableImageCachePayload,
+  reusableImageCacheByteSize,
+} from '@services/conversations/data/image-cache-record';
+import {
   buildCanonicalWebArticleIdentity,
   normalizeWebArticleConversationKey,
   WEB_ARTICLE_SOURCE,
@@ -557,134 +561,171 @@ export async function mergeConversationsByIds(input: {
   }
 
   const db = await openDb();
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-    'readwrite',
-  );
-  try {
-    const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
-    const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
-    if (!keep) {
-      await txDone(t);
-      throw new Error('keep conversation not found');
-    }
-    if (!remove) {
-      await txDone(t);
-      return {
-        keptConversationId: keepConversationId,
-        removedConversationId: removeConversationId,
-        movedMessages: 0,
-        movedImageCache: 0,
-        merged: false,
-      };
-    }
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+      revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+    },
+    async ({ stores, markChanged }) => {
+      const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
+      const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
+      if (!keep) throw new Error('keep conversation not found');
+      if (!remove) {
+        return {
+          result: {
+            keptConversationId: keepConversationId,
+            removedConversationId: removeConversationId,
+            movedMessages: 0,
+            movedImageCache: 0,
+            merged: false,
+          },
+          conversationChanged: false,
+        };
+      }
 
-    const now = Date.now();
-    const mergedConversation: any = normalizeConversationListRecord({
-      ...keep,
-      sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
-      title: mergeStringFallback(keep.title, remove.title),
-      url: mergeStringFallback(keep.url, remove.url),
-      author: mergeStringFallback(keep.author, remove.author),
-      publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
-      notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
-      feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
-      warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
-      lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || now,
-    });
+      const now = Date.now();
+      const mergedConversation: any = normalizeConversationListRecord({
+        ...keep,
+        sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
+        title: mergeStringFallback(keep.title, remove.title),
+        url: mergeStringFallback(keep.url, remove.url),
+        author: mergeStringFallback(keep.author, remove.author),
+        publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
+        notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
+        feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
+        warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
+        lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || now,
+      });
 
-    await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
-      legacySource: remove.source,
-      legacyConversationKey: remove.conversationKey,
-      nextSource: keep.source,
-      nextConversationKey: keep.conversationKey,
-      fallbackNotionPageId: mergedConversation.notionPageId,
-      legacyConversation: remove,
-      replacementConversationId: keepConversationId,
-      createdAt: now,
-    });
+      const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+        legacySource: remove.source,
+        legacyConversationKey: remove.conversationKey,
+        nextSource: keep.source,
+        nextConversationKey: keep.conversationKey,
+        fallbackNotionPageId: mergedConversation.notionPageId,
+        legacyConversation: remove,
+        replacementConversationId: keepConversationId,
+        createdAt: now,
+      });
+      if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
 
-    await reqToPromise(stores.conversations.put(mergedConversation));
+      if (!conversationRecordsEquivalent(keep, mergedConversation)) {
+        await reqToPromise(stores.conversations.put(mergedConversation));
+        markChanged('conversations');
+      }
 
-    // Move messages.
-    const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
-    const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
-    const msgRange = globalThis.IDBKeyRange.bound(
-      [removeConversationId, -Infinity] as any,
-      [removeConversationId, Infinity] as any,
-    );
-    const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
-    let movedMessages = 0;
-    for (const row of Array.isArray(msgRows) ? msgRows : []) {
-      if (!row) continue;
-      const rowId = Number(row.id);
-      const key = safeString(row.messageKey);
-      if (key) {
-        const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
-        if (exists) {
+      const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
+      const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
+      const msgRange = globalThis.IDBKeyRange.bound(
+        [removeConversationId, -Infinity] as any,
+        [removeConversationId, Infinity] as any,
+      );
+      const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
+      let movedMessages = 0;
+      for (const row of Array.isArray(msgRows) ? msgRows : []) {
+        if (!row) continue;
+        const rowId = Number(row.id);
+        const key = safeString(row.messageKey);
+        if (key) {
+          const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
+          if (exists) {
+            if (Number.isFinite(rowId) && rowId > 0) {
+              await reqToPromise(stores.messages.delete(rowId));
+              markChanged('messages');
+            }
+            continue;
+          }
+        }
+        row.conversationId = keepConversationId;
+        await reqToPromise(stores.messages.put(row));
+        markChanged('messages');
+        movedMessages += 1;
+      }
+
+      const imageByConversation = stores.image_cache.index('by_conversationId');
+      const imageByIdentity = stores.image_cache.index('by_conversationId_url');
+      const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
+      const imgRows = (await reqToPromise(imageByConversation.getAll(imgRange) as any)) as any[];
+      let movedImageCache = 0;
+      for (const row of Array.isArray(imgRows) ? imgRows : []) {
+        if (!row) continue;
+        const rowId = Number(row.id);
+        const lookupUrl = typeof row.url === 'string' ? row.url : null;
+        const keepSide =
+          lookupUrl == null
+            ? null
+            : ((await reqToPromise(imageByIdentity.get([keepConversationId, lookupUrl] as any) as any)) as any);
+
+        if (keepSide && Number(keepSide.id) !== rowId) {
+          const keepValid = hasReusableImageCachePayload(keepSide);
+          const removeValid = hasReusableImageCachePayload(row);
+          if (!keepValid && removeValid) {
+            const repaired: any = {
+              ...keepSide,
+              blob: row.blob,
+              byteSize: reusableImageCacheByteSize(row),
+              contentType: safeString(row.contentType) || safeString(row.blob?.type) || safeString(keepSide.contentType),
+              updatedAt: pickMaxFiniteNumber(keepSide.updatedAt, row.updatedAt) || now,
+            };
+            if (Object.prototype.hasOwnProperty.call(row, 'dataUrl')) repaired.dataUrl = row.dataUrl;
+            else delete repaired.dataUrl;
+            await reqToPromise(stores.image_cache.put(repaired));
+            markChanged('image_cache');
+            movedImageCache += 1;
+          }
           if (Number.isFinite(rowId) && rowId > 0) {
-            await reqToPromise(stores.messages.delete(rowId));
+            await reqToPromise(stores.image_cache.delete(rowId));
+            markChanged('image_cache');
           }
           continue;
         }
+
+        row.conversationId = keepConversationId;
+        await reqToPromise(stores.image_cache.put(row));
+        markChanged('image_cache');
+        movedImageCache += 1;
       }
-      row.conversationId = keepConversationId;
-      await reqToPromise(stores.messages.put(row));
-      movedMessages += 1;
-    }
 
-    // Move cached images.
-    const imageCacheIdx = stores.image_cache.index('by_conversationId');
-    const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
-    const imgRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
-    let movedImageCache = 0;
-    for (const row of Array.isArray(imgRows) ? imgRows : []) {
-      if (!row) continue;
-      row.conversationId = keepConversationId;
-      await reqToPromise(stores.image_cache.put(row));
-      movedImageCache += 1;
-    }
-
-    const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
-    const mergedCanonicalUrl = mergedIsArticle ? canonicalizeArticleUrl(mergedConversation.url) : '';
-    const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
-    const commentRange = globalThis.IDBKeyRange.bound(
-      [removeConversationId, -Infinity] as any,
-      [removeConversationId, Infinity] as any,
-    );
-    const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
-    for (const row of Array.isArray(commentRows) ? commentRows : []) {
-      if (!row) continue;
-      await reqToPromise(
-        stores.article_comments.put({
-          ...row,
-          conversationId: keepConversationId,
-          ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
-          updatedAt: now,
-        }),
+      const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
+      const mergedCanonicalUrl = mergedIsArticle ? canonicalizeArticleUrl(mergedConversation.url) : '';
+      const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
+      const commentRange = globalThis.IDBKeyRange.bound(
+        [removeConversationId, -Infinity] as any,
+        [removeConversationId, Infinity] as any,
       );
-    }
+      const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
+      for (const row of Array.isArray(commentRows) ? commentRows : []) {
+        if (!row) continue;
+        await reqToPromise(
+          stores.article_comments.put({
+            ...row,
+            conversationId: keepConversationId,
+            ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
+            updatedAt: now,
+          }),
+        );
+        markChanged('article_comments');
+      }
 
-    await reqToPromise(stores.conversations.delete(removeConversationId));
-    await txDone(t);
-    invalidateConversationListStatsCache();
+      await reqToPromise(stores.conversations.delete(removeConversationId));
+      markChanged('conversations');
 
-    return {
-      keptConversationId: keepConversationId,
-      removedConversationId: removeConversationId,
-      movedMessages,
-      movedImageCache,
-      merged: true,
-    };
-  } catch (error) {
-    try {
-      t.abort();
-    } catch (_abortError) {
-      // The transaction may already be aborted by the failing request.
-    }
-    throw error;
-  }
+      return {
+        result: {
+          keptConversationId: keepConversationId,
+          removedConversationId: removeConversationId,
+          movedMessages,
+          movedImageCache,
+          merged: true,
+        },
+        conversationChanged: true,
+      };
+    },
+  );
+
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.result;
 }
 
 export async function syncConversationMessages(

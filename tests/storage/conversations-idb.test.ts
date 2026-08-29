@@ -105,6 +105,58 @@ async function listAllConversationsForTests() {
   return page.items;
 }
 
+async function seedImageCacheRow(input: {
+  conversationId: number;
+  url: string;
+  blob?: Blob;
+  byteSize?: number;
+  contentType?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}): Promise<number> {
+  const db = await openDb();
+  const transaction = db.transaction(['image_cache'], 'readwrite');
+  const id = await reqToPromise<number>(
+    transaction.objectStore('image_cache').add({
+      conversationId: input.conversationId,
+      url: input.url,
+      ...(input.blob ? { blob: input.blob } : {}),
+      byteSize: input.byteSize ?? input.blob?.size ?? 0,
+      contentType: input.contentType || input.blob?.type || 'image/png',
+      createdAt: input.createdAt ?? 1,
+      updatedAt: input.updatedAt ?? 1,
+    }) as any,
+  );
+  await txDone(transaction);
+  return Number(id);
+}
+
+async function readImageCacheRows(): Promise<any[]> {
+  const db = await openDb();
+  const transaction = db.transaction(['image_cache'], 'readonly');
+  const rows = await reqToPromise<any[]>(transaction.objectStore('image_cache').getAll());
+  await txDone(transaction);
+  return rows;
+}
+
+async function createMergePair(suffix: string) {
+  const keep = await upsertConversation({
+    sourceType: 'chat',
+    source: 'debug',
+    conversationKey: `merge-keep-${suffix}`,
+    title: 'keep',
+    lastCapturedAt: 1,
+  });
+  const remove = await upsertConversation({
+    sourceType: 'chat',
+    source: 'debug',
+    conversationKey: `merge-remove-${suffix}`,
+    title: 'remove',
+    lastCapturedAt: 2,
+  });
+  return { keepId: Number(keep.id), removeId: Number(remove.id) };
+}
+
 describe('conversations storage-idb', () => {
   it('bumps conversations for a new row and keeps an identical upsert revision-stable', async () => {
     const payload = {
@@ -1952,6 +2004,153 @@ describe('conversations storage-idb', () => {
       reason: 'identity_move',
       replacementConversationId: keepId,
     });
+  });
+
+  it('deduplicates same-URL valid image assets without overwriting the keep-side payload', async () => {
+    const { keepId, removeId } = await createMergePair('image-valid');
+    const url = 'https://example.com/shared-valid.png';
+    const keepIdAsset = await seedImageCacheRow({
+      conversationId: keepId,
+      url,
+      blob: new Blob(['keep'], { type: 'image/png' }),
+      byteSize: 4,
+      updatedAt: 10,
+    });
+    await seedImageCacheRow({
+      conversationId: removeId,
+      url,
+      blob: new Blob(['remove'], { type: 'image/png' }),
+      byteSize: 6,
+      updatedAt: 20,
+    });
+    const beforeConversationRevision = await readDataRevision('conversations');
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result).toMatchObject({ merged: true, movedImageCache: 0 });
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: keepIdAsset, conversationId: keepId, url, byteSize: 4 });
+    expect(await readDataRevision('image_cache')).toBe(1);
+    expect(await readDataRevision('conversations')).toBe(beforeConversationRevision + 1);
+    expect(await readDataRevision('messages')).toBe(0);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(0);
+  });
+
+  it('repairs an invalid keep-side image with the valid remove-side payload while preserving keep identity', async () => {
+    const { keepId, removeId } = await createMergePair('image-repair');
+    const url = 'https://example.com/shared-repair.png';
+    const keepAssetId = await seedImageCacheRow({
+      conversationId: keepId,
+      url,
+      blob: new Blob([], { type: 'image/png' }),
+      byteSize: 0,
+      updatedAt: 10,
+    });
+    await seedImageCacheRow({
+      conversationId: removeId,
+      url,
+      blob: new Blob(['source'], { type: 'image/webp' }),
+      byteSize: 6,
+      contentType: 'image/webp',
+      updatedAt: 20,
+    });
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result.movedImageCache).toBe(1);
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: keepAssetId,
+      conversationId: keepId,
+      url,
+      byteSize: 6,
+      contentType: 'image/webp',
+    });
+    expect((rows[0].blob as Blob).size).toBe(6);
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
+  it('deterministically keeps the keep-side row when both colliding image payloads are invalid', async () => {
+    const { keepId, removeId } = await createMergePair('image-invalid');
+    const url = 'https://example.com/shared-invalid.png';
+    const keepAssetId = await seedImageCacheRow({ conversationId: keepId, url, blob: new Blob([]), byteSize: 0 });
+    await seedImageCacheRow({ conversationId: removeId, url, blob: new Blob([]), byteSize: 0 });
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result.movedImageCache).toBe(0);
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: keepAssetId, conversationId: keepId, url, byteSize: 0 });
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
+  it('reassigns a non-colliding image row without changing its asset id', async () => {
+    const { keepId, removeId } = await createMergePair('image-move');
+    const url = 'https://example.com/remove-only.png';
+    const removeAssetId = await seedImageCacheRow({
+      conversationId: removeId,
+      url,
+      blob: new Blob(['move'], { type: 'image/png' }),
+      byteSize: 4,
+    });
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result.movedImageCache).toBe(1);
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: removeAssetId, conversationId: keepId, url, byteSize: 4 });
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
+  it('rolls back earlier merge mutations and all revisions when an image write fails', async () => {
+    const { keepId, removeId } = await createMergePair('image-abort');
+    await syncConversationMessages(removeId, [
+      { messageKey: 'm1', role: 'user', contentText: 'remove-message', sequence: 1, updatedAt: 1 },
+    ]);
+    await seedImageCacheRow({
+      conversationId: removeId,
+      url: 'https://example.com/fail.png',
+      blob: new Blob(['fail'], { type: 'image/png' }),
+      byteSize: 4,
+    });
+    const revisionsBefore = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
+
+    const db = await openDb();
+    const probeTx = db.transaction(['image_cache'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('image_cache')) as any;
+    const originalPut = prototype.put;
+    await txDone(probeTx);
+    prototype.put = function put(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'image_cache') throw new DOMException('forced image merge failure', 'DataError');
+      return originalPut.call(this, value, key);
+    };
+    try {
+      await expect(mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId })).rejects.toThrow();
+    } finally {
+      prototype.put = originalPut;
+    }
+
+    expect(await getConversationById(keepId)).not.toBeNull();
+    expect(await getConversationById(removeId)).not.toBeNull();
+    expect(await getMessagesByConversationId(keepId)).toEqual([]);
+    expect((await getMessagesByConversationId(removeId)).map((row) => row.messageKey)).toEqual(['m1']);
+    expect((await readImageCacheRows())[0]).toMatchObject({ conversationId: removeId });
+    expect(await readDataRevision('conversations')).toBe(revisionsBefore.conversations);
+    expect(await readDataRevision('messages')).toBe(revisionsBefore.messages);
+    expect(await readDataRevision('sync_mappings')).toBe(revisionsBefore.sync_mappings);
+    expect(await readDataRevision('image_cache')).toBe(revisionsBefore.image_cache);
+    expect(await readDataRevision('article_comments')).toBe(revisionsBefore.article_comments);
   });
 
   it('keeps canonical provider targets atomic when merging conversations with conflicting mappings', async () => {
