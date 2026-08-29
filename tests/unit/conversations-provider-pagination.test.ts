@@ -16,6 +16,8 @@ const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
+const subscribeDataRevisionChanges = vi.fn();
+const whenDataRevisionObserverReady = vi.fn();
 let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
 let portMessageListener: ((message: any) => void) | null = null;
 let portDisconnectListener: (() => void) | null = null;
@@ -63,6 +65,11 @@ vi.mock('@services/comments/client/repo', () => ({
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: (...args: any[]) => resolveDetailHeaderActions(...args),
+}));
+
+vi.mock('@services/data-revisions/observer', () => ({
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => subscribeDataRevisionChanges(listener),
+  whenDataRevisionObserverReady: () => whenDataRevisionObserverReady(),
 }));
 
 vi.mock('@services/shared/storage', () => ({
@@ -198,6 +205,10 @@ describe('ConversationsProvider pagination state', () => {
     backfillConversationImages.mockReset();
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
+    subscribeDataRevisionChanges.mockReset();
+    subscribeDataRevisionChanges.mockImplementation(() => () => {});
+    whenDataRevisionObserverReady.mockReset();
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
     storageChangeListener = null;
     portMessageListener = null;
     portDisconnectListener = null;

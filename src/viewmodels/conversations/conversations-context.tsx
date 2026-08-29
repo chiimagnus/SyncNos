@@ -27,6 +27,10 @@ import {
 import { backfillConversationImages } from '@services/conversations/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
+import {
+  subscribeDataRevisionChanges,
+  whenDataRevisionObserverReady,
+} from '@services/data-revisions/observer';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
 import { storageOnChanged } from '@services/shared/storage';
@@ -453,6 +457,20 @@ export function ConversationsProvider({
 
   const [bootstrapped, setBootstrapped] = useState(false);
   const didBootstrapRef = useRef(false);
+  const [revisionReadinessSettled, setRevisionReadinessSettled] = useState(false);
+  const revisionReadinessSettledRef = useRef(false);
+  const initialListStartedRef = useRef(false);
+  const initialListSettledRef = useRef(false);
+  const pendingListRefreshRef = useRef(false);
+  const pendingRevisionScopesRef = useRef(new Set<string>());
+  const providerGenerationRef = useRef(0);
+  const flushPendingRevisionListRef = useRef<() => void>(() => {});
+  const refreshListRef = useRef<() => Promise<void>>(async () => {});
+  const openConversationExternalByLocRef = useRef<(input: { source: string; conversationKey: string }) => Promise<void>>(
+    async () => {},
+  );
+  const initialOpenLocRef = useRef(initialOpenLoc);
+  initialOpenLocRef.current = initialOpenLoc;
 
   const activeIdRef = useRef<number | null>(null);
   const [activeId, setActiveIdState] = useState<number | null>(null);
@@ -599,6 +617,7 @@ export function ConversationsProvider({
     },
     [openConversationExternalBySourceKey],
   );
+  openConversationExternalByLocRef.current = openConversationExternalByLoc;
 
   const openConversationInListScopeBySourceKey = useCallback(
     async (source: string, conversationKey: string) => {
@@ -726,6 +745,7 @@ export function ConversationsProvider({
       }
     }
   }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId]);
+  refreshListRef.current = refreshList;
 
   const loadMoreList = useCallback(async () => {
     const cursor = listCursor;
@@ -822,15 +842,67 @@ export function ConversationsProvider({
   );
 
   useEffect(() => {
-    if (didBootstrapRef.current) return;
+    let disposed = false;
+    const generation = providerGenerationRef.current + 1;
+    providerGenerationRef.current = generation;
+    let revisionRefreshInFlight = false;
+
+    const flushPendingRevisionList = () => {
+      if (disposed || providerGenerationRef.current !== generation) return;
+      if (!revisionReadinessSettledRef.current || !initialListSettledRef.current || revisionRefreshInFlight) return;
+      if (!pendingListRefreshRef.current && !pendingRevisionScopesRef.current.size) return;
+
+      pendingListRefreshRef.current = false;
+      pendingRevisionScopesRef.current.clear();
+      revisionRefreshInFlight = true;
+      void refreshListRef
+        .current()
+        .catch(() => {})
+        .finally(() => {
+          if (disposed || providerGenerationRef.current !== generation) return;
+          revisionRefreshInFlight = false;
+          flushPendingRevisionList();
+        });
+    };
+
+    flushPendingRevisionListRef.current = flushPendingRevisionList;
+    const unsubscribe = subscribeDataRevisionChanges((scopes) => {
+      const relevantScopes = scopes.filter((scope) => scope === 'conversations' || scope === 'article_comments');
+      if (!relevantScopes.length || disposed || providerGenerationRef.current !== generation) return;
+
+      for (const scope of relevantScopes) pendingRevisionScopesRef.current.add(scope);
+      if (!revisionReadinessSettledRef.current || !initialListSettledRef.current) {
+        listRequestSeqRef.current += 1;
+        return;
+      }
+      flushPendingRevisionList();
+    });
+
+    void whenDataRevisionObserverReady().then(() => {
+      if (disposed || providerGenerationRef.current !== generation) return;
+      revisionReadinessSettledRef.current = true;
+      setRevisionReadinessSettled(true);
+      flushPendingRevisionList();
+    });
+
+    return () => {
+      disposed = true;
+      providerGenerationRef.current += 1;
+      flushPendingRevisionListRef.current = () => {};
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!revisionReadinessSettled || didBootstrapRef.current) return;
     didBootstrapRef.current = true;
 
     let cancelled = false;
     void (async () => {
-      const safeSource = String(initialOpenLoc?.source || '').trim();
-      const safeConversationKey = String(initialOpenLoc?.conversationKey || '').trim();
+      const safeSource = String(initialOpenLocRef.current?.source || '').trim();
+      const safeConversationKey = String(initialOpenLocRef.current?.conversationKey || '').trim();
       if (safeSource && safeConversationKey) {
-        await openConversationExternalByLoc({ source: safeSource, conversationKey: safeConversationKey }).catch(
+        await openConversationExternalByLocRef.current({ source: safeSource, conversationKey: safeConversationKey }).catch(
           () => {},
         );
       }
@@ -841,11 +913,31 @@ export function ConversationsProvider({
     return () => {
       cancelled = true;
     };
-  }, [initialOpenLoc, openConversationExternalByLoc]);
+  }, [revisionReadinessSettled]);
 
   useEffect(() => {
     if (!bootstrapped) return;
-    void refreshList();
+    if (initialListStartedRef.current) {
+      if (!initialListSettledRef.current) {
+        listRequestSeqRef.current += 1;
+        pendingListRefreshRef.current = true;
+        return;
+      }
+      void refreshList();
+      return;
+    }
+
+    initialListStartedRef.current = true;
+    let cancelled = false;
+    void refreshList().finally(() => {
+      if (cancelled) return;
+      initialListSettledRef.current = true;
+      flushPendingRevisionListRef.current();
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [bootstrapped, refreshList]);
 
   useEffect(() => {
@@ -933,7 +1025,14 @@ export function ConversationsProvider({
       pendingDetail = false;
       refreshTimer = null;
 
-      if (doList) await refreshList().catch(() => {});
+      if (doList) {
+        if (!revisionReadinessSettledRef.current || !initialListSettledRef.current) {
+          pendingListRefreshRef.current = true;
+          listRequestSeqRef.current += 1;
+        } else {
+          await refreshList().catch(() => {});
+        }
+      }
       // Only force-refresh detail when the active conversation is known to have changed
       // (or when sync finishes and metadata such as notionPageId is updated).
       if (doDetail) await refreshActiveDetail().catch(() => {});

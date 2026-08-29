@@ -5,6 +5,7 @@ export const DATA_REVISION_WAKE_STORAGE_KEY = 'webclipper_data_revision_wake_v1'
 let publishActive = false;
 let publishTrailing = false;
 let nonceSequence = 0;
+const listeners = new Set<{ listener: () => void }>();
 
 function nextWakeNonce(): string {
   nonceSequence += 1;
@@ -31,10 +32,24 @@ async function flushWake(): Promise<void> {
 }
 
 export function publishDataRevisionWake(): void {
+  for (const subscription of Array.from(listeners)) {
+    try {
+      subscription.listener();
+    } catch (_error) {}
+  }
   if (publishActive) {
     publishTrailing = true;
     return;
   }
   publishActive = true;
   void flushWake();
+}
+
+export function subscribeDataRevisionWake(listener: () => void): () => void {
+  if (typeof listener !== 'function') return () => {};
+  const subscription = { listener };
+  listeners.add(subscription);
+  return () => {
+    listeners.delete(subscription);
+  };
 }
