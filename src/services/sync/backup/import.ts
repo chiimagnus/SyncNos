@@ -835,54 +835,60 @@ export async function importBackupZipV2Merge(
 
   // 2) Upsert messages by (localConversationId, messageKey).
   {
-    const { t, stores: s } = tx(db, ['messages'], 'readwrite');
-    const idx = s.messages.index('by_conversationId_messageKey');
-
     progress.stage = 'Messages';
     report();
     const stageNow = Date.now();
-    let i = 0;
-    for (const [uk, list] of messagesByUniqueKey.entries()) {
-      const localConversationId = uniqueToLocalId.get(uk);
-      if (!localConversationId) {
-        i += Array.isArray(list) ? list.length : 0;
-        bump(Array.isArray(list) ? list.length : 0, 'Messages');
-        continue;
-      }
+    await runTrackedTransaction(
+      { db, stores: ['messages'], revisionScopes: ['messages'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.messages.index('by_conversationId_messageKey');
 
-      const msgs = Array.isArray(list) ? list : [];
-      for (const incoming of msgs) {
-        const messageKey = incoming && incoming.messageKey ? String(incoming.messageKey) : '';
-        if (!messageKey) {
-          stats.messagesSkipped += 1;
-          bump(1, 'Messages');
-          continue;
+        for (const [uk, list] of messagesByUniqueKey.entries()) {
+          const localConversationId = uniqueToLocalId.get(uk);
+          if (!localConversationId) {
+            stats.messagesSkipped += Array.isArray(list) ? list.length : 0;
+            continue;
+          }
+
+          for (const incoming of Array.isArray(list) ? list : []) {
+            const messageKey = incoming?.messageKey ? String(incoming.messageKey) : '';
+            if (!messageKey) {
+              stats.messagesSkipped += 1;
+              continue;
+            }
+
+            const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
+            const base = {
+              ...(incoming || {}),
+              conversationId: localConversationId,
+              messageKey,
+              ...(existing?.id ? { id: existing.id } : {}),
+            };
+            const merged = mergeMessageRecord(existing, base);
+            merged.conversationId = localConversationId;
+            merged.messageKey = messageKey;
+
+            if (existing?.id) {
+              merged.id = existing.id;
+              if (areBackupValuesEqual(merged, existing)) continue;
+              if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+
+              await reqToPromise(s.messages.put(merged as any));
+              stats.messagesUpdated += 1;
+              markChanged('messages');
+              continue;
+            }
+
+            delete merged.id;
+            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+            await reqToPromise(s.messages.add(merged as any));
+            stats.messagesAdded += 1;
+            markChanged('messages');
+          }
         }
-
-        const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
-        const base = { ...(incoming || {}), conversationId: localConversationId, messageKey };
-        const merged = mergeMessageRecord(existing, base);
-        merged.conversationId = localConversationId;
-        merged.messageKey = messageKey;
-        if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
-
-        if (existing && existing.id) {
-          merged.id = existing.id;
-
-          await reqToPromise(s.messages.put(merged as any));
-          stats.messagesUpdated += 1;
-        } else {
-          await reqToPromise(s.messages.add(merged as any));
-          stats.messagesAdded += 1;
-        }
-
-        if (i % 40 === 0) report();
-        i += 1;
-        bump(1, 'Messages');
-      }
-    }
-
-    await txDone(t);
+      },
+    );
+    reportCommittedStage(totalMessages, 'Messages');
   }
 
   progress.stage = 'Mappings';
