@@ -446,9 +446,9 @@ export function ConversationsProvider({
   const flushPendingRevisionBatchRef = useRef<() => void>(() => {});
   const refreshListRef = useRef<(retryScopes?: readonly DataRevisionScope[]) => Promise<void>>(async () => {});
   const refreshActiveDetailRef = useRef<(retryScopes?: readonly DataRevisionScope[]) => Promise<void>>(async () => {});
-  const openConversationExternalByLocRef = useRef<(input: { source: string; conversationKey: string }) => Promise<void>>(
-    async () => {},
-  );
+  const openConversationExternalByLocRef = useRef<
+    (input: { source: string; conversationKey: string }) => Promise<void>
+  >(async () => {});
   const initialOpenLocRef = useRef(initialOpenLoc);
   initialOpenLocRef.current = initialOpenLoc;
 
@@ -514,7 +514,9 @@ export function ConversationsProvider({
     if (!activeConversationSnapshot || Number(activeConversationSnapshot.id) !== selectedId) return null;
     const commentThreadCount = Number((loaded as any)?.commentThreadCount);
     return ensureConversationUiShape(
-      Number.isFinite(commentThreadCount) ? { ...activeConversationSnapshot, commentThreadCount } : activeConversationSnapshot,
+      Number.isFinite(commentThreadCount)
+        ? { ...activeConversationSnapshot, commentThreadCount }
+        : activeConversationSnapshot,
     );
   }, [activeConversationSnapshot, items, activeId]);
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
@@ -728,97 +730,100 @@ export function ConversationsProvider({
     [openConversationIntent],
   );
 
-  const refreshList = useCallback(async (retryScopes: readonly DataRevisionScope[] = LIST_REVISION_SCOPES) => {
-    const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
-    const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
-    const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
-    const scope = listFilterScopeKey(sourceKey, siteKey);
-    const scopedRetries = retryScopes.filter((retryScope) => LIST_REVISION_SCOPES.includes(retryScope));
+  const refreshList = useCallback(
+    async (retryScopes: readonly DataRevisionScope[] = LIST_REVISION_SCOPES) => {
+      const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
+      const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
+      const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
+      const scope = listFilterScopeKey(sourceKey, siteKey);
+      const scopedRetries = retryScopes.filter((retryScope) => LIST_REVISION_SCOPES.includes(retryScope));
 
-    const requestSeq = listRequestSeqRef.current + 1;
-    listRequestSeqRef.current = requestSeq;
-    const activeMetadataRequestSeq = activeMetadataRequestSeqRef.current;
-    const activeMetadataCommitSeq = activeMetadataCommitSeqRef.current;
+      const requestSeq = listRequestSeqRef.current + 1;
+      listRequestSeqRef.current = requestSeq;
+      const activeMetadataRequestSeq = activeMetadataRequestSeqRef.current;
+      const activeMetadataCommitSeq = activeMetadataCommitSeqRef.current;
 
-    if (listCommittedFilterScopeRef.current !== scope) {
-      listCommittedFilterScopeRef.current = scope;
-      setItems([]);
-      setListCursor(null);
-      setListHasMore(false);
-      setListSummary(EMPTY_LIST_SUMMARY);
-      setListFacets(EMPTY_LIST_FACETS);
-      setSelectedIds([]);
-    }
-    setLoadingInitialList(true);
-    setLoadingMoreList(false);
-    setListError(null);
-    try {
-      const page = await getConversationListBootstrap(
-        { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
-        LIST_BOOTSTRAP_LIMIT,
-      );
-      if (requestSeq !== listRequestSeqRef.current) return;
-
-      const list = Array.isArray(page?.items) ? page.items : [];
-      listSuccessRequestSeqRef.current = requestSeq;
-      listCommittedFilterScopeRef.current = scope;
-      setItems(list);
-      setListCursor(page?.cursor ?? null);
-      setListHasMore(Boolean(page?.hasMore));
-      setListSummary(normalizeConversationListSummary(page?.summary));
-      setListFacets(normalizeConversationListFacets(page?.facets));
-
-      const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
-      setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
-
-      const currentActiveId = Number(activeIdRef.current);
-      const requestedId = Number(pendingListLocateIdRef.current);
-      const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
-      const preservingRequestedActive =
-        Number.isFinite(currentActiveId) &&
-        currentActiveId > 0 &&
-        Number.isFinite(requestedId) &&
-        requestedId > 0 &&
-        requestedId === currentActiveId;
-      const preservingSnapshotActive =
-        Number.isFinite(currentActiveId) &&
-        currentActiveId > 0 &&
-        Number.isFinite(snapshotId) &&
-        snapshotId > 0 &&
-        snapshotId === currentActiveId;
-      const shouldPreserveActive =
-        Number.isFinite(currentActiveId) &&
-        currentActiveId > 0 &&
-        (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
-
-      const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
-      setActiveId(nextActiveId);
-      if (!shouldPreserveActive) {
-        const nextActiveConversation =
-          nextActiveId == null
-            ? null
-            : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
-        setActiveConversationSnapshot(nextActiveConversation);
-      } else if (
-        activeMetadataRequestSeq === activeMetadataRequestSeqRef.current &&
-        activeMetadataCommitSeq === activeMetadataCommitSeqRef.current &&
-        !preservingSnapshotActive
-      ) {
-        const currentActiveConversation = list.find(
-          (conversation) => Number((conversation as any)?.id) === currentActiveId,
+      if (listCommittedFilterScopeRef.current !== scope) {
+        listCommittedFilterScopeRef.current = scope;
+        setItems([]);
+        setListCursor(null);
+        setListHasMore(false);
+        setListSummary(EMPTY_LIST_SUMMARY);
+        setListFacets(EMPTY_LIST_FACETS);
+        setSelectedIds([]);
+      }
+      setLoadingInitialList(true);
+      setLoadingMoreList(false);
+      setListError(null);
+      try {
+        const page = await getConversationListBootstrap(
+          { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
+          LIST_BOOTSTRAP_LIMIT,
         );
-        if (currentActiveConversation) setActiveConversationSnapshot(currentActiveConversation);
+        if (requestSeq !== listRequestSeqRef.current) return;
+
+        const list = Array.isArray(page?.items) ? page.items : [];
+        listSuccessRequestSeqRef.current = requestSeq;
+        listCommittedFilterScopeRef.current = scope;
+        setItems(list);
+        setListCursor(page?.cursor ?? null);
+        setListHasMore(Boolean(page?.hasMore));
+        setListSummary(normalizeConversationListSummary(page?.summary));
+        setListFacets(normalizeConversationListFacets(page?.facets));
+
+        const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
+        setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
+
+        const currentActiveId = Number(activeIdRef.current);
+        const requestedId = Number(pendingListLocateIdRef.current);
+        const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
+        const preservingRequestedActive =
+          Number.isFinite(currentActiveId) &&
+          currentActiveId > 0 &&
+          Number.isFinite(requestedId) &&
+          requestedId > 0 &&
+          requestedId === currentActiveId;
+        const preservingSnapshotActive =
+          Number.isFinite(currentActiveId) &&
+          currentActiveId > 0 &&
+          Number.isFinite(snapshotId) &&
+          snapshotId > 0 &&
+          snapshotId === currentActiveId;
+        const shouldPreserveActive =
+          Number.isFinite(currentActiveId) &&
+          currentActiveId > 0 &&
+          (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
+
+        const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
+        setActiveId(nextActiveId);
+        if (!shouldPreserveActive) {
+          const nextActiveConversation =
+            nextActiveId == null
+              ? null
+              : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
+          setActiveConversationSnapshot(nextActiveConversation);
+        } else if (
+          activeMetadataRequestSeq === activeMetadataRequestSeqRef.current &&
+          activeMetadataCommitSeq === activeMetadataCommitSeqRef.current &&
+          !preservingSnapshotActive
+        ) {
+          const currentActiveConversation = list.find(
+            (conversation) => Number((conversation as any)?.id) === currentActiveId,
+          );
+          if (currentActiveConversation) setActiveConversationSnapshot(currentActiveConversation);
+        }
+      } catch (e) {
+        if (requestSeq !== listRequestSeqRef.current) return;
+        setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+        requestDataRevisionRetry(scopedRetries.length ? scopedRetries : LIST_REVISION_SCOPES);
+      } finally {
+        if (requestSeq === listRequestSeqRef.current) {
+          setLoadingInitialList(false);
+        }
       }
-    } catch (e) {
-      if (requestSeq !== listRequestSeqRef.current) return;
-      setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
-      requestDataRevisionRetry(scopedRetries.length ? scopedRetries : LIST_REVISION_SCOPES);
-    } finally {
-      if (requestSeq === listRequestSeqRef.current) {
-        setLoadingInitialList(false);
-      }
-    }
-  }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId]);
+    },
+    [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId],
+  );
   refreshListRef.current = refreshList;
 
   const loadMoreList = useCallback(async () => {
@@ -872,7 +877,15 @@ export function ConversationsProvider({
         setLoadingMoreList(false);
       }
     }
-  }, [listCursor, listHasMore, listSiteFilterKey, listSourceFilterKey, loadingInitialList, loadingMoreList]);
+  }, [
+    listCursor,
+    listHasMore,
+    listSiteFilterKey,
+    listSourceFilterKey,
+    loadingInitialList,
+    loadingMoreList,
+    setActiveConversationSnapshot,
+  ]);
 
   const updateSelectedConversationUrl = useCallback(
     async (nextUrl: string) => {
@@ -986,11 +999,13 @@ export function ConversationsProvider({
             await refreshActiveDetailRef.current(['messages']);
             if (disposed || providerGenerationRef.current !== generation) return;
             detailOk =
-              detailRequestSeqRef.current === expectedDetailSeq && detailSuccessRequestSeqRef.current === expectedDetailSeq;
+              detailRequestSeqRef.current === expectedDetailSeq &&
+              detailSuccessRequestSeqRef.current === expectedDetailSeq;
           }
 
           if (headerRelevant) {
-            const prerequisitesOk = (!conversationScopeChanged || (metadataOk && listOk)) && (!messagesChanged || detailOk);
+            const prerequisitesOk =
+              (!conversationScopeChanged || (metadataOk && listOk)) && (!messagesChanged || detailOk);
             if (prerequisitesOk) {
               headerReady = true;
               headerBlockedByDataFailure = false;
@@ -1085,9 +1100,9 @@ export function ConversationsProvider({
       const safeSource = String(initialOpenLocRef.current?.source || '').trim();
       const safeConversationKey = String(initialOpenLocRef.current?.conversationKey || '').trim();
       if (safeSource && safeConversationKey) {
-        await openConversationExternalByLocRef.current({ source: safeSource, conversationKey: safeConversationKey }).catch(
-          () => {},
-        );
+        await openConversationExternalByLocRef
+          .current({ source: safeSource, conversationKey: safeConversationKey })
+          .catch(() => {});
       }
       if (cancelled) return;
       setBootstrapped(true);

@@ -84,7 +84,9 @@ export function useSyncnosAssetSrcMap(input: {
       for (const url of newlyCreatedObjectUrls) {
         try {
           URL.revokeObjectURL(url);
-        } catch (_error) {}
+        } catch (_error) {
+          // Revocation is best-effort; stale object URLs are already detached from the committed map.
+        }
       }
     };
 
@@ -157,7 +159,9 @@ export function useSyncnosAssetSrcMap(input: {
       if (nextObjectUrls.get(id) === oldUrl) continue;
       try {
         URL.revokeObjectURL(oldUrl);
-      } catch (_error) {}
+      } catch (_error) {
+        // Revocation is best-effort; this URL is no longer referenced by the committed source map.
+      }
     }
 
     assetSrcRef.current = nextSources;
@@ -208,7 +212,9 @@ export function useSyncnosAssetSrcMap(input: {
       for (const url of objectUrlByIdRef.current.values()) {
         try {
           URL.revokeObjectURL(url);
-        } catch (_error) {}
+        } catch (_error) {
+          // Revocation is best-effort; stale object URLs are already detached from the committed map.
+        }
       }
       objectUrlByIdRef.current = new Map();
       assetSrcRef.current = new Map();

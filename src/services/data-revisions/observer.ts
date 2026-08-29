@@ -97,7 +97,9 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
     for (const subscription of Array.from(listeners)) {
       try {
         subscription.listener(scopes);
-      } catch (_error) {}
+      } catch (_error) {
+        // One consumer must not prevent the remaining revision subscribers from being notified.
+      }
     }
   };
 
@@ -176,7 +178,13 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
   };
 
   const scheduleRetryReconcile = (epoch: ObserverEpoch) => {
-    if (!isActiveEpoch(epoch) || !listeners.size || !isVisible() || !epoch.retryScopes.size || epoch.retryTimer != null) {
+    if (
+      !isActiveEpoch(epoch) ||
+      !listeners.size ||
+      !isVisible() ||
+      !epoch.retryScopes.size ||
+      epoch.retryTimer != null
+    ) {
       return;
     }
     epoch.retryTimer = setTimer(() => {
@@ -201,7 +209,9 @@ export function createDataRevisionObserver(deps: DataRevisionObserverDeps = {}) 
     for (const dispose of epoch.disposeListeners.splice(0)) {
       try {
         dispose();
-      } catch (_error) {}
+      } catch (_error) {
+        // One consumer must not prevent the remaining revision subscribers from being notified.
+      }
     }
   };
 

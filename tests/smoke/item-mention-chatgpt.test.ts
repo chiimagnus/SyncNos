@@ -505,7 +505,9 @@ describe('item mention chatgpt controller', () => {
     oldReject.reject(new Error('late closed failure'));
     try {
       await oldReject.promise;
-    } catch (_error) {}
+    } catch (_error) {
+      // Expected rejection from the deliberately stale request.
+    }
     await flushMicrotasks();
     revisionListener?.(['conversations']);
     vi.advanceTimersByTime(500);
@@ -566,7 +568,14 @@ describe('item mention chatgpt controller', () => {
       ui: uiMocks,
     }).start();
     const oldEditor = document.querySelector('#prompt-textarea') as HTMLElement;
-    (oldEditor as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    (oldEditor as any).getBoundingClientRect = () => ({
+      width: 100,
+      height: 20,
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 20,
+    });
     oldEditor.textContent = '$a';
     (oldEditor as any).focus?.();
     setCaretToEnd(oldEditor);
@@ -578,7 +587,14 @@ describe('item mention chatgpt controller', () => {
     replacement.id = 'prompt-textarea';
     replacement.setAttribute('role', 'textbox');
     replacement.setAttribute('contenteditable', 'true');
-    (replacement as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    (replacement as any).getBoundingClientRect = () => ({
+      width: 100,
+      height: 20,
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 20,
+    });
     replacement.textContent = '$a';
     oldEditor.replaceWith(replacement);
     (replacement as any).focus?.();

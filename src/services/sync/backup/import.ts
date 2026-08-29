@@ -14,7 +14,7 @@ import {
   validateStorageLocalDocument,
 } from '@services/sync/backup/backup-utils';
 import { openDb } from '@platform/idb/schema';
-import { reqToPromise, tx, txDone } from '@services/sync/backup/idb';
+import { reqToPromise } from '@services/sync/backup/idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import {
   buildArticleCommentArchiveBaseKey,
@@ -327,7 +327,8 @@ export async function importBackupLegacyJsonMerge(
           if (existing?.id) {
             merged.id = existing.id;
             if (areBackupValuesEqual(merged, existing)) continue;
-            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
+              merged.updatedAt = stageNow;
 
             await reqToPromise(s.messages.put(merged as any));
             stats.messagesUpdated += 1;
@@ -523,7 +524,9 @@ export async function importBackupZipV2Merge(
   const report = () => {
     try {
       void Promise.resolve(onProgress?.({ ...progress })).catch(() => undefined);
-    } catch (_error) {}
+    } catch (_error) {
+      // Progress reporting is best-effort and must never roll back an already committed import stage.
+    }
   };
   const bump = (delta: number, stage?: string) => {
     progress.done += delta;
@@ -648,7 +651,8 @@ export async function importBackupZipV2Merge(
         const incomingIdToLocalId = new Map<number, number>();
         const now = Date.now();
         for (const item of articleCommentItems) {
-          const parentId = item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
+          const parentId =
+            item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
           const mappedConversationId =
             item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
               ? uniqueToLocalId.get(item.uniqueKey)!
@@ -670,7 +674,8 @@ export async function importBackupZipV2Merge(
               canonicalUrl: item.canonicalUrl,
               authorName: incomingUpdatedAt >= existingUpdatedAt ? (item.authorName ?? '') : existing.authorName,
               quoteText: incomingUpdatedAt >= existingUpdatedAt ? item.quoteText : String(existing.quoteText || ''),
-              commentText: incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
+              commentText:
+                incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
               locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
               createdAt: Number(existing.createdAt) || item.createdAt || now,
               updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
@@ -772,7 +777,8 @@ export async function importBackupZipV2Merge(
             if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
 
             const existingBlob = existing.blob as unknown;
-            const existingSize = Number(existing.byteSize) || (existingBlob instanceof Blob ? existingBlob.size : 0) || 0;
+            const existingSize =
+              Number(existing.byteSize) || (existingBlob instanceof Blob ? existingBlob.size : 0) || 0;
             if (existingBlob instanceof Blob && existingSize > 0) continue;
 
             await reqToPromise(
@@ -871,7 +877,8 @@ export async function importBackupZipV2Merge(
             if (existing?.id) {
               merged.id = existing.id;
               if (areBackupValuesEqual(merged, existing)) continue;
-              if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+              if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
+                merged.updatedAt = stageNow;
 
               await reqToPromise(s.messages.put(merged as any));
               stats.messagesUpdated += 1;
@@ -880,7 +887,8 @@ export async function importBackupZipV2Merge(
             }
 
             delete merged.id;
-            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
+              merged.updatedAt = stageNow;
             await reqToPromise(s.messages.add(merged as any));
             stats.messagesAdded += 1;
             markChanged('messages');

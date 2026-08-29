@@ -177,7 +177,9 @@ beforeEach(() => {
   revisionListener = null;
   revisionUnsubscribe = vi.fn();
 
-  storageMocks.get.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((key) => [key, undefined])));
+  storageMocks.get.mockImplementation(async (keys: string[]) =>
+    Object.fromEntries(keys.map((key) => [key, undefined])),
+  );
   storageMocks.set.mockResolvedValue(undefined);
   storageMocks.remove.mockResolvedValue(undefined);
   storageMocks.onChanged.mockImplementation(() => () => {});
@@ -347,7 +349,9 @@ describe('Settings controller Insight revision lifecycle', () => {
       staleRead.reject(new Error('late inactive failure'));
       try {
         await staleRead.promise;
-      } catch (_error) {}
+      } catch (_error) {
+        // Expected rejection from an intentionally stale source read.
+      }
       for (let index = 0; index < 8; index += 1) await Promise.resolve();
     });
     expect(revisionMocks.retry).not.toHaveBeenCalled();
@@ -423,7 +427,9 @@ describe('Settings controller Insight revision lifecycle', () => {
     pendingRead.reject(new Error('late dispose failure'));
     try {
       await pendingRead.promise;
-    } catch (_error) {}
+    } catch (_error) {
+      // Expected rejection after disposal; the assertion below verifies it does not request a retry.
+    }
     await Promise.resolve();
     await Promise.resolve();
 

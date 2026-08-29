@@ -35,7 +35,9 @@ export function publishDataRevisionWake(): void {
   for (const subscription of Array.from(listeners)) {
     try {
       subscription.listener();
-    } catch (_error) {}
+    } catch (_error) {
+      // Wake delivery is isolated per listener; one consumer failure must not block the others.
+    }
   }
   if (publishActive) {
     publishTrailing = true;
