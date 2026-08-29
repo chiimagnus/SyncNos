@@ -10,7 +10,7 @@ import {
 import { closeDbForTests, DB_VERSION, openDb } from '@platform/idb/schema';
 import { readDataRevision, readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
-import { importBackupLegacyJsonMerge } from '@services/sync/backup/import';
+import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -738,6 +738,57 @@ describe('data revision storage', () => {
     expect(repaired.mappingsUpdated).toBe(0);
     expect(await readDataRevision('conversations')).toBe(3);
     expect(await readDataRevision('sync_mappings')).toBe(1);
+  });
+
+  it('advances conversations once for real ZIP imports and stays stable for equivalent re-imports', async () => {
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/chatgpt/zip-revision.json';
+    const entries = new Map<string, Uint8Array>([
+      [
+        'manifest.json',
+        encoder.encode(
+          JSON.stringify({
+            backupSchemaVersion: 2,
+            exportedAt: '2026-08-29T00:00:00.000Z',
+            db: { name: 'webclipper', version: 10 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+            config: { storageLocalPath: 'config/storage-local.json' },
+            index: { conversationsCsvPath: 'sources/conversations.csv' },
+            sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+          }),
+        ),
+      ],
+      ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+      ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      [
+        entryPath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              id: 99,
+              sourceType: 'chat',
+              source: 'chatgpt',
+              conversationKey: 'zip-conversation-revision',
+              title: 'ZIP',
+              url: 'https://chatgpt.com/c/zip-conversation-revision',
+              lastCapturedAt: 10,
+            },
+            messages: [],
+            syncMapping: null,
+          }),
+        ),
+      ],
+    ]);
+
+    const first = await importBackupZipV2Merge(entries);
+    expect(first.conversationsAdded).toBe(1);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const repeated = await importBackupZipV2Merge(entries);
+    expect(repeated.conversationsAdded).toBe(0);
+    expect(repeated.conversationsUpdated).toBe(0);
+    expect(await readDataRevision('conversations')).toBe(1);
   });
 
   it('reads missing and malformed records as revision zero', async () => {

@@ -520,10 +520,18 @@ export async function importBackupZipV2Merge(
       articleCommentItems.length,
     stage: '',
   };
-  const report = () => onProgress?.({ ...progress });
+  const report = () => {
+    try {
+      void Promise.resolve(onProgress?.({ ...progress })).catch(() => undefined);
+    } catch (_error) {}
+  };
   const bump = (delta: number, stage?: string) => {
     progress.done += delta;
     if (stage) progress.stage = stage;
+  };
+  const reportCommittedStage = (delta: number, stage: string) => {
+    bump(delta, stage);
+    report();
   };
 
   const db = await openDb();
@@ -531,44 +539,48 @@ export async function importBackupZipV2Merge(
 
   // 1) Upsert conversations by (source, conversationKey).
   {
-    const { t, stores: s } = tx(db, ['conversations'], 'readwrite');
-    const idx = s.conversations.index('by_source_conversationKey');
-
     progress.stage = 'Conversations';
     report();
-    for (let i = 0; i < incomingConversations.length; i += 1) {
-      const incoming = incomingConversations[i];
-      const source = incoming && incoming.source ? String(incoming.source) : '';
-      const conversationKey = incoming && incoming.conversationKey ? String(incoming.conversationKey) : '';
-      if (!source || !conversationKey) {
-        bump(1, 'Conversations');
-        continue;
-      }
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.conversations.index('by_source_conversationKey');
+        let stageChanged = false;
 
-      const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = mergeConversationRecord(existing, incoming);
-      merged.source = source;
-      merged.conversationKey = conversationKey;
-      const normalizedMerged = normalizeConversationListRecord(merged);
+        for (const incoming of incomingConversations) {
+          const source = incoming?.source ? String(incoming.source) : '';
+          const conversationKey = incoming?.conversationKey ? String(incoming.conversationKey) : '';
+          if (!source || !conversationKey) continue;
 
-      const uk = uniqueConversationKey(normalizedMerged);
-      if (existing && existing.id) {
-        normalizedMerged.id = existing.id;
+          const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
+          const normalizedMerged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+          normalizedMerged.source = source;
+          normalizedMerged.conversationKey = conversationKey;
+          const uk = uniqueConversationKey(normalizedMerged);
 
-        await reqToPromise(s.conversations.put(normalizedMerged as any));
-        uniqueToLocalId.set(uk, Number(existing.id));
-        stats.conversationsUpdated += 1;
-      } else {
-        const id = await reqToPromise(s.conversations.add(normalizedMerged as any) as any);
-        uniqueToLocalId.set(uk, Number(id));
-        stats.conversationsAdded += 1;
-      }
+          if (existing?.id) {
+            const localId = Number(existing.id);
+            normalizedMerged.id = localId;
+            uniqueToLocalId.set(uk, localId);
+            if (areBackupValuesEqual(normalizedMerged, existing)) continue;
 
-      if (i % 20 === 0) report();
-      bump(1, 'Conversations');
-    }
+            await reqToPromise(s.conversations.put(normalizedMerged as any));
+            stats.conversationsUpdated += 1;
+            stageChanged = true;
+            continue;
+          }
 
-    await txDone(t);
+          delete normalizedMerged.id;
+          const localId = Number(await reqToPromise(s.conversations.add(normalizedMerged as any) as any));
+          uniqueToLocalId.set(uk, localId);
+          stats.conversationsAdded += 1;
+          stageChanged = true;
+        }
+
+        if (stageChanged) markChanged('conversations');
+      },
+    );
+    reportCommittedStage(incomingConversations.length, 'Conversations');
   }
 
   // 1.25) Restore article comments (validated graph, roots before replies, idempotent merge).

@@ -1160,6 +1160,58 @@ describe('backup service', () => {
     });
   });
 
+  it('keeps committed ZIP conversations when progress listeners fail', async () => {
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/chatgpt/progress.json';
+    const entries = new Map<string, Uint8Array>([
+      [
+        'manifest.json',
+        encoder.encode(
+          JSON.stringify({
+            backupSchemaVersion: 2,
+            exportedAt: '2026-08-29T00:00:00.000Z',
+            db: { name: 'webclipper', version: 10 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+            config: { storageLocalPath: 'config/storage-local.json' },
+            index: { conversationsCsvPath: 'sources/conversations.csv' },
+            sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+          }),
+        ),
+      ],
+      ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+      ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      [
+        entryPath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              id: 99,
+              sourceType: 'chat',
+              source: 'chatgpt',
+              conversationKey: 'zip-progress',
+              title: 'Progress',
+              url: 'https://chatgpt.com/c/zip-progress',
+              lastCapturedAt: 10,
+            },
+            messages: [],
+            syncMapping: null,
+          }),
+        ),
+      ],
+    ]);
+
+    await expect(
+      importBackupZipV2Merge(entries, () => {
+        throw new Error('sync listener failure');
+      }),
+    ).resolves.toMatchObject({ conversationsAdded: 1 });
+    await expect(importBackupZipV2Merge(entries, (() => Promise.reject(new Error('async listener failure'))) as any)).resolves.toMatchObject({
+      conversationsAdded: 0,
+      conversationsUpdated: 0,
+    });
+  });
+
   it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
