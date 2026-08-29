@@ -5,6 +5,17 @@ const uiMocks = vi.hoisted(() => ({
   render: vi.fn(),
   cleanup: vi.fn(),
 }));
+const revisionMocks = vi.hoisted(() => ({
+  subscribe: vi.fn(),
+  ready: vi.fn(),
+  retry: vi.fn(),
+}));
+
+vi.mock('@services/data-revisions/observer', () => ({
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => revisionMocks.subscribe(listener),
+  whenDataRevisionObserverReady: () => revisionMocks.ready(),
+  requestDataRevisionRetry: (scopes: readonly string[]) => revisionMocks.retry(scopes),
+}));
 
 import { createItemMentionController } from '../../src/services/integrations/item-mention/content/mention-controller';
 import { ITEM_MENTION_MESSAGE_TYPES } from '../../src/platform/messaging/message-contracts';
@@ -24,11 +35,18 @@ function setCaretToEnd(el: HTMLElement) {
 }
 
 let dom: JSDOM | null = null;
+let revisionUnsubscribe: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.useFakeTimers();
   uiMocks.render.mockReset();
   uiMocks.cleanup.mockReset();
+  revisionUnsubscribe = vi.fn();
+  revisionMocks.subscribe.mockReset();
+  revisionMocks.subscribe.mockImplementation(() => revisionUnsubscribe);
+  revisionMocks.ready.mockReset();
+  revisionMocks.ready.mockResolvedValue({ baselineAvailable: true });
+  revisionMocks.retry.mockReset();
 
   dom = new JSDOM(
     '<!doctype html><html><body><div data-testid="agent-send-message-button"></div><div role="textbox" data-content-editable-leaf="true" contenteditable="true"></div></body></html>',
@@ -103,14 +121,18 @@ describe('item mention notionai controller', () => {
     setCaretToEnd(leaf);
     leaf.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
 
+    await flushMicrotasks();
     vi.advanceTimersByTime(200);
     await flushMicrotasks();
+
+    expect(revisionMocks.subscribe).toHaveBeenCalledTimes(1);
 
     leaf.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     await flushMicrotasks();
 
     expect(leaf.textContent).toBe('MD');
     active?.stop?.();
+    expect(revisionUnsubscribe).toHaveBeenCalledTimes(1);
   });
 
   it('does not pick during IME composition', async () => {
@@ -150,8 +172,11 @@ describe('item mention notionai controller', () => {
     setCaretToEnd(leaf);
     leaf.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
 
+    await flushMicrotasks();
     vi.advanceTimersByTime(200);
     await flushMicrotasks();
+
+    expect(revisionMocks.subscribe).toHaveBeenCalledTimes(1);
 
     leaf.dispatchEvent(new (dom!.window as any).CompositionEvent('compositionstart', { bubbles: true }));
     leaf.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
@@ -161,5 +186,6 @@ describe('item mention notionai controller', () => {
     expect(send).not.toHaveBeenCalledWith(ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, expect.anything());
 
     active?.stop?.();
+    expect(revisionUnsubscribe).toHaveBeenCalledTimes(1);
   });
 });
