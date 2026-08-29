@@ -4,7 +4,6 @@ import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 
 import {
-  __closeDbForTests as __closeCommentDbForTests,
   attachOrphanCommentsToConversation,
   listArticleCommentsByConversationId,
 } from '@services/comments/data/storage-idb';
@@ -47,7 +46,6 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeCommentDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 
@@ -59,7 +57,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeCommentDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 });

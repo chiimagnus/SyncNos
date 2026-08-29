@@ -5,7 +5,6 @@ import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { GITHUB_MESSAGE_TYPES, UI_EVENT_TYPES, UI_PORT_NAMES } from '@platform/messaging/message-contracts';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { addArticleComment } from '@services/comments/data/storage';
-import { __closeDbForTests as closeCommentsDbForTests } from '@services/comments/data/storage-idb';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
@@ -538,7 +537,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await closeCommentsDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 });

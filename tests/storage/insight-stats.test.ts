@@ -8,7 +8,7 @@ import {
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
-import { __closeDbForTests as closeCommentsDbForTests, addArticleComment } from '@services/comments/data/storage-idb';
+import { addArticleComment } from '@services/comments/data/storage-idb';
 import {
   getInsightStats,
   INSIGHT_ARTICLE_DOMAIN_LIMIT,
@@ -65,7 +65,6 @@ async function seedConversation(input: {
 }
 
 beforeEach(async () => {
-  await closeCommentsDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 
@@ -78,7 +77,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await closeCommentsDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 });

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
 
 import {
-  __closeDbForTests,
   addArticleComment,
   attachOrphanCommentsToConversation,
   deleteArticleCommentById,
@@ -43,7 +43,7 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
+  closeDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -52,8 +52,8 @@ beforeEach(async () => {
   await deleteDb('webclipper');
 });
 
-afterEach(async () => {
-  await __closeDbForTests();
+afterEach(() => {
+  closeDbForTests();
 });
 
 describe('article comments storage-idb', () => {

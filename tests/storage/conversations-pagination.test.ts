@@ -10,7 +10,7 @@ import {
   getConversationListPage,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
-import { __closeDbForTests as closeCommentsDbForTests, addArticleComment } from '@services/comments/data/storage-idb';
+import { addArticleComment } from '@services/comments/data/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -25,7 +25,6 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await closeCommentsDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
   // @ts-expect-error test global
@@ -36,7 +35,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await closeCommentsDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 });

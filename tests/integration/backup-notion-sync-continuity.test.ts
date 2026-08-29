@@ -7,7 +7,6 @@ import {
   deleteArticleCommentById,
   listArticleCommentsByConversationId,
 } from '@services/comments/data/storage';
-import { __closeDbForTests as closeCommentsDbForTests } from '@services/comments/data/storage-idb';
 import { computeNotionCommentsDigest } from '@services/comments/sync/notion-comments-renderer';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { backgroundStorage } from '@services/conversations/background/storage';
@@ -70,7 +69,6 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
 }
 
 async function closeDbCaches(): Promise<void> {
-  await closeCommentsDbForTests();
   await closeBackupDbForTests();
   __resetConversationStorageStateForTests();
   closeDbForTests();
