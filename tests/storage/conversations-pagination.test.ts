@@ -189,6 +189,55 @@ describe('conversations pagination storage-idb', () => {
     expect(filtered.items.every((item) => item.listSiteKey === 'domain:example.com')).toBe(true);
   });
 
+  it('does not persist derived-key repairs while reading a fresh bootstrap', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'seed-schema',
+      title: 'seed',
+      url: 'https://chatgpt.com/c/seed',
+      lastCapturedAt: 1,
+    });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    const rawStore = rawTx.objectStore('conversations');
+    const existing = await reqToPromise<any>(rawStore.index('by_source_conversationKey').get(['chatgpt', 'seed-schema']));
+    existing.listSourceKey = 'stale-source';
+    existing.listSiteKey = 'stale.example';
+    await reqToPromise(rawStore.put(existing));
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+
+    const bootstrap = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(bootstrap.items).toHaveLength(1);
+    expect(bootstrap.items[0]).toMatchObject({
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'domain:chatgpt.com',
+    });
+
+    const verifyTx = rawDb.transaction(['conversations'], 'readonly');
+    const persisted = await reqToPromise<any>(
+      verifyTx.objectStore('conversations').index('by_source_conversationKey').get(['chatgpt', 'seed-schema']),
+    );
+    await new Promise<void>((resolve, reject) => {
+      verifyTx.oncomplete = () => resolve();
+      verifyTx.onerror = () => reject(verifyTx.error);
+      verifyTx.onabort = () => reject(verifyTx.error);
+    });
+    rawDb.close();
+
+    expect(persisted.listSourceKey).toBe('stale-source');
+    expect(persisted.listSiteKey).toBe('stale.example');
+  });
+
   it('recomputes summary on a fresh bootstrap after an external IndexedDB write', async () => {
     const initial = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
     expect(initial.items).toEqual([]);
