@@ -13,7 +13,14 @@ export type BackupV2FixtureOptions = {
 };
 
 export type BackupV2FixtureExpected = {
-  chat: { source: string; conversationKey: string; title: string; warningFlags: string[]; assetId: number };
+  chat: {
+    source: string;
+    conversationKey: string;
+    title: string;
+    warningFlags: string[];
+    assetId: number;
+    assetByteSize: number;
+  };
   article: { source: string; conversationKey: string; canonicalUrl: string };
   video: { source: string; conversationKey: string };
   counts: {
@@ -27,6 +34,11 @@ export type BackupV2FixtureExpected = {
 
 const encoder = new TextEncoder();
 const FIXTURE_MTIME = new Date(BACKUP_V2_FIXTURE_EXPORTED_AT);
+const FIXTURE_PNG_BYTES = Uint8Array.from([
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0,
+  181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 252, 255, 31, 0, 2, 235, 1, 245, 143, 89, 141,
+  239, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+]);
 
 function jsonBytes(value: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(value, null, 2));
@@ -189,7 +201,7 @@ export function buildBackupV2FixtureEntries(options: BackupV2FixtureOptions = {}
         uniqueKey: chatUniqueKey,
         url: 'https://images.example.test/reload-free-fixture.png',
         contentType: 'image/png',
-        byteSize: 4,
+        byteSize: FIXTURE_PNG_BYTES.byteLength,
         createdAt: BACKUP_V2_FIXTURE_CAPTURED_AT,
         updatedAt: BACKUP_V2_FIXTURE_CAPTURED_AT,
         blobPath: imageBlobPath,
@@ -245,7 +257,7 @@ export function buildBackupV2FixtureEntries(options: BackupV2FixtureOptions = {}
     [articlePath, jsonBytes(articleBundle)],
     [videoPath, jsonBytes(videoBundle)],
     [imageIndexPath, jsonBytes(imageIndex)],
-    [imageBlobPath, Uint8Array.from([137, 80, 78, 71])],
+    [imageBlobPath, FIXTURE_PNG_BYTES],
     [commentsIndexPath, jsonBytes(commentsIndex)],
   ]);
 
@@ -258,6 +270,7 @@ export function buildBackupV2FixtureEntries(options: BackupV2FixtureOptions = {}
         title: chatTitle,
         warningFlags: [...chatWarningFlags],
         assetId,
+        assetByteSize: FIXTURE_PNG_BYTES.byteLength,
       },
       article: { source: 'web', conversationKey: articleConversationKey, canonicalUrl: articleCanonicalUrl },
       video: { source: 'youtube', conversationKey: videoConversationKey },
