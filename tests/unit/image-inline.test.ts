@@ -219,7 +219,13 @@ describe('image-inline', () => {
     const rows = await reqToPromise<any[]>(verifyTx.objectStore('image_cache').getAll());
     await txDone(verifyTx);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: winnerId, byteSize: 3, contentType: 'image/png', createdAt: 10, updatedAt: 11 });
+    expect(rows[0]).toMatchObject({
+      id: winnerId,
+      byteSize: 3,
+      contentType: 'image/png',
+      createdAt: 10,
+      updatedAt: 11,
+    });
     expect(await rows[0].blob.arrayBuffer()).toEqual(await new Blob([Uint8Array.from([9, 9, 9])]).arrayBuffer());
   });
 

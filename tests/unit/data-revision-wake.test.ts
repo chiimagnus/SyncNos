@@ -33,8 +33,7 @@ describe('data revision wake', () => {
         },
       },
     };
-    const { DATA_REVISION_WAKE_STORAGE_KEY, publishDataRevisionWake } =
-      await import('@services/data-revisions/wake');
+    const { DATA_REVISION_WAKE_STORAGE_KEY, publishDataRevisionWake } = await import('@services/data-revisions/wake');
 
     publishDataRevisionWake();
     await vi.waitFor(() => expect(writes).toHaveLength(1));
@@ -60,8 +59,7 @@ describe('data revision wake', () => {
         },
       },
     };
-    const { DATA_REVISION_WAKE_STORAGE_KEY, publishDataRevisionWake } =
-      await import('@services/data-revisions/wake');
+    const { DATA_REVISION_WAKE_STORAGE_KEY, publishDataRevisionWake } = await import('@services/data-revisions/wake');
 
     publishDataRevisionWake();
     publishDataRevisionWake();

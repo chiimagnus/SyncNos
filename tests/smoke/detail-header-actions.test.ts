@@ -147,7 +147,9 @@ describe('detail-header-actions', () => {
       OBSIDIAN_STORAGE_KEYS.videoFolder,
       DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY,
     ]);
-    expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.videoFolder]: {} }, 'local')).toBe(true);
+    expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.videoFolder]: {} }, 'local')).toBe(
+      true,
+    );
     expect(
       hasDetailHeaderActionStorageDependencyChange({ [DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY]: {} }, 'local'),
     ).toBe(true);

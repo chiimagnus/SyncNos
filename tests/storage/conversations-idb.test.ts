@@ -345,17 +345,15 @@ describe('conversations storage-idb', () => {
         const snapshotResult = await syncConversationMessages(id, [{ ...stableMessage, updatedAt }]);
         expect(snapshotResult).toEqual({ upserted: 1, deleted: 0 });
       }
-      const incrementalResult = await syncConversationMessages(
-        id,
-        [{ ...stableMessage }],
-        { mode: 'incremental', diff: { added: [], updated: ['m1'], removed: [] } },
-      );
+      const incrementalResult = await syncConversationMessages(id, [{ ...stableMessage }], {
+        mode: 'incremental',
+        diff: { added: [], updated: ['m1'], removed: [] },
+      });
       expect(incrementalResult).toEqual({ upserted: 1, deleted: 0 });
-      const appendResult = await syncConversationMessages(
-        id,
-        [{ ...stableMessage }],
-        { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
-      );
+      const appendResult = await syncConversationMessages(id, [{ ...stableMessage }], {
+        mode: 'append',
+        diff: { added: [], updated: ['m1'], removed: [] },
+      });
       expect(appendResult).toEqual({ upserted: 1, deleted: 0 });
     } finally {
       prototype.put = originalPut;
@@ -2340,7 +2338,9 @@ describe('conversations storage-idb', () => {
       return originalPut.call(this, value, key);
     };
     try {
-      await expect(mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId })).rejects.toThrow();
+      await expect(
+        mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId }),
+      ).rejects.toThrow();
     } finally {
       prototype.put = originalPut;
     }

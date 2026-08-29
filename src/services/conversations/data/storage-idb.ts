@@ -187,13 +187,11 @@ function pickPreferredArticleConversation(candidates: any[]): any | null {
     const aIdentity = buildCanonicalWebArticleIdentity(a?.url);
     const bIdentity = buildCanonicalWebArticleIdentity(b?.url);
     const aCanonical =
-      safeString(a?.source) === WEB_ARTICLE_SOURCE &&
-      aIdentity?.conversationKey === safeString(a?.conversationKey)
+      safeString(a?.source) === WEB_ARTICLE_SOURCE && aIdentity?.conversationKey === safeString(a?.conversationKey)
         ? 1
         : 0;
     const bCanonical =
-      safeString(b?.source) === WEB_ARTICLE_SOURCE &&
-      bIdentity?.conversationKey === safeString(b?.conversationKey)
+      safeString(b?.source) === WEB_ARTICLE_SOURCE && bIdentity?.conversationKey === safeString(b?.conversationKey)
         ? 1
         : 0;
     if (bCanonical !== aCanonical) return bCanonical - aCanonical;
@@ -458,7 +456,8 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
       const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
       const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
       const nextConversationKey = isArticleSource
-        ? articleIdentity?.conversationKey || normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
+        ? articleIdentity?.conversationKey ||
+          normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
         : String(payloadConversationKey || existingConversationKey || '').trim();
 
       const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
@@ -488,20 +487,16 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
 
       if (existing) {
         const replacementConversationId = Number(existing.id);
-        const mappingMutation = await migrateSyncMappingKey(
-          stores.sync_mappings,
-          stores[GITHUB_CLEANUP_OUTBOX_STORE],
-          {
-            legacySource: existing.source,
-            legacyConversationKey: existing.conversationKey,
-            nextSource: record.source,
-            nextConversationKey: record.conversationKey,
-            fallbackNotionPageId: record.notionPageId,
-            legacyConversation: existing,
-            replacementConversationId,
-            createdAt: now,
-          },
-        );
+        const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+          legacySource: existing.source,
+          legacyConversationKey: existing.conversationKey,
+          nextSource: record.source,
+          nextConversationKey: record.conversationKey,
+          fallbackNotionPageId: record.notionPageId,
+          legacyConversation: existing,
+          replacementConversationId,
+          createdAt: now,
+        });
         if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
 
         if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
@@ -564,7 +559,14 @@ export async function mergeConversationsByIds(input: {
   const outcome = await runTrackedTransaction(
     {
       db,
-      stores: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+      stores: [
+        'conversations',
+        'messages',
+        'sync_mappings',
+        'image_cache',
+        'article_comments',
+        GITHUB_CLEANUP_OUTBOX_STORE,
+      ],
       revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
     },
     async ({ stores, markChanged }) => {
@@ -665,7 +667,8 @@ export async function mergeConversationsByIds(input: {
               ...keepSide,
               blob: row.blob,
               byteSize: reusableImageCacheByteSize(row),
-              contentType: safeString(row.contentType) || safeString(row.blob?.type) || safeString(keepSide.contentType),
+              contentType:
+                safeString(row.contentType) || safeString(row.blob?.type) || safeString(keepSide.contentType),
               updatedAt: pickMaxFiniteNumber(keepSide.updatedAt, row.updatedAt) || now,
             };
             if (Object.prototype.hasOwnProperty.call(row, 'dataUrl')) repaired.dataUrl = row.dataUrl;
@@ -770,7 +773,8 @@ export async function syncConversationMessages(
         const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
 
         const hasTailPolicy =
-          mode === 'append' && upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
+          mode === 'append' &&
+          upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
         let nextTailSequence = 0;
         if (hasTailPolicy) {
           const seqIdx = stores.messages.index('by_conversationId_sequence');
@@ -799,7 +803,8 @@ export async function syncConversationMessages(
             rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
               ? rawMergePolicy
               : 'replace';
-          const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+          const incomingMarkdown =
+            m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
           const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
           const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
           const preserveExistingMarkdown =
@@ -1307,7 +1312,14 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   const outcome = await runTrackedTransaction(
     {
       db,
-      stores: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+      stores: [
+        'conversations',
+        'messages',
+        'sync_mappings',
+        'image_cache',
+        'article_comments',
+        GITHUB_CLEANUP_OUTBOX_STORE,
+      ],
       revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
     },
     async ({ stores, markChanged }) => {
@@ -1636,7 +1648,9 @@ export async function recordObsidianRemoteWrite(input: {
       const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
       const rawGeneration = existing?.obsidianRemoteWriteGeneration;
       const currentGeneration =
-        typeof rawGeneration === 'number' && Number.isSafeInteger(rawGeneration) && rawGeneration >= 0 ? rawGeneration : 0;
+        typeof rawGeneration === 'number' && Number.isSafeInteger(rawGeneration) && rawGeneration >= 0
+          ? rawGeneration
+          : 0;
       if (currentGeneration >= Number.MAX_SAFE_INTEGER) {
         throw Object.assign(new Error('obsidian_remote_write_generation_overflow'), {
           code: 'obsidian_remote_write_generation_overflow',

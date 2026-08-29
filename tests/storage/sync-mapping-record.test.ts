@@ -138,7 +138,13 @@ describe('sync mapping persistence record', () => {
     for (const invalid of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, '6']) {
       const merged = mergeSyncMappingPatch(base, { obsidianRemoteWriteGeneration: invalid });
       expect(merged.obsidianRemoteWriteGeneration).toBeUndefined();
-      expect(areSyncMappingsBusinessEquivalent(merged, { source: 'chatgpt', conversationKey: 'c-generation', customMetadata: 'keep' })).toBe(true);
+      expect(
+        areSyncMappingsBusinessEquivalent(merged, {
+          source: 'chatgpt',
+          conversationKey: 'c-generation',
+          customMetadata: 'keep',
+        }),
+      ).toBe(true);
     }
 
     const moved = mergeSyncMappingForIdentityMove(
@@ -694,9 +700,9 @@ describe('sync mapping persistence record', () => {
     expect(mergeSyncMappingForImport(local, { ...incomingNewer, lastSyncedAt: '101' }).lastSyncedMessageKey).toBe(
       'local',
     );
-    expect(
-      mergeSyncMappingForImport({ ...local, lastSyncedAt: undefined }, incomingNewer).lastSyncedMessageKey,
-    ).toBe('local');
+    expect(mergeSyncMappingForImport({ ...local, lastSyncedAt: undefined }, incomingNewer).lastSyncedMessageKey).toBe(
+      'local',
+    );
   });
 
   it('different Notion pages keep the complete local provider state', () => {
@@ -771,7 +777,11 @@ describe('sync mapping persistence record', () => {
     ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local', feishuLastSyncedAt: 20 });
 
     expect(
-      mergeSyncMappingForImport(local, { feishuDocId: 'doc-other', feishuLastContentHash: 'hash-other', feishuLastSyncedAt: 999 }),
+      mergeSyncMappingForImport(local, {
+        feishuDocId: 'doc-other',
+        feishuLastContentHash: 'hash-other',
+        feishuLastSyncedAt: 999,
+      }),
     ).toMatchObject({ feishuDocId: 'doc-local', feishuLastContentHash: 'hash-local', feishuLastSyncedAt: 20 });
 
     expect(
@@ -820,7 +830,9 @@ describe('sync mapping persistence record', () => {
     expect(mergeSyncMappingForImport(local, newerAuditOnly).githubProjectionFingerprint).toBe('a'.repeat(64));
 
     const importedProviderFreshness = { updatedAt: 1, ...githubState({ marker: 'c', syncedAt: 700 }) };
-    expect(mergeSyncMappingForImport(local, importedProviderFreshness).githubProjectionFingerprint).toBe('c'.repeat(64));
+    expect(mergeSyncMappingForImport(local, importedProviderFreshness).githubProjectionFingerprint).toBe(
+      'c'.repeat(64),
+    );
 
     const restored = mergeSyncMappingForImport({}, githubState({ marker: 'd', syncedAt: 700 }));
     expect(restored.githubRemoteKey).toBe('github.com/example/syncnos@main');

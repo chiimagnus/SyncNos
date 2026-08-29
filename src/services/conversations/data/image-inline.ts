@@ -233,9 +233,9 @@ async function upsertCachedImageAsset(input: {
     { db, stores: ['image_cache'], revisionScopes: ['image_cache'] },
     async ({ stores, markChanged }) => {
       const idx = stores.image_cache.index('by_conversationId_url');
-      const existing = (await reqToPromise(
-        idx.get([input.conversationId, safeUrl]) as any,
-      )) as ImageCacheRow | undefined;
+      const existing = (await reqToPromise(idx.get([input.conversationId, safeUrl]) as any)) as
+        | ImageCacheRow
+        | undefined;
       const existingByteSize = reusableImageCacheByteSize(existing);
       if (existing && existingByteSize > 0) {
         const existingId = Number(existing.id);

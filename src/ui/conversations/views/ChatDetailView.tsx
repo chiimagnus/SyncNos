@@ -64,11 +64,7 @@ export function ChatDetailView({
                     data-chat-outline-message-id={messageId}
                     ref={getUserMessageRefSetter(messageId)}
                   >
-                    <ChatMessageBubble
-                      role={(m as any).role}
-                      markdown={text}
-                      syncnosAssetSrcById={assetSrcById}
-                    />
+                    <ChatMessageBubble role={(m as any).role} markdown={text} syncnosAssetSrcById={assetSrcById} />
                   </div>
                 );
               }

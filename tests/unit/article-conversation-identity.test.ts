@@ -20,9 +20,7 @@ describe('web article conversation identity', () => {
   });
 
   it('uses the Discourse canonical URL form for identity', () => {
-    expect(
-      buildCanonicalWebArticleIdentity('https://forum.example.com/t/topic-slug/123/4?u=someone#reply'),
-    ).toEqual({
+    expect(buildCanonicalWebArticleIdentity('https://forum.example.com/t/topic-slug/123/4?u=someone#reply')).toEqual({
       source: WEB_ARTICLE_SOURCE,
       conversationKey: 'article:https://forum.example.com/t/topic-slug/123',
       url: 'https://forum.example.com/t/topic-slug/123',

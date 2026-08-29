@@ -1132,7 +1132,10 @@ describe('article-comments-sidebar-controller', () => {
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
       ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
-      findExistingContext: vi.fn().mockImplementationOnce(() => oldFind.promise).mockImplementationOnce(() => closedFind.promise),
+      findExistingContext: vi
+        .fn()
+        .mockImplementationOnce(() => oldFind.promise)
+        .mockImplementationOnce(() => closedFind.promise),
       migrateCanonicalUrl: vi.fn(async () => {}),
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });

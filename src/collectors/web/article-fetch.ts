@@ -4,10 +4,7 @@ import {
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage';
-import {
-  buildCanonicalWebArticleIdentity,
-  WEB_ARTICLE_SOURCE,
-} from '@services/conversations/domain/article-identity';
+import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';

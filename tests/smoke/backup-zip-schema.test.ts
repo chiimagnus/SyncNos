@@ -80,7 +80,10 @@ describe('backup zip v2 schema', () => {
     const db = await openDb();
     const originalTransaction = db.transaction.bind(db);
     const openedTransactions: string[][] = [];
-    const spy = vi.spyOn(db, 'transaction').mockImplementation(((storeNames: string | string[], mode?: IDBTransactionMode) => {
+    const spy = vi.spyOn(db, 'transaction').mockImplementation(((
+      storeNames: string | string[],
+      mode?: IDBTransactionMode,
+    ) => {
       const names = (Array.isArray(storeNames) ? storeNames : [storeNames]).map(String);
       openedTransactions.push(names);
       return originalTransaction(storeNames, mode);

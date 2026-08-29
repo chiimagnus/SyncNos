@@ -28,9 +28,8 @@ describe('sync provider gate', () => {
   });
 
   it('owns the stable provider gate storage dependency set', async () => {
-    const { getSyncProviderEnabledStorageKeys, hasSyncProviderEnabledStorageChange } = await import(
-      '@services/sync/sync-provider-gate'
-    );
+    const { getSyncProviderEnabledStorageKeys, hasSyncProviderEnabledStorageChange } =
+      await import('@services/sync/sync-provider-gate');
     expect(getSyncProviderEnabledStorageKeys()).toEqual([
       'webclipper_sync_provider_obsidian_enabled',
       'webclipper_sync_provider_notion_enabled',

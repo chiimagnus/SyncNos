@@ -205,7 +205,9 @@ describe('conversations pagination storage-idb', () => {
     });
     const rawTx = rawDb.transaction(['conversations'], 'readwrite');
     const rawStore = rawTx.objectStore('conversations');
-    const existing = await reqToPromise<any>(rawStore.index('by_source_conversationKey').get(['chatgpt', 'seed-schema']));
+    const existing = await reqToPromise<any>(
+      rawStore.index('by_source_conversationKey').get(['chatgpt', 'seed-schema']),
+    );
     existing.listSourceKey = 'stale-source';
     existing.listSiteKey = 'stale.example';
     await reqToPromise(rawStore.put(existing));

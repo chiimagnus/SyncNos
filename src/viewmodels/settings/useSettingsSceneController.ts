@@ -187,11 +187,7 @@ export type UseSettingsSceneControllerArgs = {
 
 export type InsightLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 type InsightRevisionScope = 'conversations' | 'messages' | 'article_comments';
-const INSIGHT_REVISION_SCOPES: readonly InsightRevisionScope[] = [
-  'conversations',
-  'messages',
-  'article_comments',
-];
+const INSIGHT_REVISION_SCOPES: readonly InsightRevisionScope[] = ['conversations', 'messages', 'article_comments'];
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 

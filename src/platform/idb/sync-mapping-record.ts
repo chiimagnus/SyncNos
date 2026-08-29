@@ -379,7 +379,8 @@ export function mergeSyncMappingForImport(existing: unknown, incoming: unknown):
   } else {
     const localSyncedAt = validGithubLastSyncedAt(local.githubLastSyncedAt);
     const importedSyncedAt = validGithubLastSyncedAt(imported.githubLastSyncedAt);
-    githubSource = importedSyncedAt != null && (localSyncedAt == null || importedSyncedAt > localSyncedAt) ? imported : local;
+    githubSource =
+      importedSyncedAt != null && (localSyncedAt == null || importedSyncedAt > localSyncedAt) ? imported : local;
   }
   replaceGithubGroup(next, githubSource);
   normalizeObsidianRemoteWriteGeneration(next, local, imported);

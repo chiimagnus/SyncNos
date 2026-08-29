@@ -573,7 +573,13 @@ describe('obsidian-sync-orchestrator', () => {
     const naming = await loadModule('@services/conversations/domain/file-naming.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    const convo = { id: 1, sourceType: 'chat', source: 'chatgpt', conversationKey: 'rename-failure', title: 'New Title' };
+    const convo = {
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'rename-failure',
+      title: 'New Title',
+    };
     const stableId10 = naming.stableConversationId10(convo);
     const oldFilename = `chatgpt-Old Title-${stableId10}.md`;
     const oldFilenameEncoded = oldFilename.replace(/ /g, '%20');

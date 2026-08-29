@@ -65,14 +65,24 @@ vi.mock('@services/shared/clipboard', () => ({
 }));
 
 vi.mock('@services/data-revisions/observer', () => ({
-  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => subscribeDataRevisionChanges(listener),
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) =>
+    subscribeDataRevisionChanges(listener),
   whenDataRevisionObserverReady: () => whenDataRevisionObserverReady(),
   requestDataRevisionRetry: (scopes: readonly string[]) => requestDataRevisionRetry(scopes),
 }));
 
 vi.mock('@viewmodels/conversations/useConversationSyncFeedback', () => ({
   useConversationSyncFeedback: () => ({
-    feedback: { provider: null, phase: 'idle', total: 0, done: 0, failures: [], message: '', updatedAt: 0, summary: null },
+    feedback: {
+      provider: null,
+      phase: 'idle',
+      total: 0,
+      done: 0,
+      failures: [],
+      message: '',
+      updatedAt: 0,
+      summary: null,
+    },
     clearFeedback: vi.fn(),
     startSync: vi.fn(),
     syncingNotion: false,
@@ -218,7 +228,9 @@ describe('ConversationsProvider data revisions', () => {
     getEnabledSyncProviders.mockReset();
     getEnabledSyncProviders.mockResolvedValue(['obsidian', 'notion', 'feishu', 'github']);
     getConversationListPage.mockResolvedValue(makePage([]));
-    getConversationById.mockImplementation((conversationId: number) => Promise.resolve(makeConversation(Number(conversationId))));
+    getConversationById.mockImplementation((conversationId: number) =>
+      Promise.resolve(makeConversation(Number(conversationId))),
+    );
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     upsertConversation.mockResolvedValue({});
@@ -263,7 +275,9 @@ describe('ConversationsProvider data revisions', () => {
   it('invalidates an in-flight first list and runs one trailing fresh bootstrap for conversation/comment revisions', async () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();
     const firstPage = deferred<any>();
-    getConversationListBootstrap.mockImplementationOnce(() => firstPage.promise).mockResolvedValueOnce(makePage([makeConversation(2)]));
+    getConversationListBootstrap
+      .mockImplementationOnce(() => firstPage.promise)
+      .mockResolvedValueOnce(makePage([makeConversation(2)]));
     whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
 
     await renderProvider();
@@ -288,7 +302,9 @@ describe('ConversationsProvider data revisions', () => {
     whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
     getConversationListBootstrap.mockImplementation((query: any) => {
       const source = String(query?.sourceKey || 'all');
-      return Promise.resolve(makePage([makeConversation(source === 'web' ? 3 : 1, source === 'web' ? 'web' : 'chatgpt')]));
+      return Promise.resolve(
+        makePage([makeConversation(source === 'web' ? 3 : 1, source === 'web' ? 'web' : 'chatgpt')]),
+      );
     });
 
     await renderProvider();
@@ -307,9 +323,7 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect(subscribeDataRevisionChanges).toHaveBeenCalledTimes(1);
-    expect(getConversationListBootstrap.mock.calls.at(-1)?.[0]).toEqual(
-      expect.objectContaining({ sourceKey: 'web' }),
-    );
+    expect(getConversationListBootstrap.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ sourceKey: 'web' }));
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([3]);
   });
 
@@ -412,7 +426,9 @@ describe('ConversationsProvider data revisions', () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();
     const firstPage = deferred<any>();
     whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
-    getConversationListBootstrap.mockImplementationOnce(() => firstPage.promise).mockResolvedValueOnce(makePage([makeConversation(2)]));
+    getConversationListBootstrap
+      .mockImplementationOnce(() => firstPage.promise)
+      .mockResolvedValueOnce(makePage([makeConversation(2)]));
 
     await renderProvider();
     await act(async () => {
@@ -584,7 +600,9 @@ describe('ConversationsProvider data revisions', () => {
     const firstPoint = { ...makeConversation(1), title: 'first point title', author: 'first author' };
     const freshPoint = { ...makeConversation(1), title: 'fresh point title', author: 'fresh author' };
     whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    getConversationListBootstrap.mockResolvedValueOnce(makePage([stale])).mockImplementationOnce(() => refreshList.promise);
+    getConversationListBootstrap
+      .mockResolvedValueOnce(makePage([stale]))
+      .mockImplementationOnce(() => refreshList.promise);
     getConversationById.mockResolvedValueOnce(firstPoint).mockResolvedValueOnce(freshPoint);
 
     await renderProvider();
@@ -866,7 +884,10 @@ describe('ConversationsProvider data revisions', () => {
     expect(storageChangeListener).toBeTruthy();
 
     await act(async () => {
-      storageChangeListener?.({ webclipper_detail_header_last_copy_link_action_v1: { newValue: 'copy-feishu-link' } }, 'local');
+      storageChangeListener?.(
+        { webclipper_detail_header_last_copy_link_action_v1: { newValue: 'copy-feishu-link' } },
+        'local',
+      );
       await flushMicrotasks();
     });
     expect(latestState.detailHeaderActions.some((action: any) => action.id === 'fresh-header-action')).toBe(true);

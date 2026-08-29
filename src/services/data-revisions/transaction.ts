@@ -40,7 +40,10 @@ function abortQuietly(transaction: IDBTransaction): void {
   }
 }
 
-function revisionError(code: 'revision_scope_invalid' | 'revision_scope_store_missing' | 'revision_overflow', scope?: unknown) {
+function revisionError(
+  code: 'revision_scope_invalid' | 'revision_scope_store_missing' | 'revision_overflow',
+  scope?: unknown,
+) {
   return Object.assign(new Error(code), { code, ...(scope == null ? null : { scope }) });
 }
 
@@ -85,10 +88,7 @@ export async function runTrackedTransaction<T>(
         throw revisionError('revision_overflow', scope);
       }
       await requestResult(
-        revisionStore.put(
-          { revision: current.revision + 1, updatedAt: Date.now() },
-          DATA_REVISION_RECORD_KEY,
-        ),
+        revisionStore.put({ revision: current.revision + 1, updatedAt: Date.now() }, DATA_REVISION_RECORD_KEY),
       );
     }
     await done;

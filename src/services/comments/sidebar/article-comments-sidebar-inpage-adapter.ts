@@ -1,4 +1,8 @@
-import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import {
+  ARTICLE_MESSAGE_TYPES,
+  COMMENTS_MESSAGE_TYPES,
+  CORE_MESSAGE_TYPES,
+} from '@platform/messaging/message-contracts';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
 import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain/article-identity';

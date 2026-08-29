@@ -237,9 +237,7 @@ describe('useSyncnosAssetSrcMap', () => {
   it('drops an old identity resolve and drains one trailing resolve for the latest identity', async () => {
     const oldRead = deferred<any>();
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById
-      .mockImplementationOnce(() => oldRead.promise)
-      .mockResolvedValueOnce(makeAsset(8, 22));
+    mocks.getImageCacheAssetById.mockImplementationOnce(() => oldRead.promise).mockResolvedValueOnce(makeAsset(8, 22));
 
     await renderProbe(11, ['![old](syncnos-asset://7)']);
     expect(mocks.getImageCacheAssetById).toHaveBeenCalledTimes(1);
@@ -259,9 +257,7 @@ describe('useSyncnosAssetSrcMap', () => {
   it('does not retry a rejected read from an old identity', async () => {
     const oldRead = deferred<any>();
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById
-      .mockImplementationOnce(() => oldRead.promise)
-      .mockResolvedValueOnce(makeAsset(10, 22));
+    mocks.getImageCacheAssetById.mockImplementationOnce(() => oldRead.promise).mockResolvedValueOnce(makeAsset(10, 22));
 
     await renderProbe(11, ['![old](syncnos-asset://9)']);
     await renderProbe(22, ['![new](syncnos-asset://10)']);

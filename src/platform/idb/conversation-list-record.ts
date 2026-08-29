@@ -1,7 +1,9 @@
 const UNKNOWN_LIST_KEY = 'unknown';
 
 function normalizeText(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 export function normalizeConversationListStoredSourceKey(value: unknown): string {
@@ -44,9 +46,7 @@ export function normalizeConversationListRecord<T extends Record<string, any>>(r
 
   const derivedSiteKey = deriveConversationListStoredSiteKeyFromUrl(record?.url);
   const siteKey =
-    derivedSiteKey !== UNKNOWN_LIST_KEY
-      ? derivedSiteKey
-      : normalizeConversationListStoredSiteKey(existingSiteKey);
+    derivedSiteKey !== UNKNOWN_LIST_KEY ? derivedSiteKey : normalizeConversationListStoredSiteKey(existingSiteKey);
 
   if (existingSourceKey === sourceKey && existingSiteKey === siteKey) return record;
   return {

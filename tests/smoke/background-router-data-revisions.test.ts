@@ -26,9 +26,7 @@ describe('background data revision request', () => {
     }));
     registerDataRevisionHandlers(router, { readSnapshot });
 
-    await expect(
-      router.__handleMessageForTests({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT }),
-    ).resolves.toEqual({
+    await expect(router.__handleMessageForTests({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT })).resolves.toEqual({
       ok: true,
       data: {
         conversations: 1,
@@ -49,9 +47,7 @@ describe('background data revision request', () => {
     });
     registerDataRevisionHandlers(router, { readSnapshot });
 
-    await expect(
-      router.__handleMessageForTests({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT }),
-    ).resolves.toEqual({
+    await expect(router.__handleMessageForTests({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT })).resolves.toEqual({
       ok: false,
       data: null,
       error: { message: 'snapshot_unstable', extra: null },

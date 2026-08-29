@@ -73,7 +73,8 @@ vi.mock('@services/integrations/detail-header-actions', () => ({
 }));
 
 vi.mock('@services/data-revisions/observer', () => ({
-  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => subscribeDataRevisionChanges(listener),
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) =>
+    subscribeDataRevisionChanges(listener),
   whenDataRevisionObserverReady: () => whenDataRevisionObserverReady(),
   requestDataRevisionRetry: (scopes: readonly string[]) => requestDataRevisionRetry(scopes),
 }));
@@ -296,10 +297,9 @@ describe('ConversationsProvider pagination state', () => {
 
   it('keeps the committed page bundle when loading more fails', async () => {
     const firstPage = {
-      ...makePage(
-        [makeConversation(1, 'chatgpt', 'conv-1')],
-        { sources: [{ key: 'chatgpt', label: 'chatgpt', count: 2 }] },
-      ),
+      ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 2 }],
+      }),
       cursor: { lastCapturedAt: 100, id: 1 },
       hasMore: true,
       summary: { totalCount: 2, todayCount: 1 },
@@ -586,13 +586,10 @@ describe('ConversationsProvider pagination state', () => {
       url: 'https://example.com/article-301',
     };
     getConversationListBootstrap.mockResolvedValue(
-      makePage(
-        [article],
-        {
-          sources: [{ key: 'web', label: 'web', count: 1 }],
-          sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
-        },
-      ),
+      makePage([article], {
+        sources: [{ key: 'web', label: 'web', count: 1 }],
+        sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
+      }),
     );
     getConversationById.mockResolvedValue(article);
 

@@ -105,8 +105,13 @@ function observeRevisionReads(db: IDBDatabase): RevisionReadObserver {
     for (const waiter of [...waiters]) waiter();
   };
 
-  const spy = vi.spyOn(db, 'transaction').mockImplementation(((storeNames: any, mode?: IDBTransactionMode, options?: any) => {
-    const transaction = options === undefined ? original(storeNames, mode) : (original as any)(storeNames, mode, options);
+  const spy = vi.spyOn(db, 'transaction').mockImplementation(((
+    storeNames: any,
+    mode?: IDBTransactionMode,
+    options?: any,
+  ) => {
+    const transaction =
+      options === undefined ? original(storeNames, mode) : (original as any)(storeNames, mode, options);
     const stores = (Array.isArray(storeNames) ? storeNames : [storeNames]).map(String);
     if (mode === 'readonly' && stores.some((storeName) => revisionStoreNames.has(storeName))) {
       readonlyRevisionTransactions.push({ stores, mode });
@@ -242,9 +247,7 @@ describe('data revision storage', () => {
           stores.conversations.add({ source: 'test', conversationKey: 'multi' }) as any,
         );
         markChanged('conversations');
-        await requestResult(
-          stores.messages.add({ conversationId, messageKey: 'm1', role: 'user', sequence: 0 }),
-        );
+        await requestResult(stores.messages.add({ conversationId, messageKey: 'm1', role: 'user', sequence: 0 }));
         markChanged('messages');
       },
     );
@@ -265,10 +268,7 @@ describe('data revision storage', () => {
   it('fails closed for scope/store mismatch and aborts when work marks an undeclared scope', async () => {
     const db = await openDb();
     await expect(
-      runTrackedTransaction(
-        { db, stores: ['conversations'], revisionScopes: ['messages'] },
-        async () => undefined,
-      ),
+      runTrackedTransaction({ db, stores: ['conversations'], revisionScopes: ['messages'] }, async () => undefined),
     ).rejects.toMatchObject({ code: 'revision_scope_store_missing', scope: 'messages' });
 
     await expect(
@@ -463,7 +463,9 @@ describe('data revision storage', () => {
     expect(await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: keepId })).toMatchObject({
       merged: false,
     });
-    expect(await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: keepId + 999 })).toMatchObject({
+    expect(
+      await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: keepId + 999 }),
+    ).toMatchObject({
       merged: false,
     });
     expect(await readDataRevisionSnapshot()).toEqual(before);
@@ -496,7 +498,10 @@ describe('data revision storage', () => {
       const db = await openDb();
       const verifyTx = db.transaction(['sync_mappings'], 'readonly');
       const stored = await requestResult<any>(
-        verifyTx.objectStore('sync_mappings').index('by_source_conversationKey').get(['chatgpt', 'obsidian-generation']),
+        verifyTx
+          .objectStore('sync_mappings')
+          .index('by_source_conversationKey')
+          .get(['chatgpt', 'obsidian-generation']),
       );
       await txDone(verifyTx);
       expect(stored).toMatchObject({

@@ -268,9 +268,7 @@ export function buildBackupV2FixtureEntries(options: BackupV2FixtureOptions = {}
 
 export async function createBackupV2FixtureZip(options: BackupV2FixtureOptions = {}): Promise<Blob> {
   const { entries } = buildBackupV2FixtureEntries(options);
-  return await createZipBlob(
-    Array.from(entries, ([name, data]) => ({ name, data, lastModified: FIXTURE_MTIME })),
-  );
+  return await createZipBlob(Array.from(entries, ([name, data]) => ({ name, data, lastModified: FIXTURE_MTIME })));
 }
 
 export async function writeBackupV2FixtureZip(options: BackupV2FixtureOptions = {}): Promise<{

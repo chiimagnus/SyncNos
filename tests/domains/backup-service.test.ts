@@ -995,7 +995,10 @@ describe('backup service', () => {
     const db = await openDb();
     const firstTx = db.transaction(['conversations'], 'readonly');
     const persisted = await reqToPromise<any>(
-      firstTx.objectStore('conversations').index('by_source_conversationKey').get(['chatgpt', 'legacy-remap-noop']) as any,
+      firstTx
+        .objectStore('conversations')
+        .index('by_source_conversationKey')
+        .get(['chatgpt', 'legacy-remap-noop']) as any,
     );
     await new Promise<void>((resolve, reject) => {
       firstTx.oncomplete = () => resolve();
@@ -1028,14 +1031,21 @@ describe('backup service', () => {
     expect(repeated.messagesAdded).toBe(1);
     const verifyTx = db.transaction(['messages'], 'readonly');
     const message = await reqToPromise<any>(
-      verifyTx.objectStore('messages').index('by_conversationId_messageKey').get([localConversationId, 'm-remap']) as any,
+      verifyTx
+        .objectStore('messages')
+        .index('by_conversationId_messageKey')
+        .get([localConversationId, 'm-remap']) as any,
     );
     await new Promise<void>((resolve, reject) => {
       verifyTx.oncomplete = () => resolve();
       verifyTx.onerror = () => reject(verifyTx.error);
       verifyTx.onabort = () => reject(verifyTx.error);
     });
-    expect(message).toMatchObject({ conversationId: localConversationId, messageKey: 'm-remap', contentText: 'mapped' });
+    expect(message).toMatchObject({
+      conversationId: localConversationId,
+      messageKey: 'm-remap',
+      contentText: 'mapped',
+    });
   });
 
   it('keeps Legacy message imports idempotent after remapping local identities', async () => {
@@ -1207,7 +1217,9 @@ describe('backup service', () => {
         throw new Error('sync listener failure');
       }),
     ).resolves.toMatchObject({ conversationsAdded: 1 });
-    await expect(importBackupZipV2Merge(entries, (() => Promise.reject(new Error('async listener failure'))) as any)).resolves.toMatchObject({
+    await expect(
+      importBackupZipV2Merge(entries, (() => Promise.reject(new Error('async listener failure'))) as any),
+    ).resolves.toMatchObject({
       conversationsAdded: 0,
       conversationsUpdated: 0,
     });

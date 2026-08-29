@@ -14,9 +14,6 @@ const DEFAULT_DEPS: DataRevisionHandlersDeps = {
   readSnapshot: readDataRevisionSnapshot,
 };
 
-export function registerDataRevisionHandlers(
-  router: AnyRouter,
-  deps: DataRevisionHandlersDeps = DEFAULT_DEPS,
-): void {
+export function registerDataRevisionHandlers(router: AnyRouter, deps: DataRevisionHandlersDeps = DEFAULT_DEPS): void {
   router.register(DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT, async () => router.ok(await deps.readSnapshot()));
 }

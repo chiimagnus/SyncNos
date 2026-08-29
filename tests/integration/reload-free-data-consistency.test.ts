@@ -256,7 +256,9 @@ describe('reload-free data consistency production chain', () => {
     const list = await getConversationListBootstrap({}, 20);
     expect(list.summary).toEqual({ totalCount: 3, todayCount: 3 });
     expect(list.items).toHaveLength(3);
-    expect(list.facets.sources.map((facet) => facet.key)).toEqual(expect.arrayContaining(['chatgpt', 'web', 'youtube']));
+    expect(list.facets.sources.map((facet) => facet.key)).toEqual(
+      expect.arrayContaining(['chatgpt', 'web', 'youtube']),
+    );
 
     const chat = await getConversationBySourceConversationKey(
       fixture.expected.chat.source,

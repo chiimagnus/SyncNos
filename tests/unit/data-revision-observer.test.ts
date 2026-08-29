@@ -85,7 +85,10 @@ afterEach(() => {
 
 describe('data revision observer', () => {
   it('shares one baseline across subscribers and reports only changed scopes', async () => {
-    const readSnapshot = vi.fn().mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot({ conversations: 1 }));
+    const readSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce(snapshot({ conversations: 1 }));
     const { observer } = createObserver(readSnapshot);
     const first = vi.fn();
     const second = vi.fn();
@@ -105,7 +108,10 @@ describe('data revision observer', () => {
   });
 
   it('keeps duplicate callback subscriptions active until every subscription is released', async () => {
-    const readSnapshot = vi.fn().mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot({ conversations: 1 }));
+    const readSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce(snapshot({ conversations: 1 }));
     const { observer } = createObserver(readSnapshot);
     const listener = vi.fn();
     const stopFirst = observer.subscribe(listener);
@@ -121,7 +127,10 @@ describe('data revision observer', () => {
   });
 
   it('uses same-context wake and isolates a throwing wake subscriber', async () => {
-    const readSnapshot = vi.fn().mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot({ messages: 1 }));
+    const readSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce(snapshot({ messages: 1 }));
     const observer = createDataRevisionObserver({
       readSnapshot,
       subscribeWake: subscribeDataRevisionWake,
@@ -146,7 +155,10 @@ describe('data revision observer', () => {
   });
 
   it('settles degraded after a baseline failure and emits one conservative catch-up after recovery', async () => {
-    const readSnapshot = vi.fn().mockRejectedValueOnce(new Error('background unavailable')).mockResolvedValueOnce(snapshot());
+    const readSnapshot = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('background unavailable'))
+      .mockResolvedValueOnce(snapshot());
     const { observer } = createObserver(readSnapshot);
     const listener = vi.fn();
     const stop = observer.subscribe(listener);
@@ -181,7 +193,10 @@ describe('data revision observer', () => {
     vi.useFakeTimers();
     const first = deferred<ReturnType<typeof snapshot>>();
     const second = deferred<ReturnType<typeof snapshot>>();
-    const readSnapshot = vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise);
+    const readSnapshot = vi
+      .fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
     const clearTimeoutSpy = vi.fn(globalThis.clearTimeout);
     const { observer } = createObserver(readSnapshot, { readinessTimeoutMs: 20, clearTimeout: clearTimeoutSpy });
     const firstListener = vi.fn();
@@ -208,7 +223,10 @@ describe('data revision observer', () => {
   it('keeps a replacement epoch ready when a previous epoch rejects late', async () => {
     const first = deferred<ReturnType<typeof snapshot>>();
     const second = deferred<ReturnType<typeof snapshot>>();
-    const readSnapshot = vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise);
+    const readSnapshot = vi
+      .fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
     const { observer } = createObserver(readSnapshot);
     const stopFirst = observer.subscribe(vi.fn());
     stopFirst();
@@ -297,7 +315,10 @@ describe('data revision observer', () => {
   });
 
   it('continues notifying other consumers when one revision listener throws', async () => {
-    const readSnapshot = vi.fn().mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot({ image_cache: 1 }));
+    const readSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce(snapshot({ image_cache: 1 }));
     const { observer } = createObserver(readSnapshot);
     const received = vi.fn();
     const stopThrowing = observer.subscribe(() => {

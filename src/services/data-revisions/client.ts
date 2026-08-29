@@ -1,6 +1,10 @@
 import { DATA_REVISION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@platform/runtime/runtime';
-import { DATA_REVISION_SCOPES, type DataRevisionScope, type DataRevisionSnapshot } from '@platform/idb/data-revision-record';
+import {
+  DATA_REVISION_SCOPES,
+  type DataRevisionScope,
+  type DataRevisionSnapshot,
+} from '@platform/idb/data-revision-record';
 
 type ApiResponse<T> = {
   ok: boolean;

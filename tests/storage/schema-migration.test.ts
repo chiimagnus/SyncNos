@@ -675,9 +675,7 @@ describe('storage schema migration (v10 data revisions)', () => {
 
     const storeName = DATA_REVISION_STORE_BY_SCOPE.conversations;
     const writeTx = db.transaction([storeName], 'readwrite');
-    await reqToPromise(
-      writeTx.objectStore(storeName).put({ revision: 3, updatedAt: 4 }, DATA_REVISION_RECORD_KEY),
-    );
+    await reqToPromise(writeTx.objectStore(storeName).put({ revision: 3, updatedAt: 4 }, DATA_REVISION_RECORD_KEY));
     await txDone(writeTx);
 
     const readTx = db.transaction([storeName], 'readonly');
