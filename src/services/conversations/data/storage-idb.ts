@@ -1,4 +1,9 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import {
+  buildCanonicalWebArticleIdentity,
+  normalizeWebArticleConversationKey,
+  WEB_ARTICLE_SOURCE,
+} from '@services/conversations/domain/article-identity';
 import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -117,18 +122,6 @@ function sortFacetItems(items: Array<{ key: string; label: string; count: number
   });
 }
 
-function normalizeArticleUrl(raw: unknown): string {
-  return canonicalizeArticleUrl(raw);
-}
-
-function normalizeArticleConversationKey(raw: unknown): string {
-  const key = safeString(raw);
-  if (!key) return '';
-  if (!key.toLowerCase().startsWith('article:')) return key;
-  const canonicalUrl = normalizeArticleUrl(key.slice('article:'.length));
-  return canonicalUrl ? `article:${canonicalUrl}` : key;
-}
-
 function isArticlePayload(payload: any): boolean {
   return safeString(payload?.sourceType).toLowerCase() === 'article';
 }
@@ -137,8 +130,18 @@ function pickPreferredArticleConversation(candidates: any[]): any | null {
   const list = Array.isArray(candidates) ? candidates.slice() : [];
   if (!list.length) return null;
   list.sort((a, b) => {
-    const aCanonical = safeString(a?.source) === 'web' && safeString(a?.conversationKey).startsWith('article:') ? 1 : 0;
-    const bCanonical = safeString(b?.source) === 'web' && safeString(b?.conversationKey).startsWith('article:') ? 1 : 0;
+    const aIdentity = buildCanonicalWebArticleIdentity(a?.url);
+    const bIdentity = buildCanonicalWebArticleIdentity(b?.url);
+    const aCanonical =
+      safeString(a?.source) === WEB_ARTICLE_SOURCE &&
+      aIdentity?.conversationKey === safeString(a?.conversationKey)
+        ? 1
+        : 0;
+    const bCanonical =
+      safeString(b?.source) === WEB_ARTICLE_SOURCE &&
+      bIdentity?.conversationKey === safeString(b?.conversationKey)
+        ? 1
+        : 0;
     if (bCanonical !== aCanonical) return bCanonical - aCanonical;
 
     const aMapped = safeString(a?.notionPageId) ? 1 : 0;
@@ -160,12 +163,12 @@ async function findExistingArticleConversationByUrl(
   conversationsStore: IDBObjectStore,
   rawUrl: unknown,
 ): Promise<any | null> {
-  const normalizedUrl = normalizeArticleUrl(rawUrl);
+  const normalizedUrl = canonicalizeArticleUrl(rawUrl);
   if (!normalizedUrl) return null;
   const rows = (await reqToPromise(conversationsStore.getAll() as any)) as any[];
   const matched = rows.filter((row) => {
     if (safeString(row?.sourceType).toLowerCase() !== 'article') return false;
-    return normalizeArticleUrl(row?.url) === normalizedUrl;
+    return canonicalizeArticleUrl(row?.url) === normalizedUrl;
   });
   return pickPreferredArticleConversation(matched);
 }
@@ -186,10 +189,10 @@ async function findExistingConversationForPayload(
   let conversationKey = safeString(payload?.conversationKey);
   if (!source) return null;
 
-  if (isArticlePayload(payload) && source.toLowerCase() === 'web') {
-    const canonicalUrl = normalizeArticleUrl(payload?.url);
-    if (canonicalUrl) conversationKey = `article:${canonicalUrl}`;
-    conversationKey = normalizeArticleConversationKey(conversationKey);
+  if (isArticlePayload(payload) && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
+    const identity = buildCanonicalWebArticleIdentity(payload?.url);
+    if (identity) conversationKey = identity.conversationKey;
+    conversationKey = normalizeWebArticleConversationKey(conversationKey);
   }
 
   if (!conversationKey) return null;
@@ -383,20 +386,18 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
     const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
     const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
     const isArticleSource =
-      safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === 'web';
+      safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === WEB_ARTICLE_SOURCE;
 
     const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
     const existingUrl = existing ? String(existing.url || '').trim() : '';
     const nextUrlCandidate = payloadUrl || existingUrl;
-    const nextUrl = isArticleSource ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate : nextUrlCandidate;
+    const articleIdentity = isArticleSource ? buildCanonicalWebArticleIdentity(nextUrlCandidate) : null;
+    const nextUrl = articleIdentity?.url || nextUrlCandidate;
 
     const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
     const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
-    const articleDerivedConversationKey = isArticleSource && nextUrl ? `article:${nextUrl}` : '';
     const nextConversationKey = isArticleSource
-      ? normalizeArticleConversationKey(
-          articleDerivedConversationKey || payloadConversationKey || existingConversationKey,
-        )
+      ? articleIdentity?.conversationKey || normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
       : String(payloadConversationKey || existingConversationKey || '').trim();
 
     const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
@@ -436,8 +437,8 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
       });
 
       if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
-        const fromCanonicalUrl = normalizeArticleUrl(existingUrl);
-        const toCanonicalUrl = normalizeArticleUrl(record.url);
+        const fromCanonicalUrl = canonicalizeArticleUrl(existingUrl);
+        const toCanonicalUrl = canonicalizeArticleUrl(record.url);
         await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
           conversationId: replacementConversationId,
           fromCanonicalUrl,
@@ -583,7 +584,7 @@ export async function mergeConversationsByIds(input: {
     }
 
     const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
-    const mergedCanonicalUrl = mergedIsArticle ? normalizeArticleUrl(mergedConversation.url) : '';
+    const mergedCanonicalUrl = mergedIsArticle ? canonicalizeArticleUrl(mergedConversation.url) : '';
     const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
     const commentRange = globalThis.IDBKeyRange.bound(
       [removeConversationId, -Infinity] as any,
@@ -936,7 +937,7 @@ async function readConversationListPageItems(input: {
   for (const item of pageItems) {
     if (safeString((item as any).sourceType).toLowerCase() !== 'article') continue;
     const conversationId = Number((item as any).id);
-    const canonicalUrl = normalizeArticleUrl((item as any).url);
+    const canonicalUrl = canonicalizeArticleUrl((item as any).url);
     const comments: any[] = [];
     if (globalThis.IDBKeyRange?.bound && Number.isSafeInteger(conversationId) && conversationId > 0) {
       const byConversationRange = globalThis.IDBKeyRange.bound(
