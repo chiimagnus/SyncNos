@@ -125,6 +125,36 @@ describe('sync mapping persistence record', () => {
     expect(areSyncMappingsBusinessEquivalent(base, { ...base, feishuLastSyncedAt: 51 })).toBe(false);
   });
 
+  it('normalizes Obsidian remote-write generation and keeps the valid max across identity/import merges', () => {
+    const base = {
+      source: 'chatgpt',
+      conversationKey: 'c-generation',
+      obsidianRemoteWriteGeneration: 4,
+      customMetadata: 'keep',
+    };
+
+    expect(mergeSyncMappingPatch(base, {}).obsidianRemoteWriteGeneration).toBe(4);
+    expect(mergeSyncMappingPatch(base, { obsidianRemoteWriteGeneration: 5 }).obsidianRemoteWriteGeneration).toBe(5);
+    for (const invalid of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, '6']) {
+      const merged = mergeSyncMappingPatch(base, { obsidianRemoteWriteGeneration: invalid });
+      expect(merged.obsidianRemoteWriteGeneration).toBeUndefined();
+      expect(areSyncMappingsBusinessEquivalent(merged, { source: 'chatgpt', conversationKey: 'c-generation', customMetadata: 'keep' })).toBe(true);
+    }
+
+    const moved = mergeSyncMappingForIdentityMove(
+      { id: 2, source: 'chatgpt', conversationKey: 'target', obsidianRemoteWriteGeneration: 3 },
+      { id: 1, source: 'chatgpt', conversationKey: 'legacy', obsidianRemoteWriteGeneration: 7 },
+      { source: 'chatgpt', conversationKey: 'target' },
+    );
+    expect(moved.obsidianRemoteWriteGeneration).toBe(7);
+
+    const imported = mergeSyncMappingForImport(
+      { source: 'chatgpt', conversationKey: 'target', obsidianRemoteWriteGeneration: 9 },
+      { source: 'chatgpt', conversationKey: 'target', obsidianRemoteWriteGeneration: 11 },
+    );
+    expect(imported.obsidianRemoteWriteGeneration).toBe(11);
+  });
+
   it('merges only explicitly provided valid Notion nested sections', () => {
     const existing = {
       id: 7,

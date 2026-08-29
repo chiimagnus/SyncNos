@@ -1625,6 +1625,45 @@ async function patchSyncMappingInternal(
   );
 }
 
+export async function recordObsidianRemoteWrite(input: {
+  source: unknown;
+  conversationKey: unknown;
+}): Promise<{ generation: number }> {
+  const source = safeString(input?.source);
+  const conversationKey = safeString(input?.conversationKey);
+  if (!source || !conversationKey) throw new Error('invalid obsidian remote write identity');
+
+  const db = await openDb();
+  return runTrackedTransaction(
+    { db, stores: ['sync_mappings'], revisionScopes: ['sync_mappings'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.sync_mappings.index('by_source_conversationKey');
+      const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+      const rawGeneration = existing?.obsidianRemoteWriteGeneration;
+      const currentGeneration =
+        typeof rawGeneration === 'number' && Number.isSafeInteger(rawGeneration) && rawGeneration >= 0 ? rawGeneration : 0;
+      if (currentGeneration >= Number.MAX_SAFE_INTEGER) {
+        throw Object.assign(new Error('obsidian_remote_write_generation_overflow'), {
+          code: 'obsidian_remote_write_generation_overflow',
+        });
+      }
+
+      const generation = currentGeneration + 1;
+      const next = {
+        ...(existing && typeof existing === 'object' ? existing : {}),
+        source,
+        conversationKey,
+        obsidianRemoteWriteGeneration: generation,
+        updatedAt: Date.now(),
+      };
+      if (existing) await reqToPromise(stores.sync_mappings.put(next));
+      else await reqToPromise(stores.sync_mappings.add(next));
+      markChanged('sync_mappings');
+      return { generation };
+    },
+  );
+}
+
 export async function patchSyncMapping(conversationId: number, patch: Record<string, unknown>): Promise<true> {
   return patchSyncMappingInternal(conversationId, patch);
 }

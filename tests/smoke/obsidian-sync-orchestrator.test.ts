@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backgroundStorageMocks = vi.hoisted(() => ({
   getConversationById: vi.fn(),
   getMessagesByConversationId: vi.fn(),
   getArticleCommentsByConversationId: vi.fn(),
   attachOrphanArticleCommentsToConversation: vi.fn(),
+  recordObsidianRemoteWrite: vi.fn(),
 }));
 const imageCacheMocks = vi.hoisted(() => ({ getImageCacheAssetById: vi.fn() }));
 
@@ -14,6 +15,7 @@ vi.mock('@services/conversations/background/storage', () => ({
     getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
     getArticleCommentsByConversationId: backgroundStorageMocks.getArticleCommentsByConversationId,
     attachOrphanArticleCommentsToConversation: backgroundStorageMocks.attachOrphanArticleCommentsToConversation,
+    recordObsidianRemoteWrite: backgroundStorageMocks.recordObsidianRemoteWrite,
   },
 }));
 vi.mock('@services/conversations/data/image-cache-read', () => imageCacheMocks);
@@ -45,6 +47,10 @@ function setupChromeStorage() {
   };
   return store;
 }
+
+beforeEach(() => {
+  backgroundStorageMocks.recordObsidianRemoteWrite.mockResolvedValue({ generation: 1 });
+});
 
 describe('obsidian-sync-orchestrator', () => {
   it('reports missing_api_key when api key is not configured', async () => {
@@ -185,6 +191,73 @@ describe('obsidian-sync-orchestrator', () => {
     const markdownPut = seen.find((call) => call.method === 'PUT' && call.url.endsWith(encodedNoteName));
     expect(String(markdownPut?.body || '')).toContain(`![diagram](<${noteBasename}-1.png> "caption")`);
     expect(String(markdownPut?.body || '')).not.toContain('syncnos-asset://');
+  });
+
+  it('does not record generation when only attachments succeed and the main note PUT fails', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'attachment-only-failure',
+      title: 'Attachment only failure',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      {
+        messageKey: 'm1',
+        sequence: 1,
+        contentMarkdown: '![asset](syncnos-asset://7)',
+        updatedAt: 1,
+      },
+    ]);
+    imageCacheMocks.getImageCacheAssetById.mockResolvedValue({
+      id: 7,
+      conversationId: 1,
+      url: 'https://example.com/a.png',
+      blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+      byteSize: 3,
+      contentType: 'image/png',
+    });
+
+    let binaryPutCount = 0;
+    let notePutCount = 0;
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT' && typeof init?.body !== 'string') {
+        binaryPutCount += 1;
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        notePutCount += 1;
+        return new Response(JSON.stringify({ errorCode: 50000, message: 'main put failed' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(binaryPutCount).toBe(1);
+    expect(notePutCount).toBe(1);
+    expect(syncRes.results[0].ok).toBe(false);
+    expect(syncRes.results[0].mode).toBe('failed');
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).not.toHaveBeenCalled();
   });
 
   it('rebuilds chat note when remote exists', async () => {
@@ -491,6 +564,137 @@ describe('obsidian-sync-orchestrator', () => {
     expect(putBody).toContain('## 1 assistant');
   });
 
+  it.each([
+    ['generation persistence failure blocks old-path delete', 'record_fail'],
+    ['old-path delete throw keeps generation committed', 'delete_throw'],
+  ] as const)('%s', async (_label, failureMode) => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const naming = await loadModule('@services/conversations/domain/file-naming.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    const convo = { id: 1, sourceType: 'chat', source: 'chatgpt', conversationKey: 'rename-failure', title: 'New Title' };
+    const stableId10 = naming.stableConversationId10(convo);
+    const oldFilename = `chatgpt-Old Title-${stableId10}.md`;
+    const oldFilenameEncoded = oldFilename.replace(/ /g, '%20');
+    backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'm1', sequence: 1, contentMarkdown: 'hi', updatedAt: 1 },
+    ]);
+    if (failureMode === 'record_fail') {
+      backgroundStorageMocks.recordObsidianRemoteWrite.mockRejectedValue(new Error('generation persist failed'));
+    }
+
+    let deleteCalls = 0;
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const url = String(_url || '');
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET' && url.endsWith('/vault/SyncNos-AIChats/')) {
+        return new Response(JSON.stringify({ files: [oldFilename] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'GET' && url.includes(`/vault/SyncNos-AIChats/${oldFilenameEncoded}`)) {
+        return new Response(
+          JSON.stringify({
+            frontmatter: {
+              syncnos: {
+                source: 'chatgpt',
+                conversationKey: 'rename-failure',
+                schemaVersion: 1,
+                lastSyncedSequence: 1,
+                lastSyncedMessageKey: 'm1',
+                lastSyncedMessageUpdatedAt: 1,
+              },
+            },
+            content: 'old',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'DELETE') {
+        deleteCalls += 1;
+        if (failureMode === 'delete_throw') throw new Error('forced old path delete throw');
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const result = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    if (failureMode === 'record_fail') {
+      expect(result.results[0]).toMatchObject({ ok: false, mode: 'failed' });
+      expect(String(result.results[0].error)).toContain('generation persist failed');
+      expect(deleteCalls).toBe(0);
+      expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(1);
+    } else {
+      expect(result.results[0]).toMatchObject({ ok: false, mode: 'rename_delete_failed' });
+      expect(String(result.results[0].error)).toContain('forced old path delete throw');
+      expect(deleteCalls).toBe(1);
+      expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('keeps per-item isolation when one generation commit fails after a successful main note PUT', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockImplementation(async (id: number) => ({
+      id,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: `isolation-${id}`,
+      title: `Isolation ${id}`,
+    }));
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'm1', sequence: 1, contentMarkdown: 'hi', updatedAt: 1 },
+    ]);
+    backgroundStorageMocks.recordObsidianRemoteWrite
+      .mockRejectedValueOnce(new Error('first generation failed'))
+      .mockResolvedValueOnce({ generation: 1 });
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const result = await orch.syncConversations({ conversationIds: [1, 2], instanceId: 'x' });
+
+    expect(result.results[0]).toMatchObject({ conversationId: 1, ok: false, mode: 'failed' });
+    expect(String(result.results[0].error)).toContain('first generation failed');
+    expect(result.results[1]).toMatchObject({ conversationId: 2, ok: true, mode: 'full_rebuild' });
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(2);
+  });
+
   it('renames note when title changes by rebuilding new file and deleting old file', async () => {
     setupChromeStorage();
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
@@ -505,6 +709,11 @@ describe('obsidian-sync-orchestrator', () => {
     const stableId10 = naming.stableConversationId10(convo);
     const oldFilename = `chatgpt-Old Title-${stableId10}.md`;
     const oldFilenameEncoded = oldFilename.replace(/ /g, '%20');
+    const order: string[] = [];
+    backgroundStorageMocks.recordObsidianRemoteWrite.mockImplementation(async () => {
+      order.push('record');
+      return { generation: 1 };
+    });
 
     backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
     backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
@@ -552,6 +761,7 @@ describe('obsidian-sync-orchestrator', () => {
       }
 
       if (method === 'PUT') {
+        order.push('put');
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
@@ -559,6 +769,7 @@ describe('obsidian-sync-orchestrator', () => {
       }
 
       if (method === 'DELETE') {
+        order.push('delete');
         return new Response(null, { status: 204 });
       }
 
@@ -577,6 +788,11 @@ describe('obsidian-sync-orchestrator', () => {
     const didDelete = seen.some((c) => c.method === 'DELETE');
     expect(didPut).toBe(true);
     expect(didDelete).toBe(true);
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledWith({
+      source: 'chatgpt',
+      conversationKey: 'k1',
+    });
+    expect(order).toEqual(['put', 'record', 'delete']);
   });
 });
 
@@ -585,6 +801,7 @@ afterEach(() => {
   backgroundStorageMocks.getMessagesByConversationId.mockReset();
   backgroundStorageMocks.getArticleCommentsByConversationId.mockReset();
   backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockReset();
+  backgroundStorageMocks.recordObsidianRemoteWrite.mockReset();
   imageCacheMocks.getImageCacheAssetById.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;

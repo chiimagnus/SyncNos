@@ -657,6 +657,10 @@ async function syncConversations({
               at: Date.now(),
             });
           } else {
+            await defaultBackgroundStorage.recordObsidianRemoteWrite({
+              source: decision.convo?.source,
+              conversationKey: decision.convo?.conversationKey,
+            });
             const deleteAfter = decision.deleteAfterFilePath ? safeString(decision.deleteAfterFilePath) : '';
             if (
               deleteAfter &&
@@ -668,25 +672,37 @@ async function syncConversations({
                 currentConversationTitle: currentTitle,
                 currentStage: 'deleting_old_note_path',
               });
-              const delRes = await client.deleteVaultFile(deleteAfter);
-              if (!delRes || !delRes.ok) {
+              try {
+                const delRes = await client.deleteVaultFile(deleteAfter);
+                if (!delRes || !delRes.ok) {
+                  row = buildPerConversationResult({
+                    conversationId,
+                    conversationTitle: currentTitle,
+                    ok: false,
+                    mode: 'rename_delete_failed',
+                    appended: decision.messages.length,
+                    error: delRes && delRes.error && delRes.error.message ? delRes.error.message : 'delete failed',
+                    at: Date.now(),
+                  });
+                } else {
+                  row = buildPerConversationResult({
+                    conversationId,
+                    conversationTitle: currentTitle,
+                    ok: true,
+                    mode: decision.mode,
+                    appended: decision.messages.length,
+                    error: '',
+                    at: Date.now(),
+                  });
+                }
+              } catch (error) {
                 row = buildPerConversationResult({
                   conversationId,
                   conversationTitle: currentTitle,
                   ok: false,
                   mode: 'rename_delete_failed',
                   appended: decision.messages.length,
-                  error: delRes && delRes.error && delRes.error.message ? delRes.error.message : 'delete failed',
-                  at: Date.now(),
-                });
-              } else {
-                row = buildPerConversationResult({
-                  conversationId,
-                  conversationTitle: currentTitle,
-                  ok: true,
-                  mode: decision.mode,
-                  appended: decision.messages.length,
-                  error: '',
+                  error: error instanceof Error ? error.message : String(error || 'delete failed'),
                   at: Date.now(),
                 });
               }

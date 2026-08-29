@@ -480,6 +480,88 @@ describe('data revision storage', () => {
     expect(await readDataRevisionSnapshot()).toEqual(before);
   });
 
+  it('records Obsidian remote writes as a strict atomic generation without clock dependence', async () => {
+    const { recordObsidianRemoteWrite } = await import('@services/conversations/data/storage-idb');
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(123_456);
+    try {
+      await expect(
+        recordObsidianRemoteWrite({ source: 'chatgpt', conversationKey: 'obsidian-generation' }),
+      ).resolves.toEqual({ generation: 1 });
+      await expect(
+        recordObsidianRemoteWrite({ source: 'chatgpt', conversationKey: 'obsidian-generation' }),
+      ).resolves.toEqual({ generation: 2 });
+      expect(await readDataRevision('sync_mappings')).toBe(2);
+
+      const db = await openDb();
+      const verifyTx = db.transaction(['sync_mappings'], 'readonly');
+      const stored = await requestResult<any>(
+        verifyTx.objectStore('sync_mappings').index('by_source_conversationKey').get(['chatgpt', 'obsidian-generation']),
+      );
+      await txDone(verifyTx);
+      expect(stored).toMatchObject({
+        source: 'chatgpt',
+        conversationKey: 'obsidian-generation',
+        obsidianRemoteWriteGeneration: 2,
+        updatedAt: 123_456,
+      });
+
+      await expect(recordObsidianRemoteWrite({ source: '', conversationKey: 'bad' })).rejects.toThrow(
+        'invalid obsidian remote write identity',
+      );
+      expect(await readDataRevision('sync_mappings')).toBe(2);
+
+      const overflowTx = db.transaction(['sync_mappings'], 'readwrite');
+      await requestResult(
+        overflowTx.objectStore('sync_mappings').add({
+          source: 'chatgpt',
+          conversationKey: 'obsidian-overflow',
+          obsidianRemoteWriteGeneration: Number.MAX_SAFE_INTEGER,
+          notionPageId: 'preserve-overflow-provider',
+        }),
+      );
+      await txDone(overflowTx);
+      await expect(
+        recordObsidianRemoteWrite({ source: 'chatgpt', conversationKey: 'obsidian-overflow' }),
+      ).rejects.toMatchObject({ code: 'obsidian_remote_write_generation_overflow' });
+      expect(await readDataRevision('sync_mappings')).toBe(2);
+
+      const abortSeedTx = db.transaction(['sync_mappings'], 'readwrite');
+      await requestResult(
+        abortSeedTx.objectStore('sync_mappings').add({
+          source: 'chatgpt',
+          conversationKey: 'obsidian-abort',
+          obsidianRemoteWriteGeneration: 4,
+          feishuDocId: 'preserve-doc',
+        }),
+      );
+      await txDone(abortSeedTx);
+      const probeTx = db.transaction(['sync_mappings'], 'readonly');
+      const prototype = Object.getPrototypeOf(probeTx.objectStore('sync_mappings')) as any;
+      const originalPut = prototype.put;
+      await txDone(probeTx);
+      prototype.put = function put(value: unknown, key?: IDBValidKey) {
+        if (this.name === 'sync_mappings') throw new DOMException('forced generation write failure', 'DataError');
+        return originalPut.call(this, value, key);
+      };
+      try {
+        await expect(
+          recordObsidianRemoteWrite({ source: 'chatgpt', conversationKey: 'obsidian-abort' }),
+        ).rejects.toThrow();
+      } finally {
+        prototype.put = originalPut;
+      }
+      expect(await readDataRevision('sync_mappings')).toBe(2);
+      const afterAbortTx = db.transaction(['sync_mappings'], 'readonly');
+      const afterAbort = await requestResult<any>(
+        afterAbortTx.objectStore('sync_mappings').index('by_source_conversationKey').get(['chatgpt', 'obsidian-abort']),
+      );
+      await txDone(afterAbortTx);
+      expect(afterAbort).toMatchObject({ obsidianRemoteWriteGeneration: 4, feishuDocId: 'preserve-doc' });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('tracks sync mapping and conversation mirror mutations independently', async () => {
     const { patchSyncMapping, upsertConversation } = await import('@services/conversations/data/storage-idb');
     const conversation = await upsertConversation({

@@ -51,6 +51,21 @@ function validFeishuLastSyncedAt(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+function validObsidianRemoteWriteGeneration(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function normalizeObsidianRemoteWriteGeneration(target: SyncMappingRecord, ...sources: unknown[]): void {
+  let generation: number | null = null;
+  for (const source of sources) {
+    const value = validObsidianRemoteWriteGeneration(asRecord(source).obsidianRemoteWriteGeneration);
+    if (value == null) continue;
+    generation = generation == null ? value : Math.max(generation, value);
+  }
+  if (generation == null) delete target.obsidianRemoteWriteGeneration;
+  else target.obsidianRemoteWriteGeneration = generation;
+}
+
 function replaceGroup(target: SyncMappingRecord, source: SyncMappingRecord, fields: readonly string[]): void {
   for (const field of fields) {
     delete target[field];
@@ -185,6 +200,7 @@ function syncMappingBusinessRecord(value: unknown): SyncMappingRecord {
   delete next.updatedAt;
   replaceFeishuGroup(next, value);
   replaceGithubGroup(next, value);
+  normalizeObsidianRemoteWriteGeneration(next, value);
   return next;
 }
 
@@ -229,6 +245,10 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
   if (hasGithubPatch) {
     replaceGithubGroup(next, githubTargetChanged ? incoming : { ...base, ...incoming });
   }
+  normalizeObsidianRemoteWriteGeneration(
+    next,
+    Object.prototype.hasOwnProperty.call(incoming, 'obsidianRemoteWriteGeneration') ? incoming : base,
+  );
 
   const nestedBase = notionTargetChanged ? {} : base;
   for (const field of NOTION_NESTED_FIELDS) {
@@ -292,6 +312,7 @@ export function mergeSyncMappingForIdentityMove(
   if (targetGithubRemoteKey) replaceGithubGroup(next, current);
   else if (legacyGithubRemoteKey && legacyIdentityMatches) replaceGithubGroup(next, previous);
   else replaceGithubGroup(next, {});
+  normalizeObsidianRemoteWriteGeneration(next, current, previous);
 
   next.source = desiredSource;
   next.conversationKey = desiredConversationKey;
@@ -348,6 +369,7 @@ export function mergeSyncMappingForImport(existing: unknown, incoming: unknown):
     else githubSource = imported;
   }
   replaceGithubGroup(next, githubSource);
+  normalizeObsidianRemoteWriteGeneration(next, local, imported);
 
   const localUpdatedAt = finiteNumber(local.updatedAt);
   const importedUpdatedAt = finiteNumber(imported.updatedAt);
