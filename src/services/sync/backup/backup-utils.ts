@@ -2,6 +2,7 @@ import {
   ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA,
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
+import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
@@ -23,6 +24,8 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'obsidian_api_key',
   // GitHub Device Flow/auth state contains access/refresh/device secrets.
   'github_auth_state_v1',
+  // Runtime-only cross-context invalidation metadata.
+  DATA_REVISION_WAKE_STORAGE_KEY,
 ]);
 
 function shouldIncludeStorageKeyInBackup(key: string): boolean {

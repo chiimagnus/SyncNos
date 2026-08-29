@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import {
   filterStorageForBackup,
   mergeConversationRecord,
@@ -36,6 +37,7 @@ describe('backup backup-utils', () => {
         token: { accessToken: 'ACCESS_SENTINEL_SECRET', refreshToken: 'REFRESH_SENTINEL_SECRET' },
       },
       github_auth_state_v2: { deviceCode: 'DEVICE_SENTINEL_SECRET' },
+      [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
     });
     expect(filtered).toEqual({
       notion_oauth_client_id: 'abc',

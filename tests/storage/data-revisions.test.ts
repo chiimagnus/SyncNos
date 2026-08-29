@@ -155,9 +155,64 @@ beforeEach(async () => {
 
 afterEach(() => {
   closeDbForTests();
+  delete (globalThis as any).chrome;
+  delete (globalThis as any).browser;
 });
 
 describe('data revision storage', () => {
+  it('publishes a wake only after a changed transaction commits, never for no-op or abort', async () => {
+    const writes: Record<string, unknown>[] = [];
+    (globalThis as any).chrome = {
+      runtime: {},
+      storage: {
+        local: {
+          set(payload: Record<string, unknown>, callback: () => void) {
+            writes.push(payload);
+            callback();
+          },
+        },
+      },
+    };
+    const db = await openDb();
+
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores }) => {
+        await requestResult(stores.conversations.count());
+      },
+    );
+    await Promise.resolve();
+    expect(writes).toHaveLength(0);
+
+    await expect(
+      runTrackedTransaction(
+        { db, stores: ['conversations', 'messages'], revisionScopes: ['conversations'] },
+        async ({ stores, markChanged }) => {
+          await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'wake-rollback' }));
+          markChanged('messages' as any);
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'revision_scope_invalid' });
+    await Promise.resolve();
+    expect(writes).toHaveLength(0);
+
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores, markChanged }) => {
+        await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'wake-commit' }));
+        markChanged('conversations');
+      },
+    );
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+
+    const verifyTransaction = db.transaction(['conversations'], 'readonly');
+    const done = txDone(verifyTransaction);
+    const rows = await requestResult<any[]>(verifyTransaction.objectStore('conversations').getAll());
+    await done;
+    expect(rows.map((row) => row.conversationKey)).toEqual(['wake-commit']);
+    expect(await readDataRevision('conversations')).toBe(1);
+  });
+
   it('bumps one declared scope once even when multiple rows change in the same transaction', async () => {
     const db = await openDb();
     await runTrackedTransaction(

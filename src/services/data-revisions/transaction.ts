@@ -4,6 +4,7 @@ import {
   normalizeDataRevisionRecord,
   type DataRevisionScope,
 } from '@platform/idb/data-revision-record';
+import { publishDataRevisionWake } from '@services/data-revisions/wake';
 
 export type TrackedTransactionContext = {
   stores: Record<string, IDBObjectStore>;
@@ -91,6 +92,7 @@ export async function runTrackedTransaction<T>(
       );
     }
     await done;
+    if (changedScopes.size > 0) publishDataRevisionWake();
     return result;
   } catch (error) {
     abortQuietly(transaction);
