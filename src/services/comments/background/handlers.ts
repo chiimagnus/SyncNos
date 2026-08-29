@@ -1,4 +1,4 @@
-import { COMMENTS_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
+import { COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import {
   addArticleComment,
   attachOrphanCommentsToConversation,
@@ -26,7 +26,6 @@ type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
-  eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
 type ArticleCommentsHandlersDeps = {
@@ -81,10 +80,6 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     }
 
     if (comment.conversationId) {
-      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-        reason: 'articleCommentAdded',
-        conversationId: comment.conversationId,
-      });
       fireAndForget(
         deps.onConversationChanged(
           Number(comment.conversationId),
@@ -104,17 +99,9 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     if (ok) {
       const conversationId = Number(context?.conversationId);
       if (Number.isFinite(conversationId) && conversationId > 0) {
-        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'articleCommentDeleted',
-          conversationId,
-        });
         fireAndForget(
           deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
         );
-      } else {
-        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'articleCommentDeleted',
-        });
       }
     }
     return router.ok({ ok });
@@ -126,13 +113,11 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     if (!canonicalUrl) return router.err('missing canonicalUrl');
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const res = await attachOrphanCommentsToConversation(canonicalUrl, conversationId);
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'articleCommentAttached',
-      conversationId,
-    });
-    fireAndForget(
-      deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
-    );
+    if (Number(res.updated) > 0) {
+      fireAndForget(
+        deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
+      );
+    }
     return router.ok(res);
   });
 
@@ -147,15 +132,11 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
       return router.err('invalid conversationId');
     }
     const res = await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl, toCanonicalUrl, conversationId });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'articleCommentsMigrated',
-      conversationId,
-      fromCanonicalUrl,
-      toCanonicalUrl,
-    });
-    fireAndForget(
-      deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
-    );
+    if (Number(res.updated) > 0) {
+      fireAndForget(
+        deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged),
+      );
+    }
     return router.ok(res);
   });
 }

@@ -1,4 +1,13 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import {
+  hasReusableImageCachePayload,
+  reusableImageCacheByteSize,
+} from '@services/conversations/data/image-cache-record';
+import {
+  buildCanonicalWebArticleIdentity,
+  normalizeWebArticleConversationKey,
+  WEB_ARTICLE_SOURCE,
+} from '@services/conversations/domain/article-identity';
 import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -18,50 +27,24 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
-import { openDb as openSchemaDb } from '@platform/idb/schema';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import { openDb } from '@platform/idb/schema';
 import {
+  areSyncMappingsBusinessEquivalent,
   mergeSyncMappingForIdentityMove,
   mergeSyncMappingPatch,
   readGithubContinuity,
 } from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 
-let cachedDb: IDBDatabase | null = null;
-let openingDb: Promise<IDBDatabase> | null = null;
 let conversationListStatsCacheKey: string | null = null;
 let conversationListStatsCacheValue: { summary: ConversationListSummary; facets: ConversationListFacets } | null = null;
-let conversationListDerivedKeysBackfilled = false;
-let conversationListDerivedKeysBackfillPromise: Promise<void> | null = null;
 
-async function openDb(): Promise<IDBDatabase> {
-  if (cachedDb) return cachedDb;
-  if (openingDb) return openingDb;
-  openingDb = openSchemaDb()
-    .then((db) => {
-      cachedDb = db;
-      return db;
-    })
-    .finally(() => {
-      openingDb = null;
-    });
-  return openingDb;
-}
-
-export async function __closeDbForTests(): Promise<void> {
-  try {
-    const db = cachedDb || (openingDb ? await openingDb : null);
-    db?.close?.();
-  } catch (_e) {
-    // ignore
-  } finally {
-    cachedDb = null;
-    openingDb = null;
-    conversationListStatsCacheKey = null;
-    conversationListStatsCacheValue = null;
-    conversationListDerivedKeysBackfilled = false;
-    conversationListDerivedKeysBackfillPromise = null;
-  }
+export function __resetConversationStorageStateForTests(): void {
+  conversationListStatsCacheKey = null;
+  conversationListStatsCacheValue = null;
 }
 
 function tx(
@@ -100,58 +83,61 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
-function normalizeMessageTimestamp(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : Date.now();
+function storedValueEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => storedValueEqual(value, right[index]));
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) return false;
+    const key = leftKeys[index];
+    if (!storedValueEqual(leftRecord[key], rightRecord[key])) return false;
+  }
+  return true;
+}
+
+function conversationRecordsEquivalent(left: unknown, right: unknown): boolean {
+  const leftRecord = { ...((left && typeof left === 'object' ? left : {}) as Record<string, unknown>) };
+  const rightRecord = { ...((right && typeof right === 'object' ? right : {}) as Record<string, unknown>) };
+  delete leftRecord.id;
+  delete rightRecord.id;
+  return storedValueEqual(leftRecord, rightRecord);
+}
+
+type ResolvedMessageTimestamp = { present: false } | { present: true; value: unknown };
+
+function resolveMessageTimestamp(
+  existing: Record<string, unknown> | null | undefined,
+  incoming: unknown,
+  preserveExisting: boolean,
+): ResolvedMessageTimestamp {
+  const hasExistingTimestamp = !!existing && Object.prototype.hasOwnProperty.call(existing, 'updatedAt');
+  if (preserveExisting && existing) {
+    return hasExistingTimestamp ? { present: true, value: existing.updatedAt } : { present: false };
+  }
+  if (typeof incoming === 'number' && Number.isFinite(incoming)) return { present: true, value: incoming };
+  if (existing) return hasExistingTimestamp ? { present: true, value: existing.updatedAt } : { present: false };
+  return { present: true, value: Date.now() };
+}
+
+function messageRecordsEquivalent(left: unknown, right: unknown): boolean {
+  const leftRecord = { ...((left && typeof left === 'object' ? left : {}) as Record<string, unknown>) };
+  const rightRecord = { ...((right && typeof right === 'object' ? right : {}) as Record<string, unknown>) };
+  delete leftRecord.id;
+  delete rightRecord.id;
+  return storedValueEqual(leftRecord, rightRecord);
 }
 
 function normalizeListKey(value: unknown, fallback: string): string {
   const text = safeString(value).toLowerCase();
   return text || fallback;
-}
-
-function parseListSiteKeyFromUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return 'unknown';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return 'unknown';
-    const host = normalizeListKey(url.hostname, '');
-    return host ? `domain:${host}` : 'unknown';
-  } catch (_e) {
-    return 'unknown';
-  }
-}
-
-function deriveConversationListSourceKey(record: any): string {
-  return normalizeListKey(record?.source, 'unknown');
-}
-
-function deriveConversationListSiteKey(record: any): string {
-  return parseListSiteKeyFromUrl(record?.url);
-}
-
-function normalizeConversationListRecord<T extends Record<string, any>>(record: T): T {
-  const existingSourceKey = safeString(record?.listSourceKey);
-  const existingSiteKey = safeString(record?.listSiteKey);
-  const derivedSourceKey = deriveConversationListSourceKey(record);
-  const sourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : normalizeListKey(existingSourceKey, 'unknown');
-
-  const derivedSiteKey = normalizeConversationListSiteFilterKey(deriveConversationListSiteKey(record));
-  // When url is present and valid, derivedSiteKey wins. Only fall back to the stored key
-  // when we cannot derive a stable domain value.
-  const siteKey =
-    derivedSiteKey !== 'unknown'
-      ? derivedSiteKey
-      : existingSiteKey
-        ? normalizeConversationListSiteFilterKey(existingSiteKey)
-        : 'unknown';
-  if (existingSourceKey === sourceKey && existingSiteKey === siteKey) return record;
-  return {
-    ...record,
-    listSourceKey: sourceKey,
-    listSiteKey: siteKey,
-  } as T;
 }
 
 function toComparableCursor(cursor: ConversationListCursor | null | undefined): ConversationListCursor | null {
@@ -165,43 +151,6 @@ function toComparableCursor(cursor: ConversationListCursor | null | undefined): 
 function invalidateConversationListStatsCache(): void {
   conversationListStatsCacheKey = null;
   conversationListStatsCacheValue = null;
-}
-
-async function ensureConversationListDerivedKeysBackfilled(): Promise<void> {
-  if (conversationListDerivedKeysBackfilled) return;
-  if (conversationListDerivedKeysBackfillPromise) return await conversationListDerivedKeysBackfillPromise;
-
-  conversationListDerivedKeysBackfillPromise = (async () => {
-    const db = await openDb();
-    const { t, stores } = tx(db, ['conversations'], 'readwrite');
-
-    let changed = false;
-    const request = stores.conversations.openCursor();
-    await new Promise<void>((resolve, reject) => {
-      request.onerror = () => reject(request.error || new Error('cursor failed'));
-      request.onsuccess = () => {
-        const cursor = request.result as IDBCursorWithValue | null;
-        if (!cursor) return resolve();
-        const raw = (cursor.value || {}) as any;
-        const normalized = normalizeConversationListRecord(raw);
-        if (normalized !== raw) {
-          changed = true;
-          cursor.update(normalized as any);
-        }
-        cursor.continue();
-      };
-    });
-
-    await txDone(t);
-    if (changed) invalidateConversationListStatsCache();
-    conversationListDerivedKeysBackfilled = true;
-  })()
-    .catch(() => {})
-    .finally(() => {
-      conversationListDerivedKeysBackfillPromise = null;
-    });
-
-  await conversationListDerivedKeysBackfillPromise;
 }
 
 function isSameLocalDayTimestamp(ts: number, now: Date): boolean {
@@ -227,18 +176,6 @@ function sortFacetItems(items: Array<{ key: string; label: string; count: number
   });
 }
 
-function normalizeArticleUrl(raw: unknown): string {
-  return canonicalizeArticleUrl(raw);
-}
-
-function normalizeArticleConversationKey(raw: unknown): string {
-  const key = safeString(raw);
-  if (!key) return '';
-  if (!key.toLowerCase().startsWith('article:')) return key;
-  const canonicalUrl = normalizeArticleUrl(key.slice('article:'.length));
-  return canonicalUrl ? `article:${canonicalUrl}` : key;
-}
-
 function isArticlePayload(payload: any): boolean {
   return safeString(payload?.sourceType).toLowerCase() === 'article';
 }
@@ -247,8 +184,16 @@ function pickPreferredArticleConversation(candidates: any[]): any | null {
   const list = Array.isArray(candidates) ? candidates.slice() : [];
   if (!list.length) return null;
   list.sort((a, b) => {
-    const aCanonical = safeString(a?.source) === 'web' && safeString(a?.conversationKey).startsWith('article:') ? 1 : 0;
-    const bCanonical = safeString(b?.source) === 'web' && safeString(b?.conversationKey).startsWith('article:') ? 1 : 0;
+    const aIdentity = buildCanonicalWebArticleIdentity(a?.url);
+    const bIdentity = buildCanonicalWebArticleIdentity(b?.url);
+    const aCanonical =
+      safeString(a?.source) === WEB_ARTICLE_SOURCE && aIdentity?.conversationKey === safeString(a?.conversationKey)
+        ? 1
+        : 0;
+    const bCanonical =
+      safeString(b?.source) === WEB_ARTICLE_SOURCE && bIdentity?.conversationKey === safeString(b?.conversationKey)
+        ? 1
+        : 0;
     if (bCanonical !== aCanonical) return bCanonical - aCanonical;
 
     const aMapped = safeString(a?.notionPageId) ? 1 : 0;
@@ -270,12 +215,12 @@ async function findExistingArticleConversationByUrl(
   conversationsStore: IDBObjectStore,
   rawUrl: unknown,
 ): Promise<any | null> {
-  const normalizedUrl = normalizeArticleUrl(rawUrl);
+  const normalizedUrl = canonicalizeArticleUrl(rawUrl);
   if (!normalizedUrl) return null;
   const rows = (await reqToPromise(conversationsStore.getAll() as any)) as any[];
   const matched = rows.filter((row) => {
     if (safeString(row?.sourceType).toLowerCase() !== 'article') return false;
-    return normalizeArticleUrl(row?.url) === normalizedUrl;
+    return canonicalizeArticleUrl(row?.url) === normalizedUrl;
   });
   return pickPreferredArticleConversation(matched);
 }
@@ -296,10 +241,10 @@ async function findExistingConversationForPayload(
   let conversationKey = safeString(payload?.conversationKey);
   if (!source) return null;
 
-  if (isArticlePayload(payload) && source.toLowerCase() === 'web') {
-    const canonicalUrl = normalizeArticleUrl(payload?.url);
-    if (canonicalUrl) conversationKey = `article:${canonicalUrl}`;
-    conversationKey = normalizeArticleConversationKey(conversationKey);
+  if (isArticlePayload(payload) && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
+    const identity = buildCanonicalWebArticleIdentity(payload?.url);
+    if (identity) conversationKey = identity.conversationKey;
+    conversationKey = normalizeWebArticleConversationKey(conversationKey);
   }
 
   if (!conversationKey) return null;
@@ -388,14 +333,15 @@ async function enqueueGithubCleanupSnapshot(
 async function migrateArticleCommentsForIdentityRewrite(
   commentsStore: IDBObjectStore,
   input: { conversationId: number; fromCanonicalUrl: string; toCanonicalUrl: string; updatedAt: number },
-): Promise<void> {
-  if (!input.fromCanonicalUrl || !input.toCanonicalUrl || input.fromCanonicalUrl === input.toCanonicalUrl) return;
+): Promise<number> {
+  if (!input.fromCanonicalUrl || !input.toCanonicalUrl || input.fromCanonicalUrl === input.toCanonicalUrl) return 0;
   const index = commentsStore.index('by_canonicalUrl_createdAt');
   const range = globalThis.IDBKeyRange.bound(
     [input.fromCanonicalUrl, -Infinity] as any,
     [input.fromCanonicalUrl, Infinity] as any,
   );
   const rows = (await reqToPromise(index.getAll(range) as any)) as any[];
+  let updated = 0;
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row) continue;
     const currentConversationId = Number(row.conversationId);
@@ -403,7 +349,9 @@ async function migrateArticleCommentsForIdentityRewrite(
       row.conversationId == null || !Number.isFinite(currentConversationId) || currentConversationId <= 0;
     if (!isOrphan && currentConversationId !== input.conversationId) continue;
     await reqToPromise(commentsStore.put({ ...row, canonicalUrl: input.toCanonicalUrl, updatedAt: input.updatedAt }));
+    updated += 1;
   }
+  return updated;
 }
 
 async function migrateSyncMappingKey(
@@ -419,40 +367,37 @@ async function migrateSyncMappingKey(
     replacementConversationId?: number;
     createdAt: number;
   },
-): Promise<void> {
+): Promise<{ syncMappingChanged: boolean }> {
   const legacySource = safeString(input.legacySource);
   const legacyConversationKey = safeString(input.legacyConversationKey);
   const nextSource = safeString(input.nextSource);
   const nextConversationKey = safeString(input.nextConversationKey);
   const fallbackNotionPageId = safeString(input.fallbackNotionPageId);
 
-  if (!nextSource || !nextConversationKey) return;
+  if (!nextSource || !nextConversationKey) return { syncMappingChanged: false };
   const idx = syncMappingsStore.index('by_source_conversationKey');
 
   const target = (await reqToPromise(idx.get([nextSource, nextConversationKey]) as any)) as any;
   const identity = { source: nextSource, conversationKey: nextConversationKey, fallbackNotionPageId };
-  const persistTargetFallback = async () => {
-    if (!target) return;
+  const persistTargetFallback = async (): Promise<boolean> => {
+    if (!target) return false;
     const merged = mergeSyncMappingForIdentityMove(target, null, identity) as any;
-    if (JSON.stringify(merged) !== JSON.stringify(target)) {
-      await reqToPromise(syncMappingsStore.put(merged));
-    }
+    if (areSyncMappingsBusinessEquivalent(merged, target)) return false;
+    await reqToPromise(syncMappingsStore.put(merged));
+    return true;
   };
 
   if (legacySource === nextSource && legacyConversationKey === nextConversationKey) {
-    await persistTargetFallback();
-    return;
+    return { syncMappingChanged: await persistTargetFallback() };
   }
 
   if (!legacySource || !legacyConversationKey) {
-    await persistTargetFallback();
-    return;
+    return { syncMappingChanged: await persistTargetFallback() };
   }
 
   const legacy = (await reqToPromise(idx.get([legacySource, legacyConversationKey]) as any)) as any;
   if (!legacy) {
-    await persistTargetFallback();
-    return;
+    return { syncMappingChanged: await persistTargetFallback() };
   }
 
   const replacementConversationId = Number(input.replacementConversationId);
@@ -467,114 +412,122 @@ async function migrateSyncMappingKey(
   if (!target) {
     const moved = mergeSyncMappingForIdentityMove(null, legacy, identity) as any;
     await reqToPromise(syncMappingsStore.put(moved));
-    return;
+    return { syncMappingChanged: true };
   }
 
+  let syncMappingChanged = false;
   const merged = mergeSyncMappingForIdentityMove(target, legacy, identity) as any;
-  await reqToPromise(syncMappingsStore.put(merged));
+  if (!areSyncMappingsBusinessEquivalent(merged, target)) {
+    await reqToPromise(syncMappingsStore.put(merged));
+    syncMappingChanged = true;
+  }
 
   const legacyId = Number(legacy.id);
   if (Number.isFinite(legacyId) && legacyId > 0 && legacyId !== Number(target.id)) {
     await reqToPromise(syncMappingsStore.delete(legacyId));
+    syncMappingChanged = true;
   }
+  return { syncMappingChanged };
 }
 
 export async function upsertConversation(payload: any): Promise<Conversation> {
   const db = await openDb();
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'sync_mappings', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-    'readwrite',
-  );
-  try {
-    const existing = await findExistingConversationForPayload(stores.conversations, payload);
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: ['conversations', 'sync_mappings', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+      revisionScopes: ['conversations', 'sync_mappings', 'article_comments'],
+    },
+    async ({ stores, markChanged }) => {
+      const existing = await findExistingConversationForPayload(stores.conversations, payload);
 
-    const now = Date.now();
-    const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
-    const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
-    const isArticleSource =
-      safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === 'web';
+      const now = Date.now();
+      const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
+      const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
+      const isArticleSource =
+        safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === WEB_ARTICLE_SOURCE;
 
-    const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
-    const existingUrl = existing ? String(existing.url || '').trim() : '';
-    const nextUrlCandidate = payloadUrl || existingUrl;
-    const nextUrl = isArticleSource ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate : nextUrlCandidate;
+      const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+      const existingUrl = existing ? String(existing.url || '').trim() : '';
+      const nextUrlCandidate = payloadUrl || existingUrl;
+      const articleIdentity = isArticleSource ? buildCanonicalWebArticleIdentity(nextUrlCandidate) : null;
+      const nextUrl = articleIdentity?.url || nextUrlCandidate;
 
-    const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
-    const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
-    const articleDerivedConversationKey = isArticleSource && nextUrl ? `article:${nextUrl}` : '';
-    const nextConversationKey = isArticleSource
-      ? normalizeArticleConversationKey(
-          articleDerivedConversationKey || payloadConversationKey || existingConversationKey,
-        )
-      : String(payloadConversationKey || existingConversationKey || '').trim();
+      const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
+      const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
+      const nextConversationKey = isArticleSource
+        ? articleIdentity?.conversationKey ||
+          normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
+        : String(payloadConversationKey || existingConversationKey || '').trim();
 
-    const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
-    const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
-
-    const baseRecord = normalizeConversationListRecord({
-      sourceType: nextSourceType,
-      source: nextSource,
-      conversationKey: nextConversationKey,
-      title: nextTitle || (existing ? existing.title || '' : ''),
-      url: nextUrl || (existing ? existing.url || '' : ''),
-      author: payload.author || (existing ? existing.author || '' : ''),
-      publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
-      warningFlags: Array.isArray(payload.warningFlags)
-        ? payload.warningFlags
-        : existing
-          ? existing.warningFlags || []
-          : [],
-      notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
-      feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
-      lastCapturedAt: nextLastCapturedAt,
-    });
-
-    const record: any = withOptionalId(existing && existing.id, baseRecord);
-
-    if (existing) {
-      const replacementConversationId = Number(existing.id);
-      await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
-        legacySource: existing.source,
-        legacyConversationKey: existing.conversationKey,
-        nextSource: record.source,
-        nextConversationKey: record.conversationKey,
-        fallbackNotionPageId: record.notionPageId,
-        legacyConversation: existing,
-        replacementConversationId,
-        createdAt: now,
+      const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
+      const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
+      const existingBase = existing && typeof existing === 'object' ? { ...existing } : {};
+      delete existingBase.id;
+      const baseRecord = normalizeConversationListRecord({
+        ...existingBase,
+        sourceType: nextSourceType,
+        source: nextSource,
+        conversationKey: nextConversationKey,
+        title: nextTitle || (existing ? existing.title || '' : ''),
+        url: nextUrl || (existing ? existing.url || '' : ''),
+        author: payload.author || (existing ? existing.author || '' : ''),
+        publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
+        warningFlags: Array.isArray(payload.warningFlags)
+          ? payload.warningFlags
+          : existing
+            ? existing.warningFlags || []
+            : [],
+        notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
+        feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
+        lastCapturedAt: nextLastCapturedAt,
       });
 
-      if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
-        const fromCanonicalUrl = normalizeArticleUrl(existingUrl);
-        const toCanonicalUrl = normalizeArticleUrl(record.url);
-        await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
-          conversationId: replacementConversationId,
-          fromCanonicalUrl,
-          toCanonicalUrl,
-          updatedAt: now,
+      const record: any = withOptionalId(existing && existing.id, baseRecord);
+
+      if (existing) {
+        const replacementConversationId = Number(existing.id);
+        const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+          legacySource: existing.source,
+          legacyConversationKey: existing.conversationKey,
+          nextSource: record.source,
+          nextConversationKey: record.conversationKey,
+          fallbackNotionPageId: record.notionPageId,
+          legacyConversation: existing,
+          replacementConversationId,
+          createdAt: now,
         });
+        if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
+
+        if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
+          const fromCanonicalUrl = canonicalizeArticleUrl(existingUrl);
+          const toCanonicalUrl = canonicalizeArticleUrl(record.url);
+          const updatedComments = await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
+            conversationId: replacementConversationId,
+            fromCanonicalUrl,
+            toCanonicalUrl,
+            updatedAt: now,
+          });
+          if (updatedComments > 0) markChanged('article_comments');
+        }
+
+        const conversationChanged = !conversationRecordsEquivalent(existing, record);
+        if (conversationChanged) {
+          await reqToPromise(stores.conversations.put(record));
+          markChanged('conversations');
+        }
+        return { record, conversationChanged };
       }
 
-      await reqToPromise(stores.conversations.put(record));
-      await txDone(t);
-      invalidateConversationListStatsCache();
-      return record;
-    }
+      const id = await reqToPromise(stores.conversations.add(record));
+      record.id = id as any;
+      markChanged('conversations');
+      return { record, conversationChanged: true };
+    },
+  );
 
-    const id = await reqToPromise(stores.conversations.add(record));
-    record.id = id as any;
-    await txDone(t);
-    invalidateConversationListStatsCache();
-    return record;
-  } catch (error) {
-    try {
-      t.abort();
-    } catch (_abortError) {
-      // The transaction may already be aborted by the failing request.
-    }
-    throw error;
-  }
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.record;
 }
 
 export async function mergeConversationsByIds(input: {
@@ -603,134 +556,179 @@ export async function mergeConversationsByIds(input: {
   }
 
   const db = await openDb();
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-    'readwrite',
-  );
-  try {
-    const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
-    const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
-    if (!keep) {
-      await txDone(t);
-      throw new Error('keep conversation not found');
-    }
-    if (!remove) {
-      await txDone(t);
-      return {
-        keptConversationId: keepConversationId,
-        removedConversationId: removeConversationId,
-        movedMessages: 0,
-        movedImageCache: 0,
-        merged: false,
-      };
-    }
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: [
+        'conversations',
+        'messages',
+        'sync_mappings',
+        'image_cache',
+        'article_comments',
+        GITHUB_CLEANUP_OUTBOX_STORE,
+      ],
+      revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+    },
+    async ({ stores, markChanged }) => {
+      const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
+      const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
+      if (!keep) throw new Error('keep conversation not found');
+      if (!remove) {
+        return {
+          result: {
+            keptConversationId: keepConversationId,
+            removedConversationId: removeConversationId,
+            movedMessages: 0,
+            movedImageCache: 0,
+            merged: false,
+          },
+          conversationChanged: false,
+        };
+      }
 
-    const now = Date.now();
-    const mergedConversation: any = normalizeConversationListRecord({
-      ...keep,
-      sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
-      title: mergeStringFallback(keep.title, remove.title),
-      url: mergeStringFallback(keep.url, remove.url),
-      author: mergeStringFallback(keep.author, remove.author),
-      publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
-      notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
-      feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
-      warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
-      lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || now,
-    });
+      const now = Date.now();
+      const mergedConversation: any = normalizeConversationListRecord({
+        ...keep,
+        sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
+        title: mergeStringFallback(keep.title, remove.title),
+        url: mergeStringFallback(keep.url, remove.url),
+        author: mergeStringFallback(keep.author, remove.author),
+        publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
+        notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
+        feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
+        warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
+        lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || now,
+      });
 
-    await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
-      legacySource: remove.source,
-      legacyConversationKey: remove.conversationKey,
-      nextSource: keep.source,
-      nextConversationKey: keep.conversationKey,
-      fallbackNotionPageId: mergedConversation.notionPageId,
-      legacyConversation: remove,
-      replacementConversationId: keepConversationId,
-      createdAt: now,
-    });
+      const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+        legacySource: remove.source,
+        legacyConversationKey: remove.conversationKey,
+        nextSource: keep.source,
+        nextConversationKey: keep.conversationKey,
+        fallbackNotionPageId: mergedConversation.notionPageId,
+        legacyConversation: remove,
+        replacementConversationId: keepConversationId,
+        createdAt: now,
+      });
+      if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
 
-    await reqToPromise(stores.conversations.put(mergedConversation));
+      if (!conversationRecordsEquivalent(keep, mergedConversation)) {
+        await reqToPromise(stores.conversations.put(mergedConversation));
+        markChanged('conversations');
+      }
 
-    // Move messages.
-    const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
-    const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
-    const msgRange = globalThis.IDBKeyRange.bound(
-      [removeConversationId, -Infinity] as any,
-      [removeConversationId, Infinity] as any,
-    );
-    const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
-    let movedMessages = 0;
-    for (const row of Array.isArray(msgRows) ? msgRows : []) {
-      if (!row) continue;
-      const rowId = Number(row.id);
-      const key = safeString(row.messageKey);
-      if (key) {
-        const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
-        if (exists) {
+      const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
+      const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
+      const msgRange = globalThis.IDBKeyRange.bound(
+        [removeConversationId, -Infinity] as any,
+        [removeConversationId, Infinity] as any,
+      );
+      const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
+      let movedMessages = 0;
+      for (const row of Array.isArray(msgRows) ? msgRows : []) {
+        if (!row) continue;
+        const rowId = Number(row.id);
+        const key = safeString(row.messageKey);
+        if (key) {
+          const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
+          if (exists) {
+            if (Number.isFinite(rowId) && rowId > 0) {
+              await reqToPromise(stores.messages.delete(rowId));
+              markChanged('messages');
+            }
+            continue;
+          }
+        }
+        row.conversationId = keepConversationId;
+        await reqToPromise(stores.messages.put(row));
+        markChanged('messages');
+        movedMessages += 1;
+      }
+
+      const imageByConversation = stores.image_cache.index('by_conversationId');
+      const imageByIdentity = stores.image_cache.index('by_conversationId_url');
+      const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
+      const imgRows = (await reqToPromise(imageByConversation.getAll(imgRange) as any)) as any[];
+      let movedImageCache = 0;
+      for (const row of Array.isArray(imgRows) ? imgRows : []) {
+        if (!row) continue;
+        const rowId = Number(row.id);
+        const lookupUrl = typeof row.url === 'string' ? row.url : null;
+        const keepSide =
+          lookupUrl == null
+            ? null
+            : ((await reqToPromise(imageByIdentity.get([keepConversationId, lookupUrl] as any) as any)) as any);
+
+        if (keepSide && Number(keepSide.id) !== rowId) {
+          const keepValid = hasReusableImageCachePayload(keepSide);
+          const removeValid = hasReusableImageCachePayload(row);
+          if (!keepValid && removeValid) {
+            const repaired: any = {
+              ...keepSide,
+              blob: row.blob,
+              byteSize: reusableImageCacheByteSize(row),
+              contentType:
+                safeString(row.contentType) || safeString(row.blob?.type) || safeString(keepSide.contentType),
+              updatedAt: pickMaxFiniteNumber(keepSide.updatedAt, row.updatedAt) || now,
+            };
+            if (Object.prototype.hasOwnProperty.call(row, 'dataUrl')) repaired.dataUrl = row.dataUrl;
+            else delete repaired.dataUrl;
+            await reqToPromise(stores.image_cache.put(repaired));
+            markChanged('image_cache');
+            movedImageCache += 1;
+          }
           if (Number.isFinite(rowId) && rowId > 0) {
-            await reqToPromise(stores.messages.delete(rowId));
+            await reqToPromise(stores.image_cache.delete(rowId));
+            markChanged('image_cache');
           }
           continue;
         }
+
+        row.conversationId = keepConversationId;
+        await reqToPromise(stores.image_cache.put(row));
+        markChanged('image_cache');
+        movedImageCache += 1;
       }
-      row.conversationId = keepConversationId;
-      await reqToPromise(stores.messages.put(row));
-      movedMessages += 1;
-    }
 
-    // Move cached images.
-    const imageCacheIdx = stores.image_cache.index('by_conversationId');
-    const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
-    const imgRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
-    let movedImageCache = 0;
-    for (const row of Array.isArray(imgRows) ? imgRows : []) {
-      if (!row) continue;
-      row.conversationId = keepConversationId;
-      await reqToPromise(stores.image_cache.put(row));
-      movedImageCache += 1;
-    }
-
-    const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
-    const mergedCanonicalUrl = mergedIsArticle ? normalizeArticleUrl(mergedConversation.url) : '';
-    const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
-    const commentRange = globalThis.IDBKeyRange.bound(
-      [removeConversationId, -Infinity] as any,
-      [removeConversationId, Infinity] as any,
-    );
-    const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
-    for (const row of Array.isArray(commentRows) ? commentRows : []) {
-      if (!row) continue;
-      await reqToPromise(
-        stores.article_comments.put({
-          ...row,
-          conversationId: keepConversationId,
-          ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
-          updatedAt: now,
-        }),
+      const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
+      const mergedCanonicalUrl = mergedIsArticle ? canonicalizeArticleUrl(mergedConversation.url) : '';
+      const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
+      const commentRange = globalThis.IDBKeyRange.bound(
+        [removeConversationId, -Infinity] as any,
+        [removeConversationId, Infinity] as any,
       );
-    }
+      const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
+      for (const row of Array.isArray(commentRows) ? commentRows : []) {
+        if (!row) continue;
+        await reqToPromise(
+          stores.article_comments.put({
+            ...row,
+            conversationId: keepConversationId,
+            ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
+            updatedAt: now,
+          }),
+        );
+        markChanged('article_comments');
+      }
 
-    await reqToPromise(stores.conversations.delete(removeConversationId));
-    await txDone(t);
-    invalidateConversationListStatsCache();
+      await reqToPromise(stores.conversations.delete(removeConversationId));
+      markChanged('conversations');
 
-    return {
-      keptConversationId: keepConversationId,
-      removedConversationId: removeConversationId,
-      movedMessages,
-      movedImageCache,
-      merged: true,
-    };
-  } catch (error) {
-    try {
-      t.abort();
-    } catch (_abortError) {
-      // The transaction may already be aborted by the failing request.
-    }
-    throw error;
-  }
+      return {
+        result: {
+          keptConversationId: keepConversationId,
+          removedConversationId: removeConversationId,
+          movedMessages,
+          movedImageCache,
+          merged: true,
+        },
+        conversationChanged: true,
+      };
+    },
+  );
+
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.result;
 }
 
 export async function syncConversationMessages(
@@ -747,159 +745,161 @@ export async function syncConversationMessages(
   }
   const mode = requestedMode || 'snapshot';
   const db = await openDb();
-  const { t, stores } = tx(db, ['messages'], 'readwrite');
-  const idx = stores.messages.index('by_conversationId_messageKey');
 
-  const diff = options?.diff || null;
+  return runTrackedTransaction(
+    { db, stores: ['messages'], revisionScopes: ['messages'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.messages.index('by_conversationId_messageKey');
+      const diff = options?.diff || null;
+      const normalizeKeys = (value: unknown): string[] => {
+        if (!Array.isArray(value)) return [];
+        return value.map((x) => String(x || '').trim()).filter(Boolean);
+      };
 
-  const normalizeKeys = (value: unknown): string[] => {
-    if (!Array.isArray(value)) return [];
-    return value.map((x) => String(x || '').trim()).filter(Boolean);
-  };
+      if (mode !== 'snapshot') {
+        const byKey = new Map<string, any>();
+        for (const m of messages || []) {
+          const key = m && m.messageKey ? String(m.messageKey).trim() : '';
+          if (!key) continue;
+          byKey.set(key, m);
+        }
 
-  if (mode !== 'snapshot') {
-    const byKey = new Map<string, any>();
-    for (const m of messages || []) {
-      const key = m && m.messageKey ? String(m.messageKey).trim() : '';
-      if (!key) continue;
-      byKey.set(key, m);
-    }
+        const requestedKeys = Array.from(new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)]));
+        const requestedKeySet = new Set(requestedKeys);
+        const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
+        const hasEffectiveDiff =
+          !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
+        if (!hasEffectiveDiff) return { upserted: 0, deleted: 0 };
+        const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
 
-    const requestedKeys = Array.from(new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)]));
-    const requestedKeySet = new Set(requestedKeys);
-    const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
-    const hasEffectiveDiff =
-      !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
-    if (!hasEffectiveDiff) {
-      await txDone(t);
-      return { upserted: 0, deleted: 0 };
-    }
-    const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
+        const hasTailPolicy =
+          mode === 'append' &&
+          upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
+        let nextTailSequence = 0;
+        if (hasTailPolicy) {
+          const seqIdx = stores.messages.index('by_conversationId_sequence');
+          const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+          const lastCursor = await reqToPromise(seqIdx.openCursor(range, 'prev') as any);
+          const maxSequence = Number((lastCursor as any)?.value?.sequence);
+          nextTailSequence = Number.isFinite(maxSequence) ? maxSequence + 1 : 0;
+        }
 
-    const hasTailPolicy =
-      mode === 'append' && upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
-    let nextTailSequence = 0;
-    if (hasTailPolicy) {
+        let upserted = 0;
+        for (const key of upsertKeys) {
+          const m = byKey.get(key);
+          if (!m) continue;
+
+          const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+          const preserveSequence = mode === 'append' && m.captureSequencePolicy === 'preserve-existing-tail';
+          const sequence = preserveSequence
+            ? existing && Number.isFinite(existing.sequence)
+              ? existing.sequence
+              : nextTailSequence++
+            : Number.isFinite(m.sequence)
+              ? m.sequence
+              : 0;
+          const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
+          const mergePolicy: CaptureMessageMergePolicy =
+            rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
+              ? rawMergePolicy
+              : 'replace';
+          const incomingMarkdown =
+            m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+          const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
+          const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
+          const preserveExistingMarkdown =
+            !!existing &&
+            (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
+            !!String(existing.contentMarkdown || '').trim();
+          const timestamp = resolveMessageTimestamp(existing, m.updatedAt, preserveExistingContent);
+          const baseRecord: Record<string, unknown> = {
+            conversationId,
+            messageKey: key,
+            role: m.role || 'assistant',
+            authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
+            contentText: preserveExistingContent ? existing.contentText || '' : m.contentText || '',
+            contentMarkdown: preserveExistingMarkdown ? existing.contentMarkdown || '' : incomingMarkdown,
+            sequence,
+            ...(timestamp.present ? { updatedAt: timestamp.value } : null),
+          };
+          const record: any = withOptionalId(existing && existing.id, baseRecord);
+          if (existing) {
+            if (!messageRecordsEquivalent(existing, record)) {
+              await reqToPromise(stores.messages.put(record));
+              markChanged('messages');
+            }
+          } else {
+            const id = await reqToPromise(stores.messages.add(record));
+            record.id = id as any;
+            markChanged('messages');
+          }
+          upserted += 1;
+        }
+
+        let deleted = 0;
+        for (const key of removedKeys) {
+          const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+          const id = Number(existing && existing.id);
+          if (!Number.isFinite(id) || id <= 0) continue;
+          await reqToPromise(stores.messages.delete(id));
+          markChanged('messages');
+          deleted += 1;
+        }
+
+        return { upserted, deleted };
+      }
+
+      const presentKeys = new Set<string>();
+      let upserted = 0;
+
+      for (const m of messages || []) {
+        if (!m || !m.messageKey) continue;
+        presentKeys.add(String(m.messageKey));
+
+        const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
+        const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+        const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
+        const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
+        const baseRecord: Record<string, unknown> = {
+          conversationId,
+          messageKey: m.messageKey,
+          role: m.role || 'assistant',
+          authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
+          contentText: m.contentText || '',
+          contentMarkdown: incomingMarkdown,
+          sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
+          ...(timestamp.present ? { updatedAt: timestamp.value } : null),
+        };
+        const record: any = withOptionalId(existing && existing.id, baseRecord);
+        if (existing) {
+          if (!messageRecordsEquivalent(existing, record)) {
+            await reqToPromise(stores.messages.put(record));
+            markChanged('messages');
+          }
+        } else {
+          const id = await reqToPromise(stores.messages.add(record));
+          record.id = id as any;
+          markChanged('messages');
+        }
+        upserted += 1;
+      }
+
       const seqIdx = stores.messages.index('by_conversationId_sequence');
       const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
-      const lastCursor = await reqToPromise(seqIdx.openCursor(range, 'prev') as any);
-      const maxSequence = Number((lastCursor as any)?.value?.sequence);
-      nextTailSequence = Number.isFinite(maxSequence) ? maxSequence + 1 : 0;
-    }
-
-    let upserted = 0;
-    for (const key of upsertKeys) {
-      const m = byKey.get(key);
-      if (!m) continue;
-
-      const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
-      const preserveSequence = mode === 'append' && m.captureSequencePolicy === 'preserve-existing-tail';
-      const sequence = preserveSequence
-        ? existing && Number.isFinite(existing.sequence)
-          ? existing.sequence
-          : nextTailSequence++
-        : Number.isFinite(m.sequence)
-          ? m.sequence
-          : 0;
-      const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
-      const mergePolicy: CaptureMessageMergePolicy =
-        rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
-          ? rawMergePolicy
-          : 'replace';
-      const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
-      const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-      const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
-      const preserveExistingMarkdown =
-        !!existing &&
-        (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
-        !!String(existing.contentMarkdown || '').trim();
-      const baseRecord = {
-        conversationId,
-        messageKey: key,
-        role: m.role || 'assistant',
-        authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-        contentText: preserveExistingContent ? existing.contentText || '' : m.contentText || '',
-        contentMarkdown: preserveExistingMarkdown ? existing.contentMarkdown || '' : incomingMarkdown,
-        sequence,
-        updatedAt: preserveExistingContent
-          ? normalizeMessageTimestamp(existing.updatedAt)
-          : normalizeMessageTimestamp(m.updatedAt),
-      };
-      const record: any = withOptionalId(existing && existing.id, baseRecord);
-      if (existing) {
-        await reqToPromise(stores.messages.put(record));
-      } else {
-        const id = await reqToPromise(stores.messages.add(record));
-        record.id = id as any;
-      }
-      upserted += 1;
-    }
-
-    let deleted = 0;
-    for (const key of removedKeys) {
-      const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
-      const id = Number(existing && existing.id);
-      if (!Number.isFinite(id) || id <= 0) continue;
-
-      await reqToPromise(stores.messages.delete(id));
-      deleted += 1;
-    }
-
-    await txDone(t);
-    return { upserted, deleted };
-  }
-
-  const presentKeys = new Set<string>();
-  let upserted = 0;
-
-  for (const m of messages || []) {
-    if (!m || !m.messageKey) continue;
-    presentKeys.add(String(m.messageKey));
-
-    const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
-    const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
-    const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-    const baseRecord = {
-      conversationId,
-      messageKey: m.messageKey,
-      role: m.role || 'assistant',
-      authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-      contentText: m.contentText || '',
-      contentMarkdown: incomingMarkdown,
-      sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-      updatedAt: normalizeMessageTimestamp(m.updatedAt),
-    };
-    const record: any = withOptionalId(existing && existing.id, baseRecord);
-    if (existing) {
-      await reqToPromise(stores.messages.put(record));
-    } else {
-      const id = await reqToPromise(stores.messages.add(record));
-      record.id = id as any;
-    }
-    upserted += 1;
-  }
-
-  // Cleanup: delete messages not present in snapshot.
-  let deleted = 0;
-  const seqIdx = stores.messages.index('by_conversationId_sequence');
-  const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
-  const cursorReq = seqIdx.openCursor(range);
-  await new Promise<void>((resolve, reject) => {
-    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-    cursorReq.onsuccess = () => {
-      const cursor = cursorReq.result;
-      if (!cursor) return resolve();
-      const v: any = cursor.value;
-      if (v && v.messageKey && !presentKeys.has(String(v.messageKey))) {
-        cursor.delete();
+      const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
+      let deleted = 0;
+      for (const row of Array.isArray(storedRows) ? storedRows : []) {
+        if (!row?.messageKey || presentKeys.has(String(row.messageKey))) continue;
+        const id = Number(row.id);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        await reqToPromise(stores.messages.delete(id));
+        markChanged('messages');
         deleted += 1;
       }
-      cursor.continue();
-    };
-  });
 
-  await txDone(t);
-  return { upserted, deleted };
+      return { upserted, deleted };
+    },
+  );
 }
 
 function normalizeConversationListSiteFilterKey(value: unknown): string {
@@ -1046,7 +1046,7 @@ async function readConversationListPageItems(input: {
   for (const item of pageItems) {
     if (safeString((item as any).sourceType).toLowerCase() !== 'article') continue;
     const conversationId = Number((item as any).id);
-    const canonicalUrl = normalizeArticleUrl((item as any).url);
+    const canonicalUrl = canonicalizeArticleUrl((item as any).url);
     const comments: any[] = [];
     if (globalThis.IDBKeyRange?.bound && Number.isSafeInteger(conversationId) && conversationId > 0) {
       const byConversationRange = globalThis.IDBKeyRange.bound(
@@ -1103,10 +1103,9 @@ async function readConversationListSummaryAndFacets(input: {
       const cursor = request.result;
       if (!cursor) return resolve();
       const raw = (cursor.value || {}) as any;
-      const rowSourceKey = normalizeListKey(safeString(raw.listSourceKey) || safeString(raw.source), 'unknown');
-      const rowSiteKey = normalizeConversationListSiteFilterKey(
-        safeString(raw.listSiteKey) || deriveConversationListSiteKey(raw),
-      );
+      const normalized = normalizeConversationListRecord(raw);
+      const rowSourceKey = normalizeListKey(normalized.listSourceKey, 'unknown');
+      const rowSiteKey = normalizeConversationListSiteFilterKey(normalized.listSiteKey);
       const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
 
       const sourceFacet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
@@ -1147,8 +1146,6 @@ async function readConversationListPage(input: {
   cursor?: ConversationListCursor | null;
   limit?: number | null;
 }): Promise<ConversationListPage<Conversation>> {
-  await ensureConversationListDerivedKeysBackfilled();
-
   const query = resolveConversationListQuery(input.queryInput, input.limit);
   const cursor = toComparableCursor(input.cursor);
   const statsKey = `${normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL)}::${normalizeConversationListSiteFilterKey(query.siteKey)}`;
@@ -1252,11 +1249,6 @@ export async function findConversationBySourceAndKey(
   return toConversationListOpenTarget(row);
 }
 
-export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
-  const row = await getConversationById(conversationId);
-  return toConversationListOpenTarget(row);
-}
-
 export async function getMessagesByConversationId(conversationId: number): Promise<ConversationMessage[]> {
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readonly');
@@ -1317,106 +1309,95 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   }
 
   const db = await openDb();
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-    'readwrite',
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: [
+        'conversations',
+        'messages',
+        'sync_mappings',
+        'image_cache',
+        'article_comments',
+        GITHUB_CLEANUP_OUTBOX_STORE,
+      ],
+      revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+    },
+    async ({ stores, markChanged }) => {
+      let deletedConversations = 0;
+      let deletedMessages = 0;
+      let deletedMappings = 0;
+      let deletedImageCache = 0;
+
+      const msgIdx = stores.messages.index('by_conversationId_sequence');
+      const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
+      const imageCacheIdx = stores.image_cache.index('by_conversationId');
+      const articleCommentsIdx = stores.article_comments.index('by_conversationId_createdAt');
+      const now = Date.now();
+
+      for (const id of ids) {
+        const convo: any = await reqToPromise(stores.conversations.get(id));
+        if (!convo) continue;
+
+        const source = safeString(convo.source);
+        const conversationKey = safeString(convo.conversationKey);
+        if (source && conversationKey) {
+          const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
+          if (mapping && mapping.id) {
+            await enqueueGithubCleanupSnapshot(
+              stores[GITHUB_CLEANUP_OUTBOX_STORE],
+              readOwnedGithubCleanupSnapshot(mapping, convo),
+              { reason: 'delete', createdAt: now },
+            );
+            await reqToPromise(stores.sync_mappings.delete(mapping.id));
+            markChanged('sync_mappings');
+            deletedMappings += 1;
+          }
+        }
+
+        if (safeString(convo.sourceType).toLowerCase() === 'article') {
+          const commentRange = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+          const commentRows = (await reqToPromise(articleCommentsIdx.getAll(commentRange) as any)) as any[];
+          for (const row of Array.isArray(commentRows) ? commentRows : []) {
+            if (!row || row.conversationId == null) continue;
+            await reqToPromise(stores.article_comments.put({ ...row, conversationId: null }));
+            markChanged('article_comments');
+          }
+        }
+
+        const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+        const messageRows = (await reqToPromise(msgIdx.getAll(range) as any)) as any[];
+        for (const row of Array.isArray(messageRows) ? messageRows : []) {
+          const rowId = Number(row?.id);
+          if (!Number.isFinite(rowId) || rowId <= 0) continue;
+          await reqToPromise(stores.messages.delete(rowId));
+          markChanged('messages');
+          deletedMessages += 1;
+        }
+
+        const imgRange = globalThis.IDBKeyRange.only(id);
+        const imageRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
+        for (const row of Array.isArray(imageRows) ? imageRows : []) {
+          const rowId = Number(row?.id);
+          if (!Number.isFinite(rowId) || rowId <= 0) continue;
+          await reqToPromise(stores.image_cache.delete(rowId));
+          markChanged('image_cache');
+          deletedImageCache += 1;
+        }
+
+        await reqToPromise(stores.conversations.delete(id));
+        markChanged('conversations');
+        deletedConversations += 1;
+      }
+
+      return {
+        result: { deletedConversations, deletedMessages, deletedMappings, deletedImageCache },
+        conversationChanged: deletedConversations > 0,
+      };
+    },
   );
 
-  let deletedConversations = 0;
-  let deletedMessages = 0;
-  let deletedMappings = 0;
-  let deletedImageCache = 0;
-
-  const msgIdx = stores.messages.index('by_conversationId_sequence');
-  const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
-  const imageCacheIdx = stores.image_cache.index('by_conversationId');
-  const articleCommentsIdx = stores.article_comments.index('by_conversationId_createdAt');
-  const now = Date.now();
-
-  try {
-    for (const id of ids) {
-      const convo: any = await reqToPromise(stores.conversations.get(id));
-      if (!convo) continue;
-
-      const source = safeString(convo.source);
-      const conversationKey = safeString(convo.conversationKey);
-      if (source && conversationKey) {
-        const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
-        if (mapping && mapping.id) {
-          await enqueueGithubCleanupSnapshot(
-            stores[GITHUB_CLEANUP_OUTBOX_STORE],
-            readOwnedGithubCleanupSnapshot(mapping, convo),
-            { reason: 'delete', createdAt: now },
-          );
-          await reqToPromise(stores.sync_mappings.delete(mapping.id));
-          deletedMappings += 1;
-        }
-      }
-
-      if (safeString(convo.sourceType).toLowerCase() === 'article') {
-        const commentRange = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
-        const commentCursor = articleCommentsIdx.openCursor(commentRange);
-        await new Promise<void>((resolve, reject) => {
-          commentCursor.onerror = () => reject(commentCursor.error || new Error('article comment cursor failed'));
-          commentCursor.onsuccess = () => {
-            const cursor = commentCursor.result;
-            if (!cursor) return resolve();
-            const row = cursor.value as Record<string, unknown>;
-            let updateRequest: IDBRequest;
-            try {
-              updateRequest = cursor.update({ ...row, conversationId: null });
-            } catch (error) {
-              reject(error);
-              return;
-            }
-            updateRequest.onerror = () => reject(updateRequest.error || new Error('article comment detach failed'));
-            updateRequest.onsuccess = () => cursor.continue();
-          };
-        });
-      }
-
-      const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
-      const cursorReq = msgIdx.openCursor(range);
-      await new Promise<void>((resolve, reject) => {
-        cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-        cursorReq.onsuccess = () => {
-          const cursor = cursorReq.result;
-          if (!cursor) return resolve();
-          cursor.delete();
-          deletedMessages += 1;
-          cursor.continue();
-        };
-      });
-
-      await reqToPromise(stores.conversations.delete(id));
-      deletedConversations += 1;
-
-      const imgRange = globalThis.IDBKeyRange.only(id);
-      const imgCursorReq = imageCacheIdx.openCursor(imgRange);
-      await new Promise<void>((resolve, reject) => {
-        imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
-        imgCursorReq.onsuccess = () => {
-          const cursor = imgCursorReq.result;
-          if (!cursor) return resolve();
-          cursor.delete();
-          deletedImageCache += 1;
-          cursor.continue();
-        };
-      });
-    }
-
-    await txDone(t);
-  } catch (error) {
-    try {
-      t.abort();
-    } catch (_abortError) {
-      // The transaction may already be aborted by the failing request.
-    }
-    throw error;
-  }
-  invalidateConversationListStatsCache();
-  return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.result;
 }
 
 export async function getConversationById(conversationId: number): Promise<Conversation | null> {
@@ -1501,8 +1482,7 @@ export async function searchConversationMentionCandidates(input?: {
       const source = safeString(record?.source);
       const url = safeString(record?.url);
       const sourceType = safeString(record?.sourceType) || 'chat';
-      const domain =
-        stripDomainPrefix(safeString(record?.listSiteKey)) || stripDomainPrefix(deriveConversationListSiteKey(record));
+      const domain = stripDomainPrefix(safeString(record?.listSiteKey));
 
       const shouldKeep = (() => {
         if (!Number.isFinite(conversationId) || conversationId <= 0) return false;
@@ -1560,76 +1540,141 @@ export async function getSyncMappingByConversation(
   return { conversation, mapping: mapping || null };
 }
 
-export async function patchSyncMapping(conversationId: number, patch: Record<string, unknown>): Promise<true> {
+async function patchSyncMappingInternal(
+  conversationId: number,
+  patch: Record<string, unknown>,
+  options: { generateNotionBaseline?: boolean } = {},
+): Promise<true> {
   const id = Number(conversationId);
   if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
   if (!patch || typeof patch !== 'object') throw new Error('invalid patch');
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
-  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
-  if (!conversation) throw new Error('conversation not found');
+  return runTrackedTransaction(
+    { db, stores: ['conversations', 'sync_mappings'], revisionScopes: ['conversations', 'sync_mappings'] },
+    async ({ stores, markChanged }) => {
+      const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
+      if (!conversation) throw new Error('conversation not found');
 
-  const source = String(conversation.source || '').trim();
-  const conversationKey = String(conversation.conversationKey || '').trim();
-  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
+      const source = safeString(conversation.source);
+      const conversationKey = safeString(conversation.conversationKey);
+      if (!source || !conversationKey) throw new Error('missing source or conversationKey');
 
-  const idx = stores.sync_mappings.index('by_source_conversationKey');
-  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
-  const now = Date.now();
-  const previousNotionPageId = safeString(existing?.notionPageId) || safeString(conversation.notionPageId);
-  const previousFeishuDocId = safeString(existing?.feishuDocId) || safeString(conversation.feishuDocId);
-  const existingForPatch = { ...(existing && typeof existing === 'object' ? existing : {}) } as any;
-  if (previousNotionPageId && !safeString(existingForPatch.notionPageId))
-    existingForPatch.notionPageId = previousNotionPageId;
-  if (previousFeishuDocId && !safeString(existingForPatch.feishuDocId))
-    existingForPatch.feishuDocId = previousFeishuDocId;
-  const merged = mergeSyncMappingPatch(existingForPatch, patch) as any;
-  const hasNotionPagePatch = Object.prototype.hasOwnProperty.call(patch, 'notionPageId');
-  const hasFeishuDocPatch = Object.prototype.hasOwnProperty.call(patch, 'feishuDocId');
-  const nextNotionPageId = hasNotionPagePatch
-    ? safeString(merged.notionPageId)
-    : safeString(merged.notionPageId) || previousNotionPageId;
-  const nextFeishuDocId = hasFeishuDocPatch
-    ? safeString(merged.feishuDocId)
-    : safeString(merged.feishuDocId) || previousFeishuDocId;
-  const notionTargetChanged = hasNotionPagePatch && previousNotionPageId !== nextNotionPageId;
-  const conversationNotionTargetChanged =
-    hasNotionPagePatch && safeString(conversation.notionPageId) !== nextNotionPageId;
-  const next = {
-    ...merged,
-    source,
-    conversationKey,
-    notionPageId: nextNotionPageId,
-    feishuDocId: nextFeishuDocId,
-    updatedAt: now,
-  } as any;
-  const payload: any = withOptionalId(existing && existing.id, next);
-  if (existing) await reqToPromise(stores.sync_mappings.put(payload));
-  else await reqToPromise(stores.sync_mappings.add(payload));
+      const idx = stores.sync_mappings.index('by_source_conversationKey');
+      const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+      const existingForPatch = { ...(existing && typeof existing === 'object' ? existing : {}) } as any;
+      const conversationNotionPageId = safeString(conversation.notionPageId);
+      const conversationFeishuDocId = safeString(conversation.feishuDocId);
+      if (!Object.prototype.hasOwnProperty.call(existingForPatch, 'notionPageId') && conversationNotionPageId) {
+        existingForPatch.notionPageId = conversationNotionPageId;
+      }
+      if (!Object.prototype.hasOwnProperty.call(existingForPatch, 'feishuDocId') && conversationFeishuDocId) {
+        existingForPatch.feishuDocId = conversationFeishuDocId;
+      }
 
-  let conversationChanged = false;
-  if (hasNotionPagePatch && safeString(conversation.notionPageId) !== nextNotionPageId) {
-    conversation.notionPageId = nextNotionPageId;
-    conversationChanged = true;
-  }
-  for (const field of ['notionPageUrl', 'notionWorkspaceSlug'] as const) {
-    if (!notionTargetChanged && !conversationNotionTargetChanged && !Object.prototype.hasOwnProperty.call(patch, field))
-      continue;
-    const value = safeString(next[field]);
-    if (safeString(conversation[field]) === value) continue;
-    conversation[field] = value;
-    conversationChanged = true;
-  }
+      const effectivePatch = { ...patch } as Record<string, unknown>;
+      if (options.generateNotionBaseline) {
+        const previous = Number(existingForPatch.lastSyncedAt);
+        effectivePatch.lastSyncedAt = Math.max(
+          Date.now(),
+          Number.isFinite(previous) && previous >= 0 ? previous + 1 : 0,
+        );
+      }
 
-  if ((hasFeishuDocPatch || nextFeishuDocId) && safeString(conversation.feishuDocId) !== nextFeishuDocId) {
-    conversation.feishuDocId = nextFeishuDocId;
-    conversationChanged = true;
-  }
-  if (conversationChanged) await reqToPromise(stores.conversations.put(conversation));
+      const merged = mergeSyncMappingPatch(existingForPatch, effectivePatch) as any;
+      const hasNotionPagePatch = Object.prototype.hasOwnProperty.call(patch, 'notionPageId');
+      const hasFeishuDocPatch = Object.prototype.hasOwnProperty.call(patch, 'feishuDocId');
+      const previousNotionPageId = safeString(existingForPatch.notionPageId);
+      const nextNotionPageId = safeString(merged.notionPageId);
+      const nextFeishuDocId = safeString(merged.feishuDocId);
+      const notionTargetChanged = hasNotionPagePatch && previousNotionPageId !== nextNotionPageId;
+      const conversationNotionTargetChanged =
+        (hasNotionPagePatch || !!nextNotionPageId) && conversationNotionPageId !== nextNotionPageId;
+      const candidate = { ...merged, source, conversationKey } as any;
 
-  await txDone(t);
-  return true;
+      if (!areSyncMappingsBusinessEquivalent(candidate, existing)) {
+        const payload: any = withOptionalId(existing && existing.id, { ...candidate, updatedAt: Date.now() });
+        if (existing) await reqToPromise(stores.sync_mappings.put(payload));
+        else await reqToPromise(stores.sync_mappings.add(payload));
+        markChanged('sync_mappings');
+      }
+
+      let conversationChanged = false;
+      if (conversationNotionTargetChanged) {
+        conversation.notionPageId = nextNotionPageId;
+        conversationChanged = true;
+      }
+      for (const field of ['notionPageUrl', 'notionWorkspaceSlug'] as const) {
+        if (
+          !notionTargetChanged &&
+          !conversationNotionTargetChanged &&
+          !Object.prototype.hasOwnProperty.call(patch, field)
+        ) {
+          continue;
+        }
+        const value = safeString(candidate[field]);
+        if (safeString(conversation[field]) === value) continue;
+        conversation[field] = value;
+        conversationChanged = true;
+      }
+
+      if ((hasFeishuDocPatch || !!nextFeishuDocId) && conversationFeishuDocId !== nextFeishuDocId) {
+        conversation.feishuDocId = nextFeishuDocId;
+        conversationChanged = true;
+      }
+      if (conversationChanged) {
+        await reqToPromise(stores.conversations.put(conversation));
+        markChanged('conversations');
+      }
+
+      return true as const;
+    },
+  );
+}
+
+export async function recordObsidianRemoteWrite(input: {
+  source: unknown;
+  conversationKey: unknown;
+}): Promise<{ generation: number }> {
+  const source = safeString(input?.source);
+  const conversationKey = safeString(input?.conversationKey);
+  if (!source || !conversationKey) throw new Error('invalid obsidian remote write identity');
+
+  const db = await openDb();
+  return runTrackedTransaction(
+    { db, stores: ['sync_mappings'], revisionScopes: ['sync_mappings'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.sync_mappings.index('by_source_conversationKey');
+      const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+      const rawGeneration = existing?.obsidianRemoteWriteGeneration;
+      const currentGeneration =
+        typeof rawGeneration === 'number' && Number.isSafeInteger(rawGeneration) && rawGeneration >= 0
+          ? rawGeneration
+          : 0;
+      if (currentGeneration >= Number.MAX_SAFE_INTEGER) {
+        throw Object.assign(new Error('obsidian_remote_write_generation_overflow'), {
+          code: 'obsidian_remote_write_generation_overflow',
+        });
+      }
+
+      const generation = currentGeneration + 1;
+      const next = {
+        ...(existing && typeof existing === 'object' ? existing : {}),
+        source,
+        conversationKey,
+        obsidianRemoteWriteGeneration: generation,
+        updatedAt: Date.now(),
+      };
+      if (existing) await reqToPromise(stores.sync_mappings.put(next));
+      else await reqToPromise(stores.sync_mappings.add(next));
+      markChanged('sync_mappings');
+      return { generation };
+    },
+  );
+}
+
+export async function patchSyncMapping(conversationId: number, patch: Record<string, unknown>): Promise<true> {
+  return patchSyncMappingInternal(conversationId, patch);
 }
 
 export async function setConversationNotionPageId(
@@ -1666,13 +1711,17 @@ export async function setSyncCursor(
   };
   const lastSyncedAt = finiteOrNull(input?.lastSyncedAt);
 
-  return patchSyncMapping(conversationId, {
-    lastSyncedMessageKey: safeString(input?.lastSyncedMessageKey),
-    lastSyncedSequence: finiteOrNull(input?.lastSyncedSequence),
-    lastSyncedAt: lastSyncedAt ?? Date.now(),
-    lastSyncedMessageUpdatedAt: finiteOrNull(input?.lastSyncedMessageUpdatedAt),
-    ...(input?.notionSectionCursors !== undefined ? { notionSectionCursors: input.notionSectionCursors } : null),
-    ...(input?.notionSectionDigests !== undefined ? { notionSectionDigests: input.notionSectionDigests } : null),
-    ...(input?.notionSections !== undefined ? { notionSections: input.notionSections } : null),
-  });
+  return patchSyncMappingInternal(
+    conversationId,
+    {
+      lastSyncedMessageKey: safeString(input?.lastSyncedMessageKey),
+      lastSyncedSequence: finiteOrNull(input?.lastSyncedSequence),
+      ...(lastSyncedAt != null ? { lastSyncedAt } : null),
+      lastSyncedMessageUpdatedAt: finiteOrNull(input?.lastSyncedMessageUpdatedAt),
+      ...(input?.notionSectionCursors !== undefined ? { notionSectionCursors: input.notionSectionCursors } : null),
+      ...(input?.notionSectionDigests !== undefined ? { notionSectionDigests: input.notionSectionDigests } : null),
+      ...(input?.notionSections !== undefined ? { notionSections: input.notionSections } : null),
+    },
+    { generateNotionBaseline: lastSyncedAt == null },
+  );
 }

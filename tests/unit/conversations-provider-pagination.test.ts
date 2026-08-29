@@ -3,28 +3,28 @@ import { JSDOM } from 'jsdom';
 import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
-import { UI_EVENT_TYPES } from '../../src/services/protocols/message-contracts';
 import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
 
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
 const findConversationBySourceAndKey = vi.fn();
-const findConversationById = vi.fn();
+const getConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
+const subscribeDataRevisionChanges = vi.fn();
+const whenDataRevisionObserverReady = vi.fn();
+const requestDataRevisionRetry = vi.fn();
 let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
-let portMessageListener: ((message: any) => void) | null = null;
-let portDisconnectListener: (() => void) | null = null;
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
   getConversationListPage: (...args: any[]) => getConversationListPage(...args),
   findConversationBySourceAndKey: (...args: any[]) => findConversationBySourceAndKey(...args),
-  findConversationById: (...args: any[]) => findConversationById(...args),
+  getConversationById: (...args: any[]) => getConversationById(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
   upsertConversation: (...args: any[]) => upsertConversation(...args),
@@ -63,6 +63,20 @@ vi.mock('@services/comments/client/repo', () => ({
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: (...args: any[]) => resolveDetailHeaderActions(...args),
+  hasDetailHeaderActionStorageDependencyChange: (changes: unknown, areaName: string) =>
+    areaName === 'local' &&
+    !!changes &&
+    typeof changes === 'object' &&
+    Object.keys(changes as Record<string, unknown>).some(
+      (key) => key.startsWith('webclipper_sync_provider_') || key.startsWith('obsidian_'),
+    ),
+}));
+
+vi.mock('@services/data-revisions/observer', () => ({
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) =>
+    subscribeDataRevisionChanges(listener),
+  whenDataRevisionObserverReady: () => whenDataRevisionObserverReady(),
+  requestDataRevisionRetry: (scopes: readonly string[]) => requestDataRevisionRetry(scopes),
 }));
 
 vi.mock('@services/shared/storage', () => ({
@@ -72,28 +86,6 @@ vi.mock('@services/shared/storage', () => ({
       if (storageChangeListener === listener) storageChangeListener = null;
     };
   },
-}));
-
-vi.mock('@services/shared/ports', () => ({
-  connectPort: () => ({
-    onMessage: {
-      addListener: (listener: (message: any) => void) => {
-        portMessageListener = listener;
-      },
-      removeListener: (listener: (message: any) => void) => {
-        if (portMessageListener === listener) portMessageListener = null;
-      },
-    },
-    onDisconnect: {
-      addListener: (listener: () => void) => {
-        portDisconnectListener = listener;
-      },
-      removeListener: (listener: () => void) => {
-        if (portDisconnectListener === listener) portDisconnectListener = null;
-      },
-    },
-    disconnect: vi.fn(),
-  }),
 }));
 
 vi.mock('@i18n', () => ({
@@ -190,7 +182,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationListBootstrap.mockReset();
     getConversationListPage.mockReset();
     findConversationBySourceAndKey.mockReset();
-    findConversationById.mockReset();
+    getConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
     upsertConversation.mockReset();
@@ -198,12 +190,17 @@ describe('ConversationsProvider pagination state', () => {
     backfillConversationImages.mockReset();
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
+    subscribeDataRevisionChanges.mockReset();
+    subscribeDataRevisionChanges.mockImplementation(() => () => {});
+    whenDataRevisionObserverReady.mockReset();
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    requestDataRevisionRetry.mockReset();
     storageChangeListener = null;
-    portMessageListener = null;
-    portDisconnectListener = null;
 
     getConversationListPage.mockResolvedValue(makePage([]));
-    findConversationById.mockResolvedValue(null);
+    getConversationById.mockImplementation((conversationId: number) =>
+      Promise.resolve(makeConversation(Number(conversationId), 'chatgpt', `conv-${conversationId}`)),
+    );
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     upsertConversation.mockResolvedValue({});
@@ -296,6 +293,32 @@ describe('ConversationsProvider pagination state', () => {
 
     expect(String(latestState.listSourceFilterKey)).toBe('chatgpt');
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([201]);
+  });
+
+  it('keeps the committed page bundle when loading more fails', async () => {
+    const firstPage = {
+      ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 2 }],
+      }),
+      cursor: { lastCapturedAt: 100, id: 1 },
+      hasMore: true,
+      summary: { totalCount: 2, todayCount: 1 },
+    };
+    getConversationListBootstrap.mockResolvedValue(firstPage);
+    getConversationListPage.mockRejectedValue(new Error('page read failed'));
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
+    expect(latestState.listCursor).toEqual({ lastCapturedAt: 100, id: 1 });
+    expect(latestState.listHasMore).toBe(true);
+    expect(latestState.listSummary).toEqual({ totalCount: 2, todayCount: 1 });
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations', 'article_comments']);
   });
 
   it('supports open by source+key even when target is not in loaded items', async () => {
@@ -478,42 +501,6 @@ describe('ConversationsProvider pagination state', () => {
     expect(String(latestState.detail?.messages?.[0]?.contentMarkdown || '')).toBe('article three');
   });
 
-  it('refreshes both list and active detail when syncFinished is broadcast', async () => {
-    vi.useFakeTimers();
-    const conversation = makeConversation(402, 'chatgpt', 'conv-402');
-    getConversationListBootstrap.mockResolvedValue(makePage([conversation]));
-    getConversationDetail.mockResolvedValue({ conversationId: 402, messages: [] });
-
-    try {
-      await renderProvider();
-      await act(async () => {
-        await flushMicrotasks();
-        await flushMicrotasks();
-      });
-
-      const listCallsBefore = getConversationListBootstrap.mock.calls.length;
-      const detailCallsBefore = getConversationDetail.mock.calls.length;
-      expect(portMessageListener).toBeTruthy();
-
-      await act(async () => {
-        portMessageListener?.({
-          type: UI_EVENT_TYPES.CONVERSATIONS_CHANGED,
-          payload: { reason: 'syncFinished' },
-        });
-        vi.advanceTimersByTime(250);
-        await flushMicrotasks();
-        await flushMicrotasks();
-        await flushMicrotasks();
-      });
-
-      expect(getConversationListBootstrap.mock.calls.length).toBeGreaterThan(listCallsBefore);
-      expect(getConversationDetail.mock.calls.length).toBeGreaterThan(detailCallsBefore);
-      expect(getConversationDetail).toHaveBeenLastCalledWith(402);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('re-resolves detail header actions when a sync provider gate changes', async () => {
     getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(401, 'chatgpt', 'conv-401')]));
     getConversationDetail.mockResolvedValue({ conversationId: 401, messages: [] });
@@ -560,6 +547,7 @@ describe('ConversationsProvider pagination state', () => {
       url: 'https://example.com/target',
     };
     getConversationListBootstrap.mockResolvedValue(makePage([selected, conflict]));
+    getConversationById.mockResolvedValue(selected);
     getConversationDetail.mockResolvedValue({ conversationId: 501, messages: [] });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
@@ -592,21 +580,18 @@ describe('ConversationsProvider pagination state', () => {
   });
 
   it('provides cache-images tools action for article conversations', async () => {
+    const article = {
+      ...makeConversation(301, 'web', 'article-301'),
+      sourceType: 'article',
+      url: 'https://example.com/article-301',
+    };
     getConversationListBootstrap.mockResolvedValue(
-      makePage(
-        [
-          {
-            ...makeConversation(301, 'web', 'article-301'),
-            sourceType: 'article',
-            url: 'https://example.com/article-301',
-          },
-        ],
-        {
-          sources: [{ key: 'web', label: 'web', count: 1 }],
-          sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
-        },
-      ),
+      makePage([article], {
+        sources: [{ key: 'web', label: 'web', count: 1 }],
+        sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
+      }),
     );
+    getConversationById.mockResolvedValue(article);
 
     await renderProvider();
     await act(async () => {

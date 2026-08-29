@@ -19,7 +19,9 @@ import {
 } from '@services/sync/obsidian/obsidian-sync-orchestrator.ts';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 
-export function createTestBackgroundRouter() {
+export function createTestBackgroundRouter(
+  options: { onArticleConversationChanged?: (conversationId: number, reason: string) => void | Promise<void> } = {},
+) {
   const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   const router = createBackgroundRouter({
@@ -34,7 +36,7 @@ export function createTestBackgroundRouter() {
     onConversationChanged: async () => {},
     onRemoteCleanupPending: async () => {},
   });
-  registerWebArticleHandlers(router);
+  registerWebArticleHandlers(router, { onConversationChanged: options.onArticleConversationChanged });
   registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
   registerUiMessageHandlers(router);

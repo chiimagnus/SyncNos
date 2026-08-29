@@ -7,9 +7,9 @@ import {
   uniqueConversationKey,
 } from '@services/sync/backup/backup-utils';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
-import { openDb, reqToPromise, tx, txDone } from '@services/sync/backup/idb';
+import { reqToPromise, tx, txDone } from '@services/sync/backup/idb';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
-import { DB_NAME, DB_VERSION } from '@platform/idb/schema';
+import { DB_NAME, DB_VERSION, openDb } from '@platform/idb/schema';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
   serializeArticleCommentArchive,
@@ -221,14 +221,8 @@ export async function exportBackupZipV2(
     if (!m || typeof m !== 'object') continue;
     const uk = uniqueConversationKey(m);
     if (!uk) continue;
-    const existing = mappingByUniqueKey.get(uk) || null;
-    if (!existing) {
-      mappingByUniqueKey.set(uk, m);
-      continue;
-    }
-    const aUpdated = Number(existing.updatedAt) || 0;
-    const bUpdated = Number(m.updatedAt) || 0;
-    if (bUpdated > aUpdated) mappingByUniqueKey.set(uk, m);
+    if (mappingByUniqueKey.has(uk)) throw new Error(`duplicate sync mapping identity: ${uk}`);
+    mappingByUniqueKey.set(uk, m);
   }
 
   const sources = new Map<string, AnyRecord[]>();

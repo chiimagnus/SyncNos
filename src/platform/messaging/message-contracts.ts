@@ -12,6 +12,10 @@ export const CORE_MESSAGE_TYPES = {
   DELETE_CONVERSATIONS: 'deleteConversations',
 } as const;
 
+export const DATA_REVISION_MESSAGE_TYPES = {
+  GET_SNAPSHOT: 'getDataRevisionSnapshot',
+} as const;
+
 export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
   DISCONNECT: 'notionDisconnect',
@@ -94,16 +98,9 @@ export const UI_MESSAGE_TYPES = {
   CAPTURE_ACTIVE_TAB_CURRENT_PAGE: 'captureActiveTabCurrentPage',
 } as const;
 
-export const UI_EVENT_TYPES = {
-  CONVERSATIONS_CHANGED: 'conversationsChanged',
-} as const;
-
-export const UI_PORT_NAMES = {
-  POPUP_EVENTS: 'popup:events',
-} as const;
-
 export const messageContracts = {
   CORE_MESSAGE_TYPES,
+  DATA_REVISION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
   FEISHU_MESSAGE_TYPES,
@@ -114,11 +111,10 @@ export const messageContracts = {
   ITEM_MENTION_MESSAGE_TYPES,
   COMMENTS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
-  UI_EVENT_TYPES,
-  UI_PORT_NAMES,
 } as const;
 
 export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[keyof typeof CORE_MESSAGE_TYPES];
+export type DataRevisionMessageType = (typeof DATA_REVISION_MESSAGE_TYPES)[keyof typeof DATA_REVISION_MESSAGE_TYPES];
 export type NotionMessageType = (typeof NOTION_MESSAGE_TYPES)[keyof typeof NOTION_MESSAGE_TYPES];
 export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof OBSIDIAN_MESSAGE_TYPES];
 export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISHU_MESSAGE_TYPES];
@@ -129,11 +125,10 @@ export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof t
 export type ItemMentionMessageType = (typeof ITEM_MENTION_MESSAGE_TYPES)[keyof typeof ITEM_MENTION_MESSAGE_TYPES];
 export type CommentsMessageType = (typeof COMMENTS_MESSAGE_TYPES)[keyof typeof COMMENTS_MESSAGE_TYPES];
 export type UiMessageType = (typeof UI_MESSAGE_TYPES)[keyof typeof UI_MESSAGE_TYPES];
-export type UiEventType = (typeof UI_EVENT_TYPES)[keyof typeof UI_EVENT_TYPES];
-export type UiPortName = (typeof UI_PORT_NAMES)[keyof typeof UI_PORT_NAMES];
 
 export type MessageType =
   | CoreMessageType
+  | DataRevisionMessageType
   | NotionMessageType
   | ObsidianMessageType
   | FeishuMessageType

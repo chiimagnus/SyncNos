@@ -1,19 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation } from '@services/conversations/domain/models';
-import { getConversationDetail } from '@services/conversations/client/repo';
-import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
-import { storageOnChanged } from '@services/shared/storage';
 import { buildConversationSidebarRenderItems } from '@services/conversations/domain/sidebar-time-groups';
 
 import { t, formatConversationTitle, getCurrentLocale } from '@i18n';
 import type { SyncProvider } from '@services/sync/models';
-import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import { getSyncProviderDefinition, listSyncProviders } from '@services/sync/sync-provider-registry';
+import { getSyncProviderDefinition } from '@services/sync/sync-provider-registry';
 import {
   resolveConversationListTag,
   resolveConversationSourceOptionLabel,
@@ -109,7 +105,7 @@ export function ConversationListPane({
     selectedIds,
     toggleAll,
     toggleSelected,
-    setActiveId,
+    activateLoadedConversation,
     clearSelected,
     openConversationInListScopeById,
     exporting,
@@ -119,6 +115,7 @@ export function ConversationListPane({
     syncingObsidian,
     syncingFeishu,
     syncingGithub,
+    enabledSyncProviders,
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
@@ -132,6 +129,7 @@ export function ConversationListPane({
     pendingListLocateId,
     consumeListLocate,
     loadMoreList,
+    copyConversationMarkdown,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
@@ -154,7 +152,6 @@ export function ConversationListPane({
   const copiedTimerRef = useRef<number | null>(null);
   const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null);
   const copiedLinkTimerRef = useRef<number | null>(null);
-  const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>(['obsidian', 'notion']);
 
   const [, forceDeleteConfirmRender] = useState(0);
   const deleteConfirm = useMemo(
@@ -286,35 +283,6 @@ export function ConversationListPane({
     github: syncingGithub,
   };
   const syncingAny = Object.values(providerSyncing).some(Boolean);
-
-  useEffect(() => {
-    let disposed = false;
-    const load = async () => {
-      const providers = await getEnabledSyncProviders().catch(() => null);
-      if (disposed || !providers) return;
-      const next = providers as SyncProvider[];
-      setEnabledSyncProviders((current) => {
-        if (current.length === next.length && current.every((value, idx) => value === next[idx])) return current;
-        return next;
-      });
-    };
-    void load();
-
-    const enabledKeys = listSyncProviders().map((provider) => syncProviderEnabledStorageKey(provider.id));
-    const unsubscribe = storageOnChanged((changes: any, areaName: string) => {
-      if (areaName !== 'local') return;
-      if (!changes || typeof changes !== 'object') return;
-      for (const key of enabledKeys) {
-        if (!Object.prototype.hasOwnProperty.call(changes, key)) continue;
-        void load();
-        break;
-      }
-    });
-    return () => {
-      disposed = true;
-      unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -497,7 +465,7 @@ export function ConversationListPane({
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
     const id = Number(conversationId);
-    setActiveId(id);
+    activateLoadedConversation(id);
     onOpenConversation?.(id);
   };
 
@@ -529,10 +497,7 @@ export function ConversationListPane({
     e.stopPropagation();
     const id = Number((conversation as any).id);
     try {
-      const d = await getConversationDetail(id);
-      const mdText = await formatConversationMarkdownForExternalOutput(conversation as any, d as any);
-      const copied = await writeTextToClipboard(mdText);
-      if (!copied) throw new Error(t('copyFailed'));
+      await copyConversationMarkdown(id);
       setCopiedId(id);
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = window.setTimeout(() => {
@@ -1085,7 +1050,7 @@ export function ConversationListPane({
                       role="menuitem"
                       onClick={async () => {
                         setSyncOpen(false);
-                        const section = listSyncProviders()[0]?.settingsSectionKey || 'notion';
+                        const section = getSyncProviderDefinition('obsidian')?.settingsSectionKey || 'obsidian';
                         if (onOpenSettingsSection) {
                           onOpenSettingsSection(section);
                         } else {

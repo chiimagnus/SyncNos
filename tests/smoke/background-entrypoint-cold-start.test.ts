@@ -165,12 +165,10 @@ describe('background entrypoint cold start', () => {
     const onMessageAddListener = vi.fn((listener: any) => {
       runtimeMessageListener = listener;
     });
-    const onConnectAddListener = vi.fn();
     // @ts-expect-error test global
     globalThis.chrome = {
       runtime: {
         onMessage: { addListener: onMessageAddListener },
-        onConnect: { addListener: onConnectAddListener },
       },
     };
 
@@ -178,7 +176,6 @@ describe('background entrypoint cold start', () => {
     expect(callback()).toBeUndefined();
 
     expect(onMessageAddListener).toHaveBeenCalledTimes(1);
-    expect(onConnectAddListener).toHaveBeenCalledTimes(1);
     expect(mocks.setupNotionOAuthNavigationListener).toHaveBeenCalledTimes(1);
     expect(mocks.setupFeishuOAuthNavigationListener).toHaveBeenCalledTimes(1);
     expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);

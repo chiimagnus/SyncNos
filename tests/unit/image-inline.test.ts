@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import {
-  inlineChatImagesInMessages,
-  __closeDbForTests as __closeImageInlineDbForTests,
-} from '@services/conversations/data/image-inline';
-import { openDb as openSchemaDb } from '../../src/platform/idb/schema';
+  hasReusableImageCachePayload,
+  reusableImageCacheByteSize,
+} from '@services/conversations/data/image-cache-record';
+import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -28,7 +30,7 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeImageInlineDbForTests();
+  closeDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -37,12 +39,21 @@ beforeEach(async () => {
   await deleteDb('webclipper');
 });
 
-afterEach(async () => {
-  await __closeImageInlineDbForTests();
+afterEach(() => {
+  closeDbForTests();
   vi.restoreAllMocks();
 });
 
 describe('image-inline', () => {
+  it('shares one persisted reusable-payload rule with conversation merge', () => {
+    const valid = { blob: new Blob(['data'], { type: 'image/png' }), byteSize: 4 };
+    expect(hasReusableImageCachePayload(valid)).toBe(true);
+    expect(reusableImageCacheByteSize(valid)).toBe(4);
+    expect(reusableImageCacheByteSize({ blob: valid.blob, byteSize: 0 })).toBe(valid.blob.size);
+    expect(hasReusableImageCachePayload({ blob: new Blob([]), byteSize: 0 })).toBe(false);
+    expect(hasReusableImageCachePayload({ byteSize: 10 })).toBe(false);
+  });
+
   it('replaces http(s)/data images with internal asset refs and reuses cache', async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(Uint8Array.from([1, 2, 3, 4]), {
@@ -71,12 +82,11 @@ describe('image-inline', () => {
     expect(String(messages1[2].contentMarkdown)).not.toContain('data:image');
 
     // Ensure we do not store the full `data:` URL as an IndexedDB key/index value.
-    const db = await openSchemaDb();
+    const db = await openDb();
     const t = db.transaction(['image_cache'], 'readonly');
     const store = t.objectStore('image_cache');
     const rows = (await reqToPromise(store.getAll() as any)) as any[];
     await txDone(t);
-    db.close();
 
     const dataRows = rows.filter((r) => String(r?.url || '').startsWith('data:'));
     expect(dataRows.length).toBe(1);
@@ -95,6 +105,128 @@ describe('image-inline', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(messages2[0].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
     expect(String(messages2[1].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
+  });
+
+  it('reuses a valid Blob without metadata-only repair or revision bump', async () => {
+    const url = 'https://example.com/metadata-light.png';
+    const db = await openDb();
+    const seedTx = db.transaction(['image_cache'], 'readwrite');
+    const winnerId = await reqToPromise<number>(
+      seedTx.objectStore('image_cache').add({
+        conversationId: 40,
+        url,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        createdAt: 5,
+      }) as any,
+    );
+    await txDone(seedTx);
+
+    const fetchMock = vi.fn();
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+    expect(await readDataRevision('image_cache')).toBe(0);
+
+    const messages = [{ messageKey: 'm1', contentMarkdown: `![](${url})`, role: 'assistant', sequence: 1 }];
+    const result = await inlineChatImagesInMessages({ conversationId: 40, messages });
+
+    expect(result.fromCacheCount).toBe(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(messages[0].contentMarkdown).toBe(`![](syncnos-asset://${winnerId})`);
+    expect(await readDataRevision('image_cache')).toBe(0);
+
+    const verifyTx = db.transaction(['image_cache'], 'readonly');
+    const stored = await reqToPromise<any>(verifyTx.objectStore('image_cache').get(winnerId));
+    await txDone(verifyTx);
+    expect(Object.prototype.hasOwnProperty.call(stored, 'byteSize')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(stored, 'contentType')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(stored, 'updatedAt')).toBe(false);
+  });
+
+  it('bumps image revision when a legacy dataUrl cache row is actually repaired with a Blob', async () => {
+    const conversationId = 42;
+    const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([5, 6, 7])).toString('base64')}`;
+    const db = await openDb();
+    const seedTx = db.transaction(['image_cache'], 'readwrite');
+    const legacyId = await reqToPromise<number>(
+      seedTx.objectStore('image_cache').add({
+        conversationId,
+        url: dataImageUrl,
+        dataUrl: dataImageUrl,
+        byteSize: 0,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await txDone(seedTx);
+    expect(await readDataRevision('image_cache')).toBe(0);
+
+    const messages = [
+      { messageKey: 'legacy-data', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 1 },
+    ];
+    const result = await inlineChatImagesInMessages({ conversationId, messages, enableHttpImages: false });
+
+    expect(result.fromCacheCount).toBe(1);
+    expect(messages[0].contentMarkdown).toBe(`![](syncnos-asset://${legacyId})`);
+    expect(await readDataRevision('image_cache')).toBe(1);
+    const verifyTx = db.transaction(['image_cache'], 'readonly');
+    const repaired = await reqToPromise<any>(verifyTx.objectStore('image_cache').get(legacyId));
+    await txDone(verifyTx);
+    expect(repaired.blob).toBeInstanceOf(Blob);
+    expect(repaired.byteSize).toBe(3);
+  });
+
+  it('returns a transaction-time race winner without overwriting it or bumping revision', async () => {
+    const conversationId = 41;
+    const url = 'https://example.com/race.png';
+    let winnerId = 0;
+    const fetchMock = vi.fn(async () => {
+      const db = await openDb();
+      const seedTx = db.transaction(['image_cache'], 'readwrite');
+      winnerId = Number(
+        await reqToPromise(
+          seedTx.objectStore('image_cache').add({
+            conversationId,
+            url,
+            blob: new Blob([Uint8Array.from([9, 9, 9])], { type: 'image/png' }),
+            byteSize: 3,
+            contentType: 'image/png',
+            createdAt: 10,
+            updatedAt: 11,
+          }),
+        ),
+      );
+      await txDone(seedTx);
+      return new Response(Uint8Array.from([1, 2, 3, 4]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    });
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+
+    const messages = [{ messageKey: 'm-race', contentMarkdown: `![](${url})`, role: 'assistant', sequence: 1 }];
+    const result = await inlineChatImagesInMessages({ conversationId, messages });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(winnerId).toBeGreaterThan(0);
+    expect(messages[0].contentMarkdown).toBe(`![](syncnos-asset://${winnerId})`);
+    expect(result.downloadedCount).toBe(1);
+    expect(await readDataRevision('image_cache')).toBe(0);
+
+    const db = await openDb();
+    const verifyTx = db.transaction(['image_cache'], 'readonly');
+    const rows = await reqToPromise<any[]>(verifyTx.objectStore('image_cache').getAll());
+    await txDone(verifyTx);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: winnerId,
+      byteSize: 3,
+      contentType: 'image/png',
+      createdAt: 10,
+      updatedAt: 11,
+    });
+    expect(await rows[0].blob.arrayBuffer()).toEqual(await new Blob([Uint8Array.from([9, 9, 9])]).arrayBuffer());
   });
 
   it('preserves transient capture policies while converting data images', async () => {

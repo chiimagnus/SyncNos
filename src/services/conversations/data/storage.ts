@@ -29,10 +29,6 @@ export async function findConversationBySourceAndKey(
   return await idb.findConversationBySourceAndKey(source, conversationKey);
 }
 
-export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
-  return await idb.findConversationById(conversationId);
-}
-
 export async function getConversationById(conversationId: number): Promise<Conversation | null> {
   return await idb.getConversationById(conversationId);
 }

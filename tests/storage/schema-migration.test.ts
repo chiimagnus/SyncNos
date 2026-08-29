@@ -1,7 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { openDb } from '../../src/platform/idb/schema';
+import { forceCloseDatabase, IDBKeyRange, IDBVersionChangeEvent, indexedDB } from 'fake-indexeddb';
+import {
+  DATA_REVISION_RECORD_KEY,
+  DATA_REVISION_SCOPES,
+  DATA_REVISION_STORE_BY_SCOPE,
+  normalizeDataRevisionRecord,
+} from '@platform/idb/data-revision-record';
+import { closeDbForTests, DB_VERSION, openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -110,13 +116,117 @@ async function openV8Db() {
   return reqToPromise(req);
 }
 
+async function openV9Db() {
+  const db8 = await openV8Db();
+  db8.close();
+
+  const req = indexedDB.open('webclipper', 9);
+  req.onupgradeneeded = () => {
+    const db = req.result;
+    const cleanup = db.createObjectStore('github_cleanup_outbox', { keyPath: 'id', autoIncrement: true });
+    cleanup.createIndex('by_remoteKey_nextAttemptAt_createdAt', ['remoteKey', 'nextAttemptAt', 'createdAt'], {
+      unique: false,
+    });
+  };
+  return reqToPromise(req);
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
   globalThis.IDBKeyRange = IDBKeyRange;
 
+  closeDbForTests();
   await deleteDb('webclipper');
+});
+
+describe('canonical IndexedDB connection manager', () => {
+  it('reuses one opening promise and cached connection per context', async () => {
+    const firstOpen = openDb();
+    const secondOpen = openDb();
+
+    expect(secondOpen).toBe(firstOpen);
+    const firstDb = await firstOpen;
+    expect(await openDb()).toBe(firstDb);
+  });
+
+  it('clears a failed opening so a later open can retry', async () => {
+    const futureReq = indexedDB.open('webclipper', DB_VERSION + 1);
+    const futureDb = await reqToPromise(futureReq);
+    futureDb.close();
+
+    await expect(openDb()).rejects.toBeTruthy();
+    await deleteDb('webclipper');
+
+    const recovered = await openDb();
+    expect(recovered.version).toBe(DB_VERSION);
+  });
+
+  it('closes and invalidates the cached connection on versionchange', async () => {
+    const firstDb = await openDb();
+    firstDb.dispatchEvent(
+      new IDBVersionChangeEvent('versionchange', { oldVersion: DB_VERSION, newVersion: DB_VERSION + 1 }),
+    );
+
+    const reopened = await openDb();
+    expect(reopened).not.toBe(firstDb);
+    expect(reopened.version).toBe(DB_VERSION);
+  });
+
+  it('invalidates the cached connection after an unexpected close', async () => {
+    const firstDb = await openDb();
+    forceCloseDatabase(firstDb as any);
+
+    const reopened = await openDb();
+    expect(reopened).not.toBe(firstDb);
+    expect(reopened.version).toBe(DB_VERSION);
+  });
+
+  it('reports a blocked upgrade without resolving the open early', async () => {
+    const blocker = await openV8Db();
+    let resolveBlocked!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      resolveBlocked = resolve;
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation((message) => {
+      if (message === '[IndexedDB] open blocked') resolveBlocked();
+    });
+
+    const opening = openDb();
+    await blocked;
+    expect(warn).toHaveBeenCalledWith('[IndexedDB] open blocked', {
+      database: 'webclipper',
+      requestedVersion: DB_VERSION,
+    });
+
+    blocker.close();
+    const db = await opening;
+    expect(db.version).toBe(DB_VERSION);
+    warn.mockRestore();
+  });
+
+  it('does not let a reset-era late open recache or clear a newer opening', async () => {
+    const blocker = await openV8Db();
+    let resolveBlocked!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      resolveBlocked = resolve;
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation((message) => {
+      if (message === '[IndexedDB] open blocked') resolveBlocked();
+    });
+
+    const staleOpen = openDb();
+    await blocked;
+    closeDbForTests();
+    const freshOpen = openDb();
+    blocker.close();
+
+    await expect(staleOpen).rejects.toThrow('indexeddb open superseded');
+    const freshDb = await freshOpen;
+    expect(await openDb()).toBe(freshDb);
+    warn.mockRestore();
+  });
 });
 
 describe('storage schema migration (v2 NotionAI thread id)', () => {
@@ -184,7 +294,6 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
     await txDone(t2);
-    db2.close();
 
     // Only one conversation should remain after merge.
     expect(convs.filter((c) => c.source === 'notionai' && c.conversationKey === stableKey).length).toBe(1);
@@ -273,7 +382,6 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const t2 = db2.transaction(['sync_mappings'], 'readonly');
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(maps).toHaveLength(1);
     expect(maps[0]).toMatchObject({
@@ -333,7 +441,6 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     const migrated = convs.find((c) => Number(c.id) === legacyId);
     expect(migrated).toBeTruthy();
@@ -373,6 +480,19 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
         lastCapturedAt: 20,
       }),
     );
+    await reqToPromise(
+      conversations.add({
+        sourceType: 'chat',
+        source: '',
+        conversationKey: 'legacy-fallback',
+        title: 'legacy fallback',
+        url: 'not-a-http-url',
+        listSourceKey: ' ChatGPT ',
+        listSiteKey: ' Example.COM ',
+        description: 'legacy description',
+        lastCapturedAt: 30,
+      }),
+    );
     await txDone(tx7);
     db7.close();
 
@@ -397,12 +517,16 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
     expect(article.listSourceKey).toBe('web');
     expect(article.listSiteKey).toBe('domain:example.com');
 
-    db8.close();
+    const legacyFallback = rows.find((row) => row.conversationKey === 'legacy-fallback');
+    expect(legacyFallback).toBeTruthy();
+    expect(legacyFallback.listSourceKey).toBe('chatgpt');
+    expect(legacyFallback.listSiteKey).toBe('domain:example.com');
+    expect(Object.prototype.hasOwnProperty.call(legacyFallback, 'description')).toBe(false);
   });
 });
 
-describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
-  it('adds the cleanup store/index to a v8 database without changing existing store data', async () => {
+describe('storage schema migration (v10 data revisions)', () => {
+  it('upgrades v8 to v10, repairs persisted list keys, and preserves existing business data', async () => {
     const db8 = await openV8Db();
     const tx8 = db8.transaction(
       ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
@@ -411,12 +535,12 @@ describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
     await reqToPromise(
       tx8.objectStore('conversations').add({
         sourceType: 'chat',
-        source: 'chatgpt',
+        source: 'ChatGPT',
         conversationKey: 'keep',
         title: 'keep',
         url: 'https://chatgpt.com/c/keep',
-        listSourceKey: 'chatgpt',
-        listSiteKey: 'domain:chatgpt.com',
+        listSourceKey: 'stale-source',
+        listSiteKey: 'stale.example',
         lastCapturedAt: 1,
       }),
     );
@@ -424,7 +548,7 @@ describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
       tx8.objectStore('messages').add({ conversationId: 1, messageKey: 'm1', sequence: 1, contentText: 'keep' }),
     );
     await reqToPromise(
-      tx8.objectStore('sync_mappings').add({ source: 'chatgpt', conversationKey: 'keep', sharedMetadata: 'keep' }),
+      tx8.objectStore('sync_mappings').add({ source: 'ChatGPT', conversationKey: 'keep', sharedMetadata: 'keep' }),
     );
     await reqToPromise(
       tx8.objectStore('image_cache').add({ conversationId: 1, url: 'https://example.com/image.png', byteSize: 1 }),
@@ -441,36 +565,124 @@ describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
     await txDone(tx8);
     db8.close();
 
-    const db9 = await openDb();
-    expect(db9.version).toBe(9);
-    expect(db9.objectStoreNames.contains('github_cleanup_outbox')).toBe(true);
-    const tx9 = db9.transaction(
+    const db10 = await openDb();
+    expect(db10.version).toBe(10);
+    expect(db10.objectStoreNames.contains('github_cleanup_outbox')).toBe(true);
+    for (const scope of DATA_REVISION_SCOPES) {
+      expect(db10.objectStoreNames.contains(DATA_REVISION_STORE_BY_SCOPE[scope])).toBe(true);
+    }
+
+    const tx10 = db10.transaction(
       ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', 'github_cleanup_outbox'],
       'readonly',
     );
-    const cleanup = tx9.objectStore('github_cleanup_outbox');
+    const conversations = await reqToPromise<any[]>(tx10.objectStore('conversations').getAll());
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0]).toMatchObject({
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'domain:chatgpt.com',
+    });
+    expect(await reqToPromise(tx10.objectStore('messages').count())).toBe(1);
+    expect(await reqToPromise(tx10.objectStore('sync_mappings').count())).toBe(1);
+    expect(tx10.objectStore('sync_mappings').index('by_source_conversationKey').unique).toBe(true);
+    expect(await reqToPromise(tx10.objectStore('image_cache').count())).toBe(1);
+    expect(await reqToPromise(tx10.objectStore('article_comments').count())).toBe(1);
+    const cleanup = tx10.objectStore('github_cleanup_outbox');
     expect(cleanup.indexNames.contains('by_remoteKey_nextAttemptAt_createdAt')).toBe(true);
-    expect(await reqToPromise(tx9.objectStore('conversations').count())).toBe(1);
-    expect(await reqToPromise(tx9.objectStore('messages').count())).toBe(1);
-    expect(await reqToPromise(tx9.objectStore('sync_mappings').count())).toBe(1);
-    expect(await reqToPromise(tx9.objectStore('image_cache').count())).toBe(1);
-    expect(await reqToPromise(tx9.objectStore('article_comments').count())).toBe(1);
     expect(await reqToPromise(cleanup.count())).toBe(0);
-    await txDone(tx9);
-    db9.close();
+    await txDone(tx10);
   });
 
-  it('creates the cleanup store/index in a fresh database', async () => {
+  it('upgrades v9 to v10 without losing cleanup or business rows and repairs missing persisted keys', async () => {
+    const db9 = await openV9Db();
+    const tx9 = db9.transaction(
+      ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', 'github_cleanup_outbox'],
+      'readwrite',
+    );
+    await reqToPromise(
+      tx9.objectStore('conversations').add({
+        sourceType: 'article',
+        source: 'WEB',
+        conversationKey: 'article:https://example.com/v9',
+        title: 'v9',
+        url: 'https://example.com/v9#fragment',
+        lastCapturedAt: 2,
+      }),
+    );
+    await reqToPromise(
+      tx9.objectStore('messages').add({ conversationId: 1, messageKey: 'm1', sequence: 1, contentText: 'keep-v9' }),
+    );
+    await reqToPromise(
+      tx9.objectStore('sync_mappings').add({ source: 'WEB', conversationKey: 'article:https://example.com/v9' }),
+    );
+    await reqToPromise(
+      tx9.objectStore('image_cache').add({ conversationId: 1, url: 'https://example.com/v9.png', byteSize: 1 }),
+    );
+    await reqToPromise(
+      tx9.objectStore('article_comments').add({
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/v9',
+        createdAt: 2,
+        updatedAt: 2,
+        commentText: 'keep-v9',
+      }),
+    );
+    await reqToPromise(
+      tx9.objectStore('github_cleanup_outbox').add({
+        remoteKey: 'github.com/owner/repo@main',
+        paths: ['WebArticles/old.md'],
+        reason: 'delete',
+        createdAt: 2,
+        nextAttemptAt: 2,
+      }),
+    );
+    await txDone(tx9);
+    db9.close();
+
+    const db10 = await openDb();
+    expect(db10.version).toBe(10);
+    const tx10 = db10.transaction(
+      ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', 'github_cleanup_outbox'],
+      'readonly',
+    );
+    const conversations = await reqToPromise<any[]>(tx10.objectStore('conversations').getAll());
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0]).toMatchObject({
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
+    });
+    expect(await reqToPromise(tx10.objectStore('messages').count())).toBe(1);
+    expect(await reqToPromise(tx10.objectStore('sync_mappings').count())).toBe(1);
+    expect(await reqToPromise(tx10.objectStore('image_cache').count())).toBe(1);
+    expect(await reqToPromise(tx10.objectStore('article_comments').count())).toBe(1);
+    expect(await reqToPromise(tx10.objectStore('github_cleanup_outbox').count())).toBe(1);
+    await txDone(tx10);
+  });
+
+  it('creates five out-of-line revision stores and uses the fixed current key protocol', async () => {
     const db = await openDb();
-    expect(db.version).toBe(9);
-    expect(db.objectStoreNames.contains('github_cleanup_outbox')).toBe(true);
-    const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
-    const store = tx.objectStore('github_cleanup_outbox');
-    expect(store.indexNames.contains('by_remoteKey_nextAttemptAt_createdAt')).toBe(true);
-    expect(store.keyPath).toBe('id');
-    expect(store.autoIncrement).toBe(true);
-    await txDone(tx);
-    db.close();
+    expect(db.version).toBe(10);
+
+    for (const scope of DATA_REVISION_SCOPES) {
+      const storeName = DATA_REVISION_STORE_BY_SCOPE[scope];
+      const tx = db.transaction([storeName], 'readonly');
+      const store = tx.objectStore(storeName);
+      expect(store.keyPath).toBeNull();
+      const missing = await reqToPromise(store.get(DATA_REVISION_RECORD_KEY));
+      expect(normalizeDataRevisionRecord(missing)).toEqual({ revision: 0, updatedAt: 0 });
+      await txDone(tx);
+    }
+
+    const storeName = DATA_REVISION_STORE_BY_SCOPE.conversations;
+    const writeTx = db.transaction([storeName], 'readwrite');
+    await reqToPromise(writeTx.objectStore(storeName).put({ revision: 3, updatedAt: 4 }, DATA_REVISION_RECORD_KEY));
+    await txDone(writeTx);
+
+    const readTx = db.transaction([storeName], 'readonly');
+    const stored = await reqToPromise(readTx.objectStore(storeName).get(DATA_REVISION_RECORD_KEY));
+    await txDone(readTx);
+    expect(normalizeDataRevisionRecord(stored)).toEqual({ revision: 3, updatedAt: 4 });
+    expect(normalizeDataRevisionRecord({ revision: -1, updatedAt: Number.NaN })).toEqual({ revision: 0, updatedAt: 0 });
   });
 });
 
@@ -499,7 +711,6 @@ describe('storage schema migration (v6 strip article description)', () => {
     const t2 = db2.transaction(['conversations'], 'readonly');
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(convs.length).toBe(1);
     expect(Object.prototype.hasOwnProperty.call(convs[0], 'description')).toBe(false);
@@ -563,7 +774,6 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(convs).toHaveLength(1);
     expect(convs[0]).toMatchObject({
@@ -679,7 +889,6 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(convs).toHaveLength(1);
     expect(convs[0]).toMatchObject({

@@ -5,8 +5,8 @@ import { registerConversationHandlers } from '@services/conversations/background
 
 const storageMocks = vi.hoisted(() => ({
   deleteConversationsByIds: vi.fn(),
-  findConversationById: vi.fn(),
   findConversationBySourceAndKey: vi.fn(),
+  getConversationById: vi.fn(),
   getConversationListBootstrap: vi.fn(),
   getConversationListPage: vi.fn(),
   getConversationDetail: vi.fn(),
@@ -22,8 +22,8 @@ const writeMocks = vi.hoisted(() => ({
 
 vi.mock('@services/conversations/data/storage', () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
-  findConversationById: storageMocks.findConversationById,
   findConversationBySourceAndKey: storageMocks.findConversationBySourceAndKey,
+  getConversationById: storageMocks.getConversationById,
   getConversationListBootstrap: storageMocks.getConversationListBootstrap,
   getConversationListPage: storageMocks.getConversationListPage,
   getConversationDetail: storageMocks.getConversationDetail,
@@ -55,8 +55,8 @@ function createRouter() {
 afterEach(() => {
   vi.restoreAllMocks();
   storageMocks.deleteConversationsByIds.mockReset();
-  storageMocks.findConversationById.mockReset();
   storageMocks.findConversationBySourceAndKey.mockReset();
+  storageMocks.getConversationById.mockReset();
   storageMocks.getConversationListBootstrap.mockReset();
   storageMocks.getConversationListPage.mockReset();
   storageMocks.getConversationDetail.mockReset();
@@ -126,12 +126,17 @@ describe('conversations pagination handlers', () => {
     expect((noKey.error?.extra as any)?.field).toBe('conversationKey');
   });
 
-  it('returns open target on by-id lookup', async () => {
-    storageMocks.findConversationById.mockResolvedValue({
+  it('returns canonical metadata on by-id lookup', async () => {
+    storageMocks.getConversationById.mockResolvedValue({
       id: 99,
       source: 'chatgpt',
       conversationKey: 'k-99',
       lastCapturedAt: 123,
+      author: 'Author',
+      publishedAt: '2026-08-29',
+      warningFlags: ['partial'],
+      notionPageId: 'notion-99',
+      feishuDocId: 'feishu-99',
     });
     const router = createRouter();
 
@@ -141,8 +146,16 @@ describe('conversations pagination handlers', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(storageMocks.findConversationById).toHaveBeenCalledWith(99);
-    expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99' });
+    expect(storageMocks.getConversationById).toHaveBeenCalledWith(99);
+    expect(res.data).toMatchObject({
+      id: 99,
+      conversationKey: 'k-99',
+      author: 'Author',
+      publishedAt: '2026-08-29',
+      warningFlags: ['partial'],
+      notionPageId: 'notion-99',
+      feishuDocId: 'feishu-99',
+    });
   });
 
   it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {

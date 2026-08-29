@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
 
 import {
-  __closeDbForTests,
   addArticleComment,
   attachOrphanCommentsToConversation,
   deleteArticleCommentById,
@@ -43,7 +44,7 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
+  closeDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -52,8 +53,8 @@ beforeEach(async () => {
   await deleteDb('webclipper');
 });
 
-afterEach(async () => {
-  await __closeDbForTests();
+afterEach(() => {
+  closeDbForTests();
 });
 
 describe('article comments storage-idb', () => {
@@ -89,8 +90,10 @@ describe('article comments storage-idb', () => {
     expect(after.map((c) => c.id)).toEqual([c2.id]);
   });
 
-  it('returns false when deleting a missing comment id', async () => {
+  it('returns false without revision churn when deleting a missing comment id', async () => {
+    const before = await readDataRevision('article_comments');
     expect(await deleteArticleCommentById(999_999)).toBe(false);
+    expect(await readDataRevision('article_comments')).toBe(before);
   });
 
   it('round-trips author metadata and V1/V2 locators without field loss', async () => {
@@ -120,6 +123,7 @@ describe('article comments storage-idb', () => {
   });
 
   it('rejects missing, nested, and cross-context reply parents', async () => {
+    const beforeMissingParent = await readDataRevision('article_comments');
     await expect(
       addArticleComment({
         parentId: 999,
@@ -128,6 +132,7 @@ describe('article comments storage-idb', () => {
         commentText: 'missing',
       }),
     ).rejects.toThrow('parent_not_found');
+    expect(await readDataRevision('article_comments')).toBe(beforeMissingParent);
     const root = await addArticleComment({
       conversationId: 1,
       canonicalUrl: 'https://example.com/a',
@@ -189,7 +194,9 @@ describe('article comments storage-idb', () => {
     expect(byId.get(root.id)?.parentId).toBe(null);
     expect(byId.get(reply1.id)?.parentId).toBe(root.id);
 
+    const beforeDeleteRevision = await readDataRevision('article_comments');
     await deleteArticleCommentById(root.id);
+    expect(await readDataRevision('article_comments')).toBe(beforeDeleteRevision + 1);
     const after = await listArticleCommentsByCanonicalUrl(url);
     expect(after.length).toBe(0);
   });
@@ -246,8 +253,12 @@ describe('article comments storage-idb', () => {
     });
     const already = await addArticleComment({ conversationId: 9, canonicalUrl: url, commentText: 'c', createdAt: 3 });
 
+    const beforeAttachRevision = await readDataRevision('article_comments');
     const res = await attachOrphanCommentsToConversation(url, 42);
     expect(res.updated).toBe(2);
+    expect(await readDataRevision('article_comments')).toBe(beforeAttachRevision + 1);
+    expect(await attachOrphanCommentsToConversation(url, 42)).toEqual({ updated: 0 });
+    expect(await readDataRevision('article_comments')).toBe(beforeAttachRevision + 1);
 
     const list = await listArticleCommentsByCanonicalUrl(url);
     const byId = new Map(list.map((c) => [c.id, c]));
@@ -276,12 +287,22 @@ describe('article comments storage-idb', () => {
       createdAt: 4,
     });
 
+    const beforeMigrateRevision = await readDataRevision('article_comments');
     const res = await migrateArticleCommentsCanonicalUrl({
       fromCanonicalUrl: fromUrl,
       toCanonicalUrl: toUrl,
       conversationId: 1,
     });
     expect(res.updated).toBe(2);
+    expect(await readDataRevision('article_comments')).toBe(beforeMigrateRevision + 1);
+    expect(
+      await migrateArticleCommentsCanonicalUrl({
+        fromCanonicalUrl: fromUrl,
+        toCanonicalUrl: toUrl,
+        conversationId: 1,
+      }),
+    ).toEqual({ updated: 0 });
+    expect(await readDataRevision('article_comments')).toBe(beforeMigrateRevision + 1);
 
     const afterTo = await listArticleCommentsByCanonicalUrl(toUrl);
     expect(afterTo.map((c) => c.id)).toEqual([c1.id, c2.id, existing.id]);

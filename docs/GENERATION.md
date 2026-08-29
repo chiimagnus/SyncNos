@@ -18,7 +18,7 @@ The commit above is the code baseline at the start of this documentation reconci
 - `AGENTS.md` and `src/ui/AGENTS.md`: repository and UI-specific implementation constraints for agents and contributors.
 - `PRIVACY.md`: privacy boundaries and external-service disclosure.
 - `docs/CONTRIBUTING.md`: development workflow and validation requirements.
-- `docs/storage.md`: local-source-of-truth, backup, secret-exclusion, and recovery contracts.
+- `docs/storage.md`: local-source-of-truth, IndexedDB consistency/reload-free recovery, backup, secret-exclusion, and recovery contracts.
 - `docs/troubleshooting.md`: durable troubleshooting guidance.
 - `docs/guide/feishu/DocxSync.en.md` and `docs/guide/feishu/DocxSync.zh.md`: Feishu DocX setup.
 - `docs/guide/github/GitHubSync.en.md` and `docs/guide/github/GitHubSync.zh.md`: GitHub Markdown sync setup.
@@ -32,7 +32,7 @@ The commit above is the code baseline at the start of this documentation reconci
 - Runtime structure, symbols, callers, and module relationships belong to CodeGraph and source code rather than duplicated module-index Markdown.
 - GitHub runtime behavior is owned by `src/services/sync/github/**`; the guide describes user-visible behavior without copying implementation constants already enforced by code.
 - `PRIVACY.md` owns external GitHub network/auth disclosure and the distinction between local Disconnect, GitHub authorization revoke, and GitHub App installation controls.
-- `docs/storage.md` owns GitHub local-secret, backup-exclusion, sync-mapping, and cleanup-outbox recovery boundaries; setup instructions remain in the GitHub guide.
+- `docs/storage.md` owns durable local-data consistency/retry semantics, backup recovery, GitHub local-secret/backup-exclusion, sync-mapping, and cleanup-outbox recovery boundaries; implementation topology stays in source/CodeGraph and provider setup remains in the provider guides.
 - `docs/overview.md` is intentionally retired. README is the top-level navigation surface; do not recreate `docs/overview.md` or a duplicate `docs/configuration.md`.
 - `.github/features/**` and `.github/archived_features/**` are execution/history material, not canonical long-term architecture documentation.
 

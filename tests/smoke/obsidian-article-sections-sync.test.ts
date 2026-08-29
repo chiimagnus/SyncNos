@@ -5,6 +5,7 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   getMessagesByConversationId: vi.fn(),
   getArticleCommentsByConversationId: vi.fn(),
   attachOrphanArticleCommentsToConversation: vi.fn(),
+  recordObsidianRemoteWrite: vi.fn(),
 }));
 
 vi.mock('@services/conversations/background/storage', () => ({
@@ -13,6 +14,7 @@ vi.mock('@services/conversations/background/storage', () => ({
     getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
     getArticleCommentsByConversationId: backgroundStorageMocks.getArticleCommentsByConversationId,
     attachOrphanArticleCommentsToConversation: backgroundStorageMocks.attachOrphanArticleCommentsToConversation,
+    recordObsidianRemoteWrite: backgroundStorageMocks.recordObsidianRemoteWrite,
   },
 }));
 
@@ -214,6 +216,7 @@ afterEach(() => {
   backgroundStorageMocks.getMessagesByConversationId.mockReset();
   backgroundStorageMocks.getArticleCommentsByConversationId.mockReset();
   backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockReset();
+  backgroundStorageMocks.recordObsidianRemoteWrite.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup

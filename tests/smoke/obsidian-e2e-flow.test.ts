@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backgroundStorageMocks = vi.hoisted(() => ({
   getConversationById: vi.fn(),
   getMessagesByConversationId: vi.fn(),
+  recordObsidianRemoteWrite: vi.fn(),
 }));
 
 vi.mock('@services/conversations/background/storage', () => ({
   backgroundStorage: {
     getConversationById: backgroundStorageMocks.getConversationById,
     getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
+    recordObsidianRemoteWrite: backgroundStorageMocks.recordObsidianRemoteWrite,
   },
 }));
 
@@ -39,6 +41,10 @@ function setupChromeStorage() {
   };
   return store;
 }
+
+beforeEach(() => {
+  backgroundStorageMocks.recordObsidianRemoteWrite.mockResolvedValue({ generation: 1 });
+});
 
 describe('obsidian local rest api sync e2e flow (mock)', () => {
   it('rebuilds notes on every sync, and handles auth failure', async () => {
@@ -126,18 +132,33 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
     const r3 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(r3.okCount).toBe(1);
     expect(r3.results[0].mode).toBe('full_rebuild');
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(3);
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenNthCalledWith(1, {
+      source: 'chatgpt',
+      conversationKey: 'k1',
+    });
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenNthCalledWith(2, {
+      source: 'chatgpt',
+      conversationKey: 'k1',
+    });
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenNthCalledWith(3, {
+      source: 'chatgpt',
+      conversationKey: 'k1',
+    });
 
     // 4) Auth fails -> failure result
     authFail = true;
     const r4 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(r4.failCount).toBe(1);
     expect(r4.results[0].mode).toBe('failed');
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(3);
   });
 });
 
 afterEach(() => {
   backgroundStorageMocks.getConversationById.mockReset();
   backgroundStorageMocks.getMessagesByConversationId.mockReset();
+  backgroundStorageMocks.recordObsidianRemoteWrite.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup

@@ -46,6 +46,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     syncingNotion: false,
     syncingObsidian: false,
+    enabledSyncProviders: ['obsidian', 'notion'],
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
@@ -59,15 +60,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     clearSyncFeedback: vi.fn(),
     deleteSelected,
   }),
-}));
-
-vi.mock('../../src/services/sync/sync-provider-gate', () => ({
-  getEnabledSyncProviders: () => Promise.resolve(['obsidian', 'notion']),
-  syncProviderEnabledStorageKey: (provider: string) => `sync_provider_enabled.${provider}`,
-}));
-
-vi.mock('../../src/services/shared/storage', () => ({
-  storageOnChanged: () => () => {},
 }));
 
 function setupDom() {

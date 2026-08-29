@@ -1,24 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from '@ui/shared/markdown-core';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
-import { collectOrderedSyncnosAssetIds } from '@services/sync/shared/markdown-asset-refs';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
 
 type BubbleRole = 'user' | 'assistant';
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('FileReader failed'));
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.readAsDataURL(blob);
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
 
 function normalizeRole(role: unknown): BubbleRole {
   const r = String(role || '')
@@ -37,7 +22,7 @@ export type ChatMessageBubbleProps = {
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
   markdown: string;
-  conversationId?: number;
+  syncnosAssetSrcById?: ReadonlyMap<number, string>;
   readingProfile?: unknown;
   className?: string;
 };
@@ -74,7 +59,7 @@ export function ChatMessageBubble({
   headerLeft,
   headerRight,
   markdown,
-  conversationId,
+  syncnosAssetSrcById,
   readingProfile,
   className,
 }: ChatMessageBubbleProps) {
@@ -85,7 +70,6 @@ export function ChatMessageBubble({
     () => sharedMathMd,
   );
 
-  const [assetSrcById, setAssetSrcById] = useState<Map<number, string>>(() => new Map());
   const containsMath = useMemo(() => markdownLikelyContainsMath(markdown), [markdown]);
 
   useEffect(() => {
@@ -106,56 +90,11 @@ export function ChatMessageBubble({
     };
   }, [containsMath]);
 
-  useEffect(() => {
-    const ids = collectOrderedSyncnosAssetIds(String(markdown || ''));
-    if (!ids.length) {
-      setAssetSrcById(new Map());
-      return;
-    }
-
-    let disposed = false;
-    const objectUrls: string[] = [];
-
-    async function resolveAssets() {
-      const next = new Map<number, string>();
-      try {
-        for (const id of ids) {
-          const asset = await getImageCacheAssetById({ id, conversationId });
-          if (!asset || disposed) continue;
-          let url: string | null = null;
-          try {
-            url = URL.createObjectURL(asset.blob);
-            objectUrls.push(url);
-          } catch (_e) {
-            url = null;
-          }
-          if (!url) {
-            const dataUrl = await blobToDataUrl(asset.blob);
-            if (disposed) continue;
-            url = dataUrl;
-          }
-          if (url) next.set(id, url);
-        }
-      } catch (error) {
-        console.warn('[ImageAssetRender] failed to resolve local asset urls', {
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
-      }
-      if (!disposed) setAssetSrcById(next);
-    }
-
-    void resolveAssets();
-    return () => {
-      disposed = true;
-      for (const objectUrl of objectUrls) URL.revokeObjectURL(objectUrl);
-    };
-  }, [markdown, conversationId]);
-
   const html = useMemo(() => {
     const activeMathRenderer = mathRenderer || sharedMathMd;
     const renderer = containsMath && activeMathRenderer ? activeMathRenderer : sharedMd;
-    return renderer.render(String(markdown || ''), { syncnosAssetSrcById: assetSrcById } as any);
-  }, [markdown, assetSrcById, containsMath, mathRenderer]);
+    return renderer.render(String(markdown || ''), { syncnosAssetSrcById } as any);
+  }, [markdown, syncnosAssetSrcById, containsMath, mathRenderer]);
   const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
   // NOTE: asset URLs are resolved before render via markdown-it env;

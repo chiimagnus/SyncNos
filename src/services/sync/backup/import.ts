@@ -1,6 +1,8 @@
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
 import {
+  areBackupValuesEqual,
   filterStorageForBackup,
   validateImageCacheIndexDocument,
   mergeConversationRecord,
@@ -11,7 +13,9 @@ import {
   validateConversationBundle,
   validateStorageLocalDocument,
 } from '@services/sync/backup/backup-utils';
-import { openDb, reqToPromise, tx, txDone } from '@services/sync/backup/idb';
+import { openDb } from '@platform/idb/schema';
+import { reqToPromise } from '@services/sync/backup/idb';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
@@ -136,41 +140,6 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
-function deriveConversationListSourceKey(record: AnyRecord): string {
-  const source = safeString(record?.source).toLowerCase();
-  return source || 'unknown';
-}
-
-function deriveConversationListSiteKey(record: AnyRecord): string {
-  const normalizedUrl = normalizeHttpUrl(record?.url);
-  if (!normalizedUrl) return 'unknown';
-  try {
-    const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
-    return host ? `domain:${host}` : 'unknown';
-  } catch (_e) {
-    return 'unknown';
-  }
-}
-
-function normalizeListDerivedKeys(record: AnyRecord): AnyRecord {
-  if (!record || typeof record !== 'object') return record;
-  const existingListSourceKey = safeString(record?.listSourceKey);
-  const existingListSiteKey = safeString(record?.listSiteKey);
-
-  const derivedSourceKey = deriveConversationListSourceKey(record);
-  const nextListSourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : existingListSourceKey || 'unknown';
-
-  const derivedSiteKey = deriveConversationListSiteKey(record);
-  const nextListSiteKey = derivedSiteKey !== 'unknown' ? derivedSiteKey : existingListSiteKey || 'unknown';
-
-  if (existingListSourceKey === nextListSourceKey && existingListSiteKey === nextListSiteKey) return record;
-  return {
-    ...(record as any),
-    listSourceKey: nextListSourceKey,
-    listSiteKey: nextListSiteKey,
-  };
-}
-
 const CONVERSATION_MAPPING_MIRROR_FIELDS = [
   'notionPageId',
   'notionPageUrl',
@@ -178,24 +147,22 @@ const CONVERSATION_MAPPING_MIRROR_FIELDS = [
   'feishuDocId',
 ] as const;
 
-async function upsertImportedSyncMappings(input: {
-  db: IDBDatabase;
+async function applyImportedSyncMappings(input: {
+  stores: { sync_mappings: IDBObjectStore; conversations: IDBObjectStore };
   mappings: AnyRecord[];
   stats: ImportStats;
-  stage: string;
-  bump: (delta: number, stage: string) => void;
-}): Promise<void> {
-  const { t, stores } = tx(input.db, ['sync_mappings', 'conversations'], 'readwrite');
-  const mappingIndex = stores.sync_mappings.index('by_source_conversationKey');
-  const conversationIndex = stores.conversations.index('by_source_conversationKey');
+}): Promise<{ processed: number; syncMappingsChanged: boolean; conversationRowsChanged: boolean }> {
+  const mappingIndex = input.stores.sync_mappings.index('by_source_conversationKey');
+  const conversationIndex = input.stores.conversations.index('by_source_conversationKey');
+  let processed = 0;
+  let syncMappingsChanged = false;
+  let conversationRowsChanged = false;
 
   for (const incoming of input.mappings) {
+    processed += 1;
     const source = safeString(incoming?.source);
     const conversationKey = safeString(incoming?.conversationKey);
-    if (!source || !conversationKey) {
-      input.bump(1, input.stage);
-      continue;
-    }
+    if (!source || !conversationKey) continue;
 
     const existing = (await reqToPromise(mappingIndex.get([source, conversationKey]) as any)) as AnyRecord;
     const merged = mergeSyncMappingForImport(existing, incoming) as AnyRecord;
@@ -204,12 +171,16 @@ async function upsertImportedSyncMappings(input: {
 
     if (existing?.id) {
       merged.id = existing.id;
-      await reqToPromise(stores.sync_mappings.put(merged as any));
-      input.stats.mappingsUpdated += 1;
+      if (!areBackupValuesEqual(merged, existing)) {
+        await reqToPromise(input.stores.sync_mappings.put(merged as any));
+        input.stats.mappingsUpdated += 1;
+        syncMappingsChanged = true;
+      }
     } else {
       delete merged.id;
-      await reqToPromise(stores.sync_mappings.add(merged as any));
+      await reqToPromise(input.stores.sync_mappings.add(merged as any));
       input.stats.mappingsAdded += 1;
+      syncMappingsChanged = true;
     }
 
     const conversation = (await reqToPromise(conversationIndex.get([source, conversationKey]) as any)) as AnyRecord;
@@ -221,13 +192,14 @@ async function upsertImportedSyncMappings(input: {
         conversation[field] = value;
         changed = true;
       }
-      if (changed) await reqToPromise(stores.conversations.put(conversation));
+      if (changed) {
+        await reqToPromise(input.stores.conversations.put(conversation));
+        conversationRowsChanged = true;
+      }
     }
-
-    input.bump(1, input.stage);
   }
 
-  await txDone(t);
+  return { processed, syncMappingsChanged, conversationRowsChanged };
 }
 
 export async function importBackupLegacyJsonMerge(
@@ -272,105 +244,125 @@ export async function importBackupLegacyJsonMerge(
 
   // 1) Upsert conversations by (source, conversationKey).
   {
-    const { t, stores: s } = tx(db, ['conversations'], 'readwrite');
-    const idx = s.conversations.index('by_source_conversationKey');
-
     progress.stage = 'conversations';
     report();
-    for (let i = 0; i < backupConversations.length; i += 1) {
-      const incoming = backupConversations[i];
-      if (!incoming) {
-        bump(1, 'conversations');
-        continue;
-      }
-      const source = incoming.source ? String(incoming.source) : '';
-      const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
-      if (!source || !conversationKey) {
-        bump(1, 'conversations');
-        continue;
-      }
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.conversations.index('by_source_conversationKey');
+        let stageChanged = false;
 
-      const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = normalizeListDerivedKeys(mergeConversationRecord(existing, incoming));
+        for (const incoming of backupConversations) {
+          if (!incoming) continue;
+          const source = incoming.source ? String(incoming.source) : '';
+          const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
+          if (!source || !conversationKey) continue;
 
-      if (existing && existing.id) {
-        merged.id = existing.id;
+          const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
+          const merged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+          merged.source = source;
+          merged.conversationKey = conversationKey;
+          const uk = uniqueConversationKey(merged);
 
-        await reqToPromise(s.conversations.put(merged as any));
-        stats.conversationsUpdated += 1;
-        uniqueToLocalId.set(`${source}||${conversationKey}`, Number(existing.id));
-      } else {
-        const id = await reqToPromise(s.conversations.add(merged as any) as any);
-        stats.conversationsAdded += 1;
-        uniqueToLocalId.set(`${source}||${conversationKey}`, Number(id));
-      }
+          if (existing?.id) {
+            const localId = Number(existing.id);
+            merged.id = localId;
+            uniqueToLocalId.set(uk, localId);
+            if (areBackupValuesEqual(merged, existing)) continue;
 
-      bump(1, 'conversations');
-    }
+            await reqToPromise(s.conversations.put(merged as any));
+            stats.conversationsUpdated += 1;
+            stageChanged = true;
+            continue;
+          }
 
-    await txDone(t);
+          const id = Number(await reqToPromise(s.conversations.add(merged as any) as any));
+          uniqueToLocalId.set(uk, id);
+          stats.conversationsAdded += 1;
+          stageChanged = true;
+        }
+
+        if (stageChanged) markChanged('conversations');
+      },
+    );
+    bump(backupConversations.length, 'conversations');
   }
 
   // 2) Upsert messages by (localConversationId, messageKey).
   {
-    const { t, stores: s } = tx(db, ['messages'], 'readwrite');
-    const idx = s.messages.index('by_conversationId_messageKey');
-
     progress.stage = 'messages';
     report();
-    for (let i = 0; i < backupMessages.length; i += 1) {
-      const incoming = backupMessages[i];
-      if (!incoming) {
-        bump(1, 'messages');
-        continue;
-      }
-      const backupConversationId = Number(incoming.conversationId);
-      const messageKey = incoming.messageKey ? String(incoming.messageKey) : '';
-      if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
-        stats.messagesSkipped += 1;
-        bump(1, 'messages');
-        continue;
-      }
-      const uk = backupConvoIdToUnique.get(backupConversationId) || '';
-      const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
-      if (!localConversationId) {
-        stats.messagesSkipped += 1;
-        bump(1, 'messages');
-        continue;
-      }
+    const stageNow = Date.now();
+    await runTrackedTransaction(
+      { db, stores: ['messages'], revisionScopes: ['messages'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.messages.index('by_conversationId_messageKey');
 
-      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
-      const base = { ...(incoming || {}), conversationId: localConversationId, messageKey };
-      const merged = mergeMessageRecord(existing, base);
-      merged.conversationId = localConversationId;
-      merged.messageKey = messageKey;
+        for (const incoming of backupMessages) {
+          if (!incoming) continue;
+          const backupConversationId = Number(incoming.conversationId);
+          const messageKey = incoming.messageKey ? String(incoming.messageKey) : '';
+          if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
+            stats.messagesSkipped += 1;
+            continue;
+          }
+          const uk = backupConvoIdToUnique.get(backupConversationId) || '';
+          const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
+          if (!localConversationId) {
+            stats.messagesSkipped += 1;
+            continue;
+          }
 
-      if (existing && existing.id) {
-        merged.id = existing.id;
+          const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
+          const base = {
+            ...(incoming || {}),
+            conversationId: localConversationId,
+            messageKey,
+            ...(existing?.id ? { id: existing.id } : {}),
+          };
+          const merged = mergeMessageRecord(existing, base);
+          merged.conversationId = localConversationId;
+          merged.messageKey = messageKey;
 
-        await reqToPromise(s.messages.put(merged as any));
-        stats.messagesUpdated += 1;
-      } else {
-        await reqToPromise(s.messages.add(merged as any));
-        stats.messagesAdded += 1;
-      }
+          if (existing?.id) {
+            merged.id = existing.id;
+            if (areBackupValuesEqual(merged, existing)) continue;
+            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
+              merged.updatedAt = stageNow;
 
-      if (i % 25 === 0) report();
-      bump(1, 'messages');
-    }
+            await reqToPromise(s.messages.put(merged as any));
+            stats.messagesUpdated += 1;
+            markChanged('messages');
+            continue;
+          }
 
-    await txDone(t);
+          delete merged.id;
+          if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+          await reqToPromise(s.messages.add(merged as any));
+          stats.messagesAdded += 1;
+          markChanged('messages');
+        }
+      },
+    );
+    bump(backupMessages.length, 'messages');
   }
 
   progress.stage = 'mappings';
   report();
-  await upsertImportedSyncMappings({
-    db,
-    mappings: backupMappings,
-    stats,
-    stage: 'mappings',
-    bump,
-  });
+  const mappingResult = await runTrackedTransaction(
+    { db, stores: ['sync_mappings', 'conversations'], revisionScopes: ['sync_mappings', 'conversations'] },
+    async ({ stores: s, markChanged }) => {
+      const result = await applyImportedSyncMappings({
+        stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
+        mappings: backupMappings,
+        stats,
+      });
+      if (result.syncMappingsChanged) markChanged('sync_mappings');
+      if (result.conversationRowsChanged) markChanged('conversations');
+      return result;
+    },
+  );
+  bump(mappingResult.processed, 'mappings');
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'settings';
@@ -529,10 +521,20 @@ export async function importBackupZipV2Merge(
       articleCommentItems.length,
     stage: '',
   };
-  const report = () => onProgress?.({ ...progress });
+  const report = () => {
+    try {
+      void Promise.resolve(onProgress?.({ ...progress })).catch(() => undefined);
+    } catch (_error) {
+      // Progress reporting is best-effort and must never roll back an already committed import stage.
+    }
+  };
   const bump = (delta: number, stage?: string) => {
     progress.done += delta;
     if (stage) progress.stage = stage;
+  };
+  const reportCommittedStage = (delta: number, stage: string) => {
+    bump(delta, stage);
+    report();
   };
 
   const db = await openDb();
@@ -540,44 +542,48 @@ export async function importBackupZipV2Merge(
 
   // 1) Upsert conversations by (source, conversationKey).
   {
-    const { t, stores: s } = tx(db, ['conversations'], 'readwrite');
-    const idx = s.conversations.index('by_source_conversationKey');
-
     progress.stage = 'Conversations';
     report();
-    for (let i = 0; i < incomingConversations.length; i += 1) {
-      const incoming = incomingConversations[i];
-      const source = incoming && incoming.source ? String(incoming.source) : '';
-      const conversationKey = incoming && incoming.conversationKey ? String(incoming.conversationKey) : '';
-      if (!source || !conversationKey) {
-        bump(1, 'Conversations');
-        continue;
-      }
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.conversations.index('by_source_conversationKey');
+        let stageChanged = false;
 
-      const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = mergeConversationRecord(existing, incoming);
-      merged.source = source;
-      merged.conversationKey = conversationKey;
-      const normalizedMerged = normalizeListDerivedKeys(merged);
+        for (const incoming of incomingConversations) {
+          const source = incoming?.source ? String(incoming.source) : '';
+          const conversationKey = incoming?.conversationKey ? String(incoming.conversationKey) : '';
+          if (!source || !conversationKey) continue;
 
-      const uk = uniqueConversationKey(normalizedMerged);
-      if (existing && existing.id) {
-        normalizedMerged.id = existing.id;
+          const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
+          const normalizedMerged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+          normalizedMerged.source = source;
+          normalizedMerged.conversationKey = conversationKey;
+          const uk = uniqueConversationKey(normalizedMerged);
 
-        await reqToPromise(s.conversations.put(normalizedMerged as any));
-        uniqueToLocalId.set(uk, Number(existing.id));
-        stats.conversationsUpdated += 1;
-      } else {
-        const id = await reqToPromise(s.conversations.add(normalizedMerged as any) as any);
-        uniqueToLocalId.set(uk, Number(id));
-        stats.conversationsAdded += 1;
-      }
+          if (existing?.id) {
+            const localId = Number(existing.id);
+            normalizedMerged.id = localId;
+            uniqueToLocalId.set(uk, localId);
+            if (areBackupValuesEqual(normalizedMerged, existing)) continue;
 
-      if (i % 20 === 0) report();
-      bump(1, 'Conversations');
-    }
+            await reqToPromise(s.conversations.put(normalizedMerged as any));
+            stats.conversationsUpdated += 1;
+            stageChanged = true;
+            continue;
+          }
 
-    await txDone(t);
+          delete normalizedMerged.id;
+          const localId = Number(await reqToPromise(s.conversations.add(normalizedMerged as any) as any));
+          uniqueToLocalId.set(uk, localId);
+          stats.conversationsAdded += 1;
+          stageChanged = true;
+        }
+
+        if (stageChanged) markChanged('conversations');
+      },
+    );
+    reportCommittedStage(incomingConversations.length, 'Conversations');
   }
 
   // 1.25) Restore article comments (validated graph, roots before replies, idempotent merge).
@@ -600,110 +606,116 @@ export async function importBackupZipV2Merge(
       }
     }
 
-    const { t, stores: s } = tx(db, ['article_comments'], 'readwrite');
-    const store = s.article_comments;
-    const index = store.index('by_canonicalUrl_createdAt');
-    const existingByFingerprint = new Map<string, AnyRecord>();
-    const existingBaseKeyById = new Map<number, string>();
-    const existingRows: AnyRecord[] = [];
-
     progress.stage = 'Comments';
     report();
-    for (const canonicalUrl of canonicalUrls) {
-      const range = globalThis.IDBKeyRange?.bound
-        ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
-        : null;
-      const rows = range ? (await reqToPromise<any[]>(index.getAll(range) as any)) || [] : [];
-      for (const row of rows) {
-        const id = Number(row?.id);
-        const url = normalizeHttpUrl(row?.canonicalUrl);
-        const commentText = safeString(row?.commentText);
-        if (!Number.isSafeInteger(id) || id <= 0 || !url || !commentText) continue;
-        const baseKey = buildArticleCommentArchiveBaseKey({
-          uniqueKey: uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '',
-          canonicalUrl: url,
-          createdAt: Number(row?.createdAt) || 0,
-          quoteText: String(row?.quoteText || ''),
-          commentText,
-        });
-        existingBaseKeyById.set(id, baseKey);
-        existingRows.push(row);
-      }
-    }
-    for (const row of existingRows) {
-      const id = Number(row.id);
-      const baseKey = existingBaseKeyById.get(id) ?? '';
-      const parentId = Number(row.parentId);
-      const parentBaseKey =
-        Number.isSafeInteger(parentId) && parentId > 0 ? (existingBaseKeyById.get(parentId) ?? '') : '';
-      const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
-      if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
-    }
+    await runTrackedTransaction(
+      { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+      async ({ stores: s, markChanged }) => {
+        const store = s.article_comments;
+        const index = store.index('by_canonicalUrl_createdAt');
+        const existingByFingerprint = new Map<string, AnyRecord>();
+        const existingBaseKeyById = new Map<number, string>();
+        const existingRows: AnyRecord[] = [];
 
-    const incomingIdToLocalId = new Map<number, number>();
-    const now = Date.now();
-    let tick = 0;
-    for (const item of articleCommentItems) {
-      const parentId = item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
-      const mappedConversationId =
-        item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
-          ? uniqueToLocalId.get(item.uniqueKey)!
-          : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
-      const existing = existingByFingerprint.get(item.fingerprint) ?? null;
-
-      if (existing?.id) {
-        const existingId = Number(existing.id);
-        incomingIdToLocalId.set(item.commentId, existingId);
-        const incomingUpdatedAt = Number(item.updatedAt) || 0;
-        const existingUpdatedAt = Number(existing.updatedAt) || 0;
-        const next = {
-          ...existing,
-          parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
-          conversationId:
-            existing.conversationId == null && mappedConversationId != null
-              ? mappedConversationId
-              : existing.conversationId,
-          canonicalUrl: item.canonicalUrl,
-          authorName: incomingUpdatedAt >= existingUpdatedAt ? (item.authorName ?? '') : existing.authorName,
-          quoteText: incomingUpdatedAt >= existingUpdatedAt ? item.quoteText : String(existing.quoteText || ''),
-          commentText: incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
-          locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
-          createdAt: Number(existing.createdAt) || item.createdAt || now,
-          updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
-        };
-        const changed = JSON.stringify(next) !== JSON.stringify(existing);
-        if (changed) {
-          await reqToPromise(store.put(next as any));
-          stats.commentsUpdated += 1;
-        } else {
-          stats.commentsSkipped += 1;
+        for (const canonicalUrl of canonicalUrls) {
+          const range = globalThis.IDBKeyRange?.bound
+            ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
+            : null;
+          const rows = range ? (await reqToPromise<any[]>(index.getAll(range) as any)) || [] : [];
+          for (const row of rows) {
+            const id = Number(row?.id);
+            const url = normalizeHttpUrl(row?.canonicalUrl);
+            const commentText = safeString(row?.commentText);
+            if (!Number.isSafeInteger(id) || id <= 0 || !url || !commentText) continue;
+            const baseKey = buildArticleCommentArchiveBaseKey({
+              uniqueKey: uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '',
+              canonicalUrl: url,
+              createdAt: Number(row?.createdAt) || 0,
+              quoteText: String(row?.quoteText || ''),
+              commentText,
+            });
+            existingBaseKeyById.set(id, baseKey);
+            existingRows.push(row);
+          }
         }
-      } else {
-        const record = {
-          parentId,
-          conversationId: mappedConversationId,
-          canonicalUrl: item.canonicalUrl,
-          authorName: item.authorName ?? '',
-          quoteText: item.quoteText,
-          commentText: item.commentText,
-          locator: item.locator,
-          createdAt: item.createdAt || now,
-          updatedAt: item.updatedAt || item.createdAt || now,
-        };
-        const newId = Number(await reqToPromise(store.add(record as any) as any));
-        if (Number.isSafeInteger(newId) && newId > 0) incomingIdToLocalId.set(item.commentId, newId);
-        stats.commentsAdded += 1;
-      }
-      bump(1, 'Comments');
-      tick += 1;
-      if (tick % 40 === 0) report();
-    }
-    await txDone(t);
+        for (const row of existingRows) {
+          const id = Number(row.id);
+          const baseKey = existingBaseKeyById.get(id) ?? '';
+          const parentId = Number(row.parentId);
+          const parentBaseKey =
+            Number.isSafeInteger(parentId) && parentId > 0 ? (existingBaseKeyById.get(parentId) ?? '') : '';
+          const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
+          if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
+        }
+
+        const incomingIdToLocalId = new Map<number, number>();
+        const now = Date.now();
+        for (const item of articleCommentItems) {
+          const parentId =
+            item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
+          const mappedConversationId =
+            item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
+              ? uniqueToLocalId.get(item.uniqueKey)!
+              : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
+          const existing = existingByFingerprint.get(item.fingerprint) ?? null;
+
+          if (existing?.id) {
+            const existingId = Number(existing.id);
+            incomingIdToLocalId.set(item.commentId, existingId);
+            const incomingUpdatedAt = Number(item.updatedAt) || 0;
+            const existingUpdatedAt = Number(existing.updatedAt) || 0;
+            const next = {
+              ...existing,
+              parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
+              conversationId:
+                existing.conversationId == null && mappedConversationId != null
+                  ? mappedConversationId
+                  : existing.conversationId,
+              canonicalUrl: item.canonicalUrl,
+              authorName: incomingUpdatedAt >= existingUpdatedAt ? (item.authorName ?? '') : existing.authorName,
+              quoteText: incomingUpdatedAt >= existingUpdatedAt ? item.quoteText : String(existing.quoteText || ''),
+              commentText:
+                incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
+              locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
+              createdAt: Number(existing.createdAt) || item.createdAt || now,
+              updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
+            };
+            if (areBackupValuesEqual(next, existing)) {
+              stats.commentsSkipped += 1;
+              continue;
+            }
+
+            await reqToPromise(store.put(next as any));
+            stats.commentsUpdated += 1;
+            markChanged('article_comments');
+            continue;
+          }
+
+          const record = {
+            parentId,
+            conversationId: mappedConversationId,
+            canonicalUrl: item.canonicalUrl,
+            authorName: item.authorName ?? '',
+            quoteText: item.quoteText,
+            commentText: item.commentText,
+            locator: item.locator,
+            createdAt: item.createdAt || now,
+            updatedAt: item.updatedAt || item.createdAt || now,
+          };
+          const newId = Number(await reqToPromise(store.add(record as any) as any));
+          if (Number.isSafeInteger(newId) && newId > 0) incomingIdToLocalId.set(item.commentId, newId);
+          stats.commentsAdded += 1;
+          markChanged('article_comments');
+        }
+      },
+    );
+    reportCommittedStage(articleCommentItems.length, 'Comments');
   }
 
   // 1.5) Restore image cache assets and rewrite incoming markdown asset urls.
   const assetIdRemap = new Map<number, number>();
   const fallbackUrlByOldId = new Map<number, string>();
+  const rewrittenAssetMarkdownByMessage = new Map<string, string>();
 
   // If the manifest declares an image cache index but the zip does not contain it, treat this as a "text-only"
   // import: strip all `syncnos-asset://` references to a safe placeholder so we don't persist broken private URLs.
@@ -719,123 +731,96 @@ export async function importBackupZipV2Merge(
           fallbackUrlByOldId,
           defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
         });
-        if (next !== markdown) msg.contentMarkdown = next;
+        if (next !== markdown) {
+          msg.contentMarkdown = next;
+          const messageKey = safeString(msg.messageKey);
+          if (messageKey) rewrittenAssetMarkdownByMessage.set(`${uk}\u0000${messageKey}`, next);
+        }
       }
       messagesByUniqueKey.set(uk, msgs);
     }
   }
 
   if (imageCacheAssets.length) {
-    const { t, stores: s } = tx(db, ['image_cache'], 'readwrite');
-    const idx = s.image_cache.index('by_conversationId_url');
-    const now = Date.now();
-
     progress.stage = 'Assets';
     report();
+    await runTrackedTransaction(
+      { db, stores: ['image_cache'], revisionScopes: ['image_cache'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.image_cache.index('by_conversationId_url');
+        const now = Date.now();
 
-    for (let i = 0; i < imageCacheAssets.length; i += 1) {
-      const asset = imageCacheAssets[i];
-      const assetId = Number(asset && asset.assetId);
-      if (!Number.isFinite(assetId) || assetId <= 0) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-      const uniqueKey = asset && asset.uniqueKey ? String(asset.uniqueKey) : '';
-      if (!uniqueKey.trim()) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-      const localConversationId = uniqueToLocalId.get(uniqueKey);
-      if (!localConversationId) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+        for (const asset of imageCacheAssets) {
+          const assetId = Number(asset?.assetId);
+          if (!Number.isFinite(assetId) || assetId <= 0) continue;
+          const uniqueKey = asset?.uniqueKey ? String(asset.uniqueKey) : '';
+          if (!uniqueKey.trim()) continue;
+          const localConversationId = uniqueToLocalId.get(uniqueKey);
+          if (!localConversationId) continue;
 
-      const url = asset && asset.url ? String(asset.url) : '';
-      const safeUrl = url.trim();
-      if (!safeUrl) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+          const safeUrl = asset?.url ? String(asset.url).trim() : '';
+          if (!safeUrl) continue;
+          const contentType = parseContentType(asset?.contentType);
+          if (!contentType.startsWith('image/')) continue;
 
-      const contentType = parseContentType(asset && asset.contentType ? asset.contentType : '');
-      if (!contentType.startsWith('image/')) {
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+          const blobPath = asset?.blobPath ? String(asset.blobPath) : '';
+          const bytes = blobPath ? entries.get(blobPath) : null;
+          if (!bytes) {
+            fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
+            continue;
+          }
+          const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
+          const byteSize = Number(asset.byteSize) || blob.size || 0;
+          if (byteSize <= 0) {
+            fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
+            continue;
+          }
 
-      const blobPath = asset && asset.blobPath ? String(asset.blobPath) : '';
-      const bytes = blobPath ? entries.get(blobPath) : null;
-      if (!bytes) {
-        fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-      const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
-      const byteSize = Number(asset.byteSize) || blob.size || 0;
-      if (byteSize <= 0) {
-        fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
+          const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
+          if (existing?.id) {
+            const existingId = Number(existing.id);
+            if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
 
-      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
-      if (existing && existing.id) {
-        const existingId = Number(existing.id);
-        if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
+            const existingBlob = existing.blob as unknown;
+            const existingSize =
+              Number(existing.byteSize) || (existingBlob instanceof Blob ? existingBlob.size : 0) || 0;
+            if (existingBlob instanceof Blob && existingSize > 0) continue;
 
-        const existingBlob = (existing as any).blob as unknown;
-        const existingSize =
-          Number((existing as any).byteSize) || (existingBlob instanceof Blob ? existingBlob.size : 0) || 0;
-        if (existingBlob instanceof Blob && existingSize > 0) {
-          if (i % 20 === 0) report();
-          bump(1, 'Assets');
-          continue;
+            await reqToPromise(
+              s.image_cache.put({
+                ...existing,
+                conversationId: localConversationId,
+                url: safeUrl,
+                blob,
+                byteSize,
+                contentType,
+                createdAt: Number(existing.createdAt) || Number(asset.createdAt) || now,
+                updatedAt: now,
+              } as any),
+            );
+            markChanged('image_cache');
+            continue;
+          }
+
+          const nextId = Number(
+            await reqToPromise(
+              s.image_cache.add({
+                conversationId: localConversationId,
+                url: safeUrl,
+                blob,
+                byteSize,
+                contentType,
+                createdAt: Number(asset.createdAt) || now,
+                updatedAt: now,
+              } as any) as any,
+            ),
+          );
+          if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
+          markChanged('image_cache');
         }
-
-        const next = {
-          ...existing,
-          conversationId: localConversationId,
-          url: safeUrl,
-          blob,
-          byteSize,
-          contentType,
-          createdAt: Number(existing.createdAt) || Number(asset.createdAt) || now,
-          updatedAt: now,
-        };
-
-        await reqToPromise(s.image_cache.put(next as any));
-        if (i % 20 === 0) report();
-        bump(1, 'Assets');
-        continue;
-      }
-
-      const record = {
-        conversationId: localConversationId,
-        url: safeUrl,
-        blob,
-        byteSize,
-        contentType,
-        createdAt: Number(asset.createdAt) || now,
-        updatedAt: now,
-      };
-
-      const newId = await reqToPromise(s.image_cache.add(record as any) as any);
-      const nextId = Number(newId);
-      if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
-
-      if (i % 20 === 0) report();
-      bump(1, 'Assets');
-    }
-
-    await txDone(t);
+      },
+    );
+    reportCommittedStage(imageCacheAssets.length, 'Assets');
   }
 
   // If we restored some assets, rewrite `syncnos-asset://<oldId>` references to the local asset ids.
@@ -853,7 +838,11 @@ export async function importBackupZipV2Merge(
           fallbackUrlByOldId,
           defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
         });
-        if (next !== markdown) msg.contentMarkdown = next;
+        if (next !== markdown) {
+          msg.contentMarkdown = next;
+          const messageKey = safeString(msg.messageKey);
+          if (messageKey) rewrittenAssetMarkdownByMessage.set(`${uk}\u0000${messageKey}`, next);
+        }
       }
       messagesByUniqueKey.set(uk, msgs);
     }
@@ -861,63 +850,82 @@ export async function importBackupZipV2Merge(
 
   // 2) Upsert messages by (localConversationId, messageKey).
   {
-    const { t, stores: s } = tx(db, ['messages'], 'readwrite');
-    const idx = s.messages.index('by_conversationId_messageKey');
-
     progress.stage = 'Messages';
     report();
-    let i = 0;
-    for (const [uk, list] of messagesByUniqueKey.entries()) {
-      const localConversationId = uniqueToLocalId.get(uk);
-      if (!localConversationId) {
-        i += Array.isArray(list) ? list.length : 0;
-        bump(Array.isArray(list) ? list.length : 0, 'Messages');
-        continue;
-      }
+    const stageNow = Date.now();
+    await runTrackedTransaction(
+      { db, stores: ['messages'], revisionScopes: ['messages'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.messages.index('by_conversationId_messageKey');
 
-      const msgs = Array.isArray(list) ? list : [];
-      for (const incoming of msgs) {
-        const messageKey = incoming && incoming.messageKey ? String(incoming.messageKey) : '';
-        if (!messageKey) {
-          stats.messagesSkipped += 1;
-          bump(1, 'Messages');
-          continue;
+        for (const [uk, list] of messagesByUniqueKey.entries()) {
+          const localConversationId = uniqueToLocalId.get(uk);
+          if (!localConversationId) {
+            stats.messagesSkipped += Array.isArray(list) ? list.length : 0;
+            continue;
+          }
+
+          for (const incoming of Array.isArray(list) ? list : []) {
+            const messageKey = incoming?.messageKey ? String(incoming.messageKey) : '';
+            if (!messageKey) {
+              stats.messagesSkipped += 1;
+              continue;
+            }
+
+            const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
+            const base = {
+              ...(incoming || {}),
+              conversationId: localConversationId,
+              messageKey,
+              ...(existing?.id ? { id: existing.id } : {}),
+            };
+            const merged = mergeMessageRecord(existing, base);
+            const rewrittenAssetMarkdown = rewrittenAssetMarkdownByMessage.get(`${uk}\u0000${messageKey}`);
+            if (rewrittenAssetMarkdown != null) merged.contentMarkdown = rewrittenAssetMarkdown;
+            merged.conversationId = localConversationId;
+            merged.messageKey = messageKey;
+
+            if (existing?.id) {
+              merged.id = existing.id;
+              if (areBackupValuesEqual(merged, existing)) continue;
+              if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
+                merged.updatedAt = stageNow;
+
+              await reqToPromise(s.messages.put(merged as any));
+              stats.messagesUpdated += 1;
+              markChanged('messages');
+              continue;
+            }
+
+            delete merged.id;
+            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
+              merged.updatedAt = stageNow;
+            await reqToPromise(s.messages.add(merged as any));
+            stats.messagesAdded += 1;
+            markChanged('messages');
+          }
         }
-
-        const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
-        const base = { ...(incoming || {}), conversationId: localConversationId, messageKey };
-        const merged = mergeMessageRecord(existing, base);
-        merged.conversationId = localConversationId;
-        merged.messageKey = messageKey;
-
-        if (existing && existing.id) {
-          merged.id = existing.id;
-
-          await reqToPromise(s.messages.put(merged as any));
-          stats.messagesUpdated += 1;
-        } else {
-          await reqToPromise(s.messages.add(merged as any));
-          stats.messagesAdded += 1;
-        }
-
-        if (i % 40 === 0) report();
-        i += 1;
-        bump(1, 'Messages');
-      }
-    }
-
-    await txDone(t);
+      },
+    );
+    reportCommittedStage(totalMessages, 'Messages');
   }
 
   progress.stage = 'Mappings';
   report();
-  await upsertImportedSyncMappings({
-    db,
-    mappings: incomingMappings,
-    stats,
-    stage: 'Mappings',
-    bump,
-  });
+  const mappingResult = await runTrackedTransaction(
+    { db, stores: ['sync_mappings', 'conversations'], revisionScopes: ['sync_mappings', 'conversations'] },
+    async ({ stores: s, markChanged }) => {
+      const result = await applyImportedSyncMappings({
+        stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
+        mappings: incomingMappings,
+        stats,
+      });
+      if (result.syncMappingsChanged) markChanged('sync_mappings');
+      if (result.conversationRowsChanged) markChanged('conversations');
+      return result;
+    },
+  );
+  reportCommittedStage(mappingResult.processed, 'Mappings');
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
   progress.stage = 'Settings';

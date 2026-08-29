@@ -1,3 +1,5 @@
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import { DATA_REVISION_SCOPES, DATA_REVISION_STORE_BY_SCOPE } from '@platform/idb/data-revision-record';
 import {
   GITHUB_CLEANUP_OUTBOX_DUE_INDEX,
   GITHUB_CLEANUP_OUTBOX_STORE,
@@ -5,7 +7,7 @@ import {
 import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 9;
+export const DB_VERSION = 10;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -50,27 +52,10 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   return Array.from(values);
 }
 
-function parseSiteKeyFromUrl(url: unknown): string {
-  const normalizedUrl = normalizeHttpUrl(url);
-  if (!normalizedUrl) return 'unknown';
-  try {
-    const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
-    return host ? `domain:${host}` : 'unknown';
-  } catch (_e) {
-    return 'unknown';
-  }
-}
-
-function deriveConversationListSourceKey(row: Record<string, unknown> | undefined): string {
-  const source = safeString(row?.source).toLowerCase();
-  return source || 'unknown';
-}
-
-function deriveConversationListSiteKey(row: Record<string, unknown> | undefined): string {
-  return parseSiteKeyFromUrl(row?.url);
-}
-
-function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void {
+function normalizeConversationListStoredKeys(
+  { db, tx }: MigrationContext,
+  options: { stripLegacyDescription?: boolean } = {},
+): void {
   if (!db.objectStoreNames.contains('conversations')) return;
   const conversationsStore = tx.objectStore('conversations');
   const req = conversationsStore.openCursor();
@@ -78,19 +63,11 @@ function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void
     const cursor = req.result;
     if (!cursor) return;
     const value = (cursor.value || {}) as Record<string, unknown>;
-    const nextSourceKey = deriveConversationListSourceKey(value);
-    const nextSiteKey = deriveConversationListSiteKey(value);
-    const hasLegacyDescription = Object.prototype.hasOwnProperty.call(value, 'description');
-    if (
-      safeString(value.listSourceKey) !== nextSourceKey ||
-      safeString(value.listSiteKey) !== nextSiteKey ||
-      hasLegacyDescription
-    ) {
-      const next = {
-        ...value,
-        listSourceKey: nextSourceKey,
-        listSiteKey: nextSiteKey,
-      } as Record<string, unknown>;
+    const normalized = normalizeConversationListRecord(value);
+    const hasLegacyDescription =
+      options.stripLegacyDescription === true && Object.prototype.hasOwnProperty.call(value, 'description');
+    if (normalized !== value || hasLegacyDescription) {
+      const next = { ...normalized } as Record<string, unknown>;
       if (hasLegacyDescription) delete (next as any).description;
       cursor.update(next as any);
     }
@@ -947,6 +924,13 @@ function ensureGithubCleanupOutboxStore(db: IDBDatabase, tx: IDBTransaction | nu
   }
 }
 
+function ensureDataRevisionStores(db: IDBDatabase): void {
+  for (const scope of DATA_REVISION_SCOPES) {
+    const storeName = DATA_REVISION_STORE_BY_SCOPE[scope];
+    if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName);
+  }
+}
+
 function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   const db = request.result;
   const tx = request.transaction;
@@ -957,6 +941,7 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureImageCacheStore(db, tx);
   ensureArticleCommentsStore(db, tx);
   ensureGithubCleanupOutboxStore(db, tx);
+  ensureDataRevisionStores(db);
 
   if (tx && oldVersion < 2) {
     try {
@@ -982,18 +967,78 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   if (tx && oldVersion < 8) {
     // Consistency-critical migration for list pagination/filter keys.
     // Do not swallow failures here, otherwise list indexes and record keys may drift.
-    backfillConversationListDerivedKeys({ db, tx });
+    normalizeConversationListStoredKeys({ db, tx }, { stripLegacyDescription: true });
+  } else if (tx && oldVersion < 10) {
+    // v8/v9 already have list indexes but may contain stale or malformed persisted keys.
+    normalizeConversationListStoredKeys({ db, tx });
   }
 }
 
+let cachedDb: IDBDatabase | null = null;
+let openingDb: Promise<IDBDatabase> | null = null;
+let dbLifecycleGeneration = 0;
+
+function attachDbLifecycle(db: IDBDatabase, generation: number): void {
+  db.onversionchange = () => {
+    if (dbLifecycleGeneration !== generation || cachedDb !== db) return;
+    dbLifecycleGeneration += 1;
+    cachedDb = null;
+    db.close();
+  };
+
+  db.addEventListener('close', () => {
+    if (dbLifecycleGeneration !== generation || cachedDb !== db) return;
+    dbLifecycleGeneration += 1;
+    cachedDb = null;
+  });
+}
+
 export function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (cachedDb) return Promise.resolve(cachedDb);
+  if (openingDb) return openingDb;
+
+  const generation = dbLifecycleGeneration;
+  let managedPromise: Promise<IDBDatabase>;
+  const requestPromise = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error || new Error('indexeddb open failed'));
+    req.onerror = () => {
+      if (dbLifecycleGeneration !== generation || openingDb !== managedPromise) {
+        reject(req.error || new Error('indexeddb open superseded'));
+        return;
+      }
+      reject(req.error || new Error('indexeddb open failed'));
+    };
+    req.onblocked = () => {
+      console.warn('[IndexedDB] open blocked', { database: DB_NAME, requestedVersion: DB_VERSION });
+    };
     req.onupgradeneeded = (event) => {
       const oldVersion = typeof event.oldVersion === 'number' ? event.oldVersion : 0;
       runUpgrades(req, oldVersion);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (dbLifecycleGeneration !== generation || openingDb !== managedPromise) {
+        db.close();
+        reject(new Error('indexeddb open superseded'));
+        return;
+      }
+      cachedDb = db;
+      attachDbLifecycle(db, generation);
+      resolve(db);
+    };
   });
+
+  managedPromise = requestPromise.finally(() => {
+    if (dbLifecycleGeneration === generation && openingDb === managedPromise) openingDb = null;
+  });
+  openingDb = managedPromise;
+  return managedPromise;
+}
+
+export function closeDbForTests(): void {
+  dbLifecycleGeneration += 1;
+  const db = cachedDb;
+  cachedDb = null;
+  openingDb = null;
+  db?.close();
 }

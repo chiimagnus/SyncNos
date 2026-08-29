@@ -63,56 +63,48 @@ export async function listDueGithubCleanupRows(
   const now = requireTimestamp(nowInput);
   const limit = requireLimit(limitInput);
   const db = await openDb();
-  try {
-    const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readonly');
-    const index = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE).index(GITHUB_CLEANUP_OUTBOX_DUE_INDEX);
-    const range = globalThis.IDBKeyRange.bound([remoteKey, 0, 0], [remoteKey, now, Infinity]);
+  const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readonly');
+  const index = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE).index(GITHUB_CLEANUP_OUTBOX_DUE_INDEX);
+  const range = globalThis.IDBKeyRange.bound([remoteKey, 0, 0], [remoteKey, now, Infinity]);
 
-    const result = await new Promise<{ rows: GithubCleanupOutboxRecord[]; hasMoreDue: boolean }>((resolve, reject) => {
-      const rows: GithubCleanupOutboxRecord[] = [];
-      const request = index.openCursor(range);
-      request.onerror = () => reject(request.error || new Error('github cleanup outbox cursor failed'));
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) return resolve({ rows, hasMoreDue: false });
-        const row = normalizeGithubCleanupOutboxRecord(cursor.value);
-        if (row && row.remoteKey === remoteKey && row.nextAttemptAt <= now) {
-          if (rows.length >= limit) return resolve({ rows, hasMoreDue: true });
-          rows.push(row);
-        }
-        cursor.continue();
-      };
-    });
-    await txDone(transaction);
-    return result;
-  } finally {
-    db.close();
-  }
+  const result = await new Promise<{ rows: GithubCleanupOutboxRecord[]; hasMoreDue: boolean }>((resolve, reject) => {
+    const rows: GithubCleanupOutboxRecord[] = [];
+    const request = index.openCursor(range);
+    request.onerror = () => reject(request.error || new Error('github cleanup outbox cursor failed'));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve({ rows, hasMoreDue: false });
+      const row = normalizeGithubCleanupOutboxRecord(cursor.value);
+      if (row && row.remoteKey === remoteKey && row.nextAttemptAt <= now) {
+        if (rows.length >= limit) return resolve({ rows, hasMoreDue: true });
+        rows.push(row);
+      }
+      cursor.continue();
+    };
+  });
+  await txDone(transaction);
+  return result;
 }
 
 export async function getNextGithubCleanupDueAt(remoteKeyInput: string): Promise<number | null> {
   const remoteKey = requireRemoteKey(remoteKeyInput);
   const db = await openDb();
-  try {
-    const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readonly');
-    const index = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE).index(GITHUB_CLEANUP_OUTBOX_DUE_INDEX);
-    const range = globalThis.IDBKeyRange.bound([remoteKey, 0, 0], [remoteKey, Infinity, Infinity]);
-    const next = await new Promise<number | null>((resolve, reject) => {
-      const request = index.openCursor(range);
-      request.onerror = () => reject(request.error || new Error('github cleanup outbox cursor failed'));
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) return resolve(null);
-        const row = normalizeGithubCleanupOutboxRecord(cursor.value);
-        if (row && row.remoteKey === remoteKey) return resolve(row.nextAttemptAt);
-        cursor.continue();
-      };
-    });
-    await txDone(transaction);
-    return next;
-  } finally {
-    db.close();
-  }
+  const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readonly');
+  const index = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE).index(GITHUB_CLEANUP_OUTBOX_DUE_INDEX);
+  const range = globalThis.IDBKeyRange.bound([remoteKey, 0, 0], [remoteKey, Infinity, Infinity]);
+  const next = await new Promise<number | null>((resolve, reject) => {
+    const request = index.openCursor(range);
+    request.onerror = () => reject(request.error || new Error('github cleanup outbox cursor failed'));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve(null);
+      const row = normalizeGithubCleanupOutboxRecord(cursor.value);
+      if (row && row.remoteKey === remoteKey) return resolve(row.nextAttemptAt);
+      cursor.continue();
+    };
+  });
+  await txDone(transaction);
+  return next;
 }
 
 export async function deferGithubCleanupRows(idsInput: readonly unknown[], nextAttemptAtInput: number): Promise<void> {
@@ -120,30 +112,22 @@ export async function deferGithubCleanupRows(idsInput: readonly unknown[], nextA
   if (!ids.length) return;
   const nextAttemptAt = requireTimestamp(nextAttemptAtInput);
   const db = await openDb();
-  try {
-    const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readwrite');
-    const store = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
-    for (const id of ids) {
-      const row = normalizeGithubCleanupOutboxRecord(await requestResult<any>(store.get(id)));
-      if (!row) continue;
-      await requestResult(store.put({ ...row, nextAttemptAt }));
-    }
-    await txDone(transaction);
-  } finally {
-    db.close();
+  const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readwrite');
+  const store = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
+  for (const id of ids) {
+    const row = normalizeGithubCleanupOutboxRecord(await requestResult<any>(store.get(id)));
+    if (!row) continue;
+    await requestResult(store.put({ ...row, nextAttemptAt }));
   }
+  await txDone(transaction);
 }
 
 export async function ackGithubCleanupRows(idsInput: readonly unknown[]): Promise<void> {
   const ids = normalizeIds(idsInput);
   if (!ids.length) return;
   const db = await openDb();
-  try {
-    const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readwrite');
-    const store = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
-    for (const id of ids) store.delete(id);
-    await txDone(transaction);
-  } finally {
-    db.close();
-  }
+  const transaction = db.transaction([GITHUB_CLEANUP_OUTBOX_STORE], 'readwrite');
+  const store = transaction.objectStore(GITHUB_CLEANUP_OUTBOX_STORE);
+  for (const id of ids) store.delete(id);
+  await txDone(transaction);
 }

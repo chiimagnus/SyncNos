@@ -110,6 +110,8 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 
 SyncNos 采用 local-first，因此涉及 IndexedDB、备份/恢复、同步映射、OAuth、缓存图片、权限或迁移的改动，都需要明确审查失败路径。请说明外部目标失败时会发生什么，以及现有本地数据如何保持可恢复。
 
+涉及 durable revision、跨 surface 刷新或备份 merge 的改动，定向验证还应覆盖：no-op 不制造 revision、业务数据与 revision 同事务提交、wake 丢失后仍可从 snapshot 收敛、canonical read reject 保留 last-good 并可 replay、相同备份重复导入保持幂等，以及恢复出的图片 local ID 与 Markdown asset 引用一致。若改动影响已挂载 UI，请至少做一次不 reload 的真实浏览器 smoke；通用命令仍按上面的验证矩阵执行。
+
 不要提交真实凭据、私人用户内容、浏览器 profile、包含个人数据的生成备份归档，或采集到的 session 材料。
 
 ## 许可证

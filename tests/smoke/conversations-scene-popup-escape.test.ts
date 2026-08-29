@@ -10,6 +10,7 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
+const activateLoadedConversation = vi.fn();
 const openConversationExternalById = vi.fn();
 const openConversationExternalBySourceKey = vi.fn();
 const consumePendingOpenConversation = vi.fn(() => null);
@@ -40,6 +41,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     toggleAll: vi.fn(),
     toggleSelected: vi.fn(),
     setActiveId,
+    activateLoadedConversation,
     clearSelected: vi.fn(),
     exporting: false,
     listError: null,
@@ -55,6 +57,9 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     syncingNotion: false,
     syncingObsidian: false,
+    syncingFeishu: false,
+    syncingGithub: false,
+    enabledSyncProviders: ['obsidian', 'notion'],
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
@@ -79,6 +84,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
     syncSelectedObsidian: vi.fn(),
+    syncSelectedFeishu: vi.fn(),
+    syncSelectedGithub: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
     loadingList: false,
@@ -145,6 +152,7 @@ describe('ConversationsScene popup Escape behavior', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
+    activateLoadedConversation.mockReset();
     openConversationExternalById.mockReset();
     openConversationExternalBySourceKey.mockReset();
     consumePendingOpenConversation.mockReset();
@@ -187,7 +195,7 @@ describe('ConversationsScene popup Escape behavior', () => {
       await flushImmediate();
     });
 
-    expect(setActiveId).toHaveBeenCalledWith(11);
+    expect(activateLoadedConversation).toHaveBeenCalledWith(11);
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 
     const event = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });

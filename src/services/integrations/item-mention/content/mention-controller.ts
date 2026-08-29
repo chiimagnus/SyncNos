@@ -8,6 +8,11 @@ import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/ite
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
 import { moveMentionHighlightIndex } from '@services/integrations/item-mention/content/mention-ui-state';
+import {
+  requestDataRevisionRetry,
+  subscribeDataRevisionChanges,
+  whenDataRevisionObserverReady,
+} from '@services/data-revisions/observer';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -80,7 +85,13 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       let searchTimer: ReturnType<typeof setTimeout> | null = null;
       let requestSeq = 0;
       let pickSeq = 0;
+      let pickInFlight = false;
       let composing = false;
+      let activationGeneration = 0;
+      let activationReady = false;
+      let revisionUnsubscribe: (() => void) | null = null;
+      let pendingSearch = false;
+      let activeSearch: { activationGeneration: number; requestId: number; query: string } | null = null;
       const unsubscribeInvalidated = rt.onInvalidated?.(() => stop()) || null;
 
       function stopTimers() {
@@ -119,39 +130,92 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         });
       }
 
+      function deactivateMentionActivation() {
+        if (!revisionUnsubscribe && !activationReady && !pendingSearch && !activeSearch) return;
+        activationGeneration += 1;
+        activationReady = false;
+        requestSeq += 1;
+        pendingSearch = false;
+        activeSearch = null;
+        stopTimers();
+        try {
+          revisionUnsubscribe?.();
+        } catch (_error) {
+          // ignore observer cleanup errors
+        }
+        revisionUnsubscribe = null;
+      }
+
+      function schedulePendingSearch() {
+        if (stopped || !session?.open || !activationReady || !pendingSearch || activeSearch) return;
+        stopTimers();
+        searchTimer = setTimeout(() => {
+          searchTimer = null;
+          if (stopped || !session?.open || !activationReady || activeSearch || !pendingSearch) return;
+          pendingSearch = false;
+          void runSearch(session.query);
+        }, 120);
+      }
+
+      function queueLatestSearch() {
+        if (stopped || !session?.open) return;
+        requestSeq += 1;
+        pendingSearch = true;
+        schedulePendingSearch();
+      }
+
+      function activateMentionSession() {
+        if (stopped || !session?.open || revisionUnsubscribe) return;
+        const generation = ++activationGeneration;
+        activationReady = false;
+        revisionUnsubscribe = subscribeDataRevisionChanges((scopes) => {
+          if (stopped || generation !== activationGeneration || !session?.open) return;
+          if (!scopes.includes('conversations')) return;
+          queueLatestSearch();
+        });
+        void whenDataRevisionObserverReady().then(() => {
+          if (stopped || generation !== activationGeneration || !session?.open) return;
+          activationReady = true;
+          schedulePendingSearch();
+        });
+      }
+
       async function runSearch(query: string) {
-        const reqId = (requestSeq += 1);
+        if (stopped || !session?.open || !activationReady || activeSearch) return;
         const queryKey = String(query || '');
+        const requestId = ++requestSeq;
+        const search = { activationGeneration, requestId, query: queryKey };
+        activeSearch = search;
+
+        const isCurrentSearch = () =>
+          !stopped &&
+          activeSearch === search &&
+          search.activationGeneration === activationGeneration &&
+          search.requestId === requestSeq &&
+          !!session?.open &&
+          session.query === queryKey;
 
         try {
           const res = await searchMentionCandidates(rt, { query: queryKey, limit: 20 });
-          if (stopped) return;
-          if (reqId !== requestSeq) return;
-          if (!session || !session.open) return;
-          if (session.query !== queryKey) return;
+          if (!isCurrentSearch()) return;
 
           items = Array.isArray((res as any).candidates) ? (res as any).candidates : [];
-          if (session.highlightIndex >= items.length) {
-            session = { ...session, highlightIndex: 0 };
+          if (session!.highlightIndex >= items.length) {
+            session = { ...session!, highlightIndex: 0 };
           }
           renderPopup();
         } catch (error) {
+          if (!isCurrentSearch()) return;
           if (rt.isInvalidContextError?.(error)) {
             stop();
             return;
           }
-          items = [];
+          requestDataRevisionRetry(['conversations']);
           renderPopup();
+        } finally {
+          if (activeSearch === search) activeSearch = null;
+          schedulePendingSearch();
         }
-      }
-
-      function scheduleSearch() {
-        stopTimers();
-        if (!session || !session.open) return;
-        searchTimer = setTimeout(() => {
-          searchTimer = null;
-          void runSearch(session?.query || '');
-        }, 120);
       }
 
       async function pickHighlighted() {
@@ -167,24 +231,27 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
           triggerEnd: session.triggerEnd,
         };
         const editorElSnapshot = editor.el;
+        const isCurrentPickSession = () =>
+          !stopped &&
+          pickId === pickSeq &&
+          session?.open === true &&
+          session.query === sessionSnapshot.query &&
+          session.triggerStart === sessionSnapshot.triggerStart &&
+          session.triggerEnd === sessionSnapshot.triggerEnd;
 
         const index = clamp(session.highlightIndex || 0, 0, items.length - 1);
         const picked = items[index];
         const conversationId = Number(picked?.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return;
 
+        let inserted = false;
+        pickInFlight = true;
+        deactivateMentionActivation();
+
         try {
           const payload = await buildMentionInsertText(rt, { conversationId });
-          if (stopped) return;
-          if (pickId !== pickSeq) return;
-          if (!session || !session.open) return;
-          if (
-            session.query !== sessionSnapshot.query ||
-            session.triggerStart !== sessionSnapshot.triggerStart ||
-            session.triggerEnd !== sessionSnapshot.triggerEnd
-          ) {
-            return;
-          }
+          if (!isCurrentPickSession()) return;
+
           const currentEditor = adapter.detectActiveEditor();
           if (!currentEditor || currentEditor.el !== editorElSnapshot) return;
 
@@ -193,13 +260,21 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
           const range = { start: sessionSnapshot.triggerStart, end: sessionSnapshot.triggerEnd };
           adapter.replaceRange(currentEditor, range, markdown);
+          inserted = true;
           adapter.focus(currentEditor);
-
-          session = null;
-          items = [];
-          hidePopup();
         } catch (error) {
           if (rt.isInvalidContextError?.(error)) stop();
+        } finally {
+          if (inserted) {
+            pickInFlight = false;
+            deactivateMentionActivation();
+            session = null;
+            items = [];
+            hidePopup();
+          } else if (isCurrentPickSession()) {
+            pickInFlight = false;
+            activateMentionSession();
+          }
         }
       }
 
@@ -216,9 +291,12 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
       function refresh(input?: { close?: boolean }) {
         const editor = adapter.detectActiveEditor();
+        const wasOpen = session?.open === true;
         if (!editor || !editor.el) {
+          if (wasOpen) pickSeq += 1;
           session = null;
           items = [];
+          deactivateMentionActivation();
           hidePopup();
           return;
         }
@@ -234,24 +312,41 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         lastCursor = Number.isFinite(cursor) ? cursor : text.length;
 
         const prevQuery = session?.query || '';
+        const prevTriggerStart = session?.triggerStart ?? -1;
+        const prevTriggerEnd = session?.triggerEnd ?? -1;
         session = updateMentionSession(session, { text, cursor: lastCursor, close: !!input?.close });
         if (!session) {
+          if (wasOpen) pickSeq += 1;
+          pickInFlight = false;
           items = [];
+          deactivateMentionActivation();
           hidePopup();
           return;
         }
 
         if (!session.open) {
+          if (wasOpen) pickSeq += 1;
+          pickInFlight = false;
+          deactivateMentionActivation();
           hidePopup();
           return;
         }
 
-        if (session.query !== prevQuery) {
+        const queryChanged = session.query !== prevQuery;
+        const pickContextChanged =
+          queryChanged || session.triggerStart !== prevTriggerStart || session.triggerEnd !== prevTriggerEnd;
+        if (pickContextChanged) {
+          pickSeq += 1;
+          pickInFlight = false;
+        }
+
+        if (!pickInFlight) activateMentionSession();
+        if (queryChanged) {
           items = [];
           session = { ...session, highlightIndex: 0 };
-          scheduleSearch();
-        } else if (!items.length) {
-          scheduleSearch();
+          queueLatestSearch();
+        } else if (!pickInFlight && !items.length && !activeSearch && !pendingSearch) {
+          queueLatestSearch();
         }
 
         renderPopup();
@@ -338,7 +433,9 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       function stop() {
         if (stopped) return;
         stopped = true;
-        stopTimers();
+        pickSeq += 1;
+        pickInFlight = false;
+        deactivateMentionActivation();
         try {
           unsubscribeInvalidated?.();
         } catch (_e) {

@@ -1,4 +1,4 @@
-import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
+import { ARTICLE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from '@collectors/web/article-fetch';
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import {
@@ -10,7 +10,6 @@ type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
-  eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
 type WebArticleHandlersDeps = {
@@ -36,10 +35,6 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
 
       const conversationId = Number((data as any)?.conversationId);
       if (Number.isFinite(conversationId) && conversationId > 0) {
-        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'articleFetch',
-          conversationId,
-        });
         fireAndForget(
           deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
         );
@@ -58,10 +53,6 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
       const conversationId = Number((data as any)?.conversationId);
       const isNew = (data as any)?.isNew === true;
       if (isNew && Number.isFinite(conversationId) && conversationId > 0) {
-        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'articleFetch',
-          conversationId,
-        });
         fireAndForget(
           deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
         );

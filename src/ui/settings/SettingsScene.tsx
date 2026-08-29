@@ -185,9 +185,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatDollarMentionEnabled,
 
     insightStats,
-    insightLoading,
+    insightLoadStatus,
     insightError,
-    hasLoadedInsight,
     insightRange,
     setInsightRange,
     aboutYouUserName,
@@ -436,10 +435,9 @@ export function SettingsScene(props: SettingsSceneProps) {
 
       {activeSection === 'aboutyou' ? (
         <InsightSection
-          loading={insightLoading}
+          status={insightLoadStatus}
           error={insightError}
           stats={insightStats}
-          hasLoaded={hasLoadedInsight}
           range={insightRange}
           onChangeRange={setInsightRange}
         />

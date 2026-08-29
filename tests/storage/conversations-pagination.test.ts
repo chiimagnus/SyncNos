@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
 import {
-  __closeDbForTests,
-  findConversationById,
+  __resetConversationStorageStateForTests,
   findConversationBySourceAndKey,
   getConversationListBootstrap,
   getConversationListPage,
@@ -24,7 +24,8 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
@@ -33,7 +34,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 });
 
 describe('conversations pagination storage-idb', () => {
@@ -178,12 +180,81 @@ describe('conversations pagination storage-idb', () => {
 
     const filtered = await getConversationListBootstrap({
       sourceKey: 'web',
-      siteKey: 'domain:example.com',
+      siteKey: 'Example.COM',
       limit: 20,
     });
     expect(filtered.summary.totalCount).toBe(2);
     expect(filtered.items.every((item) => item.listSourceKey === 'web')).toBe(true);
     expect(filtered.items.every((item) => item.listSiteKey === 'domain:example.com')).toBe(true);
+  });
+
+  it('does not persist derived-key repairs while reading a fresh bootstrap', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'seed-schema',
+      title: 'seed',
+      url: 'https://chatgpt.com/c/seed',
+      lastCapturedAt: 1,
+    });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    const rawStore = rawTx.objectStore('conversations');
+    const existing = await reqToPromise<any>(
+      rawStore.index('by_source_conversationKey').get(['chatgpt', 'seed-schema']),
+    );
+    existing.listSourceKey = 'stale-source';
+    existing.listSiteKey = 'stale.example';
+    await reqToPromise(rawStore.put(existing));
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+
+    const bootstrap = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(bootstrap.items).toHaveLength(1);
+    expect(bootstrap.items[0]).toMatchObject({
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'domain:chatgpt.com',
+    });
+
+    const verifyTx = rawDb.transaction(['conversations'], 'readonly');
+    const persisted = await reqToPromise<any>(
+      verifyTx.objectStore('conversations').index('by_source_conversationKey').get(['chatgpt', 'seed-schema']),
+    );
+    await new Promise<void>((resolve, reject) => {
+      verifyTx.oncomplete = () => resolve();
+      verifyTx.onerror = () => reject(verifyTx.error);
+      verifyTx.onabort = () => reject(verifyTx.error);
+    });
+    rawDb.close();
+
+    expect(persisted.listSourceKey).toBe('stale-source');
+    expect(persisted.listSiteKey).toBe('stale.example');
+  });
+
+  it('shows a tracked upsert in the next fresh bootstrap without stale summary state', async () => {
+    const initial = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(initial.summary.totalCount).toBe(0);
+
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'tracked-bootstrap',
+      title: 'Tracked bootstrap',
+      url: 'https://chatgpt.com/c/tracked-bootstrap',
+      lastCapturedAt: Date.now(),
+    });
+
+    const refreshed = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(refreshed.items.map((item) => item.conversationKey)).toEqual(['tracked-bootstrap']);
+    expect(refreshed.summary.totalCount).toBe(1);
   });
 
   it('recomputes summary on a fresh bootstrap after an external IndexedDB write', async () => {
@@ -219,7 +290,7 @@ describe('conversations pagination storage-idb', () => {
     expect(refreshed.summary).toEqual({ totalCount: 1, todayCount: 1 });
   });
 
-  it('finds open target by source+conversationKey and by id', async () => {
+  it('finds open target by source+conversationKey', async () => {
     const inserted = await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
@@ -234,11 +305,6 @@ describe('conversations pagination storage-idb', () => {
     expect(byLoc?.id).toBe(Number(inserted.id));
     expect(byLoc?.source).toBe('chatgpt');
     expect(byLoc?.conversationKey).toBe('loc-key-1');
-
-    const byId = await findConversationById(Number(inserted.id));
-    expect(byId).toBeTruthy();
-    expect(byId?.id).toBe(Number(inserted.id));
-    expect(byId?.conversationKey).toBe('loc-key-1');
 
     const missing = await findConversationBySourceAndKey('chatgpt', 'missing');
     expect(missing).toBeNull();
@@ -262,6 +328,11 @@ describe('conversations pagination storage-idb', () => {
       lastCapturedAt: Date.now() - 1,
     });
 
+    const beforeComments = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 10 });
+    expect(beforeComments.items.find((item) => item.sourceType === 'article')?.commentThreadCount).toBe(0);
+
+    // Write directly through the storage service: no handler event is emitted here.
+    // The next bootstrap must derive its count from current article_comments state.
     const root = await addArticleComment({
       conversationId: Number(article.id),
       canonicalUrl: 'https://example.com/thread?utm_source=x',

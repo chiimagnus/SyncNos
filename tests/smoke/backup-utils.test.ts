@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import * as backupUtils from '@services/sync/backup/backup-utils.ts';
 
 describe('backup-utils', () => {
@@ -15,6 +16,7 @@ describe('backup-utils', () => {
       notion_oauth_token_v1: { accessToken: 'secret' },
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       obsidian_api_key: 'obsidian-key',
+      [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
     });
     expect(filtered).toEqual({
       notion_oauth_client_id: 'abc',

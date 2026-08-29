@@ -1,6 +1,3 @@
-import { createEventsHub } from '@platform/events/hub';
-import { UI_PORT_NAMES } from '@platform/messaging/message-contracts';
-
 type Message = { type: string; [key: string]: any };
 
 type Handler = (msg: Message, sender: any) => Promise<any> | any;
@@ -19,7 +16,6 @@ function err(message: string, extra?: unknown) {
 
 export function createBackgroundRouter({ fallback }: RouterOptions) {
   const handlers = new Map<string, Handler>();
-  const eventsHub = createEventsHub({ portName: UI_PORT_NAMES.POPUP_EVENTS });
 
   function register(type: string, handler: Handler) {
     if (!type) throw new Error('type is required');
@@ -42,16 +38,6 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
   }
 
   function start() {
-    // Port subscription keeps SW alive while popup is open (same behavior as legacy router.start()).
-    try {
-      const rt = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
-      rt?.onConnect?.addListener?.((port: any) => {
-        eventsHub.registerPort(port);
-      });
-    } catch (_e) {
-      // ignore
-    }
-
     const rt = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
     const onMessage = rt?.onMessage;
     if (!onMessage?.addListener) return;
@@ -82,5 +68,5 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     return handleMessage(msg, sender ?? null);
   }
 
-  return { ok, err, register, start, eventsHub, __handleMessageForTests };
+  return { ok, err, register, start, __handleMessageForTests };
 }

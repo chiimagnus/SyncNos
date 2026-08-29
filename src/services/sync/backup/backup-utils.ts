@@ -2,6 +2,7 @@ import {
   ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA,
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
+import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
@@ -23,6 +24,8 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'obsidian_api_key',
   // GitHub Device Flow/auth state contains access/refresh/device secrets.
   'github_auth_state_v1',
+  // Runtime-only cross-context invalidation metadata.
+  DATA_REVISION_WAKE_STORAGE_KEY,
 ]);
 
 function shouldIncludeStorageKeyInBackup(key: string): boolean {
@@ -42,6 +45,31 @@ function isNonEmptyString(v: unknown): v is string {
 
 function isFinitePositiveInt(v: unknown) {
   return Number.isFinite(v) && Number(v) > 0 && Math.floor(Number(v)) === Number(v);
+}
+
+function validTimestamp(value: unknown): number | null {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+}
+
+export function areBackupValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => areBackupValuesEqual(value, right[index]));
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+
+  const leftRecord = left as UnknownRecord;
+  const rightRecord = right as UnknownRecord;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    const key = leftKeys[index];
+    if (key !== rightKeys[index] || !areBackupValuesEqual(leftRecord[key], rightRecord[key])) return false;
+  }
+  return true;
 }
 
 export function uniqueConversationKey(conversation: UnknownRecord): string {
@@ -87,7 +115,9 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
   next.warningFlags = mergeWarningFlags(a.warningFlags, b.warningFlags);
 
   // notionPageId: never overwrite a non-empty local mapping.
-  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
+  const notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
+  if (notionPageId) next.notionPageId = notionPageId;
+  else delete next.notionPageId;
 
   const aCaptured = Number(a.lastCapturedAt) || 0;
   const bCaptured = Number(b.lastCapturedAt) || 0;
@@ -99,8 +129,8 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
 function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownRecord) {
   const a = existing && typeof existing === 'object' ? existing : {};
   const b = incoming && typeof incoming === 'object' ? incoming : {};
-  const aUpdated = Number(a.updatedAt) || 0;
-  const bUpdated = Number(b.updatedAt) || 0;
+  const aUpdated = validTimestamp(a.updatedAt) ?? 0;
+  const bUpdated = validTimestamp(b.updatedAt) ?? 0;
   if (bUpdated && bUpdated > aUpdated) return true;
 
   const aMd = a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
@@ -121,10 +151,11 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
   next.contentText = String(next.contentText || '');
   next.contentMarkdown = String(next.contentMarkdown || '');
 
-  const aUpdated = Number(a.updatedAt) || 0;
-  const bUpdated = Number(b.updatedAt) || 0;
-  const maxUpdated = Math.max(aUpdated, bUpdated, 0);
-  next.updatedAt = maxUpdated || Date.now();
+  const aUpdated = validTimestamp(a.updatedAt);
+  const bUpdated = validTimestamp(b.updatedAt);
+  const maxUpdated = Math.max(aUpdated ?? 0, bUpdated ?? 0);
+  if (maxUpdated > 0) next.updatedAt = maxUpdated;
+  else delete next.updatedAt;
 
   const aSeq = Number(a.sequence);
   const bSeq = Number(b.sequence);

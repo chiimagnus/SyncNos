@@ -27,6 +27,11 @@ export type ArticleCommentsSidebarListInput = {
   signal?: AbortSignal;
 };
 
+export type ArticleCommentsSidebarFindExistingContextInput = {
+  canonicalUrl: string;
+  signal?: AbortSignal;
+};
+
 export type ArticleCommentsSidebarAdapterErrorCode =
   | 'invalid_query'
   | 'runtime_unavailable'
@@ -113,6 +118,9 @@ export type ArticleCommentsSidebarAdapter = {
     commentText: string;
   }) => Promise<void>;
   delete: (input: { id: number }) => Promise<void>;
+  findExistingContext?: (
+    input: ArticleCommentsSidebarFindExistingContextInput,
+  ) => Promise<ArticleCommentsSidebarContext>;
   migrateCanonicalUrl?: (input: {
     fromCanonicalUrl: string;
     toCanonicalUrl: string;

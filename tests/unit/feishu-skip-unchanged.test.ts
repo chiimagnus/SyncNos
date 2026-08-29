@@ -114,9 +114,11 @@ describe('feishu skip unchanged', () => {
       { method: 'GET' },
       { accessToken: 't' },
     );
-    expect(backgroundStorageMocks.patchSyncMapping).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({ feishuDocId: 'doc1' }),
-    );
+    expect(backgroundStorageMocks.patchSyncMapping).toHaveBeenCalledWith(1, {
+      feishuDocId: 'doc1',
+      feishuLastContentHash: hash,
+      feishuLastSyncedAt: res.results?.[0]?.at,
+    });
+    expect(Number(res.results?.[0]?.at)).toBeGreaterThanOrEqual(0);
   });
 });

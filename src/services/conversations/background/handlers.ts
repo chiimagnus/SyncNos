@@ -1,9 +1,9 @@
-import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
+import { CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet } from '@platform/storage/local';
 import {
   deleteConversationsByIds,
-  findConversationById,
   findConversationBySourceAndKey,
+  getConversationById,
   getConversationListBootstrap,
   getConversationListPage,
   getConversationDetail,
@@ -28,7 +28,6 @@ type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
-  eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
 type ConversationHandlersDeps = {
@@ -146,8 +145,8 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!Number.isFinite(conversationId) || conversationId <= 0) {
       return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
     }
-    const target = await findConversationById(conversationId);
-    return router.ok(target);
+    const conversation = await getConversationById(conversationId);
+    return router.ok(conversation);
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, async (msg) => {
@@ -186,10 +185,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const convo = await writeConversationSnapshot(payload);
     const conversationId = Number((convo as any)?.id);
     if (Number.isFinite(conversationId) && conversationId > 0) {
-      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-        reason: existed ? 'upsertConversation' : 'createConversation',
-        conversationId,
-      });
       fireAndForget(
         deps.onConversationChanged(
           conversationId,
@@ -220,11 +215,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
 
     const res = await mergeConversationsByIds({ keepConversationId, removeConversationId });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'mergeConversations',
-      conversationId: keepConversationId,
-      removedConversationId: removeConversationId,
-    });
     if (res?.merged === true) {
       fireAndForget(
         deps.onConversationChanged(keepConversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.mergeConversation),
@@ -316,10 +306,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
 
     const res = await writeConversationMessagesSnapshot(conversationId, messages, { mode, diff });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'upsert',
-      conversationId,
-    });
     fireAndForget(
       deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
     );
@@ -337,20 +323,12 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       onProgress: async (progress) => {
         const updatedMessages = Number(progress?.updatedMessages) || 0;
         if (updatedMessages <= 0) return;
-        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'upsert',
-          conversationId,
-        });
         if (progressEnqueued) return;
         progressEnqueued = true;
         fireAndForget(
           deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages),
         );
       },
-    });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'upsert',
-      conversationId,
     });
     fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages));
     return router.ok(res);
@@ -359,13 +337,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
   router.register(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, async (msg) => {
     const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
     const res = await deleteConversationsByIds(ids);
-    const normalizedIds = Array.isArray(ids)
-      ? ids.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
-      : [];
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'delete',
-      conversationIds: normalizedIds,
-    });
     if (Number((res as any)?.deletedConversations) > 0) fireAndForget(deps.onRemoteCleanupPending());
     return router.ok(res);
   });

@@ -27,6 +27,24 @@ describe('sync provider gate', () => {
     store = {};
   });
 
+  it('owns the stable provider gate storage dependency set', async () => {
+    const { getSyncProviderEnabledStorageKeys, hasSyncProviderEnabledStorageChange } =
+      await import('@services/sync/sync-provider-gate');
+    expect(getSyncProviderEnabledStorageKeys()).toEqual([
+      'webclipper_sync_provider_obsidian_enabled',
+      'webclipper_sync_provider_notion_enabled',
+      'webclipper_sync_provider_feishu_enabled',
+      'webclipper_sync_provider_github_enabled',
+    ]);
+    expect(
+      hasSyncProviderEnabledStorageChange({ webclipper_sync_provider_github_enabled: { newValue: false } }, 'local'),
+    ).toBe(true);
+    expect(
+      hasSyncProviderEnabledStorageChange({ webclipper_sync_provider_github_enabled: { newValue: false } }, 'sync'),
+    ).toBe(false);
+    expect(hasSyncProviderEnabledStorageChange({ unrelated: { newValue: false } }, 'local')).toBe(false);
+  });
+
   it('defaults to enabled when key is missing', async () => {
     const { getEnabledSyncProviders, isSyncProviderEnabled } = await import('@services/sync/sync-provider-gate');
     expect(await isSyncProviderEnabled('notion')).toBe(true);

@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { openDb } from '../../src/platform/idb/schema';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
 
 import {
-  __closeDbForTests as __closeCommentDbForTests,
   attachOrphanCommentsToConversation,
   listArticleCommentsByConversationId,
 } from '@services/comments/data/storage-idb';
 import { buildConversationBasename, stableConversationId10 } from '@services/conversations/domain/file-naming';
 import {
-  __closeDbForTests,
+  __resetConversationStorageStateForTests,
   deleteConversationsByIds,
   getConversationById,
   getConversationTailWindowBySourceAndKey,
@@ -46,8 +47,46 @@ async function deleteDb(name: string) {
   await reqToPromise(req as unknown as IDBRequest<unknown>);
 }
 
+describe('conversation list stored-key normalization', () => {
+  it('normalizes source/site keys and only falls back to stored keys when source/url cannot derive them', () => {
+    expect(
+      normalizeConversationListRecord({
+        source: ' Web ',
+        url: 'HTTPS://Example.COM/path#fragment',
+        listSourceKey: 'stale-source',
+        listSiteKey: 'stale.example',
+      }),
+    ).toMatchObject({ listSourceKey: 'web', listSiteKey: 'domain:example.com' });
+
+    expect(
+      normalizeConversationListRecord({
+        source: ' ',
+        url: 'mailto:test@example.com',
+        listSourceKey: ' ChatGPT ',
+        listSiteKey: ' Example.COM ',
+      }),
+    ).toMatchObject({ listSourceKey: 'chatgpt', listSiteKey: 'domain:example.com' });
+
+    expect(normalizeConversationListRecord({ source: '', url: 'not a url' })).toMatchObject({
+      listSourceKey: 'unknown',
+      listSiteKey: 'unknown',
+    });
+  });
+
+  it('preserves object identity when the stored keys are already canonical', () => {
+    const record = {
+      source: 'web',
+      url: 'https://example.com/post',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
+    };
+    expect(normalizeConversationListRecord(record)).toBe(record);
+  });
+});
+
 beforeEach(async () => {
-  await __closeDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -57,8 +96,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
-  await __closeCommentDbForTests();
+  __resetConversationStorageStateForTests();
+  closeDbForTests();
 });
 
 async function listAllConversationsForTests() {
@@ -66,7 +105,157 @@ async function listAllConversationsForTests() {
   return page.items;
 }
 
+async function seedImageCacheRow(input: {
+  conversationId: number;
+  url: string;
+  blob?: Blob;
+  byteSize?: number;
+  contentType?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}): Promise<number> {
+  const db = await openDb();
+  const transaction = db.transaction(['image_cache'], 'readwrite');
+  const id = await reqToPromise<number>(
+    transaction.objectStore('image_cache').add({
+      conversationId: input.conversationId,
+      url: input.url,
+      ...(input.blob ? { blob: input.blob } : {}),
+      byteSize: input.byteSize ?? input.blob?.size ?? 0,
+      contentType: input.contentType || input.blob?.type || 'image/png',
+      createdAt: input.createdAt ?? 1,
+      updatedAt: input.updatedAt ?? 1,
+    }) as any,
+  );
+  await txDone(transaction);
+  return Number(id);
+}
+
+async function readImageCacheRows(): Promise<any[]> {
+  const db = await openDb();
+  const transaction = db.transaction(['image_cache'], 'readonly');
+  const rows = await reqToPromise<any[]>(transaction.objectStore('image_cache').getAll());
+  await txDone(transaction);
+  return rows;
+}
+
+async function createMergePair(suffix: string) {
+  const keep = await upsertConversation({
+    sourceType: 'chat',
+    source: 'debug',
+    conversationKey: `merge-keep-${suffix}`,
+    title: 'keep',
+    lastCapturedAt: 1,
+  });
+  const remove = await upsertConversation({
+    sourceType: 'chat',
+    source: 'debug',
+    conversationKey: `merge-remove-${suffix}`,
+    title: 'remove',
+    lastCapturedAt: 2,
+  });
+  return { keepId: Number(keep.id), removeId: Number(remove.id) };
+}
+
 describe('conversations storage-idb', () => {
+  it('bumps conversations for a new row and keeps an identical upsert revision-stable', async () => {
+    const payload = {
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'revision-stable',
+      title: 'Stable',
+      url: 'https://example.com/stable',
+      warningFlags: ['keep'],
+      lastCapturedAt: 10,
+    };
+
+    const created = await upsertConversation(payload);
+    expect(Number(created.id)).toBeGreaterThan(0);
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(0);
+
+    const repeated = await upsertConversation(payload);
+    expect(Number(repeated.id)).toBe(Number(created.id));
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(0);
+  });
+
+  it('preserves persisted mapping mirrors and unknown fields across an identical upsert', async () => {
+    const payload = {
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'preserve-existing-fields',
+      title: 'Preserve',
+      notionPageId: 'page-1',
+      feishuDocId: 'doc-1',
+      lastCapturedAt: 20,
+    };
+    const created = await upsertConversation(payload);
+    const id = Number(created.id);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations'], 'readwrite');
+    const store = seedTx.objectStore('conversations');
+    const row = await reqToPromise<any>(store.get(id));
+    await reqToPromise(
+      store.put({
+        ...row,
+        notionPageUrl: 'https://notion.so/page-1',
+        notionWorkspaceSlug: 'workspace-1',
+        futureConversationMetadata: { nested: { a: 1 } },
+      }),
+    );
+    await txDone(seedTx);
+
+    await upsertConversation(payload);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['conversations'], 'readonly');
+    const persisted = await reqToPromise<any>(verifyTx.objectStore('conversations').get(id));
+    await txDone(verifyTx);
+    expect(persisted).toMatchObject({
+      notionPageUrl: 'https://notion.so/page-1',
+      notionWorkspaceSlug: 'workspace-1',
+      futureConversationMetadata: { nested: { a: 1 } },
+    });
+  });
+
+  it('bumps only sync_mappings when upsert repairs a missing mapping mirror', async () => {
+    const payload = {
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'mapping-only',
+      title: 'Mapping only',
+      notionPageId: 'page-mirror',
+      lastCapturedAt: 30,
+    };
+    const created = await upsertConversation(payload);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'chatgpt',
+        conversationKey: 'mapping-only',
+        unknownMetadata: { keep: true },
+      }),
+    );
+    await txDone(seedTx);
+
+    await upsertConversation(payload);
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(1);
+    const mapping = await getSyncMappingByConversation(Number(created.id));
+    expect(mapping?.mapping).toMatchObject({
+      notionPageId: 'page-mirror',
+      unknownMetadata: { keep: true },
+    });
+  });
+
   it('upserts conversation and lists conversations sorted by lastCapturedAt desc', async () => {
     await upsertConversation({
       sourceType: 'chat',
@@ -118,6 +307,82 @@ describe('conversations storage-idb', () => {
 
     const after = await getMessagesByConversationId(id);
     expect(after.map((m) => m.messageKey)).toEqual(['m1']);
+  });
+
+  it('keeps equivalent message rows revision-stable when incoming timestamps are missing or invalid', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'message_timestamp_noop',
+      title: 'Timestamp no-op',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    const stableMessage = {
+      messageKey: 'm1',
+      role: 'user',
+      authorName: 'User',
+      contentText: 'same',
+      contentMarkdown: 'same',
+      sequence: 1,
+    };
+
+    await syncConversationMessages(id, [{ ...stableMessage, updatedAt: 100 }]);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    const db = await openDb();
+    const probeTx = db.transaction(['messages'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('messages')) as any;
+    const originalPut = prototype.put;
+    await txDone(probeTx);
+    prototype.put = function put(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'messages') throw new DOMException('equivalent message must not be put', 'DataError');
+      return originalPut.call(this, value, key);
+    };
+
+    try {
+      for (const updatedAt of [undefined, '100', Number.NaN, Number.POSITIVE_INFINITY]) {
+        const snapshotResult = await syncConversationMessages(id, [{ ...stableMessage, updatedAt }]);
+        expect(snapshotResult).toEqual({ upserted: 1, deleted: 0 });
+      }
+      const incrementalResult = await syncConversationMessages(id, [{ ...stableMessage }], {
+        mode: 'incremental',
+        diff: { added: [], updated: ['m1'], removed: [] },
+      });
+      expect(incrementalResult).toEqual({ upserted: 1, deleted: 0 });
+      const appendResult = await syncConversationMessages(id, [{ ...stableMessage }], {
+        mode: 'append',
+        diff: { added: [], updated: ['m1'], removed: [] },
+      });
+      expect(appendResult).toEqual({ upserted: 1, deleted: 0 });
+    } finally {
+      prototype.put = originalPut;
+    }
+
+    expect(await readDataRevision('messages')).toBe(1);
+    const preserved = await getMessagesByConversationId(id);
+    expect(preserved[0]?.updatedAt).toBe(100);
+
+    await syncConversationMessages(id, [{ ...stableMessage, updatedAt: 101 }]);
+    expect(await readDataRevision('messages')).toBe(2);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(101);
+  });
+
+  it('uses a current timestamp only when inserting a new message without a finite timestamp', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'message_timestamp_new',
+      title: 'Timestamp new',
+      lastCapturedAt: 1,
+    });
+    const before = Date.now();
+    await syncConversationMessages(Number(convo.id), [
+      { messageKey: 'm1', role: 'user', contentText: 'new', sequence: 1, updatedAt: 'invalid' },
+    ]);
+    const stored = await getMessagesByConversationId(Number(convo.id));
+    expect(Number(stored[0]?.updatedAt)).toBeGreaterThanOrEqual(before);
+    expect(Number(stored[0]?.updatedAt)).toBeLessThanOrEqual(Date.now());
   });
 
   it('syncs messages incrementally without snapshot cleanup', async () => {
@@ -766,7 +1031,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(seedTx);
-    db.close();
 
     await patchSyncMapping(conversationId, {
       notionSections: { conversations: { headingBlockId: 'h-new' } },
@@ -831,6 +1095,127 @@ describe('conversations storage-idb', () => {
     });
     expect(Number(afterCursor?.mapping?.lastSyncedAt)).toBeGreaterThan(0);
     expect(Number(afterCursor?.mapping?.updatedAt)).toBeGreaterThanOrEqual(beforeCursorUpdatedAt);
+  });
+
+  it('keeps audit metadata and absent provider targets stable for business-equivalent mapping patches', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-business-noop',
+      title: 'Mapping business no-op',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'mapping-business-noop',
+        customMetadata: 'same',
+        updatedAt: 123,
+      }),
+    );
+    await txDone(seedTx);
+
+    const conversationsBefore = await readDataRevision('conversations');
+    const mappingsBefore = await readDataRevision('sync_mappings');
+    await patchSyncMapping(conversationId, { customMetadata: 'same' });
+
+    const unchanged = await getSyncMappingByConversation(conversationId);
+    expect(unchanged?.mapping?.updatedAt).toBe(123);
+    expect(Object.prototype.hasOwnProperty.call(unchanged?.mapping || {}, 'notionPageId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(unchanged?.mapping || {}, 'feishuDocId')).toBe(false);
+    expect(await readDataRevision('conversations')).toBe(conversationsBefore);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore);
+
+    await patchSyncMapping(conversationId, { customMetadata: 'changed' });
+    const changed = await getSyncMappingByConversation(conversationId);
+    expect(changed?.mapping?.customMetadata).toBe('changed');
+    expect(Object.prototype.hasOwnProperty.call(changed?.mapping || {}, 'notionPageId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(changed?.mapping || {}, 'feishuDocId')).toBe(false);
+    expect(await readDataRevision('conversations')).toBe(conversationsBefore);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore + 1);
+  });
+
+  it('repairs a conversation provider mirror without rewriting an equivalent mapping', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-mirror-only',
+      title: 'Mapping mirror only',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'mapping-mirror-only',
+        feishuDocId: 'doc-existing',
+        updatedAt: 321,
+      }),
+    );
+    await txDone(seedTx);
+
+    const conversationsBefore = await readDataRevision('conversations');
+    const mappingsBefore = await readDataRevision('sync_mappings');
+    await patchSyncMapping(conversationId, { feishuDocId: 'doc-existing' });
+
+    const after = await getSyncMappingByConversation(conversationId);
+    expect(after?.mapping?.updatedAt).toBe(321);
+    expect(after?.mapping?.feishuDocId).toBe('doc-existing');
+    expect(after?.conversation?.feishuDocId).toBe('doc-existing');
+    expect(await readDataRevision('conversations')).toBe(conversationsBefore + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore);
+  });
+
+  it('generates a strictly newer implicit sync baseline and keeps an explicit identical cursor stable', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'cursor-baseline-monotonic',
+      title: 'Cursor baseline',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+    const previousBaseline = 9_000_000_000_000;
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'cursor-baseline-monotonic',
+        lastSyncedMessageKey: 'm1',
+        lastSyncedSequence: 1,
+        lastSyncedAt: previousBaseline,
+        lastSyncedMessageUpdatedAt: 2,
+        updatedAt: 50,
+      }),
+    );
+    await txDone(seedTx);
+
+    const mappingsBefore = await readDataRevision('sync_mappings');
+    await setSyncCursor(conversationId, {
+      lastSyncedMessageKey: 'm1',
+      lastSyncedSequence: 1,
+      lastSyncedMessageUpdatedAt: 2,
+    });
+    const generated = await getSyncMappingByConversation(conversationId);
+    expect(generated?.mapping?.lastSyncedAt).toBe(previousBaseline + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore + 1);
+
+    const generatedUpdatedAt = generated?.mapping?.updatedAt;
+    await setSyncCursor(conversationId, {
+      lastSyncedMessageKey: 'm1',
+      lastSyncedSequence: 1,
+      lastSyncedAt: previousBaseline + 1,
+      lastSyncedMessageUpdatedAt: 2,
+    });
+    const explicitNoop = await getSyncMappingByConversation(conversationId);
+    expect(explicitNoop?.mapping?.updatedAt).toBe(generatedUpdatedAt);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore + 1);
   });
 
   it('resets stale Notion continuity when the destination page changes and keeps the same mapping identity', async () => {
@@ -931,7 +1316,6 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(tx);
-    db.close();
 
     await setConversationNotionPageId(conversationId, 'page-new');
 
@@ -1010,7 +1394,6 @@ describe('conversations storage-idb', () => {
       t.onerror = () => reject(t.error || new Error('tx failed'));
       t.onabort = () => reject(t.error || new Error('tx aborted'));
     });
-    db.close();
 
     const res = await deleteConversationsByIds([id]);
     expect(res.deletedConversations).toBe(1);
@@ -1024,7 +1407,77 @@ describe('conversations storage-idb', () => {
     const verifyTx = verifyDb.transaction(['github_cleanup_outbox'], 'readonly');
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
+  });
+
+  it('advances each affected scope once when deleting an article with messages, mapping, image, and comments', async () => {
+    const canonicalUrl = 'https://example.com/delete-revisions';
+    const convo = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${canonicalUrl}`,
+      title: 'Delete revisions',
+      url: canonicalUrl,
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'delete me', sequence: 1, updatedAt: 1 },
+    ]);
+    await seedImageCacheRow({
+      conversationId: id,
+      url: 'https://example.com/delete.png',
+      blob: new Blob(['image'], { type: 'image/png' }),
+      byteSize: 5,
+    });
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings', 'article_comments'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'web',
+        conversationKey: `article:${canonicalUrl}`,
+        notionPageId: 'page-delete',
+      }),
+    );
+    const commentId = await reqToPromise<number>(
+      seedTx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId: id,
+        canonicalUrl,
+        quoteText: '',
+        commentText: 'detach me',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await txDone(seedTx);
+
+    const before = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
+
+    const result = await deleteConversationsByIds([id]);
+    expect(result).toEqual({
+      deletedConversations: 1,
+      deletedMessages: 1,
+      deletedMappings: 1,
+      deletedImageCache: 1,
+    });
+    expect(await readDataRevision('conversations')).toBe(before.conversations + 1);
+    expect(await readDataRevision('messages')).toBe(before.messages + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(before.sync_mappings + 1);
+    expect(await readDataRevision('image_cache')).toBe(before.image_cache + 1);
+    expect(await readDataRevision('article_comments')).toBe(before.article_comments + 1);
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['article_comments'], 'readonly');
+    const detached = await reqToPromise<any>(verifyTx.objectStore('article_comments').get(commentId));
+    await txDone(verifyTx);
+    expect(detached).toMatchObject({ id: commentId, conversationId: null, canonicalUrl });
   });
 
   it('atomically enqueues only identity-owned GitHub managed paths before deleting local facts', async () => {
@@ -1062,7 +1515,6 @@ describe('conversations storage-idb', () => {
     const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
     const rows = await reqToPromise<any[]>(tx.objectStore('github_cleanup_outbox').getAll());
     await txDone(tx);
-    db.close();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       remoteKey: 'github.com/owner/repo@main',
@@ -1110,7 +1562,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(tx);
-    db.close();
 
     await deleteConversationsByIds([id]);
 
@@ -1118,7 +1569,6 @@ describe('conversations storage-idb', () => {
     const orphanTx = orphanDb.transaction(['article_comments'], 'readonly');
     const orphans = await reqToPromise<any[]>(orphanTx.objectStore('article_comments').getAll());
     await txDone(orphanTx);
-    orphanDb.close();
     expect(orphans).toHaveLength(2);
     expect(orphans.map((row) => row.conversationId)).toEqual([null, null]);
     expect(orphans.find((row) => row.id === replyId)?.parentId).toBe(parentId);
@@ -1169,7 +1619,6 @@ describe('conversations storage-idb', () => {
     const tx = db.transaction(['github_cleanup_outbox'], 'readonly');
     expect(await reqToPromise(tx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(tx);
-    db.close();
   });
 
   it('aborts conversation delete if cleanup enqueue fails, preserving conversation mapping and comments', async () => {
@@ -1207,11 +1656,17 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(commentTx);
+    const revisionsBeforeFailure = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
     const probeTx = db.transaction(['github_cleanup_outbox'], 'readonly');
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
     await txDone(probeTx);
-    db.close();
 
     prototype.add = function add(value: unknown, key?: IDBValidKey) {
       if (this.name === 'github_cleanup_outbox') throw new DOMException('forced outbox failure', 'DataError');
@@ -1232,7 +1687,11 @@ describe('conversations storage-idb', () => {
     expect(comments[0]?.conversationId).toBe(id);
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
+    expect(await readDataRevision('conversations')).toBe(revisionsBeforeFailure.conversations);
+    expect(await readDataRevision('messages')).toBe(revisionsBeforeFailure.messages);
+    expect(await readDataRevision('sync_mappings')).toBe(revisionsBeforeFailure.sync_mappings);
+    expect(await readDataRevision('image_cache')).toBe(revisionsBeforeFailure.image_cache);
+    expect(await readDataRevision('article_comments')).toBe(revisionsBeforeFailure.article_comments);
   });
 
   it('rewrites an explicit article identity atomically while migrating owned and orphan comments', async () => {
@@ -1308,7 +1767,12 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(commentTx);
-    db.close();
+
+    const revisionsBeforeRewrite = {
+      conversations: await readDataRevision('conversations'),
+      syncMappings: await readDataRevision('sync_mappings'),
+      articleComments: await readDataRevision('article_comments'),
+    };
 
     const rewritten = await upsertConversation({
       id: existingId,
@@ -1332,7 +1796,6 @@ describe('conversations storage-idb', () => {
     const commentRows = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
     const cleanupRows = await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll());
     await txDone(verifyTx);
-    verifyDb.close();
 
     expect(commentRows.find((row) => row.id === ownedId)).toMatchObject({
       conversationId: existingId,
@@ -1358,6 +1821,90 @@ describe('conversations storage-idb', () => {
       replacementConversationId: existingId,
     });
     expect(cleanupRows[0].nextAttemptAt).toBe(cleanupRows[0].createdAt);
+    expect(await readDataRevision('conversations')).toBe(revisionsBeforeRewrite.conversations + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(revisionsBeforeRewrite.syncMappings + 1);
+    expect(await readDataRevision('article_comments')).toBe(revisionsBeforeRewrite.articleComments + 1);
+  });
+
+  it('skips an equivalent canonical mapping put while still deleting the legacy identity row', async () => {
+    const oldUrl = 'https://example.com/equivalent-mapping-old';
+    const nextUrl = 'https://example.com/equivalent-mapping-new';
+    const existing = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${oldUrl}`,
+      title: 'Equivalent mapping',
+      url: oldUrl,
+      lastCapturedAt: 1,
+    });
+    const existingId = Number(existing.id);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    const mappings = seedTx.objectStore('sync_mappings');
+    const sharedBusinessState = {
+      notionPageId: 'page-1',
+      notionPageUrl: 'https://notion.so/page-1',
+      lastSyncedAt: 20,
+      futureProviderMetadata: { nested: { a: 1, b: 2 } },
+    };
+    const legacyId = await reqToPromise<number>(
+      mappings.add({
+        source: 'web',
+        conversationKey: `article:${oldUrl}`,
+        ...sharedBusinessState,
+        updatedAt: 1,
+      }) as any,
+    );
+    const targetId = await reqToPromise<number>(
+      mappings.add({
+        conversationKey: `article:${nextUrl}`,
+        source: 'web',
+        futureProviderMetadata: { nested: { b: 2, a: 1 } },
+        notionPageUrl: 'https://notion.so/page-1',
+        notionPageId: 'page-1',
+        lastSyncedAt: 20,
+        updatedAt: 999,
+      }) as any,
+    );
+    await txDone(seedTx);
+
+    const probeTx = db.transaction(['sync_mappings'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('sync_mappings')) as any;
+    const originalPut = prototype.put;
+    await txDone(probeTx);
+
+    prototype.put = function put(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'sync_mappings') throw new DOMException('equivalent mapping must not be put', 'DataError');
+      return originalPut.call(this, value, key);
+    };
+    try {
+      const rewritten = await upsertConversation({
+        id: existingId,
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: `article:${oldUrl}`,
+        title: 'Equivalent mapping rewritten',
+        url: nextUrl,
+        lastCapturedAt: 2,
+      });
+      expect(rewritten.conversationKey).toBe(`article:${nextUrl}`);
+    } finally {
+      prototype.put = originalPut;
+    }
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['sync_mappings'], 'readonly');
+    const rows = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
+    await txDone(verifyTx);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: targetId,
+      source: 'web',
+      conversationKey: `article:${nextUrl}`,
+      updatedAt: 999,
+    });
+    expect(rows.some((row) => Number(row.id) === Number(legacyId))).toBe(false);
   });
 
   it('aborts an article identity rewrite when GitHub cleanup enqueue fails', async () => {
@@ -1397,7 +1944,6 @@ describe('conversations storage-idb', () => {
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
     await txDone(probeTx);
-    db.close();
 
     prototype.add = function add(value: unknown, key?: IDBValidKey) {
       if (this.name === 'github_cleanup_outbox') throw new DOMException('forced identity outbox failure', 'DataError');
@@ -1432,7 +1978,6 @@ describe('conversations storage-idb', () => {
     expect(rows[0]).toMatchObject({ conversationId: existingId, canonicalUrl: oldUrl, commentText: 'must stay old' });
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
   });
 
   it('reuses and rewrites legacy article conversation rows by normalized url', async () => {
@@ -1475,7 +2020,6 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(t);
-    db.close();
 
     const conversation = await upsertConversation({
       sourceType: 'article',
@@ -1496,7 +2040,6 @@ describe('conversations storage-idb', () => {
     const verifyConversations = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll());
     const verifyMappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
     await txDone(verifyTx);
-    reopened.close();
 
     expect(verifyConversations).toHaveLength(1);
     expect(verifyConversations[0]).toMatchObject({
@@ -1604,7 +2147,6 @@ describe('conversations storage-idb', () => {
       }) as any,
     );
     await txDone(t);
-    db.close();
 
     const res = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
     expect(res.keptConversationId).toBe(keepId);
@@ -1630,7 +2172,6 @@ describe('conversations storage-idb', () => {
     const verifyComments = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
     const cleanupRows = await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll());
     await txDone(verifyTx);
-    reopened.close();
 
     expect(verifyMappings).toHaveLength(1);
     expect(verifyMappings[0]).toMatchObject({
@@ -1665,6 +2206,155 @@ describe('conversations storage-idb', () => {
       reason: 'identity_move',
       replacementConversationId: keepId,
     });
+  });
+
+  it('deduplicates same-URL valid image assets without overwriting the keep-side payload', async () => {
+    const { keepId, removeId } = await createMergePair('image-valid');
+    const url = 'https://example.com/shared-valid.png';
+    const keepIdAsset = await seedImageCacheRow({
+      conversationId: keepId,
+      url,
+      blob: new Blob(['keep'], { type: 'image/png' }),
+      byteSize: 4,
+      updatedAt: 10,
+    });
+    await seedImageCacheRow({
+      conversationId: removeId,
+      url,
+      blob: new Blob(['remove'], { type: 'image/png' }),
+      byteSize: 6,
+      updatedAt: 20,
+    });
+    const beforeConversationRevision = await readDataRevision('conversations');
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result).toMatchObject({ merged: true, movedImageCache: 0 });
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: keepIdAsset, conversationId: keepId, url, byteSize: 4 });
+    expect(await readDataRevision('image_cache')).toBe(1);
+    expect(await readDataRevision('conversations')).toBe(beforeConversationRevision + 1);
+    expect(await readDataRevision('messages')).toBe(0);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(0);
+  });
+
+  it('repairs an invalid keep-side image with the valid remove-side payload while preserving keep identity', async () => {
+    const { keepId, removeId } = await createMergePair('image-repair');
+    const url = 'https://example.com/shared-repair.png';
+    const keepAssetId = await seedImageCacheRow({
+      conversationId: keepId,
+      url,
+      blob: new Blob([], { type: 'image/png' }),
+      byteSize: 0,
+      updatedAt: 10,
+    });
+    await seedImageCacheRow({
+      conversationId: removeId,
+      url,
+      blob: new Blob(['source'], { type: 'image/webp' }),
+      byteSize: 6,
+      contentType: 'image/webp',
+      updatedAt: 20,
+    });
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result.movedImageCache).toBe(1);
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: keepAssetId,
+      conversationId: keepId,
+      url,
+      byteSize: 6,
+      contentType: 'image/webp',
+    });
+    expect((rows[0].blob as Blob).size).toBe(6);
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
+  it('deterministically keeps the keep-side row when both colliding image payloads are invalid', async () => {
+    const { keepId, removeId } = await createMergePair('image-invalid');
+    const url = 'https://example.com/shared-invalid.png';
+    const keepAssetId = await seedImageCacheRow({ conversationId: keepId, url, blob: new Blob([]), byteSize: 0 });
+    await seedImageCacheRow({ conversationId: removeId, url, blob: new Blob([]), byteSize: 0 });
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result.movedImageCache).toBe(0);
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: keepAssetId, conversationId: keepId, url, byteSize: 0 });
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
+  it('reassigns a non-colliding image row without changing its asset id', async () => {
+    const { keepId, removeId } = await createMergePair('image-move');
+    const url = 'https://example.com/remove-only.png';
+    const removeAssetId = await seedImageCacheRow({
+      conversationId: removeId,
+      url,
+      blob: new Blob(['move'], { type: 'image/png' }),
+      byteSize: 4,
+    });
+
+    const result = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    expect(result.movedImageCache).toBe(1);
+    const rows = await readImageCacheRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: removeAssetId, conversationId: keepId, url, byteSize: 4 });
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
+  it('rolls back earlier merge mutations and all revisions when an image write fails', async () => {
+    const { keepId, removeId } = await createMergePair('image-abort');
+    await syncConversationMessages(removeId, [
+      { messageKey: 'm1', role: 'user', contentText: 'remove-message', sequence: 1, updatedAt: 1 },
+    ]);
+    await seedImageCacheRow({
+      conversationId: removeId,
+      url: 'https://example.com/fail.png',
+      blob: new Blob(['fail'], { type: 'image/png' }),
+      byteSize: 4,
+    });
+    const revisionsBefore = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
+
+    const db = await openDb();
+    const probeTx = db.transaction(['image_cache'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('image_cache')) as any;
+    const originalPut = prototype.put;
+    await txDone(probeTx);
+    prototype.put = function put(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'image_cache') throw new DOMException('forced image merge failure', 'DataError');
+      return originalPut.call(this, value, key);
+    };
+    try {
+      await expect(
+        mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId }),
+      ).rejects.toThrow();
+    } finally {
+      prototype.put = originalPut;
+    }
+
+    expect(await getConversationById(keepId)).not.toBeNull();
+    expect(await getConversationById(removeId)).not.toBeNull();
+    expect(await getMessagesByConversationId(keepId)).toEqual([]);
+    expect((await getMessagesByConversationId(removeId)).map((row) => row.messageKey)).toEqual(['m1']);
+    expect((await readImageCacheRows())[0]).toMatchObject({ conversationId: removeId });
+    expect(await readDataRevision('conversations')).toBe(revisionsBefore.conversations);
+    expect(await readDataRevision('messages')).toBe(revisionsBefore.messages);
+    expect(await readDataRevision('sync_mappings')).toBe(revisionsBefore.sync_mappings);
+    expect(await readDataRevision('image_cache')).toBe(revisionsBefore.image_cache);
+    expect(await readDataRevision('article_comments')).toBe(revisionsBefore.article_comments);
   });
 
   it('keeps canonical provider targets atomic when merging conversations with conflicting mappings', async () => {
@@ -1744,7 +2434,6 @@ describe('conversations storage-idb', () => {
       }),
     );
     await txDone(tx);
-    db.close();
 
     await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
 
@@ -1753,7 +2442,6 @@ describe('conversations storage-idb', () => {
     const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
     const cleanupRows = await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll());
     await txDone(verifyTx);
-    reopened.close();
 
     expect(mappings).toHaveLength(1);
     expect(mappings[0]).toMatchObject({
@@ -1830,7 +2518,6 @@ describe('conversations storage-idb', () => {
     const prototype = Object.getPrototypeOf(probeTx.objectStore('github_cleanup_outbox')) as any;
     const originalAdd = prototype.add;
     await txDone(probeTx);
-    db.close();
 
     prototype.add = function add(value: unknown, key?: IDBValidKey) {
       if (this.name === 'github_cleanup_outbox') throw new DOMException('forced merge outbox failure', 'DataError');
@@ -1858,7 +2545,6 @@ describe('conversations storage-idb', () => {
     });
     expect(await reqToPromise(verifyTx.objectStore('github_cleanup_outbox').count())).toBe(0);
     await txDone(verifyTx);
-    verifyDb.close();
   });
 
   it('maintains listSourceKey/listSiteKey on upsert and merge writes', async () => {

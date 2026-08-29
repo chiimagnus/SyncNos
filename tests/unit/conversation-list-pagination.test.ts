@@ -18,16 +18,6 @@ vi.mock('../../src/ui/i18n', () => ({
   getCurrentLocale: () => 'en',
 }));
 
-const getEnabledSyncProviders = vi.fn<() => Promise<Array<'obsidian' | 'notion'>>>();
-vi.mock('../../src/services/sync/sync-provider-gate', () => ({
-  getEnabledSyncProviders: () => getEnabledSyncProviders(),
-  syncProviderEnabledStorageKey: (provider: string) => `sync_provider_enabled.${provider}`,
-}));
-
-vi.mock('../../src/services/shared/storage', () => ({
-  storageOnChanged: () => () => {},
-}));
-
 let currentState: any = null;
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => currentState,
@@ -149,6 +139,7 @@ function buildState(overrides: Record<string, unknown> = {}) {
     },
     syncingNotion: false,
     syncingObsidian: false,
+    enabledSyncProviders: ['notion'],
     deleting: false,
     loadingList: false,
     loadingInitialList: false,
@@ -195,8 +186,6 @@ describe('ConversationListPane pagination behaviors', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 18, 12, 0, 0, 0));
     setupDom();
-    getEnabledSyncProviders.mockReset();
-    getEnabledSyncProviders.mockResolvedValue(['notion']);
     currentState = buildState();
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
@@ -423,6 +412,9 @@ describe('ConversationListPane pagination behaviors', () => {
 
     await renderPane();
     expect(loadMoreList).toHaveBeenCalledTimes(1);
+
+    // The mocked ViewModel mutates out-of-band; render the committed next snapshot explicitly.
+    await renderPane();
     expect(consumeListLocate).toHaveBeenCalledTimes(1);
     expect(loadMoreList.mock.invocationCallOrder[0]).toBeLessThan(consumeListLocate.mock.invocationCallOrder[0]);
   });
