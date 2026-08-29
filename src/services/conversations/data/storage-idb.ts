@@ -26,6 +26,7 @@ import {
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
 import {
+  areSyncMappingsBusinessEquivalent,
   mergeSyncMappingForIdentityMove,
   mergeSyncMappingPatch,
   readGithubContinuity,
@@ -281,14 +282,15 @@ async function enqueueGithubCleanupSnapshot(
 async function migrateArticleCommentsForIdentityRewrite(
   commentsStore: IDBObjectStore,
   input: { conversationId: number; fromCanonicalUrl: string; toCanonicalUrl: string; updatedAt: number },
-): Promise<void> {
-  if (!input.fromCanonicalUrl || !input.toCanonicalUrl || input.fromCanonicalUrl === input.toCanonicalUrl) return;
+): Promise<number> {
+  if (!input.fromCanonicalUrl || !input.toCanonicalUrl || input.fromCanonicalUrl === input.toCanonicalUrl) return 0;
   const index = commentsStore.index('by_canonicalUrl_createdAt');
   const range = globalThis.IDBKeyRange.bound(
     [input.fromCanonicalUrl, -Infinity] as any,
     [input.fromCanonicalUrl, Infinity] as any,
   );
   const rows = (await reqToPromise(index.getAll(range) as any)) as any[];
+  let updated = 0;
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row) continue;
     const currentConversationId = Number(row.conversationId);
@@ -296,7 +298,9 @@ async function migrateArticleCommentsForIdentityRewrite(
       row.conversationId == null || !Number.isFinite(currentConversationId) || currentConversationId <= 0;
     if (!isOrphan && currentConversationId !== input.conversationId) continue;
     await reqToPromise(commentsStore.put({ ...row, canonicalUrl: input.toCanonicalUrl, updatedAt: input.updatedAt }));
+    updated += 1;
   }
+  return updated;
 }
 
 async function migrateSyncMappingKey(
@@ -312,40 +316,37 @@ async function migrateSyncMappingKey(
     replacementConversationId?: number;
     createdAt: number;
   },
-): Promise<void> {
+): Promise<{ syncMappingChanged: boolean }> {
   const legacySource = safeString(input.legacySource);
   const legacyConversationKey = safeString(input.legacyConversationKey);
   const nextSource = safeString(input.nextSource);
   const nextConversationKey = safeString(input.nextConversationKey);
   const fallbackNotionPageId = safeString(input.fallbackNotionPageId);
 
-  if (!nextSource || !nextConversationKey) return;
+  if (!nextSource || !nextConversationKey) return { syncMappingChanged: false };
   const idx = syncMappingsStore.index('by_source_conversationKey');
 
   const target = (await reqToPromise(idx.get([nextSource, nextConversationKey]) as any)) as any;
   const identity = { source: nextSource, conversationKey: nextConversationKey, fallbackNotionPageId };
-  const persistTargetFallback = async () => {
-    if (!target) return;
+  const persistTargetFallback = async (): Promise<boolean> => {
+    if (!target) return false;
     const merged = mergeSyncMappingForIdentityMove(target, null, identity) as any;
-    if (JSON.stringify(merged) !== JSON.stringify(target)) {
-      await reqToPromise(syncMappingsStore.put(merged));
-    }
+    if (areSyncMappingsBusinessEquivalent(merged, target)) return false;
+    await reqToPromise(syncMappingsStore.put(merged));
+    return true;
   };
 
   if (legacySource === nextSource && legacyConversationKey === nextConversationKey) {
-    await persistTargetFallback();
-    return;
+    return { syncMappingChanged: await persistTargetFallback() };
   }
 
   if (!legacySource || !legacyConversationKey) {
-    await persistTargetFallback();
-    return;
+    return { syncMappingChanged: await persistTargetFallback() };
   }
 
   const legacy = (await reqToPromise(idx.get([legacySource, legacyConversationKey]) as any)) as any;
   if (!legacy) {
-    await persistTargetFallback();
-    return;
+    return { syncMappingChanged: await persistTargetFallback() };
   }
 
   const replacementConversationId = Number(input.replacementConversationId);
@@ -360,16 +361,22 @@ async function migrateSyncMappingKey(
   if (!target) {
     const moved = mergeSyncMappingForIdentityMove(null, legacy, identity) as any;
     await reqToPromise(syncMappingsStore.put(moved));
-    return;
+    return { syncMappingChanged: true };
   }
 
+  let syncMappingChanged = false;
   const merged = mergeSyncMappingForIdentityMove(target, legacy, identity) as any;
-  await reqToPromise(syncMappingsStore.put(merged));
+  if (!areSyncMappingsBusinessEquivalent(merged, target)) {
+    await reqToPromise(syncMappingsStore.put(merged));
+    syncMappingChanged = true;
+  }
 
   const legacyId = Number(legacy.id);
   if (Number.isFinite(legacyId) && legacyId > 0 && legacyId !== Number(target.id)) {
     await reqToPromise(syncMappingsStore.delete(legacyId));
+    syncMappingChanged = true;
   }
+  return { syncMappingChanged };
 }
 
 export async function upsertConversation(payload: any): Promise<Conversation> {

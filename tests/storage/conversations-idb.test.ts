@@ -1386,6 +1386,87 @@ describe('conversations storage-idb', () => {
     expect(cleanupRows[0].nextAttemptAt).toBe(cleanupRows[0].createdAt);
   });
 
+  it('skips an equivalent canonical mapping put while still deleting the legacy identity row', async () => {
+    const oldUrl = 'https://example.com/equivalent-mapping-old';
+    const nextUrl = 'https://example.com/equivalent-mapping-new';
+    const existing = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${oldUrl}`,
+      title: 'Equivalent mapping',
+      url: oldUrl,
+      lastCapturedAt: 1,
+    });
+    const existingId = Number(existing.id);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    const mappings = seedTx.objectStore('sync_mappings');
+    const sharedBusinessState = {
+      notionPageId: 'page-1',
+      notionPageUrl: 'https://notion.so/page-1',
+      lastSyncedAt: 20,
+      futureProviderMetadata: { nested: { a: 1, b: 2 } },
+    };
+    const legacyId = await reqToPromise<number>(
+      mappings.add({
+        source: 'web',
+        conversationKey: `article:${oldUrl}`,
+        ...sharedBusinessState,
+        updatedAt: 1,
+      }) as any,
+    );
+    const targetId = await reqToPromise<number>(
+      mappings.add({
+        conversationKey: `article:${nextUrl}`,
+        source: 'web',
+        futureProviderMetadata: { nested: { b: 2, a: 1 } },
+        notionPageUrl: 'https://notion.so/page-1',
+        notionPageId: 'page-1',
+        lastSyncedAt: 20,
+        updatedAt: 999,
+      }) as any,
+    );
+    await txDone(seedTx);
+
+    const probeTx = db.transaction(['sync_mappings'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('sync_mappings')) as any;
+    const originalPut = prototype.put;
+    await txDone(probeTx);
+
+    prototype.put = function put(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'sync_mappings') throw new DOMException('equivalent mapping must not be put', 'DataError');
+      return originalPut.call(this, value, key);
+    };
+    try {
+      const rewritten = await upsertConversation({
+        id: existingId,
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: `article:${oldUrl}`,
+        title: 'Equivalent mapping rewritten',
+        url: nextUrl,
+        lastCapturedAt: 2,
+      });
+      expect(rewritten.conversationKey).toBe(`article:${nextUrl}`);
+    } finally {
+      prototype.put = originalPut;
+    }
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['sync_mappings'], 'readonly');
+    const rows = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
+    await txDone(verifyTx);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: targetId,
+      source: 'web',
+      conversationKey: `article:${nextUrl}`,
+      updatedAt: 999,
+    });
+    expect(rows.some((row) => Number(row.id) === Number(legacyId))).toBe(false);
+  });
+
   it('aborts an article identity rewrite when GitHub cleanup enqueue fails', async () => {
     const oldUrl = 'https://example.com/rewrite-abort-old';
     const nextUrl = 'https://example.com/rewrite-abort-new';

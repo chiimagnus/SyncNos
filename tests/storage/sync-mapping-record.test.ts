@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  areSyncMappingsBusinessEquivalent,
   mergeSyncMappingForIdentityMove,
   mergeSyncMappingForImport,
   mergeSyncMappingPatch,
@@ -60,6 +61,70 @@ function githubState(input: {
 }
 
 describe('sync mapping persistence record', () => {
+  it('compares business state independently of local id, audit updatedAt, and object key order', () => {
+    const left = {
+      id: 1,
+      updatedAt: 10,
+      source: 'web',
+      conversationKey: 'article:https://example.com/post',
+      lastSyncedAt: 20,
+      unknownMetadata: {
+        z: true,
+        nested: { b: 2, a: 1 },
+        ordered: ['first', { value: 2 }],
+      },
+      ...githubState({ syncedAt: 30, marker: 'a' }),
+      githubManagedFiles: {
+        'SyncNos-AIChats/chat.md': {
+          sha: 'A'.repeat(40),
+          contentHash: 'a'.repeat(64),
+          kind: 'markdown',
+        },
+      },
+    };
+    const right = {
+      id: 999,
+      updatedAt: 999,
+      conversationKey: 'article:https://example.com/post',
+      source: 'web',
+      unknownMetadata: {
+        ordered: ['first', { value: 2 }],
+        nested: { a: 1, b: 2 },
+        z: true,
+      },
+      lastSyncedAt: 20,
+      ...githubState({ syncedAt: 30, marker: 'a' }),
+    };
+
+    expect(areSyncMappingsBusinessEquivalent(left, right)).toBe(true);
+    expect(
+      areSyncMappingsBusinessEquivalent(left, {
+        ...right,
+        unknownMetadata: { ...right.unknownMetadata, ordered: [{ value: 2 }, 'first'] },
+      }),
+    ).toBe(false);
+    expect(areSyncMappingsBusinessEquivalent(left, { ...right, lastSyncedAt: 21 })).toBe(false);
+    expect(areSyncMappingsBusinessEquivalent(left, { ...right, githubLastSyncedAt: 31 })).toBe(false);
+  });
+
+  it('keeps unknown future provider fields in business equivalence', () => {
+    const base = {
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      obsidianGeneration: { note: 4, assets: ['a', 'b'] },
+      feishuLastSyncedAt: 50,
+    };
+
+    expect(areSyncMappingsBusinessEquivalent(base, structuredClone(base))).toBe(true);
+    expect(
+      areSyncMappingsBusinessEquivalent(base, {
+        ...base,
+        obsidianGeneration: { note: 5, assets: ['a', 'b'] },
+      }),
+    ).toBe(false);
+    expect(areSyncMappingsBusinessEquivalent(base, { ...base, feishuLastSyncedAt: 51 })).toBe(false);
+  });
+
   it('merges only explicitly provided valid Notion nested sections', () => {
     const existing = {
       id: 7,

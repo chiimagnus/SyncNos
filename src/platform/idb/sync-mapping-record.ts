@@ -136,6 +136,37 @@ function githubContinuityTimestamp(record: SyncMappingRecord): number | null {
   return validGithubLastSyncedAt(record.githubLastSyncedAt) ?? finiteNumber(record.updatedAt);
 }
 
+function syncMappingBusinessValueEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => syncMappingBusinessValueEqual(value, right[index]));
+  }
+  if (!isRecord(left) || !isRecord(right)) return false;
+
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) return false;
+    const key = leftKeys[index];
+    if (!syncMappingBusinessValueEqual(left[key], right[key])) return false;
+  }
+  return true;
+}
+
+function syncMappingBusinessRecord(value: unknown): SyncMappingRecord {
+  const next = { ...asRecord(value) };
+  delete next.id;
+  delete next.updatedAt;
+  replaceGithubGroup(next, value);
+  return next;
+}
+
+export function areSyncMappingsBusinessEquivalent(left: unknown, right: unknown): boolean {
+  return syncMappingBusinessValueEqual(syncMappingBusinessRecord(left), syncMappingBusinessRecord(right));
+}
+
 export function stripSyncMappingLocalId(record: unknown): SyncMappingRecord {
   const next = { ...asRecord(record) };
   delete next.id;
