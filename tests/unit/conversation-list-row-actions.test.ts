@@ -5,8 +5,6 @@ import { act, createElement } from 'react';
 
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
-const getConversationDetailMock = vi.fn();
-const formatConversationMarkdownMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 let currentState: any = null;
 
@@ -14,14 +12,6 @@ vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => key,
   formatConversationTitle: (text: string) => text,
   getCurrentLocale: () => 'en',
-}));
-
-vi.mock('../../src/services/conversations/client/repo', () => ({
-  getConversationDetail: (...args: any[]) => getConversationDetailMock(...args),
-}));
-
-vi.mock('../../src/services/conversations/external-markdown', () => ({
-  formatConversationMarkdownForExternalOutput: (...args: any[]) => formatConversationMarkdownMock(...args),
 }));
 
 vi.mock('../../src/services/shared/clipboard', () => ({
@@ -120,6 +110,7 @@ function buildState() {
       pendingListLocateId: null,
       consumeListLocate: vi.fn(() => null),
       loadMoreList: vi.fn(async () => {}),
+      copyConversationMarkdown: vi.fn().mockResolvedValue(undefined),
       exportSelectedMarkdown: vi.fn(),
       syncSelectedNotion: vi.fn().mockResolvedValue(undefined),
       syncSelectedObsidian: vi.fn().mockResolvedValue(undefined),
@@ -149,8 +140,6 @@ describe('ConversationListPane row actions', () => {
     conversation = built.conversation;
     currentState = built.state;
     onOpenConversation = vi.fn();
-    getConversationDetailMock.mockResolvedValue({ conversationId: 11, messages: [] });
-    formatConversationMarkdownMock.mockResolvedValue('# exact markdown\n');
     writeTextToClipboardMock.mockResolvedValue(true);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
@@ -187,12 +176,8 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(getConversationDetailMock).toHaveBeenCalledWith(11);
-    expect(formatConversationMarkdownMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: conversation.id, conversationKey: conversation.conversationKey }),
-      expect.objectContaining({ conversationId: 11 }),
-    );
-    expect(writeTextToClipboardMock).toHaveBeenCalledWith('# exact markdown\n');
+    expect(currentState.copyConversationMarkdown).toHaveBeenCalledWith(11);
+    expect(writeTextToClipboardMock).not.toHaveBeenCalled();
     expect(copyButton?.textContent).toBe('✓');
     expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
@@ -378,7 +363,7 @@ describe('ConversationListPane row actions', () => {
   it('reports clipboard failure without showing a copied state', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis, 'alert', { configurable: true, value: alertSpy });
-    writeTextToClipboardMock.mockResolvedValue(false);
+    currentState.copyConversationMarkdown.mockRejectedValueOnce(new Error('copyFailed'));
     await renderPane();
     const copyButton = document.querySelector('[aria-label="copyFullMarkdown"]') as HTMLButtonElement | null;
 

@@ -12,6 +12,8 @@ const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
+const formatConversationMarkdownForExternalOutput = vi.fn();
+const writeTextToClipboard = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
 const getEnabledSyncProviders = vi.fn();
 const subscribeDataRevisionChanges = vi.fn();
@@ -52,6 +54,14 @@ vi.mock('@services/conversations/client/repo', () => ({
   upsertConversation: (...args: any[]) => upsertConversation(...args),
   mergeConversations: (...args: any[]) => mergeConversations(...args),
   backfillConversationImages: (...args: any[]) => backfillConversationImages(...args),
+}));
+
+vi.mock('@services/conversations/external-markdown', () => ({
+  formatConversationMarkdownForExternalOutput: (...args: any[]) => formatConversationMarkdownForExternalOutput(...args),
+}));
+
+vi.mock('@services/shared/clipboard', () => ({
+  writeTextToClipboard: (...args: any[]) => writeTextToClipboard(...args),
 }));
 
 vi.mock('@services/data-revisions/observer', () => ({
@@ -199,6 +209,10 @@ describe('ConversationsProvider data revisions', () => {
     upsertConversation.mockReset();
     mergeConversations.mockReset();
     backfillConversationImages.mockReset();
+    formatConversationMarkdownForExternalOutput.mockReset();
+    formatConversationMarkdownForExternalOutput.mockResolvedValue('# fresh markdown\n');
+    writeTextToClipboard.mockReset();
+    writeTextToClipboard.mockResolvedValue(true);
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
     getEnabledSyncProviders.mockReset();
@@ -488,6 +502,97 @@ describe('ConversationsProvider data revisions', () => {
     expect(String(latestState.selectedConversation?.title || '')).toBe('fresh point title');
     expect(String(latestState.selectedConversation?.author || '')).toBe('fresh author');
     expect(Number(latestState.selectedConversation?.commentThreadCount)).toBe(7);
+  });
+
+  it('copies row markdown from fresh point metadata and fresh detail without mutating provider state', async () => {
+    const stale = {
+      ...makeConversation(1),
+      title: 'stale title',
+      author: 'stale author',
+      publishedAt: '2025-01-01',
+      warningFlags: ['stale-warning'],
+      url: 'https://example.com/stale',
+    };
+    const fresh = {
+      ...makeConversation(1),
+      title: 'fresh title',
+      author: 'fresh author',
+      publishedAt: '2026-08-29',
+      warningFlags: ['fresh-warning'],
+      url: 'https://example.com/fresh',
+    };
+    const freshDetail = { conversationId: 1, messages: [{ messageKey: 'm1', contentText: 'fresh body' }] };
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([stale]));
+    getConversationById.mockResolvedValue(fresh);
+    getConversationDetail.mockResolvedValue(freshDetail);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    const activeBefore = latestState.activeId;
+    const selectedBefore = [...latestState.selectedIds];
+    formatConversationMarkdownForExternalOutput.mockClear();
+    writeTextToClipboard.mockClear();
+    requestDataRevisionRetry.mockClear();
+
+    await act(async () => {
+      await latestState.copyConversationMarkdown(1);
+      await flushMicrotasks();
+    });
+
+    expect(getConversationById.mock.calls.at(-1)?.[0]).toBe(1);
+    expect(getConversationDetail.mock.calls.at(-1)?.[0]).toBe(1);
+    expect(formatConversationMarkdownForExternalOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        title: 'fresh title',
+        author: 'fresh author',
+        publishedAt: '2026-08-29',
+        warningFlags: ['fresh-warning'],
+        url: 'https://example.com/fresh',
+      }),
+      freshDetail,
+    );
+    expect(writeTextToClipboard).toHaveBeenCalledWith('# fresh markdown\n');
+    expect(latestState.activeId).toBe(activeBefore);
+    expect(latestState.selectedIds).toEqual(selectedBefore);
+    expect(requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
+  it('keeps one-shot copy failures out of active state and the revision retry loop', async () => {
+    const fresh = makeConversation(41);
+    const validDetail = { conversationId: 41, messages: [] };
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    const activeBefore = latestState.activeId;
+    const selectedBefore = [...latestState.selectedIds];
+    requestDataRevisionRetry.mockClear();
+
+    getConversationById.mockResolvedValueOnce(null);
+    await expect(latestState.copyConversationMarkdown(41)).rejects.toThrow('conversation not found');
+
+    getConversationById.mockRejectedValueOnce(new Error('point read failed'));
+    await expect(latestState.copyConversationMarkdown(41)).rejects.toThrow('point read failed');
+
+    getConversationById.mockResolvedValueOnce(fresh);
+    getConversationDetail.mockRejectedValueOnce(new Error('detail read failed'));
+    await expect(latestState.copyConversationMarkdown(41)).rejects.toThrow('detail read failed');
+
+    getConversationById.mockResolvedValueOnce(fresh);
+    getConversationDetail.mockResolvedValueOnce(validDetail);
+    writeTextToClipboard.mockResolvedValueOnce(false);
+    await expect(latestState.copyConversationMarkdown(41)).rejects.toThrow('copyFailed');
+
+    expect(latestState.activeId).toBe(activeBefore);
+    expect(latestState.selectedIds).toEqual(selectedBefore);
+    expect(requestDataRevisionRetry).not.toHaveBeenCalled();
   });
 
   it('keeps last-good detail, clears stale Header, and retries messages after a same-active detail read fails', async () => {

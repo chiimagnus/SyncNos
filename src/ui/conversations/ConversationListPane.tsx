@@ -1,8 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation } from '@services/conversations/domain/models';
-import { getConversationDetail } from '@services/conversations/client/repo';
-import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
@@ -131,6 +129,7 @@ export function ConversationListPane({
     pendingListLocateId,
     consumeListLocate,
     loadMoreList,
+    copyConversationMarkdown,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
@@ -498,10 +497,7 @@ export function ConversationListPane({
     e.stopPropagation();
     const id = Number((conversation as any).id);
     try {
-      const d = await getConversationDetail(id);
-      const mdText = await formatConversationMarkdownForExternalOutput(conversation as any, d as any);
-      const copied = await writeTextToClipboard(mdText);
-      if (!copied) throw new Error(t('copyFailed'));
+      await copyConversationMarkdown(id);
       setCopiedId(id);
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = window.setTimeout(() => {

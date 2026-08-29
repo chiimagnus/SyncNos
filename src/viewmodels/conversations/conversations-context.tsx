@@ -11,9 +11,11 @@ import type {
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
+import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
+import { writeTextToClipboard } from '@services/shared/clipboard';
 import {
   deleteConversations,
   findConversationBySourceAndKey,
@@ -392,6 +394,7 @@ type ConversationsAppState = {
   toggleAll: (scopeIds?: number[]) => void;
   clearSelected: () => void;
 
+  copyConversationMarkdown: (conversationId: number) => Promise<void>;
   exportSelectedMarkdown: (opts: { mergeSingle: boolean }) => Promise<void>;
   syncSelectedNotion: () => Promise<void>;
   syncSelectedObsidian: () => Promise<void>;
@@ -1275,6 +1278,23 @@ export function ConversationsProvider({
 
   const clearSelected = useCallback(() => setSelectedIds([]), []);
 
+  const copyConversationMarkdown = useCallback(async (conversationId: number) => {
+    const id = Number(conversationId);
+    if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+
+    const conversation = await getConversationById(id);
+    if (!conversation) throw new Error('conversation not found');
+    if (Number(conversation.id) !== id) throw new Error('conversation lookup returned a mismatched id');
+
+    const freshDetail = await getConversationDetail(id);
+    if (Number((freshDetail as any)?.conversationId) !== id) {
+      throw new Error('conversation detail returned a mismatched id');
+    }
+
+    const markdown = await formatConversationMarkdownForExternalOutput(conversation, freshDetail);
+    if (!(await writeTextToClipboard(markdown))) throw new Error(t('copyFailed'));
+  }, []);
+
   const exportSelectedMarkdown = useCallback(
     async ({ mergeSingle }: { mergeSingle: boolean }) => {
       const ids = selectedIds.slice();
@@ -1423,6 +1443,7 @@ export function ConversationsProvider({
     toggleSelected,
     toggleAll,
     clearSelected,
+    copyConversationMarkdown,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
