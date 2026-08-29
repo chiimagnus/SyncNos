@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 
-import { closeDbForTests } from '@platform/idb/schema';
+import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { listArticleCommentsByConversationId, deleteArticleCommentById } from '@services/comments/data/storage';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
@@ -318,6 +318,54 @@ describe('reload-free data consistency production chain', () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 20));
     expect(listConsumer.reads).toBe(readsBeforeIdenticalImport);
     listConsumer.dispose();
+  });
+
+  it('remaps message asset refs when a repeated ZIP import recreates a missing local cache row', async () => {
+    const fixture = buildBackupV2FixtureEntries();
+    await importBackupZipV2Merge(fixture.entries);
+
+    const chat = await getConversationBySourceConversationKey(
+      fixture.expected.chat.source,
+      fixture.expected.chat.conversationKey,
+    );
+    const chatId = Number(chat?.id);
+    const initialDetail = await getConversationDetail(chatId);
+    const initialAssetRef = /syncnos-asset:\/\/(\d+)/.exec(String(initialDetail.messages[1]?.contentMarkdown || ''));
+    const initialAssetId = Number(initialAssetRef?.[1]);
+    expect(initialAssetId).toBeGreaterThan(0);
+
+    const db = await openDb();
+    const deleteTx = db.transaction(['image_cache'], 'readwrite');
+    deleteTx.objectStore('image_cache').delete(initialAssetId);
+    await new Promise<void>((resolve, reject) => {
+      deleteTx.oncomplete = () => resolve();
+      deleteTx.onerror = () => reject(deleteTx.error);
+      deleteTx.onabort = () => reject(deleteTx.error);
+    });
+
+    const beforeRestore = await readDataRevisionSnapshot();
+    const stats = await importBackupZipV2Merge(fixture.entries);
+    expect(stats.messagesUpdated).toBe(1);
+
+    const afterRestore = await readDataRevisionSnapshot();
+    expect(afterRestore.image_cache).toBe(beforeRestore.image_cache + 1);
+    expect(afterRestore.messages).toBe(beforeRestore.messages + 1);
+    expect({ ...afterRestore, image_cache: 0, messages: 0 }).toEqual({
+      ...beforeRestore,
+      image_cache: 0,
+      messages: 0,
+    });
+
+    const restoredDetail = await getConversationDetail(chatId);
+    const restoredAssetRef = /syncnos-asset:\/\/(\d+)/.exec(String(restoredDetail.messages[1]?.contentMarkdown || ''));
+    const restoredAssetId = Number(restoredAssetRef?.[1]);
+    expect(restoredAssetId).toBeGreaterThan(0);
+    expect(restoredAssetId).not.toBe(initialAssetId);
+    await expect(getImageCacheAssetById({ id: restoredAssetId, conversationId: chatId })).resolves.toMatchObject({
+      url: 'https://images.example.test/reload-free-fixture.png',
+      contentType: 'image/png',
+      byteSize: 4,
+    });
   });
 
   it('replays a failed mounted List canonical read against an unchanged revision vector and preserves the last-good bundle', async () => {

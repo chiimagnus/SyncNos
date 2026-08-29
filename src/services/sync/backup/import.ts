@@ -715,6 +715,7 @@ export async function importBackupZipV2Merge(
   // 1.5) Restore image cache assets and rewrite incoming markdown asset urls.
   const assetIdRemap = new Map<number, number>();
   const fallbackUrlByOldId = new Map<number, string>();
+  const rewrittenAssetMarkdownByMessage = new Map<string, string>();
 
   // If the manifest declares an image cache index but the zip does not contain it, treat this as a "text-only"
   // import: strip all `syncnos-asset://` references to a safe placeholder so we don't persist broken private URLs.
@@ -730,7 +731,11 @@ export async function importBackupZipV2Merge(
           fallbackUrlByOldId,
           defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
         });
-        if (next !== markdown) msg.contentMarkdown = next;
+        if (next !== markdown) {
+          msg.contentMarkdown = next;
+          const messageKey = safeString(msg.messageKey);
+          if (messageKey) rewrittenAssetMarkdownByMessage.set(`${uk}\u0000${messageKey}`, next);
+        }
       }
       messagesByUniqueKey.set(uk, msgs);
     }
@@ -833,7 +838,11 @@ export async function importBackupZipV2Merge(
           fallbackUrlByOldId,
           defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
         });
-        if (next !== markdown) msg.contentMarkdown = next;
+        if (next !== markdown) {
+          msg.contentMarkdown = next;
+          const messageKey = safeString(msg.messageKey);
+          if (messageKey) rewrittenAssetMarkdownByMessage.set(`${uk}\u0000${messageKey}`, next);
+        }
       }
       messagesByUniqueKey.set(uk, msgs);
     }
@@ -871,6 +880,8 @@ export async function importBackupZipV2Merge(
               ...(existing?.id ? { id: existing.id } : {}),
             };
             const merged = mergeMessageRecord(existing, base);
+            const rewrittenAssetMarkdown = rewrittenAssetMarkdownByMessage.get(`${uk}\u0000${messageKey}`);
+            if (rewrittenAssetMarkdown != null) merged.contentMarkdown = rewrittenAssetMarkdown;
             merged.conversationId = localConversationId;
             merged.messageKey = messageKey;
 

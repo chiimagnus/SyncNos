@@ -478,6 +478,31 @@ describe('backup service', () => {
     expect(match).not.toBeNull();
     const referencedId = Number(match?.[1]);
     expect(assets.some((a) => Number(a.id) === referencedId)).toBe(true);
+
+    const deleteAssetTx = db2.transaction(['image_cache'], 'readwrite');
+    deleteAssetTx.objectStore('image_cache').delete(referencedId);
+    await new Promise<void>((resolve, reject) => {
+      deleteAssetTx.oncomplete = () => resolve();
+      deleteAssetTx.onerror = () => reject(deleteAssetTx.error);
+      deleteAssetTx.onabort = () => reject(deleteAssetTx.error);
+    });
+
+    const repeatedStats = await importBackupZipV2Merge(entries);
+    expect(repeatedStats.messagesUpdated).toBe(1);
+
+    const restoredAgainTx = db2.transaction(['messages', 'image_cache'], 'readonly');
+    const restoredAgainMessages = await reqToPromise<any[]>(restoredAgainTx.objectStore('messages').getAll() as any);
+    const restoredAgainAssets = await reqToPromise<any[]>(restoredAgainTx.objectStore('image_cache').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      restoredAgainTx.oncomplete = () => resolve();
+      restoredAgainTx.onerror = () => reject(restoredAgainTx.error);
+      restoredAgainTx.onabort = () => reject(restoredAgainTx.error);
+    });
+
+    expect(restoredAgainAssets).toHaveLength(1);
+    expect(Number(restoredAgainAssets[0]?.id)).not.toBe(referencedId);
+    const remapped = /syncnos-asset:\/\/(\d+)/.exec(String(restoredAgainMessages[0]?.contentMarkdown || ''));
+    expect(Number(remapped?.[1])).toBe(Number(restoredAgainAssets[0]?.id));
   });
 
   it('importBackupZipV2Merge tolerates missing image index and strips syncnos-asset urls', async () => {
