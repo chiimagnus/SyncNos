@@ -1,5 +1,6 @@
 import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { registerDataRevisionHandlers } from '@services/data-revisions/background-handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerWebArticleHandlers } from '@collectors/web/article-fetch-background-handlers';
@@ -63,6 +64,7 @@ export default defineBackground(() => {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
     onRemoteCleanupPending: () => services.autoSync.onRemoteCleanupPending(),
   });
+  registerDataRevisionHandlers(router);
   registerItemMentionHandlers(router);
   registerArticleCommentsHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),

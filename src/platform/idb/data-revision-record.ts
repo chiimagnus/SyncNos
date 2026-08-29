@@ -23,6 +23,8 @@ export type DataRevisionRecord = {
   updatedAt: number;
 };
 
+export type DataRevisionSnapshot = Record<DataRevisionScope, number>;
+
 export function normalizeDataRevisionRecord(value: unknown): DataRevisionRecord {
   const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const revision =

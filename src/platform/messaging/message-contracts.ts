@@ -12,6 +12,10 @@ export const CORE_MESSAGE_TYPES = {
   DELETE_CONVERSATIONS: 'deleteConversations',
 } as const;
 
+export const DATA_REVISION_MESSAGE_TYPES = {
+  GET_SNAPSHOT: 'getDataRevisionSnapshot',
+} as const;
+
 export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
   DISCONNECT: 'notionDisconnect',
@@ -104,6 +108,7 @@ export const UI_PORT_NAMES = {
 
 export const messageContracts = {
   CORE_MESSAGE_TYPES,
+  DATA_REVISION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
   FEISHU_MESSAGE_TYPES,
@@ -119,6 +124,7 @@ export const messageContracts = {
 } as const;
 
 export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[keyof typeof CORE_MESSAGE_TYPES];
+export type DataRevisionMessageType = (typeof DATA_REVISION_MESSAGE_TYPES)[keyof typeof DATA_REVISION_MESSAGE_TYPES];
 export type NotionMessageType = (typeof NOTION_MESSAGE_TYPES)[keyof typeof NOTION_MESSAGE_TYPES];
 export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof OBSIDIAN_MESSAGE_TYPES];
 export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISHU_MESSAGE_TYPES];
@@ -134,6 +140,7 @@ export type UiPortName = (typeof UI_PORT_NAMES)[keyof typeof UI_PORT_NAMES];
 
 export type MessageType =
   | CoreMessageType
+  | DataRevisionMessageType
   | NotionMessageType
   | ObsidianMessageType
   | FeishuMessageType

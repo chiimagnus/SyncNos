@@ -1,5 +1,6 @@
 export {
   CORE_MESSAGE_TYPES,
+  DATA_REVISION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
   FEISHU_MESSAGE_TYPES,
@@ -17,6 +18,7 @@ export {
 
 export type {
   CoreMessageType,
+  DataRevisionMessageType,
   NotionMessageType,
   ObsidianMessageType,
   FeishuMessageType,
