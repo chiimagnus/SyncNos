@@ -78,6 +78,17 @@ function rewriteSyncnosAssetUrlsInMarkdown(
 
 export type ImportProgress = { done: number; total: number; stage: string };
 
+function reportImportProgressBestEffort(
+  onProgress: ((p: ImportProgress) => void) | undefined,
+  progress: ImportProgress,
+): void {
+  try {
+    void Promise.resolve(onProgress?.({ ...progress })).catch(() => undefined);
+  } catch (_error) {
+    // Progress reporting is best-effort and must never fail an import whose durable stage already committed.
+  }
+}
+
 export type ImportStats = {
   conversationsAdded: number;
   conversationsUpdated: number;
@@ -222,7 +233,7 @@ export async function importBackupLegacyJsonMerge(
 
   const totalWork = backupConversations.length + backupMessages.length + backupMappings.length + settingsKeys.length;
   const progress: ImportProgress = { done: 0, total: totalWork, stage: '' };
-  const report = () => onProgress?.({ ...progress });
+  const report = () => reportImportProgressBestEffort(onProgress, progress);
   const bump = (n: number, stage: string) => {
     progress.done += Number(n) || 0;
     if (stage) progress.stage = stage;
@@ -521,13 +532,7 @@ export async function importBackupZipV2Merge(
       articleCommentItems.length,
     stage: '',
   };
-  const report = () => {
-    try {
-      void Promise.resolve(onProgress?.({ ...progress })).catch(() => undefined);
-    } catch (_error) {
-      // Progress reporting is best-effort and must never roll back an already committed import stage.
-    }
-  };
+  const report = () => reportImportProgressBestEffort(onProgress, progress);
   const bump = (delta: number, stage?: string) => {
     progress.done += delta;
     if (stage) progress.stage = stage;
