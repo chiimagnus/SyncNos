@@ -287,55 +287,60 @@ export async function importBackupLegacyJsonMerge(
 
   // 2) Upsert messages by (localConversationId, messageKey).
   {
-    const { t, stores: s } = tx(db, ['messages'], 'readwrite');
-    const idx = s.messages.index('by_conversationId_messageKey');
-
     progress.stage = 'messages';
     report();
     const stageNow = Date.now();
-    for (let i = 0; i < backupMessages.length; i += 1) {
-      const incoming = backupMessages[i];
-      if (!incoming) {
-        bump(1, 'messages');
-        continue;
-      }
-      const backupConversationId = Number(incoming.conversationId);
-      const messageKey = incoming.messageKey ? String(incoming.messageKey) : '';
-      if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
-        stats.messagesSkipped += 1;
-        bump(1, 'messages');
-        continue;
-      }
-      const uk = backupConvoIdToUnique.get(backupConversationId) || '';
-      const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
-      if (!localConversationId) {
-        stats.messagesSkipped += 1;
-        bump(1, 'messages');
-        continue;
-      }
+    await runTrackedTransaction(
+      { db, stores: ['messages'], revisionScopes: ['messages'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.messages.index('by_conversationId_messageKey');
 
-      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
-      const base = { ...(incoming || {}), conversationId: localConversationId, messageKey };
-      const merged = mergeMessageRecord(existing, base);
-      merged.conversationId = localConversationId;
-      merged.messageKey = messageKey;
-      if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+        for (const incoming of backupMessages) {
+          if (!incoming) continue;
+          const backupConversationId = Number(incoming.conversationId);
+          const messageKey = incoming.messageKey ? String(incoming.messageKey) : '';
+          if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
+            stats.messagesSkipped += 1;
+            continue;
+          }
+          const uk = backupConvoIdToUnique.get(backupConversationId) || '';
+          const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
+          if (!localConversationId) {
+            stats.messagesSkipped += 1;
+            continue;
+          }
 
-      if (existing && existing.id) {
-        merged.id = existing.id;
+          const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
+          const base = {
+            ...(incoming || {}),
+            conversationId: localConversationId,
+            messageKey,
+            ...(existing?.id ? { id: existing.id } : {}),
+          };
+          const merged = mergeMessageRecord(existing, base);
+          merged.conversationId = localConversationId;
+          merged.messageKey = messageKey;
 
-        await reqToPromise(s.messages.put(merged as any));
-        stats.messagesUpdated += 1;
-      } else {
-        await reqToPromise(s.messages.add(merged as any));
-        stats.messagesAdded += 1;
-      }
+          if (existing?.id) {
+            merged.id = existing.id;
+            if (areBackupValuesEqual(merged, existing)) continue;
+            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
 
-      if (i % 25 === 0) report();
-      bump(1, 'messages');
-    }
+            await reqToPromise(s.messages.put(merged as any));
+            stats.messagesUpdated += 1;
+            markChanged('messages');
+            continue;
+          }
 
-    await txDone(t);
+          delete merged.id;
+          if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
+          await reqToPromise(s.messages.add(merged as any));
+          stats.messagesAdded += 1;
+          markChanged('messages');
+        }
+      },
+    );
+    bump(backupMessages.length, 'messages');
   }
 
   progress.stage = 'mappings';

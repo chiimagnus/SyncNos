@@ -1037,6 +1037,74 @@ describe('backup service', () => {
     expect(message).toMatchObject({ conversationId: localConversationId, messageKey: 'm-remap', contentText: 'mapped' });
   });
 
+  it('keeps Legacy message imports idempotent after remapping local identities', async () => {
+    const doc = {
+      schemaVersion: 1,
+      stores: {
+        conversations: [
+          {
+            id: 99,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            conversationKey: 'legacy-message-noop',
+            title: 'Stable',
+            url: 'https://chatgpt.com/c/legacy-message-noop',
+            warningFlags: [],
+            lastCapturedAt: 10,
+          },
+        ],
+        messages: [
+          {
+            id: 500,
+            conversationId: 99,
+            messageKey: 'm-stable',
+            role: 'user',
+            contentText: 'stable',
+            contentMarkdown: '',
+            sequence: 1,
+          },
+        ],
+        sync_mappings: [],
+      },
+      storageLocal: {},
+    };
+
+    const first = await importBackupLegacyJsonMerge(doc);
+    expect(first.messagesAdded).toBe(1);
+    const db = await openDb();
+    const firstTx = db.transaction(['messages'], 'readonly');
+    const persisted = await reqToPromise<any>(firstTx.objectStore('messages').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      firstTx.oncomplete = () => resolve();
+      firstTx.onerror = () => reject(firstTx.error);
+      firstTx.onabort = () => reject(firstTx.error);
+    });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({ conversationId: 1, messageKey: 'm-stable', contentText: 'stable' });
+    expect(persisted[0].id).not.toBe(500);
+    expect(persisted[0].updatedAt).toBeGreaterThan(0);
+
+    const repeated = await importBackupLegacyJsonMerge(doc);
+    expect(repeated.messagesAdded).toBe(0);
+    expect(repeated.messagesUpdated).toBe(0);
+
+    const changed = await importBackupLegacyJsonMerge({
+      ...doc,
+      stores: {
+        ...doc.stores,
+        messages: [
+          {
+            ...doc.stores.messages[0],
+            contentText: 'changed',
+            updatedAt: Number(persisted[0].updatedAt) + 1,
+          },
+        ],
+      },
+    });
+    expect(changed.messagesAdded).toBe(0);
+    expect(changed.messagesUpdated).toBe(1);
+  });
+
   it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

@@ -626,6 +626,65 @@ describe('data revision storage', () => {
     expect(await readDataRevision('conversations')).toBe(2);
   });
 
+  it('advances messages once for real Legacy changes and stays stable for equivalent re-imports', async () => {
+    const buildBackup = (messageOneUpdatedAt: number) => ({
+      schemaVersion: 1,
+      stores: {
+        conversations: [
+          {
+            id: 99,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            conversationKey: 'legacy-message-revision',
+            title: 'Legacy',
+            url: 'https://chatgpt.com/c/legacy-message-revision',
+            lastCapturedAt: 10,
+          },
+        ],
+        messages: [
+          {
+            id: 500,
+            conversationId: 99,
+            messageKey: 'm1',
+            role: 'user',
+            contentText: 'first',
+            contentMarkdown: '',
+            sequence: 1,
+            updatedAt: messageOneUpdatedAt,
+          },
+          {
+            id: 501,
+            conversationId: 99,
+            messageKey: 'm2',
+            role: 'assistant',
+            contentText: 'second',
+            contentMarkdown: '',
+            sequence: 2,
+            updatedAt: 10,
+          },
+        ],
+        sync_mappings: [],
+      },
+      storageLocal: {},
+    });
+
+    expect(await readDataRevision('messages')).toBe(0);
+    const first = await importBackupLegacyJsonMerge(buildBackup(10));
+    expect(first.messagesAdded).toBe(2);
+    expect(first.messagesUpdated).toBe(0);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    const repeated = await importBackupLegacyJsonMerge(buildBackup(10));
+    expect(repeated.messagesAdded).toBe(0);
+    expect(repeated.messagesUpdated).toBe(0);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    const changed = await importBackupLegacyJsonMerge(buildBackup(11));
+    expect(changed.messagesAdded).toBe(0);
+    expect(changed.messagesUpdated).toBe(1);
+    expect(await readDataRevision('messages')).toBe(2);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 
