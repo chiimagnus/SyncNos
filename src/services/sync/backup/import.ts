@@ -197,9 +197,12 @@ async function applyImportedSyncMappings(input: {
     const conversation = (await reqToPromise(conversationIndex.get([source, conversationKey]) as any)) as AnyRecord;
     if (conversation?.id) {
       let changed = false;
-      for (const field of CONVERSATION_MAPPING_MIRROR_FIELDS) {
+      const mirrorFields = Object.prototype.hasOwnProperty.call(merged, 'notionPageId')
+        ? CONVERSATION_MAPPING_MIRROR_FIELDS
+        : CONVERSATION_MAPPING_MIRROR_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(merged, field));
+      for (const field of mirrorFields) {
         const value = safeString(merged[field]);
-        if (!value || safeString(conversation[field]) === value) continue;
+        if (safeString(conversation[field]) === value) continue;
         conversation[field] = value;
         changed = true;
       }
