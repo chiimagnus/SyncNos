@@ -30,6 +30,7 @@ import { publishReaderPerformanceStats, readReaderPerformanceClock } from '@ui/r
 import { ReaderHeaderToolbar } from '@ui/reader/ReaderHeaderToolbar';
 import { ReaderToolbar } from '@ui/reader/ReaderToolbar';
 import { useReaderNarration } from '@viewmodels/reader/useReaderNarration';
+import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAssetSrcMap';
 import { useReaderPrefs } from '@viewmodels/reader/useReaderPrefs';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
@@ -95,6 +96,13 @@ export function ArticleReaderView({
     () => readerFeatures ?? { textLayout: false, theme: false, narration: false },
     [readerFeatures],
   );
+  const detailConversationId = Number((detail as any)?.conversationId || (selected as any)?.id || activeId);
+  const assetSrcById = useSyncnosAssetSrcMap({
+    conversationId: Number.isFinite(detailConversationId) && detailConversationId > 0 ? detailConversationId : null,
+    markdowns: Array.isArray(detail?.messages)
+      ? detail.messages.map((message: any) => String(message?.contentMarkdown || message?.contentText || ''))
+      : [],
+  });
   const { prefs, update } = useReaderPrefs();
   const { mode: themeMode, update: updateThemeMode } = useAppThemeMode();
   const readerVars = readerPrefsToCssVars(prefs) as CSSProperties;
@@ -504,18 +512,13 @@ export function ArticleReaderView({
             >
               {detail.messages.map((m: any) => {
                 const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-                const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
 
                 return (
                   <ChatMessageBubble
                     key={String((m as any).id)}
                     role="assistant"
                     markdown={text}
-                    conversationId={
-                      Number.isFinite(messageConversationId) && messageConversationId > 0
-                        ? messageConversationId
-                        : undefined
-                    }
+                    syncnosAssetSrcById={assetSrcById}
                     className={READER_PROSE_CLASS}
                   />
                 );

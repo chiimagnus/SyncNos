@@ -1,5 +1,6 @@
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 import { t } from '@i18n';
+import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAssetSrcMap';
 import type { DetailViewSharedProps } from '@ui/conversations/views/detail-view-props';
 
 export type ChatDetailViewProps = DetailViewSharedProps & {
@@ -24,6 +25,14 @@ export function ChatDetailView({
   getUserMessageRefSetter,
   setMessagesRootRef,
 }: ChatDetailViewProps) {
+  const detailConversationId = Number((detail as any)?.conversationId || (selected as any)?.id || activeId);
+  const assetSrcById = useSyncnosAssetSrcMap({
+    conversationId: Number.isFinite(detailConversationId) && detailConversationId > 0 ? detailConversationId : null,
+    markdowns: Array.isArray(detail?.messages)
+      ? detail.messages.map((message: any) => String(message?.contentMarkdown || message?.contentText || ''))
+      : [],
+  });
+
   return (
     <div className="tw-flex tw-min-w-0 tw-gap-4">
       <div className="tw-min-w-0 tw-flex-1">
@@ -45,7 +54,6 @@ export function ChatDetailView({
               const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
               const outlineIndex = messageId == null ? null : outlineIndexByMessageId.get(messageId) || null;
               const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-              const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
 
               if (role === 'user' && messageId != null) {
                 return (
@@ -59,11 +67,7 @@ export function ChatDetailView({
                     <ChatMessageBubble
                       role={(m as any).role}
                       markdown={text}
-                      conversationId={
-                        Number.isFinite(messageConversationId) && messageConversationId > 0
-                          ? messageConversationId
-                          : undefined
-                      }
+                      syncnosAssetSrcById={assetSrcById}
                     />
                   </div>
                 );
@@ -74,11 +78,7 @@ export function ChatDetailView({
                   key={String((m as any).id)}
                   role={(m as any).role}
                   markdown={text}
-                  conversationId={
-                    Number.isFinite(messageConversationId) && messageConversationId > 0
-                      ? messageConversationId
-                      : undefined
-                  }
+                  syncnosAssetSrcById={assetSrcById}
                 />
               );
             })}

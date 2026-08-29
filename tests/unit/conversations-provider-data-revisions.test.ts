@@ -313,6 +313,32 @@ describe('ConversationsProvider data revisions', () => {
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([3]);
   });
 
+  it('ignores image_cache revisions so mounted detail assets can refresh without rereading list or detail', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    const listCalls = getConversationListBootstrap.mock.calls.length;
+    const pointCalls = getConversationById.mock.calls.length;
+    const detailCalls = getConversationDetail.mock.calls.length;
+    const headerCalls = resolveDetailHeaderActions.mock.calls.length;
+
+    await act(async () => {
+      revisionListener?.(['image_cache']);
+      await flushMicrotasks();
+    });
+
+    expect(getConversationListBootstrap).toHaveBeenCalledTimes(listCalls);
+    expect(getConversationById).toHaveBeenCalledTimes(pointCalls);
+    expect(getConversationDetail).toHaveBeenCalledTimes(detailCalls);
+    expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(headerCalls);
+  });
+
   it('keeps the committed list bundle on a same-scope revision read failure and replays the next revision', async () => {
     whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
     getConversationListBootstrap

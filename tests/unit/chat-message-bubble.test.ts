@@ -60,6 +60,23 @@ describe('ChatMessageBubble', () => {
     expect(bookClass).toContain('[&_p]:tw-mb-[1.2rem]');
   });
 
+  it('renders syncnos assets only from the resolved source map supplied by its owner', () => {
+    const resolved = renderToStaticMarkup(
+      createElement(ChatMessageBubble, {
+        markdown: '![cached](syncnos-asset://7)',
+        syncnosAssetSrcById: new Map([[7, 'blob:resolved-7']]),
+      }),
+    );
+    expect(resolved).toContain('src="blob:resolved-7"');
+    expect(resolved).toContain('data-syncnos-asset-id="7"');
+
+    const unresolved = renderToStaticMarkup(
+      createElement(ChatMessageBubble, { markdown: '![cached](syncnos-asset://7)' }),
+    );
+    expect(unresolved).not.toContain('blob:resolved-7');
+    expect(unresolved).toContain('data:image/gif;base64,');
+  });
+
   it('keeps core readability guard classes mounted on markdown container', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: '# t\n\ntext' }));
     const cls = extractMarkdownClass(html);
