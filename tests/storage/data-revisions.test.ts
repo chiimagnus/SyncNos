@@ -791,6 +791,80 @@ describe('data revision storage', () => {
     expect(await readDataRevision('conversations')).toBe(1);
   });
 
+  it('advances article_comments once for real ZIP imports and stays stable for equivalent re-imports', async () => {
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/web/zip-comment-revision.json';
+    const entries = new Map<string, Uint8Array>([
+      [
+        'manifest.json',
+        encoder.encode(
+          JSON.stringify({
+            backupSchemaVersion: 2,
+            exportedAt: '2026-08-29T00:00:00.000Z',
+            db: { name: 'webclipper', version: 10 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 0, article_comments: 1 },
+            config: { storageLocalPath: 'config/storage-local.json' },
+            index: { conversationsCsvPath: 'sources/conversations.csv' },
+            sources: [{ source: 'web', conversationCount: 1, files: [entryPath] }],
+            assets: { articleCommentsIndexPath: 'assets/article-comments/index.json' },
+          }),
+        ),
+      ],
+      ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+      ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      [
+        entryPath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              id: 99,
+              sourceType: 'article',
+              source: 'web',
+              conversationKey: 'zip-comment-revision',
+              title: 'ZIP',
+              url: 'https://example.com/zip-comment-revision',
+              lastCapturedAt: 10,
+            },
+            messages: [],
+            syncMapping: null,
+          }),
+        ),
+      ],
+      [
+        'assets/article-comments/index.json',
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            comments: [
+              {
+                commentId: 1,
+                parentCommentId: null,
+                uniqueKey: 'web||zip-comment-revision',
+                canonicalUrl: 'https://example.com/zip-comment-revision',
+                authorName: 'Author',
+                quoteText: 'Quote',
+                commentText: 'Comment',
+                locator: null,
+                createdAt: 1,
+                updatedAt: 2,
+              },
+            ],
+          }),
+        ),
+      ],
+    ]);
+
+    const first = await importBackupZipV2Merge(entries);
+    expect(first.commentsAdded).toBe(1);
+    expect(await readDataRevision('article_comments')).toBe(1);
+
+    const repeated = await importBackupZipV2Merge(entries);
+    expect(repeated.commentsAdded).toBe(0);
+    expect(repeated.commentsUpdated).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(1);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 

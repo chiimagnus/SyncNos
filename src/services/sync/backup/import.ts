@@ -603,105 +603,108 @@ export async function importBackupZipV2Merge(
       }
     }
 
-    const { t, stores: s } = tx(db, ['article_comments'], 'readwrite');
-    const store = s.article_comments;
-    const index = store.index('by_canonicalUrl_createdAt');
-    const existingByFingerprint = new Map<string, AnyRecord>();
-    const existingBaseKeyById = new Map<number, string>();
-    const existingRows: AnyRecord[] = [];
-
     progress.stage = 'Comments';
     report();
-    for (const canonicalUrl of canonicalUrls) {
-      const range = globalThis.IDBKeyRange?.bound
-        ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
-        : null;
-      const rows = range ? (await reqToPromise<any[]>(index.getAll(range) as any)) || [] : [];
-      for (const row of rows) {
-        const id = Number(row?.id);
-        const url = normalizeHttpUrl(row?.canonicalUrl);
-        const commentText = safeString(row?.commentText);
-        if (!Number.isSafeInteger(id) || id <= 0 || !url || !commentText) continue;
-        const baseKey = buildArticleCommentArchiveBaseKey({
-          uniqueKey: uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '',
-          canonicalUrl: url,
-          createdAt: Number(row?.createdAt) || 0,
-          quoteText: String(row?.quoteText || ''),
-          commentText,
-        });
-        existingBaseKeyById.set(id, baseKey);
-        existingRows.push(row);
-      }
-    }
-    for (const row of existingRows) {
-      const id = Number(row.id);
-      const baseKey = existingBaseKeyById.get(id) ?? '';
-      const parentId = Number(row.parentId);
-      const parentBaseKey =
-        Number.isSafeInteger(parentId) && parentId > 0 ? (existingBaseKeyById.get(parentId) ?? '') : '';
-      const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
-      if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
-    }
+    await runTrackedTransaction(
+      { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+      async ({ stores: s, markChanged }) => {
+        const store = s.article_comments;
+        const index = store.index('by_canonicalUrl_createdAt');
+        const existingByFingerprint = new Map<string, AnyRecord>();
+        const existingBaseKeyById = new Map<number, string>();
+        const existingRows: AnyRecord[] = [];
 
-    const incomingIdToLocalId = new Map<number, number>();
-    const now = Date.now();
-    let tick = 0;
-    for (const item of articleCommentItems) {
-      const parentId = item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
-      const mappedConversationId =
-        item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
-          ? uniqueToLocalId.get(item.uniqueKey)!
-          : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
-      const existing = existingByFingerprint.get(item.fingerprint) ?? null;
-
-      if (existing?.id) {
-        const existingId = Number(existing.id);
-        incomingIdToLocalId.set(item.commentId, existingId);
-        const incomingUpdatedAt = Number(item.updatedAt) || 0;
-        const existingUpdatedAt = Number(existing.updatedAt) || 0;
-        const next = {
-          ...existing,
-          parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
-          conversationId:
-            existing.conversationId == null && mappedConversationId != null
-              ? mappedConversationId
-              : existing.conversationId,
-          canonicalUrl: item.canonicalUrl,
-          authorName: incomingUpdatedAt >= existingUpdatedAt ? (item.authorName ?? '') : existing.authorName,
-          quoteText: incomingUpdatedAt >= existingUpdatedAt ? item.quoteText : String(existing.quoteText || ''),
-          commentText: incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
-          locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
-          createdAt: Number(existing.createdAt) || item.createdAt || now,
-          updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
-        };
-        const changed = !areBackupValuesEqual(next, existing);
-        if (changed) {
-          await reqToPromise(store.put(next as any));
-          stats.commentsUpdated += 1;
-        } else {
-          stats.commentsSkipped += 1;
+        for (const canonicalUrl of canonicalUrls) {
+          const range = globalThis.IDBKeyRange?.bound
+            ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
+            : null;
+          const rows = range ? (await reqToPromise<any[]>(index.getAll(range) as any)) || [] : [];
+          for (const row of rows) {
+            const id = Number(row?.id);
+            const url = normalizeHttpUrl(row?.canonicalUrl);
+            const commentText = safeString(row?.commentText);
+            if (!Number.isSafeInteger(id) || id <= 0 || !url || !commentText) continue;
+            const baseKey = buildArticleCommentArchiveBaseKey({
+              uniqueKey: uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '',
+              canonicalUrl: url,
+              createdAt: Number(row?.createdAt) || 0,
+              quoteText: String(row?.quoteText || ''),
+              commentText,
+            });
+            existingBaseKeyById.set(id, baseKey);
+            existingRows.push(row);
+          }
         }
-      } else {
-        const record = {
-          parentId,
-          conversationId: mappedConversationId,
-          canonicalUrl: item.canonicalUrl,
-          authorName: item.authorName ?? '',
-          quoteText: item.quoteText,
-          commentText: item.commentText,
-          locator: item.locator,
-          createdAt: item.createdAt || now,
-          updatedAt: item.updatedAt || item.createdAt || now,
-        };
-        const newId = Number(await reqToPromise(store.add(record as any) as any));
-        if (Number.isSafeInteger(newId) && newId > 0) incomingIdToLocalId.set(item.commentId, newId);
-        stats.commentsAdded += 1;
-      }
-      bump(1, 'Comments');
-      tick += 1;
-      if (tick % 40 === 0) report();
-    }
-    await txDone(t);
+        for (const row of existingRows) {
+          const id = Number(row.id);
+          const baseKey = existingBaseKeyById.get(id) ?? '';
+          const parentId = Number(row.parentId);
+          const parentBaseKey =
+            Number.isSafeInteger(parentId) && parentId > 0 ? (existingBaseKeyById.get(parentId) ?? '') : '';
+          const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
+          if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
+        }
+
+        const incomingIdToLocalId = new Map<number, number>();
+        const now = Date.now();
+        for (const item of articleCommentItems) {
+          const parentId = item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
+          const mappedConversationId =
+            item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
+              ? uniqueToLocalId.get(item.uniqueKey)!
+              : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
+          const existing = existingByFingerprint.get(item.fingerprint) ?? null;
+
+          if (existing?.id) {
+            const existingId = Number(existing.id);
+            incomingIdToLocalId.set(item.commentId, existingId);
+            const incomingUpdatedAt = Number(item.updatedAt) || 0;
+            const existingUpdatedAt = Number(existing.updatedAt) || 0;
+            const next = {
+              ...existing,
+              parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
+              conversationId:
+                existing.conversationId == null && mappedConversationId != null
+                  ? mappedConversationId
+                  : existing.conversationId,
+              canonicalUrl: item.canonicalUrl,
+              authorName: incomingUpdatedAt >= existingUpdatedAt ? (item.authorName ?? '') : existing.authorName,
+              quoteText: incomingUpdatedAt >= existingUpdatedAt ? item.quoteText : String(existing.quoteText || ''),
+              commentText: incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
+              locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
+              createdAt: Number(existing.createdAt) || item.createdAt || now,
+              updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
+            };
+            if (areBackupValuesEqual(next, existing)) {
+              stats.commentsSkipped += 1;
+              continue;
+            }
+
+            await reqToPromise(store.put(next as any));
+            stats.commentsUpdated += 1;
+            markChanged('article_comments');
+            continue;
+          }
+
+          const record = {
+            parentId,
+            conversationId: mappedConversationId,
+            canonicalUrl: item.canonicalUrl,
+            authorName: item.authorName ?? '',
+            quoteText: item.quoteText,
+            commentText: item.commentText,
+            locator: item.locator,
+            createdAt: item.createdAt || now,
+            updatedAt: item.updatedAt || item.createdAt || now,
+          };
+          const newId = Number(await reqToPromise(store.add(record as any) as any));
+          if (Number.isSafeInteger(newId) && newId > 0) incomingIdToLocalId.set(item.commentId, newId);
+          stats.commentsAdded += 1;
+          markChanged('article_comments');
+        }
+      },
+    );
+    reportCommittedStage(articleCommentItems.length, 'Comments');
   }
 
   // 1.5) Restore image cache assets and rewrite incoming markdown asset urls.

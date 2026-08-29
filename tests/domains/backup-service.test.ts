@@ -829,7 +829,8 @@ describe('backup service', () => {
       ['assets/article-comments/index.json', enc.encode(JSON.stringify(comments))],
     ]);
 
-    await importBackupZipV2Merge(entries);
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.commentsAdded).toBe(1);
     const db = await openDb();
     const tx = db.transaction(['article_comments'], 'readonly');
     const rows = await reqToPromise<any[]>(tx.objectStore('article_comments').getAll());
