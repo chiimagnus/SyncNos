@@ -10,6 +10,14 @@
 - 文章评论属于本地文章身份下的独立注释层；回复必须保持在线程所属的同一文章身份中。
 - 图片缓存是增强数据。下载或缓存失败不得阻断正文保存。
 
+## 本地一致性与刷新
+
+- `src/platform/idb/schema.ts` 的 canonical connection manager 统一拥有 IndexedDB connection 生命周期。业务数据层只借用 `openDb()` 返回的连接，不再维护各自的 connection cache，也不关闭借来的 canonical connection；`versionchange` / close 后由 manager 失效当前连接，下一次 `openDb()` 再建立连接。
+- `conversations`、`messages`、`sync_mappings`、`article_comments`、`image_cache` 的 durable revision 是跨 surface 数据一致性的 correctness 真源。对这些 scope 的实际业务变更与 revision 递增必须位于同一 IndexedDB transaction；no-op 不得制造 revision。
+- post-commit wake 只负责尽快唤醒观察者，不能作为“数据已经是什么”的事实真源。观察者必须重新读取 durable revision snapshot，再按发生变化的 scope 重读 canonical 数据；不能因为漏掉一次 wake 就永久停留在旧状态。
+- consumer 的 canonical read 若 reject，必须保留 last-good 状态并允许对同一 revision replay；只有成功 resolve 的空值 / `null` 才能当 authoritative empty。visibility / focus / pageshow 与可见期 safety reconcile 用于补偿丢失的提示，不应在 revision 未变化时制造业务 reread storm。
+- Comments、Insight、mention 等 activation-scoped consumer 只在对应 session / surface 活跃时持有订阅；重新激活时从 canonical 数据恢复。不要重新引入自定义 event/Port 总线作为本地数据正确性的第二套协议。
+
 ## 备份
 
 当前 Zip 备份用于恢复本地数据，而不是复制浏览器内部数据库文件。它可包含：
@@ -32,8 +40,11 @@ GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage ba
 
 ## 导入与失败语义
 
-- 导入执行合并恢复，不把备份当成无条件覆盖当前本地数据库的镜像。
+- 导入执行合并恢复，不把备份当成无条件覆盖当前本地数据库的镜像；相同备份重复导入应保持幂等，不因为时间戳或其他机械字段制造业务变化与 revision。
+- Zip 导入按已提交 stage 推进，而不是把整个 archive 伪装成单个跨阶段事务。后续 stage 失败时，之前已经 commit 的 stage 保持有效；进度只能报告已经 commit 的阶段。
 - 备份 manifest、schema 和 Zip 内部路径必须先验证；危险路径或无效结构应拒绝导入。
+- 图片 cache row 的本地 ID 不具备跨数据库可移植性。导入恢复图片时必须把 Markdown 中的 `syncnos-asset://<oldId>` 重写到实际恢复出的 local asset ID；即使重复导入时本地 cache row 曾被删除并重新分配 ID，也不能留下指向旧 ID 的消息引用。
+- image-cache index 或 blob 不可恢复时不得持久化悬空的私有 asset URL：按当前导入策略降级到安全 placeholder，或在可用时回退到原始 `http(s)` / `data:` 图片来源。
 - 某些非关键资产无法恢复时，应保留明确 warning / 降级结果，而不是写入损坏数据。
 - 外部同步失败不能删除或回滚已经成功保存的本地内容。
 
