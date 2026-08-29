@@ -9,8 +9,9 @@ import {
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
 import { addArticleComment } from '@services/comments/data/storage-idb';
+import { getInsightStatsSourceData } from '@services/insight/insight-stats-source';
 import {
-  getInsightStats,
+  buildInsightStats,
   INSIGHT_ARTICLE_DOMAIN_LIMIT,
   INSIGHT_CHAT_SOURCE_LIMIT,
   INSIGHT_OTHER_LABEL,
@@ -19,6 +20,10 @@ import {
   INSIGHT_UNTITLED_CONVERSATION,
 } from '../../src/viewmodels/settings/insight-stats';
 import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
+
+async function readInsightStats(options?: { since?: number; until?: number }) {
+  return buildInsightStats(await getInsightStatsSourceData(), options);
+}
 
 async function deleteDb(name: string) {
   await new Promise<void>((resolve, reject) => {
@@ -83,7 +88,7 @@ afterEach(async () => {
 
 describe('insight stats', () => {
   it('returns the empty stats shape for an empty database', async () => {
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats).toEqual({
       totalClips: 0,
@@ -101,6 +106,29 @@ describe('insight stats', () => {
       videoPlatformDistribution: [],
       topVideoCommentedClips: [],
     });
+  });
+
+  it('does not take ownership of the canonical connection after reading source data', async () => {
+    await getInsightStatsSourceData();
+
+    const conversation = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:borrowed-connection',
+      title: 'Borrowed connection',
+      url: 'https://example.com/borrowed-connection',
+      lastCapturedAt: 10,
+    });
+    await addArticleComment({
+      conversationId: conversation.id,
+      canonicalUrl: 'https://example.com/borrowed-connection',
+      commentText: 'still writable',
+      createdAt: 11,
+    });
+
+    const source = await getInsightStatsSourceData();
+    expect(source.conversations.some((item) => Number(item.id) === Number(conversation.id))).toBe(true);
+    expect(source.commentCounts.get(Number(conversation.id))).toBe(1);
   });
 
   it('aggregates mixed chat and article data', async () => {
@@ -137,7 +165,7 @@ describe('insight stats', () => {
       lastCapturedAt: 4,
     });
 
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats.totalClips).toBe(4);
     expect(stats.chatCount).toBe(2);
@@ -183,7 +211,7 @@ describe('insight stats', () => {
       lastCapturedAt: 1,
     });
 
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats.articleCount).toBe(1);
     expect(stats.articleDomainDistribution).toEqual([{ label: INSIGHT_UNKNOWN_DOMAIN_LABEL, count: 1 }]);
@@ -223,7 +251,7 @@ describe('insight stats', () => {
       lastCapturedAt: 4,
     });
 
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats.articleCount).toBe(4);
     expect(stats.articleDomainDistribution).toEqual([
@@ -283,7 +311,7 @@ describe('insight stats', () => {
       lastCapturedAt: 4,
     });
 
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats.totalClips).toBe(5);
     expect(stats.chatCount).toBe(1);
@@ -316,7 +344,7 @@ describe('insight stats', () => {
       lastCapturedAt: dayMs * 2,
     });
 
-    const stats = await getInsightStats({ since: dayMs * 2, until: dayMs * 2 + 1 });
+    const stats = await readInsightStats({ since: dayMs * 2, until: dayMs * 2 + 1 });
 
     expect(stats.videoCount).toBe(1);
     expect(stats.videoDailyTrend.map((item) => item.count)).toEqual([1]);
@@ -372,7 +400,7 @@ describe('insight stats', () => {
       }
     }
 
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats.topArticleCommentedClips.map(({ title, commentCount }) => ({ title, commentCount }))).toEqual([
       { title: 'Most commented article', commentCount: 3 },
@@ -407,7 +435,7 @@ describe('insight stats', () => {
       });
     }
 
-    const stats = await getInsightStats();
+    const stats = await readInsightStats();
 
     expect(stats.chatSourceDistribution.at(-1)).toEqual({
       label: INSIGHT_OTHER_LABEL,

@@ -57,12 +57,11 @@ import {
   type AntiHotlinkRuleDraft,
 } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
 import type { AntiHotlinkRuleValidationIssue } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
+import { getInsightStatsSourceData, type InsightStatsSourceData } from '@services/insight/insight-stats-source';
 import {
   buildInsightStats,
-  getInsightStatsSourceData,
   getInsightTimeRangeWindow,
   type InsightStats,
-  type InsightStatsSourceData,
   type InsightTimeRange,
 } from '@viewmodels/settings/insight-stats';
 
