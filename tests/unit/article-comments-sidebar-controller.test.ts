@@ -1055,6 +1055,40 @@ describe('article-comments-sidebar-controller', () => {
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
   });
 
+  it('blocks combined article_comments refresh on FIND rejection and resumes it after conversations replay', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/a', conversationId: 1 })),
+      findExistingContext: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('find unavailable'))
+        .mockResolvedValueOnce({ canonicalUrl: 'https://example.com/a', conversationId: 1 }),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    adapter.list.mockClear();
+    revisionMocks.requestDataRevisionRetry.mockClear();
+
+    revisionListener?.(['article_comments', 'conversations']);
+    await vi.waitFor(() => expect(revisionMocks.requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(adapter.list).not.toHaveBeenCalled();
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+
+    revisionListener?.(['conversations']);
+    await vi.waitFor(() => expect(adapter.findExistingContext).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
+    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+  });
+
   it('orders combined conversations and article_comments batches as FIND then one comments refresh', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);

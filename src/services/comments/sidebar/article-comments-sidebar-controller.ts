@@ -67,6 +67,8 @@ type ControllerOperation = {
   abortController: AbortController;
 };
 
+type IdentityReconcileResult = 'changed' | 'unchanged' | 'failed' | 'stale';
+
 class ControllerOperationAbortedError extends Error {
   constructor() {
     super('article comments controller operation aborted');
@@ -150,6 +152,7 @@ export function createArticleCommentsSidebarController(input: {
   let revisionBatchDraining = false;
   let identityReconcileGeneration = 0;
   let identityAbortController: AbortController | null = null;
+  let deferredArticleCommentsAfterIdentityFailure = false;
   let drainPendingRevisionBatch: () => void = () => {};
   const loadListeners = new Set<() => void>();
   let loadSnapshot: ArticleCommentsSidebarLoadSnapshot = {
@@ -337,10 +340,10 @@ export function createArticleCommentsSidebarController(input: {
     identityAbortController = null;
   };
 
-  const reconcileExistingContext = async (): Promise<boolean> => {
-    if (typeof adapter.findExistingContext !== 'function') return false;
+  const reconcileExistingContext = async (): Promise<IdentityReconcileResult> => {
+    if (typeof adapter.findExistingContext !== 'function') return 'unchanged';
     const canonicalUrl = getCanonicalUrl();
-    if (!canonicalUrl) return false;
+    if (!canonicalUrl) return 'unchanged';
 
     const generation = identityReconcileGeneration;
     const expectedActivationGeneration = activationGeneration;
@@ -359,18 +362,18 @@ export function createArticleCommentsSidebarController(input: {
         expectedContextKey !== getContextKey() ||
         abortController.signal.aborted
       ) {
-        return false;
+        return 'stale';
       }
 
       const normalized = normalizeContext(resolved);
       if (!normalized || canonicalizeArticleUrl(normalized.canonicalUrl) !== canonicalUrl) {
         requestDataRevisionRetry(['conversations']);
-        return false;
+        return 'failed';
       }
-      if (buildCommentContextIdentityKey(normalized) === getContextKey()) return false;
+      if (buildCommentContextIdentityKey(normalized) === getContextKey()) return 'unchanged';
 
       assignContext(normalized);
-      return true;
+      return 'changed';
     } catch (_error) {
       if (
         disposed ||
@@ -381,10 +384,10 @@ export function createArticleCommentsSidebarController(input: {
         expectedContextKey !== getContextKey() ||
         abortController.signal.aborted
       ) {
-        return false;
+        return 'stale';
       }
       requestDataRevisionRetry(['conversations']);
-      return false;
+      return 'failed';
     } finally {
       if (identityAbortController === abortController) identityAbortController = null;
     }
@@ -407,14 +410,34 @@ export function createArticleCommentsSidebarController(input: {
     revisionBatchDraining = true;
     void (async () => {
       let shouldRefreshComments = batch.has('article_comments');
+      if (
+        deferredArticleCommentsAfterIdentityFailure &&
+        !batch.has('conversations') &&
+        typeof adapter.findExistingContext === 'function'
+      ) {
+        return;
+      }
       if (batch.has('conversations') && typeof adapter.findExistingContext === 'function') {
-        const identityChanged = await reconcileExistingContext();
+        const hadDeferredArticleComments = deferredArticleCommentsAfterIdentityFailure;
+        const identityResult = await reconcileExistingContext();
         if (disposed || !sessionOpen || !activationReady) return;
         if (pendingRevisionScopes.has('conversations')) {
-          if (shouldRefreshComments) pendingRevisionScopes.add('article_comments');
+          if (shouldRefreshComments || hadDeferredArticleComments) {
+            deferredArticleCommentsAfterIdentityFailure = true;
+          }
           return;
         }
-        if (identityChanged) shouldRefreshComments = true;
+        if (identityResult === 'failed') {
+          if (shouldRefreshComments || hadDeferredArticleComments || pendingRevisionScopes.has('article_comments')) {
+            deferredArticleCommentsAfterIdentityFailure = true;
+          }
+          return;
+        }
+        if (identityResult === 'stale') return;
+
+        if (pendingRevisionScopes.delete('article_comments')) shouldRefreshComments = true;
+        deferredArticleCommentsAfterIdentityFailure = false;
+        if (identityResult === 'changed' || hadDeferredArticleComments) shouldRefreshComments = true;
       }
       if (shouldRefreshComments) await refresh();
     })().finally(() => {
@@ -437,6 +460,7 @@ export function createArticleCommentsSidebarController(input: {
     revisionUnsubscribe?.();
     revisionUnsubscribe = null;
     pendingRevisionScopes.clear();
+    deferredArticleCommentsAfterIdentityFailure = false;
     invalidateIdentityReconcile();
     operationGeneration += 1;
     mutationGeneration += 1;
