@@ -411,6 +411,31 @@ describe('data revision storage', () => {
     expect(await readDataRevisionSnapshot()).toEqual(before);
   });
 
+  it('tracks sync mapping and conversation mirror mutations independently', async () => {
+    const { patchSyncMapping, upsertConversation } = await import('@services/conversations/data/storage-idb');
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-revision-scopes',
+      title: 'Mapping revisions',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(conversation.id);
+    const baseline = await readDataRevisionSnapshot();
+
+    await patchSyncMapping(conversationId, { customMetadata: 'one' });
+    expect(await readDataRevision('sync_mappings')).toBe(baseline.sync_mappings + 1);
+    expect(await readDataRevision('conversations')).toBe(baseline.conversations);
+
+    await patchSyncMapping(conversationId, { customMetadata: 'one' });
+    expect(await readDataRevision('sync_mappings')).toBe(baseline.sync_mappings + 1);
+    expect(await readDataRevision('conversations')).toBe(baseline.conversations);
+
+    await patchSyncMapping(conversationId, { feishuDocId: 'doc-1' });
+    expect(await readDataRevision('sync_mappings')).toBe(baseline.sync_mappings + 2);
+    expect(await readDataRevision('conversations')).toBe(baseline.conversations + 1);
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 

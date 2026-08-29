@@ -1099,6 +1099,127 @@ describe('conversations storage-idb', () => {
     expect(Number(afterCursor?.mapping?.updatedAt)).toBeGreaterThanOrEqual(beforeCursorUpdatedAt);
   });
 
+  it('keeps audit metadata and absent provider targets stable for business-equivalent mapping patches', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-business-noop',
+      title: 'Mapping business no-op',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'mapping-business-noop',
+        customMetadata: 'same',
+        updatedAt: 123,
+      }),
+    );
+    await txDone(seedTx);
+
+    const conversationsBefore = await readDataRevision('conversations');
+    const mappingsBefore = await readDataRevision('sync_mappings');
+    await patchSyncMapping(conversationId, { customMetadata: 'same' });
+
+    const unchanged = await getSyncMappingByConversation(conversationId);
+    expect(unchanged?.mapping?.updatedAt).toBe(123);
+    expect(Object.prototype.hasOwnProperty.call(unchanged?.mapping || {}, 'notionPageId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(unchanged?.mapping || {}, 'feishuDocId')).toBe(false);
+    expect(await readDataRevision('conversations')).toBe(conversationsBefore);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore);
+
+    await patchSyncMapping(conversationId, { customMetadata: 'changed' });
+    const changed = await getSyncMappingByConversation(conversationId);
+    expect(changed?.mapping?.customMetadata).toBe('changed');
+    expect(Object.prototype.hasOwnProperty.call(changed?.mapping || {}, 'notionPageId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(changed?.mapping || {}, 'feishuDocId')).toBe(false);
+    expect(await readDataRevision('conversations')).toBe(conversationsBefore);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore + 1);
+  });
+
+  it('repairs a conversation provider mirror without rewriting an equivalent mapping', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-mirror-only',
+      title: 'Mapping mirror only',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'mapping-mirror-only',
+        feishuDocId: 'doc-existing',
+        updatedAt: 321,
+      }),
+    );
+    await txDone(seedTx);
+
+    const conversationsBefore = await readDataRevision('conversations');
+    const mappingsBefore = await readDataRevision('sync_mappings');
+    await patchSyncMapping(conversationId, { feishuDocId: 'doc-existing' });
+
+    const after = await getSyncMappingByConversation(conversationId);
+    expect(after?.mapping?.updatedAt).toBe(321);
+    expect(after?.mapping?.feishuDocId).toBe('doc-existing');
+    expect(after?.conversation?.feishuDocId).toBe('doc-existing');
+    expect(await readDataRevision('conversations')).toBe(conversationsBefore + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore);
+  });
+
+  it('generates a strictly newer implicit sync baseline and keeps an explicit identical cursor stable', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'cursor-baseline-monotonic',
+      title: 'Cursor baseline',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+    const previousBaseline = 9_000_000_000_000;
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'cursor-baseline-monotonic',
+        lastSyncedMessageKey: 'm1',
+        lastSyncedSequence: 1,
+        lastSyncedAt: previousBaseline,
+        lastSyncedMessageUpdatedAt: 2,
+        updatedAt: 50,
+      }),
+    );
+    await txDone(seedTx);
+
+    const mappingsBefore = await readDataRevision('sync_mappings');
+    await setSyncCursor(conversationId, {
+      lastSyncedMessageKey: 'm1',
+      lastSyncedSequence: 1,
+      lastSyncedMessageUpdatedAt: 2,
+    });
+    const generated = await getSyncMappingByConversation(conversationId);
+    expect(generated?.mapping?.lastSyncedAt).toBe(previousBaseline + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore + 1);
+
+    const generatedUpdatedAt = generated?.mapping?.updatedAt;
+    await setSyncCursor(conversationId, {
+      lastSyncedMessageKey: 'm1',
+      lastSyncedSequence: 1,
+      lastSyncedAt: previousBaseline + 1,
+      lastSyncedMessageUpdatedAt: 2,
+    });
+    const explicitNoop = await getSyncMappingByConversation(conversationId);
+    expect(explicitNoop?.mapping?.updatedAt).toBe(generatedUpdatedAt);
+    expect(await readDataRevision('sync_mappings')).toBe(mappingsBefore + 1);
+  });
+
   it('resets stale Notion continuity when the destination page changes and keeps the same mapping identity', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
