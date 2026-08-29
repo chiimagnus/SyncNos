@@ -37,8 +37,14 @@ vi.mock('@services/shared/storage', () => ({
 import { t } from '@i18n';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY } from '@services/integrations/detail-header-copy-link-preference';
-import { DETAIL_HEADER_ACTION_LABELS, resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
+import {
+  DETAIL_HEADER_ACTION_LABELS,
+  getDetailHeaderActionStorageDependencyKeys,
+  hasDetailHeaderActionStorageDependencyChange,
+  resolveDetailHeaderActions,
+} from '@services/integrations/detail-header-actions';
 import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/openin-detail-header-actions';
+import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
 
 const NOTION_PAGE_ID = '01234567-89ab-cdef-0123-456789abcdef';
 const OTHER_NOTION_PAGE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -125,6 +131,28 @@ describe('detail-header-actions', () => {
     storageGetMock.mockResolvedValue({});
     storageSetMock.mockReset();
     storageSetMock.mockResolvedValue(undefined);
+  });
+
+  it('owns exactly the storage keys read by detail header resolution', () => {
+    expect(getDetailHeaderActionStorageDependencyKeys()).toEqual([
+      'webclipper_sync_provider_obsidian_enabled',
+      'webclipper_sync_provider_notion_enabled',
+      'webclipper_sync_provider_feishu_enabled',
+      'webclipper_sync_provider_github_enabled',
+      OBSIDIAN_STORAGE_KEYS.apiBaseUrl,
+      OBSIDIAN_STORAGE_KEYS.apiKey,
+      OBSIDIAN_STORAGE_KEYS.authHeaderName,
+      OBSIDIAN_STORAGE_KEYS.chatFolder,
+      OBSIDIAN_STORAGE_KEYS.articleFolder,
+      OBSIDIAN_STORAGE_KEYS.videoFolder,
+      DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY,
+    ]);
+    expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.videoFolder]: {} }, 'local')).toBe(true);
+    expect(
+      hasDetailHeaderActionStorageDependencyChange({ [DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY]: {} }, 'local'),
+    ).toBe(true);
+    expect(hasDetailHeaderActionStorageDependencyChange({ unrelated: {} }, 'local')).toBe(false);
+    expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.apiKey]: {} }, 'sync')).toBe(false);
   });
 
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {

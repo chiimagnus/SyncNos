@@ -34,6 +34,21 @@ vi.mock('@services/conversations/client/repo', () => ({
   deleteConversations: (...args: any[]) => deleteConversations(...args),
 }));
 
+vi.mock('@services/sync/sync-provider-gate', () => ({
+  syncProviderEnabledStorageKey: (provider: string) => `webclipper_sync_provider_${provider}_enabled`,
+  getSyncProviderEnabledStorageKeys: () => [
+    'webclipper_sync_provider_obsidian_enabled',
+    'webclipper_sync_provider_notion_enabled',
+    'webclipper_sync_provider_feishu_enabled',
+    'webclipper_sync_provider_github_enabled',
+  ],
+  hasSyncProviderEnabledStorageChange: () => false,
+  getEnabledSyncProviders: async () => ['obsidian', 'notion', 'feishu', 'github'],
+  isSyncProviderEnabled: async () => true,
+  ensureSyncProviderEnabled: async () => null,
+  setSyncProviderEnabled: async () => {},
+}));
+
 vi.mock('@services/sync/repo', () => ({
   clearFeishuSyncStatus: (...args: any[]) => clearFeishuSyncStatus(...args),
   clearGithubSyncStatus: (...args: any[]) => clearGithubSyncStatus(...args),

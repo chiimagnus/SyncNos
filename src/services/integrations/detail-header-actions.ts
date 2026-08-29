@@ -3,11 +3,14 @@ import { t } from '@i18n';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import {
+  DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY,
   prioritizeDetailHeaderCopyLinkActions,
   readLastDetailHeaderCopyLinkActionId,
   rememberDetailHeaderCopyLinkAction,
 } from '@services/integrations/detail-header-copy-link-preference';
+import { getSyncProviderEnabledStorageKeys } from '@services/sync/sync-provider-gate';
 import { launchObsidianApp } from '@services/sync/obsidian/obsidian-app-launch';
+import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import { reportObsidianOpenError, waitForDelay } from '@services/integrations/openin/obsidian-open-target';
@@ -22,6 +25,21 @@ export type ResolveDetailHeaderActionsInput = {
   detail?: ConversationDetail | null | undefined;
   port?: DetailHeaderActionPort;
 };
+
+export function getDetailHeaderActionStorageDependencyKeys(): string[] {
+  return Array.from(
+    new Set([
+      ...getSyncProviderEnabledStorageKeys(),
+      ...Object.values(OBSIDIAN_STORAGE_KEYS),
+      DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY,
+    ]),
+  );
+}
+
+export function hasDetailHeaderActionStorageDependencyChange(changes: unknown, areaName: string): boolean {
+  if (areaName !== 'local' || !changes || typeof changes !== 'object') return false;
+  return getDetailHeaderActionStorageDependencyKeys().some((key) => Object.prototype.hasOwnProperty.call(changes, key));
+}
 
 export async function openDetailHeaderProtocolUrl(url: string): Promise<boolean> {
   const safeUrl = String(url || '').trim();

@@ -26,7 +26,10 @@ import {
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
-import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
+import {
+  hasDetailHeaderActionStorageDependencyChange,
+  resolveDetailHeaderActions,
+} from '@services/integrations/detail-header-actions';
 import {
   requestDataRevisionRetry,
   subscribeDataRevisionChanges,
@@ -36,8 +39,8 @@ import type { DataRevisionScope } from '@services/data-revisions/client';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
 import { storageOnChanged } from '@services/shared/storage';
-import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import { listSyncProviders } from '@services/sync/sync-provider-registry';
+import { getEnabledSyncProviders, hasSyncProviderEnabledStorageChange } from '@services/sync/sync-provider-gate';
+import type { SyncProvider } from '@services/sync/models';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 import {
@@ -357,6 +360,7 @@ type ConversationsAppState = {
 
   selectedConversation: Conversation | null;
   detailHeaderActions: DetailHeaderAction[];
+  enabledSyncProviders: SyncProvider[];
 
   exporting: boolean;
   syncFeedback: ConversationSyncFeedbackState;
@@ -498,6 +502,8 @@ export function ConversationsProvider({
   }, [activeConversationSnapshot, items, activeId]);
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
   const [detailHeaderActionsRevision, setDetailHeaderActionsRevision] = useState(0);
+  const detailHeaderResolveSeqRef = useRef(0);
+  const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>([]);
 
   const setListSourceFilterKeyPersistent = useCallback((next: string) => {
     const value =
@@ -1160,16 +1166,45 @@ export function ConversationsProvider({
   }, [refreshActiveDetail, refreshList]);
 
   useEffect(() => {
-    const providerKeys = listSyncProviders().map((provider) => syncProviderEnabledStorageKey(provider.id));
-    return storageOnChanged((changes: any, areaName: string) => {
-      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
-      if (!providerKeys.some((key) => Object.prototype.hasOwnProperty.call(changes, key))) return;
-      setDetailHeaderActionsRevision((value) => value + 1);
+    let disposed = false;
+    let providerLoadSeq = 0;
+
+    const loadEnabledSyncProviders = async () => {
+      const requestSeq = providerLoadSeq + 1;
+      providerLoadSeq = requestSeq;
+      try {
+        const providers = await getEnabledSyncProviders();
+        if (disposed || requestSeq !== providerLoadSeq) return;
+        setEnabledSyncProviders(providers);
+      } catch (_error) {
+        // 保留最后一次成功的 provider gate snapshot。
+      }
+    };
+
+    void loadEnabledSyncProviders();
+    const unsubscribe = storageOnChanged((changes: any, areaName: string) => {
+      const providerGateChanged = hasSyncProviderEnabledStorageChange(changes, areaName);
+      const headerDependencyChanged = hasDetailHeaderActionStorageDependencyChange(changes, areaName);
+      if (!providerGateChanged && !headerDependencyChanged) return;
+
+      if (headerDependencyChanged) {
+        detailHeaderResolveSeqRef.current += 1;
+        setDetailHeaderActionsRevision((value) => value + 1);
+      }
+      if (providerGateChanged) void loadEnabledSyncProviders();
     });
+
+    return () => {
+      disposed = true;
+      providerLoadSeq += 1;
+      detailHeaderResolveSeqRef.current += 1;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const resolveSeq = detailHeaderResolveSeqRef.current + 1;
+    detailHeaderResolveSeqRef.current = resolveSeq;
 
     if (!selectedConversation) {
       setDetailHeaderActions([]);
@@ -1179,7 +1214,7 @@ export function ConversationsProvider({
     setDetailHeaderActions([]);
     void resolveDetailHeaderActions({ conversation: selectedConversation, detail })
       .then((actions) => {
-        if (cancelled) return;
+        if (resolveSeq !== detailHeaderResolveSeqRef.current) return;
 
         const safeActions = Array.isArray(actions) ? actions : [];
 
@@ -1204,11 +1239,11 @@ export function ConversationsProvider({
         setDetailHeaderActions(cacheImagesAction ? [cacheImagesAction, ...safeActions] : safeActions);
       })
       .catch(() => {
-        if (!cancelled) setDetailHeaderActions([]);
+        if (resolveSeq === detailHeaderResolveSeqRef.current) setDetailHeaderActions([]);
       });
 
     return () => {
-      cancelled = true;
+      if (detailHeaderResolveSeqRef.current === resolveSeq) detailHeaderResolveSeqRef.current += 1;
     };
   }, [detail, detailHeaderActionsRevision, refreshActiveDetail, selectedConversation]);
 
@@ -1357,6 +1392,7 @@ export function ConversationsProvider({
     detail,
     selectedConversation,
     detailHeaderActions,
+    enabledSyncProviders,
     exporting,
     syncFeedback,
     syncingNotion,

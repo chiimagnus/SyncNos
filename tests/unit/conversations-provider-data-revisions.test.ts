@@ -13,11 +13,34 @@ const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
+const getEnabledSyncProviders = vi.fn();
 const subscribeDataRevisionChanges = vi.fn();
 const whenDataRevisionObserverReady = vi.fn();
 const requestDataRevisionRetry = vi.fn();
 let revisionListener: ((scopes: readonly string[]) => void) | null = null;
 let revisionUnsubscribe = vi.fn();
+let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
+const PROVIDER_GATE_KEYS = [
+  'webclipper_sync_provider_obsidian_enabled',
+  'webclipper_sync_provider_notion_enabled',
+  'webclipper_sync_provider_feishu_enabled',
+  'webclipper_sync_provider_github_enabled',
+];
+const DETAIL_HEADER_CONFIG_KEYS = [
+  ...PROVIDER_GATE_KEYS,
+  'obsidian_api_base_url',
+  'obsidian_api_key',
+  'obsidian_api_auth_header_name',
+  'obsidian_chat_folder',
+  'obsidian_article_folder',
+  'obsidian_video_folder',
+  'webclipper_detail_header_last_copy_link_action_v1',
+];
+
+function hasLocalStorageChange(changes: unknown, areaName: string, keys: readonly string[]): boolean {
+  if (areaName !== 'local' || !changes || typeof changes !== 'object') return false;
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(changes, key));
+}
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
@@ -59,10 +82,23 @@ vi.mock('@services/comments/client/repo', () => ({
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: (...args: any[]) => resolveDetailHeaderActions(...args),
+  hasDetailHeaderActionStorageDependencyChange: (changes: unknown, areaName: string) =>
+    hasLocalStorageChange(changes, areaName, DETAIL_HEADER_CONFIG_KEYS),
+}));
+
+vi.mock('@services/sync/sync-provider-gate', () => ({
+  getEnabledSyncProviders: () => getEnabledSyncProviders(),
+  hasSyncProviderEnabledStorageChange: (changes: unknown, areaName: string) =>
+    hasLocalStorageChange(changes, areaName, PROVIDER_GATE_KEYS),
 }));
 
 vi.mock('@services/shared/storage', () => ({
-  storageOnChanged: () => () => {},
+  storageOnChanged: (listener: (changes: any, areaName: string) => void) => {
+    storageChangeListener = listener;
+    return () => {
+      if (storageChangeListener === listener) storageChangeListener = null;
+    };
+  },
 }));
 
 vi.mock('@services/shared/ports', () => ({
@@ -154,6 +190,7 @@ describe('ConversationsProvider data revisions', () => {
     latestState = null;
     revisionListener = null;
     revisionUnsubscribe = vi.fn();
+    storageChangeListener = null;
     subscribeDataRevisionChanges.mockReset();
     subscribeDataRevisionChanges.mockImplementation((listener) => {
       revisionListener = listener;
@@ -172,6 +209,8 @@ describe('ConversationsProvider data revisions', () => {
     backfillConversationImages.mockReset();
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
+    getEnabledSyncProviders.mockReset();
+    getEnabledSyncProviders.mockResolvedValue(['obsidian', 'notion', 'feishu', 'github']);
     getConversationListPage.mockResolvedValue(makePage([]));
     getConversationById.mockImplementation((conversationId: number) => Promise.resolve(makeConversation(Number(conversationId))));
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
@@ -457,6 +496,78 @@ describe('ConversationsProvider data revisions', () => {
     expect(String(latestState.selectedConversation?.title || '')).toBe('fresh point title');
     expect(String(latestState.selectedConversation?.author || '')).toBe('fresh author');
     expect(Number(latestState.selectedConversation?.commentThreadCount)).toBe(7);
+  });
+
+  it('keeps the last-good provider gate snapshot when a config reload fails', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+    getEnabledSyncProviders.mockResolvedValueOnce(['notion']).mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await renderProvider();
+    expect(latestState.enabledSyncProviders).toEqual(['notion']);
+    expect(storageChangeListener).toBeTruthy();
+
+    await act(async () => {
+      storageChangeListener?.({ webclipper_sync_provider_notion_enabled: { newValue: false } }, 'local');
+      await flushMicrotasks();
+    });
+
+    expect(getEnabledSyncProviders).toHaveBeenCalledTimes(2);
+    expect(latestState.enabledSyncProviders).toEqual(['notion']);
+  });
+
+  it('invalidates an older Header resolve before config-triggered recomputation', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
+    getConversationById.mockResolvedValue(makeConversation(1));
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    const staleResolve = deferred<any[]>();
+    const staleAction = { id: 'stale-header-action', slot: 'open' } as any;
+    const freshAction = { id: 'fresh-header-action', slot: 'open' } as any;
+    resolveDetailHeaderActions.mockImplementationOnce(() => staleResolve.promise).mockResolvedValue([freshAction]);
+
+    await act(async () => {
+      storageChangeListener?.({ obsidian_video_folder: { newValue: 'Videos' } }, 'local');
+      await flushMicrotasks();
+    });
+    expect(storageChangeListener).toBeTruthy();
+
+    await act(async () => {
+      storageChangeListener?.({ webclipper_detail_header_last_copy_link_action_v1: { newValue: 'copy-feishu-link' } }, 'local');
+      await flushMicrotasks();
+    });
+    expect(latestState.detailHeaderActions.some((action: any) => action.id === 'fresh-header-action')).toBe(true);
+
+    await act(async () => {
+      staleResolve.resolve([staleAction]);
+      await flushMicrotasks();
+    });
+    expect(latestState.detailHeaderActions.some((action: any) => action.id === 'fresh-header-action')).toBe(true);
+    expect(latestState.detailHeaderActions.some((action: any) => action.id === 'stale-header-action')).toBe(false);
+  });
+
+  it('ignores unrelated and non-local storage changes', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+
+    await renderProvider();
+    const providerLoads = getEnabledSyncProviders.mock.calls.length;
+    const headerResolves = resolveDetailHeaderActions.mock.calls.length;
+
+    await act(async () => {
+      storageChangeListener?.({ unrelated: { newValue: true } }, 'local');
+      storageChangeListener?.({ obsidian_api_key: { newValue: 'secret' } }, 'sync');
+      await flushMicrotasks();
+    });
+
+    expect(getEnabledSyncProviders).toHaveBeenCalledTimes(providerLoads);
+    expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(headerResolves);
   });
 
   it('unsubscribes the stable observer when the Provider unmounts', async () => {

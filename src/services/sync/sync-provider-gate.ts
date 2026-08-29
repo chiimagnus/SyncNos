@@ -11,6 +11,23 @@ export function syncProviderEnabledStorageKey(id: SyncProvider): string {
   return `webclipper_sync_provider_${id}_enabled`;
 }
 
+export function getSyncProviderEnabledStorageKeys(): string[] {
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const provider of listSyncProviders()) {
+    const key = syncProviderEnabledStorageKey(provider.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+}
+
+export function hasSyncProviderEnabledStorageChange(changes: unknown, areaName: string): boolean {
+  if (areaName !== 'local' || !changes || typeof changes !== 'object') return false;
+  return getSyncProviderEnabledStorageKeys().some((key) => Object.prototype.hasOwnProperty.call(changes, key));
+}
+
 export async function isSyncProviderEnabled(id: SyncProvider): Promise<boolean> {
   const key = syncProviderEnabledStorageKey(id);
   const res = await storageGet([key]).catch(() => ({}));
@@ -28,8 +45,7 @@ export async function setSyncProviderEnabled(id: SyncProvider, enabled: boolean)
 
 export async function getEnabledSyncProviders(): Promise<SyncProvider[]> {
   const providers = listSyncProviders();
-  const keys = providers.map((p) => syncProviderEnabledStorageKey(p.id));
-  const res = await storageGet(keys).catch(() => ({}));
+  const res = await storageGet(getSyncProviderEnabledStorageKeys());
   const out: SyncProvider[] = [];
   for (const p of providers) {
     const key = syncProviderEnabledStorageKey(p.id);

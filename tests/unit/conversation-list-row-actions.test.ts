@@ -8,7 +8,6 @@ import { ConversationListPane } from '../../src/ui/conversations/ConversationLis
 const getConversationDetailMock = vi.fn();
 const formatConversationMarkdownMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
-const getEnabledSyncProvidersMock = vi.fn();
 let currentState: any = null;
 
 vi.mock('../../src/ui/i18n', () => ({
@@ -33,18 +32,8 @@ vi.mock('../../src/services/shared/webext', () => ({
   openOrFocusExtensionAppTab: vi.fn(),
 }));
 
-vi.mock('../../src/services/shared/storage', () => ({
-  storageOnChanged: () => () => {},
-}));
-
-vi.mock('../../src/services/sync/sync-provider-gate', () => ({
-  getEnabledSyncProviders: () => getEnabledSyncProvidersMock(),
-  syncProviderEnabledStorageKey: (provider: string) => `sync_provider_enabled.${provider}`,
-}));
-
 vi.mock('../../src/services/sync/sync-provider-registry', () => ({
   getSyncProviderDefinition: (provider: string) => ({ id: provider, labelKey: `provider.${provider}` }),
-  listSyncProviders: () => [{ id: 'notion' }, { id: 'obsidian' }, { id: 'feishu' }, { id: 'github' }],
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -117,6 +106,7 @@ function buildState() {
       syncingObsidian: false,
       syncingFeishu: false,
       syncingGithub: false,
+      enabledSyncProviders: ['notion'],
       deleting: false,
       listSourceFilterKey: 'all',
       listSiteFilterKey: 'all',
@@ -162,7 +152,6 @@ describe('ConversationListPane row actions', () => {
     getConversationDetailMock.mockResolvedValue({ conversationId: 11, messages: [] });
     formatConversationMarkdownMock.mockResolvedValue('# exact markdown\n');
     writeTextToClipboardMock.mockResolvedValue(true);
-    getEnabledSyncProvidersMock.mockResolvedValue(['notion']);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -343,7 +332,7 @@ describe('ConversationListPane row actions', () => {
 
   it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
     currentState.selectedIds = [11];
-    getEnabledSyncProvidersMock.mockResolvedValue(['github']);
+    currentState.enabledSyncProviders = ['github'];
     await renderPane();
 
     const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement | null;
@@ -361,7 +350,7 @@ describe('ConversationListPane row actions', () => {
 
   it('dispatches the GitHub sync menu item to the real GitHub context callback', async () => {
     currentState.selectedIds = [11];
-    getEnabledSyncProvidersMock.mockResolvedValue(['notion', 'github']);
+    currentState.enabledSyncProviders = ['notion', 'github'];
     await renderPane();
 
     const syncMenuButton = document.getElementById('btnSyncTo') as HTMLButtonElement | null;
