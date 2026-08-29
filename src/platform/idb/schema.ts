@@ -1,4 +1,5 @@
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import { DATA_REVISION_SCOPES, DATA_REVISION_STORE_BY_SCOPE } from '@platform/idb/data-revision-record';
 import {
   GITHUB_CLEANUP_OUTBOX_DUE_INDEX,
   GITHUB_CLEANUP_OUTBOX_STORE,
@@ -6,7 +7,7 @@ import {
 import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 9;
+export const DB_VERSION = 10;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -51,7 +52,10 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   return Array.from(values);
 }
 
-function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void {
+function normalizeConversationListStoredKeys(
+  { db, tx }: MigrationContext,
+  options: { stripLegacyDescription?: boolean } = {},
+): void {
   if (!db.objectStoreNames.contains('conversations')) return;
   const conversationsStore = tx.objectStore('conversations');
   const req = conversationsStore.openCursor();
@@ -60,7 +64,8 @@ function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void
     if (!cursor) return;
     const value = (cursor.value || {}) as Record<string, unknown>;
     const normalized = normalizeConversationListRecord(value);
-    const hasLegacyDescription = Object.prototype.hasOwnProperty.call(value, 'description');
+    const hasLegacyDescription =
+      options.stripLegacyDescription === true && Object.prototype.hasOwnProperty.call(value, 'description');
     if (normalized !== value || hasLegacyDescription) {
       const next = { ...normalized } as Record<string, unknown>;
       if (hasLegacyDescription) delete (next as any).description;
@@ -919,6 +924,13 @@ function ensureGithubCleanupOutboxStore(db: IDBDatabase, tx: IDBTransaction | nu
   }
 }
 
+function ensureDataRevisionStores(db: IDBDatabase): void {
+  for (const scope of DATA_REVISION_SCOPES) {
+    const storeName = DATA_REVISION_STORE_BY_SCOPE[scope];
+    if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName);
+  }
+}
+
 function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   const db = request.result;
   const tx = request.transaction;
@@ -929,6 +941,7 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureImageCacheStore(db, tx);
   ensureArticleCommentsStore(db, tx);
   ensureGithubCleanupOutboxStore(db, tx);
+  ensureDataRevisionStores(db);
 
   if (tx && oldVersion < 2) {
     try {
@@ -954,7 +967,10 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   if (tx && oldVersion < 8) {
     // Consistency-critical migration for list pagination/filter keys.
     // Do not swallow failures here, otherwise list indexes and record keys may drift.
-    backfillConversationListDerivedKeys({ db, tx });
+    normalizeConversationListStoredKeys({ db, tx }, { stripLegacyDescription: true });
+  } else if (tx && oldVersion < 10) {
+    // v8/v9 already have list indexes but may contain stale or malformed persisted keys.
+    normalizeConversationListStoredKeys({ db, tx });
   }
 }
 
