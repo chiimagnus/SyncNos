@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { openDb } from '../../src/platform/idb/schema';
+import { forceCloseDatabase, IDBKeyRange, IDBVersionChangeEvent, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests, DB_VERSION, openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -116,7 +116,96 @@ beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.IDBKeyRange = IDBKeyRange;
 
+  closeDbForTests();
   await deleteDb('webclipper');
+});
+
+describe('canonical IndexedDB connection manager', () => {
+  it('reuses one opening promise and cached connection per context', async () => {
+    const firstOpen = openDb();
+    const secondOpen = openDb();
+
+    expect(secondOpen).toBe(firstOpen);
+    const firstDb = await firstOpen;
+    expect(await openDb()).toBe(firstDb);
+  });
+
+  it('clears a failed opening so a later open can retry', async () => {
+    const futureReq = indexedDB.open('webclipper', DB_VERSION + 1);
+    const futureDb = await reqToPromise(futureReq);
+    futureDb.close();
+
+    await expect(openDb()).rejects.toBeTruthy();
+    await deleteDb('webclipper');
+
+    const recovered = await openDb();
+    expect(recovered.version).toBe(DB_VERSION);
+  });
+
+  it('closes and invalidates the cached connection on versionchange', async () => {
+    const firstDb = await openDb();
+    firstDb.dispatchEvent(
+      new IDBVersionChangeEvent('versionchange', { oldVersion: DB_VERSION, newVersion: DB_VERSION + 1 }),
+    );
+
+    const reopened = await openDb();
+    expect(reopened).not.toBe(firstDb);
+    expect(reopened.version).toBe(DB_VERSION);
+  });
+
+  it('invalidates the cached connection after an unexpected close', async () => {
+    const firstDb = await openDb();
+    forceCloseDatabase(firstDb as any);
+
+    const reopened = await openDb();
+    expect(reopened).not.toBe(firstDb);
+    expect(reopened.version).toBe(DB_VERSION);
+  });
+
+  it('reports a blocked upgrade without resolving the open early', async () => {
+    const blocker = await openV8Db();
+    let resolveBlocked!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      resolveBlocked = resolve;
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation((message) => {
+      if (message === '[IndexedDB] open blocked') resolveBlocked();
+    });
+
+    const opening = openDb();
+    await blocked;
+    expect(warn).toHaveBeenCalledWith('[IndexedDB] open blocked', {
+      database: 'webclipper',
+      requestedVersion: DB_VERSION,
+    });
+
+    blocker.close();
+    const db = await opening;
+    expect(db.version).toBe(DB_VERSION);
+    warn.mockRestore();
+  });
+
+  it('does not let a reset-era late open recache or clear a newer opening', async () => {
+    const blocker = await openV8Db();
+    let resolveBlocked!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      resolveBlocked = resolve;
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation((message) => {
+      if (message === '[IndexedDB] open blocked') resolveBlocked();
+    });
+
+    const staleOpen = openDb();
+    await blocked;
+    closeDbForTests();
+    const freshOpen = openDb();
+    blocker.close();
+
+    await expect(staleOpen).rejects.toThrow('indexeddb open superseded');
+    const freshDb = await freshOpen;
+    expect(await openDb()).toBe(freshDb);
+    warn.mockRestore();
+  });
 });
 
 describe('storage schema migration (v2 NotionAI thread id)', () => {
@@ -184,7 +273,6 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
     await txDone(t2);
-    db2.close();
 
     // Only one conversation should remain after merge.
     expect(convs.filter((c) => c.source === 'notionai' && c.conversationKey === stableKey).length).toBe(1);
@@ -273,7 +361,6 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const t2 = db2.transaction(['sync_mappings'], 'readonly');
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(maps).toHaveLength(1);
     expect(maps[0]).toMatchObject({
@@ -333,7 +420,6 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     const migrated = convs.find((c) => Number(c.id) === legacyId);
     expect(migrated).toBeTruthy();
@@ -396,8 +482,6 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
     expect(article).toBeTruthy();
     expect(article.listSourceKey).toBe('web');
     expect(article.listSiteKey).toBe('domain:example.com');
-
-    db8.close();
   });
 });
 
@@ -457,7 +541,6 @@ describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
     expect(await reqToPromise(tx9.objectStore('article_comments').count())).toBe(1);
     expect(await reqToPromise(cleanup.count())).toBe(0);
     await txDone(tx9);
-    db9.close();
   });
 
   it('creates the cleanup store/index in a fresh database', async () => {
@@ -470,7 +553,6 @@ describe('storage schema migration (v9 GitHub cleanup outbox)', () => {
     expect(store.keyPath).toBe('id');
     expect(store.autoIncrement).toBe(true);
     await txDone(tx);
-    db.close();
   });
 });
 
@@ -499,7 +581,6 @@ describe('storage schema migration (v6 strip article description)', () => {
     const t2 = db2.transaction(['conversations'], 'readonly');
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(convs.length).toBe(1);
     expect(Object.prototype.hasOwnProperty.call(convs[0], 'description')).toBe(false);
@@ -563,7 +644,6 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(convs).toHaveLength(1);
     expect(convs[0]).toMatchObject({
@@ -679,7 +759,6 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
     const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
     await txDone(t2);
-    db2.close();
 
     expect(convs).toHaveLength(1);
     expect(convs[0]).toMatchObject({

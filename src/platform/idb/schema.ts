@@ -986,14 +986,71 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   }
 }
 
+let cachedDb: IDBDatabase | null = null;
+let openingDb: Promise<IDBDatabase> | null = null;
+let dbLifecycleGeneration = 0;
+
+function attachDbLifecycle(db: IDBDatabase, generation: number): void {
+  db.onversionchange = () => {
+    if (dbLifecycleGeneration !== generation || cachedDb !== db) return;
+    dbLifecycleGeneration += 1;
+    cachedDb = null;
+    db.close();
+  };
+
+  db.addEventListener('close', () => {
+    if (dbLifecycleGeneration !== generation || cachedDb !== db) return;
+    dbLifecycleGeneration += 1;
+    cachedDb = null;
+  });
+}
+
 export function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (cachedDb) return Promise.resolve(cachedDb);
+  if (openingDb) return openingDb;
+
+  const generation = dbLifecycleGeneration;
+  let managedPromise: Promise<IDBDatabase>;
+  const requestPromise = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error || new Error('indexeddb open failed'));
+    req.onerror = () => {
+      if (dbLifecycleGeneration !== generation || openingDb !== managedPromise) {
+        reject(req.error || new Error('indexeddb open superseded'));
+        return;
+      }
+      reject(req.error || new Error('indexeddb open failed'));
+    };
+    req.onblocked = () => {
+      console.warn('[IndexedDB] open blocked', { database: DB_NAME, requestedVersion: DB_VERSION });
+    };
     req.onupgradeneeded = (event) => {
       const oldVersion = typeof event.oldVersion === 'number' ? event.oldVersion : 0;
       runUpgrades(req, oldVersion);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (dbLifecycleGeneration !== generation || openingDb !== managedPromise) {
+        db.close();
+        reject(new Error('indexeddb open superseded'));
+        return;
+      }
+      cachedDb = db;
+      attachDbLifecycle(db, generation);
+      resolve(db);
+    };
   });
+
+  managedPromise = requestPromise.finally(() => {
+    if (dbLifecycleGeneration === generation && openingDb === managedPromise) openingDb = null;
+  });
+  openingDb = managedPromise;
+  return managedPromise;
+}
+
+export function closeDbForTests(): void {
+  dbLifecycleGeneration += 1;
+  const db = cachedDb;
+  cachedDb = null;
+  openingDb = null;
+  db?.close();
 }
