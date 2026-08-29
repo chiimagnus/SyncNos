@@ -10,6 +10,7 @@ import {
 import { closeDbForTests, DB_VERSION, openDb } from '@platform/idb/schema';
 import { readDataRevision, readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
+import { importBackupLegacyJsonMerge } from '@services/sync/backup/import';
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -585,6 +586,44 @@ describe('data revision storage', () => {
     await patchSyncMapping(conversationId, { feishuDocId: 'doc-1' });
     expect(await readDataRevision('sync_mappings')).toBe(baseline.sync_mappings + 2);
     expect(await readDataRevision('conversations')).toBe(baseline.conversations + 1);
+  });
+
+  it('advances conversations once for real Legacy backup changes and stays stable for identical re-imports', async () => {
+    const buildBackup = (lastCapturedAt: number) => ({
+      schemaVersion: 1,
+      stores: {
+        conversations: [
+          {
+            id: 99,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            conversationKey: 'legacy-conversation-revision',
+            title: 'Legacy',
+            url: 'https://chatgpt.com/c/legacy-conversation-revision',
+            lastCapturedAt,
+          },
+        ],
+        messages: [],
+        sync_mappings: [],
+      },
+      storageLocal: {},
+    });
+
+    expect(await readDataRevision('conversations')).toBe(0);
+    const first = await importBackupLegacyJsonMerge(buildBackup(10));
+    expect(first.conversationsAdded).toBe(1);
+    expect(first.conversationsUpdated).toBe(0);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const repeated = await importBackupLegacyJsonMerge(buildBackup(10));
+    expect(repeated.conversationsAdded).toBe(0);
+    expect(repeated.conversationsUpdated).toBe(0);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const changed = await importBackupLegacyJsonMerge(buildBackup(20));
+    expect(changed.conversationsAdded).toBe(0);
+    expect(changed.conversationsUpdated).toBe(1);
+    expect(await readDataRevision('conversations')).toBe(2);
   });
 
   it('reads missing and malformed records as revision zero', async () => {

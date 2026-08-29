@@ -15,6 +15,7 @@ import {
 } from '@services/sync/backup/backup-utils';
 import { openDb } from '@platform/idb/schema';
 import { reqToPromise, tx, txDone } from '@services/sync/backup/idb';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
@@ -240,43 +241,48 @@ export async function importBackupLegacyJsonMerge(
 
   // 1) Upsert conversations by (source, conversationKey).
   {
-    const { t, stores: s } = tx(db, ['conversations'], 'readwrite');
-    const idx = s.conversations.index('by_source_conversationKey');
-
     progress.stage = 'conversations';
     report();
-    for (let i = 0; i < backupConversations.length; i += 1) {
-      const incoming = backupConversations[i];
-      if (!incoming) {
-        bump(1, 'conversations');
-        continue;
-      }
-      const source = incoming.source ? String(incoming.source) : '';
-      const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
-      if (!source || !conversationKey) {
-        bump(1, 'conversations');
-        continue;
-      }
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores: s, markChanged }) => {
+        const idx = s.conversations.index('by_source_conversationKey');
+        let stageChanged = false;
 
-      const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+        for (const incoming of backupConversations) {
+          if (!incoming) continue;
+          const source = incoming.source ? String(incoming.source) : '';
+          const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
+          if (!source || !conversationKey) continue;
 
-      if (existing && existing.id) {
-        merged.id = existing.id;
+          const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
+          const merged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+          merged.source = source;
+          merged.conversationKey = conversationKey;
+          const uk = uniqueConversationKey(merged);
 
-        await reqToPromise(s.conversations.put(merged as any));
-        stats.conversationsUpdated += 1;
-        uniqueToLocalId.set(`${source}||${conversationKey}`, Number(existing.id));
-      } else {
-        const id = await reqToPromise(s.conversations.add(merged as any) as any);
-        stats.conversationsAdded += 1;
-        uniqueToLocalId.set(`${source}||${conversationKey}`, Number(id));
-      }
+          if (existing?.id) {
+            const localId = Number(existing.id);
+            merged.id = localId;
+            uniqueToLocalId.set(uk, localId);
+            if (areBackupValuesEqual(merged, existing)) continue;
 
-      bump(1, 'conversations');
-    }
+            await reqToPromise(s.conversations.put(merged as any));
+            stats.conversationsUpdated += 1;
+            stageChanged = true;
+            continue;
+          }
 
-    await txDone(t);
+          const id = Number(await reqToPromise(s.conversations.add(merged as any) as any));
+          uniqueToLocalId.set(uk, id);
+          stats.conversationsAdded += 1;
+          stageChanged = true;
+        }
+
+        if (stageChanged) markChanged('conversations');
+      },
+    );
+    bump(backupConversations.length, 'conversations');
   }
 
   // 2) Upsert messages by (localConversationId, messageKey).

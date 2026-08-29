@@ -966,6 +966,77 @@ describe('backup service', () => {
     expect(chromeMock.__setPayloads.some((p) => (p as any).notion_oauth_client_id === 'cid')).toBe(true);
   });
 
+  it('keeps Legacy conversation remap on a no-op so later message rows target the existing local id', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const conversation = {
+      id: 99,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'legacy-remap-noop',
+      title: 'Stable',
+      url: 'https://chatgpt.com/c/legacy-remap-noop',
+      warningFlags: [],
+      lastCapturedAt: 10,
+    };
+    const baseDoc = {
+      schemaVersion: 1,
+      stores: { conversations: [conversation], messages: [], sync_mappings: [] },
+      storageLocal: {},
+    };
+
+    const first = await importBackupLegacyJsonMerge(baseDoc);
+    expect(first.conversationsAdded).toBe(1);
+    const db = await openDb();
+    const firstTx = db.transaction(['conversations'], 'readonly');
+    const persisted = await reqToPromise<any>(
+      firstTx.objectStore('conversations').index('by_source_conversationKey').get(['chatgpt', 'legacy-remap-noop']) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      firstTx.oncomplete = () => resolve();
+      firstTx.onerror = () => reject(firstTx.error);
+      firstTx.onabort = () => reject(firstTx.error);
+    });
+    const localConversationId = Number(persisted.id);
+
+    const repeated = await importBackupLegacyJsonMerge({
+      ...baseDoc,
+      stores: {
+        ...baseDoc.stores,
+        messages: [
+          {
+            id: 500,
+            conversationId: 99,
+            messageKey: 'm-remap',
+            role: 'user',
+            contentText: 'mapped',
+            contentMarkdown: '',
+            sequence: 1,
+            updatedAt: 1,
+          },
+        ],
+      },
+    });
+
+    expect(repeated.conversationsAdded).toBe(0);
+    expect(repeated.conversationsUpdated).toBe(0);
+    expect(repeated.messagesAdded).toBe(1);
+    const verifyTx = db.transaction(['messages'], 'readonly');
+    const message = await reqToPromise<any>(
+      verifyTx.objectStore('messages').index('by_conversationId_messageKey').get([localConversationId, 'm-remap']) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      verifyTx.oncomplete = () => resolve();
+      verifyTx.onerror = () => reject(verifyTx.error);
+      verifyTx.onabort = () => reject(verifyTx.error);
+    });
+    expect(message).toMatchObject({ conversationId: localConversationId, messageKey: 'm-remap', contentText: 'mapped' });
+  });
+
   it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
@@ -1127,7 +1198,7 @@ describe('backup service', () => {
       lastSyncedMessageKey: 'incoming-m9',
       notionSections: { conversations: { headingBlockId: 'incoming-heading' } },
       feishuDocId: 'doc-same',
-      feishuLastContentHash: 'incoming-hash',
+      feishuLastContentHash: 'local-hash',
       localOnly: 'keep',
       incomingOnly: 'filled',
       updatedAt: 500,
