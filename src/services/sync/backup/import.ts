@@ -2,6 +2,7 @@ import { normalizeConversationListRecord } from '@platform/idb/conversation-list
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
 import {
+  areBackupValuesEqual,
   filterStorageForBackup,
   validateImageCacheIndexDocument,
   mergeConversationRecord,
@@ -285,6 +286,7 @@ export async function importBackupLegacyJsonMerge(
 
     progress.stage = 'messages';
     report();
+    const stageNow = Date.now();
     for (let i = 0; i < backupMessages.length; i += 1) {
       const incoming = backupMessages[i];
       if (!incoming) {
@@ -311,6 +313,7 @@ export async function importBackupLegacyJsonMerge(
       const merged = mergeMessageRecord(existing, base);
       merged.conversationId = localConversationId;
       merged.messageKey = messageKey;
+      if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
 
       if (existing && existing.id) {
         merged.id = existing.id;
@@ -638,7 +641,7 @@ export async function importBackupZipV2Merge(
           createdAt: Number(existing.createdAt) || item.createdAt || now,
           updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
         };
-        const changed = JSON.stringify(next) !== JSON.stringify(existing);
+        const changed = !areBackupValuesEqual(next, existing);
         if (changed) {
           await reqToPromise(store.put(next as any));
           stats.commentsUpdated += 1;
@@ -833,6 +836,7 @@ export async function importBackupZipV2Merge(
 
     progress.stage = 'Messages';
     report();
+    const stageNow = Date.now();
     let i = 0;
     for (const [uk, list] of messagesByUniqueKey.entries()) {
       const localConversationId = uniqueToLocalId.get(uk);
@@ -856,6 +860,7 @@ export async function importBackupZipV2Merge(
         const merged = mergeMessageRecord(existing, base);
         merged.conversationId = localConversationId;
         merged.messageKey = messageKey;
+        if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
 
         if (existing && existing.id) {
           merged.id = existing.id;

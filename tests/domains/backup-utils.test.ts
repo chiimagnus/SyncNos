@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import {
+  areBackupValuesEqual,
   filterStorageForBackup,
   mergeConversationRecord,
   mergeMessageRecord,
@@ -143,6 +144,30 @@ describe('backup backup-utils', () => {
     expect(merged.title).toBe('Local');
     expect(merged.url).toBe('https://a');
     expect(merged.lastCapturedAt).toBe(9);
+  });
+
+  it('compares backup values with stable object keys, ordered arrays, and real timestamps', () => {
+    expect(
+      areBackupValuesEqual(
+        { updatedAt: 10, nested: { a: 1, b: 2 }, ordered: ['x', { y: 3 }] },
+        { ordered: ['x', { y: 3 }], nested: { b: 2, a: 1 }, updatedAt: 10 },
+      ),
+    ).toBe(true);
+    expect(areBackupValuesEqual({ ordered: ['a', 'b'] }, { ordered: ['b', 'a'] })).toBe(false);
+    expect(areBackupValuesEqual({ updatedAt: 10 }, { updatedAt: 11 })).toBe(false);
+    expect(areBackupValuesEqual(null, null)).toBe(true);
+    expect(areBackupValuesEqual(1, 1)).toBe(true);
+    expect(areBackupValuesEqual(1, '1')).toBe(false);
+  });
+
+  it('mergeMessageRecord stays pure when both timestamps are missing or invalid', () => {
+    const merged = mergeMessageRecord(
+      { conversationId: 1, messageKey: 'm1', contentText: 'local', updatedAt: Number.NaN },
+      { conversationId: 1, messageKey: 'm1', contentMarkdown: 'incoming', updatedAt: -1 },
+    );
+
+    expect(merged.contentMarkdown).toBe('incoming');
+    expect(merged).not.toHaveProperty('updatedAt');
   });
 
   it('mergeMessageRecord prefers newer updatedAt and fills missing markdown', () => {

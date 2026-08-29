@@ -7,6 +7,7 @@ import {
 } from '@services/comments/domain/comment-archive';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
+  areBackupValuesEqual,
   validateArticleCommentsIndexDocument,
   validateBackupManifest,
 } from '@services/sync/backup/backup-utils';
@@ -178,6 +179,24 @@ describe('backup article comments', () => {
 
     expect(prepared.items).toHaveLength(2);
     expect(prepared.items[0]?.fingerprint).not.toBe(prepared.items[1]?.fingerprint);
+  });
+
+  it('treats comment records with reordered object keys as equal without ignoring timestamps', () => {
+    const left = {
+      id: 7,
+      canonicalUrl: 'https://example.com/a',
+      locator: { quote: { exact: 'q', prefix: 'p' }, position: { start: 1, end: 2 } },
+      updatedAt: 20,
+    };
+    const reordered = {
+      updatedAt: 20,
+      locator: { position: { end: 2, start: 1 }, quote: { prefix: 'p', exact: 'q' } },
+      canonicalUrl: 'https://example.com/a',
+      id: 7,
+    };
+
+    expect(areBackupValuesEqual(left, reordered)).toBe(true);
+    expect(areBackupValuesEqual(left, { ...reordered, updatedAt: 21 })).toBe(false);
   });
 
   it('accepts manifests with articleCommentsIndexPath', () => {
