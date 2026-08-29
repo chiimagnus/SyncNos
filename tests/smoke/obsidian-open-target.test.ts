@@ -318,4 +318,60 @@ describe('obsidian-open-target', () => {
     expect(target.availabilityState).toBe('not-synced');
     expect(target.error?.code).toBe('note_not_found');
   });
+
+  it('passes the configured video folder to the detail note resolver without changing chat or article folders', async () => {
+    const resolveExistingNotePath = vi.fn(async () => ({
+      ok: true,
+      desiredFilePath: 'Custom-Videos/youtube-Video-1234567890.md',
+      resolvedFilePath: 'Custom-Videos/youtube-Video-1234567890.md',
+      found: true,
+    }));
+    const services = {
+      settingsStore: {
+        getConnectionConfig: vi.fn(async () => ({
+          apiBaseUrl: 'http://127.0.0.1:27123',
+          apiKey: 'k',
+          authHeaderName: 'Authorization',
+        })),
+        getPathConfig: vi.fn(async () => ({
+          chatFolder: 'Custom-Chats',
+          articleFolder: 'Custom-Articles',
+          videoFolder: 'Custom-Videos',
+        })),
+      },
+      localRestClient: {
+        NOTE_JSON_ACCEPT: 'application/vnd.olrapi.note+json',
+        createClient: vi.fn(() => ({ ok: true, openVaultFile: vi.fn(async () => ({ ok: true })) })),
+      },
+      notePath: {
+        buildStableNotePath: vi.fn(() => 'Custom-Videos/youtube-Video-1234567890.md'),
+        resolveExistingNotePath,
+      },
+      metadata: {
+        readSyncnosObject: vi.fn(),
+      },
+    };
+
+    const target = await resolveObsidianOpenTarget({
+      conversation: {
+        id: 6,
+        source: 'youtube',
+        sourceType: 'video',
+        conversationKey: 'video-6',
+        title: 'Video',
+      },
+      services,
+    });
+
+    expect(target.available).toBe(true);
+    expect(resolveExistingNotePath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderByKindId: {
+          chat: 'Custom-Chats',
+          article: 'Custom-Articles',
+          video: 'Custom-Videos',
+        },
+      }),
+    );
+  });
 });

@@ -84,6 +84,7 @@ function buildFolderByKindId(pathConfig: Awaited<ReturnType<typeof getDefaultObs
   return {
     chat: safeString(pathConfig.chatFolder),
     article: safeString(pathConfig.articleFolder),
+    video: safeString(pathConfig.videoFolder),
   };
 }
 
