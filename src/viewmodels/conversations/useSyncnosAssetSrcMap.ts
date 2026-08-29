@@ -44,6 +44,8 @@ type ResolvedAssetSource = {
   objectUrl: boolean;
 };
 
+const EMPTY_ASSET_SRC_MAP: ReadonlyMap<number, string> = new Map();
+
 export function useSyncnosAssetSrcMap(input: {
   conversationId?: number | null;
   markdowns: readonly string[];
@@ -62,6 +64,7 @@ export function useSyncnosAssetSrcMap(input: {
   const trailingRef = useRef(false);
   const assetSrcRef = useRef<Map<number, string>>(new Map());
   const objectUrlByIdRef = useRef<Map<number, string>>(new Map());
+  const assetSourceConversationIdRef = useRef<number | null>(conversationId);
   const [assetSrcById, setAssetSrcById] = useState<Map<number, string>>(() => new Map());
 
   if (identityKeyRef.current !== identityKey) {
@@ -70,6 +73,7 @@ export function useSyncnosAssetSrcMap(input: {
   }
   latestConversationIdRef.current = conversationId;
   latestAssetIdsRef.current = assetIds;
+  const assetSourceMatchesConversation = assetSourceConversationIdRef.current === conversationId;
 
   const resolveCurrent = useCallback(async () => {
     const generation = generationRef.current;
@@ -222,8 +226,23 @@ export function useSyncnosAssetSrcMap(input: {
   }, [requestResolve]);
 
   useEffect(() => {
+    if (assetSourceConversationIdRef.current === conversationId) return;
+    assetSourceConversationIdRef.current = conversationId;
+    for (const url of objectUrlByIdRef.current.values()) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (_error) {
+        // Revocation is best-effort; this URL belongs to the previous conversation and is no longer renderable.
+      }
+    }
+    objectUrlByIdRef.current = new Map();
+    assetSrcRef.current = new Map();
+    setAssetSrcById(new Map());
+  }, [conversationId]);
+
+  useEffect(() => {
     requestResolve();
   }, [identityKey, requestResolve]);
 
-  return assetSrcById;
+  return assetSourceMatchesConversation ? assetSrcById : EMPTY_ASSET_SRC_MAP;
 }

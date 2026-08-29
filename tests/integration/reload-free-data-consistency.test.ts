@@ -281,7 +281,7 @@ describe('reload-free data consistency production chain', () => {
     await expect(getImageCacheAssetById({ id: restoredAssetId, conversationId: chatId })).resolves.toMatchObject({
       url: 'https://images.example.test/reload-free-fixture.png',
       contentType: 'image/png',
-      byteSize: 4,
+      byteSize: fixture.expected.chat.assetByteSize,
     });
     const mapping = await backgroundStorage.getSyncMappingByConversation(chatId);
     expect(mapping?.mapping).toMatchObject({
@@ -364,7 +364,7 @@ describe('reload-free data consistency production chain', () => {
     await expect(getImageCacheAssetById({ id: restoredAssetId, conversationId: chatId })).resolves.toMatchObject({
       url: 'https://images.example.test/reload-free-fixture.png',
       contentType: 'image/png',
-      byteSize: 4,
+      byteSize: fixture.expected.chat.assetByteSize,
     });
   });
 

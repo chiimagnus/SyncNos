@@ -78,6 +78,7 @@ describe('useSyncnosAssetSrcMap', () => {
   let revisionListener: ((scopes: readonly string[]) => void) | null = null;
   let unsubscribe: ReturnType<typeof vi.fn>;
   let latestMap: ReadonlyMap<number, string> = new Map();
+  let renderedMaps: ReadonlyMap<number, string>[] = [];
   let createObjectUrl: ReturnType<typeof vi.fn>;
   let revokeObjectUrl: ReturnType<typeof vi.fn>;
   let originalCreateObjectUrl: PropertyDescriptor | undefined;
@@ -86,6 +87,7 @@ describe('useSyncnosAssetSrcMap', () => {
 
   function Probe({ conversationId, markdowns }: { conversationId: number; markdowns: string[] }) {
     latestMap = useSyncnosAssetSrcMap({ conversationId, markdowns });
+    renderedMaps.push(latestMap);
     return null;
   }
 
@@ -100,6 +102,7 @@ describe('useSyncnosAssetSrcMap', () => {
     setupDom();
     root = ReactDOM.createRoot(document.getElementById('root')!);
     latestMap = new Map();
+    renderedMaps = [];
     revisionListener = null;
     unsubscribe = vi.fn();
     objectUrlSequence = 0;
@@ -215,6 +218,23 @@ describe('useSyncnosAssetSrcMap', () => {
     expect(latestMap.get(4)).toBe('blob:asset-2');
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:asset-1');
     expect(mocks.requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse a prior conversation asset when the new conversation read rejects', async () => {
+    mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    mocks.getImageCacheAssetById.mockResolvedValueOnce(makeAsset(4, 11));
+    await renderProbe(11, ['![cached](syncnos-asset://4)']);
+    expect(latestMap.get(4)).toBe('blob:asset-1');
+
+    renderedMaps = [];
+    mocks.getImageCacheAssetById.mockRejectedValueOnce(new Error('idb unavailable'));
+    await renderProbe(22, ['![cached](syncnos-asset://4)']);
+
+    expect(renderedMaps.every((map) => !map.has(4))).toBe(true);
+    expect(mocks.getImageCacheAssetById).toHaveBeenLastCalledWith({ id: 4, conversationId: 22 });
+    expect(latestMap.has(4)).toBe(false);
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:asset-1');
+    expect(mocks.requestDataRevisionRetry).toHaveBeenCalledWith(['image_cache']);
   });
 
   it('treats resolved null as authoritative missing and revokes the old object URL', async () => {

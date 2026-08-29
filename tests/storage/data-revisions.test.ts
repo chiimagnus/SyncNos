@@ -745,6 +745,135 @@ describe('data revision storage', () => {
     expect(await readDataRevision('sync_mappings')).toBe(1);
   });
 
+  it('clears stale conversation mirrors for explicit empty mappings in Legacy and ZIP imports', async () => {
+    const source = 'chatgpt';
+    const conversationKey = 'cleared-mapping-mirror';
+    const incomingConversation = {
+      id: 99,
+      sourceType: 'chat',
+      source,
+      conversationKey,
+      title: 'Cleared mapping',
+      url: 'https://chatgpt.com/c/cleared-mapping-mirror',
+      lastCapturedAt: 10,
+    };
+    const clearedMapping = {
+      source,
+      conversationKey,
+      notionPageId: '',
+      feishuDocId: '',
+      updatedAt: 10,
+    };
+    const legacyBackup = {
+      schemaVersion: 1,
+      stores: { conversations: [incomingConversation], messages: [], sync_mappings: [clearedMapping] },
+      storageLocal: {},
+    };
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/chatgpt/cleared-mapping-mirror.json';
+    const zipEntries = new Map<string, Uint8Array>([
+      [
+        'manifest.json',
+        encoder.encode(
+          JSON.stringify({
+            backupSchemaVersion: 2,
+            exportedAt: '2026-08-29T00:00:00.000Z',
+            db: { name: 'webclipper', version: 10 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 1 },
+            config: { storageLocalPath: 'config/storage-local.json' },
+            index: { conversationsCsvPath: 'sources/conversations.csv' },
+            sources: [{ source, conversationCount: 1, files: [entryPath] }],
+          }),
+        ),
+      ],
+      ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+      ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      [
+        entryPath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: incomingConversation,
+            messages: [],
+            syncMapping: clearedMapping,
+          }),
+        ),
+      ],
+    ]);
+    const seedStaleMirror = async () => {
+      closeDbForTests();
+      await deleteDb();
+      const { upsertConversation } = await import('@services/conversations/data/storage-idb');
+      const conversationForSeed = { ...incomingConversation };
+      delete conversationForSeed.id;
+      await upsertConversation({
+        ...conversationForSeed,
+        notionPageId: 'page-stale',
+        notionPageUrl: 'https://notion.so/page-stale',
+        notionWorkspaceSlug: 'workspace-stale',
+        feishuDocId: 'doc-stale',
+      });
+      const db = await openDb();
+      const transaction = db.transaction(['conversations', 'sync_mappings'], 'readwrite');
+      const conversationStore = transaction.objectStore('conversations');
+      const [persistedConversation] = await requestResult<any[]>(conversationStore.getAll());
+      await requestResult(
+        conversationStore.put({
+          ...persistedConversation,
+          notionPageId: 'page-stale',
+          notionPageUrl: 'https://notion.so/page-stale',
+          notionWorkspaceSlug: 'workspace-stale',
+          feishuDocId: 'doc-stale',
+        }),
+      );
+      await requestResult(transaction.objectStore('sync_mappings').add(clearedMapping));
+      await txDone(transaction);
+    };
+    const expectClearedMirror = async () => {
+      const db = await openDb();
+      const transaction = db.transaction(['conversations', 'sync_mappings'], 'readonly');
+      const conversation = await requestResult<any>(transaction.objectStore('conversations').getAll());
+      const mapping = await requestResult<any>(transaction.objectStore('sync_mappings').getAll());
+      await txDone(transaction);
+      expect(conversation).toHaveLength(1);
+      expect(conversation[0]).toMatchObject({
+        notionPageId: '',
+        notionPageUrl: '',
+        notionWorkspaceSlug: '',
+        feishuDocId: '',
+      });
+      expect(mapping).toEqual([expect.objectContaining(clearedMapping)]);
+    };
+
+    await seedStaleMirror();
+    const legacyBaseline = await readDataRevisionSnapshot();
+    await importBackupLegacyJsonMerge(legacyBackup);
+    expect(await readDataRevisionSnapshot()).toMatchObject({
+      conversations: legacyBaseline.conversations + 1,
+      sync_mappings: legacyBaseline.sync_mappings,
+    });
+    await expectClearedMirror();
+    await importBackupLegacyJsonMerge(legacyBackup);
+    expect(await readDataRevisionSnapshot()).toMatchObject({
+      conversations: legacyBaseline.conversations + 1,
+      sync_mappings: legacyBaseline.sync_mappings,
+    });
+
+    await seedStaleMirror();
+    const zipBaseline = await readDataRevisionSnapshot();
+    await importBackupZipV2Merge(zipEntries);
+    expect(await readDataRevisionSnapshot()).toMatchObject({
+      conversations: zipBaseline.conversations + 1,
+      sync_mappings: zipBaseline.sync_mappings,
+    });
+    await expectClearedMirror();
+    await importBackupZipV2Merge(zipEntries);
+    expect(await readDataRevisionSnapshot()).toMatchObject({
+      conversations: zipBaseline.conversations + 1,
+      sync_mappings: zipBaseline.sync_mappings,
+    });
+  });
+
   it('advances conversations once for real ZIP imports and stays stable for equivalent re-imports', async () => {
     const encoder = new TextEncoder();
     const entryPath = 'sources/chatgpt/zip-revision.json';

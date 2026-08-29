@@ -116,7 +116,12 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
 
   // notionPageId: never overwrite a non-empty local mapping.
   const notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
-  if (notionPageId) next.notionPageId = notionPageId;
+  const hasExplicitEmptyNotionPageId = [a, b].some(
+    (record) =>
+      Object.prototype.hasOwnProperty.call(record, 'notionPageId') &&
+      !pickStringPreferExisting(record.notionPageId, ''),
+  );
+  if (notionPageId || hasExplicitEmptyNotionPageId) next.notionPageId = notionPageId;
   else delete next.notionPageId;
 
   const aCaptured = Number(a.lastCapturedAt) || 0;

@@ -1250,6 +1250,43 @@ describe('backup service', () => {
     });
   });
 
+  it('keeps committed Legacy conversations when progress listeners fail', async () => {
+    const doc = {
+      schemaVersion: 1,
+      stores: {
+        conversations: [
+          {
+            id: 99,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            conversationKey: 'legacy-progress',
+            title: 'Legacy progress',
+            url: 'https://chatgpt.com/c/legacy-progress',
+            lastCapturedAt: 10,
+          },
+        ],
+        messages: [],
+        sync_mappings: [],
+      },
+      storageLocal: {},
+    };
+    const failAfterConversationCommit = (progress: { done: number; stage: string }) => {
+      if (progress.stage === 'conversations' && progress.done > 0) throw new Error('sync listener failure');
+    };
+    const rejectAfterConversationCommit = (progress: { done: number; stage: string }) => {
+      if (progress.stage === 'conversations' && progress.done > 0)
+        return Promise.reject(new Error('async listener failure'));
+    };
+
+    await expect(importBackupLegacyJsonMerge(doc, failAfterConversationCommit)).resolves.toMatchObject({
+      conversationsAdded: 1,
+    });
+    await expect(importBackupLegacyJsonMerge(doc, rejectAfterConversationCommit)).resolves.toMatchObject({
+      conversationsAdded: 0,
+      conversationsUpdated: 0,
+    });
+  });
+
   it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

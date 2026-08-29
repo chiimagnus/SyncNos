@@ -41,7 +41,7 @@ GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage ba
 ## 导入与失败语义
 
 - 导入执行合并恢复，不把备份当成无条件覆盖当前本地数据库的镜像；相同备份重复导入应保持幂等，不因为时间戳或其他机械字段制造业务变化与 revision。
-- Zip 导入按已提交 stage 推进，而不是把整个 archive 伪装成单个跨阶段事务。后续 stage 失败时，之前已经 commit 的 stage 保持有效；进度只能报告已经 commit 的阶段。
+- Zip 导入按已提交 stage 推进，而不是把整个 archive 伪装成单个跨阶段事务。后续 stage 失败时，之前已经 commit 的 stage 保持有效；进度只能报告已经 commit 的阶段。Legacy / Zip 的 progress listener 都是 best-effort side effect：同步 throw 或异步 reject 不得把已经提交的导入 stage 反向解释成失败。
 - 备份 manifest、schema 和 Zip 内部路径必须先验证；危险路径或无效结构应拒绝导入。
 - 图片 cache row 的本地 ID 不具备跨数据库可移植性。导入恢复图片时必须把 Markdown 中的 `syncnos-asset://<oldId>` 重写到实际恢复出的 local asset ID；即使重复导入时本地 cache row 曾被删除并重新分配 ID，也不能留下指向旧 ID 的消息引用。
 - image-cache index 或 blob 不可恢复时不得持久化悬空的私有 asset URL：按当前导入策略降级到安全 placeholder，或在可用时回退到原始 `http(s)` / `data:` 图片来源。
