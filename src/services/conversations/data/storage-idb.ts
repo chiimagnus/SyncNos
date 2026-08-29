@@ -32,6 +32,7 @@ import {
   readGithubContinuity,
 } from '@platform/idb/sync-mapping-record';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 
 let conversationListStatsCacheKey: string | null = null;
@@ -76,6 +77,34 @@ function withOptionalId<T extends Record<string, any>>(existingId: unknown, payl
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function storedValueEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => storedValueEqual(value, right[index]));
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) return false;
+    const key = leftKeys[index];
+    if (!storedValueEqual(leftRecord[key], rightRecord[key])) return false;
+  }
+  return true;
+}
+
+function conversationRecordsEquivalent(left: unknown, right: unknown): boolean {
+  const leftRecord = { ...((left && typeof left === 'object' ? left : {}) as Record<string, unknown>) };
+  const rightRecord = { ...((right && typeof right === 'object' ? right : {}) as Record<string, unknown>) };
+  delete leftRecord.id;
+  delete rightRecord.id;
+  return storedValueEqual(leftRecord, rightRecord);
 }
 
 function normalizeMessageTimestamp(value: unknown): number {
@@ -381,98 +410,105 @@ async function migrateSyncMappingKey(
 
 export async function upsertConversation(payload: any): Promise<Conversation> {
   const db = await openDb();
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'sync_mappings', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-    'readwrite',
-  );
-  try {
-    const existing = await findExistingConversationForPayload(stores.conversations, payload);
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: ['conversations', 'sync_mappings', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
+      revisionScopes: ['conversations', 'sync_mappings', 'article_comments'],
+    },
+    async ({ stores, markChanged }) => {
+      const existing = await findExistingConversationForPayload(stores.conversations, payload);
 
-    const now = Date.now();
-    const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
-    const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
-    const isArticleSource =
-      safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === WEB_ARTICLE_SOURCE;
+      const now = Date.now();
+      const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
+      const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
+      const isArticleSource =
+        safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === WEB_ARTICLE_SOURCE;
 
-    const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
-    const existingUrl = existing ? String(existing.url || '').trim() : '';
-    const nextUrlCandidate = payloadUrl || existingUrl;
-    const articleIdentity = isArticleSource ? buildCanonicalWebArticleIdentity(nextUrlCandidate) : null;
-    const nextUrl = articleIdentity?.url || nextUrlCandidate;
+      const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+      const existingUrl = existing ? String(existing.url || '').trim() : '';
+      const nextUrlCandidate = payloadUrl || existingUrl;
+      const articleIdentity = isArticleSource ? buildCanonicalWebArticleIdentity(nextUrlCandidate) : null;
+      const nextUrl = articleIdentity?.url || nextUrlCandidate;
 
-    const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
-    const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
-    const nextConversationKey = isArticleSource
-      ? articleIdentity?.conversationKey || normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
-      : String(payloadConversationKey || existingConversationKey || '').trim();
+      const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
+      const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
+      const nextConversationKey = isArticleSource
+        ? articleIdentity?.conversationKey || normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
+        : String(payloadConversationKey || existingConversationKey || '').trim();
 
-    const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
-    const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
-
-    const baseRecord = normalizeConversationListRecord({
-      sourceType: nextSourceType,
-      source: nextSource,
-      conversationKey: nextConversationKey,
-      title: nextTitle || (existing ? existing.title || '' : ''),
-      url: nextUrl || (existing ? existing.url || '' : ''),
-      author: payload.author || (existing ? existing.author || '' : ''),
-      publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
-      warningFlags: Array.isArray(payload.warningFlags)
-        ? payload.warningFlags
-        : existing
-          ? existing.warningFlags || []
-          : [],
-      notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
-      feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
-      lastCapturedAt: nextLastCapturedAt,
-    });
-
-    const record: any = withOptionalId(existing && existing.id, baseRecord);
-
-    if (existing) {
-      const replacementConversationId = Number(existing.id);
-      await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
-        legacySource: existing.source,
-        legacyConversationKey: existing.conversationKey,
-        nextSource: record.source,
-        nextConversationKey: record.conversationKey,
-        fallbackNotionPageId: record.notionPageId,
-        legacyConversation: existing,
-        replacementConversationId,
-        createdAt: now,
+      const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
+      const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
+      const existingBase = existing && typeof existing === 'object' ? { ...existing } : {};
+      delete existingBase.id;
+      const baseRecord = normalizeConversationListRecord({
+        ...existingBase,
+        sourceType: nextSourceType,
+        source: nextSource,
+        conversationKey: nextConversationKey,
+        title: nextTitle || (existing ? existing.title || '' : ''),
+        url: nextUrl || (existing ? existing.url || '' : ''),
+        author: payload.author || (existing ? existing.author || '' : ''),
+        publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
+        warningFlags: Array.isArray(payload.warningFlags)
+          ? payload.warningFlags
+          : existing
+            ? existing.warningFlags || []
+            : [],
+        notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
+        feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
+        lastCapturedAt: nextLastCapturedAt,
       });
 
-      if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
-        const fromCanonicalUrl = canonicalizeArticleUrl(existingUrl);
-        const toCanonicalUrl = canonicalizeArticleUrl(record.url);
-        await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
-          conversationId: replacementConversationId,
-          fromCanonicalUrl,
-          toCanonicalUrl,
-          updatedAt: now,
-        });
+      const record: any = withOptionalId(existing && existing.id, baseRecord);
+
+      if (existing) {
+        const replacementConversationId = Number(existing.id);
+        const mappingMutation = await migrateSyncMappingKey(
+          stores.sync_mappings,
+          stores[GITHUB_CLEANUP_OUTBOX_STORE],
+          {
+            legacySource: existing.source,
+            legacyConversationKey: existing.conversationKey,
+            nextSource: record.source,
+            nextConversationKey: record.conversationKey,
+            fallbackNotionPageId: record.notionPageId,
+            legacyConversation: existing,
+            replacementConversationId,
+            createdAt: now,
+          },
+        );
+        if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
+
+        if (isArticleSource && Number.isSafeInteger(replacementConversationId) && replacementConversationId > 0) {
+          const fromCanonicalUrl = canonicalizeArticleUrl(existingUrl);
+          const toCanonicalUrl = canonicalizeArticleUrl(record.url);
+          const updatedComments = await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
+            conversationId: replacementConversationId,
+            fromCanonicalUrl,
+            toCanonicalUrl,
+            updatedAt: now,
+          });
+          if (updatedComments > 0) markChanged('article_comments');
+        }
+
+        const conversationChanged = !conversationRecordsEquivalent(existing, record);
+        if (conversationChanged) {
+          await reqToPromise(stores.conversations.put(record));
+          markChanged('conversations');
+        }
+        return { record, conversationChanged };
       }
 
-      await reqToPromise(stores.conversations.put(record));
-      await txDone(t);
-      invalidateConversationListStatsCache();
-      return record;
-    }
+      const id = await reqToPromise(stores.conversations.add(record));
+      record.id = id as any;
+      markChanged('conversations');
+      return { record, conversationChanged: true };
+    },
+  );
 
-    const id = await reqToPromise(stores.conversations.add(record));
-    record.id = id as any;
-    await txDone(t);
-    invalidateConversationListStatsCache();
-    return record;
-  } catch (error) {
-    try {
-      t.abort();
-    } catch (_abortError) {
-      // The transaction may already be aborted by the failing request.
-    }
-    throw error;
-  }
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.record;
 }
 
 export async function mergeConversationsByIds(input: {

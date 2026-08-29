@@ -238,6 +238,24 @@ describe('conversations pagination storage-idb', () => {
     expect(persisted.listSiteKey).toBe('stale.example');
   });
 
+  it('shows a tracked upsert in the next fresh bootstrap without stale summary state', async () => {
+    const initial = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(initial.summary.totalCount).toBe(0);
+
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'tracked-bootstrap',
+      title: 'Tracked bootstrap',
+      url: 'https://chatgpt.com/c/tracked-bootstrap',
+      lastCapturedAt: Date.now(),
+    });
+
+    const refreshed = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(refreshed.items.map((item) => item.conversationKey)).toEqual(['tracked-bootstrap']);
+    expect(refreshed.summary.totalCount).toBe(1);
+  });
+
   it('recomputes summary on a fresh bootstrap after an external IndexedDB write', async () => {
     const initial = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
     expect(initial.items).toEqual([]);

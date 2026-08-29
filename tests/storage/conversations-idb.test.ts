@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
 
 import {
   attachOrphanCommentsToConversation,
@@ -105,6 +106,104 @@ async function listAllConversationsForTests() {
 }
 
 describe('conversations storage-idb', () => {
+  it('bumps conversations for a new row and keeps an identical upsert revision-stable', async () => {
+    const payload = {
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'revision-stable',
+      title: 'Stable',
+      url: 'https://example.com/stable',
+      warningFlags: ['keep'],
+      lastCapturedAt: 10,
+    };
+
+    const created = await upsertConversation(payload);
+    expect(Number(created.id)).toBeGreaterThan(0);
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(0);
+
+    const repeated = await upsertConversation(payload);
+    expect(Number(repeated.id)).toBe(Number(created.id));
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+    expect(await readDataRevision('article_comments')).toBe(0);
+  });
+
+  it('preserves persisted mapping mirrors and unknown fields across an identical upsert', async () => {
+    const payload = {
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'preserve-existing-fields',
+      title: 'Preserve',
+      notionPageId: 'page-1',
+      feishuDocId: 'doc-1',
+      lastCapturedAt: 20,
+    };
+    const created = await upsertConversation(payload);
+    const id = Number(created.id);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations'], 'readwrite');
+    const store = seedTx.objectStore('conversations');
+    const row = await reqToPromise<any>(store.get(id));
+    await reqToPromise(
+      store.put({
+        ...row,
+        notionPageUrl: 'https://notion.so/page-1',
+        notionWorkspaceSlug: 'workspace-1',
+        futureConversationMetadata: { nested: { a: 1 } },
+      }),
+    );
+    await txDone(seedTx);
+
+    await upsertConversation(payload);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['conversations'], 'readonly');
+    const persisted = await reqToPromise<any>(verifyTx.objectStore('conversations').get(id));
+    await txDone(verifyTx);
+    expect(persisted).toMatchObject({
+      notionPageUrl: 'https://notion.so/page-1',
+      notionWorkspaceSlug: 'workspace-1',
+      futureConversationMetadata: { nested: { a: 1 } },
+    });
+  });
+
+  it('bumps only sync_mappings when upsert repairs a missing mapping mirror', async () => {
+    const payload = {
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'mapping-only',
+      title: 'Mapping only',
+      notionPageId: 'page-mirror',
+      lastCapturedAt: 30,
+    };
+    const created = await upsertConversation(payload);
+    expect(await readDataRevision('conversations')).toBe(1);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'chatgpt',
+        conversationKey: 'mapping-only',
+        unknownMetadata: { keep: true },
+      }),
+    );
+    await txDone(seedTx);
+
+    await upsertConversation(payload);
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(1);
+    const mapping = await getSyncMappingByConversation(Number(created.id));
+    expect(mapping?.mapping).toMatchObject({
+      notionPageId: 'page-mirror',
+      unknownMetadata: { keep: true },
+    });
+  });
+
   it('upserts conversation and lists conversations sorted by lastCapturedAt desc', async () => {
     await upsertConversation({
       sourceType: 'chat',
@@ -1337,6 +1436,12 @@ describe('conversations storage-idb', () => {
     );
     await txDone(commentTx);
 
+    const revisionsBeforeRewrite = {
+      conversations: await readDataRevision('conversations'),
+      syncMappings: await readDataRevision('sync_mappings'),
+      articleComments: await readDataRevision('article_comments'),
+    };
+
     const rewritten = await upsertConversation({
       id: existingId,
       sourceType: 'article',
@@ -1384,6 +1489,9 @@ describe('conversations storage-idb', () => {
       replacementConversationId: existingId,
     });
     expect(cleanupRows[0].nextAttemptAt).toBe(cleanupRows[0].createdAt);
+    expect(await readDataRevision('conversations')).toBe(revisionsBeforeRewrite.conversations + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(revisionsBeforeRewrite.syncMappings + 1);
+    expect(await readDataRevision('article_comments')).toBe(revisionsBeforeRewrite.articleComments + 1);
   });
 
   it('skips an equivalent canonical mapping put while still deleting the legacy identity row', async () => {

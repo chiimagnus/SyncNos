@@ -9,6 +9,7 @@ import {
 } from '@platform/idb/data-revision-record';
 import { closeDbForTests, DB_VERSION, openDb } from '@platform/idb/schema';
 import { readDataRevision, readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
+import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -157,6 +158,152 @@ afterEach(() => {
 });
 
 describe('data revision storage', () => {
+  it('bumps one declared scope once even when multiple rows change in the same transaction', async () => {
+    const db = await openDb();
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores, markChanged }) => {
+        await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'one' }));
+        markChanged('conversations');
+        await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'two' }));
+        markChanged('conversations');
+      },
+    );
+
+    expect(await readDataRevision('conversations')).toBe(1);
+    const transaction = db.transaction(['conversations'], 'readonly');
+    const done = txDone(transaction);
+    expect(await requestResult(transaction.objectStore('conversations').count())).toBe(2);
+    await done;
+  });
+
+  it('bumps multiple changed scopes atomically and leaves no-op scopes unchanged', async () => {
+    const db = await openDb();
+    await runTrackedTransaction(
+      { db, stores: ['conversations', 'messages'], revisionScopes: ['conversations', 'messages'] },
+      async ({ stores, markChanged }) => {
+        const conversationId = await requestResult<number>(
+          stores.conversations.add({ source: 'test', conversationKey: 'multi' }) as any,
+        );
+        markChanged('conversations');
+        await requestResult(
+          stores.messages.add({ conversationId, messageKey: 'm1', role: 'user', sequence: 0 }),
+        );
+        markChanged('messages');
+      },
+    );
+
+    expect(await readDataRevision('conversations')).toBe(1);
+    expect(await readDataRevision('messages')).toBe(1);
+    expect(await readDataRevision('sync_mappings')).toBe(0);
+
+    await runTrackedTransaction(
+      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+      async ({ stores }) => {
+        await requestResult(stores.conversations.count());
+      },
+    );
+    expect(await readDataRevision('conversations')).toBe(1);
+  });
+
+  it('fails closed for scope/store mismatch and aborts when work marks an undeclared scope', async () => {
+    const db = await openDb();
+    await expect(
+      runTrackedTransaction(
+        { db, stores: ['conversations'], revisionScopes: ['messages'] },
+        async () => undefined,
+      ),
+    ).rejects.toMatchObject({ code: 'revision_scope_store_missing', scope: 'messages' });
+
+    await expect(
+      runTrackedTransaction(
+        { db, stores: ['conversations', 'messages'], revisionScopes: ['conversations'] },
+        async ({ stores, markChanged }) => {
+          await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'must-rollback' }));
+          markChanged('messages' as any);
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'revision_scope_invalid', scope: 'messages' });
+
+    const transaction = db.transaction(['conversations'], 'readonly');
+    const done = txDone(transaction);
+    expect(await requestResult(transaction.objectStore('conversations').count())).toBe(0);
+    await done;
+    expect(await readDataRevision('conversations')).toBe(0);
+  });
+
+  it('rolls back business rows and revisions when a request fails', async () => {
+    const db = await openDb();
+    await expect(
+      runTrackedTransaction(
+        { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+        async ({ stores, markChanged }) => {
+          await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'duplicate' }));
+          markChanged('conversations');
+          await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'duplicate' }));
+          markChanged('conversations');
+        },
+      ),
+    ).rejects.toBeTruthy();
+
+    const transaction = db.transaction(['conversations'], 'readonly');
+    const done = txDone(transaction);
+    expect(await requestResult(transaction.objectStore('conversations').count())).toBe(0);
+    await done;
+    expect(await readDataRevision('conversations')).toBe(0);
+  });
+
+  it('aborts the whole transaction instead of wrapping an exhausted revision', async () => {
+    await writeRevision('conversations', Number.MAX_SAFE_INTEGER, 1);
+    const db = await openDb();
+
+    await expect(
+      runTrackedTransaction(
+        { db, stores: ['conversations'], revisionScopes: ['conversations'] },
+        async ({ stores, markChanged }) => {
+          await requestResult(stores.conversations.add({ source: 'test', conversationKey: 'overflow' }));
+          markChanged('conversations');
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'revision_overflow', scope: 'conversations' });
+
+    expect(await readDataRevision('conversations')).toBe(Number.MAX_SAFE_INTEGER);
+    const transaction = db.transaction(['conversations'], 'readonly');
+    const done = txDone(transaction);
+    expect(await requestResult(transaction.objectStore('conversations').count())).toBe(0);
+    await done;
+  });
+
+  it('allows an untracked outbox write without manufacturing a UI data revision', async () => {
+    const db = await openDb();
+    await runTrackedTransaction(
+      {
+        db,
+        stores: ['conversations', 'github_cleanup_outbox'],
+        revisionScopes: ['conversations'],
+      },
+      async ({ stores }) => {
+        await requestResult(
+          stores.github_cleanup_outbox.add({
+            remoteKey: 'github.com/example/repo@main',
+            paths: ['WebArticles/a.md'],
+            reason: 'test',
+            replacementConversationId: 1,
+            createdAt: 1,
+            nextAttemptAt: 1,
+            attemptCount: 0,
+          }),
+        );
+      },
+    );
+
+    expect(await readDataRevision('conversations')).toBe(0);
+    const transaction = db.transaction(['github_cleanup_outbox'], 'readonly');
+    const done = txDone(transaction);
+    expect(await requestResult(transaction.objectStore('github_cleanup_outbox').count())).toBe(1);
+    await done;
+  });
+
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
 
