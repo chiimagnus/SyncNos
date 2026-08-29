@@ -63,9 +63,9 @@ export async function findConversationBySourceAndKey(
   return unwrap(res);
 }
 
-export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
+export async function getConversationById(conversationId: number): Promise<Conversation | null> {
   const id = Number(conversationId);
-  const res = await send<ApiResponse<ConversationListOpenTarget | null>>(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, {
+  const res = await send<ApiResponse<Conversation | null>>(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, {
     conversationId: id,
   });
   return unwrap(res);

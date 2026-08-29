@@ -109,7 +109,7 @@ export function ConversationListPane({
     selectedIds,
     toggleAll,
     toggleSelected,
-    setActiveId,
+    activateLoadedConversation,
     clearSelected,
     openConversationInListScopeById,
     exporting,
@@ -497,7 +497,7 @@ export function ConversationListPane({
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
     const id = Number(conversationId);
-    setActiveId(id);
+    activateLoadedConversation(id);
     onOpenConversation?.(id);
   };
 

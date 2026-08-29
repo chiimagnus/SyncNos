@@ -16,8 +16,8 @@ import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
   deleteConversations,
-  findConversationById,
   findConversationBySourceAndKey,
+  getConversationById,
   getConversationListBootstrap,
   getConversationListPage,
   getConversationDetail,
@@ -291,32 +291,6 @@ function listFilterScopeKey(sourceKey: string, siteKey: string): string {
   return `${sourceKey}::${siteKey}`;
 }
 
-function toOpenTargetFromConversation(
-  conversation: Conversation | null | undefined,
-): ConversationListOpenTarget | null {
-  if (!conversation) return null;
-  const id = Number((conversation as any).id);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  const source = String((conversation as any).source || '').trim();
-  const conversationKey = String((conversation as any).conversationKey || '').trim();
-  if (!source || !conversationKey) return null;
-  const lastCapturedAt = Number((conversation as any).lastCapturedAt);
-  const sourceType = resolveConversationSourceType({
-    sourceType: (conversation as any).sourceType,
-    source,
-    url: (conversation as any).url,
-  });
-  return {
-    id,
-    source,
-    conversationKey,
-    title: String((conversation as any).title || '').trim() || undefined,
-    url: String((conversation as any).url || '').trim() || undefined,
-    sourceType,
-    lastCapturedAt: Number.isFinite(lastCapturedAt) ? lastCapturedAt : 0,
-  };
-}
-
 function toConversationFromOpenTarget(target: ConversationListOpenTarget): Conversation {
   const source = String(target.source || '').trim();
   const url = String(target.url || '').trim() || undefined;
@@ -334,20 +308,6 @@ function toConversationFromOpenTarget(target: ConversationListOpenTarget): Conve
     sourceType,
     lastCapturedAt: Number.isFinite(Number(target.lastCapturedAt)) ? Number(target.lastCapturedAt) : undefined,
   };
-}
-
-function sameOpenTarget(a: ConversationListOpenTarget | null, b: ConversationListOpenTarget | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    Number(a.id) === Number(b.id) &&
-    String(a.source || '') === String(b.source || '') &&
-    String(a.conversationKey || '') === String(b.conversationKey || '') &&
-    String(a.title || '') === String(b.title || '') &&
-    String(a.url || '') === String(b.url || '') &&
-    String(a.sourceType || '') === String(b.sourceType || '') &&
-    Number(a.lastCapturedAt || 0) === Number(b.lastCapturedAt || 0)
-  );
 }
 
 function mergeConversationPageItems(prev: Conversation[], next: Conversation[]): Conversation[] {
@@ -425,6 +385,7 @@ type ConversationsAppState = {
   refreshList: () => Promise<void>;
   refreshActiveDetail: () => Promise<void>;
   setActiveId: (id: number | null) => void;
+  activateLoadedConversation: (id: number) => void;
   toggleSelected: (id: number) => void;
   toggleAll: (scopeIds?: number[]) => void;
   clearSelected: () => void;
@@ -480,8 +441,13 @@ export function ConversationsProvider({
   initialOpenLocRef.current = initialOpenLoc;
 
   const activeIdRef = useRef<number | null>(null);
+  const activeMetadataRequestSeqRef = useRef(0);
+  const activeMetadataCommitSeqRef = useRef(0);
+  const rehydrateActiveConversationMetadataRef = useRef<() => void>(() => {});
   const [activeId, setActiveIdState] = useState<number | null>(null);
   const setActiveId = useCallback((id: number | null) => {
+    if (activeIdRef.current === id) return;
+    activeMetadataRequestSeqRef.current += 1;
     activeIdRef.current = id;
     setActiveIdState(id);
   }, []);
@@ -496,11 +462,9 @@ export function ConversationsProvider({
 
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
-  const activeConversationSnapshotRef = useRef<ConversationListOpenTarget | null>(null);
-  const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(
-    null,
-  );
-  const setActiveConversationSnapshot = useCallback((next: ConversationListOpenTarget | null) => {
+  const activeConversationSnapshotRef = useRef<Conversation | null>(null);
+  const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<Conversation | null>(null);
+  const setActiveConversationSnapshot = useCallback((next: Conversation | null) => {
     activeConversationSnapshotRef.current = next;
     setActiveConversationSnapshotState(next);
   }, []);
@@ -526,10 +490,11 @@ export function ConversationsProvider({
     if (!Number.isFinite(selectedId) || selectedId <= 0) return null;
 
     const loaded = items.find((x) => Number(x.id) === selectedId);
-    if (loaded) return ensureConversationUiShape(loaded);
-
     if (!activeConversationSnapshot || Number(activeConversationSnapshot.id) !== selectedId) return null;
-    return toConversationFromOpenTarget(activeConversationSnapshot);
+    const commentThreadCount = Number((loaded as any)?.commentThreadCount);
+    return ensureConversationUiShape(
+      Number.isFinite(commentThreadCount) ? { ...activeConversationSnapshot, commentThreadCount } : activeConversationSnapshot,
+    );
   }, [activeConversationSnapshot, items, activeId]);
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
   const [detailHeaderActionsRevision, setDetailHeaderActionsRevision] = useState(0);
@@ -566,24 +531,63 @@ export function ConversationsProvider({
     return Number.isFinite(Number(id)) ? (id as number) : null;
   }, []);
 
-  const applyOpenTarget = useCallback(
-    (target: ConversationListOpenTarget | null, options?: { preserveListScope?: boolean }) => {
-      if (!target) return;
-      const id = Number((target as any).id);
+  const clearPendingListLocate = useCallback((conversationId: number) => {
+    if (Number(pendingListLocateIdRef.current) !== conversationId) return;
+    pendingListLocateIdRef.current = null;
+    setPendingListLocateId(null);
+  }, []);
+
+  const rehydrateActiveConversationMetadata = useCallback(async () => {
+    const id = Number(activeIdRef.current);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const requestSeq = activeMetadataRequestSeqRef.current + 1;
+    activeMetadataRequestSeqRef.current = requestSeq;
+    try {
+      const conversation = await getConversationById(id);
+      if (requestSeq !== activeMetadataRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+      if (!conversation) {
+        setActiveConversationSnapshot(null);
+        clearPendingListLocate(id);
+        setActiveId(null);
+        return;
+      }
+      if (Number(conversation.id) !== id) throw new Error('conversation lookup returned a mismatched id');
+      activeMetadataCommitSeqRef.current += 1;
+      setActiveConversationSnapshot(conversation);
+    } catch (_error) {
+      if (requestSeq !== activeMetadataRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+      requestDataRevisionRetry(['conversations']);
+    }
+  }, [clearPendingListLocate, setActiveConversationSnapshot, setActiveId]);
+  rehydrateActiveConversationMetadataRef.current = () => {
+    void rehydrateActiveConversationMetadata();
+  };
+
+  const applyActiveConversation = useCallback(
+    (conversation: Conversation | null, options?: { preserveListScope?: boolean }) => {
+      if (!conversation) return;
+      const id = Number((conversation as any).id);
       if (!Number.isFinite(id) || id <= 0) return;
-      const normalizedTarget: ConversationListOpenTarget = {
-        ...target,
+      const source = String((conversation as any).source || '').trim();
+      const conversationKey = String((conversation as any).conversationKey || '').trim();
+      if (!source || !conversationKey) return;
+      const normalizedConversation: Conversation = {
+        ...conversation,
+        id,
+        source,
+        conversationKey,
         sourceType: resolveConversationSourceType({
-          sourceType: (target as any)?.sourceType,
-          source: (target as any)?.source,
-          url: (target as any)?.url,
+          sourceType: (conversation as any)?.sourceType,
+          source,
+          url: (conversation as any)?.url,
         }),
       };
       if (!options?.preserveListScope) {
         setListSourceFilterKeyPersistent(LIST_SOURCE_KEY_ALL);
         setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
       }
-      setActiveConversationSnapshot(normalizedTarget);
+      setActiveConversationSnapshot(normalizedConversation);
       setActiveId(id);
       requestListLocate(id);
     },
@@ -594,6 +598,18 @@ export function ConversationsProvider({
       setListSiteFilterKeyPersistent,
       setListSourceFilterKeyPersistent,
     ],
+  );
+
+  const activateLoadedConversation = useCallback(
+    (conversationId: number) => {
+      const id = Number(conversationId);
+      if (!Number.isFinite(id) || id <= 0 || Number(activeIdRef.current) === id) return;
+      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
+      if (!loaded) return;
+      setActiveConversationSnapshot(loaded);
+      setActiveId(id);
+    },
+    [items, setActiveConversationSnapshot, setActiveId],
   );
 
   const openConversationBySourceKey = useCallback(
@@ -607,9 +623,9 @@ export function ConversationsProvider({
 
       const target = await findConversationBySourceAndKey(safeSource, safeConversationKey).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyOpenTarget(target, options);
+      applyActiveConversation(target ? toConversationFromOpenTarget(target) : null, options);
     },
-    [applyOpenTarget],
+    [applyActiveConversation],
   );
 
   const openConversationExternalBySourceKey = useCallback(
@@ -645,40 +661,28 @@ export function ConversationsProvider({
     async (conversationId: number) => {
       const id = Number(conversationId);
       if (!Number.isFinite(id) || id <= 0) return;
-      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
-      if (loaded) {
-        applyOpenTarget(toOpenTargetFromConversation(loaded), { preserveListScope: false });
-        return;
-      }
-
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
 
-      const target = await findConversationById(id).catch(() => null);
+      const conversation = await getConversationById(id).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyOpenTarget(target, { preserveListScope: false });
+      applyActiveConversation(conversation, { preserveListScope: false });
     },
-    [applyOpenTarget, items],
+    [applyActiveConversation],
   );
 
   const openConversationInListScopeById = useCallback(
     async (conversationId: number) => {
       const id = Number(conversationId);
       if (!Number.isFinite(id) || id <= 0) return;
-      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
-      if (loaded) {
-        applyOpenTarget(toOpenTargetFromConversation(loaded), { preserveListScope: true });
-        return;
-      }
-
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
 
-      const target = await findConversationById(id).catch(() => null);
+      const conversation = await getConversationById(id).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyOpenTarget(target, { preserveListScope: true });
+      applyActiveConversation(conversation, { preserveListScope: true });
     },
-    [applyOpenTarget, items],
+    [applyActiveConversation],
   );
 
   const refreshList = useCallback(async (retryScopes: readonly DataRevisionScope[] = LIST_REVISION_SCOPES) => {
@@ -690,6 +694,8 @@ export function ConversationsProvider({
 
     const requestSeq = listRequestSeqRef.current + 1;
     listRequestSeqRef.current = requestSeq;
+    const activeMetadataRequestSeq = activeMetadataRequestSeqRef.current;
+    const activeMetadataCommitSeq = activeMetadataCommitSeqRef.current;
 
     if (listCommittedFilterScopeRef.current !== scope) {
       listCommittedFilterScopeRef.current = scope;
@@ -748,7 +754,16 @@ export function ConversationsProvider({
           nextActiveId == null
             ? null
             : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
-        setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
+        setActiveConversationSnapshot(nextActiveConversation);
+      } else if (
+        activeMetadataRequestSeq === activeMetadataRequestSeqRef.current &&
+        activeMetadataCommitSeq === activeMetadataCommitSeqRef.current &&
+        !preservingSnapshotActive
+      ) {
+        const currentActiveConversation = list.find(
+          (conversation) => Number((conversation as any)?.id) === currentActiveId,
+        );
+        if (currentActiveConversation) setActiveConversationSnapshot(currentActiveConversation);
       }
     } catch (e) {
       if (requestSeq !== listRequestSeqRef.current) return;
@@ -774,6 +789,8 @@ export function ConversationsProvider({
 
     const requestSeq = listRequestSeqRef.current + 1;
     listRequestSeqRef.current = requestSeq;
+    const activeMetadataRequestSeq = activeMetadataRequestSeqRef.current;
+    const activeMetadataCommitSeq = activeMetadataCommitSeqRef.current;
 
     setLoadingMoreList(true);
     setListError(null);
@@ -791,6 +808,17 @@ export function ConversationsProvider({
       setListHasMore(Boolean(page?.hasMore));
       setListSummary(normalizeConversationListSummary(page?.summary));
       setListFacets(normalizeConversationListFacets(page?.facets));
+      const activeId = Number(activeIdRef.current);
+      const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
+      const activeConversation = pageItems.find((conversation) => Number((conversation as any)?.id) === activeId);
+      if (
+        activeConversation &&
+        snapshotId !== activeId &&
+        activeMetadataRequestSeq === activeMetadataRequestSeqRef.current &&
+        activeMetadataCommitSeq === activeMetadataCommitSeqRef.current
+      ) {
+        setActiveConversationSnapshot(activeConversation);
+      }
     } catch (e) {
       if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
@@ -890,6 +918,10 @@ export function ConversationsProvider({
       if (!relevantScopes.length || disposed || providerGenerationRef.current !== generation) return;
 
       for (const scope of relevantScopes) pendingRevisionScopesRef.current.add(scope);
+      if (relevantScopes.includes('conversations')) {
+        activeMetadataRequestSeqRef.current += 1;
+        rehydrateActiveConversationMetadataRef.current();
+      }
       if (!revisionReadinessSettledRef.current || !initialListSettledRef.current) {
         listRequestSeqRef.current += 1;
         return;
@@ -978,20 +1010,6 @@ export function ConversationsProvider({
     setSelectedIds([]);
   }, [listSiteFilterKey, listSourceFilterKey]);
 
-  useEffect(() => {
-    const id = Number(activeId);
-    if (!Number.isFinite(id) || id <= 0) {
-      setActiveConversationSnapshot(null);
-      return;
-    }
-    const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
-    if (!loaded) return;
-    const nextSnapshot = toOpenTargetFromConversation(loaded);
-    const prevSnapshot = activeConversationSnapshotRef.current;
-    if (sameOpenTarget(prevSnapshot, nextSnapshot)) return;
-    setActiveConversationSnapshot(nextSnapshot);
-  }, [activeId, items, setActiveConversationSnapshot]);
-
   const refreshActiveDetail = useCallback(async () => {
     const id = Number(activeIdRef.current);
     if (!Number.isFinite(id) || id <= 0) {
@@ -1026,8 +1044,9 @@ export function ConversationsProvider({
 
   useEffect(() => {
     activeIdRef.current = activeId;
+    void rehydrateActiveConversationMetadata();
     void refreshActiveDetail();
-  }, [activeId, refreshActiveDetail]);
+  }, [activeId, rehydrateActiveConversationMetadata, refreshActiveDetail]);
 
   useEffect(() => {
     let disposed = false;
@@ -1362,6 +1381,7 @@ export function ConversationsProvider({
     refreshList,
     refreshActiveDetail,
     setActiveId,
+    activateLoadedConversation,
     toggleSelected,
     toggleAll,
     clearSelected,

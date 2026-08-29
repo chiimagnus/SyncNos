@@ -6,7 +6,7 @@ import { act, createElement } from 'react';
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
 const findConversationBySourceAndKey = vi.fn();
-const findConversationById = vi.fn();
+const getConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
@@ -23,7 +23,7 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
   getConversationListPage: (...args: any[]) => getConversationListPage(...args),
   findConversationBySourceAndKey: (...args: any[]) => findConversationBySourceAndKey(...args),
-  findConversationById: (...args: any[]) => findConversationById(...args),
+  getConversationById: (...args: any[]) => getConversationById(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
   upsertConversation: (...args: any[]) => upsertConversation(...args),
@@ -164,7 +164,7 @@ describe('ConversationsProvider data revisions', () => {
     getConversationListBootstrap.mockReset();
     getConversationListPage.mockReset();
     findConversationBySourceAndKey.mockReset();
-    findConversationById.mockReset();
+    getConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
     upsertConversation.mockReset();
@@ -173,7 +173,7 @@ describe('ConversationsProvider data revisions', () => {
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
     getConversationListPage.mockResolvedValue(makePage([]));
-    findConversationById.mockResolvedValue(null);
+    getConversationById.mockImplementation((conversationId: number) => Promise.resolve(makeConversation(Number(conversationId))));
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     upsertConversation.mockResolvedValue({});
@@ -358,6 +358,105 @@ describe('ConversationsProvider data revisions', () => {
 
     expect(requestDataRevisionRetry).not.toHaveBeenCalled();
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([2]);
+  });
+
+  it('keeps the last-good active metadata on point read failure and rehydrates after the next revision', async () => {
+    const pointRead = deferred<any>();
+    const stale = { ...makeConversation(1), title: 'stale title', author: 'stale author', warningFlags: ['old'] };
+    const fresh = { ...makeConversation(1), title: 'fresh title', author: 'fresh author', warningFlags: ['fresh'] };
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([stale]));
+    getConversationById.mockImplementationOnce(() => pointRead.promise).mockResolvedValueOnce(fresh);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(String(latestState.selectedConversation?.author || '')).toBe('stale author');
+
+    await act(async () => {
+      pointRead.reject(new Error('temporary point read failure'));
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(String(latestState.selectedConversation?.title || '')).toBe('stale title');
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+    expect(String(latestState.selectedConversation?.title || '')).toBe('fresh title');
+    expect(String(latestState.selectedConversation?.author || '')).toBe('fresh author');
+    expect(latestState.selectedConversation?.warningFlags).toEqual(['fresh']);
+  });
+
+  it('clears active state only when the canonical point read resolves missing', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(null);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    expect(latestState.activeId).toBeNull();
+    expect(latestState.selectedConversation).toBeNull();
+  });
+
+  it('drops an old point response after switching the active conversation', async () => {
+    const firstRead = deferred<any>();
+    const secondRead = deferred<any>();
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1), makeConversation(2)]));
+    getConversationById.mockImplementation((conversationId: number) =>
+      Number(conversationId) === 1 ? firstRead.promise : secondRead.promise,
+    );
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      latestState.setActiveId(2);
+      await flushMicrotasks();
+      firstRead.resolve(null);
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(2);
+
+    await act(async () => {
+      secondRead.resolve({ ...makeConversation(2), author: 'current author' });
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(2);
+    expect(String(latestState.selectedConversation?.author || '')).toBe('current author');
+  });
+
+  it('does not let a late list response overwrite newer point metadata', async () => {
+    const refreshList = deferred<any>();
+    const stale = { ...makeConversation(1), title: 'stale list title', commentThreadCount: 7 };
+    const firstPoint = { ...makeConversation(1), title: 'first point title', author: 'first author' };
+    const freshPoint = { ...makeConversation(1), title: 'fresh point title', author: 'fresh author' };
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValueOnce(makePage([stale])).mockImplementationOnce(() => refreshList.promise);
+    getConversationById.mockResolvedValueOnce(firstPoint).mockResolvedValueOnce(freshPoint);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+    expect(String(latestState.selectedConversation?.title || '')).toBe('fresh point title');
+
+    await act(async () => {
+      refreshList.resolve(makePage([stale]));
+      await flushMicrotasks();
+    });
+    expect(String(latestState.selectedConversation?.title || '')).toBe('fresh point title');
+    expect(String(latestState.selectedConversation?.author || '')).toBe('fresh author');
+    expect(Number(latestState.selectedConversation?.commentThreadCount)).toBe(7);
   });
 
   it('unsubscribes the stable observer when the Provider unmounts', async () => {

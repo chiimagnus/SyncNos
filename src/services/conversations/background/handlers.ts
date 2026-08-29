@@ -2,8 +2,8 @@ import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-
 import { storageGet } from '@platform/storage/local';
 import {
   deleteConversationsByIds,
-  findConversationById,
   findConversationBySourceAndKey,
+  getConversationById,
   getConversationListBootstrap,
   getConversationListPage,
   getConversationDetail,
@@ -146,8 +146,8 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!Number.isFinite(conversationId) || conversationId <= 0) {
       return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
     }
-    const target = await findConversationById(conversationId);
-    return router.ok(target);
+    const conversation = await getConversationById(conversationId);
+    return router.ok(conversation);
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, async (msg) => {

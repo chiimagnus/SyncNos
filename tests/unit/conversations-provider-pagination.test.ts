@@ -9,7 +9,7 @@ import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
 const findConversationBySourceAndKey = vi.fn();
-const findConversationById = vi.fn();
+const getConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
@@ -27,7 +27,7 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
   getConversationListPage: (...args: any[]) => getConversationListPage(...args),
   findConversationBySourceAndKey: (...args: any[]) => findConversationBySourceAndKey(...args),
-  findConversationById: (...args: any[]) => findConversationById(...args),
+  getConversationById: (...args: any[]) => getConversationById(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
   upsertConversation: (...args: any[]) => upsertConversation(...args),
@@ -199,7 +199,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationListBootstrap.mockReset();
     getConversationListPage.mockReset();
     findConversationBySourceAndKey.mockReset();
-    findConversationById.mockReset();
+    getConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
     upsertConversation.mockReset();
@@ -217,7 +217,9 @@ describe('ConversationsProvider pagination state', () => {
     portDisconnectListener = null;
 
     getConversationListPage.mockResolvedValue(makePage([]));
-    findConversationById.mockResolvedValue(null);
+    getConversationById.mockImplementation((conversationId: number) =>
+      Promise.resolve(makeConversation(Number(conversationId), 'chatgpt', `conv-${conversationId}`)),
+    );
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     upsertConversation.mockResolvedValue({});
@@ -601,6 +603,7 @@ describe('ConversationsProvider pagination state', () => {
       url: 'https://example.com/target',
     };
     getConversationListBootstrap.mockResolvedValue(makePage([selected, conflict]));
+    getConversationById.mockResolvedValue(selected);
     getConversationDetail.mockResolvedValue({ conversationId: 501, messages: [] });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
@@ -633,21 +636,21 @@ describe('ConversationsProvider pagination state', () => {
   });
 
   it('provides cache-images tools action for article conversations', async () => {
+    const article = {
+      ...makeConversation(301, 'web', 'article-301'),
+      sourceType: 'article',
+      url: 'https://example.com/article-301',
+    };
     getConversationListBootstrap.mockResolvedValue(
       makePage(
-        [
-          {
-            ...makeConversation(301, 'web', 'article-301'),
-            sourceType: 'article',
-            url: 'https://example.com/article-301',
-          },
-        ],
+        [article],
         {
           sources: [{ key: 'web', label: 'web', count: 1 }],
           sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
         },
       ),
     );
+    getConversationById.mockResolvedValue(article);
 
     await renderProvider();
     await act(async () => {

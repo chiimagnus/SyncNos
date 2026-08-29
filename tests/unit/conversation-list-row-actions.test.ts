@@ -98,7 +98,7 @@ function buildState() {
       selectedIds: [],
       toggleAll: vi.fn(),
       toggleSelected: vi.fn(),
-      setActiveId: vi.fn(),
+      activateLoadedConversation: vi.fn(),
       clearSelected: vi.fn(),
       openConversationInListScopeById: vi.fn(),
       exporting: false,
@@ -205,7 +205,7 @@ describe('ConversationListPane row actions', () => {
     );
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('# exact markdown\n');
     expect(copyButton?.textContent).toBe('✓');
-    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -235,7 +235,7 @@ describe('ConversationListPane row actions', () => {
     const sourceLabel = sourceButton?.querySelector('span:not([data-conversation-source-link-check])');
     expect(sourceLabel?.textContent).toBe('sourceChatgpt');
     expect(sourceLabel?.classList.contains('tw-invisible')).toBe(true);
-    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -283,7 +283,7 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
   });
 
@@ -323,8 +323,22 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
     expect(currentState.toggleAll).toHaveBeenLastCalledWith([13]);
-    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
+  });
+
+  it('activates a displayed row through the metadata-aware context action', async () => {
+    await renderPane();
+    const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
+    expect(row).toBeTruthy();
+
+    await act(async () => {
+      row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    expect(currentState.activateLoadedConversation).toHaveBeenCalledWith(11);
+    expect(onOpenConversation).toHaveBeenCalledWith(11);
   });
 
   it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
@@ -387,7 +401,7 @@ describe('ConversationListPane row actions', () => {
 
     expect(alertSpy).toHaveBeenCalledWith('copyFailed');
     expect(copyButton?.textContent).toBe('⧉');
-    expect(currentState.setActiveId).not.toHaveBeenCalled();
+    expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
     expect(onOpenConversation).not.toHaveBeenCalled();
   });
 });

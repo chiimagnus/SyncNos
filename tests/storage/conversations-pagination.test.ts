@@ -4,7 +4,6 @@ import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests } from '@platform/idb/schema';
 import {
   __resetConversationStorageStateForTests,
-  findConversationById,
   findConversationBySourceAndKey,
   getConversationListBootstrap,
   getConversationListPage,
@@ -289,7 +288,7 @@ describe('conversations pagination storage-idb', () => {
     expect(refreshed.summary).toEqual({ totalCount: 1, todayCount: 1 });
   });
 
-  it('finds open target by source+conversationKey and by id', async () => {
+  it('finds open target by source+conversationKey', async () => {
     const inserted = await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
@@ -304,11 +303,6 @@ describe('conversations pagination storage-idb', () => {
     expect(byLoc?.id).toBe(Number(inserted.id));
     expect(byLoc?.source).toBe('chatgpt');
     expect(byLoc?.conversationKey).toBe('loc-key-1');
-
-    const byId = await findConversationById(Number(inserted.id));
-    expect(byId).toBeTruthy();
-    expect(byId?.id).toBe(Number(inserted.id));
-    expect(byId?.conversationKey).toBe('loc-key-1');
 
     const missing = await findConversationBySourceAndKey('chatgpt', 'missing');
     expect(missing).toBeNull();

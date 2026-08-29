@@ -1244,11 +1244,6 @@ export async function findConversationBySourceAndKey(
   return toConversationListOpenTarget(row);
 }
 
-export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
-  const row = await getConversationById(conversationId);
-  return toConversationListOpenTarget(row);
-}
-
 export async function getMessagesByConversationId(conversationId: number): Promise<ConversationMessage[]> {
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readonly');
