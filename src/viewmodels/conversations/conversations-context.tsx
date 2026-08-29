@@ -36,8 +36,6 @@ import {
   whenDataRevisionObserverReady,
 } from '@services/data-revisions/observer';
 import type { DataRevisionScope } from '@services/data-revisions/client';
-import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
-import { connectPort } from '@services/shared/ports';
 import { storageOnChanged } from '@services/shared/storage';
 import { getEnabledSyncProviders, hasSyncProviderEnabledStorageChange } from '@services/sync/sync-provider-gate';
 import type { SyncProvider } from '@services/sync/models';
@@ -434,10 +432,13 @@ export function ConversationsProvider({
   const initialListStartedRef = useRef(false);
   const initialListSettledRef = useRef(false);
   const pendingListRefreshRef = useRef(false);
-  const pendingRevisionScopesRef = useRef(new Set<string>());
+  const pendingRevisionScopesRef = useRef(new Set<DataRevisionScope>());
   const providerGenerationRef = useRef(0);
-  const flushPendingRevisionListRef = useRef<() => void>(() => {});
+  const revisionBatchInFlightRef = useRef(false);
+  const pendingConfigHeaderResolveRef = useRef(false);
+  const flushPendingRevisionBatchRef = useRef<() => void>(() => {});
   const refreshListRef = useRef<(retryScopes?: readonly DataRevisionScope[]) => Promise<void>>(async () => {});
+  const refreshActiveDetailRef = useRef<(retryScopes?: readonly DataRevisionScope[]) => Promise<void>>(async () => {});
   const openConversationExternalByLocRef = useRef<(input: { source: string; conversationKey: string }) => Promise<void>>(
     async () => {},
   );
@@ -447,7 +448,7 @@ export function ConversationsProvider({
   const activeIdRef = useRef<number | null>(null);
   const activeMetadataRequestSeqRef = useRef(0);
   const activeMetadataCommitSeqRef = useRef(0);
-  const rehydrateActiveConversationMetadataRef = useRef<() => void>(() => {});
+  const rehydrateActiveConversationMetadataRef = useRef<() => Promise<boolean>>(async () => true);
   const [activeId, setActiveIdState] = useState<number | null>(null);
   const setActiveId = useCallback((id: number | null) => {
     if (activeIdRef.current === id) return;
@@ -456,13 +457,20 @@ export function ConversationsProvider({
     setActiveIdState(id);
   }, []);
   const listRequestSeqRef = useRef(0);
+  const listSuccessRequestSeqRef = useRef(0);
   const detailRequestSeqRef = useRef(0);
+  const detailSuccessRequestSeqRef = useRef(0);
   const openTargetRequestSeqRef = useRef(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ConversationDetail | null>(null);
+  const detailRef = useRef<ConversationDetail | null>(null);
+  const [detail, setDetailState] = useState<ConversationDetail | null>(null);
+  const setDetail = useCallback((next: ConversationDetail | null) => {
+    detailRef.current = next;
+    setDetailState(next);
+  }, []);
 
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
@@ -503,6 +511,7 @@ export function ConversationsProvider({
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
   const [detailHeaderActionsRevision, setDetailHeaderActionsRevision] = useState(0);
   const detailHeaderResolveSeqRef = useRef(0);
+  const detailHeaderRetryScopesRef = useRef<DataRevisionScope[]>([]);
   const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>([]);
 
   const setListSourceFilterKeyPersistent = useCallback((next: string) => {
@@ -543,32 +552,32 @@ export function ConversationsProvider({
     setPendingListLocateId(null);
   }, []);
 
-  const rehydrateActiveConversationMetadata = useCallback(async () => {
+  const rehydrateActiveConversationMetadata = useCallback(async (): Promise<boolean> => {
     const id = Number(activeIdRef.current);
-    if (!Number.isFinite(id) || id <= 0) return;
+    if (!Number.isFinite(id) || id <= 0) return true;
 
     const requestSeq = activeMetadataRequestSeqRef.current + 1;
     activeMetadataRequestSeqRef.current = requestSeq;
     try {
       const conversation = await getConversationById(id);
-      if (requestSeq !== activeMetadataRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+      if (requestSeq !== activeMetadataRequestSeqRef.current || Number(activeIdRef.current) !== id) return false;
       if (!conversation) {
         setActiveConversationSnapshot(null);
         clearPendingListLocate(id);
         setActiveId(null);
-        return;
+        return true;
       }
       if (Number(conversation.id) !== id) throw new Error('conversation lookup returned a mismatched id');
       activeMetadataCommitSeqRef.current += 1;
       setActiveConversationSnapshot(conversation);
+      return true;
     } catch (_error) {
-      if (requestSeq !== activeMetadataRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+      if (requestSeq !== activeMetadataRequestSeqRef.current || Number(activeIdRef.current) !== id) return false;
       requestDataRevisionRetry(['conversations']);
+      return false;
     }
   }, [clearPendingListLocate, setActiveConversationSnapshot, setActiveId]);
-  rehydrateActiveConversationMetadataRef.current = () => {
-    void rehydrateActiveConversationMetadata();
-  };
+  rehydrateActiveConversationMetadataRef.current = rehydrateActiveConversationMetadata;
 
   const applyActiveConversation = useCallback(
     (conversation: Conversation | null, options?: { preserveListScope?: boolean }) => {
@@ -723,6 +732,7 @@ export function ConversationsProvider({
       if (requestSeq !== listRequestSeqRef.current) return;
 
       const list = Array.isArray(page?.items) ? page.items : [];
+      listSuccessRequestSeqRef.current = requestSeq;
       listCommittedFilterScopeRef.current = scope;
       setItems(list);
       setListCursor(page?.cursor ?? null);
@@ -880,72 +890,159 @@ export function ConversationsProvider({
         });
       }
 
-      await upsertConversation({
+      const updated = await upsertConversation({
         id: Number((convo as any)?.id),
         source: (convo as any)?.source,
         conversationKey: (convo as any)?.conversationKey,
         sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
         url: nextCanonical,
       });
+      if (Number(activeIdRef.current) === Number(updated?.id)) setActiveConversationSnapshot(updated);
+      await refreshList();
     },
-    [items, selectedConversation],
+    [items, refreshList, selectedConversation, setActiveConversationSnapshot],
   );
 
   useEffect(() => {
     let disposed = false;
     const generation = providerGenerationRef.current + 1;
     providerGenerationRef.current = generation;
-    let revisionRefreshInFlight = false;
 
-    const flushPendingRevisionList = () => {
+    const flushPendingRevisionBatch = () => {
       if (disposed || providerGenerationRef.current !== generation) return;
-      if (!revisionReadinessSettledRef.current || !initialListSettledRef.current || revisionRefreshInFlight) return;
+      if (!revisionReadinessSettledRef.current || !initialListSettledRef.current || revisionBatchInFlightRef.current) {
+        return;
+      }
       if (!pendingListRefreshRef.current && !pendingRevisionScopesRef.current.size) return;
 
-      const retryScopes = pendingRevisionScopesRef.current.size
-        ? LIST_REVISION_SCOPES.filter((scope) => pendingRevisionScopesRef.current.has(scope))
-        : LIST_REVISION_SCOPES;
-      pendingListRefreshRef.current = false;
-      pendingRevisionScopesRef.current.clear();
-      revisionRefreshInFlight = true;
-      void refreshListRef
-        .current(retryScopes)
-        .catch(() => {})
-        .finally(() => {
-          if (disposed || providerGenerationRef.current !== generation) return;
-          revisionRefreshInFlight = false;
-          flushPendingRevisionList();
-        });
+      revisionBatchInFlightRef.current = true;
+      void (async () => {
+        let headerReady = false;
+        let headerBlockedByDataFailure = false;
+        const headerRetryScopes = new Set<DataRevisionScope>();
+
+        while (!disposed && providerGenerationRef.current === generation) {
+          const batchScopes = new Set(pendingRevisionScopesRef.current);
+          const forceListRefresh = pendingListRefreshRef.current;
+          pendingRevisionScopesRef.current.clear();
+          pendingListRefreshRef.current = false;
+          if (!batchScopes.size && !forceListRefresh) break;
+
+          const conversationScopeChanged = batchScopes.has('conversations');
+          const commentsChanged = batchScopes.has('article_comments');
+          const messagesChanged = batchScopes.has('messages');
+          const mappingsChanged = batchScopes.has('sync_mappings');
+          const headerRelevant = conversationScopeChanged || messagesChanged || mappingsChanged;
+
+          let metadataOk = true;
+          let listOk = true;
+          let detailOk = true;
+
+          if (conversationScopeChanged) {
+            metadataOk = await rehydrateActiveConversationMetadataRef.current();
+            if (disposed || providerGenerationRef.current !== generation) return;
+          }
+
+          if (conversationScopeChanged || commentsChanged || forceListRefresh) {
+            const expectedListSeq = listRequestSeqRef.current + 1;
+            const listRetryScopes = LIST_REVISION_SCOPES.filter((scope) => batchScopes.has(scope));
+            if (listRetryScopes.length) await refreshListRef.current(listRetryScopes);
+            else await refreshListRef.current();
+            if (disposed || providerGenerationRef.current !== generation) return;
+            listOk =
+              listRequestSeqRef.current === expectedListSeq && listSuccessRequestSeqRef.current === expectedListSeq;
+          }
+
+          if (messagesChanged) {
+            const expectedDetailSeq = detailRequestSeqRef.current + 1;
+            await refreshActiveDetailRef.current(['messages']);
+            if (disposed || providerGenerationRef.current !== generation) return;
+            detailOk =
+              detailRequestSeqRef.current === expectedDetailSeq && detailSuccessRequestSeqRef.current === expectedDetailSeq;
+          }
+
+          if (headerRelevant) {
+            const prerequisitesOk = (!conversationScopeChanged || (metadataOk && listOk)) && (!messagesChanged || detailOk);
+            if (prerequisitesOk) {
+              headerReady = true;
+              headerBlockedByDataFailure = false;
+              for (const scope of batchScopes) {
+                if (scope === 'conversations' || scope === 'messages' || scope === 'sync_mappings') {
+                  headerRetryScopes.add(scope);
+                }
+              }
+            } else {
+              headerReady = false;
+              headerBlockedByDataFailure = true;
+              headerRetryScopes.clear();
+            }
+          }
+        }
+
+        const configResolvePending = pendingConfigHeaderResolveRef.current;
+        pendingConfigHeaderResolveRef.current = false;
+        revisionBatchInFlightRef.current = false;
+
+        if (headerReady) {
+          detailHeaderRetryScopesRef.current = Array.from(headerRetryScopes);
+          setDetailHeaderActionsRevision((value) => value + 1);
+        } else if (configResolvePending && !headerBlockedByDataFailure) {
+          detailHeaderRetryScopesRef.current = [];
+          setDetailHeaderActionsRevision((value) => value + 1);
+        }
+
+        flushPendingRevisionBatch();
+      })().catch(() => {
+        revisionBatchInFlightRef.current = false;
+        flushPendingRevisionBatch();
+      });
     };
 
-    flushPendingRevisionListRef.current = flushPendingRevisionList;
+    flushPendingRevisionBatchRef.current = flushPendingRevisionBatch;
     const unsubscribe = subscribeDataRevisionChanges((scopes) => {
-      const relevantScopes = scopes.filter((scope) => scope === 'conversations' || scope === 'article_comments');
+      const relevantScopes = scopes.filter(
+        (scope) =>
+          scope === 'conversations' ||
+          scope === 'messages' ||
+          scope === 'sync_mappings' ||
+          scope === 'article_comments',
+      );
       if (!relevantScopes.length || disposed || providerGenerationRef.current !== generation) return;
 
       for (const scope of relevantScopes) pendingRevisionScopesRef.current.add(scope);
+      const listChanged = relevantScopes.includes('conversations') || relevantScopes.includes('article_comments');
+      const headerChanged =
+        relevantScopes.includes('conversations') ||
+        relevantScopes.includes('messages') ||
+        relevantScopes.includes('sync_mappings');
+
       if (relevantScopes.includes('conversations')) {
         activeMetadataRequestSeqRef.current += 1;
-        rehydrateActiveConversationMetadataRef.current();
+        openTargetRequestSeqRef.current += 1;
       }
-      if (!revisionReadinessSettledRef.current || !initialListSettledRef.current) {
-        listRequestSeqRef.current += 1;
-        return;
+      if (listChanged) listRequestSeqRef.current += 1;
+      if (relevantScopes.includes('messages')) detailRequestSeqRef.current += 1;
+      if (headerChanged) {
+        detailHeaderResolveSeqRef.current += 1;
+        detailHeaderRetryScopesRef.current = [];
+        setDetailHeaderActions([]);
       }
-      flushPendingRevisionList();
+
+      flushPendingRevisionBatch();
     });
 
     void whenDataRevisionObserverReady().then(() => {
       if (disposed || providerGenerationRef.current !== generation) return;
       revisionReadinessSettledRef.current = true;
       setRevisionReadinessSettled(true);
-      flushPendingRevisionList();
+      flushPendingRevisionBatch();
     });
 
     return () => {
       disposed = true;
       providerGenerationRef.current += 1;
-      flushPendingRevisionListRef.current = () => {};
+      revisionBatchInFlightRef.current = false;
+      flushPendingRevisionBatchRef.current = () => {};
       unsubscribe();
     };
   }, []);
@@ -989,7 +1086,7 @@ export function ConversationsProvider({
     void refreshList().finally(() => {
       if (cancelled) return;
       initialListSettledRef.current = true;
-      flushPendingRevisionListRef.current();
+      flushPendingRevisionBatchRef.current();
     });
 
     return () => {
@@ -1016,154 +1113,50 @@ export function ConversationsProvider({
     setSelectedIds([]);
   }, [listSiteFilterKey, listSourceFilterKey]);
 
-  const refreshActiveDetail = useCallback(async () => {
-    const id = Number(activeIdRef.current);
-    if (!Number.isFinite(id) || id <= 0) {
-      detailRequestSeqRef.current += 1;
-      setLoadingDetail(false);
-      setDetailError(null);
-      setDetail(null);
-      return;
-    }
-
-    const requestSeq = detailRequestSeqRef.current + 1;
-    detailRequestSeqRef.current = requestSeq;
-    setLoadingDetail(true);
-    setDetailError(null);
-    setDetail((current) => (Number((current as any)?.conversationId) === id ? current : null));
-    try {
-      const d = await loadDetailFor(id);
-      if (requestSeq !== detailRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
-      const detailId = Number((d as any)?.conversationId);
-      if (Number.isFinite(detailId) && detailId > 0 && detailId !== id) return;
-      setDetail(d);
-    } catch (e) {
-      if (requestSeq !== detailRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
-      setDetailError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
-      setDetail(null);
-    } finally {
-      if (requestSeq === detailRequestSeqRef.current && Number(activeIdRef.current) === id) {
+  const refreshActiveDetail = useCallback(
+    async (retryScopes: readonly DataRevisionScope[] = []) => {
+      const id = Number(activeIdRef.current);
+      if (!Number.isFinite(id) || id <= 0) {
+        detailRequestSeqRef.current += 1;
+        detailSuccessRequestSeqRef.current = detailRequestSeqRef.current;
         setLoadingDetail(false);
+        setDetailError(null);
+        setDetail(null);
+        return;
       }
-    }
-  }, []);
+
+      const requestSeq = detailRequestSeqRef.current + 1;
+      detailRequestSeqRef.current = requestSeq;
+      setLoadingDetail(true);
+      setDetailError(null);
+      if (Number((detailRef.current as any)?.conversationId) !== id) setDetail(null);
+      try {
+        const d = await loadDetailFor(id);
+        if (requestSeq !== detailRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+        const detailId = Number((d as any)?.conversationId);
+        if (Number.isFinite(detailId) && detailId > 0 && detailId !== id) return;
+        detailSuccessRequestSeqRef.current = requestSeq;
+        setDetail(d);
+      } catch (e) {
+        if (requestSeq !== detailRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+        setDetailError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+        const replayScopes = retryScopes.filter((scope) => scope === 'messages');
+        if (replayScopes.length) requestDataRevisionRetry(replayScopes);
+      } finally {
+        if (requestSeq === detailRequestSeqRef.current && Number(activeIdRef.current) === id) {
+          setLoadingDetail(false);
+        }
+      }
+    },
+    [setDetail],
+  );
+  refreshActiveDetailRef.current = refreshActiveDetail;
 
   useEffect(() => {
     activeIdRef.current = activeId;
     void rehydrateActiveConversationMetadata();
     void refreshActiveDetail();
   }, [activeId, rehydrateActiveConversationMetadata, refreshActiveDetail]);
-
-  useEffect(() => {
-    let disposed = false;
-    let port: any = null;
-    let refreshTimer: any = null;
-    let pendingList = false;
-    let pendingDetail = false;
-
-    const flush = async () => {
-      if (disposed) return;
-      const doList = pendingList;
-      const doDetail = pendingDetail;
-      pendingList = false;
-      pendingDetail = false;
-      refreshTimer = null;
-
-      if (doList) {
-        if (!revisionReadinessSettledRef.current || !initialListSettledRef.current) {
-          pendingListRefreshRef.current = true;
-          listRequestSeqRef.current += 1;
-        } else {
-          await refreshList().catch(() => {});
-        }
-      }
-      // Only force-refresh detail when the active conversation is known to have changed
-      // (or when sync finishes and metadata such as notionPageId is updated).
-      if (doDetail) await refreshActiveDetail().catch(() => {});
-    };
-
-    const scheduleFlush = () => {
-      if (disposed) return;
-      if (refreshTimer) return;
-      refreshTimer = setTimeout(() => {
-        void flush();
-      }, 250);
-    };
-
-    const connect = () => {
-      if (disposed) return;
-      try {
-        port = connectPort(UI_PORT_NAMES.POPUP_EVENTS);
-      } catch (_e) {
-        port = null;
-        return;
-      }
-
-      const onMessage = (message: any) => {
-        if (disposed) return;
-        if (!message || typeof message !== 'object') return;
-        if (message.type !== UI_EVENT_TYPES.CONVERSATIONS_CHANGED) return;
-
-        const payload = (message as any).payload || {};
-        pendingList = true;
-
-        const reason = String(payload.reason || '').trim();
-        if (reason === 'delete') {
-          // Let refreshList() normalize activeId; detail will refresh via the activeId effect.
-        } else if (reason === 'syncFinished') {
-          pendingDetail = true;
-        } else {
-          const changedId = Number(payload.conversationId);
-          if (Number.isFinite(changedId) && changedId > 0 && Number(activeIdRef.current) === changedId) {
-            pendingDetail = true;
-          }
-          const ids = Array.isArray(payload.conversationIds) ? payload.conversationIds : [];
-          if (ids.some((id: any) => Number(id) === Number(activeIdRef.current))) {
-            pendingDetail = true;
-          }
-        }
-
-        scheduleFlush();
-      };
-
-      const onDisconnect = () => {
-        try {
-          port?.onMessage?.removeListener?.(onMessage);
-        } catch (_e) {
-          // ignore
-        }
-        port = null;
-        if (disposed) return;
-        setTimeout(connect, 1000);
-      };
-
-      try {
-        port?.onMessage?.addListener?.(onMessage);
-        port?.onDisconnect?.addListener?.(onDisconnect);
-      } catch (_e) {
-        try {
-          port?.disconnect?.();
-        } catch (_e2) {
-          // ignore
-        }
-        port = null;
-      }
-    };
-
-    connect();
-
-    return () => {
-      disposed = true;
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = null;
-      try {
-        port?.disconnect?.();
-      } catch (_e) {
-        // ignore
-      }
-      port = null;
-    };
-  }, [refreshActiveDetail, refreshList]);
 
   useEffect(() => {
     let disposed = false;
@@ -1189,7 +1182,10 @@ export function ConversationsProvider({
 
       if (headerDependencyChanged) {
         detailHeaderResolveSeqRef.current += 1;
-        setDetailHeaderActionsRevision((value) => value + 1);
+        detailHeaderRetryScopesRef.current = [];
+        setDetailHeaderActions([]);
+        if (revisionBatchInFlightRef.current) pendingConfigHeaderResolveRef.current = true;
+        else setDetailHeaderActionsRevision((value) => value + 1);
       }
       if (providerGateChanged) void loadEnabledSyncProviders();
     });
@@ -1203,8 +1199,12 @@ export function ConversationsProvider({
   }, []);
 
   useEffect(() => {
+    if (revisionBatchInFlightRef.current) return;
+
     const resolveSeq = detailHeaderResolveSeqRef.current + 1;
     detailHeaderResolveSeqRef.current = resolveSeq;
+    const retryScopes = detailHeaderRetryScopesRef.current;
+    detailHeaderRetryScopesRef.current = [];
 
     if (!selectedConversation) {
       setDetailHeaderActions([]);
@@ -1239,7 +1239,9 @@ export function ConversationsProvider({
         setDetailHeaderActions(cacheImagesAction ? [cacheImagesAction, ...safeActions] : safeActions);
       })
       .catch(() => {
-        if (resolveSeq === detailHeaderResolveSeqRef.current) setDetailHeaderActions([]);
+        if (resolveSeq !== detailHeaderResolveSeqRef.current) return;
+        setDetailHeaderActions([]);
+        if (retryScopes.length) requestDataRevisionRetry(retryScopes);
       });
 
     return () => {

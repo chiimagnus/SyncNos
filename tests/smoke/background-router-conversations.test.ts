@@ -121,13 +121,12 @@ afterEach(() => {
   backfillJobMocks.backfillConversationImages.mockReset();
 });
 
-describe('background-router conversations events', () => {
-  it('broadcasts conversationsChanged after syncConversationMessages', async () => {
-    const broadcast = vi.fn();
+describe('background-router conversations', () => {
+  it('persists syncConversationMessages and emits the durable auto-sync change signal', async () => {
+    const onConversationChanged = vi.fn(async () => {});
     writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
 
-    const router = createRouter();
-    router.eventsHub.broadcast = broadcast;
+    const router = createRouter({ onConversationChanged });
 
     const res = await router.__handleMessageForTests({
       type: 'syncConversationMessages',
@@ -140,7 +139,8 @@ describe('background-router conversations events', () => {
       mode: 'snapshot',
       diff: null,
     });
-    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'upsert', conversationId: 123 });
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenCalledWith(123, 'syncConversationMessages');
   });
 
   it('rejects an unknown non-empty persistence mode before image or storage work', async () => {
@@ -273,8 +273,8 @@ describe('background-router conversations events', () => {
     );
   });
 
-  it('broadcasts incremental updates while backfillConversationImages is running', async () => {
-    const broadcast = vi.fn();
+  it('coalesces backfill progress into durable auto-sync change signals without a UI event bus', async () => {
+    const onConversationChanged = vi.fn(async () => {});
     backfillJobMocks.backfillConversationImages.mockImplementation(async (input: any) => {
       await input?.onProgress?.({ updatedMessages: 1 });
       await input?.onProgress?.({ updatedMessages: 2 });
@@ -289,8 +289,7 @@ describe('background-router conversations events', () => {
       };
     });
 
-    const router = createRouter();
-    router.eventsHub.broadcast = broadcast;
+    const router = createRouter({ onConversationChanged });
 
     const res = await router.__handleMessageForTests({
       type: 'backfillConversationImages',
@@ -305,19 +304,10 @@ describe('background-router conversations events', () => {
         conversationUrl: 'https://example.com/a',
       }),
     );
-    expect(broadcast).toHaveBeenCalledTimes(3);
-    expect(broadcast).toHaveBeenNthCalledWith(1, 'conversationsChanged', {
-      reason: 'upsert',
-      conversationId: 888,
-    });
-    expect(broadcast).toHaveBeenNthCalledWith(2, 'conversationsChanged', {
-      reason: 'upsert',
-      conversationId: 888,
-    });
-    expect(broadcast).toHaveBeenNthCalledWith(3, 'conversationsChanged', {
-      reason: 'upsert',
-      conversationId: 888,
-    });
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenCalledTimes(2);
+    expect(onConversationChanged).toHaveBeenNthCalledWith(1, 888, 'backfillImages');
+    expect(onConversationChanged).toHaveBeenNthCalledWith(2, 888, 'backfillImages');
   });
 
   it('marks the kept conversation dirty and wakes remote cleanup after a real merge', async () => {
@@ -369,8 +359,7 @@ describe('background-router conversations events', () => {
     expect(onRemoteCleanupPending).not.toHaveBeenCalled();
   });
 
-  it('broadcasts delete and wakes durable remote cleanup without enqueueing deleted ids', async () => {
-    const broadcast = vi.fn();
+  it('wakes durable remote cleanup after delete without enqueueing deleted ids', async () => {
     const onConversationChanged = vi.fn(async () => {});
     const onRemoteCleanupPending = vi.fn(async () => {});
     storageMocks.deleteConversationsByIds.mockResolvedValue({
@@ -380,7 +369,6 @@ describe('background-router conversations events', () => {
     });
 
     const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
-    router.eventsHub.broadcast = broadcast;
 
     const res = await router.__handleMessageForTests({
       type: 'deleteConversations',
@@ -389,8 +377,7 @@ describe('background-router conversations events', () => {
     await Promise.resolve();
 
     expect(res.ok).toBe(true);
-    expect(storageMocks.deleteConversationsByIds).toHaveBeenCalled();
-    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'delete', conversationIds: [1, 2] });
+    expect(storageMocks.deleteConversationsByIds).toHaveBeenCalledWith([1, '2', 'bad', -1]);
     expect(onRemoteCleanupPending).toHaveBeenCalledTimes(1);
     expect(onConversationChanged).not.toHaveBeenCalled();
   });

@@ -11,8 +11,6 @@ export {
   CONTENT_MESSAGE_TYPES,
   COMMENTS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
-  UI_EVENT_TYPES,
-  UI_PORT_NAMES,
   messageContracts,
 } from '@platform/messaging/message-contracts';
 
@@ -28,7 +26,5 @@ export type {
   CurrentPageMessageType,
   CommentsMessageType,
   UiMessageType,
-  UiEventType,
-  UiPortName,
   MessageType,
 } from '@platform/messaging/message-contracts';

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 
 import { createBackgroundRouter } from '@platform/messaging/background-router';
-import { GITHUB_MESSAGE_TYPES, UI_EVENT_TYPES, UI_PORT_NAMES } from '@platform/messaging/message-contracts';
+import { GITHUB_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { addArticleComment } from '@services/comments/data/storage';
 import { backgroundStorage } from '@services/conversations/background/storage';
@@ -431,22 +431,14 @@ async function seedImageAsset(id: number, conversationId: number, url: string, b
   await txDone(tx);
 }
 
-function waitForGithubSyncFinished(router: ReturnType<typeof createBackgroundRouter>) {
-  return new Promise<void>((resolve, reject) => {
-    const registered = router.eventsHub.registerPort({
-      name: UI_PORT_NAMES.POPUP_EVENTS,
-      postMessage(message: any) {
-        if (
-          message?.type === UI_EVENT_TYPES.CONVERSATIONS_CHANGED &&
-          message?.payload?.reason === 'syncFinished' &&
-          message?.payload?.provider === 'github'
-        ) {
-          resolve();
-        }
-      },
-    });
-    if (!registered) reject(new Error('failed to register GitHub sync completion listener'));
-  });
+async function waitForGithubSyncTerminalStatus(router: ReturnType<typeof createBackgroundRouter>) {
+  for (let attempt = 0; attempt < 1_000; attempt += 1) {
+    const status = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const phase = String(status?.data?.job?.status || '');
+    if (phase && phase !== 'running') return status;
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error('GitHub sync did not reach a terminal durable job state');
 }
 
 const testIndexedDb = new IDBFactory();
@@ -647,15 +639,13 @@ describe('GitHub Markdown production-chain integration', () => {
     });
 
     const refUpdatesBeforeFirstSync = fakeGithub.syncRefUpdates;
-    const syncFinished = waitForGithubSyncFinished(router);
     const manualStart = await router.__handleMessageForTests({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [chat.id, article.id],
     });
     expect(manualStart).toMatchObject({ ok: true, data: { started: true, provider: 'github' } });
     assertSecretFree(manualStart);
-    await syncFinished;
-    const firstStatus = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const firstStatus = await waitForGithubSyncTerminalStatus(router);
     expect(firstStatus.data.job).toMatchObject({ status: 'done', okCount: 2, failCount: 0 });
     assertSecretFree(firstStatus);
     expect(fakeGithub.syncRefUpdates - refUpdatesBeforeFirstSync).toBe(1);

@@ -34,14 +34,6 @@ vi.mock('@services/comments/client/repo', () => ({
   listArticleCommentsByConversationId: listArticleCommentsByConversationIdMock,
 }));
 
-vi.mock('../../src/platform/runtime/ports', () => ({
-  connectPort: () => ({
-    onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
-    onDisconnect: { addListener: vi.fn(), removeListener: vi.fn() },
-    disconnect: vi.fn(),
-  }),
-}));
-
 import { ArticleCommentsSection } from '../../src/ui/conversations/ArticleCommentsSection';
 import { createCommentSidebarSession } from '../../src/services/comments/sidebar/comment-sidebar-session';
 import { createArticleCommentsSidebarAppAdapter } from '../../src/services/comments/sidebar/article-comments-sidebar-app-adapter';

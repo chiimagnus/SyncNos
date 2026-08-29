@@ -151,12 +151,12 @@ async function applyImportedSyncMappings(input: {
   stores: { sync_mappings: IDBObjectStore; conversations: IDBObjectStore };
   mappings: AnyRecord[];
   stats: ImportStats;
-}): Promise<{ processed: number; syncMappingsChanged: boolean; conversationsChanged: boolean }> {
+}): Promise<{ processed: number; syncMappingsChanged: boolean; conversationRowsChanged: boolean }> {
   const mappingIndex = input.stores.sync_mappings.index('by_source_conversationKey');
   const conversationIndex = input.stores.conversations.index('by_source_conversationKey');
   let processed = 0;
   let syncMappingsChanged = false;
-  let conversationsChanged = false;
+  let conversationRowsChanged = false;
 
   for (const incoming of input.mappings) {
     processed += 1;
@@ -194,12 +194,12 @@ async function applyImportedSyncMappings(input: {
       }
       if (changed) {
         await reqToPromise(input.stores.conversations.put(conversation));
-        conversationsChanged = true;
+        conversationRowsChanged = true;
       }
     }
   }
 
-  return { processed, syncMappingsChanged, conversationsChanged };
+  return { processed, syncMappingsChanged, conversationRowsChanged };
 }
 
 export async function importBackupLegacyJsonMerge(
@@ -357,7 +357,7 @@ export async function importBackupLegacyJsonMerge(
         stats,
       });
       if (result.syncMappingsChanged) markChanged('sync_mappings');
-      if (result.conversationsChanged) markChanged('conversations');
+      if (result.conversationRowsChanged) markChanged('conversations');
       return result;
     },
   );
@@ -902,7 +902,7 @@ export async function importBackupZipV2Merge(
         stats,
       });
       if (result.syncMappingsChanged) markChanged('sync_mappings');
-      if (result.conversationsChanged) markChanged('conversations');
+      if (result.conversationRowsChanged) markChanged('conversations');
       return result;
     },
   );

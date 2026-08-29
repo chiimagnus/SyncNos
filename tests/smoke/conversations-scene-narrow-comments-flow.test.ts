@@ -10,6 +10,7 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
+const activateLoadedConversation = vi.fn();
 const openConversationExternalById = vi.fn();
 const openConversationExternalBySourceKey = vi.fn();
 type PendingOpenConversationMockPayload = {
@@ -70,6 +71,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     toggleAll: vi.fn(),
     toggleSelected: vi.fn(),
     setActiveId,
+    activateLoadedConversation,
     clearSelected: vi.fn(),
     exporting: false,
     listError: null,
@@ -85,6 +87,9 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     syncingNotion: false,
     syncingObsidian: false,
+    syncingFeishu: false,
+    syncingGithub: false,
+    enabledSyncProviders: ['obsidian', 'notion'],
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
@@ -109,6 +114,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
     syncSelectedObsidian: vi.fn(),
+    syncSelectedFeishu: vi.fn(),
+    syncSelectedGithub: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
     loadingList: false,
@@ -177,6 +184,7 @@ describe('ConversationsScene narrow comments flow', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
+    activateLoadedConversation.mockReset();
     openConversationExternalById.mockReset();
     openConversationExternalBySourceKey.mockReset();
     consumePendingOpenConversation.mockReset();

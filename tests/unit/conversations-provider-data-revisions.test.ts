@@ -101,14 +101,6 @@ vi.mock('@services/shared/storage', () => ({
   },
 }));
 
-vi.mock('@services/shared/ports', () => ({
-  connectPort: () => ({
-    onMessage: { addListener: () => {}, removeListener: () => {} },
-    onDisconnect: { addListener: () => {}, removeListener: () => {} },
-    disconnect: () => {},
-  }),
-}));
-
 vi.mock('@i18n', () => ({
   t: (key: string) => key,
 }));
@@ -267,8 +259,8 @@ describe('ConversationsProvider data revisions', () => {
     });
     expect(getConversationListBootstrap).toHaveBeenCalledTimes(1);
 
-    revisionListener?.(['conversations', 'article_comments']);
     await act(async () => {
+      revisionListener?.(['conversations', 'article_comments']);
       firstPage.resolve(makePage([makeConversation(1)]));
       await flushMicrotasks();
     });
@@ -496,6 +488,136 @@ describe('ConversationsProvider data revisions', () => {
     expect(String(latestState.selectedConversation?.title || '')).toBe('fresh point title');
     expect(String(latestState.selectedConversation?.author || '')).toBe('fresh author');
     expect(Number(latestState.selectedConversation?.commentThreadCount)).toBe(7);
+  });
+
+  it('keeps last-good detail, clears stale Header, and retries messages after a same-active detail read fails', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail.mockResolvedValueOnce({ conversationId: 1, messages: ['old'] });
+    resolveDetailHeaderActions.mockResolvedValue([{ id: 'old-header-action', slot: 'open' } as any]);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    expect(latestState.detail?.messages).toEqual(['old']);
+    expect(latestState.detailHeaderActions.some((action: any) => action.id === 'old-header-action')).toBe(true);
+
+    requestDataRevisionRetry.mockClear();
+    getConversationDetail.mockRejectedValueOnce(new Error('detail unavailable'));
+    await act(async () => {
+      revisionListener?.(['messages']);
+      await flushMicrotasks();
+    });
+
+    expect(latestState.detail?.messages).toEqual(['old']);
+    expect(latestState.detailError).toBe('detail unavailable');
+    expect(latestState.detailHeaderActions).toEqual([]);
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['messages']);
+  });
+
+  it('restores detail and Header together when the same messages revision is replayed successfully', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail
+      .mockResolvedValueOnce({ conversationId: 1, messages: ['old'] })
+      .mockRejectedValueOnce(new Error('detail unavailable'))
+      .mockResolvedValueOnce({ conversationId: 1, messages: ['fresh'] });
+    resolveDetailHeaderActions
+      .mockResolvedValueOnce([{ id: 'old-header-action', slot: 'open' } as any])
+      .mockResolvedValue([{ id: 'fresh-header-action', slot: 'open' } as any]);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      revisionListener?.(['messages']);
+      await flushMicrotasks();
+    });
+    expect(latestState.detailHeaderActions).toEqual([]);
+
+    await act(async () => {
+      revisionListener?.(['messages']);
+      await flushMicrotasks();
+    });
+
+    expect(latestState.detail?.messages).toEqual(['fresh']);
+    expect(latestState.detailError).toBeNull();
+    expect(latestState.detailHeaderActions.some((action: any) => action.id === 'fresh-header-action')).toBe(true);
+  });
+
+  it('does not rebuild Header when a conversations batch list prerequisite fails', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap
+      .mockResolvedValueOnce(makePage([makeConversation(1)]))
+      .mockRejectedValueOnce(new Error('list unavailable'));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
+    resolveDetailHeaderActions.mockResolvedValue([{ id: 'old-header-action', slot: 'open' } as any]);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    const resolvesBefore = resolveDetailHeaderActions.mock.calls.length;
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+
+    expect(latestState.detailHeaderActions).toEqual([]);
+    expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(resolvesBefore);
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+  });
+
+  it('retries sync_mappings when a mapping-only Header resolve fails without rereading list or detail', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
+    resolveDetailHeaderActions.mockResolvedValue([]);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    const listCalls = getConversationListBootstrap.mock.calls.length;
+    const detailCalls = getConversationDetail.mock.calls.length;
+    requestDataRevisionRetry.mockClear();
+    resolveDetailHeaderActions.mockRejectedValueOnce(new Error('mapping unavailable'));
+
+    await act(async () => {
+      revisionListener?.(['sync_mappings']);
+      await flushMicrotasks();
+    });
+
+    expect(getConversationListBootstrap).toHaveBeenCalledTimes(listCalls);
+    expect(getConversationDetail).toHaveBeenCalledTimes(detailCalls);
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['sync_mappings']);
+  });
+
+  it('does not turn config-only Header resolve failure into an IDB retry', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
+    resolveDetailHeaderActions.mockResolvedValue([]);
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    requestDataRevisionRetry.mockClear();
+    resolveDetailHeaderActions.mockRejectedValueOnce(new Error('config resolve failed'));
+
+    await act(async () => {
+      storageChangeListener?.({ obsidian_video_folder: { newValue: 'Videos' } }, 'local');
+      await flushMicrotasks();
+    });
+
+    expect(requestDataRevisionRetry).not.toHaveBeenCalled();
   });
 
   it('keeps the last-good provider gate snapshot when a config reload fails', async () => {
