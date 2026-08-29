@@ -9,6 +9,7 @@ import {
 } from '@platform/idb/github-cleanup-outbox-record';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
+import { getConversationById, upsertConversation } from '@services/conversations/data/storage-idb';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import {
   ackGithubCleanupRows,
@@ -314,6 +315,29 @@ describe('github cleanup outbox store', () => {
     await ackGithubCleanupRows([firstId, firstId, 999_999]);
     await ackGithubCleanupRows([firstId]);
     expect((await readAllRows()).map((row) => row.id)).toEqual([secondId]);
+  });
+
+  it('keeps the canonical connection usable across outbox operations and another storage writer', async () => {
+    const [deferredId, ackedId] = await seedRows([
+      buildGithubCleanupOutboxRecord({ remoteKey: REMOTE_A, paths: ['defer.md'], reason: 'delete', createdAt: 1 }),
+      buildGithubCleanupOutboxRecord({ remoteKey: REMOTE_A, paths: ['ack.md'], reason: 'delete', createdAt: 2 }),
+    ]);
+
+    expect((await listDueGithubCleanupRows(REMOTE_A, 10)).rows).toHaveLength(2);
+    await expect(getNextGithubCleanupDueAt(REMOTE_A)).resolves.toBe(1);
+    await deferGithubCleanupRows([deferredId], 100);
+    await ackGithubCleanupRows([ackedId]);
+
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'github-outbox-connection-ownership',
+      title: 'Connection ownership regression',
+      lastCapturedAt: 20,
+    });
+    await expect(getConversationById(Number(conversation.id))).resolves.toMatchObject({
+      conversationKey: 'github-outbox-connection-ownership',
+    });
   });
 
   it('skips malformed persisted rows rather than returning them as deletion authority', async () => {
