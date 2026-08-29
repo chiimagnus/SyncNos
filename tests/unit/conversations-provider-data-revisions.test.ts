@@ -477,6 +477,80 @@ describe('ConversationsProvider data revisions', () => {
     expect(latestState.selectedConversation).toBeNull();
   });
 
+  it('replays a current source-key navigation rejection without treating it as missing', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    findConversationBySourceAndKey
+      .mockRejectedValueOnce(new Error('temporary find failure'))
+      .mockResolvedValueOnce({ ...makeConversation(2), conversationKey: 'target-conversation' });
+    getConversationById.mockImplementation(async (conversationId: number) => {
+      const id = Number(conversationId);
+      return id === 2 ? { ...makeConversation(2), conversationKey: 'target-conversation' } : makeConversation(id);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    requestDataRevisionRetry.mockClear();
+
+    await act(async () => {
+      await latestState.openConversationExternalBySourceKey('chatgpt', 'target-conversation');
+      await flushMicrotasks();
+    });
+
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+
+    expect(findConversationBySourceAndKey).toHaveBeenCalledTimes(2);
+    expect(Number(latestState.activeId)).toBe(2);
+    expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('target-conversation');
+  });
+
+  it('replays a current ById navigation rejection while authoritative missing stays non-retriable', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    let targetReads = 0;
+    getConversationById.mockImplementation(async (conversationId: number) => {
+      const id = Number(conversationId);
+      if (id === 2 && targetReads++ === 0) throw new Error('temporary point failure');
+      if (id === 3) return null;
+      return makeConversation(id);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    requestDataRevisionRetry.mockClear();
+
+    await act(async () => {
+      await latestState.openConversationInListScopeById(2);
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+
+    await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(2);
+
+    requestDataRevisionRetry.mockClear();
+    await act(async () => {
+      await latestState.openConversationExternalById(3);
+      await flushMicrotasks();
+    });
+    expect(Number(latestState.activeId)).toBe(2);
+    expect(requestDataRevisionRetry).not.toHaveBeenCalled();
+  });
+
   it('drops an old point response after switching the active conversation', async () => {
     const firstRead = deferred<any>();
     const secondRead = deferred<any>();

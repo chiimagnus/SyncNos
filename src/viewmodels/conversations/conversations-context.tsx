@@ -340,6 +340,10 @@ function mergeConversationPageItems(prev: Conversation[], next: Conversation[]):
   return out;
 }
 
+type ConversationOpenIntent =
+  | { kind: 'source-key'; source: string; conversationKey: string; preserveListScope: boolean }
+  | { kind: 'id'; conversationId: number; preserveListScope: boolean };
+
 type ConversationsAppState = {
   loadingList: boolean;
   loadingInitialList: boolean;
@@ -464,6 +468,8 @@ export function ConversationsProvider({
   const detailRequestSeqRef = useRef(0);
   const detailSuccessRequestSeqRef = useRef(0);
   const openTargetRequestSeqRef = useRef(0);
+  const pendingOpenIntentRef = useRef<ConversationOpenIntent | null>(null);
+  const replayPendingOpenIntentRef = useRef<() => Promise<void>>(async () => {});
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -630,20 +636,49 @@ export function ConversationsProvider({
     [items, setActiveConversationSnapshot, setActiveId],
   );
 
+  const openConversationIntent = useCallback(
+    async (intent: ConversationOpenIntent) => {
+      const requestSeq = openTargetRequestSeqRef.current + 1;
+      openTargetRequestSeqRef.current = requestSeq;
+      pendingOpenIntentRef.current = intent;
+
+      try {
+        const conversation =
+          intent.kind === 'source-key'
+            ? await findConversationBySourceAndKey(intent.source, intent.conversationKey).then((target) =>
+                target ? toConversationFromOpenTarget(target) : null,
+              )
+            : await getConversationById(intent.conversationId);
+        if (requestSeq !== openTargetRequestSeqRef.current || pendingOpenIntentRef.current !== intent) return;
+        pendingOpenIntentRef.current = null;
+        if (!conversation) return;
+        applyActiveConversation(conversation, { preserveListScope: intent.preserveListScope });
+      } catch (_error) {
+        if (requestSeq !== openTargetRequestSeqRef.current || pendingOpenIntentRef.current !== intent) return;
+        requestDataRevisionRetry(['conversations']);
+      }
+    },
+    [applyActiveConversation],
+  );
+  replayPendingOpenIntentRef.current = async () => {
+    const intent = pendingOpenIntentRef.current;
+    if (!intent) return;
+    await openConversationIntent(intent);
+  };
+
   const openConversationBySourceKey = useCallback(
     async (source: string, conversationKey: string, options?: { preserveListScope?: boolean }) => {
       const safeSource = String(source || '').trim();
       const safeConversationKey = String(conversationKey || '').trim();
       if (!safeSource || !safeConversationKey) return;
-
-      const requestSeq = openTargetRequestSeqRef.current + 1;
-      openTargetRequestSeqRef.current = requestSeq;
-
-      const target = await findConversationBySourceAndKey(safeSource, safeConversationKey).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyActiveConversation(target ? toConversationFromOpenTarget(target) : null, options);
+      await openConversationIntent({
+        kind: 'source-key',
+        source: safeSource,
+        conversationKey: safeConversationKey,
+        preserveListScope: options?.preserveListScope === true,
+      });
     },
-    [applyActiveConversation],
+    [openConversationIntent],
   );
 
   const openConversationExternalBySourceKey = useCallback(
@@ -679,28 +714,18 @@ export function ConversationsProvider({
     async (conversationId: number) => {
       const id = Number(conversationId);
       if (!Number.isFinite(id) || id <= 0) return;
-      const requestSeq = openTargetRequestSeqRef.current + 1;
-      openTargetRequestSeqRef.current = requestSeq;
-
-      const conversation = await getConversationById(id).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyActiveConversation(conversation, { preserveListScope: false });
+      await openConversationIntent({ kind: 'id', conversationId: id, preserveListScope: false });
     },
-    [applyActiveConversation],
+    [openConversationIntent],
   );
 
   const openConversationInListScopeById = useCallback(
     async (conversationId: number) => {
       const id = Number(conversationId);
       if (!Number.isFinite(id) || id <= 0) return;
-      const requestSeq = openTargetRequestSeqRef.current + 1;
-      openTargetRequestSeqRef.current = requestSeq;
-
-      const conversation = await getConversationById(id).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyActiveConversation(conversation, { preserveListScope: true });
+      await openConversationIntent({ kind: 'id', conversationId: id, preserveListScope: true });
     },
-    [applyActiveConversation],
+    [openConversationIntent],
   );
 
   const refreshList = useCallback(async (retryScopes: readonly DataRevisionScope[] = LIST_REVISION_SCOPES) => {
@@ -1022,6 +1047,7 @@ export function ConversationsProvider({
       if (relevantScopes.includes('conversations')) {
         activeMetadataRequestSeqRef.current += 1;
         openTargetRequestSeqRef.current += 1;
+        void replayPendingOpenIntentRef.current();
       }
       if (listChanged) listRequestSeqRef.current += 1;
       if (relevantScopes.includes('messages')) detailRequestSeqRef.current += 1;
