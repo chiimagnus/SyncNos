@@ -86,7 +86,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: { listShell?: { rightSlot?: ReactNode } }) => {
-    const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty'>('list');
+    const [mode, setMode] = useState<'list' | 'detail'>('list');
     const toList = () => {
       setMode('list');
     };
@@ -112,18 +112,7 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         },
         'show-detail',
       ),
-      createElement(
-        'button',
-        {
-          type: 'button',
-          onClick: () => {
-            setMode('detail-empty');
-          },
-        },
-        'show-detail-empty',
-      ),
-      mode === 'detail' ? createElement('button', { 'aria-label': 'Open in Notion' }, 'open-in-notion') : null,
-      mode === 'detail-empty' ? createElement('button', { 'aria-label': 'Back to chats' }, 'back') : null,
+      mode === 'detail' ? createElement('div', { 'data-mock-narrow-detail': 'true' }, 'detail') : null,
     );
   },
 }));
@@ -175,7 +164,7 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
-describe('AppShell narrow detail header actions', () => {
+describe('AppShell narrow list header actions', () => {
   let root: ReactDOM.Root | null = null;
 
   beforeEach(() => {
@@ -192,7 +181,7 @@ describe('AppShell narrow detail header actions', () => {
     cleanupDom();
   });
 
-  it('shows Open in Notion in narrow app detail mode', () => {
+  it('keeps list-only settings chrome out of narrow detail mode', () => {
     act(() => {
       root!.render(createElement(AppShell));
     });
@@ -208,26 +197,6 @@ describe('AppShell narrow detail header actions', () => {
     });
 
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
-  });
-
-  it('keeps the narrow app detail header action area empty when no actions are available', () => {
-    act(() => {
-      root!.render(createElement(AppShell));
-    });
-
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
-    const detailButton = Array.from(document.querySelectorAll('button')).find(
-      (el) => el.textContent === 'show-detail-empty',
-    ) as HTMLButtonElement | undefined;
-    expect(detailButton).toBeTruthy();
-
-    act(() => {
-      detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="Back to chats"]')).toBeTruthy();
+    expect(document.querySelector('[data-mock-narrow-detail="true"]')).toBeTruthy();
   });
 });

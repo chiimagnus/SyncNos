@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { t } from '@i18n';
@@ -40,9 +40,9 @@ export type ReaderFeatures = { textLayout: boolean; theme: boolean; narration: b
 // readerFeatures is wired in for the P4 toolbar button visibility; the text-layout
 // piece itself is always active via the `--reader-*` variables below.
 export type ArticleReaderViewProps = DetailViewSharedProps & {
+  metadata?: ReactNode;
   readerFeatures?: ReaderFeatures;
   readerToolbarPortalTarget?: HTMLElement | null;
-  readerOutlinePortalTarget?: HTMLElement | null;
   outlineScrollRoot?: Element | null;
 };
 
@@ -85,9 +85,9 @@ export function ArticleReaderView({
   loadingDetail,
   detailError,
   setMessagesRootRef,
+  metadata,
   readerFeatures,
   readerToolbarPortalTarget,
-  readerOutlinePortalTarget,
   outlineScrollRoot,
 }: ArticleReaderViewProps) {
   // readerFeatures gates each toolbar piece; chat conversations pass all-false (or
@@ -453,7 +453,6 @@ export function ArticleReaderView({
     );
   }, [features, prefs, readerToolbarPortalTarget, themeMode, toolbarNarration, update, updateThemeMode]);
 
-  const shouldRenderInlineRail = !!outlinePayload?.entries.length;
   const outlineRail = useMemo(
     () =>
       outlinePayload ? (
@@ -463,11 +462,6 @@ export function ArticleReaderView({
       ) : null,
     [outlinePayload],
   );
-  const outlineToolbarPortal = useMemo(() => {
-    if (!readerOutlinePortalTarget || !outlineRail) return null;
-    return createPortal(outlineRail, readerOutlinePortalTarget);
-  }, [outlineRail, readerOutlinePortalTarget]);
-
   const handleSentenceClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (!features.narration || narration.state === 'idle') return;
@@ -491,9 +485,23 @@ export function ArticleReaderView({
   return (
     <>
       {headerToolbar}
-      {outlineToolbarPortal}
       <div className={READER_SHELL_CLASS} style={readerVars} data-reader-shell="article">
         <div className={READER_MAIN_CLASS} data-reader-main="article-main">
+          {metadata ? (
+            <div className="tw-mx-auto tw-w-full" style={READER_COLUMN_STYLE} data-reader-metadata-column="true">
+              {metadata}
+            </div>
+          ) : null}
+
+          <div className="tw-sticky tw-top-14 tw-z-30 tw-h-0 tw-pointer-events-none" data-detail-outline-anchor="true">
+            <div
+              className="tw-pointer-events-auto tw-absolute tw-right-0 tw-top-0 tw-pt-3"
+              data-reader-outline-toolbar-slot={outlineScrollRoot ? 'route-scroll' : 'viewport'}
+            >
+              {outlineRail}
+            </div>
+          </div>
+
           {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
           {loadingDetail ? (
             <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p>
@@ -532,8 +540,6 @@ export function ArticleReaderView({
             </p>
           )}
         </div>
-
-        {shouldRenderInlineRail && !readerOutlinePortalTarget ? outlineRail : null}
       </div>
     </>
   );

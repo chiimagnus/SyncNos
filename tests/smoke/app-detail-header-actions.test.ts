@@ -637,6 +637,8 @@ describe('ConversationDetailPane header actions', () => {
 
     const editButton = document.querySelector('[aria-label="Edit URL"]') as HTMLButtonElement | null;
     expect(editButton).toBeTruthy();
+    expect(editButton?.className || '').not.toContain('focus-visible:tw-outline-none');
+    expect(editButton?.className || '').toContain('focus-visible:tw-outline-[var(--focus-ring)]');
 
     act(() => {
       editButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -675,6 +677,56 @@ describe('ConversationDetailPane header actions', () => {
       saveButtonAfterCancel!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
+    expect(updateSelectedConversationUrl).toHaveBeenCalledWith('https://example.com/article');
+    expect(document.querySelector('input[inputmode="url"]')).toBeFalsy();
+  });
+
+  it('handles URL edit Enter and Escape without relying on pointer controls', async () => {
+    const updateSelectedConversationUrl = vi.fn(async () => {});
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-11',
+      url: 'https://example.com/article',
+    } as any;
+    currentState.updateSelectedConversationUrl = updateSelectedConversationUrl;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    const openEditor = () => {
+      const editButton = document.querySelector('[aria-label="Edit URL"]') as HTMLButtonElement | null;
+      expect(editButton).toBeTruthy();
+      act(() => {
+        editButton!.click();
+      });
+      const input = document.querySelector('input[inputmode="url"]') as HTMLInputElement | null;
+      expect(input).toBeTruthy();
+      (input as any).attachEvent = () => {};
+      (input as any).detachEvent = () => {};
+      input!.focus();
+      return input!;
+    };
+
+    let input = openEditor();
+    const escape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => {
+      input.dispatchEvent(escape);
+    });
+    expect(escape.defaultPrevented).toBe(true);
+    expect(document.querySelector('input[inputmode="url"]')).toBeFalsy();
+    expect(updateSelectedConversationUrl).not.toHaveBeenCalled();
+
+    input = openEditor();
+    const enter = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    await act(async () => {
+      input.dispatchEvent(enter);
+      await Promise.resolve();
+    });
+    expect(enter.defaultPrevented).toBe(true);
     expect(updateSelectedConversationUrl).toHaveBeenCalledWith('https://example.com/article');
     expect(document.querySelector('input[inputmode="url"]')).toBeFalsy();
   });
@@ -1107,12 +1159,15 @@ describe('ConversationDetailPane header actions', () => {
     const commentsBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     const actionsIsland = document.querySelector('[data-detail-actions-island="true"]') as HTMLElement | null;
     const metadata = document.querySelector('[data-detail-metadata="true"]') as HTMLElement | null;
+    const outlineAnchor = document.querySelector('[data-detail-outline-anchor="true"]') as HTMLElement | null;
     expect(commentsBtn).toBeTruthy();
     expect(actionsIsland).toBeTruthy();
     expect(metadata).toBeTruthy();
     expect(actionsIsland?.contains(commentsBtn)).toBe(true);
     expect(metadata?.contains(commentsBtn)).toBe(false);
     expect(metadata?.querySelector('h2')?.textContent).toBe('Article');
+    expect(outlineAnchor).toBeTruthy();
+    expect(Boolean(metadata!.compareDocumentPosition(outlineAnchor!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(actionsIsland?.className).toContain('tw-whitespace-nowrap');
     expect(actionsIsland?.className).not.toContain('tw-flex-wrap');
   });

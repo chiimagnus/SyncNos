@@ -313,6 +313,38 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
   });
 
+  it('lets More consume Escape before returning from narrow detail', async () => {
+    act(() => {
+      root!.render(createElement(ConversationsScene));
+    });
+
+    const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
+    expect(row).toBeTruthy();
+    act(() => {
+      row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+    });
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+
+    const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
+    expect(moreButton).toBeTruthy();
+    await act(async () => {
+      moreButton!.click();
+      await flushImmediate();
+    });
+    const moreMenu = document.querySelector('[role="menu"]') as HTMLElement | null;
+    expect(moreMenu).toBeTruthy();
+    expect(moreMenu?.hidden).toBe(false);
+
+    const menuEscape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => {
+      moreButton!.dispatchEvent(menuEscape);
+      await flushImmediate();
+    });
+    expect(menuEscape.defaultPrevented).toBe(true);
+    expect(moreMenu?.hidden).toBe(true);
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+  });
+
   it('opens detail via pending source/key and then enters comments route', () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,
