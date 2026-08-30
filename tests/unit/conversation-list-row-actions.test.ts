@@ -285,6 +285,12 @@ describe('ConversationListPane row actions', () => {
     expect(yesterdayButton).toBeTruthy();
     expect(todayButton?.classList.contains('webclipper-btn')).toBe(true);
     expect(todayButton?.classList.contains('webclipper-btn--compact')).toBe(true);
+    const todaySection = todayButton?.parentElement;
+    expect(todaySection?.className || '').toContain('tw-sticky');
+    expect(todaySection?.className || '').toContain('tw-w-fit');
+    expect(todaySection?.className || '').toContain('tw-justify-self-start');
+    expect(todaySection?.className || '').not.toContain('-tw-mx-3');
+    expect(todaySection?.className || '').not.toContain('tw-bg-[var(--bg-primary)]');
 
     await act(async () => {
       todayButton!.click();
