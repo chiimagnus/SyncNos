@@ -193,6 +193,82 @@ describe('ConversationDetailPane header actions', () => {
     cleanupDom();
   });
 
+  it('renders two floating control islands and keeps title and URL in content metadata', () => {
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Chat metadata title',
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'chat-11',
+      url: 'https://example.com/chat',
+    } as any;
+    currentState.detail = {
+      conversationId: 11,
+      messages: [
+        {
+          id: 1101,
+          messageKey: 'chat-11-user-1',
+          role: 'user',
+          contentText: 'Outline entry',
+          contentMarkdown: 'Outline entry',
+        },
+      ],
+    } as any;
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        href: 'https://app.notion.com/example',
+        afterTriggerLabel: 'Copied',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+
+    act(() => {
+      root!.render(
+        createElement(ConversationDetailPane, {
+          onBack: vi.fn(),
+        }),
+      );
+    });
+
+    const detail = document.querySelector('[aria-label="Conversation detail"]') as HTMLElement | null;
+    expect(detail).toBeTruthy();
+    expect(Array.from(detail!.children).some((child) => child.tagName === 'HEADER')).toBe(false);
+
+    const floatingLayer = detail!.querySelector('[data-detail-floating-layer="true"]') as HTMLElement | null;
+    const navIsland = detail!.querySelector('[data-detail-nav-island="true"]') as HTMLElement | null;
+    const actionsIsland = detail!.querySelector('[data-detail-actions-island="true"]') as HTMLElement | null;
+    const metadata = detail!.querySelector('[data-detail-metadata="true"]') as HTMLElement | null;
+    const outlineAnchor = detail!.querySelector('[data-detail-outline-anchor="true"]') as HTMLElement | null;
+    const chatOutline = detail!.querySelector('[data-chat-outline-root]') as HTMLElement | null;
+
+    expect(floatingLayer).toBeTruthy();
+    expect(floatingLayer?.className || '').toContain('tw-sticky');
+    expect(floatingLayer?.className || '').toContain('tw-pointer-events-none');
+    expect(navIsland).toBeTruthy();
+    expect(actionsIsland).toBeTruthy();
+    expect(navIsland?.className || '').toContain('tw-pointer-events-auto');
+    expect(actionsIsland?.className || '').toContain('tw-pointer-events-auto');
+
+    expect(metadata).toBeTruthy();
+    expect(outlineAnchor).toBeTruthy();
+    expect(outlineAnchor?.className || '').toContain('tw-sticky');
+    expect(outlineAnchor?.className || '').toContain('tw-top-14');
+    expect(outlineAnchor?.className || '').toContain('tw-h-0');
+    expect(outlineAnchor?.className || '').toContain('tw-pointer-events-none');
+    expect(chatOutline).toBeTruthy();
+    expect(chatOutline?.className || '').toContain('tw-pointer-events-auto');
+    expect(Boolean(metadata!.compareDocumentPosition(outlineAnchor!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(metadata?.querySelector('h2')?.textContent).toBe('Chat metadata title');
+    expect(metadata?.querySelector('[aria-label="Edit URL"]')?.textContent).toBe('https://example.com/chat');
+    expect(navIsland?.textContent || '').not.toContain('Chat metadata title');
+    expect(actionsIsland?.textContent || '').not.toContain('Chat metadata title');
+  });
+
   it('moves Open in Notion into the More menu when the action is available', async () => {
     currentState.detailHeaderActions = [
       {
@@ -1005,7 +1081,7 @@ describe('ConversationDetailPane header actions', () => {
     restoreSelection();
   });
 
-  it('keeps the comments toggle in the same header row as title metadata container', async () => {
+  it('keeps the comments toggle in the right floating island and title in content metadata', async () => {
     currentState.selectedConversation = {
       id: 12,
       title: 'Article',
@@ -1026,22 +1102,22 @@ describe('ConversationDetailPane header actions', () => {
       await Promise.resolve();
     });
 
-    const header = document.querySelector('header');
-    expect(header).toBeTruthy();
+    expect(document.querySelector('header')).toBeFalsy();
 
     const commentsBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    const actionsIsland = document.querySelector('[data-detail-actions-island="true"]') as HTMLElement | null;
+    const metadata = document.querySelector('[data-detail-metadata="true"]') as HTMLElement | null;
     expect(commentsBtn).toBeTruthy();
-    const title = header?.querySelector('h2');
-    expect(title).toBeTruthy();
-
-    const commentsContainer = commentsBtn?.parentElement;
-    expect(commentsContainer).toBeTruthy();
-    expect(commentsContainer?.className).toContain('tw-whitespace-nowrap');
-    expect(commentsContainer?.className).not.toContain('tw-flex-wrap');
-    expect(header?.className).not.toContain('tw-flex-col');
+    expect(actionsIsland).toBeTruthy();
+    expect(metadata).toBeTruthy();
+    expect(actionsIsland?.contains(commentsBtn)).toBe(true);
+    expect(metadata?.contains(commentsBtn)).toBe(false);
+    expect(metadata?.querySelector('h2')?.textContent).toBe('Article');
+    expect(actionsIsland?.className).toContain('tw-whitespace-nowrap');
+    expect(actionsIsland?.className).not.toContain('tw-flex-wrap');
   });
 
-  it('shows reader toolbar in the header for article and video detail modes', async () => {
+  it('shows reader toolbar in More for article and video detail modes', async () => {
     currentState.detailHeaderActions = [];
 
     currentState.selectedConversation = {

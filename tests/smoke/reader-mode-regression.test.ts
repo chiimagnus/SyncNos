@@ -229,7 +229,7 @@ describe('reader mode regression', () => {
     cleanupDom();
   });
 
-  it('shows the reader shell for article and video detail modes, portals reader controls into the header, and keeps the outline minimap visible only when headings exist', async () => {
+  it('shows the reader shell for article and video detail modes, portals reader controls into More, and keeps the outline minimap visible only when headings exist', async () => {
     currentState.selectedConversation = {
       id: 11,
       title: 'Article',
