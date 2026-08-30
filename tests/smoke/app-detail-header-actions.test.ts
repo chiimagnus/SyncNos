@@ -263,7 +263,9 @@ describe('ConversationDetailPane header actions', () => {
     expect(chatOutline).toBeTruthy();
     expect(chatOutline?.className || '').toContain('tw-pointer-events-auto');
     expect(Boolean(metadata!.compareDocumentPosition(outlineAnchor!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-    expect(metadata?.querySelector('h2')?.textContent).toBe('Chat metadata title');
+    const pageTitle = metadata?.querySelector('h2') as HTMLElement | null;
+    expect(pageTitle?.textContent).toBe('Chat metadata title');
+    expect(pageTitle?.className || '').toContain('tw-text-[36px]');
     expect(metadata?.querySelector('[aria-label="Edit URL"]')?.textContent).toBe('https://example.com/chat');
     expect(navIsland?.textContent || '').not.toContain('Chat metadata title');
     expect(actionsIsland?.textContent || '').not.toContain('Chat metadata title');
