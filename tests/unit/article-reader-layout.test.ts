@@ -133,6 +133,7 @@ function renderArticle(root: ReactDOM.Root) {
         loadingDetail: false,
         detailError: null,
         setMessagesRootRef: vi.fn(),
+        metadata: createElement('div', { 'data-testid': 'detail-metadata' }, 'metadata'),
         readerFeatures: { textLayout: true, theme: true, narration: false },
       }),
     );
@@ -175,22 +176,25 @@ describe('ArticleReaderView layout', () => {
     const main = shell?.querySelector('[data-reader-main="article-main"]') as HTMLElement | null;
     const rail = shell?.querySelector('[data-reader-rail="article-rail"]') as HTMLElement | null;
     const sentenceRoot = shell?.querySelector('[data-reader-sentence-root="true"]') as HTMLElement | null;
+    const metadataColumn = shell?.querySelector('[data-reader-metadata-column="true"]') as HTMLElement | null;
 
     expect(main).toBeTruthy();
     expect(main?.className).toContain('tw-flex-1');
     expect(rail).toBeNull();
     expect(shell?.querySelector('[data-testid="reader-header-toolbar"]')).toBeNull();
+    expect(metadataColumn).toBeTruthy();
+    expect(metadataColumn?.querySelector('[data-testid="detail-metadata"]')).toBeTruthy();
+    expect(metadataColumn?.style.maxWidth).toBe('var(--reader-content-width)');
     expect(sentenceRoot).toBeTruthy();
     expect(sentenceRoot?.style.maxWidth).toBe('var(--reader-content-width)');
+    expect(sentenceRoot?.contains(metadataColumn!)).toBe(false);
+    expect(metadataColumn?.contains(sentenceRoot!)).toBe(false);
   });
 
-  it('portals reader controls and the outline rail into their provided header targets', async () => {
+  it('portals reader controls to More and keeps the outline rail in the reader sticky anchor', async () => {
     const headerTarget = document.createElement('div');
     headerTarget.setAttribute('data-reader-header-toolbar-slot', 'true');
     document.body.appendChild(headerTarget);
-    const outlineTarget = document.createElement('div');
-    outlineTarget.setAttribute('data-reader-outline-toolbar-slot', 'true');
-    document.body.appendChild(outlineTarget);
     mocks.outlineEntries.push({
       index: 0,
       level: 1,
@@ -215,7 +219,6 @@ describe('ArticleReaderView layout', () => {
           setMessagesRootRef: vi.fn(),
           readerFeatures: { textLayout: true, theme: true, narration: true },
           readerToolbarPortalTarget: headerTarget,
-          readerOutlinePortalTarget: outlineTarget,
           outlineScrollRoot: document.body,
         }),
       );
@@ -226,8 +229,10 @@ describe('ArticleReaderView layout', () => {
     expect(headerTarget.querySelector('[data-testid="reader-header-toolbar"]')).toBeTruthy();
     const shell = document.querySelector('[data-reader-shell="article"]') as HTMLElement | null;
     expect(shell?.querySelector('[data-testid="reader-header-toolbar"]')).toBeNull();
-    expect(shell?.querySelector('[data-reader-rail="article-rail"]')).toBeNull();
-    const rail = outlineTarget.querySelector('[data-reader-rail="article-rail"]') as HTMLElement | null;
+    const outlineAnchor = shell?.querySelector('[data-detail-outline-anchor="true"]') as HTMLElement | null;
+    const rail = outlineAnchor?.querySelector('[data-reader-rail="article-rail"]') as HTMLElement | null;
+    expect(outlineAnchor).toBeTruthy();
+    expect(outlineAnchor?.className).toContain('tw-sticky');
     expect(rail).toBeTruthy();
     expect(rail?.querySelector('[data-testid="reader-toolbar"]')).toBeTruthy();
   });

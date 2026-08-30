@@ -272,6 +272,7 @@ describe('ConversationListPane row actions', () => {
       { ...conversation, id: 13, conversationKey: 'conv-13', lastCapturedAt: yesterday.getTime() },
     ];
     currentState.listSummary = { totalCount: 3, todayCount: 2 };
+    currentState.selectedIds = [11, 12];
 
     await renderPane();
     const todayButton = document.querySelector(
@@ -285,6 +286,8 @@ describe('ConversationListPane row actions', () => {
     expect(yesterdayButton).toBeTruthy();
     expect(todayButton?.classList.contains('webclipper-btn')).toBe(true);
     expect(todayButton?.classList.contains('webclipper-btn--compact')).toBe(true);
+    expect(todayButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(yesterdayButton?.getAttribute('aria-pressed')).toBe('false');
     const todaySection = todayButton?.parentElement;
     expect(todaySection?.className || '').toContain('tw-sticky');
     expect(todaySection?.className || '').toContain('tw-w-fit');
@@ -354,6 +357,11 @@ describe('ConversationListPane row actions', () => {
     const githubMenuItem = document.getElementById('menuSyncToGithub') as HTMLButtonElement | null;
     expect(githubMenuItem).toBeTruthy();
     expect(githubMenuItem?.textContent).toBe('githubSync');
+    const syncMenu = githubMenuItem?.closest('[role="menu"]') as HTMLElement | null;
+    const dateSection = document.querySelector('[data-conversation-section-select]')
+      ?.parentElement as HTMLElement | null;
+    expect(syncMenu?.className || '').toContain('tw-z-30');
+    expect(dateSection?.className || '').toContain('tw-z-10');
 
     await act(async () => {
       githubMenuItem!.click();

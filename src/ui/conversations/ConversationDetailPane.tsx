@@ -90,7 +90,6 @@ export function ConversationDetailPane({
   const [outlineScrollRoot, setOutlineScrollRoot] = useState<Element | null>(null);
   const [optimisticActiveIndex, setOptimisticActiveIndex] = useState<number | null>(null);
   const [readerToolbarPortalTarget, setReaderToolbarPortalTarget] = useState<HTMLDivElement | null>(null);
-  const [readerOutlinePortalTarget, setReaderOutlinePortalTarget] = useState<HTMLDivElement | null>(null);
   const outlineEntries = useMemo(
     () => (isChatRenderer && Array.isArray(detail?.messages) ? buildChatOutlineEntries(detail.messages) : []),
     [isChatRenderer, detail?.messages],
@@ -284,6 +283,75 @@ export function ConversationDetailPane({
     });
   };
 
+  const detailMetadata = (
+    <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
+      <h2 className="tw-m-0 tw-block tw-min-w-0 tw-break-words tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] [overflow-wrap:anywhere]">
+        {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
+      </h2>
+      {selected ? (
+        <div className="tw-mt-1.5 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+          {urlEditing ? (
+            <>
+              <input
+                ref={urlInputRef}
+                className="webclipper-field tw-min-w-0 tw-w-56 tw-max-w-full tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)]"
+                value={urlDraft}
+                onChange={(e) => setUrlDraft(e.target.value)}
+                placeholder="https://"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelUrlEditing();
+                    return;
+                  }
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitUrlDraft();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={`${buttonFilledClassName()} tw-h-6 tw-min-h-0 tw-shrink-0 tw-px-2 tw-text-[11px]`}
+                onClick={submitUrlDraft}
+              >
+                {t('saveButton')}
+              </button>
+              <button
+                type="button"
+                className={`${buttonTintClassName()} tw-h-6 tw-min-h-0 tw-shrink-0 tw-px-2 tw-text-[11px]`}
+                onClick={cancelUrlEditing}
+              >
+                {t('cancelButton')}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="tw-min-w-0 tw-flex-1 tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+              onClick={() => {
+                setUrlDraft(displayedUrl);
+                setUrlEditing(true);
+              }}
+              aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+              title={displayedUrl || t('noLinkAvailable')}
+            >
+              {displayedUrl || t('noLinkAvailable')}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="tw-mt-1.5 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+          {t('selectConversationHint')}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <section className="tw-min-h-full tw-bg-[var(--bg-card)]">
       <section className="tw-flex tw-flex-col tw-bg-[var(--bg-card)]" aria-label={t('conversationDetailAria')}>
@@ -446,75 +514,13 @@ export function ConversationDetailPane({
         </div>
 
         <div className={[containerPaddingClassName, 'tw-relative tw-pb-3 tw-pt-1 md:tw-pb-4 md:tw-pt-2'].join(' ')}>
-          <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
-            <h2 className="tw-m-0 tw-block tw-min-w-0 tw-break-words tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] [overflow-wrap:anywhere]">
-              {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
-            </h2>
-            {selected ? (
-              <div className="tw-mt-1.5 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-                {urlEditing ? (
-                  <>
-                    <input
-                      ref={urlInputRef}
-                      className="webclipper-field tw-min-w-0 tw-w-56 tw-max-w-full tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)]"
-                      value={urlDraft}
-                      onChange={(e) => setUrlDraft(e.target.value)}
-                      placeholder="https://"
-                      inputMode="url"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          e.preventDefault();
-                          cancelUrlEditing();
-                          return;
-                        }
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          submitUrlDraft();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className={`${buttonFilledClassName()} tw-h-6 tw-min-h-0 tw-shrink-0 tw-px-2 tw-text-[11px]`}
-                      onClick={submitUrlDraft}
-                    >
-                      {t('saveButton')}
-                    </button>
-                    <button
-                      type="button"
-                      className={`${buttonTintClassName()} tw-h-6 tw-min-h-0 tw-shrink-0 tw-px-2 tw-text-[11px]`}
-                      onClick={cancelUrlEditing}
-                    >
-                      {t('cancelButton')}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="tw-min-w-0 tw-flex-1 tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
-                    onClick={() => {
-                      setUrlDraft(displayedUrl);
-                      setUrlEditing(true);
-                    }}
-                    aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
-                    title={displayedUrl || t('noLinkAvailable')}
-                  >
-                    {displayedUrl || t('noLinkAvailable')}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="tw-mt-1.5 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-                {t('selectConversationHint')}
-              </div>
-            )}
-          </div>
+          {isArticleRenderer ? null : detailMetadata}
 
-          <div className="tw-sticky tw-top-14 tw-z-30 tw-h-0 tw-pointer-events-none" data-detail-outline-anchor="true">
-            {isChatRenderer ? (
+          {isChatRenderer ? (
+            <div
+              className="tw-sticky tw-top-14 tw-z-30 tw-h-0 tw-pointer-events-none"
+              data-detail-outline-anchor="true"
+            >
               <div
                 className="tw-pointer-events-auto tw-absolute tw-right-0 tw-top-0"
                 data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
@@ -525,16 +531,8 @@ export function ConversationDetailPane({
                   onPickEntry={pickOutlineEntry}
                 />
               </div>
-            ) : null}
-
-            {isArticleRenderer ? (
-              <div
-                ref={setReaderOutlinePortalTarget}
-                className="tw-pointer-events-auto tw-absolute tw-right-0 tw-top-0 tw-pt-3"
-                data-reader-outline-toolbar-slot={outlineScrollRoot ? 'route-scroll' : 'viewport'}
-              />
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {isArticleRenderer ? (
             <ArticleReaderView
@@ -545,9 +543,9 @@ export function ConversationDetailPane({
               loadingDetail={loadingDetail}
               detailError={detailError}
               setMessagesRootRef={setMessagesRootRef}
+              metadata={detailMetadata}
               readerFeatures={readerFeatures}
               readerToolbarPortalTarget={readerToolbarPortalTarget}
-              readerOutlinePortalTarget={readerOutlinePortalTarget}
               outlineScrollRoot={outlineScrollRoot}
             />
           ) : (
