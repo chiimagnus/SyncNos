@@ -672,7 +672,7 @@ export function ConversationListPane({
               return (
                 <div
                   key={entry.key}
-                  className="tw-sticky tw-top-0 tw-z-10 -tw-mx-3 tw-w-auto tw-bg-[var(--bg-primary)] tw-px-3 tw-py-1.5"
+                  className="tw-sticky tw-top-0 tw-z-10 tw-w-fit tw-justify-self-start tw-py-1.5"
                 >
                   <button
                     type="button"
