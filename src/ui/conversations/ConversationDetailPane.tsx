@@ -285,7 +285,7 @@ export function ConversationDetailPane({
 
   const detailMetadata = (
     <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
-      <h2 className="tw-m-0 tw-block tw-min-w-0 tw-break-words tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] [overflow-wrap:anywhere]">
+      <h2 className="tw-m-0 tw-block tw-min-w-0 tw-break-words tw-text-[36px] tw-font-extrabold tw-leading-[1.1] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] [overflow-wrap:anywhere]">
         {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
       </h2>
       {selected ? (
