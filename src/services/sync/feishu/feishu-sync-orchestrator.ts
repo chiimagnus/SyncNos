@@ -612,10 +612,9 @@ async function appendTextBlocks({
 
 async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
   const safeInstanceId = safeString(instanceId);
-  const job =
-    safeInstanceId && typeof feishuSyncJobStore.abortRunningJobIfFromOtherInstance === 'function'
-      ? await feishuSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
-      : await feishuSyncJobStore.getJob();
+  const job = safeInstanceId
+    ? await feishuSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
+    : await feishuSyncJobStore.getJob();
   return { provider: SYNC_PROVIDER, job, instanceId: safeInstanceId };
 }
 
@@ -824,7 +823,4 @@ async function syncConversations({
   return lifecycle.summary();
 }
 
-const api = { getSyncStatus, clearSyncStatus, syncConversations };
-
 export { getSyncStatus, clearSyncStatus, syncConversations };
-export default api;

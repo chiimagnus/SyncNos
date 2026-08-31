@@ -419,10 +419,9 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
 
 async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
   const safeInstanceId = safeString(instanceId);
-  const job =
-    safeInstanceId && typeof obsidianSyncJobStore.abortRunningJobIfFromOtherInstance === 'function'
-      ? await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
-      : await obsidianSyncJobStore.getJob();
+  const job = safeInstanceId
+    ? await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
+    : await obsidianSyncJobStore.getJob();
   return { provider: SYNC_PROVIDER, job, instanceId: safeInstanceId };
 }
 
@@ -644,7 +643,4 @@ async function syncConversations({
   return lifecycle.summary();
 }
 
-const api = { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
-
 export { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
-export default api;
