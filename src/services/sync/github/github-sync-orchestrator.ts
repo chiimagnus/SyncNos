@@ -19,6 +19,7 @@ import {
   type GithubSyncPlannerMode,
 } from '@services/sync/github/github-sync-planner';
 import type { GithubSettings } from '@services/sync/github/settings-store';
+import { createSyncJobLifecycle, type SyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@services/sync/models';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -281,6 +282,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     ids: readonly number[],
     mode: GithubSyncPlannerMode,
     preflight: GithubRepositoryPreflight,
+    lifecycle: SyncJobLifecycle,
   ): Promise<GithubSyncStagedRun> {
     const items: GithubSyncStagedItem[] = [];
 
@@ -289,6 +291,8 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         const row = await services.storage.getSyncMappingByConversation(conversationId);
         if (!row?.conversation) throw new Error('conversation not found');
         const conversation = row.conversation;
+        const conversationTitle = safeString(conversation.title);
+        await lifecycle.setItem(conversationId, { conversationTitle, currentStage: 'staging_projection' });
         const messages = await services.storage.getMessagesByConversationId(conversationId);
         let comments: any[] = [];
         if (safeString(conversation.sourceType) === 'article') {
@@ -317,7 +321,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         });
         items.push({
           conversationId,
-          conversationTitle: safeString(conversation.title),
+          conversationTitle,
           status: plan.status === 'no_changes' ? 'no_changes' : 'staged',
           error: '',
           warnings: [...projection.warnings.map((warning) => warning.code), ...plan.warnings],
@@ -327,12 +331,14 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       } catch (error) {
         items.push({
           conversationId,
-          conversationTitle: '',
+          conversationTitle: lifecycle.titleFor(conversationId),
           status: 'failed',
           error: safeString((error as any)?.code || (error as any)?.message || 'github_local_stage_failed'),
           warnings: [],
           operations: [],
         });
+      } finally {
+        if (lifecycle.titleFor(conversationId)) await lifecycle.finishItem(conversationId);
       }
     }
 
@@ -380,17 +386,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     const deferredReplacementIds = new Set<number>();
     let cleanupHasMoreDue = false;
     let dueRows: GithubCleanupOutboxRecord[] = [];
-    let currentJob: SyncJobSnapshot | null = null;
+    let lifecycle: SyncJobLifecycle | null = null;
+    const getLifecycle = (): SyncJobLifecycle | null => lifecycle;
     let jobPersistenceWarning = false;
-
-    const persistCurrentJob = async (partial: Partial<SyncJobSnapshot>): Promise<boolean> => {
-      if (!currentJob) return true;
-      const next = { ...currentJob, ...partial, updatedAt: services.now() };
-      const persisted = await services.jobStore.setJob(next);
-      if (persisted) currentJob = next;
-      else jobPersistenceWarning = true;
-      return persisted;
-    };
 
     const claimJob = async (currentStage: string) => {
       const existingJob = await services.jobStore.abortRunningJobIfFromOtherInstance(instanceId);
@@ -406,7 +404,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         updatedAt: startedAt,
         finishedAt: null,
         conversationIds: [...ids],
-        currentConversationId: ids[0] || undefined,
         currentStage,
         okCount: 0,
         failCount: 0,
@@ -419,32 +416,20 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         if (services.jobStore.isRunningJob(claimed)) throw buildAlreadyRunningError();
         throw buildJobPersistenceError();
       }
-      currentJob = candidate;
+      lifecycle = createSyncJobLifecycle({
+        initialJob: claimed,
+        persist: async (job) => {
+          const persisted = await services.jobStore.setJob(job);
+          if (!persisted) jobPersistenceWarning = true;
+          return persisted;
+        },
+        now: services.now,
+      });
     };
 
     const persistFailedTerminalJob = async (error: unknown) => {
-      if (!currentJob) return;
-      const at = services.now();
-      const code = safeString((error as any)?.code || (error as any)?.message || 'github_sync_failed');
-      const perConversation: SyncPerConversationResult[] = ids.map((conversationId) => ({
-        conversationId,
-        ok: false,
-        mode: 'failed',
-        appended: 0,
-        error: code,
-        warnings: [],
-        at,
-      }));
-      await persistCurrentJob({
-        status: 'done',
-        finishedAt: at,
-        currentConversationId: undefined,
-        currentConversationTitle: undefined,
-        currentStage: 'done',
-        okCount: 0,
-        failCount: perConversation.length,
-        perConversation,
-      });
+      if (!lifecycle) return;
+      await lifecycle.failPending(error, { currentStage: 'done' });
     };
 
     try {
@@ -454,12 +439,12 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
 
       if (ids.length) {
         await claimJob('preparing_queue');
-        await persistCurrentJob({ currentStage: 'preflight' });
+        await lifecycle!.setRunStage('preflight');
         settings = await services.getSettings();
         preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
-        await persistCurrentJob({ currentStage: 'staging_projection' });
-        staged = await stageResolved(ids, mode, preflight);
-        await persistCurrentJob({ currentStage: 'cleaning_remote_files' });
+        await lifecycle!.setRunStage('staging_projection');
+        staged = await stageResolved(ids, mode, preflight, lifecycle!);
+        await lifecycle!.setRunStage('cleaning_remote_files');
       } else {
         settings = await services.getSettings();
         preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
@@ -603,19 +588,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
           deferredReplacementConversationIds: [...deferredReplacementIds].slice(0, GITHUB_CLEANUP_OUTBOX_BATCH_LIMIT),
           cleanupWarnings: [...new Set(cleanupWarnings)],
         };
-        if (currentJob) {
-          const finishedAt = services.now();
-          const perConversation = toJobRows(finalResult.items, finishedAt);
-          await persistCurrentJob({
-            status: 'done',
-            finishedAt,
-            currentConversationId: undefined,
-            currentConversationTitle: undefined,
-            currentStage: 'done',
-            okCount: perConversation.filter((row) => row.ok).length,
-            failCount: perConversation.filter((row) => !row.ok).length,
-            perConversation,
-          });
+        if (lifecycle) {
+          const perConversation = toJobRows(finalResult.items, services.now());
+          await lifecycle.finish(perConversation, { currentStage: 'done' });
         }
         if (jobPersistenceWarning) {
           finalResult.cleanupWarnings = [
@@ -641,7 +616,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
 
       let transport: GithubGitTransactionResult;
       try {
-        await persistCurrentJob({ currentStage: 'committing_tree' });
+        await getLifecycle()?.setRunStage('committing_tree');
         transport = await services.commit({
           repository: staged.target.repository,
           branch: staged.target.branch,
@@ -699,7 +674,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         });
       }
 
-      await persistCurrentJob({ currentStage: 'updating_mappings' });
+      await getLifecycle()?.setRunStage('updating_mappings');
       const items: GithubSyncRunItem[] = [];
       for (const item of staged.items) {
         if (item.status === 'no_changes') {

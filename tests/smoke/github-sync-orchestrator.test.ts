@@ -285,7 +285,7 @@ describe('github sync orchestrator staging through production sync', () => {
 
   it('isolates one local projection failure and keeps other safe staged rows', async () => {
     let stagedOperations: readonly any[] = [];
-    const { services } = fakeServices({
+    const { services, jobStore, getPersistedJob } = fakeServices({
       rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
       messages: { 1: new Error('broken local read'), 2: [message('safe body')] },
       commitImpl: async ({ operations }) => {
@@ -303,9 +303,27 @@ describe('github sync orchestrator staging through production sync', () => {
       instanceId: 'local-failure',
     });
 
-    expect(result.items.find((item) => item.conversationId === 1)?.status).toBe('failed');
+    expect(result.items.find((item) => item.conversationId === 1)).toMatchObject({
+      status: 'failed',
+      conversationTitle: 'Title 1',
+      error: 'broken local read',
+    });
     expect(result.items.find((item) => item.conversationId === 2)?.status).toBe('synced');
     expect(stagedOperations).toHaveLength(1);
+    expect(
+      (jobStore.setJob as any).mock.calls.some(
+        ([job]: any[]) =>
+          job?.currentConversationId === 1 &&
+          job?.currentConversationTitle === 'Title 1' &&
+          job?.currentStage === 'staging_projection',
+      ),
+    ).toBe(true);
+    expect(getPersistedJob()?.perConversation.find((row) => row.conversationId === 1)).toMatchObject({
+      conversationTitle: 'Title 1',
+      ok: false,
+      mode: 'failed',
+      error: 'broken local read',
+    });
   });
 
   it('dedupes identical content staged to the same path', async () => {
@@ -448,6 +466,8 @@ describe('github sync orchestrator job lifecycle', () => {
       conversationIds: [1],
       currentStage: 'preparing_queue',
     });
+    expect((jobStore.setJob as any).mock.calls[0]?.[0]?.currentConversationId).toBeUndefined();
+    expect((jobStore.setJob as any).mock.calls[0]?.[0]?.currentConversationTitle).toBeUndefined();
     expect((jobStore.setJob as any).mock.invocationCallOrder[0]).toBeLessThan(
       (services.preflight as any).mock.invocationCallOrder[0],
     );
