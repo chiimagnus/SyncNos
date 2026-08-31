@@ -1,11 +1,5 @@
 import type { NotionServices } from '@services/sync/notion/notion-services.ts';
-import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { extractNotionWorkspaceSlugFromUrl } from '@services/sync/notion/notion-url-utils';
-import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
-import notionDbManagerDefault from '@services/sync/notion/notion-db-manager.ts';
-import notionSyncJobStoreDefault from '@services/sync/notion/notion-sync-job-store.ts';
-import notionSyncServiceDefault from '@services/sync/notion/notion-sync-service.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '@platform/storage/local';
 import {
@@ -1485,30 +1479,3 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     syncConversations,
   };
 }
-
-function createDefaultNotionServices(): NotionServices {
-  return {
-    tokenStore: { getToken: getNotionOAuthToken },
-    storage: defaultBackgroundStorage,
-    conversationKinds: builtInConversationKinds,
-    dbManager: notionDbManagerDefault,
-    syncService: notionSyncServiceDefault,
-    jobStore: notionSyncJobStoreDefault,
-  };
-}
-
-const defaultOrchestrator = createNotionSyncOrchestrator(createDefaultNotionServices());
-
-export async function getSyncJobStatus(input: { instanceId: string }) {
-  return defaultOrchestrator.getSyncJobStatus(input as any);
-}
-
-export async function clearSyncJobStatus(input: { instanceId: string }) {
-  return defaultOrchestrator.clearSyncJobStatus(input as any);
-}
-
-export async function syncConversations(input: { conversationIds?: unknown[]; instanceId: string }) {
-  return defaultOrchestrator.syncConversations(input as any);
-}
-
-export default defaultOrchestrator;

@@ -4,11 +4,12 @@ import { registerWebArticleHandlers } from '../../src/collectors/web/article-fet
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
-import {
-  clearSyncJobStatus as clearNotionSyncJobStatus,
-  getSyncJobStatus as getNotionSyncJobStatus,
-  syncConversations as syncNotionConversations,
-} from '@services/sync/notion/notion-sync-orchestrator.ts';
+import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
+import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { backgroundStorage } from '@services/conversations/background/storage';
+import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
+import notionSyncJobStore from '@services/sync/notion/notion-sync-job-store.ts';
+import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import {
   clearSyncStatus as clearObsidianSyncStatus,
@@ -31,6 +32,15 @@ export function createTestBackgroundRouter(
     }),
   });
 
+  const notionSyncOrchestrator = createNotionSyncOrchestrator({
+    tokenStore: { getToken: getNotionOAuthToken },
+    storage: backgroundStorage,
+    conversationKinds,
+    dbManager: notionDbManager,
+    syncService: notionSyncService,
+    jobStore: notionSyncJobStore,
+  });
+
   registerConversationHandlers(router, {
     onConversationChanged: async () => {},
     onRemoteCleanupPending: async () => {},
@@ -41,11 +51,7 @@ export function createTestBackgroundRouter(
   registerUiMessageHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: () => instanceId,
-    notionSyncOrchestrator: {
-      syncConversations: syncNotionConversations,
-      clearSyncJobStatus: clearNotionSyncJobStatus,
-      getSyncJobStatus: getNotionSyncJobStatus,
-    },
+    notionSyncOrchestrator,
     obsidianSyncOrchestrator: {
       clearSyncStatus: clearObsidianSyncStatus,
       syncConversations: obsidianSyncConversations,
