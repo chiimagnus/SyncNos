@@ -260,7 +260,10 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
 }) {
   let nextBlocks = Array.isArray(blocks) ? blocks : [];
   if (!nextBlocks.length || typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return nextBlocks;
-  if (typeof notionSyncService.hasExternalImageBlocks === 'function' && !notionSyncService.hasExternalImageBlocks(nextBlocks)) {
+  if (
+    typeof notionSyncService.hasExternalImageBlocks === 'function' &&
+    !notionSyncService.hasExternalImageBlocks(nextBlocks)
+  ) {
     return nextBlocks;
   }
 
@@ -761,23 +764,21 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               }
               appendedBlockCount = sections.length + articleBlocks.length + commentBlocks.length;
 
-              if (storage?.setSyncCursor) {
-                await lifecycle.setItem(id, {
-                  conversationTitle: toCurrentConversationTitle(convo, id),
-                  currentStage: 'saving_sync_cursor',
-                });
-                trace.mark('save cursor');
+              await lifecycle.setItem(id, {
+                conversationTitle: toCurrentConversationTitle(convo, id),
+                currentStage: 'saving_sync_cursor',
+              });
+              trace.mark('save cursor');
 
-                await storage.setSyncCursor(id, {
-                  ...nextCursor,
-                  notionSectionDigests: {
-                    article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() },
-                    ...(typeof commentsDigest === 'string'
-                      ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
-                      : null),
-                  },
-                });
-              }
+              await storage.setSyncCursor(id, {
+                ...nextCursor,
+                notionSectionDigests: {
+                  article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() },
+                  ...(typeof commentsDigest === 'string'
+                    ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
+                    : null),
+                },
+              });
 
               lifecycle.recordResult({
                 conversationId: id,
@@ -827,24 +828,22 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               appendedBlockCount = blocks.length + 1;
             }
 
-            if (storage?.setSyncCursor) {
-              await lifecycle.setItem(id, {
-                conversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                notionSectionCursors: {
-                  conversations: {
-                    lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-                    lastSyncedSequence: nextCursor.lastSyncedSequence,
-                    lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-                  },
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
                 },
-              });
-            }
+              },
+            });
 
             lifecycle.recordResult({
               conversationId: id,
@@ -1082,29 +1081,27 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             }
 
             const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor) {
-              await lifecycle.setItem(id, {
-                conversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                ...(typeof articleDigest === 'string' || typeof commentsDigest === 'string'
-                  ? {
-                      notionSectionDigests: {
-                        ...(typeof articleDigest === 'string'
-                          ? { article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() } }
-                          : null),
-                        ...(typeof commentsDigest === 'string'
-                          ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
-                          : null),
-                      },
-                    }
-                  : null),
-              });
-            }
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              ...(typeof articleDigest === 'string' || typeof commentsDigest === 'string'
+                ? {
+                    notionSectionDigests: {
+                      ...(typeof articleDigest === 'string'
+                        ? { article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() } }
+                        : null),
+                      ...(typeof commentsDigest === 'string'
+                        ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
+                        : null),
+                    },
+                  }
+                : null),
+            });
 
             const resultMode =
               shouldUpdateArticle || shouldUpdateComments
@@ -1247,24 +1244,22 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               });
             }
             const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor) {
-              await lifecycle.setItem(id, {
-                conversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                notionSectionCursors: {
-                  conversations: {
-                    lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-                    lastSyncedSequence: nextCursor.lastSyncedSequence,
-                    lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-                  },
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
                 },
-              });
-            }
+              },
+            });
             lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
@@ -1333,24 +1328,22 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               }
             }
             const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor) {
-              await lifecycle.setItem(id, {
-                conversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                notionSectionCursors: {
-                  conversations: {
-                    lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-                    lastSyncedSequence: nextCursor.lastSyncedSequence,
-                    lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-                  },
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
                 },
-              });
-            }
+              },
+            });
             lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
@@ -1376,14 +1369,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 properties: desiredProperties,
               });
             }
-            if (storage.setSyncCursor && inc && inc.ok) {
+            if (inc && inc.ok) {
               await lifecycle.setItem(id, {
                 conversationTitle: toCurrentConversationTitle(convo, id),
                 currentStage: 'saving_sync_cursor',
               });
-            }
-            const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor && inc && inc.ok) {
+              const nextCursor = lastMessageCursor(messages);
               trace.mark('save cursor');
 
               await storage.setSyncCursor(id, {

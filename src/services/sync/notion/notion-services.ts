@@ -23,7 +23,7 @@ export type NotionBackgroundStorage = {
     pageId: string,
     meta?: { notionPageUrl?: string; notionWorkspaceSlug?: string },
   ) => Promise<any>;
-  setSyncCursor?: (conversationId: number, cursor: any) => Promise<any>;
+  setSyncCursor: (conversationId: number, cursor: any) => Promise<any>;
   patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any>;
   getArticleCommentsByConversationId?: (conversationId: number) => Promise<ArticleCommentDto[]>;
   attachOrphanArticleCommentsToConversation?: (canonicalUrl: string, conversationId: number) => Promise<any>;
