@@ -2,7 +2,7 @@
 
 [English](./LocalRestAPI.en.md) | **中文**
 
-本指南负责 SyncNos WebClipper 通过 Local REST API 插件同步到 Obsidian vault 的用户配置步骤；运行时行为仍以 `src/services/sync/obsidian/**` 为准。
+本指南负责 SyncNos WebClipper 通过 Local REST API 插件同步到 Obsidian vault 的用户配置步骤；运行时行为以当前源码为准，不在本指南复制内部模块结构。
 
 ## 准备条件
 

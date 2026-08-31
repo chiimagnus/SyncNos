@@ -37,6 +37,7 @@ collectors -> services/shared
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
 - `anti_hotlink_rules_v1` 命中后补 referer 并尝试缓存图片，但图片失败不得阻断正文采集。
+- Provider 的手动同步与自动同步必须收敛到同一 orchestrator / SyncJob 生命周期；scheduler、handler 或 UI 不得另写第二套 progress / terminal job 状态。某 conversation 的非空标题一旦已知，后续空 progress/error payload 不得把它降级回仅 ID；provider 自己的事务、并发和远端写入语义不能被共享 lifecycle 改写。
 - IndexedDB 业务层统一借用 `src/platform/idb/schema.ts` 的 canonical connection；受 revision 跟踪的 writer 必须让业务变更与 revision 同事务提交，consumer 以 durable revision + canonical reread 为正确性真源，禁止重新引入自定义 event/Port 总线作为第二套数据一致性协议。恢复/失败语义见 [`docs/storage.md`](docs/storage.md)。
 
 ## Agent 实现约束

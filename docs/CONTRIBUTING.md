@@ -104,7 +104,7 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 
 对于触及 WebClipper 代码路径的非 Draft PR，GitHub Actions 当前会运行 `npm ci` 和 `npm run gate:ci`。该 CI 结果**不能**替代要求的本地 production build 或手动浏览器验证。
 
-当改动涉及 [`AGENTS.md`](../AGENTS.md) 中的产品不变量时，请在 PR 中提供相应的架构专项扫描或定向测试证据。
+当改动涉及 [`AGENTS.md`](../AGENTS.md) 中的产品不变量时，请在 PR 中提供相应的架构专项扫描或定向测试证据。涉及 provider 同步生命周期时，定向验证至少应覆盖 manual / auto-sync 走同一任务入口、已知 conversation identity 在晚期失败后不降级，以及 provider 原有事务或并发语义没有被共享 progress lifecycle 改写。
 
 ## 数据与隐私变更
 

@@ -2,7 +2,7 @@
 
 **English** | [中文](./DocxSync.zh.md)
 
-This guide covers the user-facing setup for syncing SyncNos WebClipper content to Feishu DocX. Runtime behavior remains owned by `src/services/sync/feishu/**`.
+This guide covers the user-facing setup for syncing SyncNos WebClipper content to Feishu DocX. Runtime behavior is defined by the current source code rather than duplicated as internal module structure here.
 
 ## Prerequisites
 

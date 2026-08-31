@@ -2,7 +2,7 @@
 
 **English** | [中文](./LocalRestAPI.zh.md)
 
-This guide covers the user-facing setup for syncing SyncNos WebClipper content to an Obsidian vault through the Local REST API plugin. Runtime behavior remains owned by `src/services/sync/obsidian/**`.
+This guide covers the user-facing setup for syncing SyncNos WebClipper content to an Obsidian vault through the Local REST API plugin. Runtime behavior is defined by the current source code rather than duplicated as internal module structure here.
 
 ## Prerequisites
 

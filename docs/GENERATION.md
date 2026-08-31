@@ -7,8 +7,8 @@ This file records the source baseline and ownership rules used for the long-term
 | Field | Value |
 | --- | --- |
 | Repository | `SyncNos` WebClipper codebase (origin: `chiimagnus/SyncNos`) |
-| Commit hash | `c3337109ac3e54e9bf2bc18a9d89812769489c60` |
-| Generated at | `2026-08-28` |
+| Commit hash | `529c39c486a64662c41499fb9815c0af7f25f7ec` |
+| Generated at | `2026-08-31` |
 
 The commit above is the code baseline at the start of this documentation reconciliation. Documentation-only edits do not advance it.
 
@@ -21,16 +21,14 @@ The commit above is the code baseline at the start of this documentation reconci
 - `docs/storage.md`: local-source-of-truth, IndexedDB consistency/reload-free recovery, backup, secret-exclusion, and recovery contracts.
 - `docs/troubleshooting.md`: durable troubleshooting guidance.
 - `docs/guide/feishu/DocxSync.en.md` and `docs/guide/feishu/DocxSync.zh.md`: Feishu DocX setup.
-- `docs/guide/github/GitHubSync.en.md` and `docs/guide/github/GitHubSync.zh.md`: GitHub Markdown sync setup.
 - `docs/guide/obsidian/LocalRestAPI.en.md` and `docs/guide/obsidian/LocalRestAPI.zh.md`: Obsidian Local REST API setup.
 - `docs/GENERATION.md`: this baseline and ownership record.
 
 ## Documentation Ownership
 
 - README owns only the top-level feature/output summary and navigation; it does not duplicate provider setup or maintain a static Settings screenshot that can drift from the live UI.
-- Provider-specific setup belongs in the corresponding guide under `docs/guide/`.
+- Maintained provider-specific setup belongs in the corresponding guide under `docs/guide/`; GitHub currently has no standalone setup guide, so README keeps only the top-level target summary.
 - Runtime structure, symbols, callers, and module relationships belong to CodeGraph and source code rather than duplicated module-index Markdown.
-- GitHub runtime behavior is owned by `src/services/sync/github/**`; the guide describes user-visible behavior without copying implementation constants already enforced by code.
 - `PRIVACY.md` owns external GitHub network/auth disclosure and the distinction between local Disconnect, GitHub authorization revoke, and GitHub App installation controls.
 - `docs/storage.md` owns durable local-data consistency/retry semantics, backup recovery, GitHub local-secret/backup-exclusion, sync-mapping, and cleanup-outbox recovery boundaries; implementation topology stays in source/CodeGraph and provider setup remains in the provider guides.
 - `docs/overview.md` is intentionally retired. README is the top-level navigation surface; do not recreate `docs/overview.md` or a duplicate `docs/configuration.md`.
