@@ -43,13 +43,6 @@ type GithubSyncStagedRun = {
   };
   operations: GithubStagedOperation[];
   items: GithubSyncStagedItem[];
-  summary: {
-    candidateCount: number;
-    noOpCount: number;
-    stagedCount: number;
-    failedCount: number;
-    warningCount: number;
-  };
 };
 
 export type GithubSyncRunItem = {
@@ -342,19 +335,10 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       }
     }
 
-    const operations = applyCollisionGuard(items);
-    const summary = {
-      candidateCount: ids.length,
-      noOpCount: items.filter((item) => item.status === 'no_changes').length,
-      stagedCount: items.filter((item) => item.status === 'staged').length,
-      failedCount: items.filter((item) => item.status === 'failed').length,
-      warningCount: items.reduce((count, item) => count + item.warnings.length, 0),
-    };
     return {
       target: { repository: preflight.repository, branch: preflight.branch, remoteKey: preflight.remoteKey },
-      operations,
+      operations: applyCollisionGuard(items),
       items,
-      summary,
     };
   }
 
@@ -387,10 +371,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     let cleanupHasMoreDue = false;
     let dueRows: GithubCleanupOutboxRecord[] = [];
     let lifecycle: SyncJobLifecycle | null = null;
-    const getLifecycle = (): SyncJobLifecycle | null => lifecycle;
     let jobPersistenceWarning = false;
 
-    const claimJob = async (currentStage: string) => {
+    const claimJob = async (currentStage: string): Promise<SyncJobLifecycle> => {
       const existingJob = await services.jobStore.abortRunningJobIfFromOtherInstance(instanceId);
       if (services.jobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
@@ -416,7 +399,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         if (services.jobStore.isRunningJob(claimed)) throw buildAlreadyRunningError();
         throw buildJobPersistenceError();
       }
-      lifecycle = createSyncJobLifecycle({
+      return createSyncJobLifecycle({
         initialJob: claimed,
         persist: async (job) => {
           const persisted = await services.jobStore.setJob(job);
@@ -427,24 +410,19 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       });
     };
 
-    const persistFailedTerminalJob = async (error: unknown) => {
-      if (!lifecycle) return;
-      await lifecycle.failPending(error, { currentStage: 'done' });
-    };
-
     try {
       let settings: GithubSettings;
       let preflight: GithubRepositoryPreflight;
       let staged: GithubSyncStagedRun;
 
       if (ids.length) {
-        await claimJob('preparing_queue');
-        await lifecycle!.setRunStage('preflight');
+        lifecycle = await claimJob('preparing_queue');
+        await lifecycle.setRunStage('preflight');
         settings = await services.getSettings();
         preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
-        await lifecycle!.setRunStage('staging_projection');
-        staged = await stageResolved(ids, mode, preflight, lifecycle!);
-        await lifecycle!.setRunStage('cleaning_remote_files');
+        await lifecycle.setRunStage('staging_projection');
+        staged = await stageResolved(ids, mode, preflight, lifecycle);
+        await lifecycle.setRunStage('cleaning_remote_files');
       } else {
         settings = await services.getSettings();
         preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
@@ -452,7 +430,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
           target: { repository: preflight.repository, branch: preflight.branch, remoteKey: preflight.remoteKey },
           operations: [],
           items: [],
-          summary: { candidateCount: 0, noOpCount: 0, stagedCount: 0, failedCount: 0, warningCount: 0 },
         };
       }
 
@@ -468,7 +445,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         cleanupWarnings.push('github_cleanup_list_failed');
       }
 
-      if (!ids.length && dueRows.length) await claimJob('cleaning_remote_files');
+      if (!ids.length && dueRows.length) lifecycle = await claimJob('cleaning_remote_files');
 
       const stagedByConversationId = new Map(staged.items.map((item) => [item.conversationId, item]));
       const replacementChecks = new Map<
@@ -616,7 +593,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
 
       let transport: GithubGitTransactionResult;
       try {
-        await getLifecycle()?.setRunStage('committing_tree');
+        await lifecycle?.setRunStage('committing_tree');
         transport = await services.commit({
           repository: staged.target.repository,
           branch: staged.target.branch,
@@ -674,7 +651,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         });
       }
 
-      await getLifecycle()?.setRunStage('updating_mappings');
+      await lifecycle?.setRunStage('updating_mappings');
       const items: GithubSyncRunItem[] = [];
       for (const item of staged.items) {
         if (item.status === 'no_changes') {
@@ -719,7 +696,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         summary: finalSummary(items),
       });
     } catch (error) {
-      await persistFailedTerminalJob(error);
+      await lifecycle?.failPending(error, { currentStage: 'done' });
       throw error;
     }
   }
