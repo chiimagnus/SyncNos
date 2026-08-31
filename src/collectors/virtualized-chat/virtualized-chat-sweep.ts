@@ -225,6 +225,8 @@ const VIRTUALIZED_REASON_CODES = new Set([
   'scroll_stalled',
   'top_not_reached',
   'bottom_not_reached',
+  'boundary_stalled',
+  'boundary_unstable',
   'final_live_changed',
 ]);
 
@@ -410,12 +412,17 @@ export function createPreparedCaptureConsumer<T>(source: string) {
   };
 }
 
+export type VirtualizedBoundary = 'top' | 'bottom';
+export type VirtualizedBoundaryState = 'confirmed' | 'pending';
+
 export type VirtualizedPassAdapter<T> = {
   getScrollSeed: () => Element | null;
   sampleIdentity: () => string | null;
   readDescriptorKeys: () => string[];
   // Unresolved entries must use the matching descriptor/message key, never a shared turn key.
   readUnresolvedKeys?: () => string[];
+  readBoundaryState?: (boundary: VirtualizedBoundary) => VirtualizedBoundaryState;
+  onTopConfirmed?: (accumulator: PreparedAccumulator<T>) => void;
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
 };
 
@@ -435,6 +442,7 @@ export type VirtualizedPassOptions = {
   stableSamples?: number;
   pollMs?: number;
   stepTimeoutMs?: number;
+  boundaryTimeoutMs?: number;
   overlapRatio?: number;
   maxOverlapRecoveries?: number;
   sleep?: (ms: number) => Promise<void>;
@@ -443,16 +451,12 @@ export type VirtualizedPassOptions = {
 };
 
 const PASS_DEFAULTS = Object.freeze({
-  maxSteps: 120,
   stableSamples: 2,
   pollMs: 40,
   stepTimeoutMs: 1200,
+  boundaryTimeoutMs: 30_000,
   overlapRatio: 0.65,
   maxOverlapRecoveries: 4,
-});
-
-const SWEEP_DEFAULTS = Object.freeze({
-  totalDeadlineMs: 30_000,
 });
 
 function boundedInteger(value: unknown, fallback: number, min: number, max: number, allowZero = false): number {
@@ -499,10 +503,16 @@ export async function runVirtualizedPass<T>(
   accumulator: PreparedAccumulator<T>,
   options: VirtualizedPassOptions = {},
 ): Promise<VirtualizedPassResult> {
-  const maxSteps = boundedInteger(options.maxSteps, PASS_DEFAULTS.maxSteps, 1, 2000);
+  const maxSteps = boundedInteger(options.maxSteps, Number.POSITIVE_INFINITY, 1, 2000);
   const stableSamples = boundedInteger(options.stableSamples, PASS_DEFAULTS.stableSamples, 1, 10);
   const pollMs = boundedInteger(options.pollMs, PASS_DEFAULTS.pollMs, 0, 5000, true);
   const stepTimeoutMs = boundedInteger(options.stepTimeoutMs, PASS_DEFAULTS.stepTimeoutMs, 1, 60_000);
+  const boundaryTimeoutMs = boundedInteger(
+    options.boundaryTimeoutMs,
+    PASS_DEFAULTS.boundaryTimeoutMs,
+    1,
+    120_000,
+  );
   const overlapRatio = boundedRatio(options.overlapRatio, PASS_DEFAULTS.overlapRatio);
   const maxOverlapRecoveries = boundedInteger(
     options.maxOverlapRecoveries,
@@ -536,6 +546,18 @@ export async function runVirtualizedPass<T>(
   let added = 0;
   let updated = 0;
   const unresolvedKeys = new Set<string>();
+  const readBoundaryState = (boundary: VirtualizedBoundary): VirtualizedBoundaryState | null => {
+    if (!adapter.readBoundaryState) return 'confirmed';
+    try {
+      const state = adapter.readBoundaryState(boundary);
+      if (state === 'confirmed' || state === 'pending') return state;
+      addReason('pass_failed');
+      return null;
+    } catch (_error) {
+      addReason('pass_failed');
+      return null;
+    }
+  };
   const readUnresolvedKeys = (): string[] | null => {
     try {
       const output: string[] = [];
@@ -580,7 +602,9 @@ export async function runVirtualizedPass<T>(
     return true;
   };
 
-  const stabilize = async (): Promise<{ metrics: ScrollMetrics; keys: string[]; unresolvedKeys: string[] } | null> => {
+  type StableWindow = { metrics: ScrollMetrics; keys: string[]; unresolvedKeys: string[] };
+
+  const stabilize = async (): Promise<StableWindow | null> => {
     const deadline = now() + stepTimeoutMs;
     let lastSignature = '';
     let stableCount = 0;
@@ -608,15 +632,84 @@ export async function runVirtualizedPass<T>(
     return latest;
   };
 
+  const acquireLogicalTop = async (): Promise<StableWindow | null> => {
+    let lastSignature = '';
+    let progressDeadline = now() + boundaryTimeoutMs;
+    while (!deadlineExceeded()) {
+      writeScrollPosition(runtime, root, 0, 0);
+      const stable = await stabilize();
+      if (!stable) return null;
+      maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
+      const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        progressDeadline = now() + boundaryTimeoutMs;
+      }
+      if (!isAtScrollTop(stable.metrics)) {
+        await sleep(Math.max(1, pollMs));
+        if (!validateAfterAwait()) return null;
+        continue;
+      }
+      const state = readBoundaryState('top');
+      if (!state) return null;
+      if (state === 'confirmed') {
+        try {
+          adapter.onTopConfirmed?.(accumulator);
+        } catch (_error) {
+          addReason('pass_failed');
+          return null;
+        }
+        reachedTop = true;
+        return stable;
+      }
+      if (now() > progressDeadline) {
+        addReason('boundary_stalled');
+        return stable;
+      }
+      await sleep(Math.max(1, pollMs));
+      if (!validateAfterAwait()) return null;
+    }
+    return null;
+  };
+
+  const waitForLogicalBottom = async (): Promise<{ stable: StableWindow | null; confirmed: boolean }> => {
+    let lastSignature = '';
+    let progressDeadline = now() + boundaryTimeoutMs;
+    while (!deadlineExceeded()) {
+      const stable = await stabilize();
+      if (!stable) return { stable: null, confirmed: false };
+      const previousExtent = maxScrollExtent;
+      maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
+      if (stable.metrics.scrollHeight + 1 < previousExtent) {
+        addReason('boundary_unstable');
+        return { stable, confirmed: false };
+      }
+      if (!isAtScrollBottom(stable.metrics)) return { stable, confirmed: false };
+      const state = readBoundaryState('bottom');
+      if (!state) return { stable: null, confirmed: false };
+      if (state === 'confirmed') return { stable, confirmed: true };
+      const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        progressDeadline = now() + boundaryTimeoutMs;
+      }
+      if (now() > progressDeadline) {
+        addReason('boundary_stalled');
+        return { stable, confirmed: false };
+      }
+      await sleep(Math.max(1, pollMs));
+      if (!validateAfterAwait()) return { stable: null, confirmed: false };
+    }
+    return { stable: null, confirmed: false };
+  };
+
   try {
     if (deadlineExceeded()) {
       return { reachedTop, reachedBottom, steps, maxScrollExtent, reasons, added, updated, unresolvedKeys: [] };
     }
-    writeScrollPosition(runtime, root, 0, 0);
-    let stable = await stabilize();
-    if (!stable)
+    let stable = await acquireLogicalTop();
+    if (!stable || !reachedTop)
       return { reachedTop, reachedBottom, steps, maxScrollExtent, reasons, added, updated, unresolvedKeys: [] };
-    reachedTop = isAtScrollTop(stable.metrics);
     previousTop = stable.metrics.top;
 
     while (steps < maxSteps) {
@@ -654,10 +747,29 @@ export async function runVirtualizedPass<T>(
       clearResolvedKeys();
       steps += 1;
       const metrics = readScrollMetrics(runtime, root);
+      const previousExtent = maxScrollExtent;
       maxScrollExtent = Math.max(maxScrollExtent, metrics.scrollHeight);
       if (isAtScrollBottom(metrics)) {
-        reachedBottom = true;
-        break;
+        if (metrics.scrollHeight + 1 < previousExtent) {
+          addReason('boundary_unstable');
+          break;
+        }
+        const boundaryState = readBoundaryState('bottom');
+        if (!boundaryState) break;
+        if (boundaryState === 'confirmed') {
+          reachedBottom = true;
+          break;
+        }
+        const bottom = await waitForLogicalBottom();
+        if (!bottom.stable) break;
+        stable = bottom.stable;
+        if (bottom.confirmed) {
+          reachedBottom = true;
+          break;
+        }
+        if (reasons.includes('boundary_stalled') || reasons.includes('boundary_unstable')) break;
+        previousTop = stable.metrics.top;
+        continue;
       }
 
       previousTop = metrics.top;
@@ -722,6 +834,8 @@ const INCOMPLETE_REASONS = new Set([
   'scroll_stalled',
   'top_not_reached',
   'bottom_not_reached',
+  'boundary_stalled',
+  'boundary_unstable',
   'final_live_changed',
 ]);
 
@@ -731,9 +845,9 @@ export async function runVirtualizedSweep<T>(
   accumulator: PreparedAccumulator<T>,
   options: VirtualizedSweepOptions = {},
 ): Promise<VirtualizedSweepResult> {
-  const totalDeadlineMs = boundedInteger(options.totalDeadlineMs, SWEEP_DEFAULTS.totalDeadlineMs, 1, 300_000);
+  const totalDeadlineMs = boundedInteger(options.totalDeadlineMs, Number.POSITIVE_INFINITY, 1, 300_000);
   const now = options.now || Date.now;
-  const deadline = now() + totalDeadlineMs;
+  const deadline = Number.isFinite(totalDeadlineMs) ? now() + totalDeadlineMs : Number.POSITIVE_INFINITY;
   const sweepIdentity = String(adapter.sampleIdentity() || '').trim();
   const validateSweepIdentity = (): boolean => {
     const currentIdentity = String(adapter.sampleIdentity() || '').trim();

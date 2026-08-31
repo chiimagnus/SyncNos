@@ -286,13 +286,16 @@ describe('virtualized chat overlapping window order', () => {
 });
 
 describe('virtualized chat single pass', () => {
-  function harness(windows: Array<{ top: number; keys: string[] }>, options: { growAt?: number } = {}) {
+  function harness(
+    windows: Array<{ top: number; keys: string[] }>,
+    options: { growAt?: number; initialScrollHeight?: number } = {},
+  ) {
     const dom = new JSDOM('<body><div id="root"><div id="seed"></div></div></body>');
     const root = dom.window.document.querySelector('#root') as HTMLElement;
     const seed = dom.window.document.querySelector('#seed') as HTMLElement;
     root.style.overflowY = 'auto';
     let top = 0;
-    let scrollHeight = 300;
+    let scrollHeight = options.initialScrollHeight ?? 300;
     Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
     Object.defineProperty(root, 'scrollHeight', {
       configurable: true,
@@ -335,7 +338,17 @@ describe('virtualized chat single pass', () => {
         return mergePreparedRecords(target, records);
       },
     };
-    return { dom, root, seed, accumulator, adapter, getTop: () => top };
+    return {
+      dom,
+      root,
+      seed,
+      accumulator,
+      adapter,
+      getTop: () => top,
+      setScrollHeight: (value: number) => {
+        scrollHeight = value;
+      },
+    };
   }
 
   it('survives replacement and node recycling because each window is plain data', async () => {
@@ -381,6 +394,132 @@ describe('virtualized chat single pass', () => {
     );
     expect(result.maxScrollExtent).toBe(400);
     expect(finishPreparedCapture(test.accumulator).records.at(-1)?.key).toBe('g');
+  });
+
+  it('waits for a provider-confirmed logical top before sweeping downward', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['c', 'd'] },
+        { top: 60, keys: ['d', 'e'] },
+        { top: 120, keys: ['e', 'f'] },
+      ],
+      { initialScrollHeight: 300 },
+    );
+    let prepended = false;
+    let waits = 0;
+    const currentKeys = () => {
+      const top = test.getTop();
+      if (!prepended) {
+        if (top >= 120) return ['e', 'f'];
+        if (top >= 60) return ['d', 'e'];
+        return ['c', 'd'];
+      }
+      if (top >= 400) return ['h', 'i'];
+      if (top >= 360) return ['g', 'h'];
+      if (top >= 300) return ['f', 'g'];
+      if (top >= 240) return ['e', 'f'];
+      if (top >= 180) return ['d', 'e'];
+      if (top >= 120) return ['c', 'd'];
+      if (top >= 60) return ['b', 'c'];
+      return ['a', 'b'];
+    };
+    test.adapter.readDescriptorKeys = currentKeys;
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        currentKeys().map((key, index) => ({
+          key,
+          turnKey: key,
+          withinTurn: index,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+      );
+    (test.adapter as any).readBoundaryState = (boundary: 'top' | 'bottom') =>
+      boundary === 'top' && !prepended ? 'pending' : 'confirmed';
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      {
+        stableSamples: 1,
+        pollMs: 0,
+        overlapRatio: 0.6,
+        sleep: async () => {
+          waits += 1;
+          if (waits !== 1) return;
+          prepended = true;
+          test.setScrollHeight(500);
+          test.root.scrollTop = 100;
+        },
+      },
+    );
+
+    expect(prepended).toBe(true);
+    expect(result).toMatchObject({ completeness: 'complete', reachedTop: true, reachedBottom: true });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+      'g',
+      'h',
+      'i',
+    ]);
+  });
+
+  it('does not accept a regressed scroll extent as the logical bottom', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialScrollHeight: 500 },
+    );
+    const harvest = test.adapter.harvest;
+    let harvests = 0;
+    test.adapter.harvest = async (target) => {
+      const result = await harvest(target);
+      harvests += 1;
+      if (harvests === 2) test.setScrollHeight(test.getTop() + 100);
+      return result;
+    };
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+
+    expect(result.completeness).toBe('partial');
+    expect(result.reachedBottom).toBe(false);
+    expect(result.reasons).toContain('boundary_unstable');
+  });
+
+  it('does not impose a fixed default step ceiling on a healthy long conversation', async () => {
+    const windows = Array.from({ length: 160 }, (_, index) => ({
+      top: index * 60,
+      keys: [`m${index}`, `m${index + 1}`],
+    }));
+    const test = harness(windows, { initialScrollHeight: windows.at(-1)!.top + 100 });
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+
+    expect(result).toMatchObject({ completeness: 'complete', reachedBottom: true });
+    expect(result.steps).toBeGreaterThan(120);
+    expect(result.reasons).not.toContain('step_budget_exhausted');
+    expect(finishPreparedCapture(test.accumulator).records.at(-1)?.key).toBe('m160');
   });
 
   it('reduces the step to recover overlap before declaring an unanchored window', async () => {
