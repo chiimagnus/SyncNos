@@ -14,6 +14,7 @@ import {
 import { preprocessFeishuDocxMarkdownImages } from '@services/sync/feishu/docx/feishu-docx-image-preprocess';
 import { bindFeishuDocxImagesByOrder } from '@services/sync/feishu/docx/image-block-binder';
 import { sha256Hex } from '@services/sync/shared/content-hash';
+import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'feishu';
 const TOKEN_EXCHANGE_PROXY_URL_KEY = 'feishu_oauth_token_exchange_proxy_url';
@@ -697,43 +698,32 @@ async function syncConversations({
   const existingJob = await feishuSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
   if (feishuSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
-  const currentJob: any = {
-    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    provider: SYNC_PROVIDER,
-    instanceId: safeInstanceId,
-    status: 'running',
-    startedAt: Date.now(),
-    updatedAt: Date.now(),
-    finishedAt: null,
-    conversationIds: ids,
-    okCount: 0,
-    failCount: 0,
-    perConversation: [],
-  };
-
-  async function persistCurrentJob(partial: Record<string, unknown> = {}) {
-    Object.assign(currentJob, partial, { updatedAt: Date.now() });
-    await feishuSyncJobStore.setJob({ ...(currentJob as any) });
-  }
-
-  await persistCurrentJob({
-    currentConversationId: ids[0] || undefined,
-    currentStage: ids.length ? 'preparing_queue' : '',
+  const startedAt = Date.now();
+  const lifecycle = createSyncJobLifecycle({
+    initialJob: {
+      id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+      provider: SYNC_PROVIDER,
+      instanceId: safeInstanceId,
+      status: 'running',
+      startedAt,
+      updatedAt: startedAt,
+      finishedAt: null,
+      conversationIds: ids,
+      currentStage: 'preparing_queue',
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    },
+    persist: (job) => feishuSyncJobStore.setJob(job),
   });
 
-  const results: any[] = [];
+  await lifecycle.setRunStage('preparing_queue');
   let accessToken = '';
 
   for (const conversationId of ids) {
     let row: any = null;
     try {
-      await persistCurrentJob({
-        currentConversationId: conversationId,
-        currentConversationTitle: '',
-        currentStage: 'loading_conversation',
-      });
-
-      accessToken = accessToken || (await resolveFeishuAccessToken());
+      await lifecycle.setRunStage('loading_conversation');
 
       const mappingRes = await defaultBackgroundStorage.getSyncMappingByConversation(conversationId);
       if (!mappingRes || !mappingRes.conversation) {
@@ -748,15 +738,13 @@ async function syncConversations({
         });
       } else {
         const convo: any = mappingRes.conversation;
-        const currentTitle = safeString(convo.title) || `conversation#${conversationId}`;
+        const conversationTitle = safeString(convo.title);
+        const documentTitle = conversationTitle || `conversation#${conversationId}`;
+        await lifecycle.setItem(conversationId, { conversationTitle, currentStage: 'preparing_sync' });
+
+        accessToken = accessToken || (await resolveFeishuAccessToken());
         const messages = await defaultBackgroundStorage.getMessagesByConversationId(conversationId);
         const detail = { id: conversationId, messages: Array.isArray(messages) ? messages : [] } as any;
-
-        await persistCurrentJob({
-          currentConversationId: conversationId,
-          currentConversationTitle: currentTitle,
-          currentStage: 'preparing_sync',
-        });
 
         const markdown = await formatConversationMarkdownForFeishuDocxSync(convo as any, detail as any);
         const existingDocId = safeString(mappingRes.mapping?.feishuDocId);
@@ -791,7 +779,7 @@ async function syncConversations({
 
             row = buildPerConversationResult({
               conversationId,
-              conversationTitle: currentTitle,
+              conversationTitle,
               ok: true,
               mode: 'skipped_unchanged',
               appended: 0,
@@ -799,21 +787,13 @@ async function syncConversations({
               warnings: [],
               at: syncedAt,
             });
-            results.push(row);
-            currentJob.perConversation.push(row);
-            currentJob.okCount = results.filter((r) => r.ok).length;
-            currentJob.failCount = results.length - currentJob.okCount;
-            await persistCurrentJob({
-              currentConversationId: conversationId,
-              currentConversationTitle: undefined,
-              currentStage: 'finishing_current_item',
-            });
+            row = (await lifecycle.completeItem(row)).row;
             continue;
           }
         }
 
         if (docId) {
-          await persistCurrentJob({ currentStage: 'rebuilding_destination_page' });
+          await lifecycle.setItem(conversationId, { currentStage: 'rebuilding_destination_page' });
           try {
             await clearRootChildren({ accessToken, docId });
           } catch (_e) {
@@ -823,7 +803,7 @@ async function syncConversations({
         }
 
         if (!docId) {
-          await persistCurrentJob({ currentStage: 'creating_destination_page' });
+          await lifecycle.setItem(conversationId, { currentStage: 'creating_destination_page' });
           let folderToken: string | undefined = undefined;
           const resolved = await resolveConfiguredTargetFolderToken(accessToken, convo);
           if (resolved.hasConfig) {
@@ -834,10 +814,10 @@ async function syncConversations({
             createWarnings = resolved.warnings;
           }
 
-          docId = await createDoc({ accessToken, title: currentTitle, folderToken });
+          docId = await createDoc({ accessToken, title: documentTitle, folderToken });
         }
 
-        await persistCurrentJob({ currentStage: 'uploading_message_blocks' });
+        await lifecycle.setItem(conversationId, { currentStage: 'uploading_message_blocks' });
         let appended = 0;
         let appendWarnings: string[] = [];
         try {
@@ -847,9 +827,9 @@ async function syncConversations({
         } catch (e) {
           if (existingDocId) {
             mode = 'create';
-            await persistCurrentJob({ currentStage: 'creating_destination_page' });
-            docId = await createDoc({ accessToken, title: currentTitle });
-            await persistCurrentJob({ currentStage: 'uploading_message_blocks' });
+            await lifecycle.setItem(conversationId, { currentStage: 'creating_destination_page' });
+            docId = await createDoc({ accessToken, title: documentTitle });
+            await lifecycle.setItem(conversationId, { currentStage: 'uploading_message_blocks' });
             const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
             appended = res.appended;
             appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
@@ -867,7 +847,7 @@ async function syncConversations({
 
         row = buildPerConversationResult({
           conversationId,
-          conversationTitle: currentTitle,
+          conversationTitle,
           ok: true,
           mode,
           appended,
@@ -879,7 +859,7 @@ async function syncConversations({
     } catch (e: any) {
       row = buildPerConversationResult({
         conversationId,
-        conversationTitle: '',
+        conversationTitle: lifecycle.titleFor(conversationId),
         ok: false,
         mode: 'failed',
         appended: 0,
@@ -888,26 +868,11 @@ async function syncConversations({
       });
     }
 
-    results.push(row);
-    currentJob.perConversation.push(row);
-    currentJob.okCount = results.filter((r) => r.ok).length;
-    currentJob.failCount = results.length - currentJob.okCount;
-    await persistCurrentJob({
-      currentConversationId: conversationId,
-      currentConversationTitle: undefined,
-      currentStage: 'finishing_current_item',
-    });
+    row = (await lifecycle.completeItem(row)).row;
   }
 
-  currentJob.status = 'done';
-  currentJob.finishedAt = Date.now();
-  await persistCurrentJob({
-    currentConversationId: undefined,
-    currentConversationTitle: undefined,
-    currentStage: undefined,
-  });
-
-  return buildSyncSummary(results, instanceId);
+  await lifecycle.finish();
+  return buildSyncSummary(lifecycle.results(), instanceId);
 }
 
 const api = { getSyncStatus, clearSyncStatus, syncConversations };
