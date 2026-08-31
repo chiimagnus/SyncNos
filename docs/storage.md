@@ -36,6 +36,7 @@ GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage ba
 
 - GitHub auth/pending state 存在 `chrome.storage.local` 的 `github_auth_state_v1`，属于 secret/runtime state，不进入 Zip backup。
 - pending Device Flow 的 remote-state discovery 不得把单个 UI timer 当成 correctness 唯一来源。设置页面在重新可见、重新获得焦点或 pageshow 时，只在持久化 `nextPollAt` 已到期后补做 reconcile；poll interval、`slow_down`、expiry 与跨调用 claim 仍由 Device Flow service 和 durable auth state 最终裁决。timer / lifecycle wake 的并发触发必须合并，且授权收敛不得因无关设置操作而长期阻塞。
+- mount hydration、auth storage wake 与 poll-error recovery 可能并发读取 GitHub safe auth snapshot；较旧响应不得覆盖更新的已应用 auth 状态。较新的读取失败只保留 last-good，不得把失败解释成 disconnected，也不能让乱序响应把 connected 回退为 pending。
 - GitHub remote cleanup outbox 存在 IndexedDB 的 `github_cleanup_outbox`，用于在删除、identity move 或网络失败后恢复受管远端路径清理；它是派生恢复状态，不进入 Zip backup，也不应通过导入恢复为另一台设备上的待执行远端操作。
 - GitHub sync mapping 可以进入既有 mapping backup，因为它描述本地内容与派生远端 projection 的连续性；它不能携带 access/refresh/device secret。
 
