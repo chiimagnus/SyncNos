@@ -4,7 +4,6 @@ import { registerWebArticleHandlers } from '../../src/collectors/web/article-fet
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
-import notionSyncJobStore from '@services/sync/notion/notion-sync-job-store.ts';
 import {
   clearSyncJobStatus as clearNotionSyncJobStatus,
   getSyncJobStatus as getNotionSyncJobStatus,
@@ -37,7 +36,7 @@ export function createTestBackgroundRouter(
     onRemoteCleanupPending: async () => {},
   });
   registerWebArticleHandlers(router, { onConversationChanged: options.onArticleConversationChanged });
-  registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
+  registerNotionSettingsHandlers(router, { conversationKinds });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
   registerUiMessageHandlers(router);
   registerSyncHandlers(router, {

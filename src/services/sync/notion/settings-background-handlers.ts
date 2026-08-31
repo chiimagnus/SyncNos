@@ -2,6 +2,7 @@ import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet, storageRemove } from '@platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { listNotionParentPages } from '@services/sync/notion/notion-parent-pages.ts';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -10,7 +11,6 @@ type AnyRouter = {
 };
 
 type Deps = {
-  notionSyncJobStore: { NOTION_SYNC_JOB_KEY?: unknown } | null;
   conversationKinds: { getNotionStorageKeys?: () => unknown[] } | null;
 };
 
@@ -32,11 +32,7 @@ function getNotionDisconnectStorageKeys(deps: Deps): string[] {
     return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles', 'notion_db_id_syncnos_videos'];
   })();
 
-  const syncJobKey = deps.notionSyncJobStore?.NOTION_SYNC_JOB_KEY
-    ? String(deps.notionSyncJobStore.NOTION_SYNC_JOB_KEY).trim()
-    : '';
-
-  return Array.from(new Set([...base, ...notionDbKeys, ...(syncJobKey ? [syncJobKey] : [])]));
+  return Array.from(new Set([...base, ...notionDbKeys, SYNC_JOB_STORAGE_KEYS.notion]));
 }
 
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {

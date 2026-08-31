@@ -78,7 +78,6 @@ function fakeServices(input: {
     return Date.now() - updatedAt < maxAge;
   };
   const jobStore: GithubOrchestratorServices['jobStore'] = {
-    GITHUB_SYNC_JOB_KEY: 'github_sync_job_v1',
     getJob: vi.fn(async () => cloneJob(persistedJob)),
     setJob: vi.fn(async (job) => {
       jobSetCalls += 1;
@@ -93,8 +92,8 @@ function fakeServices(input: {
       if (!current || current.status !== 'running') return current;
       const owner = String(current.instanceId || '');
       if (!owner || owner === String(instanceId || '')) return current;
-      const forceAbort = typeof options === 'object' && options?.forceAbort === true;
-      const staleMs = typeof options === 'number' ? options : options?.staleMs;
+      const forceAbort = options?.forceAbort === true;
+      const staleMs = options?.staleMs;
       if (!forceAbort && isRunningJob(current, staleMs)) return current;
       const now = Date.now();
       persistedJob = {

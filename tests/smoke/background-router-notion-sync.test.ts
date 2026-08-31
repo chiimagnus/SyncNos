@@ -4,8 +4,10 @@ import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-b
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
-import { NOTION_SYNC_JOB_KEY } from '@services/sync/notion/notion-sync-job-store.ts';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
+
+const NOTION_SYNC_JOB_KEY = SYNC_JOB_STORAGE_KEYS.notion;
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = {
@@ -154,10 +156,7 @@ function createRouter({
     notionFilesApi: {},
   });
 
-  registerNotionSettingsHandlers(router as any, {
-    notionSyncJobStore: notionServices.jobStore,
-    conversationKinds,
-  });
+  registerNotionSettingsHandlers(router as any, { conversationKinds });
 
   registerSyncHandlers(router as any, {
     getInstanceId: () => instanceId,

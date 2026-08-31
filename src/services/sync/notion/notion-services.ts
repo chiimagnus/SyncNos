@@ -1,5 +1,5 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
-import type { ReconcileRunningSyncJobOptions } from '@services/sync/sync-job-store';
+import type { SyncJobStore } from '@services/sync/sync-job-store';
 
 export type NotionToken = {
   accessToken: string;
@@ -10,16 +10,7 @@ export type NotionTokenStore = {
   getToken: () => Promise<NotionToken | null>;
 };
 
-export type NotionJobStore = {
-  NOTION_SYNC_JOB_KEY: string;
-  getJob?: () => Promise<any>;
-  setJob: (job: any) => Promise<boolean>;
-  isRunningJob: (job: any, staleMs?: number) => boolean;
-  abortRunningJobIfFromOtherInstance: (
-    instanceId: string,
-    options?: number | ReconcileRunningSyncJobOptions,
-  ) => Promise<any>;
-};
+export type NotionJobStore = SyncJobStore;
 
 export type NotionConversationKinds = {
   pick: (input: { source?: unknown; sourceType?: unknown }) => any;

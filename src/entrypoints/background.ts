@@ -74,7 +74,6 @@ export default defineBackground(() => {
   });
   registerChatgptDeepResearchHandlers(router);
   registerNotionSettingsHandlers(router, {
-    notionSyncJobStore: services.notionSyncJobStore,
     conversationKinds: services.conversationKinds,
   });
   registerFeishuSettingsHandlers(router);

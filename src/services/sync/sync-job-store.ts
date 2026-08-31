@@ -98,17 +98,15 @@ export type ReconcileRunningSyncJobOptions = {
 export async function abortRunningSyncJobIfFromOtherInstance(
   provider: SyncProvider,
   instanceId: string,
-  options?: number | ReconcileRunningSyncJobOptions,
+  options: ReconcileRunningSyncJobOptions = {},
 ): Promise<SyncJobSnapshot | null> {
   const current = await getSyncJob(provider);
   if (!current || current.status !== 'running') return current;
   const jobInstanceId = current.instanceId ? String(current.instanceId) : '';
   if (!jobInstanceId || jobInstanceId === String(instanceId || '')) return current;
 
-  const normalizedOptions =
-    typeof options === 'number' ? ({ staleMs: options } satisfies ReconcileRunningSyncJobOptions) : options || {};
-  const forceAbort = normalizedOptions.forceAbort === true;
-  const staleMs = normalizedOptions.staleMs;
+  const forceAbort = options.forceAbort === true;
+  const staleMs = options.staleMs;
 
   // Do not abort a still-active job from another background instance. Treat it as running
   // unless it is stale, otherwise concurrent background contexts could keep aborting each
@@ -126,4 +124,24 @@ export async function abortRunningSyncJobIfFromOtherInstance(
   };
   await setSyncJob(provider, aborted);
   return aborted;
+}
+
+export type SyncJobStore = {
+  getJob: () => Promise<SyncJobSnapshot | null>;
+  setJob: (job: SyncJobSnapshot | null) => Promise<boolean>;
+  isRunningJob: (job: SyncJobSnapshot | null | undefined, staleMs?: number) => boolean;
+  abortRunningJobIfFromOtherInstance: (
+    instanceId: string,
+    options?: ReconcileRunningSyncJobOptions,
+  ) => Promise<SyncJobSnapshot | null>;
+};
+
+export function createSyncJobStore(provider: SyncProvider): SyncJobStore {
+  return {
+    getJob: () => getSyncJob(provider),
+    setJob: (job) => setSyncJob(provider, job),
+    isRunningJob: isRunningSyncJob,
+    abortRunningJobIfFromOtherInstance: (instanceId, options) =>
+      abortRunningSyncJobIfFromOtherInstance(provider, instanceId, options),
+  };
 }

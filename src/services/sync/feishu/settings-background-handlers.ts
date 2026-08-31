@@ -1,7 +1,7 @@
 import { FEISHU_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageRemove } from '@platform/storage/local';
-import feishuSyncJobStore from '@services/sync/feishu/feishu-sync-job-store.ts';
 import { clearFeishuOAuthToken, getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -10,9 +10,7 @@ type AnyRouter = {
 };
 
 function getFeishuDisconnectStorageKeys(): string[] {
-  const base = ['feishu_oauth_pending_state', 'feishu_oauth_last_error'];
-  const syncJobKey = feishuSyncJobStore.FEISHU_SYNC_JOB_KEY ? String(feishuSyncJobStore.FEISHU_SYNC_JOB_KEY) : '';
-  return Array.from(new Set([...base, ...(syncJobKey ? [syncJobKey] : [])]));
+  return ['feishu_oauth_pending_state', 'feishu_oauth_last_error', SYNC_JOB_STORAGE_KEYS.feishu];
 }
 
 export function registerFeishuSettingsHandlers(router: AnyRouter) {
@@ -28,7 +26,6 @@ export function registerFeishuSettingsHandlers(router: AnyRouter) {
     await clearFeishuOAuthToken();
     const clearedKeys = getFeishuDisconnectStorageKeys();
     await storageRemove(clearedKeys);
-    await feishuSyncJobStore.setJob(null).catch(() => {});
     return router.ok({ disconnected: true, clearedKeys });
   });
 }
