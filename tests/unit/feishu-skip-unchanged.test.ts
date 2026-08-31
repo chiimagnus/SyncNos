@@ -33,13 +33,13 @@ const jobStoreMocks = vi.hoisted(() => ({
   getJob: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/feishu-sync-job-store.ts', () => ({
-  default: {
+vi.mock('@services/sync/sync-job-store', () => ({
+  createSyncJobStore: () => ({
     abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
     isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
-  },
+  }),
 }));
 
 vi.mock('@services/sync/feishu/docx/feishu-docx-markdown', () => ({
