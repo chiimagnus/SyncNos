@@ -336,6 +336,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubRepositoriesLoading, setGithubRepositoriesLoading] = useState(false);
   const [githubRepositoryDiscoveryError, setGithubRepositoryDiscoveryError] = useState('');
   const githubRepositoryDiscoveryGenerationRef = useRef(0);
+  // GET_SETTINGS auth reads can overlap: reject responses older than the latest successful/direct auth update,
+  // but let an older successful read become last-good when a newer read failed.
+  const githubAuthRequestSeqRef = useRef(0);
+  const githubAuthAppliedSeqRef = useRef(0);
   // ponytail: 这里只合并同一时刻的 Device Flow poll；poll interval 与跨调用并发仍由 service 层持久化状态最终门禁。
   const githubDevicePollInFlightRef = useRef<Promise<void> | null>(null);
   const [githubRepository, setGithubRepository] = useState('');
@@ -448,14 +452,22 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const applyGithubAuth = useCallback(
-    (value: unknown) => {
+    (value: unknown, snapshotRequestSeq?: number) => {
+      if (snapshotRequestSeq == null) {
+        const directSeq = githubAuthRequestSeqRef.current + 1;
+        githubAuthRequestSeqRef.current = directSeq;
+        githubAuthAppliedSeqRef.current = directSeq;
+      } else {
+        if (snapshotRequestSeq <= githubAuthAppliedSeqRef.current) return;
+        githubAuthAppliedSeqRef.current = snapshotRequestSeq;
+      }
+
       const next = normalizeGithubAuthSummary(value);
       setGithubAuth(next);
       if (next.state !== 'connected') {
         setGithubConnectionTest({ status: 'idle' });
         clearGithubRepositoryDiscovery();
       }
-      return next;
     },
     [clearGithubRepositoryDiscovery],
   );
@@ -469,7 +481,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const applyGithubSettingsResponse = useCallback(
-    (value: any) => {
+    (value: any, authSnapshotRequestSeq?: number) => {
       const settings = value?.settings || {};
       const app = value?.app || {};
       applyGithubTargetSettings(settings);
@@ -477,7 +489,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setGithubAppUrl(String(app.appUrl || ''));
       setGithubInstallUrl(String(app.installUrl || ''));
       setGithubConnectionTest({ status: 'idle' });
-      return applyGithubAuth(value?.auth);
+      applyGithubAuth(value?.auth, authSnapshotRequestSeq);
     },
     [applyGithubAuth, applyGithubTargetSettings],
   );
@@ -537,15 +549,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const refreshGithubAuthFromStorageSignal = useCallback(async () => {
+    const requestSeq = githubAuthRequestSeqRef.current + 1;
+    githubAuthRequestSeqRef.current = requestSeq;
     try {
       const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
-      applyGithubAuth(snapshot?.auth);
+      applyGithubAuth(snapshot?.auth, requestSeq);
     } catch (_error) {
       // Storage changes are only a wake signal. Keep the current safe UI snapshot if rehydration fails.
     }
   }, [applyGithubAuth]);
 
   const refreshInternal = useCallback(async () => {
+    const githubAuthRequestSeq = githubAuthRequestSeqRef.current + 1;
+    githubAuthRequestSeqRef.current = githubAuthRequestSeq;
     const [notionRes, feishuRes, local, obsidianRes, githubRes, antiHotlinkRulesDraft] = await Promise.all([
       send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
       send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
@@ -660,7 +676,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianStatus(t('statusIdle'));
 
     const githubSettings = unwrap(githubRes);
-    applyGithubSettingsResponse(githubSettings);
+    applyGithubSettingsResponse(githubSettings, githubAuthRequestSeq);
   }, [applyGithubSettingsResponse, articleDbSpec.storageKey, chatDbSpec.storageKey, videoDbSpec.storageKey]);
 
   const refresh = useCallback(async () => {
@@ -1020,7 +1036,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     );
   }, [applyGithubAuth, runTask]);
 
-  const onPollGithubDeviceFlow = useCallback(() => {
+  const pollGithubDeviceFlow = useCallback(() => {
     if (githubDevicePollInFlightRef.current) return githubDevicePollInFlightRef.current;
 
     const poll = (async () => {
@@ -1031,8 +1047,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         // A failed poll may still advance nextPollAt or clear a terminal flow. Rehydrate the safe durable state
         // before surfacing the original error so every later timer/lifecycle reconcile follows canonical timing.
         try {
+          const requestSeq = githubAuthRequestSeqRef.current + 1;
+          githubAuthRequestSeqRef.current = requestSeq;
           const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
-          applyGithubSettingsResponse(snapshot);
+          applyGithubAuth(snapshot?.auth, requestSeq);
         } catch (_refreshError) {
           // GET_SETTINGS is recovery only; do not replace the original poll failure.
         }
@@ -1044,16 +1062,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     githubDevicePollInFlightRef.current = poll;
     return poll;
-  }, [applyGithubAuth, applyGithubSettingsResponse]);
+  }, [applyGithubAuth]);
 
   useEffect(() => {
     if (githubAuth.state !== 'pending') return;
     const delay = Math.max(0, githubAuth.nextPollAt - Date.now());
     const timer = setTimeout(() => {
-      void onPollGithubDeviceFlow();
+      void pollGithubDeviceFlow();
     }, delay);
     return () => clearTimeout(timer);
-  }, [githubAuth, onPollGithubDeviceFlow]);
+  }, [githubAuth, pollGithubDeviceFlow]);
 
   useEffect(() => {
     if (githubAuth.state !== 'pending') return;
@@ -1061,7 +1079,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const reconcileIfDue = () => {
       if (globalThis.document?.visibilityState === 'hidden') return;
       if (Date.now() < githubAuth.nextPollAt) return;
-      void onPollGithubDeviceFlow();
+      void pollGithubDeviceFlow();
     };
     const onVisibilityChange = () => {
       if (globalThis.document?.visibilityState !== 'hidden') reconcileIfDue();
@@ -1077,7 +1095,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       windowLike?.removeEventListener('focus', reconcileIfDue);
       windowLike?.removeEventListener('pageshow', reconcileIfDue);
     };
-  }, [githubAuth, onPollGithubDeviceFlow]);
+  }, [githubAuth, pollGithubDeviceFlow]);
 
   const onCancelGithubDeviceFlow = useCallback(async () => {
     await runTask(
@@ -2077,7 +2095,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleGithubAutoSyncEnabled,
     githubConnectionTest,
     onGithubConnect,
-    onPollGithubDeviceFlow,
     onCancelGithubDeviceFlow,
     onDisconnectGithub,
     onRefreshGithubRepositories,

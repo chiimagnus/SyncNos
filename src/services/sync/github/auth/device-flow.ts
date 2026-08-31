@@ -10,7 +10,7 @@ import {
   type GithubSafeAuthSummary,
 } from '@services/sync/github/auth/auth-store';
 
-export type GithubDeviceFlowErrorCode =
+type GithubDeviceFlowErrorCode =
   | 'github_device_start_failed'
   | 'github_device_poll_failed'
   | 'github_device_not_pending'
@@ -20,7 +20,7 @@ export type GithubDeviceFlowErrorCode =
   | 'github_device_disabled'
   | 'github_device_invalid';
 
-export class GithubDeviceFlowError extends Error {
+class GithubDeviceFlowError extends Error {
   constructor(readonly code: GithubDeviceFlowErrorCode) {
     super(code);
     this.name = 'GithubDeviceFlowError';
@@ -45,10 +45,6 @@ function positiveNumber(value: unknown): number | null {
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 && value === value.trim() ? value : null;
-}
-
-function formBody(fields: Record<string, string>): URLSearchParams {
-  return new URLSearchParams(fields);
 }
 
 async function parseJsonResponse(response: Response, code: GithubDeviceFlowErrorCode): Promise<any> {
@@ -139,7 +135,7 @@ async function startDeviceFlowRequest({
         Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formBody({ client_id: GITHUB_APP_CONFIG.clientId }),
+      body: new URLSearchParams({ client_id: GITHUB_APP_CONFIG.clientId }),
     });
   } catch (_error) {
     throw new GithubDeviceFlowError('github_device_start_failed');
@@ -213,7 +209,7 @@ export async function pollDeviceFlowOnce({
         Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formBody({
+      body: new URLSearchParams({
         client_id: GITHUB_APP_CONFIG.clientId,
         device_code: deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
