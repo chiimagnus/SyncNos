@@ -336,6 +336,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [githubRepositoriesLoading, setGithubRepositoriesLoading] = useState(false);
   const [githubRepositoryDiscoveryError, setGithubRepositoryDiscoveryError] = useState('');
   const githubRepositoryDiscoveryGenerationRef = useRef(0);
+  // ponytail: 这里只合并同一时刻的 Device Flow poll；poll interval 与跨调用并发仍由 service 层持久化状态最终门禁。
+  const githubDevicePollInFlightRef = useRef<Promise<void> | null>(null);
   const [githubRepository, setGithubRepository] = useState('');
   const [githubBranch, setGithubBranch] = useState('');
   const githubPersistedBranchRef = useRef('');
@@ -1018,27 +1020,31 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     );
   }, [applyGithubAuth, runTask]);
 
-  const onPollGithubDeviceFlow = useCallback(async () => {
-    await runTask(
-      async () => {
+  const onPollGithubDeviceFlow = useCallback(() => {
+    if (githubDevicePollInFlightRef.current) return githubDevicePollInFlightRef.current;
+
+    const poll = (async () => {
+      try {
+        const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, {}));
+        applyGithubAuth(data?.auth);
+      } catch (error) {
+        // A failed poll may still advance nextPollAt or clear a terminal flow. Rehydrate the safe durable state
+        // before surfacing the original error so every later timer/lifecycle reconcile follows canonical timing.
         try {
-          const data = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, {}));
-          applyGithubAuth(data?.auth);
-        } catch (error) {
-          // P2 may have advanced nextPollAt or cleared a terminal flow before returning an error.
-          // Rehydrate only the safe local DTO so the timer follows the persisted state instead of stale React state.
-          try {
-            const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
-            applyGithubSettingsResponse(snapshot);
-          } catch (_refreshError) {
-            // Keep the original poll error; GET_SETTINGS is recovery, not a replacement failure surface.
-          }
-          throw error;
+          const snapshot = unwrap(await send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}));
+          applyGithubSettingsResponse(snapshot);
+        } catch (_refreshError) {
+          // GET_SETTINGS is recovery only; do not replace the original poll failure.
         }
-      },
-      { useBusy: false, clearError: false, fallbackMessage: 'github_device_poll_failed' },
-    );
-  }, [applyGithubAuth, applyGithubSettingsResponse, runTask]);
+        setError(toErrorMessage(error, 'github_device_poll_failed'));
+      }
+    })().finally(() => {
+      if (githubDevicePollInFlightRef.current === poll) githubDevicePollInFlightRef.current = null;
+    });
+
+    githubDevicePollInFlightRef.current = poll;
+    return poll;
+  }, [applyGithubAuth, applyGithubSettingsResponse]);
 
   useEffect(() => {
     if (githubAuth.state !== 'pending') return;
@@ -1047,6 +1053,30 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       void onPollGithubDeviceFlow();
     }, delay);
     return () => clearTimeout(timer);
+  }, [githubAuth, onPollGithubDeviceFlow]);
+
+  useEffect(() => {
+    if (githubAuth.state !== 'pending') return;
+
+    const reconcileIfDue = () => {
+      if (globalThis.document?.visibilityState === 'hidden') return;
+      if (Date.now() < githubAuth.nextPollAt) return;
+      void onPollGithubDeviceFlow();
+    };
+    const onVisibilityChange = () => {
+      if (globalThis.document?.visibilityState !== 'hidden') reconcileIfDue();
+    };
+
+    const documentLike = globalThis.document;
+    const windowLike = globalThis.window;
+    documentLike?.addEventListener('visibilitychange', onVisibilityChange);
+    windowLike?.addEventListener('focus', reconcileIfDue);
+    windowLike?.addEventListener('pageshow', reconcileIfDue);
+    return () => {
+      documentLike?.removeEventListener('visibilitychange', onVisibilityChange);
+      windowLike?.removeEventListener('focus', reconcileIfDue);
+      windowLike?.removeEventListener('pageshow', reconcileIfDue);
+    };
   }, [githubAuth, onPollGithubDeviceFlow]);
 
   const onCancelGithubDeviceFlow = useCallback(async () => {
