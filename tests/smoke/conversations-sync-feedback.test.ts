@@ -301,6 +301,13 @@ describe('Conversations sync feedback', () => {
     selectFirstConversation();
     clickNotionButton();
 
+    const optimisticNotice = document.getElementById('conversationSyncFeedback');
+    expect(optimisticNotice).toBeTruthy();
+    expect(optimisticNotice?.getAttribute('data-phase')).toBe('running');
+    expect(optimisticNotice?.textContent).toContain(t('syncStagePreparingQueue'));
+    expect(optimisticNotice?.textContent).not.toContain(`${t('conversationLabel')} #11`);
+    expect(optimisticNotice?.textContent).not.toContain(t('currentPrefix'));
+
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       instanceId: 'notion-test',
