@@ -1,4 +1,4 @@
-# Feishu DocX Sync Setup (WebClipper)
+# Feishu Sync Setup (WebClipper)
 
 **English** | [中文](./DocxSync.zh.md)
 

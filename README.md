@@ -68,8 +68,8 @@ YouTube and Bilibili pages can capture transcripts/subtitles that the page has a
 | --- | --- |
 | **Notion** | Syncs local content through the Notion API after OAuth. Manual sync is always available; optional auto-sync can be enabled. |
 | **Obsidian** | Writes Markdown and local image attachments to your vault through the localhost Local REST API. See [setup](docs/guide/obsidian/LocalRestAPI.en.md). |
-| **Feishu (DocX)** | Syncs local content to Feishu DocX after OAuth. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/feishu/DocxSync.en.md). |
-| **GitHub (Markdown)** | Writes the local projection to an authorized repository/branch through the SyncNos GitHub App. Manual sync is always available; optional auto-sync can be enabled. |
+| **Feishu** | Syncs local content to Feishu DocX after OAuth. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/feishu/DocxSync.en.md). |
+| **GitHub** | Writes the local projection to an authorized repository/branch through the SyncNos GitHub App. Manual sync is always available; optional auto-sync can be enabled. |
 | **Markdown / Zip** | Exports individual content or a local backup package. |
 
 ## Screenshots

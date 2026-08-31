@@ -1,4 +1,4 @@
-# 飞书 DocX 同步配置指南（WebClipper）
+# 飞书同步配置指南（WebClipper）
 
 [English](./DocxSync.en.md) | **中文**
 
