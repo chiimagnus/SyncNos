@@ -7,9 +7,9 @@ import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-backg
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage } from '@services/conversations/background/storage';
-import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
+import * as notionDbManager from '@services/sync/notion/notion-db-manager.ts';
 import { createSyncJobStore } from '@services/sync/sync-job-store';
-import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
+import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import {
   clearSyncStatus as clearObsidianSyncStatus,

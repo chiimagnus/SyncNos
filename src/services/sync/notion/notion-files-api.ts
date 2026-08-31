@@ -201,17 +201,6 @@ async function waitUntilUploaded({
   throw new Error('file upload timed out');
 }
 
-const api = {
-  FILE_UPLOAD_VERSION,
-  sanitizeFilename,
-  guessFilenameFromUrl,
-  createExternalURLUpload,
-  createFileUpload,
-  sendFileUpload,
-  retrieveUpload,
-  waitUntilUploaded,
-};
-
 export {
   FILE_UPLOAD_VERSION,
   sanitizeFilename,
@@ -222,4 +211,3 @@ export {
   retrieveUpload,
   waitUntilUploaded,
 };
-export default api;

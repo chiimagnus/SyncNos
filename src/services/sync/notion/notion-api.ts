@@ -149,7 +149,4 @@ async function searchPages({ accessToken, query, pageSize }: NotionSearchArgs) {
   return { results: [], has_more: false, next_cursor: null };
 }
 
-const api = { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
-
 export { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
-export default api;

@@ -4,8 +4,8 @@ import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage as notionBackgroundStorage } from '@services/conversations/background/storage';
-import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
-import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
+import * as notionDbManager from '@services/sync/notion/notion-db-manager.ts';
+import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 
 import {
   clearSyncStatus as clearObsidianSyncStatus,

@@ -7,16 +7,7 @@ vi.mock('@services/sync/notion/notion-files-api.ts', () => {
     if (!filesApi) throw new Error('filesApi not set');
     return filesApi;
   };
-  const proxy = new Proxy(
-    {},
-    {
-      get(_target, prop) {
-        return (getApi() as any)[prop as any];
-      },
-    },
-  );
   return {
-    default: proxy,
     FILE_UPLOAD_VERSION: '2025-09-03',
     sanitizeFilename: (name: any) => String(name || '').trim() || 'image.jpg',
     guessFilenameFromUrl: (_url: any) => 'image.jpg',
@@ -28,7 +19,7 @@ vi.mock('@services/sync/notion/notion-files-api.ts', () => {
   };
 });
 
-import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
+import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 
 beforeEach(() => {
   filesApi = null;
