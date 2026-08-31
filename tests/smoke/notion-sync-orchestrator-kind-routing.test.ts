@@ -349,6 +349,61 @@ describe('notion-sync-orchestrator kind routing', () => {
     });
   });
 
+  it('persists a terminal failure job when Notion preflight fails before loading conversations', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      abortRunningJobIfFromOtherInstance: async () => currentJob,
+      isRunningJob: (job: any) => job && job.status === 'running',
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => null },
+      storage: {
+        getSyncMappingByConversation: async () => null,
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      notionApi: {},
+      notionFilesApi: {},
+      dbManager: { ensureDatabase: async () => ({ databaseId: 'unused' }) },
+      syncService: {
+        createPageInDatabase: async () => ({ id: 'unused' }),
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore,
+    });
+
+    await expect(orchestrator.syncConversations({ conversationIds: [7], instanceId: 'i' })).rejects.toThrow(
+      'notion not connected',
+    );
+
+    expect(currentJob).toMatchObject({
+      provider: 'notion',
+      status: 'done',
+      conversationIds: [7],
+      okCount: 0,
+      failCount: 1,
+    });
+    expect(currentJob?.currentConversationId).toBeUndefined();
+    expect(currentJob?.currentConversationTitle).toBeUndefined();
+    expect(currentJob?.perConversation).toHaveLength(1);
+    expect(currentJob?.perConversation?.[0]).toMatchObject({
+      conversationId: 7,
+      ok: false,
+      mode: 'failed',
+      error: 'notion not connected',
+    });
+  });
+
   it('reconciles a foreign running notion job to aborted on status read after reload', async () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
