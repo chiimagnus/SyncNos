@@ -16,13 +16,16 @@ body {
 }
 
 html,
-body,
-#root {
-  height: 100%;
-}
-
-html,
 body {
+  height: 100%;
   width: 420px;
   min-height: 600px;
+}
+
+/* Keep host autosizing on html/body, but fit the app to the viewport Chromium actually grants after zoom/clamping. */
+#root {
+  position: fixed;
+  inset: 0;
+  width: min(420px, 100vw);
+  height: min(600px, 100vh);
 }

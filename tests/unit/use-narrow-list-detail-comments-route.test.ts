@@ -140,4 +140,39 @@ describe('useNarrowListDetailCommentsRoute', () => {
     expect(listEscape.defaultPrevented).toBe(false);
     expect(latestSnapshot?.route).toBe('list');
   });
+
+  it('lets editable controls and open local layers own Escape before detail-route navigation', () => {
+    act(() => {
+      root!.render(createElement(RouteHarness, { isNarrow: true, defaultRoute: 'detail' }));
+    });
+    expect(latestSnapshot?.route).toBe('detail');
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const inputEscape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => {
+      input.dispatchEvent(inputEscape);
+    });
+    expect(inputEscape.defaultPrevented).toBe(false);
+    expect(latestSnapshot?.route).toBe('detail');
+    input.remove();
+
+    const openMenu = document.createElement('div');
+    openMenu.setAttribute('role', 'menu');
+    document.body.appendChild(openMenu);
+    const menuEscape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => {
+      document.dispatchEvent(menuEscape);
+    });
+    expect(menuEscape.defaultPrevented).toBe(false);
+    expect(latestSnapshot?.route).toBe('detail');
+    openMenu.remove();
+
+    const routeEscape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => {
+      document.dispatchEvent(routeEscape);
+    });
+    expect(routeEscape.defaultPrevented).toBe(true);
+    expect(latestSnapshot?.route).toBe('list');
+  });
 });
