@@ -145,6 +145,14 @@ export function isGoogleFaviconUrl(src: unknown): boolean {
   return /^https:\/\/www\.google\.com\/s2\/favicons(?:[?#]|$)/i.test(String(src || '').trim());
 }
 
+export function isChatgptNonContentImageUrl(src: unknown): boolean {
+  const value = String(src || '').trim();
+  return (
+    isGoogleFaviconUrl(value) ||
+    /^https:\/\/chatgpt\.com\/images\/ecosystem\/apps\/[^/?#]+\/icon\.png(?:[?#]|$)/i.test(value)
+  );
+}
+
 function removeNonContentNodes(container: any): any {
   if (!container || !container.querySelectorAll) return container;
 
@@ -509,7 +517,7 @@ function htmlToMarkdown(root: any): any {
 
     if (tag === 'img') {
       const src = node.getAttribute ? String(node.getAttribute('src') || '').trim() : '';
-      if (isGoogleFaviconUrl(src)) return '';
+      if (isChatgptNonContentImageUrl(src)) return '';
       if (/^https?:\/\//i.test(src)) return `![](${src})`;
       return '';
     }

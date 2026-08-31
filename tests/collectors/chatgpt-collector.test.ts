@@ -255,7 +255,7 @@ describe('chatgpt-collector', () => {
     expect(text).not.toContain('Copy chrome');
   });
 
-  it('keeps ChatGPT source links while omitting their Google favicon images', async () => {
+  it('keeps ChatGPT content images while omitting non-content source and app icons', async () => {
     const html = `
       <article data-testid="conversation-turn-1" data-turn-id="turn_favicon">
         <div data-message-author-role="assistant" data-message-id="m_ai_favicon">
@@ -266,6 +266,7 @@ describe('chatgpt-collector', () => {
                 <span>arXiv</span>
               </a>
             </p>
+            <img src="https://chatgpt.com/images/ecosystem/apps/github/icon.png" />
             <img src="https://example.com/chart.png" />
           </div>
         </div>
@@ -284,6 +285,7 @@ describe('chatgpt-collector', () => {
     const assistant = snap.messages.find((message: any) => message.role === 'assistant');
     expect(assistant.contentMarkdown).toContain('[arXiv](https://arxiv.org/abs/2312.10997)');
     expect(assistant.contentMarkdown).not.toContain('www.google.com/s2/favicons');
+    expect(assistant.contentMarkdown).not.toContain('chatgpt.com/images/ecosystem/apps/github/icon.png');
     expect(assistant.contentMarkdown).toContain('![](https://example.com/chart.png)');
   });
 

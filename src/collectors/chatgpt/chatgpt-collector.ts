@@ -1,7 +1,7 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
-import chatgptMarkdown, { isGoogleFaviconUrl } from '@collectors/chatgpt/chatgpt-markdown.ts';
+import chatgptMarkdown, { isChatgptNonContentImageUrl } from '@collectors/chatgpt/chatgpt-markdown.ts';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -281,7 +281,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function extractChatgptImageUrls(element: ParentNode | null): string[] {
-    return extractImageUrlsFromElement(element).filter((url) => !isGoogleFaviconUrl(url));
+    return extractImageUrlsFromElement(element).filter((url) => !isChatgptNonContentImageUrl(url));
   }
 
   type ChatgptDescriptor = {
