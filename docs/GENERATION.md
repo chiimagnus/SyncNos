@@ -20,7 +20,7 @@ The commit above is the code baseline at the start of this documentation reconci
 - `docs/CONTRIBUTING.md`: development workflow and validation requirements.
 - `docs/storage.md`: local-source-of-truth, IndexedDB consistency/reload-free recovery, backup, secret-exclusion, and recovery contracts.
 - `docs/troubleshooting.md`: durable troubleshooting guidance.
-- `docs/guide/feishu/DocxSync.en.md` and `docs/guide/feishu/DocxSync.zh.md`: Feishu DocX setup.
+- `docs/guide/feishu/DocxSync.en.md` and `docs/guide/feishu/DocxSync.zh.md`: Feishu setup.
 - `docs/guide/obsidian/LocalRestAPI.en.md` and `docs/guide/obsidian/LocalRestAPI.zh.md`: Obsidian Local REST API setup.
 - `docs/GENERATION.md`: this baseline and ownership record.
 
