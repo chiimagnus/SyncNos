@@ -507,12 +507,7 @@ export async function runVirtualizedPass<T>(
   const stableSamples = boundedInteger(options.stableSamples, PASS_DEFAULTS.stableSamples, 1, 10);
   const pollMs = boundedInteger(options.pollMs, PASS_DEFAULTS.pollMs, 0, 5000, true);
   const stepTimeoutMs = boundedInteger(options.stepTimeoutMs, PASS_DEFAULTS.stepTimeoutMs, 1, 60_000);
-  const boundaryTimeoutMs = boundedInteger(
-    options.boundaryTimeoutMs,
-    PASS_DEFAULTS.boundaryTimeoutMs,
-    1,
-    120_000,
-  );
+  const boundaryTimeoutMs = boundedInteger(options.boundaryTimeoutMs, PASS_DEFAULTS.boundaryTimeoutMs, 1, 120_000);
   const overlapRatio = boundedRatio(options.overlapRatio, PASS_DEFAULTS.overlapRatio);
   const maxOverlapRecoveries = boundedInteger(
     options.maxOverlapRecoveries,
