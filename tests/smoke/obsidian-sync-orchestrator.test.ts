@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 
 const backgroundStorageMocks = vi.hoisted(() => ({
   getConversationById: vi.fn(),
@@ -329,7 +330,7 @@ describe('obsidian-sync-orchestrator', () => {
 
   it('reconciles a foreign running obsidian job to aborted on status read after reload', async () => {
     setupChromeStorage();
-    const jobStore = await loadModule('@services/sync/obsidian/obsidian-sync-job-store.ts');
+    const jobStore = createSyncJobStore('obsidian');
     await jobStore.setJob({
       id: 'job_running',
       provider: 'obsidian',

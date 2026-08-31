@@ -8,7 +8,7 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
-import notionSyncJobStore from '@services/sync/notion/notion-sync-job-store.ts';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import {
@@ -32,6 +32,7 @@ export function createTestBackgroundRouter(
     }),
   });
 
+  const notionSyncJobStore = createSyncJobStore('notion');
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     tokenStore: { getToken: getNotionOAuthToken },
     storage: backgroundStorage,

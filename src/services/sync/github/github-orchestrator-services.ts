@@ -17,7 +17,7 @@ import {
   preflightGithubRepository,
   type GithubRepositoryPreflight,
 } from '@services/sync/github/github-repository-service';
-import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getGithubSettings, type GithubSettings } from '@services/sync/github/settings-store';
 
 export type GithubOrchestratorStorage = {
@@ -27,6 +27,8 @@ export type GithubOrchestratorStorage = {
   attachOrphanArticleCommentsToConversation: (canonicalUrl: string, conversationId: number) => Promise<unknown>;
   patchSyncMapping: (conversationId: number, patch: Record<string, unknown>) => Promise<unknown>;
 };
+
+const githubSyncJobStore = createSyncJobStore('github');
 
 export const GITHUB_REPLACEMENT_DEFER_SAFETY_MS = 5_000;
 export const DEFAULT_GITHUB_REPLACEMENT_DEFER_MS = GITHUB_AUTO_SYNC_DEBOUNCE_MS + GITHUB_REPLACEMENT_DEFER_SAFETY_MS;

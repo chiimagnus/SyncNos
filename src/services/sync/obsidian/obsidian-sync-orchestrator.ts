@@ -14,7 +14,7 @@ import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
 } from '@services/sync/shared/remote-markdown-metadata.ts';
-import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import {
   collectOrderedSyncnosAssetIds,
@@ -23,6 +23,7 @@ import {
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'obsidian';
+const obsidianSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();

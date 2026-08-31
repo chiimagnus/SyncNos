@@ -3,7 +3,7 @@ import { backgroundStorage as defaultBackgroundStorage } from '@services/convers
 import { formatConversationMarkdownForFeishuDocxSync } from '@services/sync/feishu/docx/feishu-docx-markdown';
 import { fetchFeishuJson } from '@services/sync/feishu/feishu-api';
 import { getFeishuOAuthToken, setFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
-import feishuSyncJobStore from '@services/sync/feishu/feishu-sync-job-store.ts';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getFeishuPathConfig, pickFeishuFolderPathForConversation } from '@services/sync/feishu/settings-store';
 import { resolveFeishuDriveFolderTokenByPath } from '@services/sync/feishu/drive-folder-path';
 import {
@@ -17,6 +17,7 @@ import { sha256Hex } from '@services/sync/shared/content-hash';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'feishu';
+const feishuSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
 const TOKEN_EXCHANGE_PROXY_URL_KEY = 'feishu_oauth_token_exchange_proxy_url';
 const OAUTH_CLIENT_ID_KEY = 'feishu_oauth_client_id';
 const OAUTH_CLIENT_SECRET_KEY = 'feishu_oauth_client_secret';

@@ -1,6 +1,6 @@
 import articleFetchService from '@collectors/web/article-fetch-service.ts';
 
-import notionSyncJobStore from '@services/sync/notion/notion-sync-job-store.ts';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage as notionBackgroundStorage } from '@services/conversations/background/storage';
@@ -96,6 +96,7 @@ export type BackgroundServices = {
 };
 
 export function createBackgroundServices(deps: { getInstanceId: () => string }): BackgroundServices {
+  const notionSyncJobStore = createSyncJobStore('notion');
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     tokenStore: { getToken: getNotionOAuthToken },
     storage: notionBackgroundStorage,
