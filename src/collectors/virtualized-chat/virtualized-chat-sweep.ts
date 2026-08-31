@@ -24,6 +24,7 @@ type ScrollRootSnapshot = {
   isDocumentRoot: boolean;
   identity: string;
   metrics: ScrollMetrics;
+  wasAtBottom: boolean;
 };
 
 function finite(value: unknown, fallback = 0): number {
@@ -109,11 +110,13 @@ export function isAtScrollBottom(metrics: ScrollMetrics): boolean {
 export function createScrollRootRestorer(runtime: ScrollRuntime): { restore: () => ScrollRestoreResult } {
   const identity = String(runtime.sampleIdentity() || '').trim();
   const root = resolveScrollRoot(runtime, runtime.getSeed());
+  const metrics = readScrollMetrics(runtime, root);
   const snapshot: ScrollRootSnapshot = {
     root,
     isDocumentRoot: isDocumentScrollRoot(runtime.document, root),
     identity,
-    metrics: readScrollMetrics(runtime, root),
+    metrics,
+    wasAtBottom: isAtScrollBottom(metrics),
   };
   let restored = false;
 
@@ -131,7 +134,11 @@ export function createScrollRootRestorer(runtime: ScrollRuntime): { restore: () 
       const currentRoot = resolveScrollRoot(runtime, runtime.getSeed());
       if (currentRoot !== snapshot.root) return { restored: false, reason: 'root_replaced' };
       try {
-        writeScrollPosition(runtime, snapshot.root, snapshot.metrics.left, snapshot.metrics.top);
+        const currentMetrics = readScrollMetrics(runtime, snapshot.root);
+        const restoreTop = snapshot.wasAtBottom
+          ? Math.max(0, currentMetrics.scrollHeight - currentMetrics.clientHeight)
+          : snapshot.metrics.top;
+        writeScrollPosition(runtime, snapshot.root, snapshot.metrics.left, restoreTop);
         return { restored: true, reason: 'restored' };
       } catch (_error) {
         return { restored: false, reason: 'restore_failed' };

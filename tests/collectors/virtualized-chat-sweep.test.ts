@@ -62,6 +62,17 @@ describe('virtualized chat scroll root', () => {
     expect(root.scrollTop).toBe(80);
   });
 
+  it('preserves bottom affinity when prepended history grows the scroll extent', () => {
+    const { dom, root, seed } = makeNestedRoot();
+    const runtime = { document: dom.window.document, window: dom.window as any };
+    root.scrollTop = 400;
+    const restorer = createScrollRootRestorer({ ...runtime, getSeed: () => seed, sampleIdentity: () => 'chat-a' });
+    setMetric(root, 'scrollHeight', 900);
+    root.scrollTop = 0;
+    expect(restorer.restore()).toEqual({ restored: true, reason: 'restored' });
+    expect(root.scrollTop).toBe(800);
+  });
+
   it('skips restore for detached, replaced, or identity-changed roots', () => {
     const first = makeNestedRoot();
     const runtime = { document: first.dom.window.document, window: first.dom.window as any };
