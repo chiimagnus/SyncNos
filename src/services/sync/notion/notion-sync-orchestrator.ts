@@ -1,7 +1,7 @@
 import type { NotionServices } from '@services/sync/notion/notion-services.ts';
 import { extractNotionWorkspaceSlugFromUrl } from '@services/sync/notion/notion-url-utils';
 import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
-import { storageGet, storageRemove } from '@platform/storage/local';
+import { storageGet } from '@platform/storage/local';
 import {
   buildNotionCommentsBlocks,
   computeNotionCommentsDigest,
@@ -204,15 +204,6 @@ function pagePropertiesNeedUpdate(page: any, desiredProperties: any): boolean {
   return false;
 }
 
-function canUpgradeImageBlocks(notionSyncService: any, blocks: any): boolean {
-  if (!blocks || !blocks.length) return false;
-  if (typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return false;
-  if (typeof notionSyncService.hasExternalImageBlocks === 'function') {
-    return notionSyncService.hasExternalImageBlocks(blocks);
-  }
-  return true;
-}
-
 function countExternalImageBlocks(blocks: unknown): number {
   const list = Array.isArray(blocks) ? blocks : [];
   let count = 0;
@@ -268,7 +259,10 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   warnings: any[];
 }) {
   let nextBlocks = Array.isArray(blocks) ? blocks : [];
-  if (!canUpgradeImageBlocks(notionSyncService, nextBlocks)) return nextBlocks;
+  if (!nextBlocks.length || typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return nextBlocks;
+  if (typeof notionSyncService.hasExternalImageBlocks === 'function' && !notionSyncService.hasExternalImageBlocks(nextBlocks)) {
+    return nextBlocks;
+  }
 
   const externalBefore = countExternalImageBlocks(nextBlocks);
   try {
@@ -365,25 +359,6 @@ function stripLeadingArticleRoleHeading(blocks: unknown) {
 async function getNotionParentPageId() {
   const res = await storageGet(['notion_parent_page_id']);
   return String((res as any)?.notion_parent_page_id || '');
-}
-
-async function clearCachedDatabaseId(notionDbManager: any, storageKey: unknown) {
-  if (notionDbManager && typeof notionDbManager.clearCachedDatabaseId === 'function') {
-    await notionDbManager.clearCachedDatabaseId(storageKey);
-    return true;
-  }
-  const explicit = String(storageKey || '').trim();
-  const fallback =
-    notionDbManager && notionDbManager.DEFAULT_DB_STORAGE_KEY
-      ? String(notionDbManager.DEFAULT_DB_STORAGE_KEY).trim()
-      : 'notion_db_id_syncnos_ai_chats';
-  const key = explicit || fallback;
-  try {
-    await storageRemove([key]);
-    return true;
-  } catch (_e) {
-    return false;
-  }
 }
 
 export function createNotionSyncOrchestrator(services: NotionServices) {
@@ -500,7 +475,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         const pending = dbRecoveryPromiseByStorageKey.get(storageKey);
         if (pending) return pending;
         const recoveryPromise = (async () => {
-          await clearCachedDatabaseId(notionDbManager, storageKey);
+          await notionDbManager.clearCachedDatabaseId(storageKey);
           const rebuiltDb = await notionDbManager.ensureDatabase({
             accessToken: token.accessToken,
             parentPageId,
@@ -625,9 +600,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             try {
               const page = await notionSyncService.getPage(token.accessToken, pageId);
               existingPage = page;
-              pageUsable = notionSyncService.isPageUsableForDatabase
-                ? notionSyncService.isPageUsableForDatabase(page, dbId)
-                : notionSyncService.pageBelongsToDatabase(page, dbId);
+              pageUsable = notionSyncService.isPageUsableForDatabase(page, dbId);
             } catch (_e) {
               pageUsable = false;
             }

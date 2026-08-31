@@ -31,19 +31,16 @@ export type NotionDbManager = {
     parentPageId: string;
     dbSpec: any;
   }) => Promise<{ databaseId?: unknown }>;
-  clearCachedDatabaseId?: (storageKey?: string) => Promise<any>;
-  DEFAULT_DB_STORAGE_KEY?: string;
+  clearCachedDatabaseId: (storageKey?: string) => Promise<any>;
 };
 
 export type NotionSyncService = {
-  getPage?: (accessToken: string, pageId: string) => Promise<any>;
+  getPage: (accessToken: string, pageId: string) => Promise<any>;
   createPageInDatabase: (accessToken: string, input: any) => Promise<any>;
-  updatePageProperties?: (accessToken: string, input: any) => Promise<any>;
-  clearPageChildren?: (accessToken: string, pageId: string) => Promise<any>;
+  updatePageProperties: (accessToken: string, input: any) => Promise<any>;
   appendChildren: (accessToken: string, pageId: string, blocks: any[]) => Promise<any>;
   messagesToBlocks: (messages: any[], input?: any) => any[];
-  isPageUsableForDatabase?: (page: any, databaseId?: string) => boolean;
-  pageBelongsToDatabase?: (page: any, databaseId: string) => boolean;
+  isPageUsableForDatabase: (page: any, databaseId?: string) => boolean;
   hasExternalImageBlocks?: (blocks: any[]) => boolean;
   upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[]) => Promise<any[]>;
 };
