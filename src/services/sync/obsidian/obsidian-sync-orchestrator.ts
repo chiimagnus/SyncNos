@@ -725,7 +725,7 @@ async function syncConversations({
       } else {
         row = buildPerConversationResult({
           conversationId,
-          conversationTitle: '',
+          conversationTitle: lifecycle.titleFor(conversationId),
           ok: false,
           mode: 'failed',
           appended: 0,
