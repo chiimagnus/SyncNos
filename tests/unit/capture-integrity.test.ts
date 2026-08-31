@@ -99,7 +99,7 @@ describe('resolveCaptureIntegrity', () => {
     expect(result.persistence).toEqual({ mode: 'append', diff: { added: ['m1'], updated: [], removed: [] } });
     expect(result.snapshot.messages[0]).toMatchObject({
       messageKey: 'm1',
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy: 'reconcile-existing-order',
       captureMergePolicy: 'replace',
     });
     expect(result.meta).toEqual({

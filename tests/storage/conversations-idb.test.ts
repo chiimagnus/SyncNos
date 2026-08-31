@@ -4,6 +4,7 @@ import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
+import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 
 import {
   attachOrphanCommentsToConversation,
@@ -671,6 +672,117 @@ describe('conversations storage-idb', () => {
     );
 
     expect((await getMessagesByConversationId(id)).map((message) => message.sequence)).toEqual([0, 1]);
+  });
+
+  it('reconciles newly discovered virtual partial prefixes before existing anchored rows', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'partial_prefix_reconcile',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
+      { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+    ]);
+
+    const integrity = resolveCaptureIntegrity('chatgpt', {
+      conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_prefix_reconcile' },
+      messages: [
+        { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0 },
+        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 2 },
+        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 3 },
+      ],
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: ['bottom_not_reached'],
+      },
+    });
+    expect(integrity.ok).toBe(true);
+    if (!integrity.ok) return;
+
+    await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['m3', 2],
+      ['m4', 3],
+    ]);
+  });
+
+  it('reconciles newly discovered virtual partial rows between stable anchors', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'partial_middle_reconcile',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
+      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 30 },
+    ]);
+
+    const integrity = resolveCaptureIntegrity('chatgpt', {
+      conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_middle_reconcile' },
+      messages: [
+        { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0 },
+        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 2 },
+      ],
+      captureMeta: { completeness: 'partial', identityVerified: true, reasons: ['bottom_not_reached'] },
+    });
+    expect(integrity.ok).toBe(true);
+    if (!integrity.ok) return;
+
+    await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['m3', 2],
+    ]);
+  });
+
+  it('keeps unanchored virtual partial rows at the tail instead of guessing a prefix', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'partial_unanchored_tail',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
+    ]);
+
+    const integrity = resolveCaptureIntegrity('chatgpt', {
+      conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_unanchored_tail' },
+      messages: [
+        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
+        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+      ],
+      captureMeta: { completeness: 'partial', identityVerified: true, reasons: ['order_unanchored'] },
+    });
+    expect(integrity.ok).toBe(true);
+    if (!integrity.ok) return;
+
+    await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 10],
+      ['m2', 20],
+      ['m3', 21],
+      ['m4', 22],
+    ]);
   });
 
   it('keeps unmarked append incoming sequence for autosave prefix reconciliation', async () => {

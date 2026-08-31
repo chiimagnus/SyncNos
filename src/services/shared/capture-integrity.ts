@@ -10,7 +10,7 @@ export type CaptureMeta = {
 export type CaptureMessageMergePolicy = 'replace' | 'preserve-existing-markdown' | 'preserve-existing-content';
 
 export type CaptureMessageTransientFields = {
-  captureSequencePolicy?: 'preserve-existing-tail';
+  captureSequencePolicy?: 'preserve-existing-tail' | 'reconcile-existing-order';
   captureMergePolicy?: CaptureMessageMergePolicy;
 };
 
@@ -168,7 +168,7 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     byKey.set(key, {
       ...message,
       messageKey: key,
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy: 'reconcile-existing-order',
       captureMergePolicy: normalizedMergePolicy(message?.captureMergePolicy),
     });
   }
