@@ -18,7 +18,11 @@ export type NotionConversationKinds = {
 export type NotionBackgroundStorage = {
   getSyncMappingByConversation: (conversationId: number) => Promise<any>;
   getMessagesByConversationId: (conversationId: number) => Promise<any[]>;
-  setConversationNotionPageId?: (conversationId: number, pageId: string) => Promise<any>;
+  setConversationNotionPageId: (
+    conversationId: number,
+    pageId: string,
+    meta?: { notionPageUrl?: string; notionWorkspaceSlug?: string },
+  ) => Promise<any>;
   setSyncCursor?: (conversationId: number, cursor: any) => Promise<any>;
   patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any>;
   getArticleCommentsByConversationId?: (conversationId: number) => Promise<ArticleCommentDto[]>;
