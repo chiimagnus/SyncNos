@@ -283,6 +283,72 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
 
+  it('preserves the conversation title when a failure happens after local identity is loaded', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      abortRunningJobIfFromOtherInstance: async () => currentJob,
+      isRunningJob: (job: any) => job && job.status === 'running',
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+      storage: {
+        getSyncMappingByConversation: async () => ({
+          conversation: {
+            id: 7,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            title: 'Notion title survives',
+            url: 'https://example.com/7',
+          },
+          mapping: null,
+        }),
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      notionApi: {},
+      notionFilesApi: {},
+      dbManager: {
+        ensureDatabase: async () => {
+          throw new Error('forced database failure');
+        },
+      },
+      syncService: {
+        createPageInDatabase: async () => ({ id: 'unused' }),
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore,
+    });
+
+    const result = await orchestrator.syncConversations({ conversationIds: [7], instanceId: 'i' });
+
+    expect(result.failCount).toBe(1);
+    expect(result.results[0]).toMatchObject({
+      conversationId: 7,
+      conversationTitle: 'Notion title survives',
+      ok: false,
+      mode: 'failed',
+      error: 'forced database failure',
+    });
+    expect(currentJob).toMatchObject({ status: 'done', okCount: 0, failCount: 1 });
+    expect(currentJob?.perConversation?.[0]).toMatchObject({
+      conversationId: 7,
+      conversationTitle: 'Notion title survives',
+      ok: false,
+      mode: 'failed',
+      error: 'forced database failure',
+    });
+  });
+
   it('reconciles a foreign running notion job to aborted on status read after reload', async () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();

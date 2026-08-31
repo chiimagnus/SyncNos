@@ -24,6 +24,7 @@ import {
   recoverSectionHeadingBlockId,
 } from '@services/sync/notion/notion-managed-sections.ts';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -512,7 +513,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       updatedAt: jobStartedAt,
       finishedAt: null,
       conversationIds: ids,
-      currentConversationId: ids[0] || undefined,
       currentConversationTitle: undefined,
       currentStage: ids.length ? 'preparing_queue' : '',
       okCount: 0,
@@ -524,6 +524,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     if (!claimedJob || claimedJob.status !== 'running' || String((claimedJob as any).id || '') !== jobId) {
       throw buildAlreadyRunningError();
     }
+
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: claimedJob,
+      persist: (job) => notionJobStore.setJob(job),
+    });
+    await lifecycle.setRunStage('preparing_queue');
 
     try {
       const token = await (notionTokenStore && notionTokenStore.getToken
@@ -596,46 +602,26 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       }
 
-      const resultSlots: any[] = ids.map(() => null);
-      let runningJobWriteChain = Promise.resolve(true);
-
       function currentResults() {
-        return resultSlots.filter(Boolean);
+        return lifecycle.results();
       }
 
-      function setResultAt(index: number, result: any) {
-        resultSlots[index] = result;
-        return result;
+      function setResultAt(_index: number, result: any) {
+        return lifecycle.recordResult(result);
       }
 
       async function writeRunningJob(partial: any = {}) {
-        runningJobWriteChain = runningJobWriteChain
-          .catch(() => true)
-          .then(async () => {
-            const results = currentResults();
-            await notionJobStore.setJob({
-              id: jobId,
-              provider: SYNC_PROVIDER,
-              instanceId,
-              status: 'running',
-              startedAt: jobStartedAt,
-              updatedAt: Date.now(),
-              finishedAt: null,
-              conversationIds: ids,
-              okCount: results.filter((r) => r.ok).length,
-              failCount: results.filter((r) => !r.ok).length,
-              perConversation: toPerConversationSnapshot(results),
-              ...partial,
-            });
-            return true;
+        const conversationId = Number(partial.currentConversationId);
+        const currentStage = String(partial.currentStage || '');
+        if (Number.isSafeInteger(conversationId) && conversationId > 0) {
+          await lifecycle.setItem(conversationId, {
+            conversationTitle: partial.currentConversationTitle,
+            currentStage,
           });
-        await runningJobWriteChain;
+          return;
+        }
+        await lifecycle.setRunStage(currentStage);
       }
-
-      await writeRunningJob({
-        currentConversationId: ids[0] || undefined,
-        currentStage: ids.length ? 'preparing_queue' : '',
-      });
 
       async function processConversation(id: any, index: number) {
         const trace = createConversationTrace(id);
@@ -1574,16 +1560,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           const normalizedError = normalizeNotionSyncError(e);
           setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: normalizedError, warnings });
           trace.flush({ mode: 'failed', ok: false, error: normalizedError });
-        }
-
-        try {
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: undefined,
-            currentStage: 'finishing_current_item',
-          });
-        } catch (_e) {
-          // ignore
+        } finally {
+          await lifecycle.finishItem(id);
         }
       }
 
@@ -1605,56 +1583,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       const okCount = results.filter((r) => r.ok).length;
       const failCount = results.length - okCount;
       const failures = buildFailureSummaries(results);
-      await notionJobStore.setJob({
-        id: jobId,
-        provider: SYNC_PROVIDER,
-        instanceId,
-        status: 'done',
-        startedAt: jobStartedAt,
-        updatedAt: Date.now(),
-        finishedAt: Date.now(),
-        conversationIds: ids,
-        currentConversationId: undefined,
-        currentConversationTitle: undefined,
-        currentStage: undefined,
-        okCount,
-        failCount,
-        perConversation: toPerConversationSnapshot(results),
-      });
+      await lifecycle.finish();
       return { provider: SYNC_PROVIDER, results, okCount, failCount, failures, jobId, instanceId };
     } catch (e) {
-      const now = Date.now();
-      try {
-        const message = normalizeNotionSyncError(e);
-        const results = ids.map((conversationId) => ({
-          conversationId,
-          conversationTitle: '',
-          ok: false,
-          mode: 'failed',
-          appended: 0,
-          error: message || 'sync failed',
-          warnings: [],
-          at: now,
-        }));
-        await notionJobStore.setJob({
-          id: jobId,
-          provider: SYNC_PROVIDER,
-          instanceId,
-          status: 'done',
-          startedAt: jobStartedAt,
-          updatedAt: now,
-          finishedAt: now,
-          conversationIds: ids,
-          currentConversationId: undefined,
-          currentConversationTitle: undefined,
-          currentStage: undefined,
-          okCount: 0,
-          failCount: ids.length,
-          perConversation: toPerConversationSnapshot(results),
-        });
-      } catch (_err) {
-        // ignore
-      }
+      await lifecycle.failPending(normalizeNotionSyncError(e));
       throw e;
     }
   }
