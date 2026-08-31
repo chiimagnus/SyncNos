@@ -164,9 +164,6 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     return persistCurrent();
   };
 
-  const beginItem = (conversationId: number, currentStage = 'loading_conversation') =>
-    setItem(conversationId, { currentStage });
-
   const setRunStage = async (currentStage: string): Promise<boolean> => {
     snapshot = {
       ...snapshot,
@@ -246,7 +243,6 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   };
 
   return {
-    beginItem,
     setItem,
     setRunStage,
     recordResult,
@@ -256,7 +252,6 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     failPending,
     titleFor: (conversationId: number) => titles.get(positiveId(conversationId)) ?? '',
     results: () => orderedResults(),
-    snapshot: () => cloneSnapshot(snapshot),
   };
 }
 

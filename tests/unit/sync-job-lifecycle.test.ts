@@ -31,7 +31,7 @@ describe('sync job lifecycle', () => {
       now: () => 10,
     });
 
-    await lifecycle.beginItem(1);
+    await lifecycle.setItem(1, { currentStage: 'loading_conversation' });
     await lifecycle.setItem(1, { conversationTitle: 'Alpha', currentStage: 'working' });
     await lifecycle.setItem(1, { conversationTitle: '', currentStage: 'finishing_current_item' });
 
@@ -53,7 +53,7 @@ describe('sync job lifecycle', () => {
     ]);
     await lifecycle.setItem(1, { conversationTitle: undefined, currentStage: 'worker-one-late' });
 
-    expect(lifecycle.snapshot()).toMatchObject({
+    expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({
       currentConversationId: 1,
       currentConversationTitle: 'First',
       currentStage: 'worker-one-late',
@@ -62,7 +62,8 @@ describe('sync job lifecycle', () => {
   });
 
   it('normalizes results, preserves input order, and derives counts from one result source', async () => {
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist: async () => true, now: () => 30 });
+    const persist = vi.fn(async () => true);
+    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist, now: () => 30 });
 
     await lifecycle.setItem(2, { conversationTitle: 'Second', currentStage: 'working' });
     lifecycle.recordResult({ conversationId: 2, ok: true, mode: 'synced', appended: 3, error: '', at: 12 });
@@ -74,11 +75,12 @@ describe('sync job lifecycle', () => {
       { conversationId: 1, conversationTitle: 'First', ok: false, mode: 'failed', appended: 0, error: 'boom' },
       { conversationId: 2, conversationTitle: 'Second', ok: true, mode: 'synced', appended: 3, error: '' },
     ]);
-    expect(lifecycle.snapshot()).toMatchObject({ status: 'done', okCount: 1, failCount: 1 });
+    expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'done', okCount: 1, failCount: 1 });
   });
 
   it('preserves completed rows and known identities when a run-level failure closes pending items', async () => {
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist: async () => true, now: () => 40 });
+    const persist = vi.fn(async () => true);
+    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist, now: () => 40 });
 
     await lifecycle.setItem(1, { conversationTitle: 'Done', currentStage: 'working' });
     lifecycle.recordResult({ conversationId: 1, ok: true, mode: 'synced' });
@@ -89,14 +91,14 @@ describe('sync job lifecycle', () => {
       { conversationId: 1, conversationTitle: 'Done', ok: true, mode: 'synced' },
       { conversationId: 2, conversationTitle: 'Pending', ok: false, mode: 'failed', error: 'transport_failed' },
     ]);
-    expect(lifecycle.snapshot()).toMatchObject({ status: 'done', okCount: 1, failCount: 1 });
+    expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'done', okCount: 1, failCount: 1 });
   });
 
   it('does not let one failed persistence poison later progress writes', async () => {
     const persist = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 50 });
 
-    await expect(lifecycle.beginItem(1)).resolves.toBe(false);
+    await expect(lifecycle.setRunStage('loading_conversation')).resolves.toBe(false);
     await expect(lifecycle.setItem(1, { conversationTitle: 'Recovered', currentStage: 'working' })).resolves.toBe(true);
     expect(persist).toHaveBeenCalledTimes(2);
   });
