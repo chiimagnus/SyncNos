@@ -276,43 +276,19 @@ function toJobRows(items: readonly GithubSyncRunItem[], at: number): SyncPerConv
   }));
 }
 
-function toStagingJobRow(item: GithubSyncStagedItem, at: number): SyncPerConversationResult {
-  return {
-    conversationId: item.conversationId,
-    conversationTitle: item.conversationTitle || undefined,
-    ok: item.status !== 'failed',
-    mode: item.status,
-    appended: 0,
-    error: item.error,
-    warnings: toJobWarnings(item.warnings),
-    at,
-  };
-}
-
 export function createGithubSyncOrchestrator(services: GithubOrchestratorServices = defaultGithubOrchestratorServices) {
   async function stageResolved(
     ids: readonly number[],
     mode: GithubSyncPlannerMode,
     preflight: GithubRepositoryPreflight,
-    persistProgress?: (partial: Partial<SyncJobSnapshot>) => Promise<unknown>,
   ): Promise<GithubSyncStagedRun> {
     const items: GithubSyncStagedItem[] = [];
-    const progressRows: SyncPerConversationResult[] = [];
-    let progressOkCount = 0;
-    let progressFailCount = 0;
 
     for (const conversationId of ids) {
-      let conversationTitle = '';
       try {
         const row = await services.storage.getSyncMappingByConversation(conversationId);
         if (!row?.conversation) throw new Error('conversation not found');
         const conversation = row.conversation;
-        conversationTitle = safeString(conversation.title);
-        await persistProgress?.({
-          currentConversationId: conversationId,
-          currentConversationTitle: conversationTitle,
-          currentStage: 'staging_projection',
-        });
         const messages = await services.storage.getMessagesByConversationId(conversationId);
         let comments: any[] = [];
         if (safeString(conversation.sourceType) === 'article') {
@@ -341,7 +317,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         });
         items.push({
           conversationId,
-          conversationTitle,
+          conversationTitle: safeString(conversation.title),
           status: plan.status === 'no_changes' ? 'no_changes' : 'staged',
           error: '',
           warnings: [...projection.warnings.map((warning) => warning.code), ...plan.warnings],
@@ -351,26 +327,13 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       } catch (error) {
         items.push({
           conversationId,
-          conversationTitle,
+          conversationTitle: '',
           status: 'failed',
           error: safeString((error as any)?.code || (error as any)?.message || 'github_local_stage_failed'),
           warnings: [],
           operations: [],
         });
       }
-
-      const progressRow = toStagingJobRow(items[items.length - 1]!, services.now());
-      progressRows.push(progressRow);
-      if (progressRow.ok) progressOkCount += 1;
-      else progressFailCount += 1;
-      await persistProgress?.({
-        currentConversationId: conversationId,
-        currentConversationTitle: conversationTitle,
-        currentStage: 'finishing_current_item',
-        okCount: progressOkCount,
-        failCount: progressFailCount,
-        perConversation: [...progressRows],
-      });
     }
 
     const operations = applyCollisionGuard(items);
@@ -427,14 +390,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       if (persisted) currentJob = next;
       else jobPersistenceWarning = true;
       return persisted;
-    };
-
-    const persistProgress = async (partial: Partial<SyncJobSnapshot>): Promise<void> => {
-      try {
-        await persistCurrentJob(partial);
-      } catch (_error) {
-        jobPersistenceWarning = true;
-      }
     };
 
     const claimJob = async (currentStage: string) => {
@@ -503,7 +458,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         settings = await services.getSettings();
         preflight = await services.preflight({ repository: settings.repository, branch: settings.branch });
         await persistCurrentJob({ currentStage: 'staging_projection' });
-        staged = await stageResolved(ids, mode, preflight, persistProgress);
+        staged = await stageResolved(ids, mode, preflight);
         await persistCurrentJob({ currentStage: 'cleaning_remote_files' });
       } else {
         settings = await services.getSettings();

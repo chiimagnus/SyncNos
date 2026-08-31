@@ -285,7 +285,7 @@ describe('github sync orchestrator staging through production sync', () => {
 
   it('isolates one local projection failure and keeps other safe staged rows', async () => {
     let stagedOperations: readonly any[] = [];
-    const { services, getPersistedJob } = fakeServices({
+    const { services } = fakeServices({
       rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
       messages: { 1: new Error('broken local read'), 2: [message('safe body')] },
       commitImpl: async ({ operations }) => {
@@ -303,18 +303,9 @@ describe('github sync orchestrator staging through production sync', () => {
       instanceId: 'local-failure',
     });
 
-    expect(result.items.find((item) => item.conversationId === 1)).toMatchObject({
-      status: 'failed',
-      conversationTitle: 'Title 1',
-    });
+    expect(result.items.find((item) => item.conversationId === 1)?.status).toBe('failed');
     expect(result.items.find((item) => item.conversationId === 2)?.status).toBe('synced');
     expect(stagedOperations).toHaveLength(1);
-    expect(getPersistedJob()?.perConversation.find((row) => row.conversationId === 1)).toMatchObject({
-      conversationTitle: 'Title 1',
-      ok: false,
-      mode: 'failed',
-      error: 'broken local read',
-    });
   });
 
   it('dedupes identical content staged to the same path', async () => {
@@ -430,58 +421,6 @@ describe('github sync orchestrator job lifecycle', () => {
     if (secondResult.status === 'rejected') {
       expect(secondResult.reason).toMatchObject({ code: 'sync_already_running' });
     }
-  });
-
-  it('publishes per-item GitHub staging progress with the current conversation title', async () => {
-    const { services, jobStore } = fakeServices({
-      rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
-      commitImpl: async ({ operations }) => ({
-        status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
-        files: resolvedFiles(operations),
-      }),
-    });
-
-    await createGithubSyncOrchestrator(services).sync({
-      conversationIds: [1, 2],
-      instanceId: 'progress-title',
-    });
-
-    const snapshots = (jobStore.setJob as any).mock.calls.map((call: any[]) => call[0] as SyncJobSnapshot);
-    expect(snapshots).toContainEqual(
-      expect.objectContaining({
-        status: 'running',
-        currentConversationId: 1,
-        currentConversationTitle: 'Title 1',
-        currentStage: 'staging_projection',
-      }),
-    );
-    expect(snapshots).toContainEqual(
-      expect.objectContaining({
-        status: 'running',
-        currentConversationId: 2,
-        currentConversationTitle: 'Title 2',
-        currentStage: 'staging_projection',
-        perConversation: [
-          expect.objectContaining({ conversationId: 1, conversationTitle: 'Title 1', ok: true, mode: 'staged' }),
-        ],
-      }),
-    );
-    expect(snapshots).toContainEqual(
-      expect.objectContaining({
-        status: 'running',
-        currentConversationId: 2,
-        currentConversationTitle: 'Title 2',
-        currentStage: 'finishing_current_item',
-        okCount: 2,
-        failCount: 0,
-        perConversation: [
-          expect.objectContaining({ conversationId: 1, conversationTitle: 'Title 1', mode: 'staged' }),
-          expect.objectContaining({ conversationId: 2, conversationTitle: 'Title 2', mode: 'staged' }),
-        ],
-      }),
-    );
   });
 
   it('claims the generic job before preflight and persists the terminal conversation result', async () => {
