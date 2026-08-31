@@ -602,11 +602,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       }
 
-      function currentResults() {
-        return lifecycle.results();
-      }
-
-      function setResultAt(_index: number, result: any) {
+      function recordResult(result: any) {
         return lifecycle.recordResult(result);
       }
 
@@ -623,7 +619,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         await lifecycle.setRunStage(currentStage);
       }
 
-      async function processConversation(id: any, index: number) {
+      async function processConversation(id: any) {
         const trace = createConversationTrace(id);
         const warnings: any[] = [];
         let conversationTitle = '';
@@ -647,7 +643,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentStage: 'preparing_sync',
           });
           if (!convo) {
-            setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: 'conversation not found' });
+            recordResult({ conversationId: id, conversationTitle, ok: false, error: 'conversation not found' });
             return;
           }
 
@@ -917,7 +913,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 });
               }
 
-              setResultAt(index, {
+              recordResult({
                 conversationId: id,
                 conversationTitle,
                 ok: true,
@@ -985,7 +981,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               });
             }
 
-            setResultAt(index, {
+            recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1256,7 +1252,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   ? 'updated_properties'
                   : 'no_changes';
 
-            setResultAt(index, {
+            recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1410,7 +1406,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 },
               });
             }
-            setResultAt(index, {
+            recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1498,7 +1494,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 },
               });
             }
-            setResultAt(index, {
+            recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1546,7 +1542,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 },
               });
             }
-            setResultAt(index, {
+            recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1558,14 +1554,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
         } catch (e) {
           const normalizedError = normalizeNotionSyncError(e);
-          setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: normalizedError, warnings });
+          recordResult({ conversationId: id, conversationTitle, ok: false, error: normalizedError, warnings });
           trace.flush({ mode: 'failed', ok: false, error: normalizedError });
         } finally {
           await lifecycle.finishItem(id);
         }
       }
 
-      const queue = ids.map((id, index) => ({ id, index }));
+      const queue = [...ids];
       let cursorIndex = 0;
       const workerCount = Math.max(1, Math.min(SYNC_CONVERSATION_CONCURRENCY, queue.length));
       await Promise.all(
@@ -1574,12 +1570,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             const next = queue[cursorIndex];
             cursorIndex += 1;
             if (!next) return;
-            await processConversation(next.id, next.index);
+            await processConversation(next);
           }
         }),
       );
 
-      const results = currentResults();
+      const results = lifecycle.results();
       const okCount = results.filter((r) => r.ok).length;
       const failCount = results.length - okCount;
       const failures = buildFailureSummaries(results);
