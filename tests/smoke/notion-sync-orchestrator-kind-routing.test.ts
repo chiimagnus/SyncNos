@@ -161,8 +161,6 @@ describe('notion-sync-orchestrator kind routing', () => {
       tokenStore,
       storage,
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager,
       syncService,
       jobStore,
@@ -270,8 +268,6 @@ describe('notion-sync-orchestrator kind routing', () => {
       tokenStore,
       storage,
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager,
       syncService,
       jobStore,
@@ -314,8 +310,6 @@ describe('notion-sync-orchestrator kind routing', () => {
         getMessagesByConversationId: async () => [],
       },
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager: {
         ensureDatabase: async () => {
           throw new Error('forced database failure');
@@ -371,8 +365,6 @@ describe('notion-sync-orchestrator kind routing', () => {
         getMessagesByConversationId: async () => [],
       },
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager: { ensureDatabase: async () => ({ databaseId: 'unused' }) },
       syncService: {
         createPageInDatabase: async () => ({ id: 'unused' }),
@@ -451,8 +443,6 @@ describe('notion-sync-orchestrator kind routing', () => {
         getMessagesByConversationId: async () => [],
       },
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager: { ensureDatabase: async () => ({ databaseId: 'db_chats' }) },
       syncService: {
         createPageInDatabase: async () => ({ id: 'p1' }),

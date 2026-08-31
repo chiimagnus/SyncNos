@@ -81,7 +81,6 @@ export function createAutoSyncSchedulerCore(config: {
   isProviderEnabled: () => Promise<boolean>;
   syncConversations: (conversationIds: number[], instanceId: string) => Promise<void>;
   getFailureRetryDelayMs?: (error: unknown) => number | null | undefined;
-  onPreflightFailed?: (args: { conversationIds: number[]; instanceId: string; error: string }) => Promise<void>;
 }): AutoSyncScheduler {
   const {
     queueStorageKey,
@@ -94,7 +93,6 @@ export function createAutoSyncSchedulerCore(config: {
     isProviderEnabled,
     syncConversations,
     getFailureRetryDelayMs,
-    onPreflightFailed,
   } = config;
 
   const readQueue = async (): Promise<QueueMap> => {
@@ -201,15 +199,6 @@ export function createAutoSyncSchedulerCore(config: {
         await writeQueue(trimmed);
         await scheduleNextAlarm(trimmed);
         return;
-      }
-
-      if (onPreflightFailed) {
-        const text = error instanceof Error ? error.message : String(error || '').trim();
-        await onPreflightFailed({
-          conversationIds: dueConversationIds,
-          instanceId,
-          error: text || 'sync failed',
-        }).catch(() => {});
       }
 
       await writeQueue(restQueue);

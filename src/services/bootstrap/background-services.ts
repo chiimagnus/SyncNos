@@ -6,8 +6,6 @@ import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage as notionBackgroundStorage } from '@services/conversations/background/storage';
 import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
 import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
-import notionApi from '@services/sync/notion/notion-api.ts';
-import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 
 import {
   clearSyncStatus as clearObsidianSyncStatus,
@@ -82,7 +80,6 @@ export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestra
 export type BackgroundServices = {
   articleFetchService: typeof articleFetchService;
   conversationKinds: typeof conversationKinds;
-  notionSyncJobStore: typeof notionSyncJobStore;
   notionSyncOrchestrator: NotionSyncOrchestrator;
   obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
   feishuSyncOrchestrator: FeishuSyncOrchestrator;
@@ -103,8 +100,6 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
     tokenStore: { getToken: getNotionOAuthToken },
     storage: notionBackgroundStorage,
     conversationKinds,
-    notionApi,
-    notionFilesApi,
     dbManager: notionDbManager,
     syncService: notionSyncService,
     jobStore: notionSyncJobStore,
@@ -138,7 +133,6 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
   return {
     articleFetchService,
     conversationKinds,
-    notionSyncJobStore,
     notionSyncOrchestrator,
     githubSyncOrchestrator,
     autoSync: {

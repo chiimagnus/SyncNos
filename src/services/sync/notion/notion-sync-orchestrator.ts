@@ -6,8 +6,6 @@ import { conversationKinds as builtInConversationKinds } from '@services/protoco
 import notionDbManagerDefault from '@services/sync/notion/notion-db-manager.ts';
 import notionSyncJobStoreDefault from '@services/sync/notion/notion-sync-job-store.ts';
 import notionSyncServiceDefault from '@services/sync/notion/notion-sync-service.ts';
-import notionApiDefault from '@services/sync/notion/notion-api.ts';
-import notionFilesApiDefault from '@services/sync/notion/notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '@platform/storage/local';
 import {
@@ -25,7 +23,6 @@ import {
 } from '@services/sync/notion/notion-managed-sections.ts';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
-import { normalizeSyncJobSnapshot } from '@services/sync/sync-job-store';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -420,13 +417,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     }
     const job =
       instanceId && typeof notionJobStore.abortRunningJobIfFromOtherInstance === 'function'
-        ? normalizeSyncJobSnapshot(
-            SYNC_PROVIDER,
-            await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId, {
-              forceAbort: true,
-            }),
-          )
-        : normalizeSyncJobSnapshot(SYNC_PROVIDER, await notionJobStore.getJob());
+        ? await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId, { forceAbort: true })
+        : await notionJobStore.getJob();
     return { provider: SYNC_PROVIDER, job, instanceId };
   }
 
@@ -488,7 +480,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       perConversation: [],
     });
 
-    const claimedJob = normalizeSyncJobSnapshot(SYNC_PROVIDER, await notionJobStore.getJob());
+    const claimedJob = await notionJobStore.getJob();
     if (!claimedJob || claimedJob.status !== 'running' || String((claimedJob as any).id || '') !== jobId) {
       throw buildAlreadyRunningError();
     }
@@ -1541,8 +1533,6 @@ function createDefaultNotionServices(): NotionServices {
     tokenStore: { getToken: getNotionOAuthToken },
     storage: defaultBackgroundStorage,
     conversationKinds: builtInConversationKinds,
-    notionApi: notionApiDefault,
-    notionFilesApi: notionFilesApiDefault,
     dbManager: notionDbManagerDefault,
     syncService: notionSyncServiceDefault,
     jobStore: notionSyncJobStoreDefault,

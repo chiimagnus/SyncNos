@@ -10,8 +10,6 @@ export type NotionTokenStore = {
   getToken: () => Promise<NotionToken | null>;
 };
 
-export type NotionJobStore = SyncJobStore;
-
 export type NotionConversationKinds = {
   pick: (input: { source?: unknown; sourceType?: unknown }) => any;
   getNotionStorageKeys?: () => string[];
@@ -50,16 +48,11 @@ export type NotionSyncService = {
   upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[]) => Promise<any[]>;
 };
 
-export type NotionApi = Record<string, unknown>;
-export type NotionFilesApi = Record<string, unknown>;
-
 export type NotionServices = {
   tokenStore: NotionTokenStore;
   storage: NotionBackgroundStorage;
   conversationKinds: NotionConversationKinds;
-  notionApi: NotionApi;
-  notionFilesApi: NotionFilesApi;
   dbManager: NotionDbManager;
   syncService: NotionSyncService;
-  jobStore: NotionJobStore;
+  jobStore: SyncJobStore;
 };

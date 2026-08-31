@@ -14,9 +14,7 @@ import {
   ensureDefaultFeishuOAuthProxyUrl,
   setupFeishuOAuthNavigationListener,
 } from '@services/sync/feishu/auth/oauth';
-import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
-import feishuSyncJobStore from '@services/sync/feishu/feishu-sync-job-store.ts';
-import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
+import { abortRunningSyncJobIfFromOtherInstance } from '@services/sync/sync-job-store';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerFeishuSettingsHandlers } from '@services/sync/feishu/settings-background-handlers';
@@ -151,10 +149,9 @@ export default defineBackground(() => {
   void ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
 
   const id = getBackgroundInstanceId();
-  runBestEffort(() => services.notionSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
-  runBestEffort(() => obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
-  runBestEffort(() => feishuSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
-  runBestEffort(() => githubSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
+  for (const provider of ['notion', 'obsidian', 'feishu', 'github'] as const) {
+    runBestEffort(() => abortRunningSyncJobIfFromOtherInstance(provider, id, { forceAbort: true }));
+  }
 
   // Best-effort recovery complements alarm wakeups after MV3 worker reloads.
   // Each provider is isolated so one synchronous or asynchronous failure cannot

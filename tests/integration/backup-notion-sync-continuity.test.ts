@@ -107,7 +107,6 @@ async function getOnlyConversationId(): Promise<number> {
 function createMemoryJobStore() {
   let job: any = null;
   return {
-    NOTION_SYNC_JOB_KEY: 'notion_sync_job_test',
     async getJob() {
       return job;
     },
@@ -247,8 +246,6 @@ describe('backup -> Notion sync continuity', () => {
       },
       storage: backgroundStorage,
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager: {
         async ensureDatabase() {
           return { databaseId: 'db-chat' };
@@ -497,8 +494,6 @@ describe('backup -> Notion sync continuity', () => {
       },
       storage: backgroundStorage,
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager: {
         async ensureDatabase() {
           return { databaseId: 'db-article' };
