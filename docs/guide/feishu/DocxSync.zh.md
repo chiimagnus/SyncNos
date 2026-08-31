@@ -1,8 +1,8 @@
-# 飞书 DocX 同步配置指南（WebClipper）
+# 飞书同步配置指南（WebClipper）
 
 [English](./DocxSync.en.md) | **中文**
 
-本指南负责 SyncNos WebClipper 同步到飞书 DocX 的用户配置步骤；运行时行为仍以 `src/services/sync/feishu/**` 为准。
+本指南负责 SyncNos WebClipper 同步到飞书 DocX 的用户配置步骤；运行时行为以当前源码为准，不在本指南复制内部模块结构。
 
 ## 准备条件
 
