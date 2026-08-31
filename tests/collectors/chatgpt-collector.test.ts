@@ -425,7 +425,7 @@ describe('chatgpt-collector', () => {
 
   it('falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label', async () => {
     const html = `
-      <article data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="t1">
+      <article data-testid="conversation-turn-1" data-turn="assistant" data-turn-id="t1">
         <h6 class="sr-only select-none">ChatGPT说:</h6>
         <div class="agent-turn">
           <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/?app=chatgpt&locale=zh-CN"></iframe>
@@ -1112,6 +1112,31 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     expect(prepared.records.map((record: any) => record.payload.contentText)).toEqual(['question', 'answer']);
   });
 
+  it('treats a top boundary loader as pending when structural turn ordinals are unavailable', () => {
+    const dom = setupChatgptDom(
+      `
+        <div role="progressbar" data-testid="history-loading"></div>
+        <article data-testid="conversation-turn" data-turn-id="turn_unindexed">
+          <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_boundary_loader',
+    );
+    const def = createChatgptCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const adapter = def.collector.__test.manualAdapter;
+
+    expect(adapter.readBoundaryState('top')).toBe('pending');
+    dom.window.document.querySelector('[role="progressbar"]')?.remove();
+    expect(adapter.readBoundaryState('top')).toBe('confirmed');
+  });
+
   it('bounds manual extraction to new or changed descriptor fingerprints', async () => {
     const dom = setupChatgptDom(
       `
@@ -1379,6 +1404,61 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     expect(prepared.identityGuard.topAnchor).toBe('turn:turn_top');
     expect(prepared.identityGuard.anchors).toContain('turn:turn_middle');
     expect(top).toBe(100);
+  });
+
+  it('waits for the canonical first structural turn before binding temporary-chat identity', async () => {
+    const dom = setupChatgptDom('', 'https://chatgpt.com/?temporary-chat=true');
+    const main = dom.window.document.querySelector('main') as HTMLElement;
+    const root = dom.window.document.documentElement;
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 200 });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
+    let top = 100;
+    let waits = 0;
+    const renderMiddle = () => {
+      main.innerHTML = `
+        <article data-testid="conversation-turn-42" data-turn-id="turn_middle">
+          <div data-message-author-role="assistant"><div class="markdown prose">middle</div></div>
+        </article>
+      `;
+    };
+    const renderCanonicalTop = () => {
+      main.innerHTML = `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_top">
+          <div data-message-author-role="user"><div class="whitespace-pre-wrap">top</div></div>
+        </article>
+      `;
+    };
+    renderMiddle();
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
+    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
+    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
+      top = Number(nextTop) || 0;
+    };
+    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
+    const topGuard = {
+      route: 'chatgpt.com/?temporary-chat=true',
+      durableId: '',
+      anchors: ['turn:turn_top', 'turn_top:user:0'],
+      topAnchor: 'turn:turn_top',
+    };
+
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+      boundaryTimeoutMs: 20,
+      sleep: async () => {
+        waits += 1;
+        if (waits === 2) renderCanonicalTop();
+      },
+    });
+
+    expect(waits).toBeGreaterThanOrEqual(2);
+    expect(prepared.conversationKey).toBe(def.collector.__test.identityConversationKey(topGuard));
+    expect(prepared.identityGuard.topAnchor).toBe('turn:turn_top');
+    expect(prepared.identityGuard.topAnchor).not.toBe('turn:turn_middle');
   });
 
   it('recycles every visible anchor without treating scrolling as navigation', async () => {

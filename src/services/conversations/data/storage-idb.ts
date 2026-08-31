@@ -731,6 +731,72 @@ export async function mergeConversationsByIds(input: {
   return outcome.result;
 }
 
+function mergeAnchoredMessageOrder(
+  storedRows: any[],
+  incomingKeys: string[],
+): { keys: string[]; anchored: boolean; changed: boolean } {
+  const storedKeys = (Array.isArray(storedRows) ? storedRows : [])
+    .map((row) => safeString(row?.messageKey))
+    .filter(Boolean);
+  const incoming: string[] = [];
+  const incomingSeen = new Set<string>();
+  for (const rawKey of incomingKeys) {
+    const key = safeString(rawKey);
+    if (!key || incomingSeen.has(key)) continue;
+    incomingSeen.add(key);
+    incoming.push(key);
+  }
+  if (!storedKeys.length) return { keys: incoming, anchored: true, changed: incoming.length > 0 };
+
+  const storedPositions = new Map(storedKeys.map((key, index) => [key, index]));
+  const knownIncoming = incoming.filter((key) => storedPositions.has(key));
+  const appendUnknown = () => {
+    const keys = storedKeys.slice();
+    for (const key of incoming) {
+      if (!storedPositions.has(key)) keys.push(key);
+    }
+    return { keys, anchored: false, changed: keys.length !== storedKeys.length };
+  };
+  if (!knownIncoming.length) return appendUnknown();
+
+  const incomingKeySet = new Set(incoming);
+  if (storedKeys.every((key) => incomingKeySet.has(key))) {
+    const changed = incoming.length !== storedKeys.length || incoming.some((key, index) => key !== storedKeys[index]);
+    return { keys: incoming, anchored: true, changed };
+  }
+
+  const knownPositions = knownIncoming.map((key) => storedPositions.get(key) as number);
+  if (knownPositions.some((position, index) => index > 0 && position <= knownPositions[index - 1])) {
+    return appendUnknown();
+  }
+
+  const merged = storedKeys.slice();
+  const knownSet = new Set(storedKeys);
+  let cursor = 0;
+  while (cursor < incoming.length) {
+    if (knownSet.has(incoming[cursor])) {
+      cursor += 1;
+      continue;
+    }
+    const start = cursor;
+    while (cursor < incoming.length && !knownSet.has(incoming[cursor])) cursor += 1;
+    const unknownRun = incoming.slice(start, cursor);
+    const previousKnown = start > 0 ? incoming[start - 1] : '';
+    const nextKnown = cursor < incoming.length ? incoming[cursor] : '';
+    let insertionIndex = merged.length;
+    if (nextKnown) insertionIndex = merged.indexOf(nextKnown);
+    else if (previousKnown) {
+      const previousIndex = merged.indexOf(previousKnown);
+      insertionIndex = previousIndex < 0 ? merged.length : previousIndex + 1;
+    }
+    merged.splice(insertionIndex, 0, ...unknownRun);
+    for (const key of unknownRun) knownSet.add(key);
+  }
+
+  const changed = merged.length !== storedKeys.length || merged.some((key, index) => key !== storedKeys[index]);
+  return { keys: merged, anchored: true, changed };
+}
+
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
@@ -775,13 +841,39 @@ export async function syncConversationMessages(
         const hasTailPolicy =
           mode === 'append' &&
           upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
+        const reconcileKeys =
+          mode === 'append'
+            ? upsertKeys.filter((key) => byKey.get(key)?.captureSequencePolicy === 'reconcile-existing-order')
+            : [];
+        const sequenceOverrides = new Map<string, number>();
         let nextTailSequence = 0;
-        if (hasTailPolicy) {
+        if (hasTailPolicy || reconcileKeys.length) {
           const seqIdx = stores.messages.index('by_conversationId_sequence');
           const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
-          const lastCursor = await reqToPromise(seqIdx.openCursor(range, 'prev') as any);
-          const maxSequence = Number((lastCursor as any)?.value?.sequence);
-          nextTailSequence = Number.isFinite(maxSequence) ? maxSequence + 1 : 0;
+          const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
+          const finiteSequences = storedRows
+            .map((row) => Number(row?.sequence))
+            .filter((sequence) => Number.isFinite(sequence));
+          nextTailSequence = finiteSequences.length ? Math.max(...finiteSequences) + 1 : 0;
+
+          if (reconcileKeys.length) {
+            const reconciled = mergeAnchoredMessageOrder(storedRows, reconcileKeys);
+            if (reconciled.anchored && reconciled.changed) {
+              const sequenceByKey = new Map(reconciled.keys.map((key, index) => [key, index]));
+              for (const key of reconcileKeys) {
+                const sequence = sequenceByKey.get(key);
+                if (sequence !== undefined) sequenceOverrides.set(key, sequence);
+              }
+              for (const row of storedRows) {
+                const key = safeString(row?.messageKey);
+                const sequence = sequenceByKey.get(key);
+                if (sequence === undefined || Number(row?.sequence) === sequence) continue;
+                await reqToPromise(stores.messages.put({ ...row, sequence }));
+                markChanged('messages');
+              }
+              nextTailSequence = reconciled.keys.length;
+            }
+          }
         }
 
         let upserted = 0;
@@ -790,14 +882,24 @@ export async function syncConversationMessages(
           if (!m) continue;
 
           const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
-          const preserveSequence = mode === 'append' && m.captureSequencePolicy === 'preserve-existing-tail';
-          const sequence = preserveSequence
-            ? existing && Number.isFinite(existing.sequence)
-              ? existing.sequence
-              : nextTailSequence++
-            : Number.isFinite(m.sequence)
-              ? m.sequence
-              : 0;
+          const reconcileSequence =
+            mode === 'append' && m.captureSequencePolicy === 'reconcile-existing-order'
+              ? sequenceOverrides.get(key)
+              : undefined;
+          const preserveSequence =
+            mode === 'append' &&
+            (m.captureSequencePolicy === 'preserve-existing-tail' ||
+              m.captureSequencePolicy === 'reconcile-existing-order');
+          const sequence =
+            reconcileSequence !== undefined
+              ? reconcileSequence
+              : preserveSequence
+                ? existing && Number.isFinite(existing.sequence)
+                  ? existing.sequence
+                  : nextTailSequence++
+                : Number.isFinite(m.sequence)
+                  ? m.sequence
+                  : 0;
           const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
           const mergePolicy: CaptureMessageMergePolicy =
             rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'

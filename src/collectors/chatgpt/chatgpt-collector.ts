@@ -10,9 +10,9 @@ import {
   mergePreparedRecords,
   createPreparedCaptureConsumer,
   runVirtualizedSweep,
-  resolveScrollRoot,
-  writeScrollPosition,
   type PreparedAccumulator,
+  type VirtualizedBoundary,
+  type VirtualizedBoundaryState,
   type PreparedIdentityGuard,
   type PreparedMessageRecord,
 } from '@collectors/virtualized-chat/virtualized-chat-sweep.ts';
@@ -711,6 +711,50 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
+  function structuralTurnOrdinal(turn: any): number | null {
+    const testId = String(turn?.getAttribute?.('data-testid') || '').trim();
+    const match = testId.match(/^conversation-turn-(\d+)$/);
+    if (!match) return null;
+    const ordinal = Number(match[1]);
+    return Number.isSafeInteger(ordinal) && ordinal > 0 ? ordinal : null;
+  }
+
+  const BOUNDARY_LOADING_SELECTOR =
+    "[role='progressbar'], [aria-busy='true'], [data-testid*='loading' i], [data-testid*='loader' i], .animate-spin";
+
+  function hasBoundaryLoadingSignal(boundary: VirtualizedBoundary, root = getConversationRoot()): boolean {
+    if (!root?.querySelectorAll) return false;
+    const turns = readTurnShells(root);
+    const edgeTurn = boundary === 'top' ? turns[0] : turns[turns.length - 1];
+    const candidates: any[] = [];
+    if (root.matches?.(BOUNDARY_LOADING_SELECTOR)) candidates.push(root);
+    candidates.push(...(Array.from(root.querySelectorAll(BOUNDARY_LOADING_SELECTOR)) as any[]));
+    for (const candidate of candidates) {
+      if (!candidate || candidate.closest?.(MODERN_TURN_SELECTOR)) continue;
+      if (isExplicitlyHiddenWithin(candidate, root)) continue;
+      if (!edgeTurn) return true;
+      if (candidate === root || candidate.contains?.(edgeTurn)) return true;
+      const order = compareDocumentOrder(candidate, edgeTurn);
+      if (boundary === 'top' ? order < 0 : order > 0) return true;
+    }
+    return false;
+  }
+
+  function readManualBoundaryState(boundary: VirtualizedBoundary): VirtualizedBoundaryState {
+    const root = getConversationRoot();
+    if (!root) return 'pending';
+    if (boundary === 'top') {
+      const ordinals = readTurnShells(root)
+        .map(structuralTurnOrdinal)
+        .filter((value): value is number => value !== null);
+      if (ordinals.length) {
+        if (Math.min(...ordinals) > 1) return 'pending';
+        if (ordinals.includes(1)) return 'confirmed';
+      }
+    }
+    return hasBoundaryLoadingSignal(boundary, root) ? 'pending' : 'confirmed';
+  }
+
   const manualAdapter = {
     readRoot: () => getConversationRoot(),
     readIdentity: () => sampleIdentityGuard(getConversationRoot()),
@@ -721,6 +765,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       readCurrentDescriptors()
         .filter((descriptor) => descriptor.visible && !descriptor.rendered)
         .map((descriptor) => descriptor.key),
+    readBoundaryState: readManualBoundaryState,
     readWindow: () => readCurrentManualWindow(true),
     getExtractionCount: () => manualExtractionCount,
   };
@@ -780,22 +825,15 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       getSeed: manualAdapter.readScrollSeed,
       sampleIdentity: sampleNavigationIdentity,
     });
-    const scrollRoot = resolveScrollRoot(scrollRuntime, manualAdapter.readScrollSeed());
-    writeScrollPosition(scrollRuntime, scrollRoot, 0, 0);
-    const settle =
-      options.sleep || ((ms: number) => new Promise<void>((resolve) => env.window.setTimeout(resolve, ms)));
-    await settle(Math.max(0, Number(options.pollMs) || 0));
-
-    const identityGuard = manualAdapter.readIdentity();
-    const conversationKey = identityConversationKey(identityGuard);
-    const sampleCaptureIdentity = createCaptureIdentitySampler(identityGuard);
+    const initialIdentityGuard = manualAdapter.readIdentity();
+    const durableConversationKey = initialIdentityGuard.durableId ? identityConversationKey(initialIdentityGuard) : '';
+    const sampleCaptureIdentity = createCaptureIdentitySampler(initialIdentityGuard);
     const accumulator = createPreparedAccumulator<any>({
       source: 'chatgpt',
-      conversationKey,
-      identityVerified: !!conversationKey,
-      identityGuard,
+      conversationKey: durableConversationKey,
+      identityVerified: !!durableConversationKey,
+      identityGuard: initialIdentityGuard,
     });
-    if (!conversationKey) addPreparedReason(accumulator, 'unstable_identity');
 
     try {
       const sweep = await runVirtualizedSweep(
@@ -805,6 +843,19 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           sampleIdentity: sampleCaptureIdentity,
           readDescriptorKeys: manualAdapter.readDescriptorKeys,
           readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
+          readBoundaryState: manualAdapter.readBoundaryState,
+          onTopConfirmed: (target) => {
+            const canonicalGuard = manualAdapter.readIdentity();
+            target.identityGuard = {
+              ...canonicalGuard,
+              anchors: canonicalGuard.anchors.slice(),
+            };
+            if (!target.conversationKey) {
+              target.conversationKey = identityConversationKey(canonicalGuard);
+              target.identityVerified = !!target.conversationKey;
+            }
+            if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
+          },
           harvest: (target) => harvestRenderedInto(target, null, { allowEditing: true }),
         },
         accumulator,
@@ -814,6 +865,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           stableSamples: options.stableSamples,
           pollMs: options.pollMs,
           stepTimeoutMs: options.stepTimeoutMs,
+          boundaryTimeoutMs: options.boundaryTimeoutMs,
           overlapRatio: options.overlapRatio,
           maxOverlapRecoveries: options.maxOverlapRecoveries,
           sleep: options.sleep,
@@ -829,6 +881,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       }
     }
 
+    if (!accumulator.conversationKey) addPreparedReason(accumulator, 'unstable_identity');
     const finalGuard = manualAdapter.readIdentity();
     if (!identityGuardsMatch(accumulator.identityGuard, finalGuard)) {
       accumulator.identityVerified = false;

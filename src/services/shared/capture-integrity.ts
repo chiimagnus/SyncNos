@@ -10,7 +10,7 @@ export type CaptureMeta = {
 export type CaptureMessageMergePolicy = 'replace' | 'preserve-existing-markdown' | 'preserve-existing-content';
 
 export type CaptureMessageTransientFields = {
-  captureSequencePolicy?: 'preserve-existing-tail';
+  captureSequencePolicy?: 'preserve-existing-tail' | 'reconcile-existing-order';
   captureMergePolicy?: CaptureMessageMergePolicy;
 };
 
@@ -159,6 +159,10 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     };
   }
 
+  const hasUntrustedOrder = (effectiveMeta.reasons || []).some(
+    (reason) => reason === 'order_unanchored' || reason === 'order_conflict',
+  );
+  const captureSequencePolicy = hasUntrustedOrder ? 'preserve-existing-tail' : 'reconcile-existing-order';
   const firstPositions: string[] = [];
   const byKey = new Map<string, any>();
   for (const message of rawMessages) {
@@ -168,7 +172,7 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     byKey.set(key, {
       ...message,
       messageKey: key,
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy,
       captureMergePolicy: normalizedMergePolicy(message?.captureMergePolicy),
     });
   }

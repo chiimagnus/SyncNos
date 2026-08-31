@@ -73,7 +73,7 @@ describe('current page capture integrity routing', () => {
       diff: { added: ['m1'], updated: [], removed: [] },
     });
     expect(harness.calls[1].payload.messages[0]).toMatchObject({
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy: 'reconcile-existing-order',
     });
   });
 
@@ -115,7 +115,7 @@ describe('current page capture integrity routing', () => {
       messageKey: 'assistant-stable-key',
       contentText,
       contentMarkdown,
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy: 'reconcile-existing-order',
       captureMergePolicy: 'replace',
     });
   });
@@ -193,7 +193,7 @@ describe('current page capture integrity routing', () => {
       diff: { added: ['m1'], updated: [], removed: [] },
     });
     expect(harness.calls[1].payload.messages[0]).toMatchObject({
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy: 'reconcile-existing-order',
       captureMergePolicy: 'preserve-existing-markdown',
     });
   });

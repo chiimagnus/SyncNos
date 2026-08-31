@@ -226,7 +226,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
           expect(payload?.messages[0]).toMatchObject({
             contentText: placeholder,
             captureMergePolicy: 'preserve-existing-content',
-            captureSequencePolicy: 'preserve-existing-tail',
+            captureSequencePolicy: 'reconcile-existing-order',
           });
           return { ok: true, data: { upserted: 1 } };
         }

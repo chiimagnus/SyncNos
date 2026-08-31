@@ -99,7 +99,7 @@ describe('resolveCaptureIntegrity', () => {
     expect(result.persistence).toEqual({ mode: 'append', diff: { added: ['m1'], updated: [], removed: [] } });
     expect(result.snapshot.messages[0]).toMatchObject({
       messageKey: 'm1',
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureSequencePolicy: 'reconcile-existing-order',
       captureMergePolicy: 'replace',
     });
     expect(result.meta).toEqual({
@@ -109,6 +109,22 @@ describe('resolveCaptureIntegrity', () => {
       metrics: { passes: 2 },
     });
   });
+
+  it.each(['order_unanchored', 'order_conflict'])(
+    'keeps virtual partial order conservative when the sweep reports %s',
+    (reason) => {
+      const result = resolveCaptureIntegrity(
+        'chatgpt',
+        snapshot({ captureMeta: { completeness: 'partial', identityVerified: true, reasons: [reason] } }),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.snapshot.messages[0]).toMatchObject({
+        messageKey: 'm1',
+        captureSequencePolicy: 'preserve-existing-tail',
+      });
+    },
+  );
 
   it.each([
     ['missing metadata', undefined],
