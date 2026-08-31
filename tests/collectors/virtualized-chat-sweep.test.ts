@@ -482,6 +482,44 @@ describe('virtualized chat single pass', () => {
     ]);
   });
 
+  it('recovers from a transient scroll-extent rebase before deciding the logical bottom', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialScrollHeight: 500 },
+    );
+    const harvest = test.adapter.harvest;
+    let harvests = 0;
+    test.adapter.harvest = async (target) => {
+      const result = await harvest(target);
+      harvests += 1;
+      if (harvests === 2) test.setScrollHeight(test.getTop() + 100);
+      if (harvests === 3 && test.getTop() === 0) test.setScrollHeight(500);
+      return result;
+    };
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+
+    expect(result).toMatchObject({ completeness: 'complete', reachedBottom: true });
+    expect(result.reasons).not.toContain('boundary_unstable');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
   it('does not accept a regressed scroll extent as the logical bottom', async () => {
     const test = harness(
       [

@@ -464,6 +464,7 @@ const PASS_DEFAULTS = Object.freeze({
   boundaryTimeoutMs: 30_000,
   overlapRatio: 0.65,
   maxOverlapRecoveries: 4,
+  maxBoundaryRecoveries: 4,
 });
 
 function boundedInteger(value: unknown, fallback: number, min: number, max: number, allowZero = false): number {
@@ -545,6 +546,7 @@ export async function runVirtualizedPass<T>(
   let maxScrollExtent = 0;
   let previousTop = 0;
   let overlapRecoveries = 0;
+  let boundaryRecoveries = 0;
   let added = 0;
   let updated = 0;
   const unresolvedKeys = new Set<string>();
@@ -634,6 +636,22 @@ export async function runVirtualizedPass<T>(
     return latest;
   };
 
+  const recoverRegressedBottom = async (metrics: ScrollMetrics): Promise<StableWindow | null> => {
+    if (boundaryRecoveries >= PASS_DEFAULTS.maxBoundaryRecoveries) {
+      addReason('boundary_unstable');
+      return null;
+    }
+    const stepBack = Math.max(1, Math.floor(metrics.clientHeight * overlapRatio));
+    const recoveryTop = Math.max(0, metrics.top - stepBack);
+    if (recoveryTop >= metrics.top) {
+      addReason('boundary_unstable');
+      return null;
+    }
+    boundaryRecoveries += 1;
+    writeScrollPosition(runtime, root, metrics.left, recoveryTop);
+    return stabilize();
+  };
+
   const acquireLogicalTop = async (): Promise<StableWindow | null> => {
     let lastSignature = '';
     let progressDeadline = now() + boundaryTimeoutMs;
@@ -683,9 +701,10 @@ export async function runVirtualizedPass<T>(
       const previousExtent = maxScrollExtent;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
       if (stable.metrics.scrollHeight + 1 < previousExtent) {
-        addReason('boundary_unstable');
-        return { stable, confirmed: false };
+        const recovered = await recoverRegressedBottom(stable.metrics);
+        return { stable: recovered, confirmed: false };
       }
+      boundaryRecoveries = 0;
       if (!isAtScrollBottom(stable.metrics)) return { stable, confirmed: false };
       const state = readBoundaryState('bottom');
       if (!state) return { stable: null, confirmed: false };
@@ -753,9 +772,13 @@ export async function runVirtualizedPass<T>(
       maxScrollExtent = Math.max(maxScrollExtent, metrics.scrollHeight);
       if (isAtScrollBottom(metrics)) {
         if (metrics.scrollHeight + 1 < previousExtent) {
-          addReason('boundary_unstable');
-          break;
+          const recovered = await recoverRegressedBottom(metrics);
+          if (!recovered) break;
+          stable = recovered;
+          previousTop = stable.metrics.top;
+          continue;
         }
+        boundaryRecoveries = 0;
         const boundaryState = readBoundaryState('bottom');
         if (!boundaryState) break;
         if (boundaryState === 'confirmed') {
