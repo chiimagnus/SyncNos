@@ -137,47 +137,6 @@ function normalizeIds(list: unknown) {
   return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
-function buildPerConversationResult({
-  conversationId,
-  conversationTitle,
-  ok,
-  mode,
-  appended,
-  error,
-  at,
-}: {
-  conversationId: number;
-  conversationTitle?: unknown;
-  ok: unknown;
-  mode: unknown;
-  appended: unknown;
-  error: unknown;
-  at: unknown;
-}) {
-  return {
-    conversationId,
-    conversationTitle: safeString(conversationTitle),
-    ok: !!ok,
-    mode: safeString(mode) || (ok ? 'ok' : 'failed'),
-    appended: Number.isFinite(Number(appended)) ? Number(appended) : 0,
-    error: safeString(error),
-    at: Number.isFinite(Number(at)) ? Number(at) : Date.now(),
-  };
-}
-
-function buildSyncSummary(results: any[], instanceId: unknown) {
-  const okCount = results.filter((r) => r.ok).length;
-  const failCount = results.length - okCount;
-  const failures = results
-    .filter((r) => !r.ok)
-    .map((r) => ({
-      conversationId: r.conversationId,
-      conversationTitle: safeString(r.conversationTitle),
-      error: r.error || 'unknown error',
-    }));
-  return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
-}
-
 function buildAlreadyRunningError() {
   const error = new Error('sync already in progress') as Error & { code?: string };
   error.code = 'sync_already_running';
@@ -275,7 +234,7 @@ async function decideSyncModeForConversation({
   if (!convo) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
         conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
@@ -283,7 +242,7 @@ async function decideSyncModeForConversation({
         appended: 0,
         error: 'conversation not found',
         at: Date.now(),
-      }),
+      },
     };
   }
 
@@ -291,7 +250,7 @@ async function decideSyncModeForConversation({
   if (!Array.isArray(messages) || !messages.length) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
         conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
@@ -299,7 +258,7 @@ async function decideSyncModeForConversation({
         appended: 0,
         error: 'No messages to sync.',
         at: Date.now(),
-      }),
+      },
     };
   }
 
@@ -330,7 +289,7 @@ async function decideSyncModeForConversation({
   if (!clientRes.ok) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
         conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
@@ -338,7 +297,7 @@ async function decideSyncModeForConversation({
         appended: 0,
         error: clientRes.error && clientRes.error.message ? clientRes.error.message : 'client error',
         at: Date.now(),
-      }),
+      },
     };
   }
   const client = clientRes.client;
@@ -364,7 +323,7 @@ async function decideSyncModeForConversation({
   if (pathResolution && !pathResolution.ok) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
         conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
@@ -372,7 +331,7 @@ async function decideSyncModeForConversation({
         appended: 0,
         error: pathResolution.error?.message ? String(pathResolution.error.message) : 'remote error',
         at: Date.now(),
-      }),
+      },
     };
   }
 
@@ -607,7 +566,7 @@ async function syncConversations({
         const currentTitle = toCurrentConversationTitle(decision.convo, conversationId);
 
         if (!clientRes.ok || !client) {
-          row = buildPerConversationResult({
+          row = {
             conversationId,
             conversationTitle: currentTitle,
             ok: false,
@@ -615,7 +574,7 @@ async function syncConversations({
             appended: 0,
             error: clientRes.error && clientRes.error.message ? clientRes.error.message : 'client error',
             at: Date.now(),
-          });
+          };
         } else if (
           decision.mode === 'full_rebuild' ||
           decision.mode === 'full_rebuild_forced' ||
@@ -642,7 +601,7 @@ async function syncConversations({
           });
           const putRes = await client.putVaultFile(decision.filePath, markdown);
           if (!putRes || !putRes.ok) {
-            row = buildPerConversationResult({
+            row = {
               conversationId,
               conversationTitle: currentTitle,
               ok: false,
@@ -650,7 +609,7 @@ async function syncConversations({
               appended: 0,
               error: putRes && putRes.error && putRes.error.message ? putRes.error.message : 'put failed',
               at: Date.now(),
-            });
+            };
           } else {
             await defaultBackgroundStorage.recordObsidianRemoteWrite({
               source: decision.convo?.source,
@@ -666,7 +625,7 @@ async function syncConversations({
               try {
                 const delRes = await client.deleteVaultFile(deleteAfter);
                 if (!delRes || !delRes.ok) {
-                  row = buildPerConversationResult({
+                  row = {
                     conversationId,
                     conversationTitle: currentTitle,
                     ok: false,
@@ -674,9 +633,9 @@ async function syncConversations({
                     appended: decision.messages.length,
                     error: delRes && delRes.error && delRes.error.message ? delRes.error.message : 'delete failed',
                     at: Date.now(),
-                  });
+                  };
                 } else {
-                  row = buildPerConversationResult({
+                  row = {
                     conversationId,
                     conversationTitle: currentTitle,
                     ok: true,
@@ -684,10 +643,10 @@ async function syncConversations({
                     appended: decision.messages.length,
                     error: '',
                     at: Date.now(),
-                  });
+                  };
                 }
               } catch (error) {
-                row = buildPerConversationResult({
+                row = {
                   conversationId,
                   conversationTitle: currentTitle,
                   ok: false,
@@ -695,10 +654,10 @@ async function syncConversations({
                   appended: decision.messages.length,
                   error: error instanceof Error ? error.message : String(error || 'delete failed'),
                   at: Date.now(),
-                });
+                };
               }
             } else {
-              row = buildPerConversationResult({
+              row = {
                 conversationId,
                 conversationTitle: currentTitle,
                 ok: true,
@@ -706,11 +665,11 @@ async function syncConversations({
                 appended: decision.messages.length,
                 error: '',
                 at: Date.now(),
-              });
+              };
             }
           }
         } else {
-          row = buildPerConversationResult({
+          row = {
             conversationId,
             conversationTitle: currentTitle,
             ok: false,
@@ -718,12 +677,12 @@ async function syncConversations({
             appended: 0,
             error: 'unknown mode',
             at: Date.now(),
-          });
+          };
         }
       } else if (decision && decision.row) {
         row = decision.row;
       } else {
-        row = buildPerConversationResult({
+        row = {
           conversationId,
           conversationTitle: lifecycle.titleFor(conversationId),
           ok: false,
@@ -731,10 +690,10 @@ async function syncConversations({
           appended: 0,
           error: 'invalid decision',
           at: Date.now(),
-        });
+        };
       }
     } catch (e: any) {
-      row = buildPerConversationResult({
+      row = {
         conversationId,
         conversationTitle: lifecycle.titleFor(conversationId),
         ok: false,
@@ -742,13 +701,13 @@ async function syncConversations({
         appended: 0,
         error: e && e.message ? e.message : String(e || 'sync failed'),
         at: Date.now(),
-      });
+      };
     }
     row = (await lifecycle.completeItem(row)).row;
   }
 
   await lifecycle.finish();
-  return buildSyncSummary(lifecycle.results(), instanceId);
+  return lifecycle.summary();
 }
 
 const api = { testConnection, getSyncStatus, clearSyncStatus, syncConversations };

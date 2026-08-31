@@ -71,10 +71,17 @@ describe('sync job lifecycle', () => {
     lifecycle.recordResult({ conversationId: 1, ok: false, error: 'boom' });
     await lifecycle.finish();
 
-    expect(lifecycle.results()).toMatchObject([
+    expect(lifecycle.summary().results).toMatchObject([
       { conversationId: 1, conversationTitle: 'First', ok: false, mode: 'failed', appended: 0, error: 'boom' },
       { conversationId: 2, conversationTitle: 'Second', ok: true, mode: 'synced', appended: 3, error: '' },
     ]);
+    expect(lifecycle.summary()).toMatchObject({
+      provider: 'github',
+      instanceId: 'test',
+      okCount: 1,
+      failCount: 1,
+      failures: [{ conversationId: 1, conversationTitle: 'First', error: 'boom' }],
+    });
     expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'done', okCount: 1, failCount: 1 });
   });
 
@@ -87,7 +94,7 @@ describe('sync job lifecycle', () => {
     await lifecycle.setItem(2, { conversationTitle: 'Pending', currentStage: 'working' });
     await lifecycle.failPending(Object.assign(new Error('transport failed'), { code: 'transport_failed' }));
 
-    expect(lifecycle.results()).toMatchObject([
+    expect(lifecycle.summary().results).toMatchObject([
       { conversationId: 1, conversationTitle: 'Done', ok: true, mode: 'synced' },
       { conversationId: 2, conversationTitle: 'Pending', ok: false, mode: 'failed', error: 'transport_failed' },
     ]);

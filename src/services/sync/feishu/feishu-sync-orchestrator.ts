@@ -88,57 +88,6 @@ function buildAlreadyRunningError() {
   return error;
 }
 
-function buildPerConversationResult({
-  conversationId,
-  conversationTitle,
-  ok,
-  mode,
-  appended,
-  error,
-  warnings,
-  at,
-}: {
-  conversationId: number;
-  conversationTitle?: unknown;
-  ok: unknown;
-  mode: unknown;
-  appended: unknown;
-  error: unknown;
-  warnings?: any[];
-  at: unknown;
-}) {
-  return {
-    conversationId,
-    conversationTitle: safeString(conversationTitle),
-    ok: !!ok,
-    mode: safeString(mode) || (ok ? 'ok' : 'failed'),
-    appended: Number.isFinite(Number(appended)) ? Number(appended) : 0,
-    error: safeString(error),
-    warnings: Array.isArray(warnings) ? warnings : [],
-    at: Number.isFinite(Number(at)) ? Number(at) : Date.now(),
-  };
-}
-
-function buildSyncSummary(results: any[], instanceId: unknown) {
-  const okCount = results.filter((r) => r.ok).length;
-  const failCount = results.length - okCount;
-  const failures = results
-    .filter((r) => !r.ok)
-    .map((r) => ({
-      conversationId: r.conversationId,
-      conversationTitle: safeString(r.conversationTitle),
-      error: r.error || 'unknown error',
-    }));
-  return {
-    provider: SYNC_PROVIDER,
-    okCount,
-    failCount,
-    failures,
-    results,
-    instanceId: safeString(instanceId),
-  };
-}
-
 async function resolveFeishuAccessToken(): Promise<string> {
   const token = await getFeishuOAuthToken();
   if (!token || !safeString(token.accessToken)) throw new Error('Feishu is not connected');
@@ -727,7 +676,7 @@ async function syncConversations({
 
       const mappingRes = await defaultBackgroundStorage.getSyncMappingByConversation(conversationId);
       if (!mappingRes || !mappingRes.conversation) {
-        row = buildPerConversationResult({
+        row = {
           conversationId,
           conversationTitle: '',
           ok: false,
@@ -735,7 +684,7 @@ async function syncConversations({
           appended: 0,
           error: 'conversation not found',
           at: Date.now(),
-        });
+        };
       } else {
         const convo: any = mappingRes.conversation;
         const conversationTitle = safeString(convo.title);
@@ -777,7 +726,7 @@ async function syncConversations({
               feishuLastSyncedAt: syncedAt,
             });
 
-            row = buildPerConversationResult({
+            row = {
               conversationId,
               conversationTitle,
               ok: true,
@@ -786,7 +735,7 @@ async function syncConversations({
               error: '',
               warnings: [],
               at: syncedAt,
-            });
+            };
             row = (await lifecycle.completeItem(row)).row;
             continue;
           }
@@ -845,7 +794,7 @@ async function syncConversations({
           feishuLastSyncedAt: syncedAt,
         });
 
-        row = buildPerConversationResult({
+        row = {
           conversationId,
           conversationTitle,
           ok: true,
@@ -854,10 +803,10 @@ async function syncConversations({
           error: '',
           warnings: limitWarnings([...createWarnings, ...appendWarnings], 20),
           at: syncedAt,
-        });
+        };
       }
     } catch (e: any) {
-      row = buildPerConversationResult({
+      row = {
         conversationId,
         conversationTitle: lifecycle.titleFor(conversationId),
         ok: false,
@@ -865,14 +814,14 @@ async function syncConversations({
         appended: 0,
         error: e && e.message ? e.message : String(e || 'sync failed'),
         at: Date.now(),
-      });
+      };
     }
 
     row = (await lifecycle.completeItem(row)).row;
   }
 
   await lifecycle.finish();
-  return buildSyncSummary(lifecycle.results(), instanceId);
+  return lifecycle.summary();
 }
 
 const api = { getSyncStatus, clearSyncStatus, syncConversations };

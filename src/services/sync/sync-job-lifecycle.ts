@@ -1,4 +1,4 @@
-import type { SyncJobSnapshot, SyncPerConversationResult } from '@services/sync/models';
+import type { SyncJobSnapshot, SyncPerConversationResult, SyncRunSummary } from '@services/sync/models';
 
 type SyncJobResultInput = Record<string, any> & {
   conversationId: number;
@@ -221,6 +221,25 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     return persistCurrent();
   };
 
+  const summary = (): SyncRunSummary => {
+    const rows = orderedResults();
+    const okCount = rows.filter((row) => row.ok).length;
+    return {
+      provider: snapshot.provider,
+      okCount,
+      failCount: rows.length - okCount,
+      failures: rows
+        .filter((row) => !row.ok)
+        .map((row) => ({
+          conversationId: row.conversationId,
+          conversationTitle: safeString(row.conversationTitle),
+          error: safeString(row.error) || 'unknown error',
+        })),
+      results: rows,
+      instanceId: safeString(snapshot.instanceId),
+    };
+  };
+
   const failPending = async (
     error: unknown,
     input: { mode?: string; currentStage?: string; warnings?: unknown[] } = {},
@@ -250,8 +269,8 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     finishItem,
     finish,
     failPending,
+    summary,
     titleFor: (conversationId: number) => titles.get(positiveId(conversationId)) ?? '',
-    results: () => orderedResults(),
   };
 }
 

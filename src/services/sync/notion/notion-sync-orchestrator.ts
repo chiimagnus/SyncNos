@@ -88,16 +88,6 @@ function isMissingDatabaseError(error: unknown): boolean {
   return message.toLowerCase().includes('database');
 }
 
-function buildFailureSummaries(results: any[]) {
-  return results
-    .filter((r) => !r.ok)
-    .map((r) => ({
-      conversationId: Number(r.conversationId) || 0,
-      conversationTitle: String(r.conversationTitle || ''),
-      error: String(r.error || 'unknown error'),
-    }));
-}
-
 function buildAlreadyRunningError(): Error {
   const error: any = new Error('sync already in progress');
   error.code = 'sync_already_running';
@@ -1509,12 +1499,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }),
       );
 
-      const results = lifecycle.results();
-      const okCount = results.filter((r) => r.ok).length;
-      const failCount = results.length - okCount;
-      const failures = buildFailureSummaries(results);
       await lifecycle.finish();
-      return { provider: SYNC_PROVIDER, results, okCount, failCount, failures, jobId, instanceId };
+      return { ...lifecycle.summary(), jobId };
     } catch (e) {
       await lifecycle.failPending(normalizeNotionSyncError(e));
       throw e;
