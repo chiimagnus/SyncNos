@@ -429,6 +429,9 @@ describe('Settings controller GitHub Device Flow', () => {
   });
 
   it('connects, cancels, and disconnects locally while preserving target settings', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+
     await renderController();
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'disconnected' });
 
