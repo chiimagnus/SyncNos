@@ -1,4 +1,4 @@
-import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
+import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read.ts';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
@@ -104,27 +104,8 @@ function guessContentTypeFromUrl(url: unknown): string {
   return '';
 }
 
-function getNotionFilesApi() {
-  return notionFilesApi;
-}
-
 function guessFilenameFromUrl(url: unknown): string {
-  const files = getNotionFilesApi();
-  if (files && typeof files.guessFilenameFromUrl === 'function') {
-    return files.guessFilenameFromUrl(url);
-  }
-  try {
-    const u = new URL(String(url || ''));
-    const last =
-      String(u.pathname || '')
-        .split('/')
-        .filter(Boolean)
-        .pop() || '';
-    if (last && last.includes('.')) return last.slice(0, 120);
-  } catch (_e) {
-    // ignore
-  }
-  return 'image.jpg';
+  return notionFilesApi.guessFilenameFromUrl(url);
 }
 
 async function downloadBytes(url: unknown) {
@@ -165,16 +146,6 @@ function toFileUploadImageBlock(block: any, uploadId: unknown) {
       file_upload: { id: uploadId },
     },
   };
-}
-
-function canUpgrade(files: any): boolean {
-  return !!(
-    files &&
-    typeof files.createExternalURLUpload === 'function' &&
-    typeof files.waitUntilUploaded === 'function' &&
-    typeof files.createFileUpload === 'function' &&
-    typeof files.sendFileUpload === 'function'
-  );
 }
 
 async function uploadFromExternalUrl(files: any, accessToken: string, url: unknown) {
@@ -255,16 +226,7 @@ async function uploadFromSyncnosAsset(files: any, accessToken: string, url: unkn
 async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any) {
   const list = Array.isArray(blocks) ? blocks : [];
   if (!list.length) return [];
-  const files = getNotionFilesApi();
-  if (!canUpgrade(files)) {
-    return list.map((b: any) => {
-      if (!b || b.type !== 'image' || !b.image || b.image.type !== 'external') return b;
-      const url = b.image && b.image.external && b.image.external.url ? String(b.image.external.url).trim() : '';
-      if (url && isDataImageUrl(url)) return paragraphBlock('[Image omitted: inline image data URL not supported]');
-      return b;
-    });
-  }
-
+  const files = notionFilesApi;
   const cache = new Map<string, string>();
   const out: any[] = [];
 
@@ -348,9 +310,4 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
   return out;
 }
 
-const api = {
-  upgradeImageBlocksToFileUploads,
-};
-
 export { upgradeImageBlocksToFileUploads };
-export default api;

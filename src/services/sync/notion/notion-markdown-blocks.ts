@@ -560,10 +560,4 @@ function markdownToNotionBlocks(markdown: string) {
   return out;
 }
 
-const api = {
-  inlineMarkdownToRichText,
-  markdownToNotionBlocks,
-};
-
 export { inlineMarkdownToRichText, markdownToNotionBlocks };
-export default api;

@@ -1,15 +1,7 @@
 import type { NotionServices } from '@services/sync/notion/notion-services.ts';
-import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { extractNotionWorkspaceSlugFromUrl } from '@services/sync/notion/notion-url-utils';
-import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
-import notionDbManagerDefault from '@services/sync/notion/notion-db-manager.ts';
-import notionSyncJobStoreDefault from '@services/sync/notion/notion-sync-job-store.ts';
-import notionSyncServiceDefault from '@services/sync/notion/notion-sync-service.ts';
-import notionApiDefault from '@services/sync/notion/notion-api.ts';
-import notionFilesApiDefault from '@services/sync/notion/notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
-import { storageGet, storageRemove } from '@platform/storage/local';
+import { storageGet } from '@platform/storage/local';
 import {
   buildNotionCommentsBlocks,
   computeNotionCommentsDigest,
@@ -24,6 +16,7 @@ import {
   recoverSectionHeadingBlockId,
 } from '@services/sync/notion/notion-managed-sections.ts';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -87,29 +80,6 @@ function isMissingDatabaseError(error: unknown): boolean {
   if (!message) return false;
   if (!isObjectNotFoundError(error)) return false;
   return message.toLowerCase().includes('database');
-}
-
-function toPerConversationSnapshot(results: any[]) {
-  return results.map((r) => ({
-    conversationId: r.conversationId,
-    conversationTitle: r.conversationTitle || '',
-    ok: !!r.ok,
-    mode: r.mode || (r.ok ? 'ok' : 'fail'),
-    appended: Number(r.appended) || 0,
-    error: r.error || '',
-    warnings: Array.isArray(r.warnings) ? r.warnings : [],
-    at: Number(r.at) || Date.now(),
-  }));
-}
-
-function buildFailureSummaries(results: any[]) {
-  return results
-    .filter((r) => !r.ok)
-    .map((r) => ({
-      conversationId: Number(r.conversationId) || 0,
-      conversationTitle: String(r.conversationTitle || ''),
-      error: String(r.error || 'unknown error'),
-    }));
 }
 
 function buildAlreadyRunningError(): Error {
@@ -234,36 +204,6 @@ function pagePropertiesNeedUpdate(page: any, desiredProperties: any): boolean {
   return false;
 }
 
-function normalizeJob(job: any) {
-  if (!job || typeof job !== 'object') return null;
-  const perConversation = toPerConversationSnapshot(Array.isArray(job.perConversation) ? job.perConversation : []);
-  const okCount = Number(job.okCount);
-  const failCount = Number(job.failCount);
-  return {
-    ...job,
-    provider: SYNC_PROVIDER,
-    status: job.status === 'finished' ? 'done' : String(job.status || 'done'),
-    startedAt: Number(job.startedAt) || 0,
-    updatedAt: Number(job.updatedAt) || Date.now(),
-    finishedAt: job.finishedAt == null ? null : Number(job.finishedAt) || null,
-    conversationIds: Array.isArray(job.conversationIds)
-      ? job.conversationIds.map((x: any) => Number(x)).filter((x: any) => Number.isFinite(x) && x > 0)
-      : [],
-    okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((r) => r.ok).length,
-    failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((r) => !r.ok).length,
-    perConversation,
-  };
-}
-
-function canUpgradeImageBlocks(notionSyncService: any, blocks: any): boolean {
-  if (!blocks || !blocks.length) return false;
-  if (typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return false;
-  if (typeof notionSyncService.hasExternalImageBlocks === 'function') {
-    return notionSyncService.hasExternalImageBlocks(blocks);
-  }
-  return true;
-}
-
 function countExternalImageBlocks(blocks: unknown): number {
   const list = Array.isArray(blocks) ? blocks : [];
   let count = 0;
@@ -319,7 +259,13 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   warnings: any[];
 }) {
   let nextBlocks = Array.isArray(blocks) ? blocks : [];
-  if (!canUpgradeImageBlocks(notionSyncService, nextBlocks)) return nextBlocks;
+  if (!nextBlocks.length || typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return nextBlocks;
+  if (
+    typeof notionSyncService.hasExternalImageBlocks === 'function' &&
+    !notionSyncService.hasExternalImageBlocks(nextBlocks)
+  ) {
+    return nextBlocks;
+  }
 
   const externalBefore = countExternalImageBlocks(nextBlocks);
   try {
@@ -418,54 +364,26 @@ async function getNotionParentPageId() {
   return String((res as any)?.notion_parent_page_id || '');
 }
 
-async function clearCachedDatabaseId(notionDbManager: any, storageKey: unknown) {
-  if (notionDbManager && typeof notionDbManager.clearCachedDatabaseId === 'function') {
-    await notionDbManager.clearCachedDatabaseId(storageKey);
-    return true;
-  }
-  const explicit = String(storageKey || '').trim();
-  const fallback =
-    notionDbManager && notionDbManager.DEFAULT_DB_STORAGE_KEY
-      ? String(notionDbManager.DEFAULT_DB_STORAGE_KEY).trim()
-      : 'notion_db_id_syncnos_ai_chats';
-  const key = explicit || fallback;
-  try {
-    await storageRemove([key]);
-    return true;
-  } catch (_e) {
-    return false;
-  }
-}
-
 export function createNotionSyncOrchestrator(services: NotionServices) {
-  const notionJobStore: any = services?.jobStore;
-  const notionTokenStore: any = services?.tokenStore;
-  const notionDbManager: any = services?.dbManager;
-  const notionSyncService: any = services?.syncService;
-  const storage: any = services?.storage;
-  const conversationKinds: any = services?.conversationKinds;
+  const {
+    jobStore: notionJobStore,
+    tokenStore: notionTokenStore,
+    dbManager: notionDbManager,
+    syncService: notionSyncService,
+    storage,
+    conversationKinds,
+  } = services;
 
   async function getSyncJobStatus(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    if (!notionJobStore || typeof notionJobStore.getJob !== 'function') {
-      throw new Error('notion sync job store missing');
-    }
-    const job =
-      instanceId && typeof notionJobStore.abortRunningJobIfFromOtherInstance === 'function'
-        ? normalizeJob(
-            await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId, {
-              forceAbort: true,
-            }),
-          )
-        : normalizeJob(await notionJobStore.getJob());
+    const job = instanceId
+      ? await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId, { forceAbort: true })
+      : await notionJobStore.getJob();
     return { provider: SYNC_PROVIDER, job, instanceId };
   }
 
   async function clearSyncJobStatus(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    if (!notionJobStore || typeof notionJobStore.setJob !== 'function') {
-      throw new Error('notion sync job store missing');
-    }
     await notionJobStore.setJob(null);
     return { provider: SYNC_PROVIDER, job: null, instanceId };
   }
@@ -473,16 +391,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
   async function syncConversations(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
     const conversationIds = input ? input.conversationIds : undefined;
-    if (
-      !notionJobStore ||
-      typeof notionJobStore.getJob !== 'function' ||
-      typeof notionJobStore.abortRunningJobIfFromOtherInstance !== 'function' ||
-      typeof notionJobStore.isRunningJob !== 'function' ||
-      typeof notionJobStore.setJob !== 'function'
-    ) {
-      throw new Error('notion sync job store missing');
-    }
-
     const ids = Array.isArray(conversationIds)
       ? Array.from(
           new Set(
@@ -512,7 +420,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       updatedAt: jobStartedAt,
       finishedAt: null,
       conversationIds: ids,
-      currentConversationId: ids[0] || undefined,
       currentConversationTitle: undefined,
       currentStage: ids.length ? 'preparing_queue' : '',
       okCount: 0,
@@ -520,25 +427,23 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       perConversation: [],
     });
 
-    const claimedJob = normalizeJob(await notionJobStore.getJob());
+    const claimedJob = await notionJobStore.getJob();
     if (!claimedJob || claimedJob.status !== 'running' || String((claimedJob as any).id || '') !== jobId) {
       throw buildAlreadyRunningError();
     }
 
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: claimedJob,
+      persist: (job) => notionJobStore.setJob(job),
+    });
+
     try {
-      const token = await (notionTokenStore && notionTokenStore.getToken
-        ? notionTokenStore.getToken()
-        : Promise.resolve(null));
-      if (!token || !token.accessToken) throw new Error('notion not connected');
+      const token = await notionTokenStore.getToken();
+      const accessToken = token?.accessToken || '';
+      if (!accessToken) throw new Error('notion not connected');
 
       const parentPageId = await getNotionParentPageId();
       if (!parentPageId) throw new Error('missing parentPageId');
-
-      if (!storage) throw new Error('storage module missing');
-      if (!notionSyncService) throw new Error('notion sync service missing');
-      if (!notionDbManager || !notionDbManager.ensureDatabase) throw new Error('notion db manager missing');
-      if (!conversationKinds || typeof conversationKinds.pick !== 'function')
-        throw new Error('conversation kinds missing');
 
       const dbIdByKindId = new Map();
       const dbIdPromiseByKindId = new Map();
@@ -554,7 +459,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         if (!spec) throw new Error(`missing dbSpec for kind ${kind && kind.id ? kind.id : '?'}`);
         const dbPromise = (async () => {
           const db = await notionDbManager.ensureDatabase({
-            accessToken: token.accessToken,
+            accessToken: accessToken,
             parentPageId,
             dbSpec: spec,
           });
@@ -576,9 +481,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         const pending = dbRecoveryPromiseByStorageKey.get(storageKey);
         if (pending) return pending;
         const recoveryPromise = (async () => {
-          await clearCachedDatabaseId(notionDbManager, storageKey);
+          await notionDbManager.clearCachedDatabaseId(storageKey);
           const rebuiltDb = await notionDbManager.ensureDatabase({
-            accessToken: token.accessToken,
+            accessToken: accessToken,
             parentPageId,
             dbSpec,
           });
@@ -596,81 +501,36 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       }
 
-      const resultSlots: any[] = ids.map(() => null);
-      let runningJobWriteChain = Promise.resolve(true);
-
-      function currentResults() {
-        return resultSlots.filter(Boolean);
-      }
-
-      function setResultAt(index: number, result: any) {
-        resultSlots[index] = result;
-        return result;
-      }
-
-      async function writeRunningJob(partial: any = {}) {
-        runningJobWriteChain = runningJobWriteChain
-          .catch(() => true)
-          .then(async () => {
-            const results = currentResults();
-            await notionJobStore.setJob({
-              id: jobId,
-              provider: SYNC_PROVIDER,
-              instanceId,
-              status: 'running',
-              startedAt: jobStartedAt,
-              updatedAt: Date.now(),
-              finishedAt: null,
-              conversationIds: ids,
-              okCount: results.filter((r) => r.ok).length,
-              failCount: results.filter((r) => !r.ok).length,
-              perConversation: toPerConversationSnapshot(results),
-              ...partial,
-            });
-            return true;
-          });
-        await runningJobWriteChain;
-      }
-
-      await writeRunningJob({
-        currentConversationId: ids[0] || undefined,
-        currentStage: ids.length ? 'preparing_queue' : '',
-      });
-
-      async function processConversation(id: any, index: number) {
+      async function processConversation(id: number) {
         const trace = createConversationTrace(id);
         const warnings: any[] = [];
         let conversationTitle = '';
-        await writeRunningJob({
-          currentConversationId: id,
-          currentConversationTitle: conversationTitle,
+        await lifecycle.setItem(id, {
+          conversationTitle,
           currentStage: 'loading_conversation',
         });
 
         try {
           trace.mark('load conversation');
 
-          const mapped = await (storage.getSyncMappingByConversation
-            ? storage.getSyncMappingByConversation(id)
-            : Promise.resolve(null));
+          const mapped = await storage.getSyncMappingByConversation(id);
           const convo = mapped && mapped.conversation ? mapped.conversation : null;
           const mapping = mapped && mapped.mapping ? mapped.mapping : null;
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: (conversationTitle = toCurrentConversationTitle(convo, id)),
+          await lifecycle.setItem(id, {
+            conversationTitle: (conversationTitle = toCurrentConversationTitle(convo, id)),
             currentStage: 'preparing_sync',
           });
           if (!convo) {
-            setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: 'conversation not found' });
+            lifecycle.recordResult({
+              conversationId: id,
+              conversationTitle,
+              ok: false,
+              error: 'conversation not found',
+            });
             return;
           }
 
-          const kindPicked = conversationKinds.pick(convo);
-          const kind =
-            kindPicked ||
-            (typeof conversationKinds.list === 'function'
-              ? (conversationKinds.list() || []).find((d: any) => d && d.id === 'chat')
-              : null);
+          const kind = conversationKinds.pick(convo);
           if (!kind) throw new Error(`no conversation kind for ${toConvoLabel(convo)}`);
           const dbSpec = kind && kind.notion && kind.notion.dbSpec ? kind.notion.dbSpec : null;
           const pageSpec = kind && kind.notion && kind.notion.pageSpec ? kind.notion.pageSpec : null;
@@ -714,9 +574,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             return cachedArticleComments;
           };
 
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: toCurrentConversationTitle(convo, id),
+          await lifecycle.setItem(id, {
+            conversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: 'ensuring_database',
           });
 
@@ -734,18 +593,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           let pageUsable = false;
           let existingPage = null;
           if (pageId) {
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: 'checking_destination_page',
             });
             trace.mark('check destination page');
             try {
-              const page = await notionSyncService.getPage(token.accessToken, pageId);
+              const page = await notionSyncService.getPage(accessToken, pageId);
               existingPage = page;
-              pageUsable = notionSyncService.isPageUsableForDatabase
-                ? notionSyncService.isPageUsableForDatabase(page, dbId)
-                : notionSyncService.pageBelongsToDatabase(page, dbId);
+              pageUsable = notionSyncService.isPageUsableForDatabase(page, dbId);
             } catch (_e) {
               pageUsable = false;
             }
@@ -774,14 +630,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   ),
                   pageSpec.buildCreateProperties(convo))
                 : pageSpec.buildCreateProperties(convo);
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: 'creating_destination_page',
             });
             trace.mark('create destination page');
             try {
-              created = await notionSyncService.createPageInDatabase(token.accessToken, {
+              created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,
                 properties: createProperties,
                 capturedAt: convo.lastCapturedAt,
@@ -790,9 +645,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               const shouldRecoverDb = isMissingDatabaseError(createErr);
               if (!shouldRecoverDb) throw createErr;
               const recoveredStorageKey = String(dbSpec.storageKey || '');
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
+              await lifecycle.setItem(id, {
+                conversationTitle: toCurrentConversationTitle(convo, id),
                 currentStage: 'rebuilding_database',
               });
               trace.mark('rebuild database');
@@ -802,14 +656,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 recoveredMissingDbByStorageKey.has(recoveredStorageKey) && dbIdByKindId.get(kind.id)
                   ? String(dbIdByKindId.get(kind.id) || '')
                   : await recoverDbForStorageKey(kind, dbSpec);
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
+              await lifecycle.setItem(id, {
+                conversationTitle: toCurrentConversationTitle(convo, id),
                 currentStage: 'creating_destination_page',
               });
               trace.mark('create destination page');
 
-              created = await notionSyncService.createPageInDatabase(token.accessToken, {
+              created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,
                 properties: createProperties,
                 capturedAt: convo.lastCapturedAt,
@@ -825,9 +678,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               ...(createdSlug ? { notionWorkspaceSlug: createdSlug } : null),
             });
 
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: 'uploading_message_blocks',
             });
             trace.mark('build blocks');
@@ -858,7 +710,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
               const builtArticle = await buildBlocksForSync({
                 notionSyncService,
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 source: convo.source,
                 messagesList: pickArticleBodyMessages(messages),
               });
@@ -876,7 +728,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               trace.mark('create section headings');
 
               const headingRes = await notionSyncService.appendChildren(
-                token.accessToken,
+                accessToken,
                 pageId,
                 sections.map((s) => buildNotionToggleHeadingBlock(s.title, s.level)),
               );
@@ -905,33 +757,30 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
               trace.mark('append children');
               if (articleBlocks.length) {
-                await notionSyncService.appendChildren(token.accessToken, articleHeadingId, articleBlocks);
+                await notionSyncService.appendChildren(accessToken, articleHeadingId, articleBlocks);
               }
               if (commentBlocks.length) {
-                await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
+                await notionSyncService.appendChildren(accessToken, commentsHeadingId, commentBlocks);
               }
               appendedBlockCount = sections.length + articleBlocks.length + commentBlocks.length;
 
-              if (storage?.setSyncCursor) {
-                await writeRunningJob({
-                  currentConversationId: id,
-                  currentConversationTitle: toCurrentConversationTitle(convo, id),
-                  currentStage: 'saving_sync_cursor',
-                });
-                trace.mark('save cursor');
+              await lifecycle.setItem(id, {
+                conversationTitle: toCurrentConversationTitle(convo, id),
+                currentStage: 'saving_sync_cursor',
+              });
+              trace.mark('save cursor');
 
-                await storage.setSyncCursor(id, {
-                  ...nextCursor,
-                  notionSectionDigests: {
-                    article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() },
-                    ...(typeof commentsDigest === 'string'
-                      ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
-                      : null),
-                  },
-                });
-              }
+              await storage.setSyncCursor(id, {
+                ...nextCursor,
+                notionSectionDigests: {
+                  article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() },
+                  ...(typeof commentsDigest === 'string'
+                    ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
+                    : null),
+                },
+              });
 
-              setResultAt(index, {
+              lifecycle.recordResult({
                 conversationId: id,
                 conversationTitle,
                 ok: true,
@@ -950,7 +799,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
             const built = await buildBlocksForSync({
               notionSyncService,
-              accessToken: token.accessToken,
+              accessToken: accessToken,
               source: convo.source,
               messagesList: messages,
             });
@@ -959,7 +808,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
             trace.mark('create section heading');
 
-            const headingRes = await notionSyncService.appendChildren(token.accessToken, pageId, [
+            const headingRes = await notionSyncService.appendChildren(accessToken, pageId, [
               buildNotionToggleHeadingBlock(conversationsSection.title, conversationsSection.level),
             ]);
             const headingResults = Array.isArray(headingRes && headingRes.results) ? headingRes.results : [];
@@ -975,31 +824,28 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             if (blocks.length) {
               trace.mark('append children');
 
-              await notionSyncService.appendChildren(token.accessToken, conversationsHeadingId, blocks);
+              await notionSyncService.appendChildren(accessToken, conversationsHeadingId, blocks);
               appendedBlockCount = blocks.length + 1;
             }
 
-            if (storage?.setSyncCursor) {
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                notionSectionCursors: {
-                  conversations: {
-                    lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-                    lastSyncedSequence: nextCursor.lastSyncedSequence,
-                    lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-                  },
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
                 },
-              });
-            }
+              },
+            });
 
-            setResultAt(index, {
+            lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1013,9 +859,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
 
           if (kind.id === 'article') {
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: 'uploading_message_blocks',
             });
 
@@ -1027,7 +872,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             if (needsPropertyUpdate) {
               trace.mark('update page properties');
 
-              await notionSyncService.updatePageProperties(token.accessToken, {
+              await notionSyncService.updatePageProperties(accessToken, {
                 pageId,
                 properties: desiredProperties,
               });
@@ -1091,7 +936,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             if (shouldEnsureAnchors) {
               trace.mark('ensure section anchors');
               const resolvedArticle = await ensureSectionHeadingBlockId({
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 pageId,
                 section: articleSection,
                 mapping,
@@ -1101,7 +946,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               });
               articleHeadingBlockId = resolvedArticle.headingBlockId;
               const resolvedComments = await ensureSectionHeadingBlockId({
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 pageId,
                 section: commentsSection,
                 mapping,
@@ -1120,7 +965,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               if (shouldUpdateArticle) {
                 const builtArticle = await buildBlocksForSync({
                   notionSyncService,
-                  accessToken: token.accessToken,
+                  accessToken: accessToken,
                   source: convo.source,
                   messagesList: pickArticleBodyMessages(messages),
                 });
@@ -1141,7 +986,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               if (shouldUpdateArticle) {
                 if (!articleHeadingBlockId) {
                   const resolved = await ensureSectionHeadingBlockId({
-                    accessToken: token.accessToken,
+                    accessToken: accessToken,
                     pageId,
                     section: articleSection,
                     mapping,
@@ -1151,16 +996,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   });
                   articleHeadingBlockId = resolved.headingBlockId;
                 }
-                await writeRunningJob({
-                  currentConversationId: id,
-                  currentConversationTitle: toCurrentConversationTitle(convo, id),
+                await lifecycle.setItem(id, {
+                  conversationTitle: toCurrentConversationTitle(convo, id),
                   currentStage: 'rebuilding_destination_page',
                 });
                 trace.mark('rebuild article section');
                 let rebuilt;
                 try {
                   rebuilt = await rebuildSectionByArchivingHeading({
-                    accessToken: token.accessToken,
+                    accessToken: accessToken,
                     pageId,
                     section: articleSection,
                     currentHeadingBlockId: articleHeadingBlockId,
@@ -1171,7 +1015,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   if (!isStaleBlockAnchorError(e)) throw e;
                   trace.mark('recover article rebuild');
                   rebuilt = await rebuildSectionByArchivingHeading({
-                    accessToken: token.accessToken,
+                    accessToken: accessToken,
                     pageId,
                     section: articleSection,
                     currentHeadingBlockId: '',
@@ -1190,7 +1034,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               if (shouldUpdateComments) {
                 if (!commentsHeadingBlockId) {
                   const resolved = await ensureSectionHeadingBlockId({
-                    accessToken: token.accessToken,
+                    accessToken: accessToken,
                     pageId,
                     section: commentsSection,
                     mapping,
@@ -1200,16 +1044,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   });
                   commentsHeadingBlockId = resolved.headingBlockId;
                 }
-                await writeRunningJob({
-                  currentConversationId: id,
-                  currentConversationTitle: toCurrentConversationTitle(convo, id),
+                await lifecycle.setItem(id, {
+                  conversationTitle: toCurrentConversationTitle(convo, id),
                   currentStage: 'rebuilding_destination_page',
                 });
                 trace.mark('rebuild comments section');
                 let rebuilt;
                 try {
                   rebuilt = await rebuildSectionByArchivingHeading({
-                    accessToken: token.accessToken,
+                    accessToken: accessToken,
                     pageId,
                     section: commentsSection,
                     currentHeadingBlockId: commentsHeadingBlockId,
@@ -1220,7 +1063,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   if (!isStaleBlockAnchorError(e)) throw e;
                   trace.mark('recover comments rebuild');
                   rebuilt = await rebuildSectionByArchivingHeading({
-                    accessToken: token.accessToken,
+                    accessToken: accessToken,
                     pageId,
                     section: commentsSection,
                     currentHeadingBlockId: '',
@@ -1238,30 +1081,27 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             }
 
             const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor) {
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                ...(typeof articleDigest === 'string' || typeof commentsDigest === 'string'
-                  ? {
-                      notionSectionDigests: {
-                        ...(typeof articleDigest === 'string'
-                          ? { article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() } }
-                          : null),
-                        ...(typeof commentsDigest === 'string'
-                          ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
-                          : null),
-                      },
-                    }
-                  : null),
-              });
-            }
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              ...(typeof articleDigest === 'string' || typeof commentsDigest === 'string'
+                ? {
+                    notionSectionDigests: {
+                      ...(typeof articleDigest === 'string'
+                        ? { article: { digest: String(articleDigest || ''), lastSyncedAt: Date.now() } }
+                        : null),
+                      ...(typeof commentsDigest === 'string'
+                        ? { comments: { digest: String(commentsDigest || ''), lastSyncedAt: Date.now() } }
+                        : null),
+                    },
+                  }
+                : null),
+            });
 
             const resultMode =
               shouldUpdateArticle || shouldUpdateComments
@@ -1270,7 +1110,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   ? 'updated_properties'
                   : 'no_changes';
 
-            setResultAt(index, {
+            lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1344,14 +1184,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
             }
 
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: 'rebuilding_destination_page',
             });
             trace.mark('rebuild page properties');
 
-            await notionSyncService.updatePageProperties(token.accessToken, {
+            await notionSyncService.updatePageProperties(accessToken, {
               pageId,
               properties: pageSpec.buildUpdateProperties(convo),
             });
@@ -1359,7 +1198,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
             const built = await buildBlocksForSync({
               notionSyncService,
-              accessToken: token.accessToken,
+              accessToken: accessToken,
               source: convo.source,
               messagesList: messages,
             });
@@ -1370,7 +1209,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             let rebuilt;
             try {
               const resolved = await ensureSectionHeadingBlockId({
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 pageId,
                 section: conversationsSection,
                 mapping,
@@ -1379,7 +1218,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 conversationId: id,
               });
               rebuilt = await rebuildSectionByArchivingHeading({
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 pageId,
                 section: conversationsSection,
                 currentHeadingBlockId: resolved.headingBlockId,
@@ -1390,7 +1229,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               if (!isStaleBlockAnchorError(e)) throw e;
               trace.mark('recover conversations rebuild');
               rebuilt = await rebuildSectionByArchivingHeading({
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 pageId,
                 section: conversationsSection,
                 currentHeadingBlockId: '',
@@ -1405,26 +1244,23 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               });
             }
             const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor) {
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                notionSectionCursors: {
-                  conversations: {
-                    lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-                    lastSyncedSequence: nextCursor.lastSyncedSequence,
-                    lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-                  },
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
                 },
-              });
-            }
-            setResultAt(index, {
+              },
+            });
+            lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1436,14 +1272,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             trace.flush({ mode: 'rebuilt', ok: true, blockCount: blocks.length });
             return;
           } else if (inc.newMessages && inc.newMessages.length) {
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: 'appending_new_messages',
             });
             trace.mark('update page properties');
 
-            await notionSyncService.updatePageProperties(token.accessToken, {
+            await notionSyncService.updatePageProperties(accessToken, {
               pageId,
               properties: pageSpec.buildUpdateProperties(convo),
             });
@@ -1451,7 +1286,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
             const built = await buildBlocksForSync({
               notionSyncService,
-              accessToken: token.accessToken,
+              accessToken: accessToken,
               source: convo.source,
               messagesList: inc.newMessages,
             });
@@ -1464,7 +1299,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 (layout.sections || []).find((s) => s && String(s.id) === 'conversations') || layout.sections?.[0];
               if (!conversationsSection) throw new Error('missing conversations section spec');
               const resolved = await ensureSectionHeadingBlockId({
-                accessToken: token.accessToken,
+                accessToken: accessToken,
                 pageId,
                 section: conversationsSection,
                 mapping,
@@ -1473,12 +1308,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 conversationId: id,
               });
               try {
-                await notionSyncService.appendChildren(token.accessToken, resolved.headingBlockId, blocks);
+                await notionSyncService.appendChildren(accessToken, resolved.headingBlockId, blocks);
               } catch (e) {
                 if (!isStaleBlockAnchorError(e)) throw e;
                 trace.mark('recover conversations anchor');
                 const recoveredId = await recoverSectionHeadingBlockId({
-                  accessToken: token.accessToken,
+                  accessToken: accessToken,
                   pageId,
                   section: conversationsSection,
                   notionSyncService,
@@ -1489,30 +1324,27 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   });
                 }
 
-                await notionSyncService.appendChildren(token.accessToken, recoveredId, blocks);
+                await notionSyncService.appendChildren(accessToken, recoveredId, blocks);
               }
             }
             const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor) {
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
-                currentStage: 'saving_sync_cursor',
-              });
-              trace.mark('save cursor');
+            await lifecycle.setItem(id, {
+              conversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: 'saving_sync_cursor',
+            });
+            trace.mark('save cursor');
 
-              await storage.setSyncCursor(id, {
-                ...nextCursor,
-                notionSectionCursors: {
-                  conversations: {
-                    lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-                    lastSyncedSequence: nextCursor.lastSyncedSequence,
-                    lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-                  },
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
                 },
-              });
-            }
-            setResultAt(index, {
+              },
+            });
+            lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1526,27 +1358,23 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             const desiredProperties = pageSpec.buildUpdateProperties(convo);
             const needsPropertyUpdate = pagePropertiesNeedUpdate(existingPage, desiredProperties);
             if (needsPropertyUpdate) {
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
+              await lifecycle.setItem(id, {
+                conversationTitle: toCurrentConversationTitle(convo, id),
                 currentStage: 'updating_page_properties',
               });
               trace.mark('update page properties');
 
-              await notionSyncService.updatePageProperties(token.accessToken, {
+              await notionSyncService.updatePageProperties(accessToken, {
                 pageId,
                 properties: desiredProperties,
               });
             }
-            if (storage.setSyncCursor && inc && inc.ok) {
-              await writeRunningJob({
-                currentConversationId: id,
-                currentConversationTitle: toCurrentConversationTitle(convo, id),
+            if (inc && inc.ok) {
+              await lifecycle.setItem(id, {
+                conversationTitle: toCurrentConversationTitle(convo, id),
                 currentStage: 'saving_sync_cursor',
               });
-            }
-            const nextCursor = lastMessageCursor(messages);
-            if (storage.setSyncCursor && inc && inc.ok) {
+              const nextCursor = lastMessageCursor(messages);
               trace.mark('save cursor');
 
               await storage.setSyncCursor(id, {
@@ -1560,7 +1388,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 },
               });
             }
-            setResultAt(index, {
+            lifecycle.recordResult({
               conversationId: id,
               conversationTitle,
               ok: true,
@@ -1572,22 +1400,20 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
         } catch (e) {
           const normalizedError = normalizeNotionSyncError(e);
-          setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: normalizedError, warnings });
-          trace.flush({ mode: 'failed', ok: false, error: normalizedError });
-        }
-
-        try {
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: undefined,
-            currentStage: 'finishing_current_item',
+          lifecycle.recordResult({
+            conversationId: id,
+            conversationTitle,
+            ok: false,
+            error: normalizedError,
+            warnings,
           });
-        } catch (_e) {
-          // ignore
+          trace.flush({ mode: 'failed', ok: false, error: normalizedError });
+        } finally {
+          await lifecycle.finishItem(id);
         }
       }
 
-      const queue = ids.map((id, index) => ({ id, index }));
+      const queue = [...ids];
       let cursorIndex = 0;
       const workerCount = Math.max(1, Math.min(SYNC_CONVERSATION_CONCURRENCY, queue.length));
       await Promise.all(
@@ -1596,65 +1422,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             const next = queue[cursorIndex];
             cursorIndex += 1;
             if (!next) return;
-            await processConversation(next.id, next.index);
+            await processConversation(next);
           }
         }),
       );
 
-      const results = currentResults();
-      const okCount = results.filter((r) => r.ok).length;
-      const failCount = results.length - okCount;
-      const failures = buildFailureSummaries(results);
-      await notionJobStore.setJob({
-        id: jobId,
-        provider: SYNC_PROVIDER,
-        instanceId,
-        status: 'done',
-        startedAt: jobStartedAt,
-        updatedAt: Date.now(),
-        finishedAt: Date.now(),
-        conversationIds: ids,
-        currentConversationId: undefined,
-        currentConversationTitle: undefined,
-        currentStage: undefined,
-        okCount,
-        failCount,
-        perConversation: toPerConversationSnapshot(results),
-      });
-      return { provider: SYNC_PROVIDER, results, okCount, failCount, failures, jobId, instanceId };
+      await lifecycle.finish();
+      return { ...lifecycle.summary(), jobId };
     } catch (e) {
-      const now = Date.now();
-      try {
-        const message = normalizeNotionSyncError(e);
-        const results = ids.map((conversationId) => ({
-          conversationId,
-          conversationTitle: '',
-          ok: false,
-          mode: 'failed',
-          appended: 0,
-          error: message || 'sync failed',
-          warnings: [],
-          at: now,
-        }));
-        await notionJobStore.setJob({
-          id: jobId,
-          provider: SYNC_PROVIDER,
-          instanceId,
-          status: 'done',
-          startedAt: jobStartedAt,
-          updatedAt: now,
-          finishedAt: now,
-          conversationIds: ids,
-          currentConversationId: undefined,
-          currentConversationTitle: undefined,
-          currentStage: undefined,
-          okCount: 0,
-          failCount: ids.length,
-          perConversation: toPerConversationSnapshot(results),
-        });
-      } catch (_err) {
-        // ignore
-      }
+      await lifecycle.failPending(normalizeNotionSyncError(e));
       throw e;
     }
   }
@@ -1665,32 +1441,3 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     syncConversations,
   };
 }
-
-function createDefaultNotionServices(): NotionServices {
-  return {
-    tokenStore: { getToken: getNotionOAuthToken },
-    storage: defaultBackgroundStorage,
-    conversationKinds: builtInConversationKinds,
-    notionApi: notionApiDefault,
-    notionFilesApi: notionFilesApiDefault,
-    dbManager: notionDbManagerDefault,
-    syncService: notionSyncServiceDefault,
-    jobStore: notionSyncJobStoreDefault,
-  };
-}
-
-const defaultOrchestrator = createNotionSyncOrchestrator(createDefaultNotionServices());
-
-export async function getSyncJobStatus(input: { instanceId: string }) {
-  return defaultOrchestrator.getSyncJobStatus(input as any);
-}
-
-export async function clearSyncJobStatus(input: { instanceId: string }) {
-  return defaultOrchestrator.clearSyncJobStatus(input as any);
-}
-
-export async function syncConversations(input: { conversationIds?: unknown[]; instanceId: string }) {
-  return defaultOrchestrator.syncConversations(input as any);
-}
-
-export default defaultOrchestrator;

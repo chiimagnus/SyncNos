@@ -33,13 +33,13 @@ const jobStoreMocks = vi.hoisted(() => ({
   getJob: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/feishu-sync-job-store.ts', () => ({
-  default: {
+vi.mock('@services/sync/sync-job-store', () => ({
+  createSyncJobStore: () => ({
     abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
     isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
-  },
+  }),
 }));
 
 vi.mock('@services/sync/feishu/docx/feishu-docx-markdown', () => ({
@@ -161,7 +161,17 @@ describe('feishu skip unchanged missing doc', () => {
     const res = await orch.syncConversations({ conversationIds: [2], instanceId: 'x' });
 
     expect(res.failCount).toBe(1);
-    expect(res.results?.[0]?.mode).toBe('failed');
+    expect(res.results?.[0]).toMatchObject({
+      conversationId: 2,
+      conversationTitle: 'fail upload',
+      mode: 'failed',
+    });
+    const terminalJob = [...jobStoreMocks.setJob.mock.calls].reverse().find(([job]) => job?.status === 'done')?.[0];
+    expect(terminalJob?.perConversation?.[0]).toMatchObject({
+      conversationId: 2,
+      conversationTitle: 'fail upload',
+      mode: 'failed',
+    });
     expect(backgroundStorageMocks.patchSyncMapping).not.toHaveBeenCalled();
   });
 });

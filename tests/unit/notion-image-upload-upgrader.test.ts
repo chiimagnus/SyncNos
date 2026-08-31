@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
+import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 import * as imageCacheRead from '@services/conversations/data/image-cache-read';
 import { upgradeImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader';
 

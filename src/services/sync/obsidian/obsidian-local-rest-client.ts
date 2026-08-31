@@ -274,11 +274,4 @@ function createClient({
   };
 }
 
-const api = {
-  NOTE_JSON_ACCEPT,
-  encodeVaultPath,
-  createClient,
-};
-
 export { NOTE_JSON_ACCEPT, encodeVaultPath, createClient };
-export default api;

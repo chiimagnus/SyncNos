@@ -24,9 +24,7 @@ const mocks = vi.hoisted(() => ({
   onAlarm: vi.fn(),
   storageOnChanged: vi.fn(),
   openOrFocusExtensionAppTab: vi.fn(),
-  obsidianAbort: vi.fn(),
-  feishuAbort: vi.fn(),
-  githubAbort: vi.fn(),
+  abortRunningSyncJobIfFromOtherInstance: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -73,14 +71,11 @@ vi.mock('@services/sync/feishu/auth/oauth', () => ({
   ensureDefaultFeishuOAuthProxyUrl: mocks.ensureDefaultFeishuOAuthProxyUrl,
   setupFeishuOAuthNavigationListener: mocks.setupFeishuOAuthNavigationListener,
 }));
-vi.mock('@services/sync/obsidian/obsidian-sync-job-store.ts', () => ({
-  default: { abortRunningJobIfFromOtherInstance: mocks.obsidianAbort },
-}));
-vi.mock('@services/sync/feishu/feishu-sync-job-store.ts', () => ({
-  default: { abortRunningJobIfFromOtherInstance: mocks.feishuAbort },
-}));
-vi.mock('@services/sync/github/github-sync-job-store', () => ({
-  default: { abortRunningJobIfFromOtherInstance: mocks.githubAbort },
+vi.mock('@services/sync/sync-job-store', () => ({
+  createSyncJobStore: (provider: string) => ({
+    abortRunningJobIfFromOtherInstance: (instanceId: string, options: unknown) =>
+      mocks.abortRunningSyncJobIfFromOtherInstance(provider, instanceId, options),
+  }),
 }));
 vi.mock('@platform/runtime/runtime', () => ({ onInstalled: mocks.onInstalled }));
 vi.mock('@platform/webext/extension-app', () => ({ openOrFocusExtensionAppTab: mocks.openOrFocusExtensionAppTab }));
@@ -115,7 +110,6 @@ function createServices() {
       },
       onRemoteCleanupPending: vi.fn().mockResolvedValue(undefined),
     },
-    notionSyncJobStore: { abortRunningJobIfFromOtherInstance: vi.fn().mockResolvedValue(undefined) },
     conversationKinds: {},
     notionSyncOrchestrator: {},
     obsidianSyncOrchestrator: { testConnection: vi.fn() },
@@ -145,9 +139,7 @@ beforeEach(() => {
   mocks.ensureDefaultNotionOAuthClientId.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthClientId.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthProxyUrl.mockResolvedValue(undefined);
-  mocks.obsidianAbort.mockResolvedValue(undefined);
-  mocks.feishuAbort.mockResolvedValue(undefined);
-  mocks.githubAbort.mockResolvedValue(undefined);
+  mocks.abortRunningSyncJobIfFromOtherInstance.mockResolvedValue(undefined);
   mocks.storageOnChanged.mockImplementation(() => () => {});
   mocks.createBackgroundServices.mockReturnValue(createServices());
   // @ts-expect-error test global cleanup
@@ -191,7 +183,9 @@ describe('background entrypoint cold start', () => {
 
     const services = mocks.createBackgroundServices.mock.results[0]?.value;
     await flushMicrotasks();
-    expect(mocks.githubAbort).toHaveBeenCalledWith(expect.any(String), { forceAbort: true });
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledWith('github', expect.any(String), {
+      forceAbort: true,
+    });
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
 
@@ -249,7 +243,7 @@ describe('background entrypoint cold start', () => {
     expect(mocks.registerUiMessageHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerSyncHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.githubAbort).toHaveBeenCalledTimes(1);
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledTimes(4);
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
   });
@@ -296,7 +290,7 @@ describe('background entrypoint cold start', () => {
     await flushMicrotasks();
 
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.githubAbort).toHaveBeenCalledTimes(1);
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledTimes(4);
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
   });
@@ -304,9 +298,9 @@ describe('background entrypoint cold start', () => {
   it('isolates each startup recovery failure from sibling jobs and schedulers', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     const services = createServices();
-    services.notionSyncJobStore.abortRunningJobIfFromOtherInstance.mockRejectedValue(
-      new Error('notion recovery failed'),
-    );
+    mocks.abortRunningSyncJobIfFromOtherInstance.mockImplementation(async (provider: string) => {
+      if (provider === 'notion') throw new Error('notion recovery failed');
+    });
     services.autoSync.obsidianScheduler.flush.mockImplementation(() => {
       throw new Error('obsidian flush failed');
     });
@@ -316,9 +310,16 @@ describe('background entrypoint cold start', () => {
     expect(() => callback()).not.toThrow();
     await flushMicrotasks();
 
-    expect(mocks.obsidianAbort).toHaveBeenCalledTimes(1);
-    expect(mocks.feishuAbort).toHaveBeenCalledTimes(1);
-    expect(mocks.githubAbort).toHaveBeenCalledTimes(1);
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledTimes(4);
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledWith('obsidian', expect.any(String), {
+      forceAbort: true,
+    });
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledWith('feishu', expect.any(String), {
+      forceAbort: true,
+    });
+    expect(mocks.abortRunningSyncJobIfFromOtherInstance).toHaveBeenCalledWith('github', expect.any(String), {
+      forceAbort: true,
+    });
     expect(services.autoSync.notionScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.obsidianScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.feishuScheduler.flush).toHaveBeenCalledTimes(1);

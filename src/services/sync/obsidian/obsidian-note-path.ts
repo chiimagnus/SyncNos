@@ -268,16 +268,6 @@ async function resolveExistingNotePath({
   };
 }
 
-const api = {
-  DEFAULT_OBSIDIAN_FOLDER,
-  folderForConversation,
-  normalizeFolderPath,
-  buildStableNotePath,
-  buildLegacyHashNotePath,
-  resolveExistingNotePath,
-  stableConversationId10,
-};
-
 export {
   DEFAULT_OBSIDIAN_FOLDER,
   folderForConversation,
@@ -287,4 +277,3 @@ export {
   resolveExistingNotePath,
   stableConversationId10,
 };
-export default api;

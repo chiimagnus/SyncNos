@@ -10,11 +10,10 @@ vi.mock('@services/sync/notion/notion-api.ts', () => {
   return {
     NOTION_VERSION: '2022-06-28',
     notionFetch,
-    default: { NOTION_VERSION: '2022-06-28', notionFetch },
   };
 });
 
-import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
+import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 
 beforeEach(() => {
   notionFetchImpl = null;

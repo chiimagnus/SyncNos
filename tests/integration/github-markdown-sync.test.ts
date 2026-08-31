@@ -31,11 +31,13 @@ import {
   GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
 } from '@services/sync/auto-sync/auto-sync-keys';
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import githubSyncJobStore from '@services/sync/github/github-sync-job-store';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { discoverGithubRepositories, preflightGithubRepository } from '@services/sync/github/github-repository-service';
 import { registerGithubSettingsHandlers } from '@services/sync/github/settings-background-handlers';
 import { getGithubSettings, saveGithubSettings } from '@services/sync/github/settings-store';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
+
+const githubSyncJobStore = createSyncJobStore('github');
 
 const DEVICE_CODE = 'e2e-device-code';
 const ACCESS_TOKEN_1 = 'e2e-access-token-1';

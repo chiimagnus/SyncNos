@@ -8,22 +8,22 @@ import {
 import { buildFullNoteMarkdown as buildDefaultFullNoteMarkdown } from '@services/sync/shared/remote-markdown-writer.ts';
 import {
   buildStableNotePath as buildDefaultStableNotePath,
-  buildLegacyHashNotePath as buildDefaultLegacyHashNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
-  stableConversationId10 as stableConversationId10Default,
 } from '@services/sync/obsidian/obsidian-note-path.ts';
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
 } from '@services/sync/shared/remote-markdown-metadata.ts';
-import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageTargets,
 } from '@services/sync/shared/markdown-asset-refs';
+import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'obsidian';
+const obsidianSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -136,108 +136,23 @@ function normalizeIds(list: unknown) {
   return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
-function buildPerConversationResult({
-  conversationId,
-  conversationTitle,
-  ok,
-  mode,
-  appended,
-  error,
-  at,
-}: {
-  conversationId: number;
-  conversationTitle?: unknown;
-  ok: unknown;
-  mode: unknown;
-  appended: unknown;
-  error: unknown;
-  at: unknown;
-}) {
-  return {
-    conversationId,
-    conversationTitle: safeString(conversationTitle),
-    ok: !!ok,
-    mode: safeString(mode) || (ok ? 'ok' : 'failed'),
-    appended: Number.isFinite(Number(appended)) ? Number(appended) : 0,
-    error: safeString(error),
-    at: Number.isFinite(Number(at)) ? Number(at) : Date.now(),
-  };
-}
-
-function buildSyncSummary(results: any[], instanceId: unknown) {
-  const okCount = results.filter((r) => r.ok).length;
-  const failCount = results.length - okCount;
-  const failures = results
-    .filter((r) => !r.ok)
-    .map((r) => ({
-      conversationId: r.conversationId,
-      conversationTitle: safeString(r.conversationTitle),
-      error: r.error || 'unknown error',
-    }));
-  return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
-}
-
 function buildAlreadyRunningError() {
   const error = new Error('sync already in progress') as Error & { code?: string };
   error.code = 'sync_already_running';
   return error;
 }
 
-function toCurrentConversationTitle(convo: any, _conversationId: number) {
-  const title = safeString(convo && convo.title);
-  if (title) return title;
-  return '';
-}
-
-function getBackgroundStorageModule() {
-  return defaultBackgroundStorage;
-}
-
-function getSettingsStoreModule() {
-  return {
-    getConnectionConfig: getObsidianConnectionConfig,
-    getPathConfig: getObsidianPathConfig,
-  };
-}
-
-function getLocalRestClientModule() {
-  return {
-    createClient: createDefaultObsidianClient,
-    NOTE_JSON_ACCEPT,
-  };
-}
-
-function getNotePathModule() {
-  return {
-    buildStableNotePath: buildDefaultStableNotePath,
-    buildLegacyHashNotePath: buildDefaultLegacyHashNotePath,
-    resolveExistingNotePath: resolveDefaultExistingNotePath,
-    stableConversationId10: stableConversationId10Default,
-  };
-}
-
-function getSyncMetadataModule() {
-  return {
-    readSyncnosObject: readDefaultSyncnosObject,
-    buildSyncnosObject: buildDefaultSyncnosObject,
-  };
-}
-
-function getMarkdownWriterModule() {
-  return {
-    buildFullNoteMarkdown: buildDefaultFullNoteMarkdown,
-  };
+function toCurrentConversationTitle(convo: any) {
+  return safeString(convo && convo.title);
 }
 
 async function buildClient() {
-  const store = getSettingsStoreModule();
-  const conn = await store.getConnectionConfig();
+  const conn = await getObsidianConnectionConfig();
   if (!conn || !conn.apiKey) {
     return { ok: false, error: { code: 'missing_api_key', message: 'Obsidian API Key is required.' } };
   }
 
-  const clientMod = getLocalRestClientModule();
-  const client = clientMod.createClient(conn);
+  const client = createDefaultObsidianClient(conn);
   if (!client || client.ok === false) {
     return {
       ok: false,
@@ -247,55 +162,49 @@ async function buildClient() {
   return {
     ok: true,
     client,
-    noteJsonAccept: safeString(clientMod.NOTE_JSON_ACCEPT) || NOTE_JSON_ACCEPT,
+    noteJsonAccept: NOTE_JSON_ACCEPT,
   };
 }
 
 async function decideSyncModeForConversation({
   conversationId,
   forceFull,
+  onConversationLoaded,
 }: {
   conversationId: number;
   forceFull?: boolean;
+  onConversationLoaded?: (conversation: any) => void | Promise<void>;
 }) {
-  const storage = getBackgroundStorageModule();
-  if (
-    !storage ||
-    typeof storage.getConversationById !== 'function' ||
-    typeof storage.getMessagesByConversationId !== 'function'
-  ) {
-    throw new Error('storage module missing');
-  }
-
-  const convo = await storage.getConversationById(conversationId);
+  const convo = await defaultBackgroundStorage.getConversationById(conversationId);
+  if (convo && onConversationLoaded) await onConversationLoaded(convo);
   if (!convo) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
-        conversationTitle: toCurrentConversationTitle(convo, conversationId),
+        conversationTitle: toCurrentConversationTitle(convo),
         ok: false,
         mode: 'failed',
         appended: 0,
         error: 'conversation not found',
         at: Date.now(),
-      }),
+      },
     };
   }
 
-  const messages = await storage.getMessagesByConversationId(conversationId);
+  const messages = await defaultBackgroundStorage.getMessagesByConversationId(conversationId);
   if (!Array.isArray(messages) || !messages.length) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
-        conversationTitle: toCurrentConversationTitle(convo, conversationId),
+        conversationTitle: toCurrentConversationTitle(convo),
         ok: false,
         mode: 'empty',
         appended: 0,
         error: 'No messages to sync.',
         at: Date.now(),
-      }),
+      },
     };
   }
 
@@ -303,17 +212,15 @@ async function decideSyncModeForConversation({
   let articleComments: ArticleCommentDto[] = [];
   if (isArticle) {
     const canonicalUrl = safeString(convo?.url);
-    if (canonicalUrl && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-      await storage.attachOrphanArticleCommentsToConversation(canonicalUrl, conversationId);
+    if (canonicalUrl) {
+      await defaultBackgroundStorage.attachOrphanArticleCommentsToConversation(canonicalUrl, conversationId);
     }
-    if (typeof storage.getArticleCommentsByConversationId === 'function') {
-      articleComments = parseArticleCommentDtos(await storage.getArticleCommentsByConversationId(conversationId));
-    }
+    articleComments = parseArticleCommentDtos(
+      await defaultBackgroundStorage.getArticleCommentsByConversationId(conversationId),
+    );
   }
 
-  const notePathMod = getNotePathModule();
-  const store = getSettingsStoreModule();
-  const pathConfig = store && typeof store.getPathConfig === 'function' ? await store.getPathConfig() : null;
+  const pathConfig = await getObsidianPathConfig();
   const folderByKindId = pathConfig
     ? {
         chat: safeString(pathConfig.chatFolder),
@@ -326,54 +233,49 @@ async function decideSyncModeForConversation({
   if (!clientRes.ok) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
-        conversationTitle: toCurrentConversationTitle(convo, conversationId),
+        conversationTitle: toCurrentConversationTitle(convo),
         ok: false,
         mode: 'failed',
         appended: 0,
         error: clientRes.error && clientRes.error.message ? clientRes.error.message : 'client error',
         at: Date.now(),
-      }),
+      },
     };
   }
   const client = clientRes.client;
   const accept = clientRes.noteJsonAccept || client.NOTE_JSON_ACCEPT || NOTE_JSON_ACCEPT;
 
-  const metaMod = getSyncMetadataModule();
-
   let existingRemote: any = null;
   let existingPath = '';
   let deleteAfterFilePath = '';
 
-  const pathResolution =
-    notePathMod && typeof (notePathMod as any).resolveExistingNotePath === 'function'
-      ? await (notePathMod as any).resolveExistingNotePath({
-          conversation: convo,
-          client,
-          noteJsonAccept: accept,
-          folderByKindId,
-          readSyncnosObject: metaMod.readSyncnosObject,
-        })
-      : null;
+  const pathResolution = await resolveDefaultExistingNotePath({
+    conversation: convo,
+    client,
+    noteJsonAccept: accept,
+    folderByKindId,
+    readSyncnosObject: readDefaultSyncnosObject,
+  });
 
   if (pathResolution && !pathResolution.ok) {
     return {
       isFinal: true,
-      row: buildPerConversationResult({
+      row: {
         conversationId: Number(conversationId),
-        conversationTitle: toCurrentConversationTitle(convo, conversationId),
+        conversationTitle: toCurrentConversationTitle(convo),
         ok: false,
         mode: 'failed',
         appended: 0,
         error: pathResolution.error?.message ? String(pathResolution.error.message) : 'remote error',
         at: Date.now(),
-      }),
+      },
     };
   }
 
   const desiredFilePath =
-    safeString(pathResolution?.desiredFilePath) || notePathMod.buildStableNotePath(convo, { folderByKindId });
+    safeString(pathResolution?.desiredFilePath) || buildDefaultStableNotePath(convo, { folderByKindId });
   existingPath = safeString(pathResolution?.resolvedFilePath);
 
   if (pathResolution?.found && existingPath) {
@@ -424,7 +326,7 @@ async function decideSyncModeForConversation({
   const note = existingRemote.data && typeof existingRemote.data === 'object' ? existingRemote.data : null;
   const frontmatter = note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
 
-  const parsed = metaMod.readSyncnosObject(frontmatter);
+  const parsed = readDefaultSyncnosObject(frontmatter);
   const parsedData = parsed && parsed.ok && parsed.data ? parsed.data : null;
   if (!parsedData) {
     return {
@@ -464,8 +366,7 @@ async function decideSyncModeForConversation({
 }
 
 async function testConnection({ instanceId }: { instanceId?: string } = {}) {
-  const store = getSettingsStoreModule();
-  const conn = await store.getConnectionConfig();
+  const conn = await getObsidianConnectionConfig();
   if (!conn || !conn.apiKey) {
     return {
       ok: false,
@@ -475,8 +376,7 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
     };
   }
 
-  const clientMod = getLocalRestClientModule();
-  const client = clientMod.createClient(conn);
+  const client = createDefaultObsidianClient(conn);
   if (!client || client.ok === false || typeof (client as any).getServerStatus !== 'function') {
     const error = client && client.error ? client.error : { code: 'invalid_client', message: 'invalid client' };
     return {
@@ -520,10 +420,9 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
 
 async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
   const safeInstanceId = safeString(instanceId);
-  const job =
-    safeInstanceId && typeof obsidianSyncJobStore.abortRunningJobIfFromOtherInstance === 'function'
-      ? await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
-      : await obsidianSyncJobStore.getJob();
+  const job = safeInstanceId
+    ? await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
+    : await obsidianSyncJobStore.getJob();
   return { provider: SYNC_PROVIDER, job, instanceId: safeInstanceId };
 }
 
@@ -558,59 +457,50 @@ async function syncConversations({
   const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
   if (obsidianSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
-  const currentJob: any = {
-    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    provider: SYNC_PROVIDER,
-    instanceId: safeInstanceId,
-    status: 'running',
-    startedAt: Date.now(),
-    updatedAt: Date.now(),
-    finishedAt: null,
-    conversationIds: ids,
-    okCount: 0,
-    failCount: 0,
-    perConversation: [],
-  };
-  async function persistCurrentJob(partial: Record<string, unknown> = {}) {
-    Object.assign(currentJob, partial, { updatedAt: Date.now() });
-    await obsidianSyncJobStore.setJob({ ...currentJob });
-  }
-
-  await persistCurrentJob({
-    currentConversationId: ids[0] || undefined,
-    currentStage: ids.length ? 'preparing_queue' : '',
+  const startedAt = Date.now();
+  const lifecycle = createSyncJobLifecycle({
+    initialJob: {
+      id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+      provider: SYNC_PROVIDER,
+      instanceId: safeInstanceId,
+      status: 'running',
+      startedAt,
+      updatedAt: startedAt,
+      finishedAt: null,
+      conversationIds: ids,
+      currentStage: 'preparing_queue',
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    },
+    persist: (job) => obsidianSyncJobStore.setJob(job),
   });
 
-  const results: any[] = [];
+  await lifecycle.setRunStage('preparing_queue');
 
   for (const conversationId of ids) {
     let row: any = null;
     try {
-      await persistCurrentJob({
-        currentConversationId: conversationId,
-        currentConversationTitle: '',
-        currentStage: 'loading_conversation',
-      });
+      await lifecycle.setRunStage('loading_conversation');
       const decision: any = await decideSyncModeForConversation({
         conversationId,
         forceFull: forceFullIds.has(conversationId),
+        onConversationLoaded: async (conversation) => {
+          await lifecycle.setItem(conversationId, {
+            conversationTitle: toCurrentConversationTitle(conversation),
+            currentStage: 'preparing_sync',
+          });
+        },
       });
       if (decision && decision.isFinal) {
-        await persistCurrentJob({
-          currentConversationId: conversationId,
-          currentConversationTitle: toCurrentConversationTitle((decision as any).convo, conversationId),
-          currentStage: 'finishing_current_item',
-        });
         row = decision.row;
       } else if (decision && decision.mode && decision.conversationId) {
-        const writer = getMarkdownWriterModule();
-        const metaMod = getSyncMetadataModule();
         const clientRes: any = await buildClient();
         const client = clientRes.ok ? clientRes.client : null;
-        const currentTitle = toCurrentConversationTitle(decision.convo, conversationId);
+        const currentTitle = toCurrentConversationTitle(decision.convo);
 
         if (!clientRes.ok || !client) {
-          row = buildPerConversationResult({
+          row = {
             conversationId,
             conversationTitle: currentTitle,
             ok: false,
@@ -618,22 +508,20 @@ async function syncConversations({
             appended: 0,
             error: clientRes.error && clientRes.error.message ? clientRes.error.message : 'client error',
             at: Date.now(),
-          });
+          };
         } else if (
           decision.mode === 'full_rebuild' ||
           decision.mode === 'full_rebuild_forced' ||
           decision.mode === 'full_rebuild_rename'
         ) {
-          await persistCurrentJob({
-            currentConversationId: conversationId,
-            currentConversationTitle: currentTitle,
+          await lifecycle.setItem(conversationId, {
             currentStage: decision.mode === 'full_rebuild_rename' ? 'renaming_note' : 'writing_full_note',
           });
-          const syncnosObject = metaMod.buildSyncnosObject({
+          const syncnosObject = buildDefaultSyncnosObject({
             conversation: decision.convo,
             lastSyncedAt: Date.now(),
           });
-          const rawMarkdown = writer.buildFullNoteMarkdown({
+          const rawMarkdown = buildDefaultFullNoteMarkdown({
             conversation: decision.convo,
             messages: decision.messages,
             syncnosObject,
@@ -647,7 +535,7 @@ async function syncConversations({
           });
           const putRes = await client.putVaultFile(decision.filePath, markdown);
           if (!putRes || !putRes.ok) {
-            row = buildPerConversationResult({
+            row = {
               conversationId,
               conversationTitle: currentTitle,
               ok: false,
@@ -655,7 +543,7 @@ async function syncConversations({
               appended: 0,
               error: putRes && putRes.error && putRes.error.message ? putRes.error.message : 'put failed',
               at: Date.now(),
-            });
+            };
           } else {
             await defaultBackgroundStorage.recordObsidianRemoteWrite({
               source: decision.convo?.source,
@@ -667,15 +555,11 @@ async function syncConversations({
               deleteAfter !== safeString(decision.filePath) &&
               typeof client.deleteVaultFile === 'function'
             ) {
-              await persistCurrentJob({
-                currentConversationId: conversationId,
-                currentConversationTitle: currentTitle,
-                currentStage: 'deleting_old_note_path',
-              });
+              await lifecycle.setItem(conversationId, { currentStage: 'deleting_old_note_path' });
               try {
                 const delRes = await client.deleteVaultFile(deleteAfter);
                 if (!delRes || !delRes.ok) {
-                  row = buildPerConversationResult({
+                  row = {
                     conversationId,
                     conversationTitle: currentTitle,
                     ok: false,
@@ -683,9 +567,9 @@ async function syncConversations({
                     appended: decision.messages.length,
                     error: delRes && delRes.error && delRes.error.message ? delRes.error.message : 'delete failed',
                     at: Date.now(),
-                  });
+                  };
                 } else {
-                  row = buildPerConversationResult({
+                  row = {
                     conversationId,
                     conversationTitle: currentTitle,
                     ok: true,
@@ -693,10 +577,10 @@ async function syncConversations({
                     appended: decision.messages.length,
                     error: '',
                     at: Date.now(),
-                  });
+                  };
                 }
               } catch (error) {
-                row = buildPerConversationResult({
+                row = {
                   conversationId,
                   conversationTitle: currentTitle,
                   ok: false,
@@ -704,10 +588,10 @@ async function syncConversations({
                   appended: decision.messages.length,
                   error: error instanceof Error ? error.message : String(error || 'delete failed'),
                   at: Date.now(),
-                });
+                };
               }
             } else {
-              row = buildPerConversationResult({
+              row = {
                 conversationId,
                 conversationTitle: currentTitle,
                 ok: true,
@@ -715,11 +599,11 @@ async function syncConversations({
                 appended: decision.messages.length,
                 error: '',
                 at: Date.now(),
-              });
+              };
             }
           }
         } else {
-          row = buildPerConversationResult({
+          row = {
             conversationId,
             conversationTitle: currentTitle,
             ok: false,
@@ -727,55 +611,37 @@ async function syncConversations({
             appended: 0,
             error: 'unknown mode',
             at: Date.now(),
-          });
+          };
         }
       } else if (decision && decision.row) {
         row = decision.row;
       } else {
-        row = buildPerConversationResult({
+        row = {
           conversationId,
-          conversationTitle: '',
+          conversationTitle: lifecycle.titleFor(conversationId),
           ok: false,
           mode: 'failed',
           appended: 0,
           error: 'invalid decision',
           at: Date.now(),
-        });
+        };
       }
     } catch (e: any) {
-      row = buildPerConversationResult({
+      row = {
         conversationId,
-        conversationTitle: '',
+        conversationTitle: lifecycle.titleFor(conversationId),
         ok: false,
         mode: 'failed',
         appended: 0,
         error: e && e.message ? e.message : String(e || 'sync failed'),
         at: Date.now(),
-      });
+      };
     }
-    results.push(row);
-    currentJob.perConversation.push(row);
-    currentJob.okCount = results.filter((r) => r.ok).length;
-    currentJob.failCount = results.length - currentJob.okCount;
-    await persistCurrentJob({
-      currentConversationId: conversationId,
-      currentConversationTitle: undefined,
-      currentStage: 'finishing_current_item',
-    });
+    row = (await lifecycle.completeItem(row)).row;
   }
 
-  currentJob.status = 'done';
-  currentJob.finishedAt = Date.now();
-  await persistCurrentJob({
-    currentConversationId: undefined,
-    currentConversationTitle: undefined,
-    currentStage: undefined,
-  });
-
-  return buildSyncSummary(results, instanceId);
+  await lifecycle.finish();
+  return lifecycle.summary();
 }
 
-const api = { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
-
 export { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
-export default api;

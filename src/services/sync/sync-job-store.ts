@@ -32,19 +32,17 @@ function normalizePerConversation(rows: unknown) {
   });
 }
 
-export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
+function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
   if (!job || typeof job !== 'object') return null;
   const value = job as Record<string, unknown>;
   const perConversation = normalizePerConversation(value.perConversation);
   const okCount = Number(value.okCount);
   const failCount = Number(value.failCount);
-  const status = String(value.status || 'done');
-
   return {
     id: value.id == null ? undefined : String(value.id || ''),
     provider,
     instanceId: value.instanceId == null ? undefined : String(value.instanceId || ''),
-    status: status === 'finished' ? 'done' : (status as SyncJobSnapshot['status']),
+    status: String(value.status || 'done') as SyncJobSnapshot['status'],
     startedAt: Number(value.startedAt) || 0,
     updatedAt: Number(value.updatedAt) || Date.now(),
     finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,
@@ -62,7 +60,7 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   };
 }
 
-export async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {
+async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {
   const key = SYNC_JOB_STORAGE_KEYS[provider];
   try {
     const res = await storageGet([key]);
@@ -72,7 +70,7 @@ export async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapsho
   }
 }
 
-export async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | null): Promise<boolean> {
+async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | null): Promise<boolean> {
   const key = SYNC_JOB_STORAGE_KEYS[provider];
   try {
     await storageSet({ [key]: job || null });
@@ -82,7 +80,7 @@ export async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | 
   }
 }
 
-export function isRunningSyncJob(job: SyncJobSnapshot | null | undefined, staleMs?: number): boolean {
+function isRunningSyncJob(job: SyncJobSnapshot | null | undefined, staleMs?: number): boolean {
   if (!job || job.status !== 'running') return false;
   const updatedAt = Number(job.updatedAt) || 0;
   if (!updatedAt) return true;
@@ -95,20 +93,18 @@ export type ReconcileRunningSyncJobOptions = {
   forceAbort?: boolean;
 };
 
-export async function abortRunningSyncJobIfFromOtherInstance(
+async function abortRunningSyncJobIfFromOtherInstance(
   provider: SyncProvider,
   instanceId: string,
-  options?: number | ReconcileRunningSyncJobOptions,
+  options: ReconcileRunningSyncJobOptions = {},
 ): Promise<SyncJobSnapshot | null> {
   const current = await getSyncJob(provider);
   if (!current || current.status !== 'running') return current;
   const jobInstanceId = current.instanceId ? String(current.instanceId) : '';
   if (!jobInstanceId || jobInstanceId === String(instanceId || '')) return current;
 
-  const normalizedOptions =
-    typeof options === 'number' ? ({ staleMs: options } satisfies ReconcileRunningSyncJobOptions) : options || {};
-  const forceAbort = normalizedOptions.forceAbort === true;
-  const staleMs = normalizedOptions.staleMs;
+  const forceAbort = options.forceAbort === true;
+  const staleMs = options.staleMs;
 
   // Do not abort a still-active job from another background instance. Treat it as running
   // unless it is stale, otherwise concurrent background contexts could keep aborting each
@@ -126,4 +122,24 @@ export async function abortRunningSyncJobIfFromOtherInstance(
   };
   await setSyncJob(provider, aborted);
   return aborted;
+}
+
+export type SyncJobStore = {
+  getJob: () => Promise<SyncJobSnapshot | null>;
+  setJob: (job: SyncJobSnapshot | null) => Promise<boolean>;
+  isRunningJob: (job: SyncJobSnapshot | null | undefined, staleMs?: number) => boolean;
+  abortRunningJobIfFromOtherInstance: (
+    instanceId: string,
+    options?: ReconcileRunningSyncJobOptions,
+  ) => Promise<SyncJobSnapshot | null>;
+};
+
+export function createSyncJobStore(provider: SyncProvider): SyncJobStore {
+  return {
+    getJob: () => getSyncJob(provider),
+    setJob: (job) => setSyncJob(provider, job),
+    isRunningJob: isRunningSyncJob,
+    abortRunningJobIfFromOtherInstance: (instanceId, options) =>
+      abortRunningSyncJobIfFromOtherInstance(provider, instanceId, options),
+  };
 }

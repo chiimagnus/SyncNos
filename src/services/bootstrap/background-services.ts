@@ -1,13 +1,11 @@
 import articleFetchService from '@collectors/web/article-fetch-service.ts';
 
-import notionSyncJobStore from '@services/sync/notion/notion-sync-job-store.ts';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage as notionBackgroundStorage } from '@services/conversations/background/storage';
-import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
-import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
-import notionApi from '@services/sync/notion/notion-api.ts';
-import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
+import * as notionDbManager from '@services/sync/notion/notion-db-manager.ts';
+import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 
 import {
   clearSyncStatus as clearObsidianSyncStatus,
@@ -82,7 +80,6 @@ export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestra
 export type BackgroundServices = {
   articleFetchService: typeof articleFetchService;
   conversationKinds: typeof conversationKinds;
-  notionSyncJobStore: typeof notionSyncJobStore;
   notionSyncOrchestrator: NotionSyncOrchestrator;
   obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
   feishuSyncOrchestrator: FeishuSyncOrchestrator;
@@ -99,17 +96,27 @@ export type BackgroundServices = {
 };
 
 export function createBackgroundServices(deps: { getInstanceId: () => string }): BackgroundServices {
+  const notionSyncJobStore = createSyncJobStore('notion');
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     tokenStore: { getToken: getNotionOAuthToken },
     storage: notionBackgroundStorage,
     conversationKinds,
-    notionApi,
-    notionFilesApi,
     dbManager: notionDbManager,
     syncService: notionSyncService,
     jobStore: notionSyncJobStore,
   });
 
+  const obsidianSyncOrchestrator: ObsidianSyncOrchestrator = {
+    syncConversations: obsidianSyncConversations,
+    getSyncStatus: getObsidianSyncStatus,
+    clearSyncStatus: clearObsidianSyncStatus,
+    testConnection: testObsidianConnection,
+  };
+  const feishuSyncOrchestrator: FeishuSyncOrchestrator = {
+    syncConversations: feishuSyncConversations,
+    getSyncStatus: getFeishuSyncStatus,
+    clearSyncStatus: clearFeishuSyncStatus,
+  };
   const githubSyncOrchestrator = createGithubSyncOrchestrator();
 
   const notionScheduler = createNotionAutoSyncScheduler({
@@ -118,27 +125,17 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
   });
   const obsidianScheduler = createObsidianAutoSyncScheduler({
     getInstanceId: deps.getInstanceId,
-    obsidianSyncOrchestrator: {
-      syncConversations: obsidianSyncConversations,
-      getSyncStatus: async (input: { instanceId: string }) => getObsidianSyncStatus(input as any),
-      clearSyncStatus: async (input: { instanceId: string }) => clearObsidianSyncStatus(input as any),
-      testConnection: testObsidianConnection,
-    },
+    obsidianSyncOrchestrator,
   });
   const feishuScheduler = createFeishuAutoSyncScheduler({
     getInstanceId: deps.getInstanceId,
-    feishuSyncOrchestrator: {
-      syncConversations: feishuSyncConversations,
-      getSyncStatus: async (input: { instanceId: string }) => getFeishuSyncStatus(input as any),
-      clearSyncStatus: async (input: { instanceId: string }) => clearFeishuSyncStatus(input as any),
-    },
+    feishuSyncOrchestrator,
   });
   const githubScheduler = createGithubAutoSyncScheduler({ getInstanceId: deps.getInstanceId, githubSyncOrchestrator });
 
   return {
     articleFetchService,
     conversationKinds,
-    notionSyncJobStore,
     notionSyncOrchestrator,
     githubSyncOrchestrator,
     autoSync: {
@@ -192,16 +189,7 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
         }
       },
     },
-    obsidianSyncOrchestrator: {
-      syncConversations: obsidianSyncConversations,
-      getSyncStatus: async (input: { instanceId: string }) => getObsidianSyncStatus(input as any),
-      clearSyncStatus: async (input: { instanceId: string }) => clearObsidianSyncStatus(input as any),
-      testConnection: testObsidianConnection,
-    },
-    feishuSyncOrchestrator: {
-      syncConversations: feishuSyncConversations,
-      getSyncStatus: async (input: { instanceId: string }) => getFeishuSyncStatus(input as any),
-      clearSyncStatus: async (input: { instanceId: string }) => clearFeishuSyncStatus(input as any),
-    },
+    obsidianSyncOrchestrator,
+    feishuSyncOrchestrator,
   };
 }

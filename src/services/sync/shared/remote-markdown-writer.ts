@@ -226,12 +226,4 @@ function buildFullNoteMarkdown({
   return buildFrontmatterBlock(frontmatter) + `# ${MESSAGES_HEADING}\n\n` + messagesMd;
 }
 
-const api = {
-  MESSAGES_HEADING,
-  ARTICLE_HEADING,
-  COMMENTS_HEADING,
-  buildFullNoteMarkdown,
-};
-
 export { MESSAGES_HEADING, ARTICLE_HEADING, COMMENTS_HEADING, buildFullNoteMarkdown };
-export default api;

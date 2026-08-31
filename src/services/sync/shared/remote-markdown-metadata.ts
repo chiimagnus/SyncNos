@@ -61,11 +61,4 @@ function buildSyncnosObject({
   };
 }
 
-const api = {
-  SCHEMA_VERSION,
-  readSyncnosObject,
-  buildSyncnosObject,
-};
-
 export { SCHEMA_VERSION, readSyncnosObject, buildSyncnosObject };
-export default api;

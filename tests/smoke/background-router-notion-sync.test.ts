@@ -4,7 +4,7 @@ import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-b
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
-import { NOTION_SYNC_JOB_KEY } from '@services/sync/notion/notion-sync-job-store.ts';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
@@ -49,7 +49,6 @@ function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
 function createInMemoryJobStore() {
   let job: any = null;
   return {
-    NOTION_SYNC_JOB_KEY,
     getJob: async () => job,
     setJob: async (next: any) => {
       job = next;
@@ -88,7 +87,6 @@ function createDelayedJobStore() {
   let job: any = null;
   const runningCounts: number[] = [];
   return {
-    NOTION_SYNC_JOB_KEY,
     runningCounts,
     getJob: async () => job,
     setJob: async (next: any) => {
@@ -150,14 +148,9 @@ function createRouter({
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     ...notionServices,
     conversationKinds,
-    notionApi: {},
-    notionFilesApi: {},
   });
 
-  registerNotionSettingsHandlers(router as any, {
-    notionSyncJobStore: notionServices.jobStore,
-    conversationKinds,
-  });
+  registerNotionSettingsHandlers(router as any, { conversationKinds });
 
   registerSyncHandlers(router as any, {
     getInstanceId: () => instanceId,
@@ -252,7 +245,7 @@ describe('background-router notion sync', () => {
         storage: null,
         dbManager: null,
         syncService: null,
-        jobStore: { NOTION_SYNC_JOB_KEY },
+        jobStore: null,
       },
     });
 
@@ -266,7 +259,7 @@ describe('background-router notion sync', () => {
     expect(removedFlatten).toContain('notion_db_id_syncnos_web_articles');
     expect(removedFlatten).toContain('notion_oauth_pending_state');
     expect(removedFlatten).toContain('notion_oauth_last_error');
-    expect(removedFlatten).toContain('notion_sync_job_v1');
+    expect(removedFlatten).toContain(SYNC_JOB_STORAGE_KEYS.notion);
   });
 
   it('recreates page when existing page is missing', async () => {
@@ -1189,8 +1182,6 @@ describe('background-router notion sync', () => {
         },
         jobStore: delayedJobStore,
         conversationKinds,
-        notionApi: {},
-        notionFilesApi: {},
       } as any);
 
       const syncPromise = orchestrator.syncConversations({ conversationIds: [1, 2], instanceId: 'status-test' });

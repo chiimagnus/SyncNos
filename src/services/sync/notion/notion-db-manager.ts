@@ -1,9 +1,8 @@
-import { buildAiOptions as buildDefaultAiOptions } from '@services/sync/notion/notion-ai.ts';
-import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
+import { buildAiOptions } from '@services/sync/notion/notion-ai.ts';
+import { notionFetch } from '@services/sync/notion/notion-api.ts';
 import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
-const DEFAULT_DB_TITLE = 'SyncNos-AI Chats';
 const DEFAULT_DB_STORAGE_KEY = 'notion_db_id_syncnos_ai_chats';
 const SEARCH_PAGE_SIZE = 100;
 const SEARCH_MAX_PAGES = 10;
@@ -26,38 +25,10 @@ async function clearCachedDatabaseId(storageKey: unknown) {
   return true;
 }
 
-function getConversationKinds() {
-  return builtInConversationKinds;
-}
-
-function getNotionFetch() {
-  return defaultNotionFetch;
-}
-
-function buildAiOptions() {
-  return buildDefaultAiOptions();
-}
-
 function defaultDbSpec() {
-  const conversationKinds = getConversationKinds();
-  const list = conversationKinds && typeof conversationKinds.list === 'function' ? conversationKinds.list() : [];
-  const chat = Array.isArray(list) ? list.find((d: any) => d && d.id === 'chat' && d.notion && d.notion.dbSpec) : null;
-  if (chat && chat.notion && chat.notion.dbSpec) return chat.notion.dbSpec;
-
-  // Fallback for unit tests / load-order gaps.
-  return {
-    title: DEFAULT_DB_TITLE,
-    storageKey: DEFAULT_DB_STORAGE_KEY,
-    properties: {
-      Name: { title: {} },
-      Date: { date: {} },
-      URL: { url: {} },
-      AI: { multi_select: { options: [] } },
-    },
-    ensureSchemaPatch: {
-      AI: { multi_select: { options: [] } },
-    },
-  };
+  const spec = builtInConversationKinds.getNotionDbSpecByKindId('chat');
+  if (!spec) throw new Error('chat notion database spec missing');
+  return spec;
 }
 
 function isUsableDatabase(database: any): boolean {
@@ -131,7 +102,6 @@ function isMissingDatabaseError(error: unknown): boolean {
 }
 
 async function getDatabase(accessToken: string, databaseId: string) {
-  const notionFetch = getNotionFetch();
   return notionFetch({ accessToken, method: 'GET', path: `/v1/databases/${databaseId}` });
 }
 
@@ -139,7 +109,6 @@ async function searchDatabases(
   accessToken: string,
   { query, parentPageId }: { query?: string; parentPageId?: string },
 ) {
-  const notionFetch = getNotionFetch();
   const results: any[] = [];
   let cursor = '';
   let pageCount = 0;
@@ -173,7 +142,6 @@ async function updateDatabase(
   { databaseId, properties }: { databaseId?: string; properties?: Record<string, unknown> },
 ) {
   const body = { properties: properties || {} };
-  const notionFetch = getNotionFetch();
   return notionFetch({ accessToken, method: 'PATCH', path: `/v1/databases/${databaseId}`, body });
 }
 
@@ -197,7 +165,6 @@ async function createDatabase(accessToken: string, { parentPageId, dbSpec }: { p
     title: [{ type: 'text', text: { content: spec.title } }],
     properties: materializeDbProperties(spec),
   };
-  const notionFetch = getNotionFetch();
   return notionFetch({ accessToken, method: 'POST', path: '/v1/databases', body });
 }
 
@@ -291,25 +258,4 @@ async function ensureDatabase({
   return { databaseId: created.id, title: spec.title, reused: false, database: created };
 }
 
-const api = {
-  ensureDatabase,
-  ensureDatabaseSchema,
-  clearCachedDatabaseId,
-  buildAiOptions,
-  getCachedDatabaseId,
-  setCachedDatabaseId,
-  DEFAULT_DB_TITLE,
-  DEFAULT_DB_STORAGE_KEY,
-};
-
-export {
-  ensureDatabase,
-  ensureDatabaseSchema,
-  clearCachedDatabaseId,
-  buildAiOptions,
-  getCachedDatabaseId,
-  setCachedDatabaseId,
-  DEFAULT_DB_TITLE,
-  DEFAULT_DB_STORAGE_KEY,
-};
-export default api;
+export { ensureDatabase, ensureDatabaseSchema, clearCachedDatabaseId, DEFAULT_DB_STORAGE_KEY };

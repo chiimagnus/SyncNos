@@ -30,7 +30,4 @@ function buildAiOptions(): AiSourceMeta[] {
   return (Object.keys(AI) as Array<keyof typeof AI>).map((k) => ({ name: AI[k].name, color: AI[k].color }));
 }
 
-const api = { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
-
 export { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
-export default api;

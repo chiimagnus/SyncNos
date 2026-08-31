@@ -78,7 +78,6 @@ function fakeServices(input: {
     return Date.now() - updatedAt < maxAge;
   };
   const jobStore: GithubOrchestratorServices['jobStore'] = {
-    GITHUB_SYNC_JOB_KEY: 'github_sync_job_v1',
     getJob: vi.fn(async () => cloneJob(persistedJob)),
     setJob: vi.fn(async (job) => {
       jobSetCalls += 1;
@@ -93,8 +92,8 @@ function fakeServices(input: {
       if (!current || current.status !== 'running') return current;
       const owner = String(current.instanceId || '');
       if (!owner || owner === String(instanceId || '')) return current;
-      const forceAbort = typeof options === 'object' && options?.forceAbort === true;
-      const staleMs = typeof options === 'number' ? options : options?.staleMs;
+      const forceAbort = options?.forceAbort === true;
+      const staleMs = options?.staleMs;
       if (!forceAbort && isRunningJob(current, staleMs)) return current;
       const now = Date.now();
       persistedJob = {
@@ -285,7 +284,7 @@ describe('github sync orchestrator staging through production sync', () => {
 
   it('isolates one local projection failure and keeps other safe staged rows', async () => {
     let stagedOperations: readonly any[] = [];
-    const { services } = fakeServices({
+    const { services, jobStore, getPersistedJob } = fakeServices({
       rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
       messages: { 1: new Error('broken local read'), 2: [message('safe body')] },
       commitImpl: async ({ operations }) => {
@@ -303,9 +302,27 @@ describe('github sync orchestrator staging through production sync', () => {
       instanceId: 'local-failure',
     });
 
-    expect(result.items.find((item) => item.conversationId === 1)?.status).toBe('failed');
+    expect(result.items.find((item) => item.conversationId === 1)).toMatchObject({
+      status: 'failed',
+      conversationTitle: 'Title 1',
+      error: 'broken local read',
+    });
     expect(result.items.find((item) => item.conversationId === 2)?.status).toBe('synced');
     expect(stagedOperations).toHaveLength(1);
+    expect(
+      (jobStore.setJob as any).mock.calls.some(
+        ([job]: any[]) =>
+          job?.currentConversationId === 1 &&
+          job?.currentConversationTitle === 'Title 1' &&
+          job?.currentStage === 'staging_projection',
+      ),
+    ).toBe(true);
+    expect(getPersistedJob()?.perConversation.find((row) => row.conversationId === 1)).toMatchObject({
+      conversationTitle: 'Title 1',
+      ok: false,
+      mode: 'failed',
+      error: 'broken local read',
+    });
   });
 
   it('dedupes identical content staged to the same path', async () => {
@@ -448,6 +465,8 @@ describe('github sync orchestrator job lifecycle', () => {
       conversationIds: [1],
       currentStage: 'preparing_queue',
     });
+    expect((jobStore.setJob as any).mock.calls[0]?.[0]?.currentConversationId).toBeUndefined();
+    expect((jobStore.setJob as any).mock.calls[0]?.[0]?.currentConversationTitle).toBeUndefined();
     expect((jobStore.setJob as any).mock.invocationCallOrder[0]).toBeLessThan(
       (services.preflight as any).mock.invocationCallOrder[0],
     );

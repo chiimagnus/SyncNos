@@ -11,7 +11,6 @@ vi.mock('@services/sync/notion/notion-api.ts', () => {
   };
   return {
     notionFetch,
-    default: { NOTION_VERSION: '2022-06-28', notionFetch },
   };
 });
 
@@ -161,8 +160,6 @@ describe('notion-sync-orchestrator kind routing', () => {
       tokenStore,
       storage,
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager,
       syncService,
       jobStore,
@@ -270,8 +267,6 @@ describe('notion-sync-orchestrator kind routing', () => {
       tokenStore,
       storage,
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager,
       syncService,
       jobStore,
@@ -281,6 +276,123 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(res.results[0].mode).toBe('rebuilt');
     expect(calls.some((c) => c.op === 'fetch' && c.req?.method === 'DELETE')).toBe(true);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
+  });
+
+  it('preserves the conversation title when a failure happens after local identity is loaded', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      abortRunningJobIfFromOtherInstance: async () => currentJob,
+      isRunningJob: (job: any) => job && job.status === 'running',
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+      storage: {
+        getSyncMappingByConversation: async () => ({
+          conversation: {
+            id: 7,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            title: 'Notion title survives',
+            url: 'https://example.com/7',
+          },
+          mapping: null,
+        }),
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      dbManager: {
+        ensureDatabase: async () => {
+          throw new Error('forced database failure');
+        },
+      },
+      syncService: {
+        createPageInDatabase: async () => ({ id: 'unused' }),
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore,
+    });
+
+    const result = await orchestrator.syncConversations({ conversationIds: [7], instanceId: 'i' });
+
+    expect(result.failCount).toBe(1);
+    expect(result.results[0]).toMatchObject({
+      conversationId: 7,
+      conversationTitle: 'Notion title survives',
+      ok: false,
+      mode: 'failed',
+      error: 'forced database failure',
+    });
+    expect(currentJob).toMatchObject({ status: 'done', okCount: 0, failCount: 1 });
+    expect(currentJob?.perConversation?.[0]).toMatchObject({
+      conversationId: 7,
+      conversationTitle: 'Notion title survives',
+      ok: false,
+      mode: 'failed',
+      error: 'forced database failure',
+    });
+  });
+
+  it('persists a terminal failure job when Notion preflight fails before loading conversations', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      abortRunningJobIfFromOtherInstance: async () => currentJob,
+      isRunningJob: (job: any) => job && job.status === 'running',
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => null },
+      storage: {
+        getSyncMappingByConversation: async () => null,
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase: async () => ({ databaseId: 'unused' }) },
+      syncService: {
+        createPageInDatabase: async () => ({ id: 'unused' }),
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore,
+    });
+
+    await expect(orchestrator.syncConversations({ conversationIds: [7], instanceId: 'i' })).rejects.toThrow(
+      'notion not connected',
+    );
+
+    expect(currentJob).toMatchObject({
+      provider: 'notion',
+      status: 'done',
+      conversationIds: [7],
+      okCount: 0,
+      failCount: 1,
+    });
+    expect(currentJob?.currentConversationId).toBeUndefined();
+    expect(currentJob?.currentConversationTitle).toBeUndefined();
+    expect(currentJob?.perConversation).toHaveLength(1);
+    expect(currentJob?.perConversation?.[0]).toMatchObject({
+      conversationId: 7,
+      ok: false,
+      mode: 'failed',
+      error: 'notion not connected',
+    });
   });
 
   it('reconciles a foreign running notion job to aborted on status read after reload', async () => {
@@ -330,8 +442,6 @@ describe('notion-sync-orchestrator kind routing', () => {
         getMessagesByConversationId: async () => [],
       },
       conversationKinds,
-      notionApi: {},
-      notionFilesApi: {},
       dbManager: { ensureDatabase: async () => ({ databaseId: 'db_chats' }) },
       syncService: {
         createPageInDatabase: async () => ({ id: 'p1' }),

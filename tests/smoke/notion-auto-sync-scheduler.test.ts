@@ -17,18 +17,10 @@ const gateMocks = vi.hoisted(() => ({
   isSyncProviderEnabled: vi.fn(),
 }));
 
-const tokenStoreMocks = vi.hoisted(() => ({
-  getNotionOAuthToken: vi.fn(),
-}));
-
 const alarmsMocks = vi.hoisted(() => ({
   isAlarmsAvailable: vi.fn(),
   create: vi.fn(),
   clear: vi.fn(),
-}));
-
-const jobStoreMocks = vi.hoisted(() => ({
-  setJob: vi.fn(),
 }));
 
 vi.mock('@services/shared/storage', () => ({
@@ -40,20 +32,10 @@ vi.mock('@services/sync/sync-provider-gate', () => ({
   isSyncProviderEnabled: gateMocks.isSyncProviderEnabled,
 }));
 
-vi.mock('@services/sync/notion/auth/token-store', () => ({
-  getNotionOAuthToken: tokenStoreMocks.getNotionOAuthToken,
-}));
-
 vi.mock('@platform/alarms/alarms', () => ({
   isAlarmsAvailable: alarmsMocks.isAlarmsAvailable,
   create: alarmsMocks.create,
   clear: alarmsMocks.clear,
-}));
-
-vi.mock('@services/sync/notion/notion-sync-job-store', () => ({
-  default: {
-    setJob: jobStoreMocks.setJob,
-  },
 }));
 
 function setStoragePatch(patch: Record<string, any>) {
@@ -72,16 +54,9 @@ beforeEach(() => {
   });
 
   gateMocks.isSyncProviderEnabled.mockResolvedValue(true);
-  tokenStoreMocks.getNotionOAuthToken.mockResolvedValue({
-    accessToken: 'token',
-    workspaceId: 'w',
-    workspaceName: 'W',
-    createdAt: Date.now(),
-  });
   alarmsMocks.isAlarmsAvailable.mockReturnValue(false);
   alarmsMocks.create.mockReset();
   alarmsMocks.clear.mockResolvedValue(true);
-  jobStoreMocks.setJob.mockResolvedValue(true);
 });
 
 describe('notion-auto-sync-scheduler', () => {
@@ -112,12 +87,10 @@ describe('notion-auto-sync-scheduler', () => {
     expect(syncConversations).toHaveBeenCalledWith({ conversationIds: [123], instanceId: 'instance-1' });
   });
 
-  it('writes a visible job failure when Notion is not connected', async () => {
-    const syncConversations = vi.fn().mockResolvedValue({});
-    tokenStoreMocks.getNotionOAuthToken.mockResolvedValue(null);
+  it('delegates failed runs to the orchestrator and clears the due queue', async () => {
+    const syncConversations = vi.fn().mockRejectedValue(new Error('notion not connected'));
     setStoragePatch({
       [NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY]: true,
-      notion_parent_page_id: 'parent',
       [NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]: { '7': Date.now() - 1 },
     });
 
@@ -131,11 +104,8 @@ describe('notion-auto-sync-scheduler', () => {
     });
 
     await scheduler.flush();
-    expect(syncConversations).not.toHaveBeenCalled();
-    expect(jobStoreMocks.setJob).toHaveBeenCalled();
-    const jobArg = jobStoreMocks.setJob.mock.calls[0]?.[0];
-    expect(jobArg?.provider).toBe('notion');
-    expect(jobArg?.status).toBe('done');
-    expect(jobArg?.failCount).toBe(1);
+
+    expect(syncConversations).toHaveBeenCalledWith({ conversationIds: [7], instanceId: 'instance-2' });
+    expect(storageState[NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({});
   });
 });

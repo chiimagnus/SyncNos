@@ -1,17 +1,16 @@
 import { optionNameForSource as defaultOptionNameForSource } from '@services/sync/notion/notion-ai.ts';
-import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
-import notionImageUploadUpgrader from '@services/sync/notion/notion-image-upload-upgrader.ts';
-import notionMarkdownBlocks from '@services/sync/notion/notion-markdown-blocks.ts';
+import { notionFetch } from '@services/sync/notion/notion-api.ts';
+import { upgradeImageBlocksToFileUploads as upgradeNotionImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader.ts';
+import {
+  inlineMarkdownToRichText as parseInlineMarkdownToRichText,
+  markdownToNotionBlocks as parseMarkdownToNotionBlocks,
+} from '@services/sync/notion/notion-markdown-blocks.ts';
 
 const MAX_TEXT = 1900;
 const APPEND_BATCH = 90;
 const APPEND_MAX_ATTEMPTS = 5;
 const CLEAR_DELETE_CONCURRENCY = 6;
 const CLEAR_DELETE_MAX_ATTEMPTS = 5;
-
-function getNotionFetch() {
-  return defaultNotionFetch;
-}
 
 function aiLabelForSource(source: unknown): string {
   return defaultOptionNameForSource(source);
@@ -91,55 +90,12 @@ function headingBlock(label: string, color?: string) {
   };
 }
 
-let markdownBlocksApi: any = null;
-let imageUploadUpgraderApi: any = null;
-
-function getMarkdownBlocksApi() {
-  if (markdownBlocksApi) return markdownBlocksApi;
-  if (
-    notionMarkdownBlocks &&
-    typeof notionMarkdownBlocks.inlineMarkdownToRichText === 'function' &&
-    typeof notionMarkdownBlocks.markdownToNotionBlocks === 'function'
-  ) {
-    markdownBlocksApi = notionMarkdownBlocks;
-    return markdownBlocksApi;
-  }
-  return null;
-}
-
-function getImageUploadUpgraderApi() {
-  if (imageUploadUpgraderApi) return imageUploadUpgraderApi;
-  if (notionImageUploadUpgrader && typeof notionImageUploadUpgrader.upgradeImageBlocksToFileUploads === 'function') {
-    imageUploadUpgraderApi = notionImageUploadUpgrader;
-    return imageUploadUpgraderApi;
-  }
-  return null;
-}
-
 function inlineMarkdownToRichText(markdown: unknown, base: any = {}, link?: unknown) {
-  const api = getMarkdownBlocksApi();
-  if (api && typeof api.inlineMarkdownToRichText === 'function') {
-    return api.inlineMarkdownToRichText(markdown, base, link);
-  }
-  const content = String(markdown || '');
-  if (!content) return [];
-  return [{ type: 'text', text: { content }, annotations: { ...base } }];
+  return parseInlineMarkdownToRichText(markdown, base, link);
 }
 
 function markdownToNotionBlocks(markdown: unknown) {
-  const api = getMarkdownBlocksApi();
-  if (api && typeof api.markdownToNotionBlocks === 'function') {
-    return api.markdownToNotionBlocks(markdown);
-  }
-  const content = String(markdown || '').trim();
-  if (!content) return [];
-  return [
-    {
-      object: 'block',
-      type: 'paragraph',
-      paragraph: { rich_text: [{ type: 'text', text: { content } }] },
-    },
-  ];
+  return parseMarkdownToNotionBlocks(String(markdown || ''));
 }
 
 function messagesToBlocks(messages: any, _options?: unknown) {
@@ -166,7 +122,6 @@ function messagesToBlocks(messages: any, _options?: unknown) {
 }
 
 async function listChildren(accessToken: string, blockId: string) {
-  const notionFetch = getNotionFetch();
   const out: any[] = [];
   let cursor: string | null = null;
   for (;;) {
@@ -187,7 +142,6 @@ async function listChildren(accessToken: string, blockId: string) {
 }
 
 async function archiveBlock(accessToken: string, blockId: string) {
-  const notionFetch = getNotionFetch();
   // Notion uses DELETE to archive blocks.
   return notionFetch({ accessToken, method: 'DELETE', path: `/v1/blocks/${blockId}` });
 }
@@ -211,7 +165,6 @@ async function archiveBlockWithRetry(accessToken: string, blockId: string) {
 async function appendBatchWithRetry(accessToken: string, pageId: string, batch: unknown) {
   const children = normalizeBlockList(batch);
   if (!children.length) return {};
-  const notionFetch = getNotionFetch();
   let attempt = 0;
   for (;;) {
     attempt += 1;
@@ -349,7 +302,6 @@ async function createPageInDatabase(
     capturedAt,
   }: { databaseId?: string; title?: string; url?: string; ai?: unknown; properties?: any; capturedAt?: unknown },
 ) {
-  const notionFetch = getNotionFetch();
   const body = {
     parent: { database_id: databaseId },
     properties: resolveProperties({ properties, title, url, ai, includeDate: true, capturedAt }),
@@ -367,7 +319,6 @@ async function updatePageProperties(
     properties,
   }: { pageId?: string; title?: string; url?: string; ai?: unknown; properties?: any },
 ) {
-  const notionFetch = getNotionFetch();
   const body = {
     properties: resolveProperties({ properties, title, url, ai, includeDate: false }),
   };
@@ -375,7 +326,6 @@ async function updatePageProperties(
 }
 
 async function getPage(accessToken: string, pageId: string) {
-  const notionFetch = getNotionFetch();
   return notionFetch({ accessToken, method: 'GET', path: `/v1/pages/${pageId}` });
 }
 
@@ -418,29 +368,8 @@ function hasExternalImageBlocks(blocks: unknown): boolean {
 }
 
 async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: unknown) {
-  const api = getImageUploadUpgraderApi();
-  if (api && typeof api.upgradeImageBlocksToFileUploads === 'function') {
-    return api.upgradeImageBlocksToFileUploads(accessToken, blocks);
-  }
-  return Array.isArray(blocks) ? blocks : [];
+  return upgradeNotionImageBlocksToFileUploads(accessToken, blocks);
 }
-
-const api = {
-  messagesToBlocks,
-  markdownToNotionBlocks,
-  inlineMarkdownToRichText,
-  clearPageChildren,
-  appendChildren,
-  createPageInDatabase,
-  updatePageProperties,
-  getPage,
-  isPageArchivedOrTrashed,
-  isPageUsableForDatabase,
-  pageBelongsToDatabase,
-  hasExternalImageBlocks,
-  upgradeImageBlocksToFileUploads,
-  aiLabelForSource,
-};
 
 export {
   messagesToBlocks,
@@ -458,4 +387,3 @@ export {
   upgradeImageBlocksToFileUploads,
   aiLabelForSource,
 };
-export default api;
