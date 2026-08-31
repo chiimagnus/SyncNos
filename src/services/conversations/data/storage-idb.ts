@@ -759,6 +759,12 @@ function mergeAnchoredMessageOrder(
   };
   if (!knownIncoming.length) return appendUnknown();
 
+  const incomingKeySet = new Set(incoming);
+  if (storedKeys.every((key) => incomingKeySet.has(key))) {
+    const changed = incoming.length !== storedKeys.length || incoming.some((key, index) => key !== storedKeys[index]);
+    return { keys: incoming, anchored: true, changed };
+  }
+
   const knownPositions = knownIncoming.map((key) => storedPositions.get(key) as number);
   if (knownPositions.some((position, index) => index > 0 && position <= knownPositions[index - 1])) {
     return appendUnknown();

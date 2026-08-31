@@ -715,6 +715,45 @@ describe('conversations storage-idb', () => {
     ]);
   });
 
+  it('repairs legacy tail-polluted order when a trusted partial capture covers every stored key', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'partial_legacy_order_recovery',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
+      { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 2 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 3 },
+    ]);
+
+    const integrity = resolveCaptureIntegrity('chatgpt', {
+      conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_legacy_order_recovery' },
+      messages: [
+        { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0 },
+        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 2 },
+        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 3 },
+      ],
+      captureMeta: { completeness: 'partial', identityVerified: true, reasons: ['bottom_not_reached'] },
+    });
+    expect(integrity.ok).toBe(true);
+    if (!integrity.ok) return;
+
+    await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['m3', 2],
+      ['m4', 3],
+    ]);
+  });
+
   it('reconciles newly discovered virtual partial rows between stable anchors', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
