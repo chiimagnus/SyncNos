@@ -59,6 +59,8 @@ vi.mock('@i18n', () => ({
 type Snapshot = ReturnType<typeof useSettingsSceneController>;
 type SettingsSection = Parameters<typeof useSettingsSceneController>[0]['activeSection'];
 type ApiResponse = { ok: boolean; data: any; error: any };
+type SettingsResponse = ApiResponse | Promise<ApiResponse> | (() => ApiResponse | Promise<ApiResponse>);
+type PollResponse = ApiResponse | Promise<ApiResponse> | (() => ApiResponse | Promise<ApiResponse>);
 type RepositoryResponse = ApiResponse | Promise<ApiResponse> | (() => ApiResponse | Promise<ApiResponse>);
 
 const ACCESS_TOKEN = 'sentinel_access_token';
@@ -79,7 +81,8 @@ let disconnectResponse: ApiResponse;
 let testConnectionResponse: ApiResponse;
 let initializeRepositoryResponse: ApiResponse;
 let saveSettingsResponse: ApiResponse | null;
-let pollResponses: Array<ApiResponse | (() => ApiResponse)> = [];
+let settingsResponses: SettingsResponse[] = [];
+let pollResponses: PollResponse[] = [];
 let repositoryResponses: RepositoryResponse[] = [];
 
 const ok = (data: any): ApiResponse => ({ ok: true, data, error: null });
@@ -218,6 +221,10 @@ function callCount(type: string) {
   return runtimeMocks.send.mock.calls.filter(([messageType]) => messageType === type).length;
 }
 
+function setVisibilityState(value: 'hidden' | 'visible') {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   latestSnapshot = null;
@@ -246,6 +253,7 @@ beforeEach(() => {
     target: { repository: 'owner/repo', branch: 'main', remoteKey: 'github.com/owner/repo@main', installationId: 1 },
   });
   saveSettingsResponse = null;
+  settingsResponses = [];
   pollResponses = [];
   repositoryResponses = [];
 
@@ -280,7 +288,10 @@ beforeEach(() => {
         videoFolder: '',
       });
     }
-    if (type === GITHUB_MESSAGE_TYPES.GET_SETTINGS) return ok(githubSettingsData);
+    if (type === GITHUB_MESSAGE_TYPES.GET_SETTINGS) {
+      const next = settingsResponses.shift();
+      return typeof next === 'function' ? next() : (next ?? ok(githubSettingsData));
+    }
     if (type === GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES) {
       const next = repositoryResponses.shift();
       if (next != null) return typeof next === 'function' ? next() : next;
@@ -381,6 +392,157 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubRepositories.map((item) => item.fullName)).toEqual(['owner/repo']);
   });
 
+  it('reconciles a due pending flow when the settings page becomes visible again', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(20_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    pollResponses = [ok({ auth: { state: 'connected' } })];
+    setVisibilityState('hidden');
+
+    await renderController();
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(0);
+
+    setVisibilityState('visible');
+    act(() => document.dispatchEvent(new window.Event('visibilitychange')));
+    await flushReact();
+
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(1);
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+    expect(callCount(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES)).toBe(1);
+  });
+
+  it.each(['focus', 'pageshow'] as const)('reconciles a due pending flow on window %s', async (eventType) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(20_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    pollResponses = [
+      ok({
+        auth: {
+          state: 'pending',
+          userCode: 'ABCD-EFGH',
+          verificationUri: 'https://github.com/login/device',
+          expiresAt: 60_000,
+          nextPollAt: 30_000,
+        },
+      }),
+    ];
+
+    await renderController();
+    act(() => window.dispatchEvent(new window.Event(eventType)));
+    await flushReact();
+
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(1);
+    expect(latestSnapshot?.githubAuth).toMatchObject({ state: 'pending', nextPollAt: 30_000 });
+  });
+
+  it('does not poll early when lifecycle signals arrive before nextPollAt', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    pollResponses = [
+      ok({
+        auth: {
+          state: 'pending',
+          userCode: 'ABCD-EFGH',
+          verificationUri: 'https://github.com/login/device',
+          expiresAt: 60_000,
+          nextPollAt: 25_000,
+        },
+      }),
+    ];
+    setVisibilityState('hidden');
+
+    await renderController();
+    setVisibilityState('visible');
+    act(() => {
+      document.dispatchEvent(new window.Event('visibilitychange'));
+      window.dispatchEvent(new window.Event('focus'));
+      window.dispatchEvent(new window.Event('pageshow'));
+    });
+    await flushReact();
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(0);
+
+    await advance(4_999);
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(0);
+    await advance(1);
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(1);
+  });
+
+  it('coalesces reactivation signals and polls outside the global settings task queue', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(20_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    setVisibilityState('hidden');
+
+    const blockedSettingsTask = deferred<void>();
+    gateMocks.setSyncProviderEnabled.mockImplementation(() => blockedSettingsTask.promise);
+    const pendingPoll = deferred<ApiResponse>();
+    pollResponses = [pendingPoll.promise];
+
+    await renderController();
+
+    let blockedAction!: Promise<unknown>;
+    act(() => {
+      blockedAction = latestSnapshot!.onToggleGithubSyncEnabled(false);
+    });
+    await flushReact();
+    expect(gateMocks.setSyncProviderEnabled).toHaveBeenCalledWith('github', false);
+    expect(latestSnapshot?.busy).toBe(true);
+
+    setVisibilityState('visible');
+    act(() => {
+      document.dispatchEvent(new window.Event('visibilitychange'));
+      window.dispatchEvent(new window.Event('focus'));
+      window.dispatchEvent(new window.Event('pageshow'));
+    });
+    await flushReact();
+
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(1);
+
+    await act(async () => {
+      pendingPoll.resolve(
+        ok({
+          auth: {
+            state: 'pending',
+            userCode: 'ABCD-EFGH',
+            verificationUri: 'https://github.com/login/device',
+            expiresAt: 60_000,
+            nextPollAt: 30_000,
+          },
+        }),
+      );
+      await pendingPoll.promise;
+      blockedSettingsTask.resolve();
+      await blockedAction;
+    });
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(1);
+    expect(latestSnapshot?.githubAuth).toMatchObject({ state: 'pending', nextPollAt: 30_000 });
+  });
+
   it('rehydrates persisted pending state after a poll error instead of retrying from stale timing', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(10_000);
@@ -445,9 +607,10 @@ describe('Settings controller GitHub Device Flow', () => {
 
     githubSettingsData = githubSettings({ state: 'connected' });
     await invoke(() => latestSnapshot!.onGithubConnect());
-    // START remains a Device Flow operation; emulate a completed connection through the safe poll action.
-    pollResponses = [ok({ auth: { state: 'connected' } })];
-    await invoke(() => latestSnapshot!.onPollGithubDeviceFlow());
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
 
     const repositoryBeforeDisconnect = latestSnapshot?.githubRepository;
@@ -660,8 +823,10 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubRepositories).toEqual([]);
 
     githubSettingsData = githubSettings({ state: 'connected' });
-    pollResponses = [ok({ auth: { state: 'connected' } })];
-    await invoke(() => latestSnapshot!.onPollGithubDeviceFlow());
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
     expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
 
     const stale = deferred<ApiResponse>();
@@ -883,6 +1048,217 @@ describe('Settings controller GitHub Device Flow', () => {
 
     expect(latestSnapshot?.githubConnectionTest).toEqual({ status: 'idle' });
     expect(latestSnapshot?.githubTargetUnavailable).toBe(true);
+  });
+
+  it('does not let stale poll-error recovery overwrite a newer GitHub auth wake', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    await renderController();
+
+    const staleRecovery = deferred<ApiResponse>();
+    const latestWake = deferred<ApiResponse>();
+    settingsResponses = [staleRecovery.promise, latestWake.promise];
+    pollResponses = [fail('github_device_poll_failed', { code: 'github_device_poll_failed' })];
+
+    await advance(5_000);
+    expect(callCount(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW)).toBe(1);
+
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
+
+    await act(async () => {
+      latestWake.resolve(ok(githubSettings({ state: 'connected' })));
+      await latestWake.promise;
+    });
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+
+    await act(async () => {
+      staleRecovery.resolve(
+        ok(
+          githubSettings({
+            state: 'pending',
+            userCode: 'ABCD-EFGH',
+            verificationUri: 'https://github.com/login/device',
+            expiresAt: 60_000,
+            nextPollAt: 30_000,
+          }),
+        ),
+      );
+      await staleRecovery.promise;
+      for (let index = 0; index < 10; index += 1) await Promise.resolve();
+    });
+
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+  });
+
+  it('does not let stale initial GitHub hydration overwrite a newer auth wake', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const staleHydration = deferred<ApiResponse>();
+    const latestWake = deferred<ApiResponse>();
+    settingsResponses = [staleHydration.promise, latestWake.promise];
+
+    await renderController();
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'disconnected' });
+
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
+
+    await act(async () => {
+      latestWake.resolve(ok(githubSettings({ state: 'connected' })));
+      await latestWake.promise;
+    });
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+
+    await act(async () => {
+      staleHydration.resolve(
+        ok(
+          githubSettings({
+            state: 'pending',
+            userCode: 'ABCD-EFGH',
+            verificationUri: 'https://github.com/login/device',
+            expiresAt: 60_000,
+            nextPollAt: 30_000,
+          }),
+        ),
+      );
+      await staleHydration.promise;
+      for (let index = 0; index < 10; index += 1) await Promise.resolve();
+    });
+
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+  });
+
+  it('keeps the latest auth snapshot when overlapping GitHub storage wakes resolve out of order', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    await renderController();
+    expect(latestSnapshot?.githubAuth).toMatchObject({ state: 'pending' });
+
+    const stale = deferred<ApiResponse>();
+    const latest = deferred<ApiResponse>();
+    settingsResponses = [stale.promise, latest.promise];
+
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
+
+    await act(async () => {
+      latest.resolve(ok(githubSettings({ state: 'connected' })));
+      await latest.promise;
+    });
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+
+    await act(async () => {
+      stale.resolve(
+        ok(
+          githubSettings({
+            state: 'pending',
+            userCode: 'ABCD-EFGH',
+            verificationUri: 'https://github.com/login/device',
+            expiresAt: 60_000,
+            nextPollAt: 30_000,
+          }),
+        ),
+      );
+      await stale.promise;
+    });
+
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+  });
+
+  it('keeps an older successful auth snapshot when a newer overlapping wake fails', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    await renderController();
+
+    const olderSuccess = deferred<ApiResponse>();
+    const newerFailure = deferred<ApiResponse>();
+    settingsResponses = [olderSuccess.promise, newerFailure.promise];
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
+
+    await act(async () => {
+      newerFailure.resolve(fail('github_settings_load_failed'));
+      await newerFailure.promise;
+    });
+    expect(latestSnapshot?.githubAuth).toMatchObject({ state: 'pending' });
+
+    await act(async () => {
+      olderSuccess.resolve(ok(githubSettings({ state: 'connected' })));
+      await olderSuccess.promise;
+    });
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+  });
+
+  it('does not let a stale storage snapshot overwrite a later successful Device Flow poll', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    githubSettingsData = githubSettings({
+      state: 'pending',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: 60_000,
+      nextPollAt: 15_000,
+    });
+    await renderController();
+
+    const staleWake = deferred<ApiResponse>();
+    settingsResponses = [staleWake.promise];
+    act(() => {
+      storageListener?.({ [GITHUB_AUTH_STATE_KEY]: { oldValue: {}, newValue: {} } }, 'local');
+    });
+    await flushReact();
+
+    pollResponses = [ok({ auth: { state: 'connected' } })];
+    await advance(5_000);
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
+
+    await act(async () => {
+      staleWake.resolve(
+        ok(
+          githubSettings({
+            state: 'pending',
+            userCode: 'ABCD-EFGH',
+            verificationUri: 'https://github.com/login/device',
+            expiresAt: 60_000,
+            nextPollAt: 30_000,
+          }),
+        ),
+      );
+      await staleWake.promise;
+    });
+    expect(latestSnapshot?.githubAuth).toEqual({ state: 'connected' });
   });
 
   it('rehydrates a safe disconnected auth summary when GitHub secret storage changes externally', async () => {
