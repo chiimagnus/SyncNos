@@ -393,30 +393,23 @@ async function clearCachedDatabaseId(notionDbManager: any, storageKey: unknown) 
 }
 
 export function createNotionSyncOrchestrator(services: NotionServices) {
-  const notionJobStore: any = services?.jobStore;
-  const notionTokenStore: any = services?.tokenStore;
-  const notionDbManager: any = services?.dbManager;
-  const notionSyncService: any = services?.syncService;
-  const storage: any = services?.storage;
-  const conversationKinds: any = services?.conversationKinds;
+  const notionJobStore: any = services.jobStore;
+  const notionTokenStore: any = services.tokenStore;
+  const notionDbManager: any = services.dbManager;
+  const notionSyncService: any = services.syncService;
+  const storage: any = services.storage;
+  const conversationKinds: any = services.conversationKinds;
 
   async function getSyncJobStatus(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    if (!notionJobStore || typeof notionJobStore.getJob !== 'function') {
-      throw new Error('notion sync job store missing');
-    }
-    const job =
-      instanceId && typeof notionJobStore.abortRunningJobIfFromOtherInstance === 'function'
-        ? await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId, { forceAbort: true })
-        : await notionJobStore.getJob();
+    const job = instanceId
+      ? await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId, { forceAbort: true })
+      : await notionJobStore.getJob();
     return { provider: SYNC_PROVIDER, job, instanceId };
   }
 
   async function clearSyncJobStatus(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    if (!notionJobStore || typeof notionJobStore.setJob !== 'function') {
-      throw new Error('notion sync job store missing');
-    }
     await notionJobStore.setJob(null);
     return { provider: SYNC_PROVIDER, job: null, instanceId };
   }
@@ -424,16 +417,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
   async function syncConversations(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
     const conversationIds = input ? input.conversationIds : undefined;
-    if (
-      !notionJobStore ||
-      typeof notionJobStore.getJob !== 'function' ||
-      typeof notionJobStore.abortRunningJobIfFromOtherInstance !== 'function' ||
-      typeof notionJobStore.isRunningJob !== 'function' ||
-      typeof notionJobStore.setJob !== 'function'
-    ) {
-      throw new Error('notion sync job store missing');
-    }
-
     const ids = Array.isArray(conversationIds)
       ? Array.from(
           new Set(
@@ -479,22 +462,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       initialJob: claimedJob,
       persist: (job) => notionJobStore.setJob(job),
     });
-    await lifecycle.setRunStage('preparing_queue');
 
     try {
-      const token = await (notionTokenStore && notionTokenStore.getToken
-        ? notionTokenStore.getToken()
-        : Promise.resolve(null));
+      const token = await notionTokenStore.getToken();
       if (!token || !token.accessToken) throw new Error('notion not connected');
 
       const parentPageId = await getNotionParentPageId();
       if (!parentPageId) throw new Error('missing parentPageId');
-
-      if (!storage) throw new Error('storage module missing');
-      if (!notionSyncService) throw new Error('notion sync service missing');
-      if (!notionDbManager || !notionDbManager.ensureDatabase) throw new Error('notion db manager missing');
-      if (!conversationKinds || typeof conversationKinds.pick !== 'function')
-        throw new Error('conversation kinds missing');
 
       const dbIdByKindId = new Map();
       const dbIdPromiseByKindId = new Map();
@@ -564,9 +538,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         try {
           trace.mark('load conversation');
 
-          const mapped = await (storage.getSyncMappingByConversation
-            ? storage.getSyncMappingByConversation(id)
-            : Promise.resolve(null));
+          const mapped = await storage.getSyncMappingByConversation(id);
           const convo = mapped && mapped.conversation ? mapped.conversation : null;
           const mapping = mapped && mapped.mapping ? mapped.mapping : null;
           await lifecycle.setItem(id, {
