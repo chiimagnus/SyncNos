@@ -571,6 +571,32 @@ describe('virtualized chat single pass', () => {
     expect(finishPreparedCapture(test.accumulator).records.at(-1)?.key).toBe('m160');
   });
 
+  it('uses the default total deadline only as an emergency liveness fail-safe', async () => {
+    const windows = Array.from({ length: 20 }, (_, index) => ({
+      top: index * 60,
+      keys: [`m${index}`, `m${index + 1}`],
+    }));
+    const test = harness(windows, { initialScrollHeight: windows.at(-1)!.top + 100 });
+    const harvest = test.adapter.harvest;
+    let clock = 0;
+    test.adapter.harvest = async (target) => {
+      const result = await harvest(target);
+      clock += 120_000;
+      return result;
+    };
+
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, now: () => clock },
+    );
+
+    expect(result.completeness).toBe('partial');
+    expect(result.reasons).toContain('total_deadline_exhausted');
+    expect(result.steps).toBeLessThan(windows.length);
+  });
+
   it('reduces the step to recover overlap before declaring an unanchored window', async () => {
     const test = harness([
       { top: 0, keys: ['a', 'b'] },

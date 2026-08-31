@@ -466,6 +466,7 @@ const PASS_DEFAULTS = Object.freeze({
   maxOverlapRecoveries: 4,
   maxBoundaryRecoveries: 4,
 });
+const EMERGENCY_TOTAL_DEADLINE_MS = 300_000;
 
 function boundedInteger(value: unknown, fallback: number, min: number, max: number, allowZero = false): number {
   const number = Number(value);
@@ -870,7 +871,12 @@ export async function runVirtualizedSweep<T>(
   accumulator: PreparedAccumulator<T>,
   options: VirtualizedSweepOptions = {},
 ): Promise<VirtualizedSweepResult> {
-  const totalDeadlineMs = boundedInteger(options.totalDeadlineMs, Number.POSITIVE_INFINITY, 1, 300_000);
+  const totalDeadlineMs = boundedInteger(
+    options.totalDeadlineMs,
+    EMERGENCY_TOTAL_DEADLINE_MS,
+    1,
+    EMERGENCY_TOTAL_DEADLINE_MS,
+  );
   const now = options.now || Date.now;
   const deadline = Number.isFinite(totalDeadlineMs) ? now() + totalDeadlineMs : Number.POSITIVE_INFINITY;
   const sweepIdentity = String(adapter.sampleIdentity() || '').trim();
