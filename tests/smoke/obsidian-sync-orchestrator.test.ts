@@ -695,9 +695,26 @@ describe('obsidian-sync-orchestrator', () => {
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
     const result = await orch.syncConversations({ conversationIds: [1, 2], instanceId: 'x' });
 
-    expect(result.results[0]).toMatchObject({ conversationId: 1, ok: false, mode: 'failed' });
+    expect(result.results[0]).toMatchObject({
+      conversationId: 1,
+      conversationTitle: 'Isolation 1',
+      ok: false,
+      mode: 'failed',
+    });
     expect(String(result.results[0].error)).toContain('first generation failed');
-    expect(result.results[1]).toMatchObject({ conversationId: 2, ok: true, mode: 'full_rebuild' });
+    expect(result.results[1]).toMatchObject({
+      conversationId: 2,
+      conversationTitle: 'Isolation 2',
+      ok: true,
+      mode: 'full_rebuild',
+    });
+    const status = await orch.getSyncStatus({ instanceId: 'x' });
+    expect(status.job?.perConversation?.[0]).toMatchObject({
+      conversationId: 1,
+      conversationTitle: 'Isolation 1',
+      ok: false,
+      mode: 'failed',
+    });
     expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(2);
   });
 

@@ -22,6 +22,7 @@ import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageTargets,
 } from '@services/sync/shared/markdown-asset-refs';
+import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 
 const SYNC_PROVIDER = 'obsidian';
 
@@ -254,9 +255,11 @@ async function buildClient() {
 async function decideSyncModeForConversation({
   conversationId,
   forceFull,
+  onConversationLoaded,
 }: {
   conversationId: number;
   forceFull?: boolean;
+  onConversationLoaded?: (conversation: any) => void | Promise<void>;
 }) {
   const storage = getBackgroundStorageModule();
   if (
@@ -268,6 +271,7 @@ async function decideSyncModeForConversation({
   }
 
   const convo = await storage.getConversationById(conversationId);
+  if (convo && onConversationLoaded) await onConversationLoaded(convo);
   if (!convo) {
     return {
       isFinal: true,
@@ -558,49 +562,42 @@ async function syncConversations({
   const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
   if (obsidianSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
-  const currentJob: any = {
-    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    provider: SYNC_PROVIDER,
-    instanceId: safeInstanceId,
-    status: 'running',
-    startedAt: Date.now(),
-    updatedAt: Date.now(),
-    finishedAt: null,
-    conversationIds: ids,
-    okCount: 0,
-    failCount: 0,
-    perConversation: [],
-  };
-  async function persistCurrentJob(partial: Record<string, unknown> = {}) {
-    Object.assign(currentJob, partial, { updatedAt: Date.now() });
-    await obsidianSyncJobStore.setJob({ ...currentJob });
-  }
-
-  await persistCurrentJob({
-    currentConversationId: ids[0] || undefined,
-    currentStage: ids.length ? 'preparing_queue' : '',
+  const startedAt = Date.now();
+  const lifecycle = createSyncJobLifecycle({
+    initialJob: {
+      id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+      provider: SYNC_PROVIDER,
+      instanceId: safeInstanceId,
+      status: 'running',
+      startedAt,
+      updatedAt: startedAt,
+      finishedAt: null,
+      conversationIds: ids,
+      currentStage: 'preparing_queue',
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    },
+    persist: (job) => obsidianSyncJobStore.setJob(job),
   });
 
-  const results: any[] = [];
+  await lifecycle.setRunStage('preparing_queue');
 
   for (const conversationId of ids) {
     let row: any = null;
     try {
-      await persistCurrentJob({
-        currentConversationId: conversationId,
-        currentConversationTitle: '',
-        currentStage: 'loading_conversation',
-      });
+      await lifecycle.setRunStage('loading_conversation');
       const decision: any = await decideSyncModeForConversation({
         conversationId,
         forceFull: forceFullIds.has(conversationId),
+        onConversationLoaded: async (conversation) => {
+          await lifecycle.setItem(conversationId, {
+            conversationTitle: toCurrentConversationTitle(conversation, conversationId),
+            currentStage: 'preparing_sync',
+          });
+        },
       });
       if (decision && decision.isFinal) {
-        await persistCurrentJob({
-          currentConversationId: conversationId,
-          currentConversationTitle: toCurrentConversationTitle((decision as any).convo, conversationId),
-          currentStage: 'finishing_current_item',
-        });
         row = decision.row;
       } else if (decision && decision.mode && decision.conversationId) {
         const writer = getMarkdownWriterModule();
@@ -624,9 +621,7 @@ async function syncConversations({
           decision.mode === 'full_rebuild_forced' ||
           decision.mode === 'full_rebuild_rename'
         ) {
-          await persistCurrentJob({
-            currentConversationId: conversationId,
-            currentConversationTitle: currentTitle,
+          await lifecycle.setItem(conversationId, {
             currentStage: decision.mode === 'full_rebuild_rename' ? 'renaming_note' : 'writing_full_note',
           });
           const syncnosObject = metaMod.buildSyncnosObject({
@@ -667,11 +662,7 @@ async function syncConversations({
               deleteAfter !== safeString(decision.filePath) &&
               typeof client.deleteVaultFile === 'function'
             ) {
-              await persistCurrentJob({
-                currentConversationId: conversationId,
-                currentConversationTitle: currentTitle,
-                currentStage: 'deleting_old_note_path',
-              });
+              await lifecycle.setItem(conversationId, { currentStage: 'deleting_old_note_path' });
               try {
                 const delRes = await client.deleteVaultFile(deleteAfter);
                 if (!delRes || !delRes.ok) {
@@ -745,7 +736,7 @@ async function syncConversations({
     } catch (e: any) {
       row = buildPerConversationResult({
         conversationId,
-        conversationTitle: '',
+        conversationTitle: lifecycle.titleFor(conversationId),
         ok: false,
         mode: 'failed',
         appended: 0,
@@ -753,26 +744,11 @@ async function syncConversations({
         at: Date.now(),
       });
     }
-    results.push(row);
-    currentJob.perConversation.push(row);
-    currentJob.okCount = results.filter((r) => r.ok).length;
-    currentJob.failCount = results.length - currentJob.okCount;
-    await persistCurrentJob({
-      currentConversationId: conversationId,
-      currentConversationTitle: undefined,
-      currentStage: 'finishing_current_item',
-    });
+    row = (await lifecycle.completeItem(row)).row;
   }
 
-  currentJob.status = 'done';
-  currentJob.finishedAt = Date.now();
-  await persistCurrentJob({
-    currentConversationId: undefined,
-    currentConversationTitle: undefined,
-    currentStage: undefined,
-  });
-
-  return buildSyncSummary(results, instanceId);
+  await lifecycle.finish();
+  return buildSyncSummary(lifecycle.results(), instanceId);
 }
 
 const api = { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
