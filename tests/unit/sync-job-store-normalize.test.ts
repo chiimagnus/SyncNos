@@ -21,12 +21,11 @@ describe('normalizeSyncJobSnapshot', () => {
     for (const key of Object.keys(storageState)) delete storageState[key];
   });
 
-  it('normalizes feishu job snapshots (finished -> done, ids, counts)', async () => {
-    const { normalizeSyncJobSnapshot } = await import('@services/sync/sync-job-store');
-
-    const snapshot = normalizeSyncJobSnapshot('feishu', {
+  it('normalizes feishu job snapshots (ids, counts)', async () => {
+    const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
+    storageState[SYNC_JOB_STORAGE_KEYS.feishu] = {
       id: 'job_1',
-      status: 'finished',
+      status: 'done',
       startedAt: 1,
       updatedAt: 2,
       finishedAt: 3,
@@ -35,7 +34,8 @@ describe('normalizeSyncJobSnapshot', () => {
         { conversationId: '1', ok: true, appended: 1, at: 10 },
         { conversationId: 2, ok: false, error: 'no permission', at: 11 },
       ],
-    });
+    };
+    const snapshot = await createSyncJobStore('feishu').getJob();
 
     expect(snapshot).toBeTruthy();
     expect(snapshot!.provider).toBe('feishu');
@@ -48,10 +48,10 @@ describe('normalizeSyncJobSnapshot', () => {
   });
 
   it('normalizes GitHub snapshots under the dedicated generic job key', async () => {
-    const { normalizeSyncJobSnapshot, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
+    const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
 
     expect(SYNC_JOB_STORAGE_KEYS.github).toBe('github_sync_job_v1');
-    const snapshot = normalizeSyncJobSnapshot('github', {
+    storageState[SYNC_JOB_STORAGE_KEYS.github] = {
       id: 'github_job_1',
       provider: 'github',
       status: 'running',
@@ -62,7 +62,8 @@ describe('normalizeSyncJobSnapshot', () => {
       okCount: 0,
       failCount: 0,
       perConversation: [],
-    });
+    };
+    const snapshot = await createSyncJobStore('github').getJob();
 
     expect(snapshot).toMatchObject({
       id: 'github_job_1',
@@ -74,8 +75,7 @@ describe('normalizeSyncJobSnapshot', () => {
   });
 
   it('aborts a foreign running job immediately when forced', async () => {
-    const { abortRunningSyncJobIfFromOtherInstance, SYNC_JOB_STORAGE_KEYS } =
-      await import('@services/sync/sync-job-store');
+    const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
     const now = Date.now();
     storageState[SYNC_JOB_STORAGE_KEYS.notion] = {
       id: 'job_2',
@@ -91,15 +91,17 @@ describe('normalizeSyncJobSnapshot', () => {
       perConversation: [],
     };
 
-    const reconciled = await abortRunningSyncJobIfFromOtherInstance('notion', 'background-new', { forceAbort: true });
+    const reconciled = await createSyncJobStore('notion').abortRunningJobIfFromOtherInstance('background-new', {
+      forceAbort: true,
+    });
     expect(reconciled?.status).toBe('aborted');
     expect(reconciled?.abortedReason).toBe('extension reloaded');
     expect((storageState[SYNC_JOB_STORAGE_KEYS.notion] as any)?.status).toBe('aborted');
   });
 
   it('keeps a fresh foreign running job until the 5 minute stale window expires when not forced', async () => {
-    const { abortRunningSyncJobIfFromOtherInstance, isRunningSyncJob, SYNC_JOB_STORAGE_KEYS } =
-      await import('@services/sync/sync-job-store');
+    const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
+    const jobStore = createSyncJobStore('feishu');
     const now = Date.now();
     storageState[SYNC_JOB_STORAGE_KEYS.feishu] = {
       id: 'job_3',
@@ -115,15 +117,15 @@ describe('normalizeSyncJobSnapshot', () => {
       perConversation: [],
     };
 
-    const fresh = await abortRunningSyncJobIfFromOtherInstance('feishu', 'background-new');
+    const fresh = await jobStore.abortRunningJobIfFromOtherInstance('background-new');
     expect(fresh?.status).toBe('running');
-    expect(isRunningSyncJob(fresh)).toBe(true);
+    expect(jobStore.isRunningJob(fresh)).toBe(true);
 
     storageState[SYNC_JOB_STORAGE_KEYS.feishu] = {
       ...(storageState[SYNC_JOB_STORAGE_KEYS.feishu] as any),
       updatedAt: now - 5 * 60 * 1000 - 1_000,
     };
-    const stale = await abortRunningSyncJobIfFromOtherInstance('feishu', 'background-new');
+    const stale = await jobStore.abortRunningJobIfFromOtherInstance('background-new');
     expect(stale?.status).toBe('aborted');
     expect(stale?.abortedReason).toBe('extension reloaded');
   });

@@ -14,7 +14,7 @@ import {
   ensureDefaultFeishuOAuthProxyUrl,
   setupFeishuOAuthNavigationListener,
 } from '@services/sync/feishu/auth/oauth';
-import { abortRunningSyncJobIfFromOtherInstance } from '@services/sync/sync-job-store';
+import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerFeishuSettingsHandlers } from '@services/sync/feishu/settings-background-handlers';
@@ -150,7 +150,8 @@ export default defineBackground(() => {
 
   const id = getBackgroundInstanceId();
   for (const provider of ['notion', 'obsidian', 'feishu', 'github'] as const) {
-    runBestEffort(() => abortRunningSyncJobIfFromOtherInstance(provider, id, { forceAbort: true }));
+    const jobStore = createSyncJobStore(provider);
+    runBestEffort(() => jobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
   }
 
   // Best-effort recovery complements alarm wakeups after MV3 worker reloads.

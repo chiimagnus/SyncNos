@@ -72,7 +72,10 @@ vi.mock('@services/sync/feishu/auth/oauth', () => ({
   setupFeishuOAuthNavigationListener: mocks.setupFeishuOAuthNavigationListener,
 }));
 vi.mock('@services/sync/sync-job-store', () => ({
-  abortRunningSyncJobIfFromOtherInstance: mocks.abortRunningSyncJobIfFromOtherInstance,
+  createSyncJobStore: (provider: string) => ({
+    abortRunningJobIfFromOtherInstance: (instanceId: string, options: unknown) =>
+      mocks.abortRunningSyncJobIfFromOtherInstance(provider, instanceId, options),
+  }),
 }));
 vi.mock('@platform/runtime/runtime', () => ({ onInstalled: mocks.onInstalled }));
 vi.mock('@platform/webext/extension-app', () => ({ openOrFocusExtensionAppTab: mocks.openOrFocusExtensionAppTab }));

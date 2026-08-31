@@ -32,19 +32,17 @@ function normalizePerConversation(rows: unknown) {
   });
 }
 
-export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
+function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
   if (!job || typeof job !== 'object') return null;
   const value = job as Record<string, unknown>;
   const perConversation = normalizePerConversation(value.perConversation);
   const okCount = Number(value.okCount);
   const failCount = Number(value.failCount);
-  const status = String(value.status || 'done');
-
   return {
     id: value.id == null ? undefined : String(value.id || ''),
     provider,
     instanceId: value.instanceId == null ? undefined : String(value.instanceId || ''),
-    status: status === 'finished' ? 'done' : (status as SyncJobSnapshot['status']),
+    status: String(value.status || 'done') as SyncJobSnapshot['status'],
     startedAt: Number(value.startedAt) || 0,
     updatedAt: Number(value.updatedAt) || Date.now(),
     finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,
@@ -62,7 +60,7 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   };
 }
 
-export async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {
+async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {
   const key = SYNC_JOB_STORAGE_KEYS[provider];
   try {
     const res = await storageGet([key]);
@@ -72,7 +70,7 @@ export async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapsho
   }
 }
 
-export async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | null): Promise<boolean> {
+async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | null): Promise<boolean> {
   const key = SYNC_JOB_STORAGE_KEYS[provider];
   try {
     await storageSet({ [key]: job || null });
@@ -82,7 +80,7 @@ export async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | 
   }
 }
 
-export function isRunningSyncJob(job: SyncJobSnapshot | null | undefined, staleMs?: number): boolean {
+function isRunningSyncJob(job: SyncJobSnapshot | null | undefined, staleMs?: number): boolean {
   if (!job || job.status !== 'running') return false;
   const updatedAt = Number(job.updatedAt) || 0;
   if (!updatedAt) return true;
@@ -95,7 +93,7 @@ export type ReconcileRunningSyncJobOptions = {
   forceAbort?: boolean;
 };
 
-export async function abortRunningSyncJobIfFromOtherInstance(
+async function abortRunningSyncJobIfFromOtherInstance(
   provider: SyncProvider,
   instanceId: string,
   options: ReconcileRunningSyncJobOptions = {},
