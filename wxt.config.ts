@@ -100,7 +100,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   entrypointsDir: 'src/entrypoints',
   webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
-  vite: () => ({
+  vite: (env) => ({
     define: {
       __SYNCNOS_FEISHU_OAUTH_CLIENT_ID__: JSON.stringify(process.env.SYNCNOS_FEISHU_OAUTH_CLIENT_ID ?? ''),
       __SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__: JSON.stringify(
@@ -111,6 +111,9 @@ export default defineConfig({
       alias: viteAlias,
     },
     build: {
+      // Chromium 152 can reject extension-page modulepreload reuse as a cross-world resource mismatch.
+      // Firefox/Safari keep Vite's default preload behavior; real ESM imports are unchanged.
+      ...(env.browser === 'chrome' ? { modulePreload: false } : {}),
       // KaTeX/Recharts can legitimately push some chunks beyond Vite's default 500kB warning threshold.
       // Keep the warning signal meaningful by using a higher, extension-appropriate limit.
       chunkSizeWarningLimit: 2000,
