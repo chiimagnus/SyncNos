@@ -6,7 +6,7 @@ import { GITHUB_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { addArticleComment } from '@services/comments/data/storage';
 import { backgroundStorage } from '@services/conversations/background/storage';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cache-read';
 import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 import {
@@ -479,7 +479,7 @@ const orchestrator = createGithubSyncOrchestrator({
   getSettings: getGithubSettings,
   preflight: (input) => preflightGithubRepository(input, api),
   storage: backgroundStorage,
-  loadImage: getImageCacheAssetById,
+  loadImages: getImageCacheAssetsByIds,
   createBlob: (input) => createGithubBlob(input, api),
   commit: (input) => commitGithubStagedOperations(input, api),
   listDueCleanupRows: listDueGithubCleanupRows,

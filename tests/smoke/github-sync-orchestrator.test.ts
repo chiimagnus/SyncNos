@@ -50,7 +50,7 @@ function fakeServices(input: {
   order?: string[];
   commitImpl?: GithubOrchestratorServices['commit'];
   patchFailures?: ReadonlySet<number>;
-  loadImage?: GithubOrchestratorServices['loadImage'];
+  loadImages?: GithubOrchestratorServices['loadImages'];
   createBlob?: GithubOrchestratorServices['createBlob'];
   cleanupRows?: GithubCleanupOutboxRecord[];
   cleanupHasMoreDue?: boolean;
@@ -119,7 +119,7 @@ function fakeServices(input: {
         return true;
       }),
     },
-    loadImage: input.loadImage ?? vi.fn(async () => null),
+    loadImages: input.loadImages ?? vi.fn(async () => new Map()),
     createBlob: input.createBlob ?? vi.fn(async () => ({ sha: 'c'.repeat(40) })),
     commit,
     listDueCleanupRows: vi.fn(async (remoteKey, now, limit) => {
@@ -310,6 +310,32 @@ describe('github sync orchestrator staging through production sync', () => {
       mode: 'failed',
       error: 'broken local read',
     });
+  });
+
+  it('fails staging when the GitHub image batch loader rejects', async () => {
+    const createBlob = vi.fn(async () => ({ sha: 'c'.repeat(40) }));
+    const { services, commit } = fakeServices({
+      rows: { 1: { conversation: chat(1) } },
+      messages: { 1: [message('![x](syncnos-asset://1)')] },
+      loadImages: vi.fn(async () => {
+        throw new Error('image batch failed');
+      }),
+      createBlob,
+    });
+
+    const result = await createGithubSyncOrchestrator(services).sync({
+      conversationIds: [1],
+      instanceId: 'image-batch-failure',
+    });
+
+    expect(result.items[0]).toMatchObject({
+      conversationId: 1,
+      status: 'failed',
+      error: 'image batch failed',
+    });
+    expect(services.loadImages).toHaveBeenCalledWith({ ids: [1], conversationId: 1 });
+    expect(createBlob).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
   });
 
   it('dedupes identical content staged to the same path', async () => {
@@ -1634,14 +1660,20 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
     const { services } = fakeServices({
       rows: { 1: { conversation: chat(1) } },
       messages: { 1: [message('before ![img](syncnos-asset://1) after')] },
-      loadImage: async () => ({
-        id: 1,
-        conversationId: 1,
-        url: 'https://cdn.example.com/image.png',
-        blob: new Blob([new Uint8Array([1])], { type: 'image/png' }),
-        byteSize: 1,
-        contentType: 'image/png',
-      }),
+      loadImages: async () =>
+        new Map([
+          [
+            1,
+            {
+              id: 1,
+              conversationId: 1,
+              url: 'https://cdn.example.com/image.png',
+              blob: new Blob([new Uint8Array([1])], { type: 'image/png' }),
+              byteSize: 1,
+              contentType: 'image/png',
+            },
+          ],
+        ]),
       createBlob: async () => {
         throw new GithubApiError('github_outcome_unknown', 0, 'github_outcome_unknown');
       },

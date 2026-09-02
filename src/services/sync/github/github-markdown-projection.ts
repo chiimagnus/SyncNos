@@ -1,6 +1,6 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
-import { getImageCacheAssetById, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
 import { sha256Hex } from '@services/sync/github/github-content-hash';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
@@ -46,7 +46,10 @@ export type GithubMarkdownProjection = {
   warnings: GithubProjectionWarning[];
 };
 
-export type GithubImageLoader = (input: { id: number; conversationId: number }) => Promise<ImageCacheAsset | null>;
+export type GithubImageBatchLoader = (input: {
+  ids: readonly number[];
+  conversationId: number;
+}) => Promise<Map<number, ImageCacheAsset>>;
 export type GithubBlobUploader = (input: { content: Uint8Array }) => Promise<{ sha: string }>;
 
 function folderForConversation(conversation: any): string {
@@ -159,7 +162,7 @@ export async function buildGithubMarkdownProjection(input: {
   comments?: ArticleCommentDto[];
   remoteKey?: string;
   continuity?: GithubProjectionContinuity;
-  imageLoader?: GithubImageLoader;
+  imageBatchLoader?: GithubImageBatchLoader;
   blobUploader?: GithubBlobUploader;
 }): Promise<GithubMarkdownProjection> {
   const conversation = input.conversation || {};
@@ -179,10 +182,11 @@ export async function buildGithubMarkdownProjection(input: {
     throw new Error('github_conversation_id_required');
   }
 
-  const imageLoader = input.imageLoader ?? getImageCacheAssetById;
+  const imageBatchLoader = input.imageBatchLoader ?? getImageCacheAssetsByIds;
   const blobUploader = input.blobUploader ?? null;
   if (assetIds.length && !blobUploader) throw new Error('github_blob_uploader_required');
 
+  const assetsById = assetIds.length ? await imageBatchLoader({ ids: assetIds, conversationId }) : new Map();
   const remoteKey = String(input.remoteKey || '');
   const namespace = attachmentNamespace(markdownPath);
   const replacementByAssetId = new Map<number, { target?: string; placeholder?: true }>();
@@ -190,7 +194,7 @@ export async function buildGithubMarkdownProjection(input: {
   const warnings: GithubProjectionWarning[] = [];
 
   for (const assetId of assetIds) {
-    const asset = await imageLoader({ id: assetId, conversationId });
+    const asset = assetsById.get(assetId) || null;
     if (!asset || !(asset.blob instanceof Blob)) {
       replacementByAssetId.set(assetId, { placeholder: true });
       warnings.push({ code: 'image_missing', assetId });
