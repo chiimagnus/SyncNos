@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests } from '@platform/idb/schema';
 import {
   __resetConversationStorageStateForTests,
@@ -76,6 +76,30 @@ describe('conversations pagination storage-idb', () => {
     expect(second.hasMore).toBe(false);
 
     expect(Number(a.id)).toBeLessThan(Number(b.id));
+  });
+
+  it('does not query article comment indexes for a non-article-only page', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'chat-only-comment-read',
+      title: 'chat only',
+      url: 'https://chatgpt.com/c/chat-only-comment-read',
+      lastCapturedAt: Date.now(),
+    });
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      const page = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 10 });
+      expect(page.items).toHaveLength(1);
+      const commentIndexReads = getAllSpy.mock.contexts.filter((context) => {
+        const indexName = String((context as any)?.name || '');
+        return indexName === 'by_conversationId_createdAt' || indexName === 'by_canonicalUrl_createdAt';
+      });
+      expect(commentIndexReads).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+    }
   });
 
   it('does not duplicate or skip rows across pages', async () => {
@@ -598,18 +622,32 @@ describe('conversations pagination storage-idb', () => {
       createdAt: 3,
     });
 
-    const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 2 });
-    expect(first.items.map((item) => item.conversationKey)).toEqual([
-      'article:https://example.com/shared',
-      'article:historical-shared-copy',
-    ]);
-    expect(first.items.map((item) => item.commentThreadCount)).toEqual([2, 2]);
-    expect(first.hasMore).toBe(true);
-    expect(first.cursor).toEqual({ lastCapturedAt: now - 1, id: duplicateId });
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 2 });
+      expect(first.items.map((item) => item.conversationKey)).toEqual([
+        'article:https://example.com/shared',
+        'article:historical-shared-copy',
+      ]);
+      expect(first.items.map((item) => item.commentThreadCount)).toEqual([2, 2]);
+      expect(first.hasMore).toBe(true);
+      expect(first.cursor).toEqual({ lastCapturedAt: now - 1, id: duplicateId });
 
-    const second = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 2 }, first.cursor!);
-    expect(second.items.map((item) => item.conversationKey)).toEqual(['after-shared']);
-    expect(second.items[0]?.commentThreadCount).toBeUndefined();
-    expect(second.hasMore).toBe(false);
+      const second = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 2 }, first.cursor!);
+      expect(second.items.map((item) => item.conversationKey)).toEqual(['after-shared']);
+      expect(second.items[0]?.commentThreadCount).toBeUndefined();
+      expect(second.hasMore).toBe(false);
+
+      const commentReadIndexNames = getAllSpy.mock.contexts
+        .map((context) => String((context as any)?.name || ''))
+        .filter((name) => name === 'by_conversationId_createdAt' || name === 'by_canonicalUrl_createdAt');
+      expect(commentReadIndexNames).toEqual([
+        'by_conversationId_createdAt',
+        'by_canonicalUrl_createdAt',
+        'by_conversationId_createdAt',
+      ]);
+    } finally {
+      getAllSpy.mockRestore();
+    }
   });
 });
