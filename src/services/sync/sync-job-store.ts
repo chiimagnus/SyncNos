@@ -1,94 +1,135 @@
 import { storageGet, storageSet } from '@platform/storage/local';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncProvider, SyncWarning } from '@services/sync/models';
-import { normalizeSyncConversationId, normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
-  notion: 'notion_sync_job_v1',
-  obsidian: 'obsidian_sync_job_v1',
-  feishu: 'feishu_sync_job_v1',
-  github: 'github_sync_job_v1',
+  notion: 'notion_sync_job_v2',
+  obsidian: 'obsidian_sync_job_v2',
+  feishu: 'feishu_sync_job_v2',
+  github: 'github_sync_job_v2',
 };
 
-function nonNegativeSafeInteger(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isSafeInteger(number) && number >= 0 ? number : null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function nonNegativeFinite(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : null;
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-function normalizeWarnings(value: unknown): SyncWarning[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value
-    .filter((warning) => warning && typeof warning === 'object' && !Array.isArray(warning))
-    .map((warning) => {
-      const raw = warning as Record<string, unknown>;
-      return {
-        code: String(raw.code || '').trim(),
-        message: String(raw.message || '').trim(),
-        ...(raw.extra === undefined ? {} : { extra: raw.extra }),
-      };
-    });
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-function normalizePerConversation(rows: unknown): SyncPerConversationResult[] {
-  if (!Array.isArray(rows)) return [];
-  const out: SyncPerConversationResult[] = [];
-  for (const row of rows) {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
-    const value = row as Record<string, unknown>;
-    const conversationId = normalizeSyncConversationId(value.conversationId);
-    if (conversationId == null) continue;
-    const appended = Number(value.appended);
-    out.push({
-      conversationId,
-      conversationTitle: value.conversationTitle == null ? undefined : String(value.conversationTitle || ''),
-      ok: value.ok === true,
-      mode: String(value.mode || (value.ok === true ? 'ok' : 'failed')),
-      appended: Number.isFinite(appended) ? appended : 0,
-      error: String(value.error || ''),
-      warnings: normalizeWarnings(value.warnings),
-      at: nonNegativeFinite(value.at) ?? 0,
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === 'string';
+}
+
+function parseWarnings(value: unknown): SyncWarning[] | undefined | null {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+  const warnings: SyncWarning[] = [];
+  for (const warning of value) {
+    if (!isRecord(warning) || typeof warning.code !== 'string' || typeof warning.message !== 'string') return null;
+    warnings.push({
+      code: warning.code,
+      message: warning.message,
+      ...(warning.extra === undefined ? {} : { extra: warning.extra }),
     });
   }
-  return out;
+  return warnings;
+}
+
+function parseConversationIds(value: unknown): number[] | null {
+  if (!Array.isArray(value)) return null;
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const id of value) {
+    if (!isPositiveSafeInteger(id) || seen.has(id)) return null;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function parsePerConversation(value: unknown): SyncPerConversationResult[] | null {
+  if (!Array.isArray(value)) return null;
+  const rows: SyncPerConversationResult[] = [];
+  const seen = new Set<number>();
+  for (const row of value) {
+    if (!isRecord(row) || !isPositiveSafeInteger(row.conversationId) || seen.has(row.conversationId)) return null;
+    seen.add(row.conversationId);
+    if (!isOptionalString(row.conversationTitle)) return null;
+    if (typeof row.ok !== 'boolean' || typeof row.mode !== 'string') return null;
+    if (typeof row.appended !== 'number' || !Number.isFinite(row.appended)) return null;
+    if (typeof row.error !== 'string' || !isNonNegativeFiniteNumber(row.at)) return null;
+    const warnings = parseWarnings(row.warnings);
+    if (warnings === null) return null;
+    rows.push({
+      conversationId: row.conversationId,
+      conversationTitle: row.conversationTitle,
+      ok: row.ok,
+      mode: row.mode,
+      appended: row.appended,
+      error: row.error,
+      warnings,
+      at: row.at,
+    });
+  }
+  return rows;
 }
 
 export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
-  if (!job || typeof job !== 'object' || Array.isArray(job)) return null;
-  const value = job as Record<string, unknown>;
-  const status = value.status;
+  if (!isRecord(job) || job.provider !== provider) return null;
+  const status = job.status;
   if (status !== 'running' && status !== 'done' && status !== 'aborted') return null;
+  if (!isOptionalString(job.id) || !isOptionalString(job.instanceId)) return null;
+  if (!isNonNegativeFiniteNumber(job.startedAt) || !isNonNegativeFiniteNumber(job.updatedAt)) return null;
+  let finishedAt: number | null;
+  if (status === 'running') {
+    if (job.finishedAt !== null) return null;
+    finishedAt = null;
+  } else {
+    if (!isNonNegativeFiniteNumber(job.finishedAt)) return null;
+    finishedAt = job.finishedAt;
+  }
+  if (!isNonNegativeSafeInteger(job.totalCount)) return null;
+  if (!isNonNegativeSafeInteger(job.okCount) || !isNonNegativeSafeInteger(job.failCount)) return null;
+  if (job.currentConversationId !== undefined && !isPositiveSafeInteger(job.currentConversationId)) return null;
+  if (!isOptionalString(job.currentConversationTitle) || !isOptionalString(job.currentStage)) return null;
+  if (!isOptionalString(job.abortedReason)) return null;
 
-  const perConversation = normalizePerConversation(value.perConversation);
-  const startedAt = nonNegativeFinite(value.startedAt) ?? 0;
-  const finishedAt = value.finishedAt == null ? null : nonNegativeFinite(value.finishedAt);
-  const updatedAt = nonNegativeFinite(value.updatedAt) ?? Math.max(startedAt, finishedAt ?? 0);
-  const okCount = nonNegativeSafeInteger(value.okCount) ?? perConversation.filter((row) => row.ok).length;
-  const failCount = nonNegativeSafeInteger(value.failCount) ?? perConversation.filter((row) => !row.ok).length;
-  const totalCount = nonNegativeSafeInteger(value.totalCount);
-  const currentConversationId = normalizeSyncConversationId(value.currentConversationId);
+  const conversationIds = parseConversationIds(job.conversationIds);
+  const perConversation = parsePerConversation(job.perConversation);
+  if (conversationIds === null || perConversation === null) return null;
+  if (status !== 'done' && (conversationIds.length > 0 || perConversation.length > 0)) return null;
+  if (status === 'done') {
+    if (conversationIds.length !== job.totalCount || perConversation.length !== job.totalCount) return null;
+    if (job.okCount + job.failCount !== job.totalCount) return null;
+    const resultIds = new Set(perConversation.map((row) => row.conversationId));
+    if (conversationIds.some((id) => !resultIds.has(id))) return null;
+  }
 
   return {
-    id: value.id == null ? undefined : String(value.id || ''),
+    id: job.id,
     provider,
-    instanceId: value.instanceId == null ? undefined : String(value.instanceId || ''),
+    instanceId: job.instanceId,
     status,
-    startedAt,
-    updatedAt,
+    startedAt: job.startedAt,
+    updatedAt: job.updatedAt,
     finishedAt,
-    ...(totalCount == null ? {} : { totalCount }),
-    conversationIds: normalizeSyncConversationIds(value.conversationIds),
-    currentConversationId: currentConversationId ?? undefined,
-    currentConversationTitle:
-      value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),
-    currentStage: value.currentStage == null ? undefined : String(value.currentStage || ''),
-    okCount,
-    failCount,
+    totalCount: job.totalCount,
+    conversationIds,
+    currentConversationId: job.currentConversationId,
+    currentConversationTitle: job.currentConversationTitle,
+    currentStage: job.currentStage,
+    okCount: job.okCount,
+    failCount: job.failCount,
     perConversation,
-    abortedReason: value.abortedReason == null ? undefined : String(value.abortedReason || ''),
+    abortedReason: job.abortedReason,
   };
 }
 

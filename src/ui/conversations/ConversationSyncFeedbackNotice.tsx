@@ -76,23 +76,7 @@ function phaseLabel(phase: ConversationSyncFeedbackState['phase']) {
 
 const SYNC_STAGE_LABEL_KEYS: Record<string, TranslationKey> = {
   preparing_queue: 'syncStagePreparingQueue',
-  loading_conversation: 'syncStageLoadingConversation',
   preparing_sync: 'syncStagePreparingSync',
-  ensuring_database: 'syncStageEnsuringDatabase',
-  checking_destination_page: 'syncStageCheckingDestinationPage',
-  creating_destination_page: 'syncStageCreatingDestinationPage',
-  rebuilding_database: 'syncStageRebuildingDatabase',
-  uploading_message_blocks: 'syncStageUploadingMessageBlocks',
-  saving_sync_cursor: 'syncStageSavingSyncCursor',
-  rebuilding_destination_page: 'syncStageRebuildingDestinationPage',
-  appending_new_messages: 'syncStageAppendingNewMessages',
-  updating_page_properties: 'syncStageUpdatingPageProperties',
-  finishing_current_item: 'syncStageFinishingCurrentItem',
-  renaming_note: 'syncStageRenamingNote',
-  writing_full_note: 'syncStageWritingFullNote',
-  deleting_old_note_path: 'syncStageDeletingOldNotePath',
-  falling_back_to_full_rebuild: 'syncStageFallingBackToFullRebuild',
-  updating_sync_metadata: 'syncStageUpdatingSyncMetadata',
 };
 
 function translateSyncStage(stage: string) {

@@ -12,6 +12,7 @@ function runningJob(conversationIds = [1, 2], overrides: Partial<SyncJobSnapshot
     startedAt: 1,
     updatedAt: 1,
     finishedAt: null,
+    totalCount: conversationIds.length,
     conversationIds,
     okCount: 0,
     failCount: 0,
@@ -25,6 +26,7 @@ describe('sync job lifecycle', () => {
     const persisted: SyncJobSnapshot[] = [];
     const lifecycle = createSyncJobLifecycle({
       initialJob: runningJob([1]),
+      configuredConversationIds: [1],
       persist: async (job) => {
         persisted.push(job);
         return true;
@@ -32,15 +34,15 @@ describe('sync job lifecycle', () => {
       now: () => 10,
     });
 
-    await lifecycle.setItem(1, { currentStage: 'loading_conversation' });
+    await lifecycle.setItem(1, { currentStage: 'preparing_sync' });
     await lifecycle.setItem(1, { conversationTitle: 'Alpha', currentStage: 'working' });
-    await lifecycle.setItem(1, { conversationTitle: '', currentStage: 'finishing_current_item' });
+    await lifecycle.setItem(1, { conversationTitle: '', currentStage: 'preparing_sync' });
 
     expect(lifecycle.titleFor(1)).toBe('Alpha');
     expect(persisted.at(-1)).toMatchObject({
       currentConversationId: 1,
       currentConversationTitle: 'Alpha',
-      currentStage: 'finishing_current_item',
+      currentStage: 'preparing_sync',
     });
   });
 
@@ -84,7 +86,12 @@ describe('sync job lifecycle', () => {
 
   it('updates counters in O(1) semantics when the same result is overwritten', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 30 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1]),
+      configuredConversationIds: [1],
+      persist,
+      now: () => 30,
+    });
 
     lifecycle.recordResult({ conversationId: 1, ok: true, mode: 'synced' });
     lifecycle.recordResult({ conversationId: 1, ok: false, mode: 'failed', error: 'later failure' });
@@ -95,7 +102,12 @@ describe('sync job lifecycle', () => {
 
   it('treats finish(rows) as replacement and counts duplicate ids by last write', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1, 2]), persist, now: () => 40 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1, 2]),
+      configuredConversationIds: [1, 2],
+      persist,
+      now: () => 40,
+    });
     lifecycle.recordResult({ conversationId: 1, ok: true, mode: 'old' });
 
     await lifecycle.finish([
@@ -134,7 +146,12 @@ describe('sync job lifecycle', () => {
 
   it('falls back to the latest still-active worker when the current worker finishes', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist, now: () => 60 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob(),
+      configuredConversationIds: [1, 2],
+      persist,
+      now: () => 60,
+    });
 
     await lifecycle.setItem(1, { conversationTitle: 'First', currentStage: 'worker-one' });
     await lifecycle.setItem(2, { conversationTitle: 'Second', currentStage: 'worker-two' });
@@ -149,7 +166,12 @@ describe('sync job lifecycle', () => {
 
   it('refreshes active recency when an existing worker reports a later stage', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist, now: () => 70 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob(),
+      configuredConversationIds: [1, 2],
+      persist,
+      now: () => 70,
+    });
 
     await lifecycle.setItem(1, { conversationTitle: 'First', currentStage: 'worker-one' });
     await lifecycle.setItem(2, { conversationTitle: 'Second', currentStage: 'worker-two' });
@@ -165,7 +187,12 @@ describe('sync job lifecycle', () => {
 
   it('clears current item fields after the last active item completes', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 80 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1]),
+      configuredConversationIds: [1],
+      persist,
+      now: () => 80,
+    });
 
     await lifecycle.setItem(1, { conversationTitle: 'Only', currentStage: 'working' });
     await lifecycle.completeItem({ conversationId: 1, ok: true });
@@ -183,7 +210,12 @@ describe('sync job lifecycle', () => {
 
   it('completes an item that never started without manufacturing a current item', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 90 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1]),
+      configuredConversationIds: [1],
+      persist,
+      now: () => 90,
+    });
 
     await lifecycle.completeItem({
       conversationId: 1,
@@ -199,7 +231,12 @@ describe('sync job lifecycle', () => {
 
   it('supports an in-memory-only finish for staged providers', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 100 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1]),
+      configuredConversationIds: [1],
+      persist,
+      now: () => 100,
+    });
 
     await lifecycle.setItem(1, { conversationTitle: 'Staged', currentStage: 'staging_projection' });
     expect(persist).toHaveBeenCalledTimes(1);
@@ -209,7 +246,12 @@ describe('sync job lifecycle', () => {
 
   it('clears item bookkeeping when switching to a run-level stage and ignores a late finish', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 110 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1]),
+      configuredConversationIds: [1],
+      persist,
+      now: () => 110,
+    });
 
     await lifecycle.setItem(1, { conversationTitle: 'Staged', currentStage: 'staging_projection' });
     await lifecycle.setRunStage('committing_tree');
@@ -222,7 +264,12 @@ describe('sync job lifecycle', () => {
 
   it('normalizes results, preserves configured order, and derives failures from one result source', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist, now: () => 120 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob(),
+      configuredConversationIds: [1, 2],
+      persist,
+      now: () => 120,
+    });
 
     await lifecycle.setItem(2, { conversationTitle: 'Second', currentStage: 'working' });
     lifecycle.recordResult({ conversationId: 2, ok: true, mode: 'synced', appended: 3, error: '', at: 12 });
@@ -246,7 +293,12 @@ describe('sync job lifecycle', () => {
 
   it('preserves completed rows and known identities when a run-level failure closes pending items with one terminal write', async () => {
     const persist = vi.fn(async () => true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob(), persist, now: () => 130 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob(),
+      configuredConversationIds: [1, 2],
+      persist,
+      now: () => 130,
+    });
 
     await lifecycle.setItem(1, { conversationTitle: 'Done', currentStage: 'working' });
     lifecycle.recordResult({ conversationId: 1, ok: true, mode: 'synced' });
@@ -267,7 +319,7 @@ describe('sync job lifecycle', () => {
     });
   });
 
-  it('keeps configured total from shrinking below legacy counts', async () => {
+  it('uses the configured execution queue as the only running total source', async () => {
     const persist = vi.fn(async () => true);
     const lifecycle = createSyncJobLifecycle({
       initialJob: runningJob([], { totalCount: 7, okCount: 2, failCount: 1 }),
@@ -277,14 +329,19 @@ describe('sync job lifecycle', () => {
     });
 
     await lifecycle.setRunStage('preparing_queue');
-    expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({ totalCount: 7, conversationIds: [], perConversation: [] });
+    expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({ totalCount: 2, conversationIds: [], perConversation: [] });
   });
 
   it('does not let one rejected persistence poison later progress writes', async () => {
     const persist = vi.fn().mockRejectedValueOnce(new Error('storage unavailable')).mockResolvedValueOnce(true);
-    const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 150 });
+    const lifecycle = createSyncJobLifecycle({
+      initialJob: runningJob([1]),
+      configuredConversationIds: [1],
+      persist,
+      now: () => 150,
+    });
 
-    await expect(lifecycle.setRunStage('loading_conversation')).resolves.toBe(false);
+    await expect(lifecycle.setRunStage('preparing_sync')).resolves.toBe(false);
     await expect(lifecycle.setItem(1, { conversationTitle: 'Recovered', currentStage: 'working' })).resolves.toBe(true);
     expect(persist).toHaveBeenCalledTimes(2);
   });

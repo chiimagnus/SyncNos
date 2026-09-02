@@ -41,8 +41,8 @@ function setupChromeStorage({ failSyncJobWrites = false }: { failSyncJobWrites?:
           cb(out);
         },
         set(payload: Record<string, unknown>, cb: () => void) {
-          if (Object.prototype.hasOwnProperty.call(payload || {}, 'obsidian_sync_job_v1')) {
-            syncJobSetPayloads.push((payload as any).obsidian_sync_job_v1);
+          if (Object.prototype.hasOwnProperty.call(payload || {}, 'obsidian_sync_job_v2')) {
+            syncJobSetPayloads.push((payload as any).obsidian_sync_job_v2);
             if (failSyncJobWrites) {
               globalThis.chrome.runtime.lastError = { message: 'forced sync job write failure' };
               cb && cb();
@@ -459,9 +459,10 @@ describe('obsidian-sync-orchestrator', () => {
       startedAt: Date.now() - 4_000,
       updatedAt: Date.now() - 1_000,
       finishedAt: null,
-      conversationIds: [1],
+      totalCount: 1,
+      conversationIds: [],
       currentConversationId: 1,
-      currentStage: 'writing_full_note',
+      currentStage: 'preparing_sync',
       okCount: 0,
       failCount: 0,
       perConversation: [],

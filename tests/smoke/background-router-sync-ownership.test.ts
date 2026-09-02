@@ -329,7 +329,7 @@ describe('Feishu destructive settings ownership', () => {
     expect(mocks.clearFeishuOAuthToken).toHaveBeenCalledTimes(1);
     expect(mocks.storageRemove).toHaveBeenCalledWith(['feishu_oauth_pending_state', 'feishu_oauth_last_error']);
     expect(response.data?.clearedKeys).toEqual(['feishu_oauth_pending_state', 'feishu_oauth_last_error']);
-    expect(response.data?.clearedKeys).not.toContain('feishu_sync_job_v1');
+    expect(response.data?.clearedKeys).not.toContain('feishu_sync_job_v2');
   });
 
   it('reports final Feishu job-clear failure after credential cleanup instead of fake disconnect success', async () => {

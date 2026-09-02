@@ -337,13 +337,14 @@ describe('Conversations sync feedback', () => {
       startedAt: Date.now(),
       updatedAt: Date.now(),
       finishedAt: null,
-      conversationIds: [11, 22],
+      totalCount: 2,
+      conversationIds: [],
       currentConversationId: 22,
       currentConversationTitle: 'Current sync target',
-      currentStage: 'uploading_message_blocks',
+      currentStage: 'preparing_sync',
       okCount: 1,
       failCount: 0,
-      perConversation: [{ conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() }],
+      perConversation: [],
       ...overrides,
     };
   }
@@ -352,9 +353,11 @@ describe('Conversations sync feedback', () => {
     return notionRunningJob({
       status: 'done',
       finishedAt: Date.now(),
+      totalCount: 1,
+      conversationIds: [11],
       currentConversationId: undefined,
-      currentConversationTitle: '',
-      currentStage: 'done',
+      currentConversationTitle: undefined,
+      currentStage: undefined,
       okCount: 1,
       failCount: 0,
       perConversation: [
@@ -379,7 +382,8 @@ describe('Conversations sync feedback', () => {
       startedAt: Date.now() - 500,
       updatedAt: Date.now(),
       finishedAt: null,
-      conversationIds: [11],
+      totalCount: 1,
+      conversationIds: [],
       currentConversationId: 11,
       currentConversationTitle: 'GitHub sync target',
       currentStage: 'committing_tree',
@@ -450,7 +454,7 @@ describe('Conversations sync feedback', () => {
     expectStatusGetterCalls({ obsidian: 1 });
   });
 
-  it('consumes a running SyncJob storage payload directly, normalizes provider by key, and keeps one listener subscription', async () => {
+  it('consumes a canonical running SyncJob storage payload directly and keeps one listener subscription', async () => {
     await renderFeedbackProbe();
     clearStatusGetterCalls();
     const listener = storageEventMocks.listener;
@@ -458,7 +462,6 @@ describe('Conversations sync feedback', () => {
     await emitStorageChanges({
       [SYNC_JOB_STORAGE_KEYS.notion]: {
         newValue: notionRunningJob({
-          provider: 'github',
           totalCount: 4,
           conversationIds: [],
           okCount: 2,
@@ -481,7 +484,6 @@ describe('Conversations sync feedback', () => {
     await emitStorageChanges({
       [SYNC_JOB_STORAGE_KEYS.notion]: {
         newValue: notionRunningJob({
-          provider: undefined,
           totalCount: 4,
           conversationIds: [],
           okCount: 3,
@@ -1034,7 +1036,7 @@ describe('Conversations sync feedback', () => {
     await emitStorageChanges({
       [SYNC_JOB_STORAGE_KEYS.github]: { newValue: githubJob({ currentConversationTitle: 'GitHub same event' }) },
       [SYNC_JOB_STORAGE_KEYS.notion]: {
-        newValue: notionRunningJob({ currentConversationTitle: 'Notion same event', provider: 'github' }),
+        newValue: notionRunningJob({ currentConversationTitle: 'Notion same event' }),
       },
     });
 
@@ -1396,7 +1398,7 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice?.textContent).toContain(t('currentPrefix'));
     expect(runningNotice?.textContent).toContain('Current sync target');
     expect(runningNotice?.textContent).toContain(t('stagePrefix'));
-    expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
+    expect(runningNotice?.textContent).toContain(t('syncStagePreparingSync'));
     expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
 
     getNotionSyncJobStatus.mockResolvedValue({
@@ -1409,6 +1411,7 @@ describe('Conversations sync feedback', () => {
         startedAt: Date.now() - 500,
         updatedAt: Date.now(),
         finishedAt: Date.now(),
+        totalCount: 2,
         conversationIds: [11, 22],
         okCount: 2,
         failCount: 0,
@@ -1460,7 +1463,7 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice?.textContent).toContain(t('currentPrefix'));
     expect(runningNotice?.textContent).toContain('Current sync target');
     expect(runningNotice?.textContent).toContain(t('stagePrefix'));
-    expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
+    expect(runningNotice?.textContent).toContain(t('syncStagePreparingSync'));
     expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
 
     const notionButton = Array.from(document.querySelectorAll('button')).find((el) =>
@@ -1539,6 +1542,7 @@ describe('Conversations sync feedback', () => {
       startedAt: Date.now() - 500,
       updatedAt: Date.now(),
       finishedAt: Date.now(),
+      totalCount: 1,
       conversationIds: [11],
       okCount: 1,
       failCount: 0,
@@ -1656,10 +1660,11 @@ describe('Conversations sync feedback', () => {
         startedAt: Date.now() - 2_000,
         updatedAt: Date.now(),
         finishedAt: Date.now(),
-        conversationIds: [11, 22],
+        totalCount: 2,
+        conversationIds: [],
         currentConversationId: 22,
         currentConversationTitle: 'Current sync target',
-        currentStage: 'ensuring_database',
+        currentStage: 'preparing_sync',
         okCount: 0,
         failCount: 0,
         perConversation: [],
@@ -1673,7 +1678,6 @@ describe('Conversations sync feedback', () => {
     expect(notice?.getAttribute('data-phase')).toBe('failed');
     expect(notice?.textContent).toContain(t('syncStopped'));
     expect(notice?.textContent).toContain('extension reloaded');
-    expect(notice?.textContent).not.toContain(t('syncStageEnsuringDatabase'));
 
     const dismissButton = document.querySelector('[aria-label="Dismiss sync feedback"]') as HTMLButtonElement | null;
     expect(dismissButton?.disabled).not.toBe(true);
@@ -1709,7 +1713,7 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice?.textContent).toContain(t('currentPrefix'));
     expect(runningNotice?.textContent).toContain('Current sync target');
     expect(runningNotice?.textContent).toContain(t('stagePrefix'));
-    expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
+    expect(runningNotice?.textContent).toContain(t('syncStagePreparingSync'));
   });
 
   it('hydrates persisted terminal feedback and clears the persisted job on dismiss', async () => {
@@ -1723,6 +1727,7 @@ describe('Conversations sync feedback', () => {
         startedAt: Date.now() - 800,
         updatedAt: Date.now(),
         finishedAt: Date.now(),
+        totalCount: 1,
         conversationIds: [11],
         okCount: 0,
         failCount: 1,

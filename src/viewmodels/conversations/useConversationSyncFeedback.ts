@@ -21,9 +21,9 @@ import type {
   SyncFailureSummary,
   SyncJobSnapshot,
   SyncJobStatusResponse,
+  SyncPerConversationResult,
   SyncProvider,
   SyncRunSummary,
-  SyncWarning,
 } from '@services/sync/models';
 import type { SyncStartAck } from '@services/sync/repo';
 import { t } from '@i18n';
@@ -93,14 +93,13 @@ function providerLabel(provider: SyncProvider) {
   return label || String(provider || '');
 }
 
-function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
-  if (!Array.isArray(rows)) return [];
+function toFailureSummariesFromRows(rows: readonly SyncPerConversationResult[]): SyncFailureSummary[] {
   return rows
-    .filter((row) => row && typeof row === 'object' && (row as any).ok === false)
+    .filter((row) => !row.ok)
     .map((row) => ({
-      conversationId: Number((row as any).conversationId) || 0,
-      conversationTitle: String((row as any).conversationTitle || '').trim(),
-      error: String((row as any).error || 'unknown error'),
+      conversationId: row.conversationId,
+      conversationTitle: row.conversationTitle?.trim() ?? '',
+      error: row.error || 'unknown error',
     }));
 }
 
@@ -112,21 +111,15 @@ export type SyncWarningSummary = {
   extra?: unknown;
 };
 
-function toWarningSummariesFromRows(rows: unknown): SyncWarningSummary[] {
-  if (!Array.isArray(rows)) return [];
+function toWarningSummariesFromRows(rows: readonly SyncPerConversationResult[]): SyncWarningSummary[] {
   const out: SyncWarningSummary[] = [];
   for (const row of rows) {
-    if (!row || typeof row !== 'object') continue;
-    const conversationId = Number((row as any).conversationId) || 0;
-    const warnings = (row as any).warnings;
-    if (!Array.isArray(warnings) || !warnings.length) continue;
-    for (const w of warnings as SyncWarning[]) {
-      if (!w || typeof w !== 'object') continue;
-      const conversationTitle = String((row as any).conversationTitle || '').trim();
-      const code = String((w as any).code || '').trim() || 'warning';
-      const message = String((w as any).message || '').trim() || code;
-      const extra = (w as any).extra;
-      out.push({ conversationId, conversationTitle, code, message, extra });
+    if (!row.warnings?.length) continue;
+    for (const warning of row.warnings) {
+      const conversationTitle = row.conversationTitle?.trim() ?? '';
+      const code = warning.code.trim() || 'warning';
+      const message = warning.message.trim() || code;
+      out.push({ conversationId: row.conversationId, conversationTitle, code, message, extra: warning.extra });
     }
   }
   return out;
@@ -140,10 +133,9 @@ function buildRunningMessage(provider: SyncProvider, done: number, total: number
 
 function buildFinishedMessage(summary: SyncRunSummary, total: number) {
   const label = providerLabel(summary.provider);
-  const safeTotal = Math.max(total, summary.results.length, summary.okCount + summary.failCount);
-  if (summary.failCount <= 0) return `${label} · ${t('phaseSuccess')} (${summary.okCount}/${safeTotal})`;
-  if (summary.okCount > 0) return `${label} · ${t('phasePartialFailed')} (${summary.failCount}/${safeTotal})`;
-  return `${label} · ${t('phaseFailed')} (${summary.failCount}/${safeTotal})`;
+  if (summary.failCount <= 0) return `${label} · ${t('phaseSuccess')} (${summary.okCount}/${total})`;
+  if (summary.okCount > 0) return `${label} · ${t('phasePartialFailed')} (${summary.failCount}/${total})`;
+  return `${label} · ${t('phaseFailed')} (${summary.failCount}/${total})`;
 }
 
 function buildAbortedMessage(job: SyncJobSnapshot) {
@@ -170,21 +162,20 @@ function toWarningSummaries(summary: SyncRunSummary) {
 function toTerminalFeedback(summary: SyncRunSummary, total: number): ConversationSyncFeedbackState {
   const failures = toFailureSummaries(summary);
   const warnings = toWarningSummaries(summary);
-  const safeTotal = Math.max(total, summary.results.length, summary.okCount + summary.failCount);
   const phase: ConversationSyncFeedbackPhase =
     summary.failCount <= 0 ? 'success' : summary.okCount > 0 ? 'partial-failed' : 'failed';
 
   return {
     provider: summary.provider,
     phase,
-    total: safeTotal,
-    done: safeTotal,
+    total,
+    done: total,
     currentConversationId: null,
     currentConversationTitle: '',
     currentStage: '',
     failures,
     warnings,
-    message: buildFinishedMessage(summary, safeTotal),
+    message: buildFinishedMessage(summary, total),
     updatedAt: Date.now(),
     summary,
   };
@@ -197,28 +188,21 @@ function toErrorMessage(provider: SyncProvider, error: unknown) {
 }
 
 function toSummaryFromJob(job: SyncJobSnapshot): SyncRunSummary | null {
-  if (!job || job.status === 'running') return null;
+  if (job.status === 'running') return null;
   return {
     provider: job.provider,
-    okCount: Number(job.okCount) || 0,
-    failCount: Number(job.failCount) || 0,
+    okCount: job.okCount,
+    failCount: job.failCount,
     failures: toFailureSummariesFromRows(job.perConversation),
-    results: Array.isArray(job.perConversation) ? job.perConversation.slice() : [],
+    results: job.perConversation.slice(),
     jobId: job.id,
     instanceId: job.instanceId,
   };
 }
 
 function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState {
-  const completed = Math.max(
-    Array.isArray(job.perConversation) ? job.perConversation.length : 0,
-    (Number(job.okCount) || 0) + (Number(job.failCount) || 0),
-  );
-  const total = Math.max(
-    completed,
-    Number.isSafeInteger(job.totalCount) && Number(job.totalCount) >= 0 ? Number(job.totalCount) : 0,
-    Array.isArray(job.conversationIds) ? job.conversationIds.length : 0,
-  );
+  const completed = job.okCount + job.failCount;
+  const total = job.totalCount;
   const failures = toFailureSummariesFromRows(job.perConversation);
   const warnings = toWarningSummariesFromRows(job.perConversation);
 
@@ -227,14 +211,14 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       provider: job.provider,
       phase: 'running',
       total,
-      done: Math.min(completed, total || completed),
-      currentConversationId: Number(job.currentConversationId) || null,
-      currentConversationTitle: String(job.currentConversationTitle || ''),
-      currentStage: String(job.currentStage || ''),
+      done: Math.min(completed, total),
+      currentConversationId: job.currentConversationId ?? null,
+      currentConversationTitle: job.currentConversationTitle ?? '',
+      currentStage: job.currentStage ?? '',
       failures,
       warnings,
       message: buildRunningMessage(job.provider, completed, total),
-      updatedAt: Number(job.updatedAt) || Date.now(),
+      updatedAt: job.updatedAt,
       summary: null,
     };
   }
@@ -244,14 +228,14 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       provider: job.provider,
       phase: 'failed',
       total,
-      done: Math.min(completed, total || completed),
-      currentConversationId: Number(job.currentConversationId) || null,
-      currentConversationTitle: String(job.currentConversationTitle || ''),
-      currentStage: String(job.currentStage || ''),
+      done: Math.min(completed, total),
+      currentConversationId: job.currentConversationId ?? null,
+      currentConversationTitle: job.currentConversationTitle ?? '',
+      currentStage: job.currentStage ?? '',
       failures,
       warnings,
       message: buildAbortedMessage(job),
-      updatedAt: Number(job.updatedAt) || Date.now(),
+      updatedAt: job.updatedAt,
       summary: toSummaryFromJob(job),
     };
   }
@@ -259,10 +243,10 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
   return toTerminalFeedback(
     {
       provider: job.provider,
-      okCount: Number(job.okCount) || 0,
-      failCount: Number(job.failCount) || 0,
+      okCount: job.okCount,
+      failCount: job.failCount,
       failures,
-      results: Array.isArray(job.perConversation) ? job.perConversation.slice() : [],
+      results: job.perConversation.slice(),
       jobId: job.id,
       instanceId: job.instanceId,
     },
@@ -306,7 +290,7 @@ function pickPrimaryObservation(
   }
   const activeWithRunningJob = active
     .filter((observation) => observation.job?.status === 'running')
-    .sort((a, b) => (Number(b.job?.updatedAt) || 0) - (Number(a.job?.updatedAt) || 0));
+    .sort((a, b) => (b.job?.updatedAt ?? 0) - (a.job?.updatedAt ?? 0));
   if (activeWithRunningJob.length) return activeWithRunningJob[0]!;
   if (active.length) return active[0]!;
 
@@ -317,7 +301,7 @@ function pickPrimaryObservation(
     const preferredTerminal = terminal.find((observation) => observation.provider === preferredProvider);
     if (preferredTerminal) return preferredTerminal;
   }
-  terminal.sort((a, b) => (Number(b.job?.updatedAt) || 0) - (Number(a.job?.updatedAt) || 0));
+  terminal.sort((a, b) => (b.job?.updatedAt ?? 0) - (a.job?.updatedAt ?? 0));
   return terminal[0] ?? null;
 }
 
@@ -619,7 +603,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
 
       const terminalChanges = changed
         .filter((item) => item.job && item.job.status !== 'running')
-        .sort((left, right) => (Number(right.job?.updatedAt) || 0) - (Number(left.job?.updatedAt) || 0));
+        .sort((left, right) => (right.job?.updatedAt ?? 0) - (left.job?.updatedAt ?? 0));
       const terminal = terminalChanges[0];
       if (terminal?.job) {
         void startHandoff({ preferredProvider: terminal.provider, terminalSeed: terminal.job });

@@ -16,7 +16,7 @@ type PersistSyncJob = (job: SyncJobSnapshot) => boolean | void | Promise<boolean
 
 type SyncJobLifecycleOptions = {
   initialJob: SyncJobSnapshot;
-  configuredConversationIds?: readonly unknown[];
+  configuredConversationIds: readonly unknown[];
   persist: PersistSyncJob;
   now?: () => number;
 };
@@ -35,11 +35,6 @@ function positiveId(value: unknown): number {
   const id = normalizeSyncConversationId(value);
   if (id == null) throw new Error('invalid conversation id');
   return id;
-}
-
-function nonNegativeSafeInteger(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isSafeInteger(number) && number >= 0 ? number : null;
 }
 
 function cloneWarnings(value: unknown): any[] | undefined {
@@ -76,19 +71,11 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   const titles = new Map<number, string>();
   const results = new Map<number, SyncPerConversationResult & Record<string, any>>();
   const activeItems = new Map<number, ActiveItem>();
-  const configuredIds = normalizeSyncConversationIds(
-    options.configuredConversationIds ?? options.initialJob.conversationIds,
-  );
+  const configuredIds = normalizeSyncConversationIds(options.configuredConversationIds);
   const configuredIdSet = new Set(configuredIds);
   let okCount = 0;
   let failCount = 0;
-  const initialTotalCount = nonNegativeSafeInteger(options.initialJob.totalCount) ?? 0;
-  const initialCompleted = Math.max(
-    options.initialJob.perConversation.length,
-    (nonNegativeSafeInteger(options.initialJob.okCount) ?? 0) +
-      (nonNegativeSafeInteger(options.initialJob.failCount) ?? 0),
-  );
-  const totalCount = Math.max(initialTotalCount, configuredIds.length, initialCompleted);
+  const totalCount = configuredIds.length;
   let snapshot: SyncJobSnapshot = {
     ...options.initialJob,
     totalCount,
@@ -208,15 +195,6 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   };
 
   const recordResult = <T extends SyncJobResultInput>(input: T): T & SyncPerConversationResult => upsertResult(input);
-
-  for (const row of options.initialJob.perConversation) upsertResult(row as SyncJobResultInput);
-  if (options.initialJob.currentConversationId) {
-    const id = positiveId(options.initialJob.currentConversationId);
-    const title = rememberTitle(id, options.initialJob.currentConversationTitle);
-    const stage = safeString(options.initialJob.currentStage);
-    activeItems.set(id, { id, title, stage });
-    applyCurrentItem({ id, title, stage });
-  }
 
   const setItem = async (
     conversationId: number,
