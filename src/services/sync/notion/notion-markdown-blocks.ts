@@ -1,4 +1,5 @@
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
 
 const MAX_TEXT = 1900;
 const MAX_EQUATION_EXPRESSION = 1900;
@@ -363,11 +364,6 @@ function markdownToNotionBlocks(markdown: string) {
     return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(text);
   }
 
-  function isSyncnosAssetUrl(url: unknown): boolean {
-    const text = String(url || '').trim();
-    return /^syncnos-asset:\/\/\d+$/i.test(text);
-  }
-
   function stripAngleBrackets(url: unknown): string {
     const text = String(url || '').trim();
     if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
@@ -413,7 +409,7 @@ function markdownToNotionBlocks(markdown: string) {
     const m = trimmed.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)\s*$/);
     if (!m) return null;
     const url = stripAngleBrackets(String(m[2] || '').trim());
-    if (!isHttpUrl(url) && !isDataImageUrl(url) && !isSyncnosAssetUrl(url)) return null;
+    if (!isHttpUrl(url) && !isDataImageUrl(url) && parseSyncnosAssetId(url) == null) return null;
     return { url, alt: String(m[1] || '') };
   }
 

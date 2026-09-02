@@ -1,6 +1,6 @@
 import { backgroundStorage } from '@services/conversations/background/storage';
 import { GITHUB_AUTO_SYNC_DEBOUNCE_MS } from '@services/sync/auto-sync/auto-sync-keys';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cache-read';
 import {
   ackGithubCleanupRows,
   deferGithubCleanupRows,
@@ -37,7 +37,7 @@ export type GithubOrchestratorServices = {
   getSettings: () => Promise<GithubSettings>;
   preflight: (input: { repository: string; branch: string }) => Promise<GithubRepositoryPreflight>;
   storage: GithubOrchestratorStorage;
-  loadImage: typeof getImageCacheAssetById;
+  loadImages: typeof getImageCacheAssetsByIds;
   createBlob: (input: { repository: string; content: Uint8Array }) => Promise<{ sha: string }>;
   commit: (input: {
     repository: string;
@@ -58,7 +58,7 @@ export const defaultGithubOrchestratorServices: GithubOrchestratorServices = {
   getSettings: getGithubSettings,
   preflight: (input) => preflightGithubRepository(input),
   storage: backgroundStorage,
-  loadImage: getImageCacheAssetById,
+  loadImages: getImageCacheAssetsByIds,
   createBlob: createGithubBlob,
   commit: ({ repository, branch, operations, message }) =>
     commitGithubStagedOperations({ repository, branch, operations, message }),

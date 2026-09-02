@@ -1,5 +1,6 @@
 import { sha256Hex } from '@services/sync/shared/content-hash';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
+import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -17,13 +18,6 @@ function isHttpUrl(url: string): boolean {
 
 function isDataImageUrl(url: string): boolean {
   return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(safeString(url));
-}
-
-function parseSyncnosAssetId(url: string): number {
-  const m = /^syncnos-asset:\/\/(\d+)$/i.exec(safeString(url));
-  if (!m) return 0;
-  const id = Number(m[1]);
-  return Number.isFinite(id) && id > 0 ? id : 0;
 }
 
 function normalizeImageExt(ext: string): string {
@@ -101,6 +95,21 @@ export async function preprocessFeishuDocxMarkdownImages(markdown: string): Prom
   const src = String(markdown || '');
   if (!src) return { markdownForConvert: '', imageSourcesInOrder: [] };
 
+  const localAssetIds: number[] = [];
+  const seenLocalAssetIds = new Set<number>();
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
+  let assetMatch: RegExpExecArray | null = null;
+  while ((assetMatch = MARKDOWN_IMAGE_RE.exec(src)) != null) {
+    const sourceUrl = stripAngleBrackets(assetMatch[2] || '');
+    const assetId = parseSyncnosAssetId(sourceUrl);
+    if (assetId == null || seenLocalAssetIds.has(assetId)) continue;
+    seenLocalAssetIds.add(assetId);
+    localAssetIds.push(assetId);
+  }
+
+  const localAssets: Map<number, ImageCacheAsset> = localAssetIds.length
+    ? await getImageCacheAssetsByIds({ ids: localAssetIds }).catch(() => new Map<number, ImageCacheAsset>())
+    : new Map<number, ImageCacheAsset>();
   const cache = new Map<string, Promise<FeishuMarkdownImageSource>>();
   const imageSourcesInOrder: FeishuMarkdownImageSource[] = [];
 
@@ -126,8 +135,8 @@ export async function preprocessFeishuDocxMarkdownImages(markdown: string): Prom
           }
 
           const assetId = parseSyncnosAssetId(sourceUrl);
-          if (assetId) {
-            const asset = await getImageCacheAssetById({ id: assetId }).catch(() => null);
+          if (assetId != null) {
+            const asset = localAssets.get(assetId) || null;
             const contentType = safeString(asset?.contentType);
             const ext = extFromContentType(contentType || 'image/png');
             const blob = asset?.blob instanceof Blob ? asset.blob : undefined;

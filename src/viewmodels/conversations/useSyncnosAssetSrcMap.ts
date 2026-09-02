@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
 import {
   requestDataRevisionRetry,
   subscribeDataRevisionChanges,
@@ -94,42 +94,57 @@ export function useSyncnosAssetSrcMap(input: {
       }
     };
 
-    for (const id of currentAssetIds) {
-      try {
-        const asset = await getImageCacheAssetById({ id, conversationId: currentConversationId });
-        if (!mountedRef.current || generation !== generationRef.current) {
-          discardCreatedUrls();
-          return;
-        }
+    let assets: Map<number, ImageCacheAsset>;
+    try {
+      assets = await getImageCacheAssetsByIds({ ids: currentAssetIds, conversationId: currentConversationId });
+    } catch (_error) {
+      if (!mountedRef.current || generation !== generationRef.current) {
+        discardCreatedUrls();
+        return;
+      }
+      readFailed = true;
+      assets = new Map();
+    }
+
+    if (!mountedRef.current || generation !== generationRef.current) {
+      discardCreatedUrls();
+      return;
+    }
+
+    if (!readFailed) {
+      for (const id of currentAssetIds) {
+        const asset = assets.get(id);
         if (!asset) {
           resolved.set(id, null);
           continue;
         }
 
-        let url = '';
-        let objectUrl = false;
         try {
-          if (typeof URL?.createObjectURL === 'function') {
-            url = URL.createObjectURL(asset.blob);
-            objectUrl = Boolean(url);
-            if (objectUrl) newlyCreatedObjectUrls.push(url);
+          let url = '';
+          let objectUrl = false;
+          try {
+            if (typeof URL?.createObjectURL === 'function') {
+              url = URL.createObjectURL(asset.blob);
+              objectUrl = Boolean(url);
+              if (objectUrl) newlyCreatedObjectUrls.push(url);
+            }
+          } catch (_error) {
+            url = '';
+            objectUrl = false;
           }
+          if (!url) url = await blobToDataUrl(asset.blob);
+          if (!mountedRef.current || generation !== generationRef.current) {
+            discardCreatedUrls();
+            return;
+          }
+          resolved.set(id, { url, objectUrl });
         } catch (_error) {
-          url = '';
-          objectUrl = false;
+          if (!mountedRef.current || generation !== generationRef.current) {
+            discardCreatedUrls();
+            return;
+          }
+          readFailed = true;
         }
-        if (!url) url = await blobToDataUrl(asset.blob);
-        if (!mountedRef.current || generation !== generationRef.current) {
-          discardCreatedUrls();
-          return;
-        }
-        resolved.set(id, { url, objectUrl });
-      } catch (_error) {
-        if (!mountedRef.current || generation !== generationRef.current) {
-          discardCreatedUrls();
-          return;
-        }
-        readFailed = true;
       }
     }
 

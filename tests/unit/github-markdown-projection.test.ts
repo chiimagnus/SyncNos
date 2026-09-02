@@ -29,6 +29,17 @@ function imageAsset(id: number, bytes: number[], url = 'https://cdn.example.com/
   };
 }
 
+function batchLoaderFromAssets(assets: ReadonlyMap<number, ReturnType<typeof imageAsset>>) {
+  return async ({ ids }: { ids: readonly number[]; conversationId: number }) => {
+    const selected = new Map<number, ReturnType<typeof imageAsset>>();
+    for (const id of ids) {
+      const asset = assets.get(id);
+      if (asset) selected.set(id, asset);
+    }
+    return selected;
+  };
+}
+
 afterEach(() => {
   process.env.TZ = originalTz;
 });
@@ -116,14 +127,19 @@ describe('github markdown projection', () => {
       buildGithubMarkdownProjection({
         conversation: conversation(),
         messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-        imageLoader: async () => imageAsset(1, [1]),
+        imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, [1])]])),
       }),
     ).rejects.toThrow('github_blob_uploader_required');
   });
 
   it('materializes content-addressed attachments and reuses same bytes within one projection', async () => {
-    const loader = vi.fn(async ({ id }: { id: number; conversationId: number }) =>
-      id === 1 ? imageAsset(1, [1, 2, 3]) : imageAsset(2, [1, 2, 3]),
+    const loader = vi.fn(
+      batchLoaderFromAssets(
+        new Map([
+          [1, imageAsset(1, [1, 2, 3])],
+          [2, imageAsset(2, [1, 2, 3])],
+        ]),
+      ),
     );
     const uploader = vi.fn(async () => ({ sha: 'a'.repeat(40) }));
     const current = conversation();
@@ -133,11 +149,12 @@ describe('github markdown projection', () => {
         {
           messageKey: 'm1',
           sequence: 1,
-          contentMarkdown: '![one](syncnos-asset://1)\n\n![two](<syncnos-asset://2> "caption")',
+          contentMarkdown:
+            '![one](syncnos-asset://1)\n\n![two](<syncnos-asset://2> "caption")\n\n![repeat](syncnos-asset://1)',
         },
       ],
       remoteKey: 'github.com/owner/repo@main',
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
 
@@ -151,9 +168,48 @@ describe('github markdown projection', () => {
         sha: 'a'.repeat(40),
       },
     ]);
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(loader).toHaveBeenCalledWith({ ids: [1, 2], conversationId: 7 });
     expect(uploader).toHaveBeenCalledTimes(1);
     expect(projection.markdownText).toContain(`![one](${relative})`);
     expect(projection.markdownText).toContain(`![two](<${relative}> "caption")`);
+    expect(projection.markdownText).toContain(`![repeat](${relative})`);
+    expect(projection.markdownText).not.toContain('syncnos-asset://');
+  });
+
+  it('keeps remote blob uploads sequential in first-reference order after one batch read', async () => {
+    const loader = vi.fn(
+      batchLoaderFromAssets(
+        new Map([
+          [1, imageAsset(1, [1])],
+          [2, imageAsset(2, [2])],
+        ]),
+      ),
+    );
+    const uploadOrder: number[] = [];
+    const uploader = vi.fn(async ({ content }: { content: Uint8Array }) => {
+      uploadOrder.push(content[0]!);
+      return { sha: content[0]!.toString(16).repeat(40) };
+    });
+
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [
+        {
+          messageKey: 'm1',
+          sequence: 1,
+          contentMarkdown: '![two](syncnos-asset://2)\n![one](syncnos-asset://1)\n![two-again](syncnos-asset://2)',
+        },
+      ],
+      imageBatchLoader: loader,
+      blobUploader: uploader,
+    });
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(loader).toHaveBeenCalledWith({ ids: [2, 1], conversationId: 7 });
+    expect(uploadOrder).toEqual([2, 1]);
+    expect(uploader).toHaveBeenCalledTimes(2);
+    expect(projection.warnings).toEqual([]);
     expect(projection.markdownText).not.toContain('syncnos-asset://');
   });
 
@@ -170,14 +226,14 @@ describe('github markdown projection', () => {
       },
     };
     const uploader = vi.fn(async () => ({ sha: 'c'.repeat(40) }));
-    const loader = vi.fn(async () => imageAsset(1, bytes));
+    const loader = vi.fn(batchLoaderFromAssets(new Map([[1, imageAsset(1, bytes)]])));
 
     const unchanged = await buildGithubMarkdownProjection({
       conversation: oldConversation,
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
       remoteKey: 'github.com/owner/repo@main',
       continuity,
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
     const renamed = await buildGithubMarkdownProjection({
@@ -185,7 +241,7 @@ describe('github markdown projection', () => {
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
       remoteKey: 'github.com/owner/repo@main',
       continuity,
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
 
@@ -216,7 +272,7 @@ describe('github markdown projection', () => {
           },
         },
       },
-      imageLoader: async () => imageAsset(1, bytes),
+      imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, bytes)]])),
       blobUploader: uploader,
     });
 
@@ -243,7 +299,7 @@ describe('github markdown projection', () => {
           },
         },
       },
-      imageLoader: async () => imageAsset(1, bytes),
+      imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, bytes)]])),
       blobUploader: uploader,
     });
 
@@ -269,7 +325,7 @@ describe('github markdown projection', () => {
           [path]: { kind: 'asset', contentHash, sha: 'b'.repeat(40) },
         },
       },
-      imageLoader: async () => imageAsset(1, bytes),
+      imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, bytes)]])),
       blobUploader: uploader,
     });
 
@@ -283,7 +339,7 @@ describe('github markdown projection', () => {
       [2, imageAsset(2, [2])],
       [3, imageAsset(3, [3])],
     ]);
-    const loader = async ({ id }: { id: number; conversationId: number }) => assets.get(id) || null;
+    const loader = batchLoaderFromAssets(assets);
     const uploader = async ({ content }: { content: Uint8Array }) => ({
       sha: content[0]!.toString(16).repeat(40).slice(0, 40),
     });
@@ -293,7 +349,7 @@ describe('github markdown projection', () => {
       messages: [
         { messageKey: 'm1', sequence: 1, contentMarkdown: '![a](syncnos-asset://1)\n![b](syncnos-asset://2)' },
       ],
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
     const reordered = await buildGithubMarkdownProjection({
@@ -305,7 +361,7 @@ describe('github markdown projection', () => {
           contentMarkdown: '![new](syncnos-asset://3)\n![b](syncnos-asset://2)\n![a](syncnos-asset://1)',
         },
       ],
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
 
@@ -318,18 +374,19 @@ describe('github markdown projection', () => {
   });
 
   it('treats missing and cross-conversation assets as placeholders without uploading', async () => {
-    const loader = vi.fn(async ({ conversationId }: { id: number; conversationId: number }) =>
-      conversationId === 999 ? imageAsset(4, [4]) : null,
-    );
+    const loader = vi.fn(async ({ ids, conversationId }: { ids: readonly number[]; conversationId: number }) => {
+      if (conversationId !== 999) return new Map();
+      return new Map(ids.map((id) => [id, imageAsset(id, [id])]));
+    });
     const uploader = vi.fn(async () => ({ sha: 'a'.repeat(40) }));
     const projection = await buildGithubMarkdownProjection({
       conversation: conversation({ id: 7 }),
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: 'before ![secret](syncnos-asset://4) after' }],
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
 
-    expect(loader).toHaveBeenCalledWith({ id: 4, conversationId: 7 });
+    expect(loader).toHaveBeenCalledWith({ ids: [4], conversationId: 7 });
     expect(uploader).not.toHaveBeenCalled();
     expect(projection.markdownText).toContain('before [Image unavailable] after');
     expect(projection.markdownText).not.toContain('syncnos-asset://');
@@ -342,7 +399,7 @@ describe('github markdown projection', () => {
       [2, imageAsset(2, [2], 'https://cdn.example.com/signed.png?token=SECRET#frag')],
       [3, imageAsset(3, [3], 'https://user:pass@cdn.example.com/credential.png')],
     ]);
-    const loader = async ({ id }: { id: number; conversationId: number }) => assets.get(id) || null;
+    const loader = batchLoaderFromAssets(assets);
     const uploader = vi.fn(async () => {
       throw new Error('upload failed with remote details');
     });
@@ -355,7 +412,7 @@ describe('github markdown projection', () => {
           contentMarkdown: '![safe](syncnos-asset://1)\n![signed](syncnos-asset://2)\n![credential](syncnos-asset://3)',
         },
       ],
-      imageLoader: loader,
+      imageBatchLoader: loader,
       blobUploader: uploader,
     });
 
@@ -370,7 +427,7 @@ describe('github markdown projection', () => {
     const projection = await buildGithubMarkdownProjection({
       conversation: conversation(),
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-      imageLoader: async () => imageAsset(1, [1], 'https://cdn.example.com/safe.png'),
+      imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, [1], 'https://cdn.example.com/safe.png')]])),
       blobUploader: async () => {
         throw Object.assign(new Error('ambiguous mutation outcome'), { code: 'github_outcome_unknown' });
       },

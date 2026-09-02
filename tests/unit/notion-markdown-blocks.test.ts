@@ -11,6 +11,20 @@ describe('notion-markdown-blocks', () => {
     expect(blocks[0]?.image?.external?.url).toBe('syncnos-asset://42');
   });
 
+  it('accepts angle-wrapped SyncNos asset targets through the shared parser', () => {
+    const blocks = markdownToNotionBlocks('![angle](<syncnos-asset://43>)');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.type).toBe('image');
+    expect(blocks[0]?.image?.external?.url).toBe('syncnos-asset://43');
+  });
+
+  it('does not accept malformed or non-positive SyncNos targets as local image blocks', () => {
+    for (const target of ['syncnos-asset://0', 'syncnos-asset://nope']) {
+      const blocks = markdownToNotionBlocks(`![](${target})`);
+      expect(blocks.some((block: any) => block?.type === 'image')).toBe(false);
+    }
+  });
+
   it('splits standalone image lines with trailing caption text into image + paragraph blocks', () => {
     const blocks = markdownToNotionBlocks(
       '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)CleanShot 828×1194 84 KB',

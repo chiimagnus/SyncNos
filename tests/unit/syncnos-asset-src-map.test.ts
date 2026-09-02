@@ -5,14 +5,14 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 const mocks = vi.hoisted(() => ({
-  getImageCacheAssetById: vi.fn(),
+  getImageCacheAssetsByIds: vi.fn(),
   subscribeDataRevisionChanges: vi.fn(),
   whenDataRevisionObserverReady: vi.fn(),
   requestDataRevisionRetry: vi.fn(),
 }));
 
 vi.mock('@services/conversations/data/image-cache-read', () => ({
-  getImageCacheAssetById: (...args: any[]) => mocks.getImageCacheAssetById(...args),
+  getImageCacheAssetsByIds: (...args: any[]) => mocks.getImageCacheAssetsByIds(...args),
 }));
 
 vi.mock('@services/data-revisions/observer', () => ({
@@ -43,6 +43,10 @@ function makeAsset(id: number, conversationId: number, byte = id) {
     byteSize: 1,
     contentType: 'image/png',
   };
+}
+
+function makeAssetMap(...assets: ReturnType<typeof makeAsset>[]) {
+  return new Map(assets.map((asset) => [asset.id, asset]));
 }
 
 async function flushMicrotasks() {
@@ -106,7 +110,7 @@ describe('useSyncnosAssetSrcMap', () => {
     revisionListener = null;
     unsubscribe = vi.fn();
     objectUrlSequence = 0;
-    mocks.getImageCacheAssetById.mockReset();
+    mocks.getImageCacheAssetsByIds.mockReset();
     mocks.subscribeDataRevisionChanges.mockReset();
     mocks.whenDataRevisionObserverReady.mockReset();
     mocks.requestDataRevisionRetry.mockReset();
@@ -140,65 +144,80 @@ describe('useSyncnosAssetSrcMap', () => {
   it('subscribes before the first asset read and proceeds after degraded readiness', async () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();
     mocks.whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
-    mocks.getImageCacheAssetById.mockResolvedValue(makeAsset(7, 11));
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(makeAssetMap(makeAsset(7, 11)));
 
     await renderProbe(11, ['![cached](syncnos-asset://7)']);
     expect(mocks.subscribeDataRevisionChanges).toHaveBeenCalledTimes(1);
-    expect(mocks.getImageCacheAssetById).not.toHaveBeenCalled();
+    expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
 
     await act(async () => {
       readiness.resolve({ baselineAvailable: false });
       await flushMicrotasks();
     });
 
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledWith({ id: 7, conversationId: 11 });
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7], conversationId: 11 });
     expect(latestMap.get(7)).toBe('blob:asset-1');
   });
 
   it('reads only the latest conversation and asset ids when identity changes while readiness is pending', async () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();
     mocks.whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
-    mocks.getImageCacheAssetById.mockImplementation(({ id, conversationId }: any) =>
-      Promise.resolve(makeAsset(id, conversationId)),
+    mocks.getImageCacheAssetsByIds.mockImplementation(({ ids, conversationId }: any) =>
+      Promise.resolve(makeAssetMap(...Array.from(ids, (id: any) => makeAsset(Number(id), conversationId)))),
     );
 
     await renderProbe(11, ['![old](syncnos-asset://1)']);
     await renderProbe(22, ['![new](syncnos-asset://2)']);
-    expect(mocks.getImageCacheAssetById).not.toHaveBeenCalled();
+    expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
 
     await act(async () => {
       readiness.resolve({ baselineAvailable: true });
       await flushMicrotasks();
     });
 
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledTimes(1);
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledWith({ id: 2, conversationId: 22 });
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [2], conversationId: 22 });
     expect(latestMap.has(1)).toBe(false);
     expect(latestMap.get(2)).toBe('blob:asset-1');
   });
 
+  it('resolves multiple local assets through one bulk read per generation', async () => {
+    mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(makeAssetMap(makeAsset(3, 11), makeAsset(4, 11)));
+
+    await renderProbe(11, [
+      '![first](syncnos-asset://3) ![duplicate](syncnos-asset://3)',
+      '![second](syncnos-asset://4)',
+    ]);
+
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [3, 4], conversationId: 11 });
+    expect(latestMap.get(3)).toBe('blob:asset-1');
+    expect(latestMap.get(4)).toBe('blob:asset-2');
+  });
+
   it('re-resolves on image_cache revisions without replacing its observer subscription', async () => {
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockResolvedValue(makeAsset(3, 11));
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(makeAssetMap(makeAsset(3, 11)));
     await renderProbe(11, ['![cached](syncnos-asset://3)']);
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledTimes(1);
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       revisionListener?.(['image_cache']);
       await flushMicrotasks();
     });
 
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledTimes(2);
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(2);
     expect(mocks.subscribeDataRevisionChanges).toHaveBeenCalledTimes(1);
   });
 
   it('preserves last-good sources on read failure, requests retry, and replaces them on replay', async () => {
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockResolvedValueOnce(makeAsset(4, 11));
+    mocks.getImageCacheAssetsByIds.mockResolvedValueOnce(makeAssetMap(makeAsset(4, 11)));
     await renderProbe(11, ['![cached](syncnos-asset://4)']);
     expect(latestMap.get(4)).toBe('blob:asset-1');
 
-    mocks.getImageCacheAssetById.mockRejectedValueOnce(new Error('idb unavailable'));
+    mocks.getImageCacheAssetsByIds.mockRejectedValueOnce(new Error('idb unavailable'));
     await act(async () => {
       revisionListener?.(['image_cache']);
       await flushMicrotasks();
@@ -209,7 +228,7 @@ describe('useSyncnosAssetSrcMap', () => {
     expect(revokeObjectUrl).not.toHaveBeenCalledWith('blob:asset-1');
 
     mocks.requestDataRevisionRetry.mockClear();
-    mocks.getImageCacheAssetById.mockResolvedValueOnce(makeAsset(4, 11, 9));
+    mocks.getImageCacheAssetsByIds.mockResolvedValueOnce(makeAssetMap(makeAsset(4, 11, 9)));
     await act(async () => {
       revisionListener?.(['image_cache']);
       await flushMicrotasks();
@@ -222,28 +241,28 @@ describe('useSyncnosAssetSrcMap', () => {
 
   it('does not reuse a prior conversation asset when the new conversation read rejects', async () => {
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockResolvedValueOnce(makeAsset(4, 11));
+    mocks.getImageCacheAssetsByIds.mockResolvedValueOnce(makeAssetMap(makeAsset(4, 11)));
     await renderProbe(11, ['![cached](syncnos-asset://4)']);
     expect(latestMap.get(4)).toBe('blob:asset-1');
 
     renderedMaps = [];
-    mocks.getImageCacheAssetById.mockRejectedValueOnce(new Error('idb unavailable'));
+    mocks.getImageCacheAssetsByIds.mockRejectedValueOnce(new Error('idb unavailable'));
     await renderProbe(22, ['![cached](syncnos-asset://4)']);
 
     expect(renderedMaps.every((map) => !map.has(4))).toBe(true);
-    expect(mocks.getImageCacheAssetById).toHaveBeenLastCalledWith({ id: 4, conversationId: 22 });
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenLastCalledWith({ ids: [4], conversationId: 22 });
     expect(latestMap.has(4)).toBe(false);
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:asset-1');
     expect(mocks.requestDataRevisionRetry).toHaveBeenCalledWith(['image_cache']);
   });
 
-  it('treats resolved null as authoritative missing and revokes the old object URL', async () => {
+  it('treats a resolved missing bulk entry as authoritative and revokes the old object URL', async () => {
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockResolvedValueOnce(makeAsset(5, 11));
+    mocks.getImageCacheAssetsByIds.mockResolvedValueOnce(makeAssetMap(makeAsset(5, 11)));
     await renderProbe(11, ['![cached](syncnos-asset://5)']);
     expect(latestMap.get(5)).toBe('blob:asset-1');
 
-    mocks.getImageCacheAssetById.mockResolvedValueOnce(null);
+    mocks.getImageCacheAssetsByIds.mockResolvedValueOnce(new Map());
     await act(async () => {
       revisionListener?.(['image_cache']);
       await flushMicrotasks();
@@ -257,19 +276,21 @@ describe('useSyncnosAssetSrcMap', () => {
   it('drops an old identity resolve and drains one trailing resolve for the latest identity', async () => {
     const oldRead = deferred<any>();
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockImplementationOnce(() => oldRead.promise).mockResolvedValueOnce(makeAsset(8, 22));
+    mocks.getImageCacheAssetsByIds
+      .mockImplementationOnce(() => oldRead.promise)
+      .mockResolvedValueOnce(makeAssetMap(makeAsset(8, 22)));
 
     await renderProbe(11, ['![old](syncnos-asset://7)']);
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledTimes(1);
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
     await renderProbe(22, ['![new](syncnos-asset://8)']);
 
     await act(async () => {
-      oldRead.resolve(makeAsset(7, 11));
+      oldRead.resolve(makeAssetMap(makeAsset(7, 11)));
       await flushMicrotasks();
     });
 
-    expect(mocks.getImageCacheAssetById).toHaveBeenCalledTimes(2);
-    expect(mocks.getImageCacheAssetById.mock.calls[1]?.[0]).toEqual({ id: 8, conversationId: 22 });
+    expect(mocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(2);
+    expect(mocks.getImageCacheAssetsByIds.mock.calls[1]?.[0]).toEqual({ ids: [8], conversationId: 22 });
     expect(latestMap.has(7)).toBe(false);
     expect(latestMap.get(8)).toBe('blob:asset-1');
   });
@@ -277,7 +298,9 @@ describe('useSyncnosAssetSrcMap', () => {
   it('does not retry a rejected read from an old identity', async () => {
     const oldRead = deferred<any>();
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockImplementationOnce(() => oldRead.promise).mockResolvedValueOnce(makeAsset(10, 22));
+    mocks.getImageCacheAssetsByIds
+      .mockImplementationOnce(() => oldRead.promise)
+      .mockResolvedValueOnce(makeAssetMap(makeAsset(10, 22)));
 
     await renderProbe(11, ['![old](syncnos-asset://9)']);
     await renderProbe(22, ['![new](syncnos-asset://10)']);
@@ -306,12 +329,12 @@ describe('useSyncnosAssetSrcMap', () => {
     await flushMicrotasks();
 
     expect(unsubscribe).toHaveBeenCalledTimes(1);
-    expect(mocks.getImageCacheAssetById).not.toHaveBeenCalled();
+    expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
   });
 
   it('revokes mounted object URLs on unmount', async () => {
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
-    mocks.getImageCacheAssetById.mockResolvedValue(makeAsset(13, 11));
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(makeAssetMap(makeAsset(13, 11)));
     await renderProbe(11, ['![cached](syncnos-asset://13)']);
     expect(latestMap.get(13)).toBe('blob:asset-1');
 

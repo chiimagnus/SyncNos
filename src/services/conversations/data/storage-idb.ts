@@ -785,6 +785,67 @@ function mergeAnchoredMessageOrder(
   return { keys: merged, anchored: true, changed };
 }
 
+export type ConversationMessageMarkdownPatch = {
+  messageKey: string;
+  beforeMarkdown: string;
+  afterMarkdown: string;
+};
+
+export async function patchConversationMessageMarkdownBatch(
+  conversationId: number,
+  patches: ConversationMessageMarkdownPatch[],
+): Promise<{ updated: number; conflicts: number }> {
+  const safeConversationId = Number(conversationId);
+  if (!Number.isFinite(safeConversationId) || safeConversationId <= 0) throw new Error('invalid conversationId');
+
+  const uniqueByKey = new Map<string, ConversationMessageMarkdownPatch>();
+  for (const rawPatch of Array.isArray(patches) ? patches : []) {
+    const messageKey = String(rawPatch?.messageKey || '');
+    if (!messageKey.trim()) continue;
+    const patch: ConversationMessageMarkdownPatch = {
+      messageKey,
+      beforeMarkdown: String(rawPatch?.beforeMarkdown ?? ''),
+      afterMarkdown: String(rawPatch?.afterMarkdown ?? ''),
+    };
+    const previous = uniqueByKey.get(messageKey);
+    if (previous) {
+      if (previous.beforeMarkdown !== patch.beforeMarkdown || previous.afterMarkdown !== patch.afterMarkdown) {
+        throw new Error(`conflicting Markdown patches for messageKey: ${messageKey}`);
+      }
+      continue;
+    }
+    uniqueByKey.set(messageKey, patch);
+  }
+
+  const effectivePatches = Array.from(uniqueByKey.values()).filter(
+    (patch) => patch.beforeMarkdown !== patch.afterMarkdown,
+  );
+  if (!effectivePatches.length) return { updated: 0, conflicts: 0 };
+
+  const db = await openDb();
+  return runTrackedTransaction(
+    { db, stores: ['messages'], revisionScopes: ['messages'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.messages.index('by_conversationId_messageKey');
+      let updated = 0;
+      let conflicts = 0;
+
+      for (const patch of effectivePatches) {
+        const latest = (await reqToPromise(idx.get([safeConversationId, patch.messageKey]) as any)) as any;
+        if (!latest || String(latest.contentMarkdown || '') !== patch.beforeMarkdown) {
+          conflicts += 1;
+          continue;
+        }
+        await reqToPromise(stores.messages.put({ ...latest, contentMarkdown: patch.afterMarkdown }));
+        markChanged('messages');
+        updated += 1;
+      }
+
+      return { updated, conflicts };
+    },
+  );
+}
+
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
@@ -834,11 +895,17 @@ export async function syncConversationMessages(
             ? upsertKeys.filter((key) => byKey.get(key)?.captureSequencePolicy === 'reconcile-existing-order')
             : [];
         const sequenceOverrides = new Map<string, number>();
+        let existingByKey: Map<unknown, any> | null = null;
         let nextTailSequence = 0;
         if (hasTailPolicy || reconcileKeys.length) {
           const seqIdx = stores.messages.index('by_conversationId_sequence');
           const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
           const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
+          existingByKey = new Map<unknown, any>();
+          for (const row of storedRows) {
+            if (!row || !Object.prototype.hasOwnProperty.call(row, 'messageKey')) continue;
+            existingByKey.set(row.messageKey, row);
+          }
           const finiteSequences = storedRows
             .map((row) => Number(row?.sequence))
             .filter((sequence) => Number.isFinite(sequence));
@@ -856,7 +923,9 @@ export async function syncConversationMessages(
                 const key = safeString(row?.messageKey);
                 const sequence = sequenceByKey.get(key);
                 if (sequence === undefined || Number(row?.sequence) === sequence) continue;
-                await reqToPromise(stores.messages.put({ ...row, sequence }));
+                const nextRow = { ...row, sequence };
+                await reqToPromise(stores.messages.put(nextRow));
+                existingByKey.set(row?.messageKey, nextRow);
                 markChanged('messages');
               }
               nextTailSequence = reconciled.keys.length;
@@ -869,7 +938,9 @@ export async function syncConversationMessages(
           const m = byKey.get(key);
           if (!m) continue;
 
-          const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+          const existing: any = existingByKey
+            ? existingByKey.get(key)
+            : await reqToPromise(idx.get([conversationId, key]) as any);
           const reconcileSequence =
             mode === 'append' && m.captureSequencePolicy === 'reconcile-existing-order'
               ? sequenceOverrides.get(key)
@@ -923,6 +994,7 @@ export async function syncConversationMessages(
             record.id = id as any;
             markChanged('messages');
           }
+          existingByKey?.set(key, record);
           upserted += 1;
         }
 
@@ -939,6 +1011,15 @@ export async function syncConversationMessages(
         return { upserted, deleted };
       }
 
+      const seqIdx = stores.messages.index('by_conversationId_sequence');
+      const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+      const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
+      const existingByKey = new Map<unknown, any>();
+      for (const row of storedRows) {
+        if (!row || !Object.prototype.hasOwnProperty.call(row, 'messageKey')) continue;
+        existingByKey.set(row.messageKey, row);
+      }
+
       const presentKeys = new Set<string>();
       let upserted = 0;
 
@@ -946,7 +1027,7 @@ export async function syncConversationMessages(
         if (!m || !m.messageKey) continue;
         presentKeys.add(String(m.messageKey));
 
-        const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
+        const existing: any = existingByKey.get(m.messageKey);
         const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
         const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
         const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
@@ -971,12 +1052,10 @@ export async function syncConversationMessages(
           record.id = id as any;
           markChanged('messages');
         }
+        existingByKey.set(m.messageKey, record);
         upserted += 1;
       }
 
-      const seqIdx = stores.messages.index('by_conversationId_sequence');
-      const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
-      const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
       let deleted = 0;
       for (const row of Array.isArray(storedRows) ? storedRows : []) {
         if (!row?.messageKey || presentKeys.has(String(row.messageKey))) continue;

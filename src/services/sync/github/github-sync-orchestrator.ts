@@ -297,7 +297,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
           comments,
           remoteKey: preflight.remoteKey,
           continuity: row.mapping || undefined,
-          imageLoader: services.loadImage,
+          imageBatchLoader: services.loadImages,
           blobUploader: ({ content }) => services.createBlob({ repository: preflight.repository, content }),
         });
         const plan = planGithubConversationSync({

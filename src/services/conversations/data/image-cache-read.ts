@@ -122,23 +122,18 @@ function txDone(t: IDBTransaction): Promise<true> {
   });
 }
 
-export async function getImageCacheAssetById(input: {
+function normalizeImageCacheAsset(input: {
   id: number;
-  conversationId?: number | null;
-}): Promise<ImageCacheAsset | null> {
-  const id = Number(input.id);
-  if (!Number.isFinite(id) || id <= 0) return null;
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['image_cache'], 'readonly');
-  const row = (await reqToPromise(stores.image_cache.get(id as any) as any)) as ImageCacheRow | undefined;
-  await txDone(t);
-
+  row: ImageCacheRow | undefined;
+  expectedConversationId?: number | null;
+}): ImageCacheAsset | null {
+  const { id, row } = input;
   if (!row) return null;
+
   const conversationId = Number(row.conversationId);
   if (!Number.isFinite(conversationId) || conversationId <= 0) return null;
 
-  const expectedConversationId = Number(input.conversationId);
+  const expectedConversationId = Number(input.expectedConversationId);
   if (
     Number.isFinite(expectedConversationId) &&
     expectedConversationId > 0 &&
@@ -158,7 +153,7 @@ export async function getImageCacheAssetById(input: {
     const copy = new ArrayBuffer(view.byteLength);
     new Uint8Array(copy).set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
     blob = new Blob([copy], { type: parseContentType(row.contentType) });
-  } else if (!blob && row.dataUrl) {
+  } else if (row.dataUrl) {
     blob = decodeDataImageUrlToBlob(row.dataUrl);
   }
 
@@ -178,4 +173,46 @@ export async function getImageCacheAssetById(input: {
     byteSize,
     contentType,
   };
+}
+
+export async function getImageCacheAssetsByIds(input: {
+  ids: Iterable<number>;
+  conversationId?: number | null;
+}): Promise<Map<number, ImageCacheAsset>> {
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const rawId of input.ids) {
+    const id = Number(rawId);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  if (!ids.length) return new Map();
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['image_cache'], 'readonly');
+  const done = txDone(t);
+  const rowRequests = ids.map((id) =>
+    reqToPromise(stores.image_cache.get(id as any) as IDBRequest<ImageCacheRow | undefined>).then(
+      (row) => [id, row] as const,
+    ),
+  );
+  const [rows] = await Promise.all([Promise.all(rowRequests), done]);
+
+  const assets = new Map<number, ImageCacheAsset>();
+  for (const [id, row] of rows) {
+    const asset = normalizeImageCacheAsset({ id, row, expectedConversationId: input.conversationId });
+    if (asset) assets.set(id, asset);
+  }
+  return assets;
+}
+
+export async function getImageCacheAssetById(input: {
+  id: number;
+  conversationId?: number | null;
+}): Promise<ImageCacheAsset | null> {
+  const id = Number(input.id);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const assets = await getImageCacheAssetsByIds({ ids: [id], conversationId: input.conversationId });
+  return assets.get(id) ?? null;
 }

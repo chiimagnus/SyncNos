@@ -316,21 +316,10 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const conversationUrl = String(msg?.conversationUrl || '').trim();
-    let progressEnqueued = false;
-    const res = await backfillConversationImages({
-      conversationId,
-      conversationUrl,
-      onProgress: async (progress) => {
-        const updatedMessages = Number(progress?.updatedMessages) || 0;
-        if (updatedMessages <= 0) return;
-        if (progressEnqueued) return;
-        progressEnqueued = true;
-        fireAndForget(
-          deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages),
-        );
-      },
-    });
-    fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages));
+    const res = await backfillConversationImages({ conversationId, conversationUrl });
+    if (Number(res?.updatedMessages) > 0) {
+      fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages));
+    }
     return router.ok(res);
   });
 

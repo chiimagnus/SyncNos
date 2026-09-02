@@ -15,7 +15,7 @@ import {
   readSyncnosObject as readDefaultSyncnosObject,
 } from '@services/sync/shared/remote-markdown-metadata.ts';
 import { createSyncJobStore } from '@services/sync/sync-job-store';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cache-read';
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageTargets,
@@ -103,6 +103,7 @@ async function materializeMarkdownAssetsForObsidian({
 
   const targetIds = collectOrderedSyncnosAssetIds(targetMarkdown);
   if (!targetIds.length) return targetMarkdown;
+  const assetsById = await getImageCacheAssetsByIds({ ids: targetIds });
 
   const noteBase = buildNoteBasenameFromFilePath(filePath);
   const attachmentNameByAssetId = new Map<number, string>();
@@ -111,7 +112,7 @@ async function materializeMarkdownAssetsForObsidian({
     const index = indexByAssetId.get(assetId);
     if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
 
-    const asset = await getImageCacheAssetById({ id: assetId });
+    const asset = assetsById.get(assetId);
     if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
     const ext = inferImageExtFromAsset(asset);
