@@ -34,6 +34,7 @@ function createHarness(overrides: Partial<GithubSettingsHandlersDeps> = {}) {
     pollDeviceFlowOnce: vi.fn(async () => ({ state: 'disconnected' as const })),
     cancelDeviceFlow: vi.fn(async () => ({ state: 'disconnected' as const })),
     clearAuthState: vi.fn(async () => ({ version: 1 as const, state: 'disconnected' as const })),
+    runExclusiveMaintenance: vi.fn(async (mutation: () => Promise<unknown>) => await mutation()),
     discoverRepositories: vi.fn(async () => ({
       status: 'github_app_not_installed' as const,
       account: null,
@@ -150,6 +151,25 @@ describe('background-router GitHub settings routes', () => {
     expect(clearAuthState).toHaveBeenCalledTimes(1);
     const disconnected = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.DISCONNECT });
     expect(disconnected.data).toMatchObject({ auth: { state: 'disconnected' }, disconnectedLocal: true });
+  });
+
+  it('rejects disconnect through the shared maintenance owner before clearing auth', async () => {
+    const clearAuthState = vi.fn();
+    const runExclusiveMaintenance = vi.fn(() => {
+      throw Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' });
+    });
+    const { router } = createHarness({
+      clearAuthState: clearAuthState as any,
+      runExclusiveMaintenance: runExclusiveMaintenance as any,
+    });
+
+    const response = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.DISCONNECT });
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: { message: 'sync_already_running', extra: { code: 'sync_already_running' } },
+    });
+    expect(clearAuthState).not.toHaveBeenCalled();
   });
 
   it('whitelists repository/settings/preflight DTOs and rejects secret-bearing save payloads', async () => {

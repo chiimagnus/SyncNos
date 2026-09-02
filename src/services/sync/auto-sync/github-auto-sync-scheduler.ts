@@ -31,6 +31,7 @@ const TRANSIENT_CODES = new Set([
   'github_git_branch_race',
   'github_git_branch_race_exhausted',
   'github_transport_resolution_incomplete',
+  'github_sync_job_persist_failed',
 ]);
 
 export function getGithubAutoSyncFailureRetryDelayMs(error: unknown): number {

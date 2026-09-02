@@ -15,9 +15,11 @@ import { preprocessFeishuDocxMarkdownImages } from '@services/sync/feishu/docx/f
 import { bindFeishuDocxImagesByOrder } from '@services/sync/feishu/docx/image-block-binder';
 import { sha256Hex } from '@services/sync/shared/content-hash';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 
 const SYNC_PROVIDER = 'feishu';
 const feishuSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
+const feishuSyncOwnership = createSyncRunOwnership();
 const TOKEN_EXCHANGE_PROXY_URL_KEY = 'feishu_oauth_token_exchange_proxy_url';
 const OAUTH_CLIENT_ID_KEY = 'feishu_oauth_client_id';
 const OAUTH_CLIENT_SECRET_KEY = 'feishu_oauth_client_secret';
@@ -83,10 +85,8 @@ function normalizeIds(list: unknown) {
   return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
-function buildAlreadyRunningError() {
-  const error = new Error('sync already in progress') as Error & { code?: string };
-  error.code = 'sync_already_running';
-  return error;
+function buildJobPersistenceError() {
+  return Object.assign(new Error('feishu sync job persistence failed'), { code: 'feishu_sync_job_persist_failed' });
 }
 
 async function resolveFeishuAccessToken(): Promise<string> {
@@ -612,19 +612,32 @@ async function appendTextBlocks({
 }
 
 async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  const safeInstanceId = safeString(instanceId);
-  const job = safeInstanceId
-    ? await feishuSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
-    : await feishuSyncJobStore.getJob();
-  return { provider: SYNC_PROVIDER, job, instanceId: safeInstanceId };
+  return { provider: SYNC_PROVIDER, job: await feishuSyncJobStore.getJob(), instanceId: safeString(instanceId) };
 }
 
-async function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  await feishuSyncJobStore.setJob(null);
-  return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
+function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+  return feishuSyncOwnership.runExclusiveMutation(async () => {
+    if (!(await feishuSyncJobStore.setJob(null))) throw buildJobPersistenceError();
+    return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
+  });
 }
 
-async function syncConversations({
+function runExclusiveMaintenance<T>(
+  mutation: () => Promise<T>,
+  options: { clearStatusAfter?: boolean } = {},
+): Promise<T> {
+  return feishuSyncOwnership.runExclusiveMutation(async () => {
+    const result = await mutation();
+    if (options.clearStatusAfter === true && !(await feishuSyncJobStore.setJob(null))) throw buildJobPersistenceError();
+    return result;
+  });
+}
+
+function reconcileStartupSyncJob() {
+  return feishuSyncOwnership.runExclusiveMutation(() => feishuSyncJobStore.abortRunningJob());
+}
+
+async function runSyncConversations({
   conversationIds,
   instanceId,
 }: {
@@ -644,9 +657,6 @@ async function syncConversations({
   }
 
   const safeInstanceId = safeString(instanceId);
-  const existingJob = await feishuSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
-  if (feishuSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
-
   const startedAt = Date.now();
   const lifecycle = createSyncJobLifecycle({
     initialJob: {
@@ -657,12 +667,14 @@ async function syncConversations({
       startedAt,
       updatedAt: startedAt,
       finishedAt: null,
-      conversationIds: ids,
+      totalCount: ids.length,
+      conversationIds: [],
       currentStage: 'preparing_queue',
       okCount: 0,
       failCount: 0,
       perConversation: [],
     },
+    configuredConversationIds: ids,
     persist: (job) => feishuSyncJobStore.setJob(job),
   });
 
@@ -672,8 +684,6 @@ async function syncConversations({
   for (const conversationId of ids) {
     let row: any = null;
     try {
-      await lifecycle.setRunStage('loading_conversation');
-
       const mappingRes = await defaultBackgroundStorage.getSyncMappingByConversation(conversationId);
       if (!mappingRes || !mappingRes.conversation) {
         row = {
@@ -742,7 +752,6 @@ async function syncConversations({
         }
 
         if (docId) {
-          await lifecycle.setItem(conversationId, { currentStage: 'rebuilding_destination_page' });
           try {
             await clearRootChildren({ accessToken, docId });
           } catch (_e) {
@@ -752,7 +761,6 @@ async function syncConversations({
         }
 
         if (!docId) {
-          await lifecycle.setItem(conversationId, { currentStage: 'creating_destination_page' });
           let folderToken: string | undefined = undefined;
           const resolved = await resolveConfiguredTargetFolderToken(accessToken, convo);
           if (resolved.hasConfig) {
@@ -766,7 +774,6 @@ async function syncConversations({
           docId = await createDoc({ accessToken, title: documentTitle, folderToken });
         }
 
-        await lifecycle.setItem(conversationId, { currentStage: 'uploading_message_blocks' });
         let appended = 0;
         let appendWarnings: string[] = [];
         try {
@@ -776,9 +783,7 @@ async function syncConversations({
         } catch (e) {
           if (existingDocId) {
             mode = 'create';
-            await lifecycle.setItem(conversationId, { currentStage: 'creating_destination_page' });
             docId = await createDoc({ accessToken, title: documentTitle });
-            await lifecycle.setItem(conversationId, { currentStage: 'uploading_message_blocks' });
             const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
             appended = res.appended;
             appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
@@ -824,4 +829,17 @@ async function syncConversations({
   return lifecycle.summary();
 }
 
-export { getSyncStatus, clearSyncStatus, syncConversations };
+function syncConversations(input: Parameters<typeof runSyncConversations>[0] = {}) {
+  return feishuSyncOwnership.startRun(() => runSyncConversations(input));
+}
+
+const isRunActive = () => feishuSyncOwnership.isRunActive();
+
+export {
+  getSyncStatus,
+  clearSyncStatus,
+  syncConversations,
+  isRunActive,
+  runExclusiveMaintenance,
+  reconcileStartupSyncJob,
+};

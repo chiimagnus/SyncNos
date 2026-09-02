@@ -26,7 +26,7 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
 };
 
-export type GithubSettingsHandlersDeps = {
+type GithubSettingsServiceDeps = {
   getSettings: typeof getGithubSettings;
   saveSettings: typeof saveGithubSettings;
   getSafeAuthSummary: typeof getGithubSafeAuthSummary;
@@ -39,7 +39,11 @@ export type GithubSettingsHandlersDeps = {
   initializeRepository: typeof initializeGithubRepository;
 };
 
-const DEFAULT_DEPS: GithubSettingsHandlersDeps = {
+export type GithubSettingsHandlersDeps = Partial<GithubSettingsServiceDeps> & {
+  runExclusiveMaintenance: <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
+};
+
+const DEFAULT_DEPS: GithubSettingsServiceDeps = {
   getSettings: getGithubSettings,
   saveSettings: saveGithubSettings,
   getSafeAuthSummary: getGithubSafeAuthSummary,
@@ -163,7 +167,7 @@ function hasOnlySettingsPayloadFields(message: any): boolean {
 
 function safeErrorResponse(router: AnyRouter, error: unknown, fallbackCode: string) {
   const rawCode = safeString((error as any)?.code);
-  const code = /^github_[a-z0-9_]+$/.test(rawCode) ? rawCode : fallbackCode;
+  const code = rawCode === 'sync_already_running' || /^github_[a-z0-9_]+$/.test(rawCode) ? rawCode : fallbackCode;
   const statusValue = Number((error as any)?.status);
   const requestIdValue = safeString((error as any)?.requestId);
   const fieldValue = safeString((error as any)?.field);
@@ -177,10 +181,12 @@ function safeErrorResponse(router: AnyRouter, error: unknown, fallbackCode: stri
   });
 }
 
-export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSettingsHandlersDeps = DEFAULT_DEPS) {
+export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSettingsHandlersDeps) {
+  const resolved = { ...DEFAULT_DEPS, ...deps };
+
   router.register(GITHUB_MESSAGE_TYPES.GET_SETTINGS, async () => {
     try {
-      const [settings, auth] = await Promise.all([deps.getSettings(), deps.getSafeAuthSummary()]);
+      const [settings, auth] = await Promise.all([resolved.getSettings(), resolved.getSafeAuthSummary()]);
       return router.ok({
         provider: 'github',
         settings: safeSettingsDto(settings),
@@ -198,7 +204,7 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW, async () => {
     try {
-      return router.ok({ auth: safeAuthDto(await deps.startDeviceFlow()) });
+      return router.ok({ auth: safeAuthDto(await resolved.startDeviceFlow()) });
     } catch (error) {
       return safeErrorResponse(router, error, 'github_device_start_failed');
     }
@@ -206,7 +212,7 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW, async () => {
     try {
-      return router.ok({ auth: safeAuthDto(await deps.pollDeviceFlowOnce()) });
+      return router.ok({ auth: safeAuthDto(await resolved.pollDeviceFlowOnce()) });
     } catch (error) {
       return safeErrorResponse(router, error, 'github_device_poll_failed');
     }
@@ -214,7 +220,7 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.CANCEL_DEVICE_FLOW, async () => {
     try {
-      return router.ok({ auth: safeAuthDto(await deps.cancelDeviceFlow()) });
+      return router.ok({ auth: safeAuthDto(await resolved.cancelDeviceFlow()) });
     } catch (error) {
       return safeErrorResponse(router, error, 'github_device_cancel_failed');
     }
@@ -222,7 +228,7 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
-      await deps.clearAuthState();
+      await resolved.runExclusiveMaintenance(() => resolved.clearAuthState());
       return router.ok({
         provider: 'github',
         auth: { state: 'disconnected' },
@@ -235,7 +241,7 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES, async () => {
     try {
-      return router.ok(safeDiscoveryDto(await deps.discoverRepositories()));
+      return router.ok(safeDiscoveryDto(await resolved.discoverRepositories()));
     } catch (error) {
       return safeErrorResponse(router, error, 'github_repository_list_failed');
     }
@@ -246,7 +252,7 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
       return router.err('github_settings_payload_invalid', { code: 'github_settings_payload_invalid' });
     }
     try {
-      const settings = await deps.saveSettings({
+      const settings = await resolved.saveSettings({
         ...(message.repository == null ? {} : { repository: message.repository }),
         ...(message.branch == null ? {} : { branch: message.branch }),
       });
@@ -258,8 +264,8 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.TEST_CONNECTION, async () => {
     try {
-      const settings = await deps.getSettings();
-      const preflight = await deps.preflightRepository({
+      const settings = await resolved.getSettings();
+      const preflight = await resolved.preflightRepository({
         repository: settings.repository,
         branch: settings.branch,
       });
@@ -271,8 +277,8 @@ export function registerGithubSettingsHandlers(router: AnyRouter, deps: GithubSe
 
   router.register(GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY, async () => {
     try {
-      const settings = await deps.getSettings();
-      const preflight = await deps.initializeRepository({
+      const settings = await resolved.getSettings();
+      const preflight = await resolved.initializeRepository({
         repository: settings.repository,
         branch: settings.branch,
       });

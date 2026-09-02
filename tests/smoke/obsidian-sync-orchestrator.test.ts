@@ -26,8 +26,9 @@ async function loadModule(rel: string) {
   return (mod as any).default || mod;
 }
 
-function setupChromeStorage() {
+function setupChromeStorage({ failSyncJobWrites = false }: { failSyncJobWrites?: boolean } = {}) {
   const store: Record<string, unknown> = {};
+  const syncJobSetPayloads: unknown[] = [];
   // @ts-expect-error test global
   globalThis.chrome = {
     runtime: { lastError: null },
@@ -40,13 +41,22 @@ function setupChromeStorage() {
           cb(out);
         },
         set(payload: Record<string, unknown>, cb: () => void) {
+          if (Object.prototype.hasOwnProperty.call(payload || {}, 'obsidian_sync_job_v1')) {
+            syncJobSetPayloads.push((payload as any).obsidian_sync_job_v1);
+            if (failSyncJobWrites) {
+              globalThis.chrome.runtime.lastError = { message: 'forced sync job write failure' };
+              cb && cb();
+              globalThis.chrome.runtime.lastError = null;
+              return;
+            }
+          }
           for (const [k, v] of Object.entries(payload || {})) store[k] = v;
           cb && cb();
         },
       },
     },
   };
-  return store;
+  return { store, syncJobSetPayloads };
 }
 
 beforeEach(() => {
@@ -132,6 +142,101 @@ describe('obsidian-sync-orchestrator', () => {
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(syncRes.results[0].ok).toBe(true);
+  });
+
+  it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
+    const { syncJobSetPayloads } = setupChromeStorage({ failSyncJobWrites: true });
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'best-effort',
+      title: 'Best effort',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'm1', sequence: 1, contentMarkdown: 'body', updatedAt: 1 },
+    ]);
+
+    let remoteStarted!: () => void;
+    let releaseRemote!: () => void;
+    const remoteStartedPromise = new Promise<void>((resolve) => {
+      remoteStarted = resolve;
+    });
+    const remoteGate = new Promise<void>((resolve) => {
+      releaseRemote = resolve;
+    });
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        remoteStarted();
+        await remoteGate;
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const firstRun = orch.syncConversations({ conversationIds: [1], instanceId: 'first' });
+    await remoteStartedPromise;
+
+    expect(orch.isRunActive()).toBe(true);
+    expect(syncJobSetPayloads[0]).toMatchObject({
+      provider: 'obsidian',
+      status: 'running',
+      totalCount: 1,
+      conversationIds: [],
+      perConversation: [],
+    });
+    expect((await orch.getSyncStatus({ instanceId: 'first' })).job).toBeNull();
+
+    let conflict: unknown = null;
+    try {
+      orch.syncConversations({ conversationIds: [2], instanceId: 'second' });
+    } catch (error) {
+      conflict = error;
+    }
+    expect(conflict).toMatchObject({ code: 'sync_already_running' });
+
+    releaseRemote();
+    const result = await firstRun;
+    expect(result.results[0]).toMatchObject({ conversationId: 1, ok: true, mode: 'full_rebuild' });
+    const runningJobs = syncJobSetPayloads.filter((job: any) => job?.status === 'running') as any[];
+    expect(
+      runningJobs.every(
+        (job: any) =>
+          job.totalCount === 1 &&
+          Array.isArray(job.conversationIds) &&
+          job.conversationIds.length === 0 &&
+          Array.isArray(job.perConversation) &&
+          job.perConversation.length === 0,
+      ),
+    ).toBe(true);
+    expect(
+      runningJobs.filter((job: any) => job.currentConversationId === 1 && job.currentStage === 'preparing_sync'),
+    ).toHaveLength(1);
+    expect(runningJobs.filter((job: any) => Number(job.okCount || 0) + Number(job.failCount || 0) === 1)).toEqual([
+      expect.objectContaining({ okCount: 1, failCount: 0, currentConversationId: undefined }),
+    ]);
+    expect(syncJobSetPayloads.at(-1)).toMatchObject({
+      status: 'done',
+      conversationIds: [1],
+      perConversation: [expect.objectContaining({ conversationId: 1, ok: true })],
+    });
+    expect(orch.isRunActive()).toBe(false);
+    expect((await orch.getSyncStatus({ instanceId: 'first' })).job).toBeNull();
   });
 
   it('materializes SyncNos image refs through the shared Markdown helper without changing Obsidian naming', async () => {
@@ -328,7 +433,7 @@ describe('obsidian-sync-orchestrator', () => {
     expect(status.job?.status).toBe('done');
   });
 
-  it('reconciles a foreign running obsidian job to aborted on status read after reload', async () => {
+  it('keeps status reads side-effect free and reconciles orphan running state only through startup maintenance', async () => {
     setupChromeStorage();
     const jobStore = createSyncJobStore('obsidian');
     await jobStore.setJob({
@@ -349,8 +454,13 @@ describe('obsidian-sync-orchestrator', () => {
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
     const status = await orch.getSyncStatus({ instanceId: 'background-new' });
-    expect(status.job?.status).toBe('aborted');
-    expect(status.job?.abortedReason).toBe('extension reloaded');
+    expect(status.job?.status).toBe('running');
+    expect((await jobStore.getJob())?.status).toBe('running');
+
+    const reconciled = await orch.reconcileStartupSyncJob();
+    expect(reconciled?.status).toBe('aborted');
+    expect(reconciled?.abortedReason).toBe('extension reloaded');
+    expect((await jobStore.getJob())?.status).toBe('aborted');
   });
 
   it('rebuilds article note when remote exists', async () => {

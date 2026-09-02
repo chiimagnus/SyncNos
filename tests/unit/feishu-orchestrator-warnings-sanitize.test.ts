@@ -25,16 +25,12 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
-  abortRunningJobIfFromOtherInstance: vi.fn(),
-  isRunningJob: vi.fn(),
   setJob: vi.fn(),
   getJob: vi.fn(),
 }));
 
 vi.mock('@services/sync/sync-job-store', () => ({
   createSyncJobStore: () => ({
-    abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
-    isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
   }),
@@ -110,7 +106,7 @@ function mockDefaultFeishuFolderLayout(path: string, init?: RequestInit) {
 }
 
 describe('feishu orchestrator warnings sanitization', () => {
-  it('does not force-abort running jobs when status is read without instanceId', async () => {
+  it('reads persisted running status without mutating it', async () => {
     setupChromeStorage();
     jobStoreMocks.getJob.mockResolvedValue({
       id: 'job_running',
@@ -129,16 +125,14 @@ describe('feishu orchestrator warnings sanitization', () => {
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
     const status = await orch.getSyncStatus();
 
-    expect(jobStoreMocks.abortRunningJobIfFromOtherInstance).not.toHaveBeenCalled();
     expect(jobStoreMocks.getJob).toHaveBeenCalledTimes(1);
+    expect(jobStoreMocks.setJob).not.toHaveBeenCalled();
     expect(status.job?.status).toBe('running');
   });
 
   it('sanitizes query values even when binder throws', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },

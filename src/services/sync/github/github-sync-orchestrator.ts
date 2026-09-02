@@ -20,6 +20,7 @@ import {
 } from '@services/sync/github/github-sync-planner';
 import type { GithubSettings } from '@services/sync/github/settings-store';
 import { createSyncJobLifecycle, type SyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@services/sync/models';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -245,10 +246,6 @@ function mergeCleanupDeletes(
   return operations;
 }
 
-function buildAlreadyRunningError(): Error {
-  return Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' });
-}
-
 function buildJobPersistenceError(): Error {
   return Object.assign(new Error('github sync job persistence failed'), { code: 'github_sync_job_persist_failed' });
 }
@@ -271,6 +268,8 @@ function toJobRows(items: readonly GithubSyncRunItem[], at: number): SyncPerConv
 }
 
 export function createGithubSyncOrchestrator(services: GithubOrchestratorServices = defaultGithubOrchestratorServices) {
+  const ownership = createSyncRunOwnership();
+
   async function stageResolved(
     ids: readonly number[],
     mode: GithubSyncPlannerMode,
@@ -331,7 +330,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
           operations: [],
         });
       } finally {
-        if (lifecycle.titleFor(conversationId)) await lifecycle.finishItem(conversationId);
+        await lifecycle.finishItem(conversationId, { persist: false });
       }
     }
 
@@ -350,12 +349,28 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     };
   }
 
-  async function clearSyncStatus(input: { instanceId?: string } = {}) {
-    await services.jobStore.setJob(null);
-    return { provider: 'github' as const, job: null, instanceId: safeString(input.instanceId) };
+  function clearSyncStatus(input: { instanceId?: string } = {}) {
+    return ownership.runExclusiveMutation(async () => {
+      if (!(await services.jobStore.setJob(null))) throw buildJobPersistenceError();
+      return { provider: 'github' as const, job: null, instanceId: safeString(input.instanceId) };
+    });
   }
 
-  let activeSyncRun: Promise<GithubSyncRunResult> | null = null;
+  function runExclusiveMaintenance<T>(
+    mutation: () => Promise<T>,
+    options: { clearStatusAfter?: boolean } = {},
+  ): Promise<T> {
+    return ownership.runExclusiveMutation(async () => {
+      const result = await mutation();
+      if (options.clearStatusAfter === true && !(await services.jobStore.setJob(null)))
+        throw buildJobPersistenceError();
+      return result;
+    });
+  }
+
+  function reconcileStartupSyncJob() {
+    return ownership.runExclusiveMutation(() => services.jobStore.abortRunningJob());
+  }
 
   async function runSync(input: {
     conversationIds?: readonly unknown[];
@@ -374,9 +389,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     let jobPersistenceWarning = false;
 
     const claimJob = async (currentStage: string): Promise<SyncJobLifecycle> => {
-      const existingJob = await services.jobStore.abortRunningJobIfFromOtherInstance(instanceId);
-      if (services.jobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
-
       const startedAt = services.now();
       const candidate: SyncJobSnapshot = {
         id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
@@ -386,7 +398,8 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         startedAt,
         updatedAt: startedAt,
         finishedAt: null,
-        conversationIds: [...ids],
+        totalCount: ids.length,
+        conversationIds: [],
         currentStage,
         okCount: 0,
         failCount: 0,
@@ -394,13 +407,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       };
       if (!(await services.jobStore.setJob(candidate))) throw buildJobPersistenceError();
 
-      const claimed = await services.jobStore.getJob();
-      if (!claimed || claimed.status !== 'running' || safeString(claimed.id) !== candidate.id) {
-        if (services.jobStore.isRunningJob(claimed)) throw buildAlreadyRunningError();
-        throw buildJobPersistenceError();
-      }
       return createSyncJobLifecycle({
-        initialJob: claimed,
+        initialJob: candidate,
+        configuredConversationIds: ids,
         persist: async (job) => {
           const persisted = await services.jobStore.setJob(job);
           if (!persisted) jobPersistenceWarning = true;
@@ -706,15 +715,15 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     mode?: GithubSyncPlannerMode;
     instanceId?: string;
   }): Promise<GithubSyncRunResult> {
-    if (activeSyncRun) return Promise.reject(buildAlreadyRunningError());
-    const run = runSync(input);
-    activeSyncRun = run;
-    const release = () => {
-      if (activeSyncRun === run) activeSyncRun = null;
-    };
-    void run.then(release, release);
-    return run;
+    return ownership.startRun(() => runSync(input));
   }
 
-  return { sync, getSyncStatus, clearSyncStatus };
+  return {
+    sync,
+    getSyncStatus,
+    clearSyncStatus,
+    isRunActive: () => ownership.isRunActive(),
+    runExclusiveMaintenance,
+    reconcileStartupSyncJob,
+  };
 }

@@ -21,9 +21,11 @@ import {
   replaceSyncnosAssetImageTargets,
 } from '@services/sync/shared/markdown-asset-refs';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 
 const SYNC_PROVIDER = 'obsidian';
 const obsidianSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
+const obsidianSyncOwnership = createSyncRunOwnership();
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -136,10 +138,8 @@ function normalizeIds(list: unknown) {
   return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
-function buildAlreadyRunningError() {
-  const error = new Error('sync already in progress') as Error & { code?: string };
-  error.code = 'sync_already_running';
-  return error;
+function buildJobPersistenceError() {
+  return Object.assign(new Error('obsidian sync job persistence failed'), { code: 'obsidian_sync_job_persist_failed' });
 }
 
 function toCurrentConversationTitle(convo: any) {
@@ -419,19 +419,33 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
 }
 
 async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  const safeInstanceId = safeString(instanceId);
-  const job = safeInstanceId
-    ? await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId, { forceAbort: true })
-    : await obsidianSyncJobStore.getJob();
-  return { provider: SYNC_PROVIDER, job, instanceId: safeInstanceId };
+  return { provider: SYNC_PROVIDER, job: await obsidianSyncJobStore.getJob(), instanceId: safeString(instanceId) };
 }
 
-async function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  await obsidianSyncJobStore.setJob(null);
-  return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
+function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+  return obsidianSyncOwnership.runExclusiveMutation(async () => {
+    if (!(await obsidianSyncJobStore.setJob(null))) throw buildJobPersistenceError();
+    return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
+  });
 }
 
-async function syncConversations({
+function runExclusiveMaintenance<T>(
+  mutation: () => Promise<T>,
+  options: { clearStatusAfter?: boolean } = {},
+): Promise<T> {
+  return obsidianSyncOwnership.runExclusiveMutation(async () => {
+    const result = await mutation();
+    if (options.clearStatusAfter === true && !(await obsidianSyncJobStore.setJob(null)))
+      throw buildJobPersistenceError();
+    return result;
+  });
+}
+
+function reconcileStartupSyncJob() {
+  return obsidianSyncOwnership.runExclusiveMutation(() => obsidianSyncJobStore.abortRunningJob());
+}
+
+async function runSyncConversations({
   conversationIds,
   forceFullConversationIds,
   instanceId,
@@ -454,9 +468,6 @@ async function syncConversations({
   }
 
   const safeInstanceId = safeString(instanceId);
-  const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
-  if (obsidianSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
-
   const startedAt = Date.now();
   const lifecycle = createSyncJobLifecycle({
     initialJob: {
@@ -467,12 +478,14 @@ async function syncConversations({
       startedAt,
       updatedAt: startedAt,
       finishedAt: null,
-      conversationIds: ids,
+      totalCount: ids.length,
+      conversationIds: [],
       currentStage: 'preparing_queue',
       okCount: 0,
       failCount: 0,
       perConversation: [],
     },
+    configuredConversationIds: ids,
     persist: (job) => obsidianSyncJobStore.setJob(job),
   });
 
@@ -481,7 +494,6 @@ async function syncConversations({
   for (const conversationId of ids) {
     let row: any = null;
     try {
-      await lifecycle.setRunStage('loading_conversation');
       const decision: any = await decideSyncModeForConversation({
         conversationId,
         forceFull: forceFullIds.has(conversationId),
@@ -514,9 +526,6 @@ async function syncConversations({
           decision.mode === 'full_rebuild_forced' ||
           decision.mode === 'full_rebuild_rename'
         ) {
-          await lifecycle.setItem(conversationId, {
-            currentStage: decision.mode === 'full_rebuild_rename' ? 'renaming_note' : 'writing_full_note',
-          });
           const syncnosObject = buildDefaultSyncnosObject({
             conversation: decision.convo,
             lastSyncedAt: Date.now(),
@@ -555,7 +564,6 @@ async function syncConversations({
               deleteAfter !== safeString(decision.filePath) &&
               typeof client.deleteVaultFile === 'function'
             ) {
-              await lifecycle.setItem(conversationId, { currentStage: 'deleting_old_note_path' });
               try {
                 const delRes = await client.deleteVaultFile(deleteAfter);
                 if (!delRes || !delRes.ok) {
@@ -644,4 +652,18 @@ async function syncConversations({
   return lifecycle.summary();
 }
 
-export { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
+function syncConversations(input: Parameters<typeof runSyncConversations>[0] = {}) {
+  return obsidianSyncOwnership.startRun(() => runSyncConversations(input));
+}
+
+const isRunActive = () => obsidianSyncOwnership.isRunActive();
+
+export {
+  testConnection,
+  getSyncStatus,
+  clearSyncStatus,
+  syncConversations,
+  isRunActive,
+  runExclusiveMaintenance,
+  reconcileStartupSyncJob,
+};

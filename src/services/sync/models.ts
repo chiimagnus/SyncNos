@@ -56,6 +56,7 @@ export type SyncJobSnapshot = {
 
 export type SyncJobStatusResponse = {
   provider: SyncProvider;
+  active: boolean;
   job: SyncJobSnapshot | null;
   instanceId?: string;
 };

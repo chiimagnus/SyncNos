@@ -58,7 +58,10 @@ describe('sync job lifecycle', () => {
     });
 
     for (const conversationId of configuredConversationIds) {
-      await lifecycle.setItem(conversationId, { conversationTitle: `Conversation ${conversationId}`, currentStage: 'working' });
+      await lifecycle.setItem(conversationId, {
+        conversationTitle: `Conversation ${conversationId}`,
+        currentStage: 'working',
+      });
       await lifecycle.completeItem({ conversationId, ok: true, mode: 'synced' });
     }
 
@@ -182,7 +185,12 @@ describe('sync job lifecycle', () => {
     const persist = vi.fn(async () => true);
     const lifecycle = createSyncJobLifecycle({ initialJob: runningJob([1]), persist, now: () => 90 });
 
-    await lifecycle.completeItem({ conversationId: 1, conversationTitle: 'Lookup failed', ok: false, error: 'missing' });
+    await lifecycle.completeItem({
+      conversationId: 1,
+      conversationTitle: 'Lookup failed',
+      ok: false,
+      error: 'missing',
+    });
 
     expect(persist.mock.calls.at(-1)?.[0]).toMatchObject({ okCount: 0, failCount: 1 });
     expect(persist.mock.calls.at(-1)?.[0].currentConversationId).toBeUndefined();

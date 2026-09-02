@@ -1,8 +1,6 @@
 import { storageGet, storageSet } from '@platform/storage/local';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncProvider, SyncWarning } from '@services/sync/models';
 
-const DEFAULT_STALE_MS = 5 * 60 * 1000;
-
 export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
   notion: 'notion_sync_job_v1',
   obsidian: 'obsidian_sync_job_v1',
@@ -113,12 +111,8 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
 
 async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {
   const key = SYNC_JOB_STORAGE_KEYS[provider];
-  try {
-    const res = await storageGet([key]);
-    return normalizeSyncJobSnapshot(provider, res?.[key] ?? null);
-  } catch (_error) {
-    return null;
-  }
+  const res = await storageGet([key]);
+  return normalizeSyncJobSnapshot(provider, res?.[key] ?? null);
 }
 
 async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | null): Promise<boolean> {
@@ -131,36 +125,9 @@ async function setSyncJob(provider: SyncProvider, job: SyncJobSnapshot | null): 
   }
 }
 
-function isRunningSyncJob(job: SyncJobSnapshot | null | undefined, staleMs?: number): boolean {
-  if (!job || job.status !== 'running') return false;
-  const updatedAt = Number(job.updatedAt) || 0;
-  if (!updatedAt) return true;
-  const maxAge = Number.isFinite(Number(staleMs)) ? Math.max(60_000, Number(staleMs)) : DEFAULT_STALE_MS;
-  return Date.now() - updatedAt < maxAge;
-}
-
-export type ReconcileRunningSyncJobOptions = {
-  staleMs?: number;
-  forceAbort?: boolean;
-};
-
-async function abortRunningSyncJobIfFromOtherInstance(
-  provider: SyncProvider,
-  instanceId: string,
-  options: ReconcileRunningSyncJobOptions = {},
-): Promise<SyncJobSnapshot | null> {
+async function abortRunningSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {
   const current = await getSyncJob(provider);
   if (!current || current.status !== 'running') return current;
-  const jobInstanceId = current.instanceId ? String(current.instanceId) : '';
-  if (!jobInstanceId || jobInstanceId === String(instanceId || '')) return current;
-
-  const forceAbort = options.forceAbort === true;
-  const staleMs = options.staleMs;
-
-  // Do not abort a still-active job from another background instance. Treat it as running
-  // unless it is stale, otherwise concurrent background contexts could keep aborting each
-  // other's jobs and cause duplicate sync writes.
-  if (!forceAbort && isRunningSyncJob(current, staleMs)) return current;
 
   const now = Date.now();
   const aborted: SyncJobSnapshot = {
@@ -171,26 +138,19 @@ async function abortRunningSyncJobIfFromOtherInstance(
     finishedAt: now,
     abortedReason: 'extension reloaded',
   };
-  await setSyncJob(provider, aborted);
-  return aborted;
+  return (await setSyncJob(provider, aborted)) ? aborted : current;
 }
 
 export type SyncJobStore = {
   getJob: () => Promise<SyncJobSnapshot | null>;
   setJob: (job: SyncJobSnapshot | null) => Promise<boolean>;
-  isRunningJob: (job: SyncJobSnapshot | null | undefined, staleMs?: number) => boolean;
-  abortRunningJobIfFromOtherInstance: (
-    instanceId: string,
-    options?: ReconcileRunningSyncJobOptions,
-  ) => Promise<SyncJobSnapshot | null>;
+  abortRunningJob: () => Promise<SyncJobSnapshot | null>;
 };
 
 export function createSyncJobStore(provider: SyncProvider): SyncJobStore {
   return {
     getJob: () => getSyncJob(provider),
     setJob: (job) => setSyncJob(provider, job),
-    isRunningJob: isRunningSyncJob,
-    abortRunningJobIfFromOtherInstance: (instanceId, options) =>
-      abortRunningSyncJobIfFromOtherInstance(provider, instanceId, options),
+    abortRunningJob: () => abortRunningSyncJob(provider),
   };
 }

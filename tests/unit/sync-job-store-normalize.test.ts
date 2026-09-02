@@ -1,24 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageState: Record<string, unknown> = {};
+const storageMocks = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn() }));
 
-vi.mock('@platform/storage/local', () => {
-  return {
-    storageGet: async (keys: string[]) => {
-      const out: Record<string, unknown> = {};
-      for (const key of keys || []) out[key] = storageState[key];
-      return out;
-    },
-    storageSet: async (patch: Record<string, unknown>) => {
-      Object.assign(storageState, patch || {});
-    },
-  };
-});
+vi.mock('@platform/storage/local', () => ({
+  storageGet: storageMocks.get,
+  storageSet: storageMocks.set,
+}));
 
 describe('normalizeSyncJobSnapshot', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     for (const key of Object.keys(storageState)) delete storageState[key];
+    storageMocks.get.mockImplementation(async (keys: string[]) => {
+      const out: Record<string, unknown> = {};
+      for (const key of keys || []) out[key] = storageState[key];
+      return out;
+    });
+    storageMocks.set.mockImplementation(async (patch: Record<string, unknown>) => {
+      Object.assign(storageState, patch || {});
+    });
   });
 
   it('normalizes ids, totalCount, rows, and counts through the provider-owned key', async () => {
@@ -61,7 +62,9 @@ describe('normalizeSyncJobSnapshot', () => {
   it('accepts only known phases instead of manufacturing a terminal job', async () => {
     const { normalizeSyncJobSnapshot } = await import('@services/sync/sync-job-store');
 
-    expect(normalizeSyncJobSnapshot('notion', { status: 'future', conversationIds: [], perConversation: [] })).toBeNull();
+    expect(
+      normalizeSyncJobSnapshot('notion', { status: 'future', conversationIds: [], perConversation: [] }),
+    ).toBeNull();
     expect(normalizeSyncJobSnapshot('notion', { conversationIds: [], perConversation: [] })).toBeNull();
     expect(normalizeSyncJobSnapshot('notion', null)).toBeNull();
   });
@@ -133,59 +136,74 @@ describe('normalizeSyncJobSnapshot', () => {
     });
   });
 
-  it('aborts a foreign running job immediately when forced', async () => {
+  it('propagates storage read failure instead of manufacturing an empty job', async () => {
+    const { createSyncJobStore } = await import('@services/sync/sync-job-store');
+    storageMocks.get.mockRejectedValueOnce(new Error('storage read failed'));
+
+    await expect(createSyncJobStore('notion').getJob()).rejects.toThrow('storage read failed');
+  });
+
+  it('returns null only when the canonical key is actually absent', async () => {
+    const { createSyncJobStore } = await import('@services/sync/sync-job-store');
+    await expect(createSyncJobStore('notion').getJob()).resolves.toBeNull();
+  });
+
+  it('materializes any orphan running job as aborted without instance or age heuristics', async () => {
     const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
-    const now = Date.now();
     storageState[SYNC_JOB_STORAGE_KEYS.notion] = {
       id: 'job_2',
       provider: 'notion',
-      instanceId: 'background-old',
       status: 'running',
-      startedAt: now - 3_000,
-      updatedAt: now - 2_000,
+      startedAt: 1,
+      updatedAt: 1,
       finishedAt: null,
-      conversationIds: [1],
+      conversationIds: [],
       okCount: 0,
       failCount: 0,
       perConversation: [],
     };
 
-    const reconciled = await createSyncJobStore('notion').abortRunningJobIfFromOtherInstance('background-new', {
-      forceAbort: true,
-    });
-    expect(reconciled?.status).toBe('aborted');
-    expect(reconciled?.abortedReason).toBe('extension reloaded');
+    const reconciled = await createSyncJobStore('notion').abortRunningJob();
+    expect(reconciled).toMatchObject({ status: 'aborted', abortedReason: 'extension reloaded' });
     expect((storageState[SYNC_JOB_STORAGE_KEYS.notion] as any)?.status).toBe('aborted');
   });
 
-  it('keeps the pre-T2 stale-window behavior until ownership replaces it', async () => {
+  it('does not report canonical recovery when the aborted snapshot cannot be persisted', async () => {
     const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
-    const jobStore = createSyncJobStore('feishu');
-    const now = Date.now();
     storageState[SYNC_JOB_STORAGE_KEYS.feishu] = {
       id: 'job_3',
       provider: 'feishu',
-      instanceId: 'background-old',
       status: 'running',
-      startedAt: now - 3_000,
-      updatedAt: now - 2_000,
+      startedAt: 1,
+      updatedAt: 1,
       finishedAt: null,
-      conversationIds: [2],
+      conversationIds: [],
       okCount: 0,
       failCount: 0,
       perConversation: [],
     };
+    storageMocks.set.mockRejectedValueOnce(new Error('storage write failed'));
 
-    const fresh = await jobStore.abortRunningJobIfFromOtherInstance('background-new');
-    expect(fresh?.status).toBe('running');
-    expect(jobStore.isRunningJob(fresh)).toBe(true);
+    const reconciled = await createSyncJobStore('feishu').abortRunningJob();
+    expect(reconciled?.status).toBe('running');
+    expect((storageState[SYNC_JOB_STORAGE_KEYS.feishu] as any)?.status).toBe('running');
+  });
 
-    storageState[SYNC_JOB_STORAGE_KEYS.feishu] = {
-      ...(storageState[SYNC_JOB_STORAGE_KEYS.feishu] as any),
-      updatedAt: now - 5 * 60 * 1000 - 1_000,
+  it('leaves terminal and missing jobs unchanged during startup reconciliation', async () => {
+    const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
+    const store = createSyncJobStore('github');
+    await expect(store.abortRunningJob()).resolves.toBeNull();
+    storageState[SYNC_JOB_STORAGE_KEYS.github] = {
+      status: 'done',
+      startedAt: 1,
+      updatedAt: 2,
+      finishedAt: 2,
+      conversationIds: [],
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
     };
-    const stale = await jobStore.abortRunningJobIfFromOtherInstance('background-new');
-    expect(stale?.status).toBe('aborted');
-    expect(stale?.abortedReason).toBe('extension reloaded');
+    await expect(store.abortRunningJob()).resolves.toMatchObject({ status: 'done' });
+    expect(storageMocks.set).not.toHaveBeenCalled();
   });
 });

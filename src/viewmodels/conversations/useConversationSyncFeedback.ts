@@ -270,24 +270,55 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
   );
 }
 
-function pickPrimaryJob(jobsInput: Array<SyncJobSnapshot | null>, preferredProvider?: SyncProvider | null) {
-  const jobs = jobsInput.filter(Boolean) as SyncJobSnapshot[];
-  if (!jobs.length) return null;
+type StatusObservation = {
+  provider: SyncProvider;
+  active: boolean;
+  job: SyncJobSnapshot | null;
+};
 
-  const compare = (a: SyncJobSnapshot, b: SyncJobSnapshot) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
-  const running = jobs.filter((job) => job.status === 'running').sort(compare);
-  if (preferredProvider) {
-    const preferredRunning = running.find((job) => job.provider === preferredProvider);
-    if (preferredRunning) return preferredRunning;
-  }
-  if (running.length) return running[0];
+type StatusReadOutcome = { ok: true; observation: StatusObservation } | { ok: false; provider: SyncProvider };
 
-  const ordered = jobs.slice().sort(compare);
+function toGenericRunningFeedback(provider: SyncProvider): ConversationSyncFeedbackState {
+  return {
+    provider,
+    phase: 'running',
+    total: 0,
+    done: 0,
+    currentConversationId: null,
+    currentConversationTitle: '',
+    currentStage: '',
+    failures: [],
+    warnings: [],
+    message: buildRunningMessage(provider, 0, 0),
+    updatedAt: Date.now(),
+    summary: null,
+  };
+}
+
+function pickPrimaryObservation(
+  observations: StatusObservation[],
+  preferredProvider?: SyncProvider | null,
+): StatusObservation | null {
+  const active = observations.filter((observation) => observation.active);
   if (preferredProvider) {
-    const preferred = ordered.find((job) => job.provider === preferredProvider);
-    if (preferred) return preferred;
+    const preferredActive = active.find((observation) => observation.provider === preferredProvider);
+    if (preferredActive) return preferredActive;
   }
-  return ordered[0];
+  const activeWithRunningJob = active
+    .filter((observation) => observation.job?.status === 'running')
+    .sort((a, b) => (Number(b.job?.updatedAt) || 0) - (Number(a.job?.updatedAt) || 0));
+  if (activeWithRunningJob.length) return activeWithRunningJob[0]!;
+  if (active.length) return active[0]!;
+
+  const terminal = observations.filter(
+    (observation) => !observation.active && observation.job && observation.job.status !== 'running',
+  );
+  if (preferredProvider) {
+    const preferredTerminal = terminal.find((observation) => observation.provider === preferredProvider);
+    if (preferredTerminal) return preferredTerminal;
+  }
+  terminal.sort((a, b) => (Number(b.job?.updatedAt) || 0) - (Number(a.job?.updatedAt) || 0));
+  return terminal[0] ?? null;
 }
 
 function assertNever(value: never): never {
@@ -318,6 +349,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const [activeRun, setActiveRun] = useState<ActiveRun | null>(null);
   const disposedRef = useRef(false);
   const runTokenRef = useRef(0);
+  const observationGenerationRef = useRef(0);
   const activeRunRef = useRef<ActiveRun | null>(null);
   const feedbackRef = useRef<ConversationSyncFeedbackState>(IDLE_FEEDBACK);
 
@@ -331,42 +363,84 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
 
   const refreshFromBackground = useCallback(
     async (preferredProvider?: SyncProvider | null) => {
-      const [notionStatus, obsidianStatus, feishuStatus, githubStatus] = await Promise.all([
-        getNotionSyncJobStatus().catch(() => ({ provider: 'notion', job: null }) as SyncJobStatusResponse),
-        getObsidianSyncStatus().catch(() => ({ provider: 'obsidian', job: null }) as SyncJobStatusResponse),
-        getFeishuSyncStatus().catch(() => ({ provider: 'feishu', job: null }) as SyncJobStatusResponse),
-        getGithubSyncStatus().catch(() => ({ provider: 'github', job: null }) as SyncJobStatusResponse),
+      const generation = observationGenerationRef.current;
+      const read = async (
+        provider: SyncProvider,
+        getter: () => Promise<SyncJobStatusResponse>,
+      ): Promise<StatusReadOutcome> => {
+        try {
+          const status = await getter();
+          return {
+            ok: true,
+            observation: { provider, active: status.active === true, job: status.job ?? null },
+          };
+        } catch (_error) {
+          return { ok: false, provider };
+        }
+      };
+      const outcomes = await Promise.all([
+        read('notion', getNotionSyncJobStatus),
+        read('obsidian', getObsidianSyncStatus),
+        read('feishu', getFeishuSyncStatus),
+        read('github', getGithubSyncStatus),
       ]);
-      if (disposedRef.current) return null;
+      if (disposedRef.current || observationGenerationRef.current !== generation) return null;
 
-      const job = pickPrimaryJob(
-        [notionStatus?.job ?? null, obsidianStatus?.job ?? null, feishuStatus?.job ?? null, githubStatus?.job ?? null],
-        preferredProvider,
-      );
-      if (job?.status === 'running') {
-        setActiveRun((current) => {
-          if (current?.provider === job.provider) return current;
+      const preferredReadFailed =
+        preferredProvider != null && outcomes.some((outcome) => !outcome.ok && outcome.provider === preferredProvider);
+      if (
+        preferredReadFailed &&
+        activeRunRef.current?.provider === preferredProvider &&
+        feedbackRef.current.phase === 'running'
+      ) {
+        return null;
+      }
+
+      const observations = outcomes
+        .filter((outcome): outcome is Extract<StatusReadOutcome, { ok: true }> => outcome.ok)
+        .map((outcome) => outcome.observation);
+      const selected = pickPrimaryObservation(observations, preferredProvider);
+
+      if (selected?.active) {
+        let nextRun = activeRunRef.current;
+        if (nextRun?.provider !== selected.provider) {
           const token = runTokenRef.current + 1;
           runTokenRef.current = token;
-          return { provider: job.provider, token };
-        });
-      } else if (job) {
+          nextRun = { provider: selected.provider, token };
+          activeRunRef.current = nextRun;
+          setActiveRun(nextRun);
+        }
+        const current = feedbackRef.current;
+        const nextFeedback =
+          selected.job?.status === 'running'
+            ? toFeedbackFromJob(selected.job)
+            : current.phase === 'running' && current.provider === selected.provider
+              ? current
+              : toGenericRunningFeedback(selected.provider);
+        feedbackRef.current = nextFeedback;
+        setFeedback(nextFeedback);
+        return selected.job;
+      }
+
+      if (selected?.job && selected.job.status !== 'running') {
         runTokenRef.current += 1;
+        activeRunRef.current = null;
         setActiveRun(null);
-      } else if (activeRunRef.current && feedbackRef.current.phase === 'running') {
-        // Preserve the current running state when a transient status read returns no job,
-        // allowing the polling loop and storage change refreshes to continue without interruption.
-      } else {
+        const nextFeedback = toFeedbackFromJob(selected.job);
+        feedbackRef.current = nextFeedback;
+        setFeedback(nextFeedback);
+        return selected.job;
+      }
+
+      if (activeRunRef.current && feedbackRef.current.phase === 'running') {
         runTokenRef.current += 1;
+        activeRunRef.current = null;
         setActiveRun(null);
       }
-      setFeedback((current) => {
-        if (job) return toFeedbackFromJob(job);
-        if (current.phase === 'running') return current;
-        if (current.phase === 'failed' && current.summary == null) return current;
-        return IDLE_FEEDBACK;
-      });
-      return job;
+      if (feedbackRef.current.phase === 'failed' && feedbackRef.current.summary == null) return null;
+      feedbackRef.current = IDLE_FEEDBACK;
+      setFeedback(IDLE_FEEDBACK);
+      return null;
     },
     [getNotionSyncJobStatus, getObsidianSyncStatus, getFeishuSyncStatus, getGithubSyncStatus],
   );
@@ -413,20 +487,17 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       try {
         const status = await getStatus();
         if (disposed || disposedRef.current || runTokenRef.current !== token) return;
-        if (!status?.job) {
-          await refreshFromBackground(provider);
+        if (status.active === true) {
+          if (status.job?.status === 'running') {
+            const nextFeedback = toFeedbackFromJob(status.job);
+            feedbackRef.current = nextFeedback;
+            setFeedback(nextFeedback);
+          }
           return;
         }
-        setFeedback((current) => {
-          if (current.phase !== 'running' || current.provider !== provider) return current;
-          return toFeedbackFromJob(status.job!);
-        });
-        if (status.job.status !== 'running') {
-          runTokenRef.current += 1;
-          setActiveRun((current) => (current?.token === token ? null : current));
-        }
+        await refreshFromBackground(provider);
       } catch (_error) {
-        // Polling is best-effort; storage updates and sync completion still refresh the visible state.
+        // A failed status read is not equivalent to active=false; keep the current run and retry.
       }
     };
 
@@ -451,11 +522,14 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const clearFeedback = useCallback(() => {
     const current = feedback;
     if (current.phase === 'running') return;
+    observationGenerationRef.current += 1;
     if (!current.provider) {
+      feedbackRef.current = IDLE_FEEDBACK;
       setFeedback(IDLE_FEEDBACK);
       return;
     }
 
+    feedbackRef.current = IDLE_FEEDBACK;
     setFeedback(IDLE_FEEDBACK);
     const clear = (() => {
       switch (current.provider) {
@@ -487,6 +561,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     async (provider: SyncProvider, conversationIds: number[]): Promise<SyncStartAck | null> => {
       const ids = normalizeIds(conversationIds);
       if (!ids.length) return null;
+      observationGenerationRef.current += 1;
 
       if (provider === 'obsidian') {
         const token = runTokenRef.current + 1;
@@ -538,9 +613,11 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
             ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
             : toErrorMessage(provider, error);
 
+          observationGenerationRef.current += 1;
           runTokenRef.current += 1;
+          activeRunRef.current = null;
           setActiveRun((current) => (current?.token === token ? null : current));
-          setFeedback({
+          const failedFeedback: ConversationSyncFeedbackState = {
             provider,
             phase: 'failed',
             total: 0,
@@ -553,7 +630,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
             message,
             updatedAt: Date.now(),
             summary: null,
-          });
+          };
+          feedbackRef.current = failedFeedback;
+          setFeedback(failedFeedback);
           throw error;
         }
       }
@@ -618,9 +697,11 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
           : toErrorMessage(provider, error);
 
+        observationGenerationRef.current += 1;
         runTokenRef.current += 1;
+        activeRunRef.current = null;
         setActiveRun((current) => (current?.token === token ? null : current));
-        setFeedback({
+        const failedFeedback: ConversationSyncFeedbackState = {
           provider,
           phase: 'failed',
           total: 0,
@@ -633,7 +714,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           message,
           updatedAt: Date.now(),
           summary: null,
-        });
+        };
+        feedbackRef.current = failedFeedback;
+        setFeedback(failedFeedback);
         throw error;
       }
     },

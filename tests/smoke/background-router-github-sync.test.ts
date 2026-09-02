@@ -48,17 +48,20 @@ function createRouter(githubSyncOrchestrator: any, instanceId = 'github-backgrou
       syncConversations: async () => ({}),
       getSyncJobStatus: async () => ({ job: null }),
       clearSyncJobStatus: async () => ({ job: null }),
+      isRunActive: () => false,
     },
     obsidianSyncOrchestrator: {
       testConnection: async () => ({ ok: true }),
       syncConversations: async () => ({}),
       getSyncStatus: async () => ({ job: null }),
       clearSyncStatus: async () => ({ job: null }),
+      isRunActive: () => false,
     },
     feishuSyncOrchestrator: {
       syncConversations: async () => ({}),
       getSyncStatus: async () => ({ job: null }),
       clearSyncStatus: async () => ({ job: null }),
+      isRunActive: () => false,
     },
     githubSyncOrchestrator,
   });
@@ -66,7 +69,7 @@ function createRouter(githubSyncOrchestrator: any, instanceId = 'github-backgrou
 }
 
 describe('background-router github sync routes', () => {
-  it('uses gate, persisted fast reject and detached reconcile without a second preflight path', async () => {
+  it('uses gate, live-owner fast reject and ignores durable running residue for admission', async () => {
     const store: Record<string, unknown> = { webclipper_sync_provider_github_enabled: false };
     installStorage(store);
     const blocker = deferred<unknown>();
@@ -75,6 +78,7 @@ describe('background-router github sync routes', () => {
       getSyncStatus: vi.fn(async () => ({ provider: 'github', job })),
       clearSyncStatus: vi.fn(async () => ({ provider: 'github', job: null })),
       sync: vi.fn(async () => await blocker.promise),
+      isRunActive: vi.fn(() => false),
     };
     const router = createRouter(githubSyncOrchestrator);
 
@@ -93,7 +97,7 @@ describe('background-router github sync routes', () => {
       conversationIds: [1, '2', 2, 0],
     });
     expect(started).toMatchObject({ ok: true, data: { started: true, provider: 'github' } });
-    expect(githubSyncOrchestrator.getSyncStatus).toHaveBeenCalledTimes(1);
+    expect(githubSyncOrchestrator.getSyncStatus).not.toHaveBeenCalled();
     expect(githubSyncOrchestrator.sync).toHaveBeenCalledWith({
       conversationIds: [1, 2],
       mode: 'reconcile',
@@ -113,13 +117,13 @@ describe('background-router github sync routes', () => {
     await Promise.resolve();
 
     job = { status: 'running', id: 'persisted-running' };
-    const persistedConflict = await router.__handleMessageForTests({
+    const residueRun = await router.__handleMessageForTests({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [4],
     });
-    expect(persistedConflict.ok).toBe(false);
-    expect(persistedConflict.error?.extra?.code).toBe('sync_already_running');
-    expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(1);
+    expect(residueRun).toMatchObject({ ok: true, data: { started: true, provider: 'github' } });
+    expect(githubSyncOrchestrator.getSyncStatus).not.toHaveBeenCalled();
+    expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(2);
   });
 
   it('delegates status and clear through the production sync contract', async () => {
@@ -132,17 +136,21 @@ describe('background-router github sync routes', () => {
       })),
       clearSyncStatus: vi.fn(async ({ instanceId }: any) => ({ provider: 'github', job: null, instanceId })),
       sync: vi.fn(async () => ({})),
+      isRunActive: vi.fn(() => false),
     };
     const router = createRouter(githubSyncOrchestrator, 'instance-status');
 
     const status = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
     expect(status).toMatchObject({
       ok: true,
-      data: { provider: 'github', job: { status: 'done' }, instanceId: 'instance-status' },
+      data: { provider: 'github', active: false, job: { status: 'done' }, instanceId: 'instance-status' },
     });
 
     const cleared = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
-    expect(cleared).toMatchObject({ ok: true, data: { provider: 'github', job: null, instanceId: 'instance-status' } });
+    expect(cleared).toMatchObject({
+      ok: true,
+      data: { provider: 'github', active: false, job: null, instanceId: 'instance-status' },
+    });
     expect(githubSyncOrchestrator.clearSyncStatus).toHaveBeenCalledWith({ instanceId: 'instance-status' });
   });
 });

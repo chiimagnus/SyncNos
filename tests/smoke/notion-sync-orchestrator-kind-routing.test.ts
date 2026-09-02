@@ -53,8 +53,6 @@ describe('notion-sync-orchestrator kind routing', () => {
     let currentJob: any = null;
     const jobStore = {
       getJob: async () => currentJob,
-      abortRunningJobIfFromOtherInstance: async () => currentJob,
-      isRunningJob: (job: any) => job && job.status === 'running',
       setJob: async (job: any) => {
         currentJob = job;
         return true;
@@ -195,8 +193,6 @@ describe('notion-sync-orchestrator kind routing', () => {
     let currentJob: any = null;
     const jobStore = {
       getJob: async () => currentJob,
-      abortRunningJobIfFromOtherInstance: async () => currentJob,
-      isRunningJob: (job: any) => job && job.status === 'running',
       setJob: async (job: any) => {
         currentJob = job;
         return true;
@@ -285,8 +281,6 @@ describe('notion-sync-orchestrator kind routing', () => {
     let currentJob: any = null;
     const jobStore = {
       getJob: async () => currentJob,
-      abortRunningJobIfFromOtherInstance: async () => currentJob,
-      isRunningJob: (job: any) => job && job.status === 'running',
       setJob: async (job: any) => {
         currentJob = job;
         return true;
@@ -349,8 +343,6 @@ describe('notion-sync-orchestrator kind routing', () => {
     let currentJob: any = null;
     const jobStore = {
       getJob: async () => currentJob,
-      abortRunningJobIfFromOtherInstance: async () => currentJob,
-      isRunningJob: (job: any) => job && job.status === 'running',
       setJob: async (job: any) => {
         currentJob = job;
         return true;
@@ -395,7 +387,99 @@ describe('notion-sync-orchestrator kind routing', () => {
     });
   });
 
-  it('reconciles a foreign running notion job to aborted on status read after reload', async () => {
+  it('rejects a second direct sync synchronously while the first durable claim is still pending', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let releaseClaim!: (value: boolean) => void;
+    const pendingClaim = new Promise<boolean>((resolve) => {
+      releaseClaim = resolve;
+    });
+    const setJob = vi
+      .fn()
+      .mockImplementationOnce(() => pendingClaim)
+      .mockResolvedValue(true);
+    const getJob = vi.fn(async () => null);
+    const getToken = vi.fn(async () => ({ accessToken: 't' }));
+    const ensureDatabase = vi.fn(async () => ({ databaseId: 'unused' }));
+    const createPageInDatabase = vi.fn(async () => ({ id: 'unused' }));
+    const getSyncMappingByConversation = vi.fn(async () => null);
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken },
+      storage: {
+        getSyncMappingByConversation,
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase },
+      syncService: {
+        createPageInDatabase,
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore: { getJob, setJob, abortRunningJob: async () => null },
+    } as any);
+
+    const first = orchestrator.syncConversations({ conversationIds: [1], instanceId: 'first' });
+    expect(() => orchestrator.syncConversations({ conversationIds: [2], instanceId: 'second' })).toThrowError(
+      expect.objectContaining({ code: 'sync_already_running' }),
+    );
+    expect(getToken).not.toHaveBeenCalled();
+    expect(ensureDatabase).not.toHaveBeenCalled();
+    expect(createPageInDatabase).not.toHaveBeenCalled();
+    expect(getSyncMappingByConversation).not.toHaveBeenCalled();
+
+    releaseClaim(true);
+    await first;
+    expect(getToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed on the compact initial claim without a getJob readback or remote work', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    const setJob = vi.fn(async () => false);
+    const getJob = vi.fn(async () => null);
+    const getToken = vi.fn(async () => ({ accessToken: 't' }));
+    const ensureDatabase = vi.fn(async () => ({ databaseId: 'unused' }));
+    const getSyncMappingByConversation = vi.fn(async () => null);
+    const createPageInDatabase = vi.fn(async () => ({ id: 'unused' }));
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken },
+      storage: {
+        getSyncMappingByConversation,
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase },
+      syncService: {
+        createPageInDatabase,
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore: { getJob, setJob, abortRunningJob: async () => null },
+    } as any);
+
+    await expect(
+      orchestrator.syncConversations({ conversationIds: [7], instanceId: 'claim-failure' }),
+    ).rejects.toMatchObject({ code: 'notion_sync_job_persist_failed' });
+    expect(setJob).toHaveBeenCalledTimes(1);
+    expect(setJob.mock.calls[0]?.[0]).toMatchObject({
+      provider: 'notion',
+      status: 'running',
+      totalCount: 1,
+      conversationIds: [],
+      perConversation: [],
+    });
+    expect(getJob).not.toHaveBeenCalled();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(getSyncMappingByConversation).not.toHaveBeenCalled();
+    expect(ensureDatabase).not.toHaveBeenCalled();
+    expect(createPageInDatabase).not.toHaveBeenCalled();
+  });
+
+  it('keeps status reads pure and reconciles a running notion residue only through startup maintenance', async () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
 
@@ -416,22 +500,20 @@ describe('notion-sync-orchestrator kind routing', () => {
     };
     const jobStore = {
       getJob: async () => currentJob,
-      abortRunningJobIfFromOtherInstance: async (instanceId: string, options?: any) => {
-        if (options?.forceAbort === true && currentJob?.instanceId !== instanceId && currentJob?.status === 'running') {
-          currentJob = {
-            ...currentJob,
-            status: 'aborted',
-            updatedAt: Date.now(),
-            finishedAt: Date.now(),
-            abortedReason: 'extension reloaded',
-          };
-        }
-        return currentJob;
-      },
-      isRunningJob: (job: any) => job && job.status === 'running',
       setJob: async (job: any) => {
         currentJob = job;
         return true;
+      },
+      abortRunningJob: async () => {
+        if (currentJob?.status !== 'running') return currentJob;
+        currentJob = {
+          ...currentJob,
+          status: 'aborted',
+          updatedAt: Date.now(),
+          finishedAt: Date.now(),
+          abortedReason: 'extension reloaded',
+        };
+        return currentJob;
       },
     };
 
@@ -452,7 +534,11 @@ describe('notion-sync-orchestrator kind routing', () => {
     });
 
     const status = await orchestrator.getSyncJobStatus({ instanceId: 'background-new' });
-    expect(status.job?.status).toBe('aborted');
-    expect(status.job?.abortedReason).toBe('extension reloaded');
+    expect(status.job?.status).toBe('running');
+
+    await orchestrator.reconcileStartupSyncJob();
+    const reconciled = await orchestrator.getSyncJobStatus({ instanceId: 'background-new' });
+    expect(reconciled.job?.status).toBe('aborted');
+    expect(reconciled.job?.abortedReason).toBe('extension reloaded');
   });
 });

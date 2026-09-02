@@ -27,16 +27,12 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
-  abortRunningJobIfFromOtherInstance: vi.fn(),
-  isRunningJob: vi.fn(),
   setJob: vi.fn(),
   getJob: vi.fn(),
 }));
 
 vi.mock('@services/sync/sync-job-store', () => ({
   createSyncJobStore: () => ({
-    abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
-    isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
   }),
@@ -89,11 +85,88 @@ afterEach(() => {
 });
 
 describe('feishu skip unchanged', () => {
+  it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
+    setupChromeStorage();
+    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    jobStoreMocks.setJob.mockResolvedValue(false);
+    jobStoreMocks.getJob.mockResolvedValue(null);
+
+    const hash = await sha256Hex('# same content');
+    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+      conversation: { id: 1, title: 't' },
+      mapping: { feishuDocId: 'doc1', feishuLastContentHash: hash },
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+
+    let releaseRemote!: () => void;
+    const remoteGate = new Promise<void>((resolve) => {
+      releaseRemote = resolve;
+    });
+    fetchFeishuJsonMock.mockImplementationOnce(async () => {
+      await remoteGate;
+      return { document: { document_id: 'doc1', revision_id: 1, title: 't' } };
+    });
+
+    const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
+    const firstRun = orch.syncConversations({ conversationIds: [1], instanceId: 'first' });
+    await vi.waitFor(() => expect(fetchFeishuJsonMock).toHaveBeenCalledTimes(1));
+
+    expect(orch.isRunActive()).toBe(true);
+    expect(jobStoreMocks.setJob.mock.calls[0]?.[0]).toMatchObject({
+      provider: 'feishu',
+      status: 'running',
+      totalCount: 1,
+      conversationIds: [],
+      perConversation: [],
+    });
+    expect(jobStoreMocks.setJob.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchFeishuJsonMock.mock.invocationCallOrder[0],
+    );
+
+    let conflict: unknown = null;
+    try {
+      orch.syncConversations({ conversationIds: [2], instanceId: 'second' });
+    } catch (error) {
+      conflict = error;
+    }
+    expect(conflict).toMatchObject({ code: 'sync_already_running' });
+    expect(fetchFeishuJsonMock).toHaveBeenCalledTimes(1);
+
+    releaseRemote();
+    const result = await firstRun;
+    expect(result.okCount).toBe(1);
+    const attemptedJobs = jobStoreMocks.setJob.mock.calls.map(([job]) => job).filter(Boolean);
+    const runningJobs = attemptedJobs.filter((job: any) => job.status === 'running');
+    expect(
+      runningJobs.every(
+        (job: any) =>
+          job.totalCount === 1 &&
+          Array.isArray(job.conversationIds) &&
+          job.conversationIds.length === 0 &&
+          Array.isArray(job.perConversation) &&
+          job.perConversation.length === 0,
+      ),
+    ).toBe(true);
+    expect(
+      runningJobs.filter((job: any) => job.currentConversationId === 1 && job.currentStage === 'preparing_sync'),
+    ).toHaveLength(1);
+    expect(runningJobs.filter((job: any) => Number(job.okCount || 0) + Number(job.failCount || 0) === 1)).toEqual([
+      expect.objectContaining({ okCount: 1, failCount: 0, currentConversationId: undefined }),
+    ]);
+    expect(attemptedJobs.at(-1)).toMatchObject({
+      status: 'done',
+      conversationIds: [1],
+      okCount: 1,
+      failCount: 0,
+      perConversation: [expect.objectContaining({ conversationId: 1, ok: true })],
+    });
+    expect(orch.isRunActive()).toBe(false);
+    expect(await orch.getSyncStatus({ instanceId: 'first' })).toMatchObject({ provider: 'feishu', job: null });
+  });
+
   it('skips syncing when content hash unchanged and docId exists', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
     fetchFeishuJsonMock.mockResolvedValue({ document: { document_id: 'doc1', revision_id: 1, title: 't' } });
 
     const hash = await sha256Hex('# same content');

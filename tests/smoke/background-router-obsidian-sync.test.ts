@@ -68,6 +68,7 @@ describe('background-router obsidian sync routes', () => {
         syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
         getSyncJobStatus: async () => ({ job: null }),
         clearSyncJobStatus: async () => ({ job: null }),
+        isRunActive: () => false,
       },
       obsidianSyncOrchestrator: {
         async testConnection({ instanceId }: any) {
@@ -84,6 +85,7 @@ describe('background-router obsidian sync routes', () => {
         async clearSyncStatus({ instanceId }: any) {
           return { job: null, instanceId };
         },
+        isRunActive: () => false,
         async syncConversations(payload: any) {
           calls.syncConversations = payload;
           if (calls.syncMode === 'long-running') {
@@ -92,10 +94,17 @@ describe('background-router obsidian sync routes', () => {
           return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
         },
       },
+      feishuSyncOrchestrator: {
+        getSyncStatus: async () => ({ job: null }),
+        clearSyncStatus: async () => ({ job: null }),
+        syncConversations: async () => ({}),
+        isRunActive: () => false,
+      },
       githubSyncOrchestrator: {
         getSyncStatus: async () => ({ job: null }),
         clearSyncStatus: async () => ({ job: null }),
         sync: async () => ({ summary: { syncedCount: 0, failedCount: 0 } }),
+        isRunActive: () => false,
       },
     });
 
@@ -135,6 +144,7 @@ describe('background-router obsidian sync routes', () => {
     expect(statusRes.ok).toBe(true);
     expect(calls.getSyncStatus).toBe(1);
     expect(typeof statusRes.data?.instanceId).toBe('string');
+    expect(statusRes.data?.active).toBe(false);
 
     const syncRes = await router.__handleMessageForTests({
       type: 'obsidianSyncConversations',

@@ -176,14 +176,44 @@ describe('Conversations sync feedback', () => {
     });
     getConversationDetail.mockResolvedValue({ id: 11, messages: [] });
     deleteConversations.mockResolvedValue(null);
-    clearNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
-    clearObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });
-    clearFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', job: null, instanceId: 'feishu-test' });
-    clearGithubSyncStatus.mockResolvedValue({ provider: 'github', job: null, instanceId: 'github-test' });
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
-    getObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });
-    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', job: null, instanceId: 'feishu-test' });
-    getGithubSyncStatus.mockResolvedValue({ provider: 'github', job: null, instanceId: 'github-test' });
+    clearNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: null,
+      instanceId: 'notion-test',
+    });
+    clearObsidianSyncStatus.mockResolvedValue({
+      provider: 'obsidian',
+      active: false,
+      job: null,
+      instanceId: 'obsidian-test',
+    });
+    clearFeishuSyncStatus.mockResolvedValue({
+      provider: 'feishu',
+      active: false,
+      job: null,
+      instanceId: 'feishu-test',
+    });
+    clearGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      active: false,
+      job: null,
+      instanceId: 'github-test',
+    });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: null,
+      instanceId: 'notion-test',
+    });
+    getObsidianSyncStatus.mockResolvedValue({
+      provider: 'obsidian',
+      active: false,
+      job: null,
+      instanceId: 'obsidian-test',
+    });
+    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: false, job: null, instanceId: 'feishu-test' });
+    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: false, job: null, instanceId: 'github-test' });
   });
 
   afterEach(() => {
@@ -295,9 +325,13 @@ describe('Conversations sync feedback', () => {
   it('shows running progress and then success summary', async () => {
     const run = deferred<any>();
     syncNotionConversations.mockImplementation(() => run.promise);
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: null });
-
     await renderPane();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      instanceId: 'notion-test',
+      job: null,
+    });
     selectFirstConversation();
     clickNotionButton();
 
@@ -310,11 +344,14 @@ describe('Conversations sync feedback', () => {
 
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: true,
       instanceId: 'notion-test',
       job: notionRunningJob(),
     });
 
     await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
       await flushMicrotasks();
     });
 
@@ -329,6 +366,7 @@ describe('Conversations sync feedback', () => {
 
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: false,
       instanceId: 'notion-test',
       job: {
         provider: 'notion',
@@ -375,6 +413,7 @@ describe('Conversations sync feedback', () => {
   it('hydrates an existing running notion job on mount', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: true,
       instanceId: 'notion-test',
       job: notionRunningJob(),
     });
@@ -398,6 +437,7 @@ describe('Conversations sync feedback', () => {
   it('hydrates compact running progress from totalCount without durable queue or result rows', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: true,
       instanceId: 'notion-test',
       job: notionRunningJob({
         totalCount: 5,
@@ -421,9 +461,159 @@ describe('Conversations sync feedback', () => {
     });
   });
 
+  it('does not treat an ownerless durable running snapshot as live feedback', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      instanceId: 'notion-test',
+      job: notionRunningJob({ updatedAt: Date.now() - 10 * 60_000 }),
+    });
+
+    await renderFeedbackProbe();
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+    expect(latestFeedback?.syncingNotion).toBe(false);
+  });
+
+  it('shows generic running feedback when ownership is active before a durable running snapshot exists', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      instanceId: 'notion-test',
+      job: null,
+    });
+
+    await renderFeedbackProbe();
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      total: 0,
+      done: 0,
+      currentConversationId: null,
+      currentConversationTitle: '',
+      currentStage: '',
+    });
+    expect(latestFeedback?.syncingNotion).toBe(true);
+  });
+
+  it('keeps a terminal snapshot non-dismissible while ownership is active and exposes it only after settle', async () => {
+    const terminalJob = {
+      provider: 'notion',
+      status: 'done',
+      startedAt: Date.now() - 500,
+      updatedAt: Date.now(),
+      finishedAt: Date.now(),
+      conversationIds: [11],
+      okCount: 1,
+      failCount: 0,
+      perConversation: [
+        {
+          conversationId: 11,
+          conversationTitle: 'Sync feedback chat',
+          ok: true,
+          mode: 'created',
+          appended: 1,
+          error: '',
+          at: Date.now(),
+        },
+      ],
+    };
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      instanceId: 'notion-test',
+      job: terminalJob,
+    });
+
+    await renderPane();
+    expect(document.getElementById('conversationSyncFeedback')?.getAttribute('data-phase')).toBe('running');
+    expect(document.querySelector('[aria-label="Dismiss sync feedback"]')).toBeNull();
+
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      instanceId: 'notion-test',
+      job: terminalJob,
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(document.getElementById('conversationSyncFeedback')?.getAttribute('data-phase')).toBe('success');
+    clickDismissButton();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    expect(clearNotionSyncJobStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a live provider across status read rejection and settles only after a trusted inactive observation', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      instanceId: 'notion-test',
+      job: notionRunningJob(),
+    });
+    await renderFeedbackProbe();
+    expect(latestFeedback?.feedback.phase).toBe('running');
+
+    getNotionSyncJobStatus.mockRejectedValue(new Error('status unavailable'));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'running' });
+    expect(latestFeedback?.syncingNotion).toBe(true);
+
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      instanceId: 'notion-test',
+      job: null,
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+    expect(latestFeedback?.syncingNotion).toBe(false);
+  });
+
+  it('drops an older mount observation after a local start failure advances the observation generation', async () => {
+    const staleMount = deferred<any>();
+    getNotionSyncJobStatus.mockImplementationOnce(() => staleMount.promise);
+    syncNotionConversations.mockRejectedValue(new Error('notion not connected'));
+
+    await renderFeedbackProbe();
+    await act(async () => {
+      await expect(latestFeedback!.startSync('notion', [11])).rejects.toThrow('notion not connected');
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'failed', summary: null });
+
+    staleMount.resolve({
+      provider: 'notion',
+      active: true,
+      instanceId: 'stale-mount',
+      job: notionRunningJob({ id: 'stale-running' }),
+    });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'failed', summary: null });
+    expect(latestFeedback?.syncingNotion).toBe(false);
+  });
+
   it('hydrates a reload-aborted notion job instead of keeping the running progress visible', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: false,
       instanceId: 'notion-test',
       job: {
         provider: 'notion',
@@ -454,22 +644,29 @@ describe('Conversations sync feedback', () => {
     expect(dismissButton?.disabled).not.toBe(true);
   });
 
-  it('attaches to the existing running notion job instead of showing sync already in progress as failure', async () => {
-    syncNotionConversations.mockRejectedValue(new Error('sync already in progress'));
+  it('attaches to a live notion run after the starter returns structured sync_already_running', async () => {
+    const conflict: any = new Error('sync already in progress');
+    conflict.code = 'sync_already_running';
+    conflict.extra = { code: 'sync_already_running' };
+    syncNotionConversations.mockRejectedValue(conflict);
+
+    await renderPane();
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: true,
       instanceId: 'notion-test',
       job: notionRunningJob(),
     });
 
-    await renderPane();
     selectFirstConversation();
     clickNotionButton();
 
     await act(async () => {
       await flushMicrotasks();
+      await flushMicrotasks();
     });
 
+    expect(syncNotionConversations).toHaveBeenCalledTimes(1);
     const runningNotice = document.getElementById('conversationSyncFeedback');
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
@@ -478,12 +675,12 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice?.textContent).toContain('Current sync target');
     expect(runningNotice?.textContent).toContain(t('stagePrefix'));
     expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
-    expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
   });
 
   it('hydrates persisted terminal feedback and clears the persisted job on dismiss', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: false,
       instanceId: 'notion-test',
       job: {
         provider: 'notion',
@@ -538,6 +735,7 @@ describe('Conversations sync feedback', () => {
   it('shows warnings inside the details popover without failing the overall sync', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: false,
       instanceId: 'notion-test',
       job: {
         provider: 'notion',
@@ -627,6 +825,7 @@ describe('Conversations sync feedback', () => {
   it('hydrates a running GitHub job through the shared feedback surface', async () => {
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
+      active: true,
       instanceId: 'github-test',
       job: githubJob(),
     });
@@ -644,6 +843,7 @@ describe('Conversations sync feedback', () => {
   it('hydrates a successful GitHub terminal job through the shared feedback surface', async () => {
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
+      active: false,
       instanceId: 'github-test',
       job: githubJob({
         status: 'done',
@@ -665,6 +865,7 @@ describe('Conversations sync feedback', () => {
   it('hydrates a failed GitHub terminal job and clears the GitHub job on dismiss', async () => {
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
+      active: false,
       instanceId: 'github-test',
       job: githubJob({
         status: 'done',
@@ -731,11 +932,13 @@ describe('Conversations sync feedback', () => {
     syncGithubConversations.mockResolvedValue({ provider: 'github', started: true });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
+      active: true,
       instanceId: 'notion-test',
       job: notionRunningJob({ updatedAt: Date.now() + 10_000 }),
     });
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
+      active: true,
       instanceId: 'github-test',
       job: githubJob({ updatedAt: Date.now() }),
     });

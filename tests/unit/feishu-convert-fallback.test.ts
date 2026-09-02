@@ -25,16 +25,12 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
-  abortRunningJobIfFromOtherInstance: vi.fn(),
-  isRunningJob: vi.fn(),
   setJob: vi.fn(),
   getJob: vi.fn(),
 }));
 
 vi.mock('@services/sync/sync-job-store', () => ({
   createSyncJobStore: () => ({
-    abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
-    isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
   }),
@@ -108,8 +104,6 @@ describe('feishu convert fallback', () => {
   it('uses descendant insertion when convert succeeds', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -143,8 +137,6 @@ describe('feishu convert fallback', () => {
   it('falls back to text blocks when convert is permission denied', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -182,8 +174,6 @@ describe('feishu convert fallback', () => {
   it('falls back to text blocks when descendant insertion fails', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -220,8 +210,6 @@ describe('feishu convert fallback', () => {
   it('falls back to text blocks when convert returns empty blocks', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -253,8 +241,6 @@ describe('feishu convert fallback', () => {
   it('batches descendant insertion when convert yields more than 1000 blocks', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },

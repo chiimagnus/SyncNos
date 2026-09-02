@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createNotionAutoSyncScheduler } from '@services/sync/auto-sync/notion-auto-sync-scheduler';
 import {
+  NOTION_AUTO_SYNC_DEBOUNCE_MS,
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY,
 } from '@services/sync/auto-sync/auto-sync-keys';
@@ -87,7 +88,54 @@ describe('notion-auto-sync-scheduler', () => {
     expect(syncConversations).toHaveBeenCalledWith({ conversationIds: [123], instanceId: 'instance-1' });
   });
 
-  it('delegates failed runs to the orchestrator and clears the due queue', async () => {
+  it('requeues a transient initial job persistence failure using the existing debounce', async () => {
+    const now = Date.now();
+    const syncConversations = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('persist failed'), { code: 'notion_sync_job_persist_failed' }));
+    setStoragePatch({
+      [NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY]: true,
+      [NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]: { '7': now - 1 },
+    });
+
+    const scheduler = createNotionAutoSyncScheduler(
+      {
+        getInstanceId: () => 'instance-persist',
+        notionSyncOrchestrator: { syncConversations } as any,
+      },
+      { now: () => now },
+    );
+
+    await scheduler.flush();
+
+    expect(storageState[NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({ '7': now + NOTION_AUTO_SYNC_DEBOUNCE_MS });
+  });
+
+  it('requeues a synchronous ownership conflict through the real Notion adapter', async () => {
+    const now = Date.now();
+    const syncConversations = vi.fn(() => {
+      throw Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' });
+    });
+    setStoragePatch({
+      [NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY]: true,
+      [NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]: { '8': now - 1 },
+    });
+
+    const scheduler = createNotionAutoSyncScheduler(
+      {
+        getInstanceId: () => 'instance-busy',
+        notionSyncOrchestrator: { syncConversations } as any,
+      },
+      { now: () => now },
+    );
+
+    await scheduler.flush();
+
+    expect(syncConversations).toHaveBeenCalledWith({ conversationIds: [8], instanceId: 'instance-busy' });
+    expect(storageState[NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({ '8': now + NOTION_AUTO_SYNC_DEBOUNCE_MS });
+  });
+
+  it('delegates ordinary failed runs to the orchestrator and keeps the existing consume-on-failure semantics', async () => {
     const syncConversations = vi.fn().mockRejectedValue(new Error('notion not connected'));
     setStoragePatch({
       [NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY]: true,
