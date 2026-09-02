@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBIndex, IDBKeyRange, IDBObjectStore, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests } from '@platform/idb/schema';
 
 import {
@@ -82,6 +82,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   __resetConversationStorageStateForTests();
   closeDbForTests();
 });
@@ -129,6 +130,156 @@ describe('insight stats', () => {
     const source = await getInsightStatsSourceData();
     expect(source.conversations.some((item) => Number(item.id) === Number(conversation.id))).toBe(true);
     expect(source.commentCounts.get(Number(conversation.id))).toBe(1);
+  });
+
+  it('counts messages and comments from compound index keys without materializing payload values', async () => {
+    const chatId = await seedConversation({
+      sourceType: 'chat',
+      source: 'ChatGPT',
+      conversationKey: 'chat-key-only',
+      title: 'Key only chat',
+      lastCapturedAt: 1,
+    });
+    const articleId = await seedConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article-key-only',
+      title: 'Key only article',
+      url: 'https://example.com/key-only',
+      lastCapturedAt: 2,
+    });
+    const videoId = await seedConversation({
+      sourceType: 'video',
+      source: 'YouTube',
+      conversationKey: 'video-key-only',
+      title: 'Key only video',
+      url: 'https://youtube.com/watch?v=key-only',
+      lastCapturedAt: 3,
+    });
+
+    const largeMarkdown = `# payload\n\n${'markdown '.repeat(20_000)}`;
+    await syncConversationMessages(chatId, [
+      {
+        messageKey: 'chat-key-only-m1',
+        role: 'user',
+        contentText: 'small text',
+        contentMarkdown: largeMarkdown,
+        sequence: 1,
+        updatedAt: 1,
+      },
+      {
+        messageKey: 'chat-key-only-m2',
+        role: 'assistant',
+        contentMarkdown: largeMarkdown,
+        sequence: 2,
+        updatedAt: 2,
+      },
+    ]);
+    await addArticleComment({
+      conversationId: articleId,
+      canonicalUrl: 'https://example.com/key-only',
+      commentText: 'article '.repeat(20_000),
+      createdAt: 10,
+    });
+    await addArticleComment({
+      conversationId: videoId,
+      canonicalUrl: 'https://youtube.com/watch?v=key-only',
+      commentText: 'video comment',
+      createdAt: 11,
+    });
+    const orphan = await addArticleComment({
+      conversationId: null,
+      canonicalUrl: 'https://example.com/orphan-key-only',
+      commentText: 'orphan '.repeat(20_000),
+      createdAt: 12,
+    });
+    expect(orphan.conversationId).toBeNull();
+
+    const openKeyCursorSpy = vi.spyOn(IDBIndex.prototype, 'openKeyCursor');
+    const objectStoreCursorSpy = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
+    const getAllKeysSpy = vi.spyOn(IDBIndex.prototype, 'getAllKeys');
+
+    const first = await getInsightStatsSourceData();
+
+    expect(first.messageCounts.get(chatId)).toBe(2);
+    expect(first.commentCounts.get(articleId)).toBe(1);
+    expect(first.commentCounts.get(videoId)).toBe(1);
+    expect(Array.from(first.commentCounts.values()).reduce((sum, count) => sum + count, 0)).toBe(2);
+    expect(openKeyCursorSpy.mock.instances.map((index) => index.name)).toEqual([
+      'by_conversationId_sequence',
+      'by_conversationId_createdAt',
+    ]);
+    expect(objectStoreCursorSpy).not.toHaveBeenCalled();
+    expect(getAllKeysSpy).not.toHaveBeenCalled();
+
+    objectStoreCursorSpy.mockRestore();
+    getAllKeysSpy.mockRestore();
+    openKeyCursorSpy.mockRestore();
+
+    await syncConversationMessages(chatId, [
+      {
+        messageKey: 'chat-key-only-m1',
+        role: 'user',
+        contentText: 'small text',
+        contentMarkdown: largeMarkdown,
+        sequence: 1,
+        updatedAt: 1,
+      },
+      {
+        messageKey: 'chat-key-only-m2',
+        role: 'assistant',
+        contentMarkdown: largeMarkdown,
+        sequence: 2,
+        updatedAt: 2,
+      },
+      {
+        messageKey: 'chat-key-only-m3',
+        role: 'assistant',
+        contentText: 'new message',
+        sequence: 3,
+        updatedAt: 3,
+      },
+    ]);
+    await addArticleComment({
+      conversationId: articleId,
+      canonicalUrl: 'https://example.com/key-only',
+      commentText: 'second article comment',
+      createdAt: 13,
+    });
+
+    const second = await getInsightStatsSourceData();
+    expect(second.messageCounts.get(chatId)).toBe(3);
+    expect(second.commentCounts.get(articleId)).toBe(2);
+  });
+
+  it('rejects the whole source read when its readonly transaction aborts', async () => {
+    await seedConversation({
+      sourceType: 'chat',
+      source: 'ChatGPT',
+      conversationKey: 'chat-abort',
+      title: 'Abort chat',
+      lastCapturedAt: 1,
+      messageCount: 2,
+    });
+
+    const originalOpenKeyCursor = IDBIndex.prototype.openKeyCursor;
+    let aborted = false;
+    const openKeyCursorSpy = vi.spyOn(IDBIndex.prototype, 'openKeyCursor').mockImplementation(function (
+      this: IDBIndex,
+      ...args: Parameters<IDBIndex['openKeyCursor']>
+    ) {
+      const request = originalOpenKeyCursor.apply(this, args);
+      if (!aborted && this.name === 'by_conversationId_sequence') {
+        aborted = true;
+        queueMicrotask(() => this.objectStore.transaction.abort());
+      }
+      return request;
+    });
+
+    await expect(getInsightStatsSourceData()).rejects.toBeInstanceOf(Error);
+    expect(aborted).toBe(true);
+
+    openKeyCursorSpy.mockRestore();
   });
 
   it('aggregates mixed chat and article data', async () => {

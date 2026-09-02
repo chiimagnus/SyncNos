@@ -29,11 +29,11 @@ async function readAllConversations(store: IDBObjectStore): Promise<Conversation
   return ((await reqToPromise(store.getAll())) as Conversation[]) || [];
 }
 
-async function readCountsByConversationId(store: IDBObjectStore): Promise<Map<number, number>> {
+async function readCountsByConversationId(index: IDBIndex): Promise<Map<number, number>> {
   const counts = new Map<number, number>();
 
   await new Promise<void>((resolve, reject) => {
-    const request = store.openCursor();
+    const request = index.openKeyCursor();
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) {
@@ -41,7 +41,8 @@ async function readCountsByConversationId(store: IDBObjectStore): Promise<Map<nu
         return;
       }
 
-      const conversationId = Number((cursor.value as { conversationId?: unknown } | undefined)?.conversationId);
+      const key = cursor.key;
+      const conversationId = Array.isArray(key) ? Number(key[0]) : Number.NaN;
       if (Number.isFinite(conversationId) && conversationId > 0) {
         counts.set(conversationId, (counts.get(conversationId) || 0) + 1);
       }
@@ -56,16 +57,17 @@ async function readCountsByConversationId(store: IDBObjectStore): Promise<Map<nu
 export async function getInsightStatsSourceData(): Promise<InsightStatsSourceData> {
   const db = await openDb();
   const transaction = db.transaction(['conversations', 'messages', 'article_comments'], 'readonly');
+  const done = txDone(transaction);
   const conversationsStore = transaction.objectStore('conversations');
-  const messagesStore = transaction.objectStore('messages');
-  const commentsStore = transaction.objectStore('article_comments');
+  const messagesIndex = transaction.objectStore('messages').index('by_conversationId_sequence');
+  const commentsIndex = transaction.objectStore('article_comments').index('by_conversationId_createdAt');
 
-  const [conversations, messageCounts, commentCounts] = await Promise.all([
+  const reads = Promise.all([
     readAllConversations(conversationsStore),
-    readCountsByConversationId(messagesStore),
-    readCountsByConversationId(commentsStore),
+    readCountsByConversationId(messagesIndex),
+    readCountsByConversationId(commentsIndex),
   ]);
-  await txDone(transaction);
+  const [[conversations, messageCounts, commentCounts]] = await Promise.all([reads, done]);
 
   return { conversations, messageCounts, commentCounts };
 }
