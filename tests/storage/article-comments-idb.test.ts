@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBKeyRange, IDBObjectStore, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 
@@ -294,7 +294,16 @@ describe('article comments storage-idb', () => {
     expect(byId.get(reply1.id)?.parentId).toBe(root.id);
 
     const beforeDeleteRevision = await readDataRevision('article_comments');
-    expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: null });
+    const getAllSpy = vi.spyOn(IDBObjectStore.prototype, 'getAll');
+    try {
+      expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: null });
+      const articleCommentMaterializations = getAllSpy.mock.contexts.filter(
+        (context) => String((context as any)?.name || '') === 'article_comments',
+      );
+      expect(articleCommentMaterializations).toHaveLength(1);
+    } finally {
+      getAllSpy.mockRestore();
+    }
     expect(await readDataRevision('article_comments')).toBe(beforeDeleteRevision + 1);
     const after = await listArticleCommentsByCanonicalUrl(url);
     expect(after.length).toBe(0);
