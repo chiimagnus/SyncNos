@@ -109,6 +109,8 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   if (status === 'done') {
     if (conversationIds.length !== job.totalCount || perConversation.length !== job.totalCount) return null;
     if (job.okCount + job.failCount !== job.totalCount) return null;
+    const actualOkCount = perConversation.filter((row) => row.ok).length;
+    if (actualOkCount !== job.okCount || perConversation.length - actualOkCount !== job.failCount) return null;
     const resultIds = new Set(perConversation.map((row) => row.conversationId));
     if (conversationIds.some((id) => !resultIds.has(id))) return null;
   }

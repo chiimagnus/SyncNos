@@ -137,6 +137,12 @@ describe('normalizeSyncJobSnapshot', () => {
     ).toBeNull();
   });
 
+  it('rejects terminal counters that disagree with the parsed row truth', async () => {
+    const { normalizeSyncJobSnapshot } = await import('@services/sync/sync-job-store');
+    expect(normalizeSyncJobSnapshot('notion', terminalJob({ okCount: 2, failCount: 0 }))).toBeNull();
+    expect(normalizeSyncJobSnapshot('notion', terminalJob({ okCount: 0, failCount: 2 }))).toBeNull();
+  });
+
   it('accepts only known phases and exact finishedAt semantics', async () => {
     const { normalizeSyncJobSnapshot } = await import('@services/sync/sync-job-store');
     expect(normalizeSyncJobSnapshot('notion', runningJob({ status: 'future' }))).toBeNull();
