@@ -1,5 +1,9 @@
 import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read.ts';
+import {
+  getImageCacheAssetsByIds,
+  type ImageCacheAsset,
+} from '@services/conversations/data/image-cache-read.ts';
+import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
@@ -7,18 +11,6 @@ function isDataImageUrl(url: unknown): boolean {
   const text = String(url || '').trim();
   if (!text) return false;
   return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(text);
-}
-
-function parseSyncnosAssetId(url: unknown): number {
-  const text = String(url || '').trim();
-  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
-  if (!matched) return 0;
-  const id = Number(matched[1]);
-  return Number.isFinite(id) && id > 0 ? id : 0;
-}
-
-function isSyncnosAssetUrl(url: unknown): boolean {
-  return parseSyncnosAssetId(url) > 0;
 }
 
 function guessExtensionFromContentType(contentType: unknown): string {
@@ -194,11 +186,12 @@ async function uploadFromDataUrl(files: any, accessToken: string, dataUrl: unkno
   return ready && ready.id ? String(ready.id).trim() : fileId;
 }
 
-async function uploadFromSyncnosAsset(files: any, accessToken: string, url: unknown) {
-  const assetId = parseSyncnosAssetId(url);
-  if (!assetId) throw new Error('invalid syncnos asset url');
-
-  const asset = await getImageCacheAssetById({ id: assetId });
+async function uploadFromSyncnosAsset(
+  files: any,
+  accessToken: string,
+  assetId: number,
+  asset: ImageCacheAsset | null,
+) {
   if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
   const bytes = new Uint8Array(await asset.blob.arrayBuffer());
@@ -227,6 +220,19 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
   const list = Array.isArray(blocks) ? blocks : [];
   if (!list.length) return [];
   const files = notionFilesApi;
+  const localAssetIds: number[] = [];
+  const seenLocalAssetIds = new Set<number>();
+  for (const block of list) {
+    if (!block || block.type !== 'image' || !block.image || block.image.type !== 'external') continue;
+    const url = block.image?.external?.url ? String(block.image.external.url).trim() : '';
+    const assetId = parseSyncnosAssetId(url);
+    if (assetId == null || seenLocalAssetIds.has(assetId)) continue;
+    seenLocalAssetIds.add(assetId);
+    localAssetIds.push(assetId);
+  }
+  const localAssets: Map<number, ImageCacheAsset> = localAssetIds.length
+    ? await getImageCacheAssetsByIds({ ids: localAssetIds }).catch(() => new Map<number, ImageCacheAsset>())
+    : new Map<number, ImageCacheAsset>();
   const cache = new Map<string, string>();
   const out: any[] = [];
 
@@ -241,6 +247,7 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
       continue;
     }
 
+    const assetId = parseSyncnosAssetId(url);
     let uploadId = cache.get(url) || '';
     if (!uploadId) {
       if (isDataImageUrl(url)) {
@@ -256,9 +263,9 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
           }
           uploadId = '';
         }
-      } else if (isSyncnosAssetUrl(url)) {
+      } else if (assetId != null) {
         try {
-          uploadId = await uploadFromSyncnosAsset(files, accessToken, url);
+          uploadId = await uploadFromSyncnosAsset(files, accessToken, assetId, localAssets.get(assetId) || null);
           if (uploadId) cache.set(url, uploadId);
         } catch (e) {
           const msg = e && (e as any).message ? String((e as any).message) : String(e);
@@ -298,7 +305,7 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
     }
 
     if (!uploadId) {
-      if (isDataImageUrl(url) || isSyncnosAssetUrl(url)) {
+      if (isDataImageUrl(url) || assetId != null) {
         out.push(paragraphBlock('[Image omitted: local image upload failed]'));
       } else out.push(b);
       continue;
