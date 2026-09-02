@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBDatabase, IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import {
   hasReusableImageCachePayload,
@@ -27,6 +27,14 @@ function txDone(t: IDBTransaction): Promise<true> {
 async function deleteDb(name: string) {
   const req = indexedDB.deleteDatabase(name);
   await reqToPromise(req as unknown as IDBRequest<unknown>);
+}
+
+async function seedImageCacheRow(row: Record<string, unknown>): Promise<number> {
+  const db = await openDb();
+  const transaction = db.transaction(['image_cache'], 'readwrite');
+  const id = Number(await reqToPromise(transaction.objectStore('image_cache').add(row as any)));
+  await txDone(transaction);
+  return id;
 }
 
 beforeEach(async () => {
@@ -105,6 +113,204 @@ describe('image-inline', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(messages2[0].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
     expect(String(messages2[1].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
+  });
+
+  it('prefetches multiple cached HTTP URLs in one readonly transaction and dedupes repeated references', async () => {
+    const conversationId = 50;
+    const firstUrl = 'https://example.com/first.png';
+    const secondUrl = 'https://example.com/second.png';
+    const firstId = await seedImageCacheRow({
+      conversationId,
+      url: firstUrl,
+      blob: new Blob([Uint8Array.of(1)], { type: 'image/png' }),
+      byteSize: 1,
+      contentType: 'image/png',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const secondId = await seedImageCacheRow({
+      conversationId,
+      url: secondUrl,
+      blob: new Blob([Uint8Array.of(2)], { type: 'image/png' }),
+      byteSize: 1,
+      contentType: 'image/png',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    const fetchMock = vi.fn();
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+
+    const messages = [
+      { messageKey: 'm1', contentMarkdown: `![](${firstUrl})`, role: 'assistant', sequence: 1 },
+      {
+        messageKey: 'm2',
+        contentMarkdown: `![](${firstUrl})\n\n![](${secondUrl})`,
+        role: 'assistant',
+        sequence: 2,
+      },
+    ];
+    const result = await inlineChatImagesInMessages({ conversationId, messages });
+
+    const readonlyImageTransactions = transactionSpy.mock.calls.filter(([storeNames, mode]) => {
+      const names = Array.isArray(storeNames) ? storeNames : [storeNames];
+      return names.includes('image_cache') && mode === 'readonly';
+    });
+    const readonlyGets = getSpy.mock.contexts
+      .map((context, index) => ({ context: context as IDBIndex, call: getSpy.mock.calls[index] }))
+      .filter(({ context }) => context.name === 'by_conversationId_url' && context.objectStore.transaction.mode === 'readonly');
+
+    expect(readonlyImageTransactions).toHaveLength(1);
+    expect(readonlyGets.map(({ call }) => call?.[0])).toEqual([
+      [conversationId, firstUrl],
+      [conversationId, secondUrl],
+    ]);
+    expect(result.fromCacheCount).toBe(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(messages[0].contentMarkdown).toBe(`![](syncnos-asset://${firstId})`);
+    expect(messages[1].contentMarkdown).toBe(
+      `![](syncnos-asset://${firstId})\n\n![](syncnos-asset://${secondId})`,
+    );
+  });
+
+  it('prefetches only messages selected by onlyMessageKeys', async () => {
+    const conversationId = 51;
+    const skippedUrl = 'https://example.com/skipped.png';
+    const selectedUrl = 'https://example.com/selected.png';
+    const selectedId = await seedImageCacheRow({
+      conversationId,
+      url: selectedUrl,
+      blob: new Blob([Uint8Array.of(3)], { type: 'image/png' }),
+      byteSize: 1,
+      contentType: 'image/png',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    const messages = [
+      { messageKey: 'skip', contentMarkdown: `![](${skippedUrl})`, role: 'assistant', sequence: 1 },
+      { messageKey: 'keep', contentMarkdown: `![](${selectedUrl})`, role: 'assistant', sequence: 2 },
+    ];
+
+    await inlineChatImagesInMessages({
+      conversationId,
+      messages,
+      onlyMessageKeys: new Set(['keep']),
+    });
+
+    const readonlyGets = getSpy.mock.contexts
+      .map((context, index) => ({ context: context as IDBIndex, call: getSpy.mock.calls[index] }))
+      .filter(({ context }) => context.name === 'by_conversationId_url' && context.objectStore.transaction.mode === 'readonly');
+    expect(readonlyGets.map(({ call }) => call?.[0])).toEqual([[conversationId, selectedUrl]]);
+    expect(messages[0].contentMarkdown).toBe(`![](${skippedUrl})`);
+    expect(messages[1].contentMarkdown).toBe(`![](syncnos-asset://${selectedId})`);
+  });
+
+  it('prefers the canonical data-image cache key over the legacy raw data URL row', async () => {
+    const conversationId = 52;
+    const bytes = Uint8Array.from([5, 6, 7]);
+    const dataImageUrl = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
+    const canonicalId = await seedImageCacheRow({
+      conversationId,
+      url: 'data:image/png;fnv1a64=ae12121853988e6f',
+      blob: new Blob([bytes], { type: 'image/png' }),
+      byteSize: 3,
+      contentType: 'image/png',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await seedImageCacheRow({
+      conversationId,
+      url: dataImageUrl,
+      dataUrl: dataImageUrl,
+      blob: new Blob([Uint8Array.of(9)], { type: 'image/png' }),
+      byteSize: 1,
+      contentType: 'image/png',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    const messages = [{ messageKey: 'm1', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 1 }];
+    const result = await inlineChatImagesInMessages({ conversationId, messages, enableHttpImages: false });
+
+    expect(result.fromCacheCount).toBe(1);
+    expect(messages[0].contentMarkdown).toBe(`![](syncnos-asset://${canonicalId})`);
+  });
+
+  it('re-decodes a data-image cache miss only at materialization time instead of retaining its Blob from pre-scan', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'atob');
+    const originalAtob = globalThis.atob;
+    expect(typeof originalAtob).toBe('function');
+    const atobSpy = vi.fn((input: string) => originalAtob(input));
+    Object.defineProperty(globalThis, 'atob', { configurable: true, writable: true, value: atobSpy });
+
+    try {
+      const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([7, 8, 9])).toString('base64')}`;
+      const messages = [
+        { messageKey: 'm1', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 1 },
+      ];
+      const result = await inlineChatImagesInMessages({ conversationId: 53, messages, enableHttpImages: false });
+
+      expect(result.downloadedCount).toBe(1);
+      expect(atobSpy).toHaveBeenCalledTimes(2);
+      expect(messages[0].contentMarkdown).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'atob', descriptor);
+      else delete (globalThis as any).atob;
+    }
+  });
+
+  it('does not prefetch disabled HTTP candidates', async () => {
+    await openDb();
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    const fetchMock = vi.fn();
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+    const messages = [
+      {
+        messageKey: 'm1',
+        contentMarkdown: '![](https://example.com/disabled-a.png)\n\n![](https://example.com/disabled-b.png)',
+        role: 'assistant',
+        sequence: 1,
+      },
+    ];
+
+    await inlineChatImagesInMessages({ conversationId: 54, messages, enableHttpImages: false });
+
+    const readonlyImageTransactions = transactionSpy.mock.calls.filter(([storeNames, mode]) => {
+      const names = Array.isArray(storeNames) ? storeNames : [storeNames];
+      return names.includes('image_cache') && mode === 'readonly';
+    });
+    expect(readonlyImageTransactions).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the prefetched cache transaction aborts instead of redownloading as cache misses', async () => {
+    await openDb();
+    const originalGet = IDBIndex.prototype.get;
+    vi.spyOn(IDBIndex.prototype, 'get').mockImplementation(function (this: IDBIndex, key: IDBValidKey | IDBKeyRange) {
+      const request = originalGet.call(this, key);
+      if (this.name === 'by_conversationId_url' && this.objectStore.transaction.mode === 'readonly') {
+        queueMicrotask(() => this.objectStore.transaction.abort());
+      }
+      return request;
+    });
+    const fetchMock = vi.fn();
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+    const messages = [
+      {
+        messageKey: 'm1',
+        contentMarkdown: '![](https://example.com/cache-abort.png)',
+        role: 'assistant',
+        sequence: 1,
+      },
+    ];
+
+    await expect(inlineChatImagesInMessages({ conversationId: 55, messages })).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reuses a valid Blob without metadata-only repair or revision bump', async () => {

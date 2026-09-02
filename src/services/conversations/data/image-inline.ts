@@ -154,12 +154,15 @@ function utf8ToBytes(text: string): Uint8Array {
   return out;
 }
 
-function parseDataImageUrl(input: {
-  dataUrl: string;
-  maxBytes: number;
-}):
-  | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
-  | { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' } {
+type DataImageFailure = { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' };
+type DataImageDescriptor =
+  | { ok: true; byteSize: number; contentType: string; cacheKey: string }
+  | DataImageFailure;
+type DecodedDataImage =
+  | { ok: true; bytes: Uint8Array; byteSize: number; contentType: string; cacheKey: string }
+  | DataImageFailure;
+
+function decodeDataImageUrl(input: { dataUrl: string; maxBytes: number }): DecodedDataImage {
   const safeDataUrl = String(input.dataUrl || '').trim();
   if (!isDataImageUrl(safeDataUrl)) return { ok: false, reason: 'non_image' };
 
@@ -197,20 +200,67 @@ function parseDataImageUrl(input: {
   }
   const hashHex = hash.toString(16).padStart(16, '0');
   const cacheKey = `data:${contentType};fnv1a64=${hashHex}`;
-
-  const blob = new Blob([Uint8Array.from(bytes)], { type: contentType });
-  return { ok: true, blob, byteSize, contentType, cacheKey };
+  return { ok: true, bytes, byteSize, contentType, cacheKey };
 }
 
-async function getCachedImage(conversationId: number, url: string): Promise<ImageCacheRow | null> {
-  const safeUrl = String(url || '').trim();
-  if (!safeUrl) return null;
+function describeDataImageUrl(input: { dataUrl: string; maxBytes: number }): DataImageDescriptor {
+  const decoded = decodeDataImageUrl(input);
+  if (!decoded.ok) return decoded;
+  return {
+    ok: true,
+    byteSize: decoded.byteSize,
+    contentType: decoded.contentType,
+    cacheKey: decoded.cacheKey,
+  };
+}
+
+function parseDataImageUrl(input: {
+  dataUrl: string;
+  maxBytes: number;
+}):
+  | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
+  | DataImageFailure {
+  const decoded = decodeDataImageUrl(input);
+  if (!decoded.ok) return decoded;
+  return {
+    ok: true,
+    blob: new Blob([Uint8Array.from(decoded.bytes)], { type: decoded.contentType }),
+    byteSize: decoded.byteSize,
+    contentType: decoded.contentType,
+    cacheKey: decoded.cacheKey,
+  };
+}
+
+async function getCachedImagesByUrls(
+  conversationId: number,
+  urls: readonly string[],
+): Promise<Map<string, ImageCacheRow>> {
+  const lookupUrls: string[] = [];
+  const seen = new Set<string>();
+  for (const rawUrl of urls) {
+    const url = String(rawUrl || '').trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    lookupUrls.push(url);
+  }
+  if (!lookupUrls.length) return new Map();
+
   const db = await openDb();
   const { t, stores } = tx(db, ['image_cache'], 'readonly');
+  const done = txDone(t);
   const idx = stores.image_cache.index('by_conversationId_url');
-  const row = (await reqToPromise(idx.get([conversationId, safeUrl]) as any)) as ImageCacheRow | undefined;
-  await txDone(t);
-  return row || null;
+  const requests = lookupUrls.map((url) =>
+    reqToPromise(idx.get([conversationId, url]) as IDBRequest<ImageCacheRow | undefined>).then(
+      (row) => [url, row] as const,
+    ),
+  );
+  const [rows] = await Promise.all([Promise.all(requests), done]);
+
+  const cached = new Map<string, ImageCacheRow>();
+  for (const [url, row] of rows) {
+    if (row) cached.set(url, row);
+  }
+  return cached;
 }
 
 async function upsertCachedImageAsset(input: {
@@ -385,6 +435,41 @@ export async function inlineChatImagesInMessages(input: {
   const onlyKeys = input.onlyMessageKeys || null;
   const enableHttpImages = input.enableHttpImages !== false;
 
+  const dataDescriptorByUrl = new Map<string, DataImageDescriptor>();
+  const cacheLookupUrls: string[] = [];
+  const seenCacheLookupUrls = new Set<string>();
+  const addCacheLookupUrl = (url: string) => {
+    if (!url || seenCacheLookupUrls.has(url)) return;
+    seenCacheLookupUrls.add(url);
+    cacheLookupUrls.push(url);
+  };
+
+  for (const msg of messages) {
+    if (!msg || !msg.messageKey) continue;
+    if (onlyKeys && !onlyKeys.has(String(msg.messageKey))) continue;
+    const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
+    if (!markdown) continue;
+
+    for (const url of extractInlineCandidateUrlsFromMarkdown(markdown)) {
+      const isDataUrl = isDataImageUrl(url);
+      const isHttpImage = !isDataUrl && isHttpUrl(url);
+      if (!isDataUrl && !isHttpImage) continue;
+      if (isHttpImage && !enableHttpImages) continue;
+      if (isDataUrl) {
+        if (!dataDescriptorByUrl.has(url)) {
+          dataDescriptorByUrl.set(url, describeDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT }));
+        }
+        const descriptor = dataDescriptorByUrl.get(url)!;
+        if (!descriptor.ok) continue;
+        addCacheLookupUrl(descriptor.cacheKey);
+        addCacheLookupUrl(url);
+      } else {
+        addCacheLookupUrl(url);
+      }
+    }
+  }
+
+  const cachedByUrl = await getCachedImagesByUrls(conversationId, cacheLookupUrls);
   const replacements = new Map<string, string>();
   const warningFlags = new Set<string>();
   let inlinedCount = 0;
@@ -409,23 +494,18 @@ export async function inlineChatImagesInMessages(input: {
       if (!isDataUrl && !isHttpImage) continue;
       if (isHttpImage && !enableHttpImages) continue;
 
-      let parsedDataUrl:
-        | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
-        | { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' }
-        | null = null;
       let cacheLookupUrl = url;
       if (isDataUrl) {
-        parsedDataUrl = parseDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT });
-        if (!parsedDataUrl.ok) {
+        const descriptor =
+          dataDescriptorByUrl.get(url) || describeDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT });
+        if (!descriptor.ok) {
           warningFlags.add('inline_images_download_failed');
           continue;
         }
-        cacheLookupUrl = parsedDataUrl.cacheKey;
+        cacheLookupUrl = descriptor.cacheKey;
       }
 
-      const cached =
-        (await getCachedImage(conversationId, cacheLookupUrl)) ||
-        (isDataUrl ? await getCachedImage(conversationId, url) : null);
+      const cached = cachedByUrl.get(cacheLookupUrl) || (isDataUrl ? cachedByUrl.get(url) : undefined);
       if (cached) {
         const cachedAsset = await ensureCachedAssetRecord(cached);
         if (cachedAsset) {
@@ -439,8 +519,12 @@ export async function inlineChatImagesInMessages(input: {
 
       let nextAsset: CachedAsset | null = null;
       if (isDataUrl) {
-        const parsed = parsedDataUrl && parsedDataUrl.ok ? parsedDataUrl : null;
-        if (!parsed) continue;
+        // ponytail: 预扫描只保留 cacheKey；cache miss 在原处理位置二次解码，避免整批 Blob 常驻。只有 profiling 证明 CPU 成本更高时才缓存解码结果。
+        const parsed = parseDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT });
+        if (!parsed.ok) {
+          warningFlags.add('inline_images_download_failed');
+          continue;
+        }
 
         nextAsset = await upsertCachedImageAsset({
           conversationId,
