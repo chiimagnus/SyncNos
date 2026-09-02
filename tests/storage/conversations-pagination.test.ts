@@ -227,6 +227,33 @@ describe('conversations pagination storage-idb', () => {
     expect(chatgpt.facets.sites).toEqual([{ key: 'domain:chatgpt.com', label: 'chatgpt.com', count: 1 }]);
   });
 
+  it('counts today from inclusive local midnight to exclusive next local midnight', async () => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const timestamps = [
+      todayStart.getTime() - 1,
+      todayStart.getTime(),
+      tomorrowStart.getTime() - 1,
+      tomorrowStart.getTime(),
+    ];
+    for (let index = 0; index < timestamps.length; index += 1) {
+      await upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: `day-boundary-${index + 1}`,
+        title: `day boundary ${index + 1}`,
+        url: `https://chatgpt.com/c/day-boundary-${index + 1}`,
+        lastCapturedAt: timestamps[index],
+      });
+    }
+
+    const bootstrap = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(bootstrap.summary).toEqual({ totalCount: 4, todayCount: 2 });
+  });
+
   it('does not persist derived-key repairs while reading a fresh bootstrap', async () => {
     await upsertConversation({
       sourceType: 'chat',
