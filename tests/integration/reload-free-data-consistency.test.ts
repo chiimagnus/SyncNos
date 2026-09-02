@@ -432,7 +432,10 @@ describe('reload-free data consistency production chain', () => {
 
     commentsConsumer.failNext();
     const vectorBeforeDelete = await readDataRevisionSnapshot();
-    await expect(deleteArticleCommentById(Number(root?.id))).resolves.toBe(true);
+    await expect(deleteArticleCommentById(Number(root?.id))).resolves.toEqual({
+      deleted: true,
+      conversationId: articleId,
+    });
     const vectorAfterDelete = await readDataRevisionSnapshot();
     expect(vectorAfterDelete.article_comments).toBe(vectorBeforeDelete.article_comments + 1);
 

@@ -13,10 +13,6 @@ export async function listArticleCommentsByConversationId(conversationId: number
   return await idb.listArticleCommentsByConversationId(conversationId);
 }
 
-export async function getArticleCommentDeleteContextById(id: number) {
-  return await idb.getArticleCommentDeleteContextById(id);
-}
-
 export async function deleteArticleCommentById(id: number) {
   return await idb.deleteArticleCommentById(id);
 }
