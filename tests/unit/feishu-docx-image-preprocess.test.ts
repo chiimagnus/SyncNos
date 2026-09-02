@@ -70,9 +70,7 @@ describe('feishu docx image preprocess', () => {
 
   it('degrades a bulk local-asset read rejection to the existing placeholder semantics', async () => {
     imageCacheMocks.getImageCacheAssetsByIds.mockRejectedValue(new Error('idb unavailable'));
-    const result = await preprocessFeishuDocxMarkdownImages(
-      '![one](syncnos-asset://7)\n\n![two](syncnos-asset://8)',
-    );
+    const result = await preprocessFeishuDocxMarkdownImages('![one](syncnos-asset://7)\n\n![two](syncnos-asset://8)');
 
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8] });

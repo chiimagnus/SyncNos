@@ -1,8 +1,5 @@
 import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
-import {
-  getImageCacheAssetsByIds,
-  type ImageCacheAsset,
-} from '@services/conversations/data/image-cache-read.ts';
+import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read.ts';
 import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
@@ -186,12 +183,7 @@ async function uploadFromDataUrl(files: any, accessToken: string, dataUrl: unkno
   return ready && ready.id ? String(ready.id).trim() : fileId;
 }
 
-async function uploadFromSyncnosAsset(
-  files: any,
-  accessToken: string,
-  assetId: number,
-  asset: ImageCacheAsset | null,
-) {
+async function uploadFromSyncnosAsset(files: any, accessToken: string, assetId: number, asset: ImageCacheAsset | null) {
   if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
   const bytes = new Uint8Array(await asset.blob.arrayBuffer());

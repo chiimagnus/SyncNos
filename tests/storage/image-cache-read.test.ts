@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBDatabase, IDBKeyRange, IDBObjectStore, indexedDB } from 'fake-indexeddb';
 
 import { closeDbForTests, openDb } from '@platform/idb/schema';
-import {
-  getImageCacheAssetById,
-  getImageCacheAssetsByIds,
-} from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetById, getImageCacheAssetsByIds } from '@services/conversations/data/image-cache-read';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -130,7 +127,9 @@ describe('image cache bulk reader', () => {
       conversationId: 42,
     });
 
-    const imageGets = getSpy.mock.contexts.filter((context) => String((context as IDBObjectStore)?.name || '') === 'image_cache');
+    const imageGets = getSpy.mock.contexts.filter(
+      (context) => String((context as IDBObjectStore)?.name || '') === 'image_cache',
+    );
     expect(imageCacheTransactions(transactionSpy.mock.calls)).toHaveLength(1);
     expect(imageGets).toHaveLength(8);
     expect([...assets.keys()]).toEqual([1, 1.5, 2, 3, 4]);

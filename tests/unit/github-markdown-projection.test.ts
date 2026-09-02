@@ -427,9 +427,7 @@ describe('github markdown projection', () => {
     const projection = await buildGithubMarkdownProjection({
       conversation: conversation(),
       messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![x](syncnos-asset://1)' }],
-      imageBatchLoader: batchLoaderFromAssets(
-        new Map([[1, imageAsset(1, [1], 'https://cdn.example.com/safe.png')]]),
-      ),
+      imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, [1], 'https://cdn.example.com/safe.png')]])),
       blobUploader: async () => {
         throw Object.assign(new Error('ambiguous mutation outcome'), { code: 'github_outcome_unknown' });
       },

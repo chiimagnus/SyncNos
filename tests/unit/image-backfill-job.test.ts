@@ -83,9 +83,7 @@ describe('image-backfill-job', () => {
   });
 
   it('does not count conflict-only candidates as updated messages', async () => {
-    storageMocks.getMessagesByConversationId.mockResolvedValue([
-      { messageKey: 'm1', contentMarkdown: 'before' },
-    ]);
+    storageMocks.getMessagesByConversationId.mockResolvedValue([{ messageKey: 'm1', contentMarkdown: 'before' }]);
     imageInlineMocks.inlineChatImagesInMessages.mockResolvedValue(
       inlineResult([{ messageKey: 'm1', contentMarkdown: 'after' }]),
     );

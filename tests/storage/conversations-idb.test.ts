@@ -425,11 +425,13 @@ describe('conversations storage-idb', () => {
       getSpy.mockRestore();
     }
 
-    expect((await getMessagesByConversationId(id)).map((message) => [message.messageKey, message.contentText])).toEqual([
-      ['m1', 'one updated'],
-      ['m2', 'two'],
-      ['m4', 'four'],
-    ]);
+    expect((await getMessagesByConversationId(id)).map((message) => [message.messageKey, message.contentText])).toEqual(
+      [
+        ['m1', 'one updated'],
+        ['m2', 'two'],
+        ['m4', 'four'],
+      ],
+    );
   });
 
   it('keeps duplicate snapshot message keys on one row with the last incoming value', async () => {

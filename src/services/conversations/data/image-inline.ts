@@ -155,9 +155,7 @@ function utf8ToBytes(text: string): Uint8Array {
 }
 
 type DataImageFailure = { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' };
-type DataImageDescriptor =
-  | { ok: true; byteSize: number; contentType: string; cacheKey: string }
-  | DataImageFailure;
+type DataImageDescriptor = { ok: true; byteSize: number; contentType: string; cacheKey: string } | DataImageFailure;
 type DecodedDataImage =
   | { ok: true; bytes: Uint8Array; byteSize: number; contentType: string; cacheKey: string }
   | DataImageFailure;
@@ -217,9 +215,7 @@ function describeDataImageUrl(input: { dataUrl: string; maxBytes: number }): Dat
 function parseDataImageUrl(input: {
   dataUrl: string;
   maxBytes: number;
-}):
-  | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
-  | DataImageFailure {
+}): { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string } | DataImageFailure {
   const decoded = decodeDataImageUrl(input);
   if (!decoded.ok) return decoded;
   return {

@@ -160,7 +160,10 @@ describe('image-inline', () => {
     });
     const readonlyGets = getSpy.mock.contexts
       .map((context, index) => ({ context: context as IDBIndex, call: getSpy.mock.calls[index] }))
-      .filter(({ context }) => context.name === 'by_conversationId_url' && context.objectStore.transaction.mode === 'readonly');
+      .filter(
+        ({ context }) =>
+          context.name === 'by_conversationId_url' && context.objectStore.transaction.mode === 'readonly',
+      );
 
     expect(readonlyImageTransactions).toHaveLength(1);
     expect(readonlyGets.map(({ call }) => call?.[0])).toEqual([
@@ -170,9 +173,7 @@ describe('image-inline', () => {
     expect(result.fromCacheCount).toBe(2);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(messages[0].contentMarkdown).toBe(`![](syncnos-asset://${firstId})`);
-    expect(messages[1].contentMarkdown).toBe(
-      `![](syncnos-asset://${firstId})\n\n![](syncnos-asset://${secondId})`,
-    );
+    expect(messages[1].contentMarkdown).toBe(`![](syncnos-asset://${firstId})\n\n![](syncnos-asset://${secondId})`);
   });
 
   it('prefetches only messages selected by onlyMessageKeys', async () => {
@@ -202,7 +203,10 @@ describe('image-inline', () => {
 
     const readonlyGets = getSpy.mock.contexts
       .map((context, index) => ({ context: context as IDBIndex, call: getSpy.mock.calls[index] }))
-      .filter(({ context }) => context.name === 'by_conversationId_url' && context.objectStore.transaction.mode === 'readonly');
+      .filter(
+        ({ context }) =>
+          context.name === 'by_conversationId_url' && context.objectStore.transaction.mode === 'readonly',
+      );
     expect(readonlyGets.map(({ call }) => call?.[0])).toEqual([[conversationId, selectedUrl]]);
     expect(messages[0].contentMarkdown).toBe(`![](${skippedUrl})`);
     expect(messages[1].contentMarkdown).toBe(`![](syncnos-asset://${selectedId})`);
@@ -248,9 +252,7 @@ describe('image-inline', () => {
 
     try {
       const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([7, 8, 9])).toString('base64')}`;
-      const messages = [
-        { messageKey: 'm1', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 1 },
-      ];
+      const messages = [{ messageKey: 'm1', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 1 }];
       const result = await inlineChatImagesInMessages({ conversationId: 53, messages, enableHttpImages: false });
 
       expect(result.downloadedCount).toBe(1);

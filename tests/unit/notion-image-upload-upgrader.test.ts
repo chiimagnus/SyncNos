@@ -112,9 +112,7 @@ describe('notion-image-upload-upgrader', () => {
     const createExternalUrlUpload = vi
       .spyOn(notionFilesApi, 'createExternalURLUpload')
       .mockResolvedValue({ id: 'up-http' } as any);
-    const createFileUpload = vi
-      .spyOn(notionFilesApi, 'createFileUpload')
-      .mockResolvedValue({ id: 'up-data' } as any);
+    const createFileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'up-data' } as any);
     const sendFileUpload = vi.spyOn(notionFilesApi, 'sendFileUpload').mockResolvedValue({} as any);
     vi.spyOn(notionFilesApi, 'waitUntilUploaded').mockImplementation(async (input: any) => ({ id: input.id }) as any);
 

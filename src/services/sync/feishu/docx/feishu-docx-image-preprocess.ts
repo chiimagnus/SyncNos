@@ -1,8 +1,5 @@
 import { sha256Hex } from '@services/sync/shared/content-hash';
-import {
-  getImageCacheAssetsByIds,
-  type ImageCacheAsset,
-} from '@services/conversations/data/image-cache-read';
+import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
 import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
 
 function safeString(v: unknown) {
