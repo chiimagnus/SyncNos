@@ -153,18 +153,6 @@ function invalidateConversationListStatsCache(): void {
   conversationListStatsCacheValue = null;
 }
 
-function isSameLocalDayTimestamp(ts: number, now: Date): boolean {
-  if (!Number.isFinite(ts) || ts <= 0) return false;
-  try {
-    const date = new Date(ts);
-    return (
-      date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
-    );
-  } catch (_e) {
-    return false;
-  }
-}
-
 function sortFacetItems(items: Array<{ key: string; label: string; count: number }>): Array<{
   key: string;
   label: string;
@@ -1117,6 +1105,100 @@ function buildListPageRange(
   };
 }
 
+function buildListTimestampRange(
+  query: ReturnType<typeof normalizeConversationListQuery>,
+  indexName: ReturnType<typeof buildListPageRange>['indexName'],
+  startInclusive: number,
+  endExclusive: number,
+): IDBKeyRange | null {
+  const keyRangeApi = globalThis.IDBKeyRange;
+  if (!keyRangeApi) return null;
+
+  const sourceKey = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
+  const siteKey = normalizeConversationListSiteFilterKey(query.siteKey);
+  const MIN_ID = 0;
+
+  if (indexName === 'by_listSourceKey_listSiteKey_lastCapturedAt_id') {
+    return keyRangeApi.bound(
+      [sourceKey, siteKey, startInclusive, MIN_ID] as any,
+      [sourceKey, siteKey, endExclusive, MIN_ID] as any,
+      false,
+      true,
+    );
+  }
+  if (indexName === 'by_listSourceKey_lastCapturedAt_id') {
+    return keyRangeApi.bound(
+      [sourceKey, startInclusive, MIN_ID] as any,
+      [sourceKey, endExclusive, MIN_ID] as any,
+      false,
+      true,
+    );
+  }
+  if (indexName === 'by_listSiteKey_lastCapturedAt_id') {
+    return keyRangeApi.bound(
+      [siteKey, startInclusive, MIN_ID] as any,
+      [siteKey, endExclusive, MIN_ID] as any,
+      false,
+      true,
+    );
+  }
+  return keyRangeApi.bound([startInclusive, MIN_ID] as any, [endExclusive, MIN_ID] as any, false, true);
+}
+
+async function hydrateConversationListArticleCommentThreadCounts(
+  items: Conversation[],
+  articleCommentsStore: IDBObjectStore,
+): Promise<void> {
+  const keyRangeApi = globalThis.IDBKeyRange;
+  const byConversation = articleCommentsStore.index('by_conversationId_createdAt');
+  const byCanonicalUrl = articleCommentsStore.index('by_canonicalUrl_createdAt');
+  const orphanRowsByCanonicalUrl = new Map<string, Promise<any[]>>();
+  const reads: Array<{
+    item: Conversation;
+    linkedRows: Promise<any[]>;
+    orphanRows: Promise<any[]>;
+  }> = [];
+
+  for (const item of items) {
+    if (safeString((item as any).sourceType).toLowerCase() !== 'article') continue;
+
+    const conversationId = Number((item as any).id);
+    const canonicalUrl = canonicalizeArticleUrl((item as any).url);
+    const linkedRows =
+      keyRangeApi && Number.isSafeInteger(conversationId) && conversationId > 0
+        ? reqToPromise<any[]>(
+            byConversation.getAll(
+              keyRangeApi.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any),
+            ) as any,
+          )
+        : Promise.resolve([]);
+
+    let orphanRows = Promise.resolve<any[]>([]);
+    if (keyRangeApi && canonicalUrl) {
+      orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || Promise.resolve([]);
+      if (!orphanRowsByCanonicalUrl.has(canonicalUrl)) {
+        orphanRows = reqToPromise<any[]>(
+          byCanonicalUrl.getAll(
+            keyRangeApi.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any),
+          ) as any,
+        );
+        orphanRowsByCanonicalUrl.set(canonicalUrl, orphanRows);
+      }
+    }
+
+    reads.push({ item, linkedRows, orphanRows });
+  }
+
+  await Promise.all(
+    reads.map(async ({ item, linkedRows, orphanRows }) => {
+      const [linked, byUrl] = await Promise.all([linkedRows, orphanRows]);
+      const comments = [...(Array.isArray(linked) ? linked : [])];
+      comments.push(...(Array.isArray(byUrl) ? byUrl.filter((row) => row?.conversationId == null) : []));
+      (item as any).commentThreadCount = computeArticleCommentThreadCount(comments);
+    }),
+  );
+}
+
 async function readConversationListPageItems(input: {
   store: IDBObjectStore;
   articleCommentsStore: IDBObjectStore;
@@ -1143,30 +1225,7 @@ async function readConversationListPageItems(input: {
 
   const hasMore = rows.length > safeLimit;
   const pageItems = hasMore ? rows.slice(0, safeLimit) : rows;
-  const byConversation = articleCommentsStore.index('by_conversationId_createdAt');
-  const byCanonicalUrl = articleCommentsStore.index('by_canonicalUrl_createdAt');
-  for (const item of pageItems) {
-    if (safeString((item as any).sourceType).toLowerCase() !== 'article') continue;
-    const conversationId = Number((item as any).id);
-    const canonicalUrl = canonicalizeArticleUrl((item as any).url);
-    const comments: any[] = [];
-    if (globalThis.IDBKeyRange?.bound && Number.isSafeInteger(conversationId) && conversationId > 0) {
-      const byConversationRange = globalThis.IDBKeyRange.bound(
-        [conversationId, -Infinity] as any,
-        [conversationId, Infinity] as any,
-      );
-      comments.push(...((await reqToPromise<any[]>(byConversation.getAll(byConversationRange) as any)) || []));
-    }
-    if (globalThis.IDBKeyRange?.bound && canonicalUrl) {
-      const byUrlRange = globalThis.IDBKeyRange.bound(
-        [canonicalUrl, -Infinity] as any,
-        [canonicalUrl, Infinity] as any,
-      );
-      const urlRows = (await reqToPromise<any[]>(byCanonicalUrl.getAll(byUrlRange) as any)) || [];
-      comments.push(...urlRows.filter((row) => row?.conversationId == null));
-    }
-    (item as any).commentThreadCount = computeArticleCommentThreadCount(comments);
-  }
+  await hydrateConversationListArticleCommentThreadCounts(pageItems as Conversation[], articleCommentsStore);
 
   const tail = pageItems.length ? pageItems[pageItems.length - 1] : null;
   const nextCursor =
@@ -1189,52 +1248,80 @@ async function readConversationListSummaryAndFacets(input: {
 }): Promise<{ summary: ConversationListSummary; facets: ConversationListFacets }> {
   const { store, query } = input;
   const sourceFilter = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
-  const siteFilter = normalizeConversationListSiteFilterKey(query.siteKey);
+  const siteFacetSourceScope = sourceFilter === LIST_SOURCE_KEY_ALL ? 'web' : sourceFilter;
   const sourceFacetMap = new Map<string, { key: string; label: string; count: number }>();
   const siteFacetMap = new Map<string, { key: string; label: string; count: number }>();
-  const siteFacetSourceScope = sourceFilter === LIST_SOURCE_KEY_ALL ? 'web' : sourceFilter;
 
-  const now = new Date();
-  let totalCount = 0;
-  let todayCount = 0;
+  const summaryRange = buildListPageRange(query, null);
+  const summaryIndex = store.index(summaryRange.indexName);
+  const totalCountPromise = reqToPromise<number>(summaryIndex.count((summaryRange.range || undefined) as any));
 
-  const request = store.openCursor();
-  await new Promise<void>((resolve, reject) => {
-    request.onerror = () => reject(request.error || new Error('cursor failed'));
-    request.onsuccess = () => {
-      const cursor = request.result;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const todayRange = buildListTimestampRange(
+    query,
+    summaryRange.indexName,
+    todayStart.getTime(),
+    tomorrowStart.getTime(),
+  );
+  const todayCountPromise = todayRange
+    ? reqToPromise<number>(summaryIndex.count(todayRange as any))
+    : Promise.resolve(0);
+
+  const sourceFacetRequest = store.index('by_listSourceKey_lastCapturedAt_id').openKeyCursor();
+  const sourceFacetsPromise = new Promise<void>((resolve, reject) => {
+    sourceFacetRequest.onerror = () => reject(sourceFacetRequest.error || new Error('source facet cursor failed'));
+    sourceFacetRequest.onsuccess = () => {
+      const cursor = sourceFacetRequest.result;
       if (!cursor) return resolve();
-      const raw = (cursor.value || {}) as any;
-      const normalized = normalizeConversationListRecord(raw);
-      const rowSourceKey = normalizeListKey(normalized.listSourceKey, 'unknown');
-      const rowSiteKey = normalizeConversationListSiteFilterKey(normalized.listSiteKey);
-      const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
+      const key = Array.isArray(cursor.key) ? cursor.key : [];
+      const rowSourceKey = normalizeListKey(key[0], 'unknown');
+      const facet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
+      facet.count += 1;
+      sourceFacetMap.set(rowSourceKey, facet);
+      cursor.continue();
+    };
+  });
 
-      const sourceFacet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
-      sourceFacet.count += 1;
-      sourceFacetMap.set(rowSourceKey, sourceFacet);
-
+  const siteFacetIndex = store.index('by_listSourceKey_listSiteKey_lastCapturedAt_id');
+  const siteFacetRange = globalThis.IDBKeyRange?.bound
+    ? globalThis.IDBKeyRange.bound(
+        [siteFacetSourceScope, '', 0, 0] as any,
+        [siteFacetSourceScope, '\uffff', Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] as any,
+      )
+    : null;
+  const siteFacetRequest = siteFacetIndex.openKeyCursor((siteFacetRange || null) as any);
+  const siteFacetsPromise = new Promise<void>((resolve, reject) => {
+    siteFacetRequest.onerror = () => reject(siteFacetRequest.error || new Error('site facet cursor failed'));
+    siteFacetRequest.onsuccess = () => {
+      const cursor = siteFacetRequest.result;
+      if (!cursor) return resolve();
+      const key = Array.isArray(cursor.key) ? cursor.key : [];
+      const rowSourceKey = normalizeListKey(key[0], 'unknown');
       if (rowSourceKey === siteFacetSourceScope) {
-        const siteFacet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteLabel, count: 0 };
-        siteFacet.count += 1;
-        siteFacetMap.set(rowSiteKey, siteFacet);
-      }
-
-      const sourceMatch = sourceFilter === LIST_SOURCE_KEY_ALL || rowSourceKey === sourceFilter;
-      const siteMatch = siteFilter === LIST_SITE_KEY_ALL || rowSiteKey === siteFilter;
-      if (sourceMatch && siteMatch) {
-        totalCount += 1;
-        const ts = Number(raw.lastCapturedAt) || 0;
-        if (isSameLocalDayTimestamp(ts, now)) todayCount += 1;
+        const rowSiteKey = normalizeConversationListSiteFilterKey(key[1]);
+        const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
+        const facet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteLabel, count: 0 };
+        facet.count += 1;
+        siteFacetMap.set(rowSiteKey, facet);
       }
       cursor.continue();
     };
   });
 
+  const [totalCount, todayCount] = await Promise.all([
+    totalCountPromise,
+    todayCountPromise,
+    sourceFacetsPromise,
+    siteFacetsPromise,
+  ]);
+
   return {
     summary: {
-      totalCount,
-      todayCount,
+      totalCount: Number(totalCount) || 0,
+      todayCount: Number(todayCount) || 0,
     },
     facets: {
       sources: sortFacetItems(Array.from(sourceFacetMap.values())),

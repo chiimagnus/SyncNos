@@ -7,7 +7,6 @@ const storageMocks = vi.hoisted(() => ({
   addArticleComment: vi.fn(),
   attachOrphanCommentsToConversation: vi.fn(),
   deleteArticleCommentById: vi.fn(),
-  getArticleCommentDeleteContextById: vi.fn(),
   listArticleCommentsByCanonicalUrl: vi.fn(),
   listArticleCommentsByConversationId: vi.fn(),
   migrateArticleCommentsCanonicalUrl: vi.fn(),
@@ -38,6 +37,47 @@ beforeEach(() => {
 });
 
 describe('article comments background handler mutation side effects', () => {
+  it('returns ok and schedules auto-sync from the committed delete result owner', async () => {
+    storageMocks.deleteArticleCommentById.mockResolvedValue({ deleted: true, conversationId: 31 });
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT)?.({ id: 7 });
+
+    expect(response).toEqual({ ok: true, data: { ok: true }, error: null });
+    expect(storageMocks.deleteArticleCommentById).toHaveBeenCalledWith(7);
+    expect(onConversationChanged).toHaveBeenCalledTimes(1);
+    expect(onConversationChanged).toHaveBeenCalledWith(
+      31,
+      AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+    );
+  });
+
+  it('returns ok=false for a missing delete without scheduling auto-sync', async () => {
+    storageMocks.deleteArticleCommentById.mockResolvedValue({ deleted: false, conversationId: null });
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT)?.({ id: 8 });
+
+    expect(response).toEqual({ ok: true, data: { ok: false }, error: null });
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not invent an auto-sync target for a deleted orphan-only comment', async () => {
+    storageMocks.deleteArticleCommentById.mockResolvedValue({ deleted: true, conversationId: null });
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT)?.({ id: 9 });
+
+    expect(response).toEqual({ ok: true, data: { ok: true }, error: null });
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
   it('keeps attach updated=0 successful without auto-sync', async () => {
     storageMocks.attachOrphanCommentsToConversation.mockResolvedValue({ updated: 0 });
     const onConversationChanged = vi.fn();

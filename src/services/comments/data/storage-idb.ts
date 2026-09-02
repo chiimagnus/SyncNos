@@ -12,11 +12,6 @@ export class ArticleCommentInvariantError extends Error {
   }
 }
 
-export type ArticleCommentDeleteContext = {
-  conversationId: number | null;
-  canonicalUrl: string;
-};
-
 function tx(
   db: IDBDatabase,
   storeNames: string[],
@@ -168,83 +163,67 @@ export async function listArticleCommentsByConversationId(conversationId: number
   return (Array.isArray(rows) ? rows : []).map(toComment);
 }
 
-function toDeleteContext(row: any): ArticleCommentDeleteContext {
-  return {
-    conversationId: normalizeConversationId(row?.conversationId),
-    canonicalUrl: normalizeCanonicalUrl(row?.canonicalUrl),
-  };
-}
+type ArticleCommentDeleteResult = {
+  deleted: boolean;
+  conversationId: number | null;
+};
 
-export async function getArticleCommentDeleteContextById(id: number): Promise<ArticleCommentDeleteContext | null> {
+export async function deleteArticleCommentById(id: number): Promise<ArticleCommentDeleteResult> {
   const commentId = Number(id);
-  if (!Number.isFinite(commentId) || commentId <= 0) return null;
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readonly');
-  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
-  await txDone(t);
-
-  const byId = new Map<number, any>();
-  for (const row of rows) {
-    const rowId = Number(row?.id);
-    if (!Number.isFinite(rowId) || rowId <= 0) continue;
-    byId.set(rowId, row);
-  }
-
-  const target = byId.get(commentId);
-  if (!target) {
-    for (const row of rows) {
-      if (normalizeParentId(row?.parentId) !== commentId) continue;
-      return toDeleteContext(row);
-    }
-    return null;
-  }
-
-  const context = toDeleteContext(target);
-  if (context.conversationId != null && context.canonicalUrl) return context;
-
-  const parentId = normalizeParentId(target?.parentId);
-  if (parentId != null) {
-    const parent = byId.get(parentId);
-    if (parent) {
-      const parentContext = toDeleteContext(parent);
-      return {
-        conversationId: context.conversationId ?? parentContext.conversationId,
-        canonicalUrl: context.canonicalUrl || parentContext.canonicalUrl,
-      };
-    }
-  }
-  return context;
-}
-
-export async function deleteArticleCommentById(id: number): Promise<boolean> {
-  const commentId = Number(id);
-  if (!Number.isFinite(commentId) || commentId <= 0) return false;
+  if (!Number.isFinite(commentId) || commentId <= 0) return { deleted: false, conversationId: null };
 
   const db = await openDb();
   return runTrackedTransaction(
     { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
     async ({ stores, markChanged }) => {
-      const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
-      const targetExists = rows.some((row) => Number(row?.id) === commentId);
-      if (!targetExists) return false;
+      const store = stores.article_comments;
+      const rows = (await reqToPromise<any[]>(store.getAll() as any)) || [];
+      const byId = new Map<number, any>();
+      const childrenByParentId = new Map<number, number[]>();
 
-      const descendants = new Set<number>([commentId]);
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const row of rows) {
-          const rowId = Number(row?.id);
-          const parentId = normalizeParentId(row?.parentId);
-          if (!Number.isFinite(rowId) || rowId <= 0 || parentId == null) continue;
-          if (!descendants.has(parentId) || descendants.has(rowId)) continue;
-          descendants.add(rowId);
-          changed = true;
+      for (const row of rows) {
+        const rowId = Number(row?.id);
+        if (!Number.isSafeInteger(rowId) || rowId <= 0) continue;
+        byId.set(rowId, row);
+
+        const parentId = normalizeParentId(row?.parentId);
+        if (parentId == null) continue;
+        const children = childrenByParentId.get(parentId) || [];
+        children.push(rowId);
+        childrenByParentId.set(parentId, children);
+      }
+
+      const target = byId.get(commentId);
+      if (!target) return { deleted: false, conversationId: null };
+
+      let conversationId = normalizeConversationId(target?.conversationId);
+      if (conversationId == null) {
+        const visitedAncestors = new Set<number>([commentId]);
+        let parentId = normalizeParentId(target?.parentId);
+        while (parentId != null && !visitedAncestors.has(parentId)) {
+          visitedAncestors.add(parentId);
+          const parent = byId.get(parentId);
+          if (!parent) break;
+          conversationId = normalizeConversationId(parent?.conversationId);
+          if (conversationId != null) break;
+          parentId = normalizeParentId(parent?.parentId);
         }
       }
-      for (const rowId of descendants) await reqToPromise(stores.article_comments.delete(rowId) as any);
+
+      const descendants = new Set<number>();
+      const pending = [commentId];
+      while (pending.length) {
+        const rowId = pending.pop();
+        if (rowId == null || descendants.has(rowId)) continue;
+        descendants.add(rowId);
+        for (const childId of childrenByParentId.get(rowId) || []) {
+          if (!descendants.has(childId)) pending.push(childId);
+        }
+      }
+
+      await Promise.all([...descendants].map((rowId) => reqToPromise(store.delete(rowId) as any)));
       markChanged('article_comments');
-      return true;
+      return { deleted: true, conversationId };
     },
   );
 }

@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests } from '@platform/idb/schema';
 import {
   __resetConversationStorageStateForTests,
@@ -78,6 +78,30 @@ describe('conversations pagination storage-idb', () => {
     expect(Number(a.id)).toBeLessThan(Number(b.id));
   });
 
+  it('does not query article comment indexes for a non-article-only page', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'chat-only-comment-read',
+      title: 'chat only',
+      url: 'https://chatgpt.com/c/chat-only-comment-read',
+      lastCapturedAt: Date.now(),
+    });
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      const page = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 10 });
+      expect(page.items).toHaveLength(1);
+      const commentIndexReads = getAllSpy.mock.contexts.filter((context) => {
+        const indexName = String((context as any)?.name || '');
+        return indexName === 'by_conversationId_createdAt' || indexName === 'by_canonicalUrl_createdAt';
+      });
+      expect(commentIndexReads).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+    }
+  });
+
   it('does not duplicate or skip rows across pages', async () => {
     const now = Date.now();
     const inserted: Array<{ id: number; conversationKey: string; lastCapturedAt: number }> = [];
@@ -121,71 +145,137 @@ describe('conversations pagination storage-idb', () => {
     expect(new Set(allIds).size).toBe(expectedIds.length);
   });
 
-  it('returns summary and facets without relying on full list materialization in UI', async () => {
-    const now = Date.now();
-    const old = now - 3 * 24 * 60 * 60 * 1000;
-    await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article:https://example.com/a',
-      title: 'a',
-      url: 'https://example.com/a',
-      lastCapturedAt: now,
-    });
-    await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article:https://example.com/b',
-      title: 'b',
-      url: 'https://example.com/b',
-      lastCapturedAt: old,
-    });
-    await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article:no-url',
-      title: 'c',
-      url: '',
-      lastCapturedAt: now,
-    });
-    await upsertConversation({
-      sourceType: 'chat',
-      source: 'chatgpt',
-      conversationKey: 'chat-1',
-      title: 'chat',
-      url: 'https://chatgpt.com/c/1',
-      lastCapturedAt: now,
-    });
-    await upsertConversation({
-      sourceType: 'chat',
-      source: 'gemini',
-      conversationKey: 'gemini-1',
-      title: 'gemini',
-      url: 'https://gemini.google.com/app/1',
-      lastCapturedAt: old,
-    });
+  it('counts summary scopes and facets from persisted list indexes without treating future rows as today', async () => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const rows = [
+      {
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/today',
+        title: 'example today',
+        url: 'https://example.com/today',
+        lastCapturedAt: today.getTime(),
+      },
+      {
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/yesterday',
+        title: 'example yesterday',
+        url: 'https://example.com/yesterday',
+        lastCapturedAt: yesterday.getTime(),
+      },
+      {
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://other.example/today',
+        title: 'other today',
+        url: 'https://other.example/today',
+        lastCapturedAt: today.getTime(),
+      },
+      {
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:no-url',
+        title: 'unknown today',
+        url: '',
+        lastCapturedAt: today.getTime(),
+      },
+      {
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://future.example/tomorrow',
+        title: 'future',
+        url: 'https://future.example/tomorrow',
+        lastCapturedAt: tomorrow.getTime(),
+      },
+      {
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'chat-1',
+        title: 'chat',
+        url: 'https://chatgpt.com/c/1',
+        lastCapturedAt: today.getTime(),
+      },
+      {
+        sourceType: 'chat',
+        source: 'gemini',
+        conversationKey: 'gemini-1',
+        title: 'gemini',
+        url: 'https://gemini.google.com/app/1',
+        lastCapturedAt: yesterday.getTime(),
+      },
+    ];
+    for (const row of rows) await upsertConversation(row);
 
     const all = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
-    expect(all.summary.totalCount).toBe(5);
-    expect(all.summary.todayCount).toBe(3);
+    expect(all.summary).toEqual({ totalCount: 7, todayCount: 4 });
+    expect(new Map(all.facets.sources.map((item) => [item.key, item.count]))).toEqual(
+      new Map([
+        ['web', 5],
+        ['chatgpt', 1],
+        ['gemini', 1],
+      ]),
+    );
+    expect(new Map(all.facets.sites.map((item) => [item.key, item.count]))).toEqual(
+      new Map([
+        ['domain:example.com', 2],
+        ['domain:future.example', 1],
+        ['domain:other.example', 1],
+        ['unknown', 1],
+      ]),
+    );
 
-    const sourceCounts = new Map(all.facets.sources.map((item) => [item.key, item.count]));
-    expect(sourceCounts.get('web')).toBe(3);
-    expect(sourceCounts.get('chatgpt')).toBe(1);
-    expect(sourceCounts.get('gemini')).toBe(1);
+    const sourceOnly = await getConversationListBootstrap({ sourceKey: 'web', siteKey: 'all', limit: 20 });
+    expect(sourceOnly.summary).toEqual({ totalCount: 5, todayCount: 3 });
 
-    const siteCounts = new Map(all.facets.sites.map((item) => [item.key, item.count]));
-    expect(siteCounts.get('domain:example.com')).toBe(2);
-    expect(siteCounts.get('unknown')).toBe(1);
-
-    const filtered = await getConversationListBootstrap({
+    const sourceAndSite = await getConversationListBootstrap({
       sourceKey: 'web',
       siteKey: 'Example.COM',
       limit: 20,
     });
-    expect(filtered.summary.totalCount).toBe(2);
-    expect(filtered.items.every((item) => item.listSourceKey === 'web')).toBe(true);
-    expect(filtered.items.every((item) => item.listSiteKey === 'domain:example.com')).toBe(true);
+    expect(sourceAndSite.summary).toEqual({ totalCount: 2, todayCount: 1 });
+    expect(sourceAndSite.items.every((item) => item.listSourceKey === 'web')).toBe(true);
+    expect(sourceAndSite.items.every((item) => item.listSiteKey === 'domain:example.com')).toBe(true);
+
+    const siteOnly = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'example.com', limit: 20 });
+    expect(siteOnly.summary).toEqual({ totalCount: 2, todayCount: 1 });
+
+    const chatgpt = await getConversationListBootstrap({ sourceKey: 'chatgpt', siteKey: 'all', limit: 20 });
+    expect(chatgpt.summary).toEqual({ totalCount: 1, todayCount: 1 });
+    expect(chatgpt.facets.sites).toEqual([{ key: 'domain:chatgpt.com', label: 'chatgpt.com', count: 1 }]);
+  });
+
+  it('counts today from inclusive local midnight to exclusive next local midnight', async () => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const timestamps = [
+      todayStart.getTime() - 1,
+      todayStart.getTime(),
+      tomorrowStart.getTime() - 1,
+      tomorrowStart.getTime(),
+    ];
+    for (let index = 0; index < timestamps.length; index += 1) {
+      await upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: `day-boundary-${index + 1}`,
+        title: `day boundary ${index + 1}`,
+        url: `https://chatgpt.com/c/day-boundary-${index + 1}`,
+        lastCapturedAt: timestamps[index],
+      });
+    }
+
+    const bootstrap = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(bootstrap.summary).toEqual({ totalCount: 4, todayCount: 2 });
   });
 
   it('does not persist derived-key repairs while reading a fresh bootstrap', async () => {
@@ -223,6 +313,8 @@ describe('conversations pagination storage-idb', () => {
       listSourceKey: 'chatgpt',
       listSiteKey: 'domain:chatgpt.com',
     });
+    expect(bootstrap.facets.sources).toEqual([{ key: 'stale-source', label: 'stale-source', count: 1 }]);
+    expect(bootstrap.facets.sites).toEqual([]);
 
     const verifyTx = rawDb.transaction(['conversations'], 'readonly');
     const persisted = await reqToPromise<any>(
@@ -255,6 +347,61 @@ describe('conversations pagination storage-idb', () => {
     const refreshed = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
     expect(refreshed.items.map((item) => item.conversationKey)).toEqual(['tracked-bootstrap']);
     expect(refreshed.summary.totalCount).toBe(1);
+  });
+
+  it('reuses bootstrap summary and facets for continuation pages in the same list scope', async () => {
+    const now = Date.now();
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'cache-1',
+      title: 'cache 1',
+      url: 'https://chatgpt.com/c/cache-1',
+      lastCapturedAt: now,
+    });
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'cache-2',
+      title: 'cache 2',
+      url: 'https://chatgpt.com/c/cache-2',
+      lastCapturedAt: now - 1,
+    });
+
+    const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 1 });
+    expect(first.summary.totalCount).toBe(2);
+    expect(first.hasMore).toBe(true);
+    expect(first.cursor).toBeTruthy();
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    rawTx.objectStore('conversations').add({
+      sourceType: 'chat',
+      source: 'gemini',
+      conversationKey: 'cache-external-newer',
+      title: 'external newer',
+      url: 'https://gemini.google.com/app/cache-external-newer',
+      lastCapturedAt: now + 1,
+      listSourceKey: 'gemini',
+      listSiteKey: 'domain:gemini.google.com',
+    });
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+    rawDb.close();
+
+    const continued = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 1 }, first.cursor!);
+    expect(continued.summary).toEqual(first.summary);
+    expect(continued.facets).toEqual(first.facets);
+
+    const fresh = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(fresh.summary.totalCount).toBe(3);
   });
 
   it('recomputes summary on a fresh bootstrap after an external IndexedDB write', async () => {
@@ -356,7 +503,8 @@ describe('conversations pagination storage-idb', () => {
       request.onerror = () => reject(request.error);
     });
     const rawTx = rawDb.transaction(['article_comments'], 'readwrite');
-    rawTx.objectStore('article_comments').add({
+    const rawStore = rawTx.objectStore('article_comments');
+    rawStore.add({
       conversationId: Number(article.id),
       canonicalUrl: 'https://example.com/thread',
       authorName: '',
@@ -366,6 +514,30 @@ describe('conversations pagination storage-idb', () => {
       parentId: 999,
       createdAt: 3,
       updatedAt: 3,
+    });
+    rawStore.add({
+      id: 1001,
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread',
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle a',
+      locator: null,
+      parentId: 1002,
+      createdAt: 4,
+      updatedAt: 4,
+    });
+    rawStore.add({
+      id: 1002,
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread',
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle b',
+      locator: null,
+      parentId: 1001,
+      createdAt: 5,
+      updatedAt: 5,
     });
     await new Promise<void>((resolve, reject) => {
       rawTx.oncomplete = () => resolve();
@@ -378,7 +550,104 @@ describe('conversations pagination storage-idb', () => {
     const articleItem = page.items.find((item) => item.sourceType === 'article');
     const chatItem = page.items.find((item) => item.sourceType !== 'article');
 
-    expect(articleItem?.commentThreadCount).toBe(2);
+    expect(articleItem?.commentThreadCount).toBe(3);
     expect(chatItem?.commentThreadCount).toBeUndefined();
+  });
+
+  it('hydrates multiple article rows with shared orphan URL comments without mixing conversation-owned rows', async () => {
+    const now = Date.now();
+    const canonical = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/shared',
+      title: 'canonical',
+      url: 'https://example.com/shared',
+      lastCapturedAt: now,
+    });
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'after-shared',
+      title: 'after',
+      url: 'https://chatgpt.com/c/after-shared',
+      lastCapturedAt: now - 2,
+    });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    const duplicateId = Number(
+      await reqToPromise(
+        rawTx.objectStore('conversations').add({
+          sourceType: 'article',
+          source: 'web',
+          conversationKey: 'article:historical-shared-copy',
+          title: 'historical duplicate',
+          url: 'https://example.com/shared#historical',
+          lastCapturedAt: now - 1,
+          listSourceKey: 'web',
+          listSiteKey: 'domain:example.com',
+        }),
+      ),
+    );
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+    rawDb.close();
+
+    await addArticleComment({
+      conversationId: Number(canonical.id),
+      canonicalUrl: 'https://example.com/shared',
+      commentText: 'canonical owned root',
+      parentId: null,
+      createdAt: 1,
+    });
+    await addArticleComment({
+      conversationId: duplicateId,
+      canonicalUrl: 'https://example.com/shared',
+      commentText: 'duplicate owned root',
+      parentId: null,
+      createdAt: 2,
+    });
+    await addArticleComment({
+      conversationId: null,
+      canonicalUrl: 'https://example.com/shared',
+      commentText: 'shared orphan root',
+      parentId: null,
+      createdAt: 3,
+    });
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 2 });
+      expect(first.items.map((item) => item.conversationKey)).toEqual([
+        'article:https://example.com/shared',
+        'article:historical-shared-copy',
+      ]);
+      expect(first.items.map((item) => item.commentThreadCount)).toEqual([2, 2]);
+      expect(first.hasMore).toBe(true);
+      expect(first.cursor).toEqual({ lastCapturedAt: now - 1, id: duplicateId });
+
+      const second = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 2 }, first.cursor!);
+      expect(second.items.map((item) => item.conversationKey)).toEqual(['after-shared']);
+      expect(second.items[0]?.commentThreadCount).toBeUndefined();
+      expect(second.hasMore).toBe(false);
+
+      const commentReadIndexNames = getAllSpy.mock.contexts
+        .map((context) => String((context as any)?.name || ''))
+        .filter((name) => name === 'by_conversationId_createdAt' || name === 'by_canonicalUrl_createdAt');
+      expect(commentReadIndexNames).toEqual([
+        'by_conversationId_createdAt',
+        'by_canonicalUrl_createdAt',
+        'by_conversationId_createdAt',
+      ]);
+    } finally {
+      getAllSpy.mockRestore();
+    }
   });
 });

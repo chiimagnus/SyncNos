@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { closeDbForTests } from '@platform/idb/schema';
+import { IDBKeyRange, IDBObjectStore, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 
 import {
@@ -22,11 +22,7 @@ function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
 }
 
 async function insertRawArticleComment(row: Record<string, unknown>): Promise<number> {
-  const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('webclipper');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const db = await openDb();
   const transaction = db.transaction(['article_comments'], 'readwrite');
   const id = await reqToPromise<number>(transaction.objectStore('article_comments').add(row) as IDBRequest<number>);
   await new Promise<void>((resolve, reject) => {
@@ -34,7 +30,6 @@ async function insertRawArticleComment(row: Record<string, unknown>): Promise<nu
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
-  db.close();
   return id;
 }
 
@@ -83,17 +78,31 @@ describe('article comments storage-idb', () => {
     const byConvo = await listArticleCommentsByConversationId(123);
     expect(byConvo.map((c) => c.id)).toEqual([c2.id]);
 
-    const ok = await deleteArticleCommentById(c1.id);
-    expect(ok).toBe(true);
+    const result = await deleteArticleCommentById(c1.id);
+    expect(result).toEqual({ deleted: true, conversationId: null });
 
     const after = await listArticleCommentsByCanonicalUrl('https://example.com/a');
     expect(after.map((c) => c.id)).toEqual([c2.id]);
   });
 
-  it('returns false without revision churn when deleting a missing comment id', async () => {
+  it('returns a stable missing result without revision churn or guessing context from malformed children', async () => {
+    const childId = await insertRawArticleComment({
+      parentId: 999_999,
+      conversationId: 77,
+      canonicalUrl: 'https://example.com/missing-parent',
+      authorName: '',
+      quoteText: '',
+      commentText: 'historical child',
+      locator: null,
+      createdAt: 1,
+      updatedAt: 1,
+    });
     const before = await readDataRevision('article_comments');
-    expect(await deleteArticleCommentById(999_999)).toBe(false);
+    expect(await deleteArticleCommentById(999_999)).toEqual({ deleted: false, conversationId: null });
     expect(await readDataRevision('article_comments')).toBe(before);
+    expect(
+      (await listArticleCommentsByCanonicalUrl('https://example.com/missing-parent')).map((item) => item.id),
+    ).toEqual([childId]);
   });
 
   it('round-trips author metadata and V1/V2 locators without field loss', async () => {
@@ -170,6 +179,96 @@ describe('article comments storage-idb', () => {
     ).rejects.toThrow('parent_context_mismatch');
   });
 
+  it('returns the deleted row owner and prefers a reply own conversationId', async () => {
+    const root = await addArticleComment({
+      conversationId: 41,
+      canonicalUrl: 'https://example.com/owners',
+      commentText: 'root',
+      createdAt: 1,
+    });
+    const reply = await addArticleComment({
+      parentId: root.id,
+      conversationId: 41,
+      canonicalUrl: 'https://example.com/owners',
+      commentText: 'reply',
+      createdAt: 2,
+    });
+
+    expect(await deleteArticleCommentById(reply.id)).toEqual({ deleted: true, conversationId: 41 });
+    expect((await listArticleCommentsByCanonicalUrl('https://example.com/owners')).map((item) => item.id)).toEqual([
+      root.id,
+    ]);
+    expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: 41 });
+  });
+
+  it('resolves the nearest valid owner through malformed deep ancestors and terminates ancestor cycles', async () => {
+    const url = 'https://example.com/historical-owner';
+    const rootId = await insertRawArticleComment({
+      id: 5001,
+      parentId: null,
+      conversationId: 51,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'root owner',
+      locator: null,
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const middleId = await insertRawArticleComment({
+      id: 5002,
+      parentId: rootId,
+      conversationId: null,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'middle without owner',
+      locator: null,
+      createdAt: 2,
+      updatedAt: 2,
+    });
+    const targetId = await insertRawArticleComment({
+      id: 5003,
+      parentId: middleId,
+      conversationId: null,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'target without owner',
+      locator: null,
+      createdAt: 3,
+      updatedAt: 3,
+    });
+    expect(await deleteArticleCommentById(targetId)).toEqual({ deleted: true, conversationId: 51 });
+
+    await insertRawArticleComment({
+      id: 5101,
+      parentId: 5102,
+      conversationId: null,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle a',
+      locator: null,
+      createdAt: 4,
+      updatedAt: 4,
+    });
+    await insertRawArticleComment({
+      id: 5102,
+      parentId: 5101,
+      conversationId: null,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle b',
+      locator: null,
+      createdAt: 5,
+      updatedAt: 5,
+    });
+    expect(await deleteArticleCommentById(5101)).toEqual({ deleted: true, conversationId: null });
+    expect((await listArticleCommentsByCanonicalUrl(url)).map((item) => item.id)).toEqual([rootId, middleId]);
+  });
+
   it('supports replies and cascades delete on root', async () => {
     const url = 'https://example.com/thread';
     const root = await addArticleComment({
@@ -195,16 +294,26 @@ describe('article comments storage-idb', () => {
     expect(byId.get(reply1.id)?.parentId).toBe(root.id);
 
     const beforeDeleteRevision = await readDataRevision('article_comments');
-    await deleteArticleCommentById(root.id);
+    const getAllSpy = vi.spyOn(IDBObjectStore.prototype, 'getAll');
+    try {
+      expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: null });
+      const articleCommentMaterializations = getAllSpy.mock.contexts.filter(
+        (context) => String((context as any)?.name || '') === 'article_comments',
+      );
+      expect(articleCommentMaterializations).toHaveLength(1);
+    } finally {
+      getAllSpy.mockRestore();
+    }
     expect(await readDataRevision('article_comments')).toBe(beforeDeleteRevision + 1);
     const after = await listArticleCommentsByCanonicalUrl(url);
     expect(after.length).toBe(0);
   });
 
-  it('deletes all descendants from malformed historical deep reply graphs', async () => {
+  it('deletes deep descendants and target-connected cycles in one revision per delete', async () => {
     const url = 'https://example.com/deep-thread';
     const root = await addArticleComment({ conversationId: 1, canonicalUrl: url, commentText: 'root', createdAt: 1 });
     const childId = await insertRawArticleComment({
+      id: 6001,
       parentId: root.id,
       conversationId: 1,
       canonicalUrl: url,
@@ -216,6 +325,7 @@ describe('article comments storage-idb', () => {
       updatedAt: 2,
     });
     await insertRawArticleComment({
+      id: 6002,
       parentId: childId,
       conversationId: 1,
       canonicalUrl: url,
@@ -226,7 +336,51 @@ describe('article comments storage-idb', () => {
       createdAt: 3,
       updatedAt: 3,
     });
-    await deleteArticleCommentById(root.id);
+    await insertRawArticleComment({
+      id: 6003,
+      parentId: 6004,
+      conversationId: 1,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle a',
+      locator: null,
+      createdAt: 4,
+      updatedAt: 4,
+    });
+    await insertRawArticleComment({
+      id: 6004,
+      parentId: 6003,
+      conversationId: 1,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle b',
+      locator: null,
+      createdAt: 5,
+      updatedAt: 5,
+    });
+    await insertRawArticleComment({
+      id: 6005,
+      parentId: 6004,
+      conversationId: 1,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle child',
+      locator: null,
+      createdAt: 6,
+      updatedAt: 6,
+    });
+
+    const before = await readDataRevision('article_comments');
+    expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: 1 });
+    expect(await readDataRevision('article_comments')).toBe(before + 1);
+    expect((await listArticleCommentsByCanonicalUrl(url)).map((item) => item.id)).toEqual([6003, 6004, 6005]);
+
+    const beforeCycleDelete = await readDataRevision('article_comments');
+    expect(await deleteArticleCommentById(6003)).toEqual({ deleted: true, conversationId: 1 });
+    expect(await readDataRevision('article_comments')).toBe(beforeCycleDelete + 1);
     expect(await listArticleCommentsByCanonicalUrl(url)).toEqual([]);
   });
 

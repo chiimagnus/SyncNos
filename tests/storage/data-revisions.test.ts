@@ -408,10 +408,10 @@ describe('data revision storage', () => {
       }),
     ).rejects.toThrow('parent_not_root');
     expect(await readDataRevision('article_comments')).toBe(2);
-    expect(await deleteArticleCommentById(999_999)).toBe(false);
+    expect(await deleteArticleCommentById(999_999)).toEqual({ deleted: false, conversationId: null });
     expect(await readDataRevision('article_comments')).toBe(2);
 
-    expect(await deleteArticleCommentById(root.id)).toBe(true);
+    expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: null });
     expect(await readDataRevision('article_comments')).toBe(3);
 
     await addArticleComment({ conversationId: null, canonicalUrl: url, commentText: 'orphan' });
