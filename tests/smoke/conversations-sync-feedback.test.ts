@@ -7,6 +7,7 @@ import { t } from '../../src/ui/i18n';
 import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
 import { useConversationSyncFeedback } from '../../src/viewmodels/conversations/useConversationSyncFeedback';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
+import { SYNC_JOB_STORAGE_KEYS } from '../../src/services/sync/sync-job-store';
 
 const getConversationListBootstrap = vi.fn();
 const getConversationDetail = vi.fn();
@@ -23,6 +24,12 @@ const getNotionSyncJobStatus = vi.fn();
 const getObsidianSyncStatus = vi.fn();
 const getFeishuSyncStatus = vi.fn();
 const getGithubSyncStatus = vi.fn();
+
+const storageEventMocks = vi.hoisted(() => ({
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
+  listener: null as ((changes: Record<string, unknown>, areaName: string) => void) | null,
+}));
 
 vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
   useIsNarrowScreen: () => true,
@@ -66,6 +73,17 @@ vi.mock('@services/sync/repo', () => ({
 
 vi.mock('../../src/platform/webext/tabs', () => ({
   tabsCreate: vi.fn(),
+}));
+
+vi.mock('@services/shared/storage', () => ({
+  storageOnChanged: (listener: (changes: Record<string, unknown>, areaName: string) => void) => {
+    storageEventMocks.subscribe(listener);
+    storageEventMocks.listener = listener;
+    return () => {
+      storageEventMocks.unsubscribe(listener);
+      if (storageEventMocks.listener === listener) storageEventMocks.listener = null;
+    };
+  },
 }));
 
 function setupDom() {
@@ -163,6 +181,9 @@ describe('Conversations sync feedback', () => {
     getObsidianSyncStatus.mockReset();
     getFeishuSyncStatus.mockReset();
     getGithubSyncStatus.mockReset();
+    storageEventMocks.subscribe.mockClear();
+    storageEventMocks.unsubscribe.mockClear();
+    storageEventMocks.listener = null;
 
     getConversationListBootstrap.mockResolvedValue({
       items: [baseConversation],
@@ -250,6 +271,29 @@ describe('Conversations sync feedback', () => {
     expect(latestFeedback).toBeTruthy();
   }
 
+  async function emitStorageChanges(changes: Record<string, unknown>) {
+    expect(storageEventMocks.listener).toBeTruthy();
+    await act(async () => {
+      storageEventMocks.listener!(changes, 'local');
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+  }
+
+  function clearStatusGetterCalls() {
+    getNotionSyncJobStatus.mockClear();
+    getObsidianSyncStatus.mockClear();
+    getFeishuSyncStatus.mockClear();
+    getGithubSyncStatus.mockClear();
+  }
+
+  function expectStatusGetterCalls(expected: Partial<Record<'notion' | 'obsidian' | 'feishu' | 'github', number>>) {
+    expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(expected.notion ?? 0);
+    expect(getObsidianSyncStatus).toHaveBeenCalledTimes(expected.obsidian ?? 0);
+    expect(getFeishuSyncStatus).toHaveBeenCalledTimes(expected.feishu ?? 0);
+    expect(getGithubSyncStatus).toHaveBeenCalledTimes(expected.github ?? 0);
+  }
+
   function selectFirstConversation() {
     const checkbox = document.querySelector(
       '[data-conversation-id="11"] input[type="checkbox"]',
@@ -304,6 +348,30 @@ describe('Conversations sync feedback', () => {
     };
   }
 
+  function notionTerminalJob(overrides: Record<string, unknown> = {}) {
+    return notionRunningJob({
+      status: 'done',
+      finishedAt: Date.now(),
+      currentConversationId: undefined,
+      currentConversationTitle: '',
+      currentStage: 'done',
+      okCount: 1,
+      failCount: 0,
+      perConversation: [
+        {
+          conversationId: 11,
+          conversationTitle: 'Sync feedback chat',
+          ok: true,
+          mode: 'created',
+          appended: 1,
+          error: '',
+          at: Date.now(),
+        },
+      ],
+      ...overrides,
+    });
+  }
+
   function githubJob(overrides: Record<string, unknown> = {}) {
     return {
       provider: 'github',
@@ -321,6 +389,973 @@ describe('Conversations sync feedback', () => {
       ...overrides,
     };
   }
+
+  it('reads all four providers exactly once on initial mount and subscribes to storage once', async () => {
+    await renderFeedbackProbe();
+
+    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
+    expect(storageEventMocks.subscribe).toHaveBeenCalledTimes(1);
+    expect(storageEventMocks.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['notion', syncNotionConversations, getNotionSyncJobStatus],
+    ['obsidian', syncObsidianConversations, getObsidianSyncStatus],
+    ['feishu', syncFeishuConversations, getFeishuSyncStatus],
+    ['github', syncGithubConversations, getGithubSyncStatus],
+  ] as const)(
+    'converges a successful %s start with only the target provider status read',
+    async (provider, starter, getter) => {
+      starter.mockResolvedValue({ provider, started: true });
+      getter.mockResolvedValue({ provider, active: true, job: null, instanceId: `${provider}-test` });
+      await renderFeedbackProbe();
+      clearStatusGetterCalls();
+
+      await act(async () => {
+        await latestFeedback!.startSync(provider, [11]);
+        await flushMicrotasks();
+      });
+
+      expect(starter).toHaveBeenCalledWith([11]);
+      expectStatusGetterCalls({ [provider]: 1 });
+      expect(latestFeedback?.feedback).toMatchObject({ provider, phase: 'running' });
+    },
+  );
+
+  it('establishes Obsidian optimistic running state before the starter promise settles', async () => {
+    const starter = deferred<any>();
+    syncObsidianConversations.mockImplementation(() => starter.promise);
+    getObsidianSyncStatus.mockResolvedValue({
+      provider: 'obsidian',
+      active: true,
+      job: null,
+      instanceId: 'obsidian-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    let startPromise!: Promise<any>;
+    act(() => {
+      startPromise = latestFeedback!.startSync('obsidian', [11]);
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'obsidian', phase: 'running', total: 1, done: 0 });
+    expectStatusGetterCalls({});
+
+    starter.resolve({ provider: 'obsidian', started: true });
+    await act(async () => {
+      await startPromise;
+      await flushMicrotasks();
+    });
+    expectStatusGetterCalls({ obsidian: 1 });
+  });
+
+  it('consumes a running SyncJob storage payload directly, normalizes provider by key, and keeps one listener subscription', async () => {
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const listener = storageEventMocks.listener;
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: {
+        newValue: notionRunningJob({
+          provider: 'github',
+          totalCount: 4,
+          conversationIds: [],
+          okCount: 2,
+          currentConversationTitle: 'Storage progress one',
+        }),
+      },
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      total: 4,
+      done: 2,
+      currentConversationTitle: 'Storage progress one',
+    });
+    expectStatusGetterCalls({});
+    expect(storageEventMocks.subscribe).toHaveBeenCalledTimes(1);
+    expect(storageEventMocks.listener).toBe(listener);
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: {
+        newValue: notionRunningJob({
+          provider: undefined,
+          totalCount: 4,
+          conversationIds: [],
+          okCount: 3,
+          currentConversationTitle: 'Storage progress two',
+        }),
+      },
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      total: 4,
+      done: 3,
+      currentConversationTitle: 'Storage progress two',
+    });
+    expectStatusGetterCalls({});
+    expect(storageEventMocks.subscribe).toHaveBeenCalledTimes(1);
+    expect(storageEventMocks.unsubscribe).not.toHaveBeenCalled();
+    expect(storageEventMocks.listener).toBe(listener);
+  });
+
+  it('uses synchronously committed refs across consecutive storage events without waiting for a React effect', async () => {
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const listener = storageEventMocks.listener!;
+
+    await act(async () => {
+      listener(
+        {
+          [SYNC_JOB_STORAGE_KEYS.notion]: {
+            newValue: notionRunningJob({ totalCount: 2, currentConversationTitle: 'First durable observation' }),
+          },
+        },
+        'local',
+      );
+      listener(
+        {
+          [SYNC_JOB_STORAGE_KEYS.notion]: {
+            newValue: notionRunningJob({
+              totalCount: 2,
+              okCount: 1,
+              currentConversationTitle: 'Second durable observation',
+            }),
+          },
+        },
+        'local',
+      );
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      done: 1,
+      currentConversationTitle: 'Second durable observation',
+    });
+    expectStatusGetterCalls({});
+  });
+
+  it('does not let a non-current running storage event steal the preferred live provider or trigger a getter', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      instanceId: 'notion-test',
+      job: notionRunningJob({ currentConversationTitle: 'Preferred Notion' }),
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.github]: {
+        newValue: githubJob({ currentConversationTitle: 'Should stay hidden', updatedAt: Date.now() + 10_000 }),
+      },
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      currentConversationTitle: 'Preferred Notion',
+    });
+    expectStatusGetterCalls({});
+  });
+
+  it('keeps fixed scan order when multiple providers are active without comparable durable running jobs', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: null,
+      instanceId: 'notion-test',
+    });
+    getObsidianSyncStatus.mockResolvedValue({
+      provider: 'obsidian',
+      active: true,
+      job: null,
+      instanceId: 'obsidian-test',
+    });
+    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: true, job: null, instanceId: 'feishu-test' });
+    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: true, job: null, instanceId: 'github-test' });
+
+    await renderFeedbackProbe();
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'running' });
+  });
+
+  it('treats an idle terminal storage event as a transition boundary until ownership is confirmed inactive', async () => {
+    const terminal = notionTerminalJob();
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
+
+    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'running' });
+    expect(latestFeedback?.feedback.summary).toBeNull();
+
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+    expect(latestFeedback?.feedback.summary).not.toBeNull();
+  });
+
+  it('keeps a terminal storage seed pending when its status getter fails without a trusted inactive fact', async () => {
+    const terminal = notionTerminalJob();
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockRejectedValue(new Error('notion status unavailable'));
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
+
+    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'running', summary: null });
+
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+  });
+
+  it('does not resurrect a terminal seed when the handoff getter successfully reports canonical clear', async () => {
+    const terminal = notionTerminalJob();
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: notionRunningJob({ currentConversationTitle: 'Before terminal' }) },
+    });
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' })
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: null, instanceId: 'notion-test' });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+    expect(latestFeedback?.feedback.summary).toBeNull();
+  });
+
+  it('uses a terminal seed only when inactive ownership was already observed and the handoff getter then rejects', async () => {
+    const terminal = notionTerminalJob();
+    await renderFeedbackProbe();
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: notionRunningJob({ currentConversationTitle: 'Before terminal' }) },
+    });
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' })
+      .mockRejectedValueOnce(new Error('handoff read failed'));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+    expect(latestFeedback?.feedback.summary).not.toBeNull();
+  });
+
+  it('keeps the preferred live provider when its terminal durable write arrives before ownership settles, then hands off', async () => {
+    const terminal = notionTerminalJob();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ currentConversationTitle: 'Notion still owns' }),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      active: true,
+      job: githubJob({ currentConversationTitle: 'Hidden GitHub' }),
+      instanceId: 'github-test',
+    });
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      currentConversationTitle: 'Notion still owns',
+    });
+
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'github',
+      phase: 'running',
+      currentConversationTitle: 'Hidden GitHub',
+    });
+  });
+
+  it('blocks handoff to another active provider while the preferred live provider status is unknown', async () => {
+    const terminal = notionTerminalJob();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ currentConversationTitle: 'Notion preferred' }),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockRejectedValueOnce(new Error('notion status unavailable'));
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      active: true,
+      job: githubJob({ currentConversationTitle: 'GitHub must wait' }),
+      instanceId: 'github-test',
+    });
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      currentConversationTitle: 'Notion preferred',
+    });
+
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'github', phase: 'running' });
+  });
+
+  it('ignores a non-current terminal clear but rescans when the visible terminal provider is cleared', async () => {
+    const terminal = notionTerminalJob();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+    clearStatusGetterCalls();
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.github]: { newValue: null } });
+    expectStatusGetterCalls({});
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: null,
+      instanceId: 'notion-test',
+    });
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: null } });
+    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+  });
+
+  it.each(['terminal-first', 'running-first'] as const)(
+    'arbitrates a multi-key current-terminal plus other-running event independently of key order: %s',
+    async (order) => {
+      const terminal = notionTerminalJob();
+      getNotionSyncJobStatus.mockResolvedValue({
+        provider: 'notion',
+        active: true,
+        job: notionRunningJob({ currentConversationTitle: 'Current Notion' }),
+        instanceId: 'notion-test',
+      });
+      await renderFeedbackProbe();
+      clearStatusGetterCalls();
+      getNotionSyncJobStatus.mockResolvedValue({
+        provider: 'notion',
+        active: false,
+        job: terminal,
+        instanceId: 'notion-test',
+      });
+      getGithubSyncStatus.mockResolvedValue({
+        provider: 'github',
+        active: true,
+        job: githubJob({ currentConversationTitle: 'Surviving GitHub' }),
+        instanceId: 'github-test',
+      });
+      const terminalChange = [SYNC_JOB_STORAGE_KEYS.notion, { newValue: terminal }] as const;
+      const runningChange = [SYNC_JOB_STORAGE_KEYS.github, { newValue: githubJob() }] as const;
+      const entries = order === 'terminal-first' ? [terminalChange, runningChange] : [runningChange, terminalChange];
+
+      await emitStorageChanges(Object.fromEntries(entries));
+
+      expect(latestFeedback?.feedback).toMatchObject({
+        provider: 'github',
+        phase: 'running',
+        currentConversationTitle: 'Surviving GitHub',
+      });
+    },
+  );
+
+  it('does not overlap the 500ms active poll while an earlier poll is still pending', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob(),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const poll = deferred<any>();
+    getNotionSyncJobStatus.mockImplementation(() => poll.promise);
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+    });
+    expectStatusGetterCalls({ notion: 1 });
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_500);
+      await flushMicrotasks();
+    });
+    expectStatusGetterCalls({ notion: 1 });
+
+    poll.resolve({ provider: 'notion', active: true, job: notionRunningJob(), instanceId: 'notion-test' });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+  });
+
+  it('does not let a delayed poll roll back a newer direct durable storage observation', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ currentConversationTitle: 'Initial' }),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const oldPoll = deferred<any>();
+    getNotionSyncJobStatus.mockImplementation(() => oldPoll.promise);
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+    });
+    expectStatusGetterCalls({ notion: 1 });
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: {
+        newValue: notionRunningJob({ currentConversationTitle: 'New durable observation', okCount: 2, totalCount: 3 }),
+      },
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ currentConversationTitle: 'New durable observation', done: 2 });
+
+    oldPoll.resolve({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ currentConversationTitle: 'Old poll response', okCount: 0, totalCount: 3 }),
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ currentConversationTitle: 'New durable observation', done: 2 });
+  });
+
+  it('suppresses interval polling while a handoff full scan remains pending beyond 500ms', async () => {
+    const terminal = notionTerminalJob();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob(),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const handoffRead = deferred<any>();
+    getNotionSyncJobStatus.mockImplementationOnce(() => handoffRead.promise);
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
+    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_500);
+      await flushMicrotasks();
+    });
+    expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(1);
+
+    handoffRead.resolve({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+  });
+
+  it('lets a newer storage event replace an older handoff without the old settle clearing the new identity', async () => {
+    const firstTerminal = notionTerminalJob({ id: 'terminal-one', updatedAt: Date.now() });
+    const secondTerminal = notionTerminalJob({ id: 'terminal-two', updatedAt: Date.now() + 1 });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob(),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const firstRead = deferred<any>();
+    const secondRead = deferred<any>();
+    getNotionSyncJobStatus
+      .mockImplementationOnce(() => firstRead.promise)
+      .mockImplementationOnce(() => secondRead.promise);
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: firstTerminal } });
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: secondTerminal } });
+    expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(2);
+
+    firstRead.resolve({ provider: 'notion', active: false, job: firstTerminal, instanceId: 'notion-test' });
+    await act(async () => {
+      await flushMicrotasks();
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+    });
+    expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(2);
+
+    secondRead.resolve({ provider: 'notion', active: false, job: secondTerminal, instanceId: 'notion-test' });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback.summary?.jobId).toBe('terminal-two');
+  });
+
+  it('keeps Obsidian attached through active=true with no durable job after structured sync_already_running, then settles', async () => {
+    const conflict: any = new Error('sync already in progress');
+    conflict.code = 'sync_already_running';
+    conflict.extra = { code: 'sync_already_running' };
+    syncObsidianConversations.mockRejectedValue(conflict);
+    getObsidianSyncStatus.mockResolvedValue({
+      provider: 'obsidian',
+      active: true,
+      job: null,
+      instanceId: 'obsidian-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    await act(async () => {
+      await latestFeedback!.startSync('obsidian', [11]);
+      await flushMicrotasks();
+    });
+
+    expect(syncObsidianConversations).toHaveBeenCalledTimes(1);
+    expectStatusGetterCalls({ obsidian: 1 });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'obsidian', phase: 'running', summary: null });
+
+    clearStatusGetterCalls();
+    getObsidianSyncStatus.mockResolvedValue({
+      provider: 'obsidian',
+      active: false,
+      job: null,
+      instanceId: 'obsidian-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+  });
+
+  it('normalizes all running keys in one storage event and adopts by stable order without status RPCs', async () => {
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.github]: { newValue: githubJob({ currentConversationTitle: 'GitHub same event' }) },
+      [SYNC_JOB_STORAGE_KEYS.notion]: {
+        newValue: notionRunningJob({ currentConversationTitle: 'Notion same event', provider: 'github' }),
+      },
+    });
+
+    expectStatusGetterCalls({});
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      currentConversationTitle: 'Notion same event',
+    });
+  });
+
+  it('lets a durable running event replace a local failure and later settles it when status proves it is residue', async () => {
+    syncNotionConversations.mockRejectedValue(new Error('local notion failure'));
+    await renderFeedbackProbe();
+    await act(async () => {
+      await expect(latestFeedback!.startSync('notion', [11])).rejects.toThrow('local notion failure');
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'failed', summary: null });
+    clearStatusGetterCalls();
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.github]: { newValue: githubJob({ currentConversationTitle: 'Tentative GitHub' }) },
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'github', phase: 'running' });
+    expectStatusGetterCalls({});
+
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      active: false,
+      job: githubJob({ currentConversationTitle: 'Residue GitHub' }),
+      instanceId: 'github-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+  });
+
+  it('does not let a delayed known-provider response roll back a newer storage progress observation', async () => {
+    const knownRead = deferred<any>();
+    syncNotionConversations.mockResolvedValue({ provider: 'notion', started: true });
+    getNotionSyncJobStatus.mockImplementation(() => knownRead.promise);
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    let startPromise!: Promise<any>;
+    await act(async () => {
+      startPromise = latestFeedback!.startSync('notion', [11]);
+      await flushMicrotasks();
+    });
+    expectStatusGetterCalls({ notion: 1 });
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: {
+        newValue: notionRunningJob({
+          totalCount: 3,
+          okCount: 2,
+          currentConversationTitle: 'Newer storage progress',
+        }),
+      },
+    });
+
+    knownRead.resolve({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ totalCount: 3, okCount: 0, currentConversationTitle: 'Older known read' }),
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      await startPromise;
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ currentConversationTitle: 'Newer storage progress', done: 2 });
+  });
+
+  it('does not let an older running poll revive state after a terminal storage event has already settled', async () => {
+    const terminal = notionTerminalJob();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ currentConversationTitle: 'Before terminal' }),
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+    const oldPoll = deferred<any>();
+    getNotionSyncJobStatus
+      .mockImplementationOnce(() => oldPoll.promise)
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+    });
+    expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(1);
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+
+    oldPoll.resolve({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ currentConversationTitle: 'Stale running poll' }),
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+  });
+
+  it('does not let a non-current terminal storage event replace the visible durable terminal', async () => {
+    const notionTerminal = notionTerminalJob({ id: 'notion-visible' });
+    const githubTerminal = githubJob({
+      id: 'github-hidden',
+      status: 'done',
+      finishedAt: Date.now(),
+      currentConversationId: undefined,
+      currentConversationTitle: '',
+      currentStage: 'done',
+      okCount: 1,
+    });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: notionTerminal,
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.github]: { newValue: githubTerminal } });
+
+    expectStatusGetterCalls({});
+    expect(latestFeedback?.feedback.summary?.jobId).toBe('notion-visible');
+    expect(latestFeedback?.feedback.provider).toBe('notion');
+  });
+
+  it('lets a non-current running durable event supersede an old visible terminal without a status read', async () => {
+    const terminal = notionTerminalJob({ id: 'notion-old-terminal' });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.github]: { newValue: githubJob({ currentConversationTitle: 'New GitHub run' }) },
+    });
+
+    expectStatusGetterCalls({});
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'github',
+      phase: 'running',
+      currentConversationTitle: 'New GitHub run',
+    });
+  });
+
+  it('hands off a cleared visible terminal to a surviving active provider and keeps the same storage subscription', async () => {
+    const terminal = notionTerminalJob();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await renderFeedbackProbe();
+    const listener = storageEventMocks.listener;
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: null,
+      instanceId: 'notion-test',
+    });
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      active: true,
+      job: githubJob({ currentConversationTitle: 'Surviving after clear' }),
+      instanceId: 'github-test',
+    });
+
+    await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: null } });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'github',
+      phase: 'running',
+      currentConversationTitle: 'Surviving after clear',
+    });
+    expect(storageEventMocks.subscribe).toHaveBeenCalledTimes(1);
+    expect(storageEventMocks.unsubscribe).not.toHaveBeenCalled();
+    expect(storageEventMocks.listener).toBe(listener);
+  });
+
+  it('keeps polling through active=true with a terminal job and only exposes terminal after a later inactive observation', async () => {
+    const terminal = notionTerminalJob();
+    await renderFeedbackProbe();
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: notionRunningJob({ currentConversationTitle: 'Live progress' }) },
+    });
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: true,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+    });
+    expectStatusGetterCalls({ notion: 1 });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'running', summary: null });
+
+    clearStatusGetterCalls();
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      active: false,
+      job: terminal,
+      instanceId: 'notion-test',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
+  });
+
+  it.each([
+    ['notion', syncNotionConversations, getNotionSyncJobStatus],
+    ['obsidian', syncObsidianConversations, getObsidianSyncStatus],
+    ['feishu', syncFeishuConversations, getFeishuSyncStatus],
+    ['github', syncGithubConversations, getGithubSyncStatus],
+  ] as const)(
+    'attaches %s conflict with only the target status read even before durable progress exists',
+    async (provider, starter, getter) => {
+      const conflict: any = new Error('sync already in progress');
+      conflict.code = 'sync_already_running';
+      conflict.extra = { code: 'sync_already_running' };
+      starter.mockRejectedValue(conflict);
+      getter.mockResolvedValue({ provider, active: true, job: null, instanceId: `${provider}-test` });
+      await renderFeedbackProbe();
+      clearStatusGetterCalls();
+
+      await act(async () => {
+        await latestFeedback!.startSync(provider, [11]);
+        await flushMicrotasks();
+      });
+
+      expectStatusGetterCalls({ [provider]: 1 });
+      expect(latestFeedback?.feedback).toMatchObject({ provider, phase: 'running', summary: null });
+    },
+  );
+
+  it('drops an older initial full-scan response after a newer durable storage observation arrives', async () => {
+    const oldMountRead = deferred<any>();
+    getNotionSyncJobStatus.mockImplementationOnce(() => oldMountRead.promise);
+    await renderFeedbackProbe();
+    expect(storageEventMocks.listener).toBeTruthy();
+
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: {
+        newValue: notionRunningJob({ totalCount: 3, okCount: 2, currentConversationTitle: 'Durable wins' }),
+      },
+    });
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      done: 2,
+      currentConversationTitle: 'Durable wins',
+    });
+
+    oldMountRead.resolve({
+      provider: 'notion',
+      active: true,
+      job: notionRunningJob({ totalCount: 3, okCount: 0, currentConversationTitle: 'Stale mount' }),
+      instanceId: 'old-mount',
+    });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({ done: 2, currentConversationTitle: 'Durable wins' });
+  });
+
+  it('settles a known-provider ACK when its targeted status proves the durable running job is only residue', async () => {
+    syncGithubConversations.mockResolvedValue({ provider: 'github', started: true });
+    getGithubSyncStatus.mockResolvedValue({
+      provider: 'github',
+      active: false,
+      job: githubJob({ currentConversationTitle: 'Ownerless residue' }),
+      instanceId: 'github-test',
+    });
+    await renderFeedbackProbe();
+    clearStatusGetterCalls();
+
+    await act(async () => {
+      await latestFeedback!.startSync('github', [11]);
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(getGithubSyncStatus).toHaveBeenCalledTimes(2);
+    expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(1);
+    expect(getObsidianSyncStatus).toHaveBeenCalledTimes(1);
+    expect(getFeishuSyncStatus).toHaveBeenCalledTimes(1);
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+  });
 
   it('shows running progress and then success summary', async () => {
     const run = deferred<any>();

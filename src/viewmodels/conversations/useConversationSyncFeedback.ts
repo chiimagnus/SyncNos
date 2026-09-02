@@ -14,7 +14,7 @@ import {
   syncNotionConversations as defaultSyncNotionConversations,
   syncObsidianConversations as defaultSyncObsidianConversations,
 } from '@services/sync/repo';
-import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
+import { normalizeSyncJobSnapshot, SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { storageOnChanged } from '@services/shared/storage';
 import type {
   SyncFailureSummary,
@@ -64,6 +64,11 @@ type ActiveRun = {
   provider: SyncProvider;
   token: number;
 };
+
+const SYNC_PROVIDER_SCAN_ORDER: readonly SyncProvider[] = ['notion', 'obsidian', 'feishu', 'github'];
+const SYNC_PROVIDER_BY_STORAGE_KEY = new Map<string, SyncProvider>(
+  SYNC_PROVIDER_SCAN_ORDER.map((provider) => [SYNC_JOB_STORAGE_KEYS[provider], provider]),
+);
 
 const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
   provider: null,
@@ -352,122 +357,44 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const observationGenerationRef = useRef(0);
   const activeRunRef = useRef<ActiveRun | null>(null);
   const feedbackRef = useRef<ConversationSyncFeedbackState>(IDLE_FEEDBACK);
+  const handoffInFlightRef = useRef<symbol | null>(null);
+  const activePollInFlightRef = useRef<Promise<void> | null>(null);
 
-  useEffect(() => {
-    activeRunRef.current = activeRun;
-  }, [activeRun]);
+  const commitFeedback = useCallback((next: ConversationSyncFeedbackState) => {
+    feedbackRef.current = next;
+    setFeedback(next);
+  }, []);
 
-  useEffect(() => {
-    feedbackRef.current = feedback;
-  }, [feedback]);
+  const commitActiveRun = useCallback((next: ActiveRun | null) => {
+    activeRunRef.current = next;
+    setActiveRun(next);
+  }, []);
 
-  const refreshFromBackground = useCallback(
-    async (preferredProvider?: SyncProvider | null) => {
-      const generation = observationGenerationRef.current;
-      const read = async (
-        provider: SyncProvider,
-        getter: () => Promise<SyncJobStatusResponse>,
-      ): Promise<StatusReadOutcome> => {
-        try {
-          const status = await getter();
-          return {
-            ok: true,
-            observation: { provider, active: status.active === true, job: status.job ?? null },
-          };
-        } catch (_error) {
-          return { ok: false, provider };
-        }
-      };
-      const outcomes = await Promise.all([
-        read('notion', getNotionSyncJobStatus),
-        read('obsidian', getObsidianSyncStatus),
-        read('feishu', getFeishuSyncStatus),
-        read('github', getGithubSyncStatus),
-      ]);
-      if (disposedRef.current || observationGenerationRef.current !== generation) return null;
-
-      const preferredReadFailed =
-        preferredProvider != null && outcomes.some((outcome) => !outcome.ok && outcome.provider === preferredProvider);
-      if (
-        preferredReadFailed &&
-        activeRunRef.current?.provider === preferredProvider &&
-        feedbackRef.current.phase === 'running'
-      ) {
-        return null;
-      }
-
-      const observations = outcomes
-        .filter((outcome): outcome is Extract<StatusReadOutcome, { ok: true }> => outcome.ok)
-        .map((outcome) => outcome.observation);
-      const selected = pickPrimaryObservation(observations, preferredProvider);
-
-      if (selected?.active) {
-        let nextRun = activeRunRef.current;
-        if (nextRun?.provider !== selected.provider) {
-          const token = runTokenRef.current + 1;
-          runTokenRef.current = token;
-          nextRun = { provider: selected.provider, token };
-          activeRunRef.current = nextRun;
-          setActiveRun(nextRun);
-        }
-        const current = feedbackRef.current;
-        const nextFeedback =
-          selected.job?.status === 'running'
-            ? toFeedbackFromJob(selected.job)
-            : current.phase === 'running' && current.provider === selected.provider
-              ? current
-              : toGenericRunningFeedback(selected.provider);
-        feedbackRef.current = nextFeedback;
-        setFeedback(nextFeedback);
-        return selected.job;
-      }
-
-      if (selected?.job && selected.job.status !== 'running') {
-        runTokenRef.current += 1;
-        activeRunRef.current = null;
-        setActiveRun(null);
-        const nextFeedback = toFeedbackFromJob(selected.job);
-        feedbackRef.current = nextFeedback;
-        setFeedback(nextFeedback);
-        return selected.job;
-      }
-
-      if (activeRunRef.current && feedbackRef.current.phase === 'running') {
-        runTokenRef.current += 1;
-        activeRunRef.current = null;
-        setActiveRun(null);
-      }
-      if (feedbackRef.current.phase === 'failed' && feedbackRef.current.summary == null) return null;
-      feedbackRef.current = IDLE_FEEDBACK;
-      setFeedback(IDLE_FEEDBACK);
-      return null;
+  const ensureActiveRun = useCallback(
+    (provider: SyncProvider): ActiveRun => {
+      const current = activeRunRef.current;
+      if (current?.provider === provider) return current;
+      const token = runTokenRef.current + 1;
+      runTokenRef.current = token;
+      const next = { provider, token };
+      commitActiveRun(next);
+      return next;
     },
-    [getNotionSyncJobStatus, getObsidianSyncStatus, getFeishuSyncStatus, getGithubSyncStatus],
+    [commitActiveRun],
   );
 
-  useEffect(() => {
-    disposedRef.current = false;
-    void refreshFromBackground();
-    return () => {
-      disposedRef.current = true;
-    };
-  }, [refreshFromBackground]);
+  const clearActiveRun = useCallback(() => {
+    runTokenRef.current += 1;
+    commitActiveRun(null);
+  }, [commitActiveRun]);
 
-  useEffect(() => {
-    const watchedKeys = new Set(Object.values(SYNC_JOB_STORAGE_KEYS));
-    return storageOnChanged((changes, areaName) => {
-      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
-      const changed = Object.keys(changes).some((key) => watchedKeys.has(key));
-      if (!changed) return;
-      void refreshFromBackground(feedback.provider);
-    });
-  }, [feedback.provider, refreshFromBackground]);
+  const advanceObservationGeneration = useCallback(() => {
+    observationGenerationRef.current += 1;
+    return observationGenerationRef.current;
+  }, []);
 
-  useEffect(() => {
-    if (!activeRun) return;
-    const token = activeRun.token;
-    const provider = activeRun.provider;
-    const getStatus = (() => {
+  const getStatusGetter = useCallback(
+    (provider: SyncProvider): (() => Promise<SyncJobStatusResponse>) => {
       switch (provider) {
         case 'notion':
           return getNotionSyncJobStatus;
@@ -480,57 +407,303 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         default:
           return assertNever(provider);
       }
-    })();
-    let disposed = false;
+    },
+    [getNotionSyncJobStatus, getObsidianSyncStatus, getFeishuSyncStatus, getGithubSyncStatus],
+  );
 
-    const poll = async () => {
+  const readProviderStatus = useCallback(
+    async (provider: SyncProvider): Promise<StatusReadOutcome> => {
       try {
-        const status = await getStatus();
-        if (disposed || disposedRef.current || runTokenRef.current !== token) return;
-        if (status.active === true) {
-          if (status.job?.status === 'running') {
-            const nextFeedback = toFeedbackFromJob(status.job);
-            feedbackRef.current = nextFeedback;
-            setFeedback(nextFeedback);
+        const status = await getStatusGetter(provider)();
+        return {
+          ok: true,
+          observation: { provider, active: status.active === true, job: status.job ?? null },
+        };
+      } catch (_error) {
+        return { ok: false, provider };
+      }
+    },
+    [getStatusGetter],
+  );
+
+  const commitLiveObservation = useCallback(
+    (observation: StatusObservation) => {
+      ensureActiveRun(observation.provider);
+      const current = feedbackRef.current;
+      if (observation.job?.status === 'running') {
+        commitFeedback(toFeedbackFromJob(observation.job));
+        return;
+      }
+      if (current.phase === 'running' && current.provider === observation.provider) return;
+      commitFeedback(toGenericRunningFeedback(observation.provider));
+    },
+    [commitFeedback, ensureActiveRun],
+  );
+
+  type FullScanOptions = {
+    preferredProvider?: SyncProvider | null;
+    terminalSeed?: SyncJobSnapshot | null;
+    trustedInactiveProvider?: SyncProvider | null;
+  };
+
+  const runFullScan = useCallback(
+    async (options: FullScanOptions = {}) => {
+      const generation = advanceObservationGeneration();
+      const outcomes = await Promise.all(SYNC_PROVIDER_SCAN_ORDER.map((provider) => readProviderStatus(provider)));
+      if (disposedRef.current || observationGenerationRef.current !== generation) return null;
+
+      const preferredProvider = options.preferredProvider ?? null;
+      const preferredReadFailed =
+        preferredProvider != null && outcomes.some((outcome) => !outcome.ok && outcome.provider === preferredProvider);
+      const hasTrustedPreferredInactive =
+        preferredProvider != null && options.trustedInactiveProvider === preferredProvider;
+      if (
+        preferredReadFailed &&
+        !hasTrustedPreferredInactive &&
+        activeRunRef.current?.provider === preferredProvider &&
+        feedbackRef.current.phase === 'running'
+      ) {
+        return null;
+      }
+
+      const observations = outcomes
+        .filter((outcome): outcome is Extract<StatusReadOutcome, { ok: true }> => outcome.ok)
+        .map((outcome) => outcome.observation);
+
+      const terminalSeed = options.terminalSeed;
+      if (terminalSeed && terminalSeed.status !== 'running') {
+        const seedProvider = terminalSeed.provider;
+        const seedOutcome = outcomes.find(
+          (outcome) => (outcome.ok ? outcome.observation.provider : outcome.provider) === seedProvider,
+        );
+        if (seedOutcome && !seedOutcome.ok) {
+          if (options.trustedInactiveProvider === seedProvider) {
+            observations.push({ provider: seedProvider, active: false, job: terminalSeed });
+          } else {
+            ensureActiveRun(seedProvider);
+            const current = feedbackRef.current;
+            if (!(current.phase === 'running' && current.provider === seedProvider)) {
+              commitFeedback(toGenericRunningFeedback(seedProvider));
+            }
+            return null;
           }
+        }
+      }
+
+      const selected = pickPrimaryObservation(observations, preferredProvider);
+      if (selected?.active) {
+        commitLiveObservation(selected);
+        return selected.job;
+      }
+
+      if (selected?.job && selected.job.status !== 'running') {
+        clearActiveRun();
+        commitFeedback(toFeedbackFromJob(selected.job));
+        return selected.job;
+      }
+
+      if (activeRunRef.current) clearActiveRun();
+      if (feedbackRef.current.phase === 'failed' && feedbackRef.current.summary == null) return null;
+      commitFeedback(IDLE_FEEDBACK);
+      return null;
+    },
+    [
+      advanceObservationGeneration,
+      clearActiveRun,
+      commitFeedback,
+      commitLiveObservation,
+      ensureActiveRun,
+      readProviderStatus,
+    ],
+  );
+
+  const startHandoff = useCallback(
+    (options: FullScanOptions = {}) => {
+      const identity = Symbol('sync-handoff');
+      handoffInFlightRef.current = identity;
+      const promise = runFullScan(options);
+      void promise.finally(() => {
+        if (handoffInFlightRef.current === identity) handoffInFlightRef.current = null;
+      });
+      return promise;
+    },
+    [runFullScan],
+  );
+
+  const convergeKnownProvider = useCallback(
+    async (provider: SyncProvider) => {
+      const generation = advanceObservationGeneration();
+      const outcome = await readProviderStatus(provider);
+      if (disposedRef.current || observationGenerationRef.current !== generation) return null;
+      if (!outcome.ok) return null;
+
+      const observation = outcome.observation;
+      if (observation.active) {
+        commitLiveObservation(observation);
+        return observation.job;
+      }
+
+      if (observation.job && observation.job.status !== 'running') {
+        return startHandoff({
+          preferredProvider: provider,
+          terminalSeed: observation.job,
+          trustedInactiveProvider: provider,
+        });
+      }
+      return startHandoff({ preferredProvider: provider, trustedInactiveProvider: provider });
+    },
+    [advanceObservationGeneration, commitLiveObservation, readProviderStatus, startHandoff],
+  );
+
+  useEffect(() => {
+    disposedRef.current = false;
+    void runFullScan();
+    return () => {
+      disposedRef.current = true;
+      observationGenerationRef.current += 1;
+      handoffInFlightRef.current = null;
+      activePollInFlightRef.current = null;
+    };
+  }, [runFullScan]);
+
+  useEffect(() => {
+    return storageOnChanged((changes, areaName) => {
+      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
+
+      const changedByProvider = new Map<SyncProvider, SyncJobSnapshot | null>();
+      for (const [key, change] of Object.entries(changes as Record<string, any>)) {
+        const provider = SYNC_PROVIDER_BY_STORAGE_KEY.get(key) ?? null;
+        if (!provider) continue;
+        changedByProvider.set(provider, normalizeSyncJobSnapshot(provider, (change as any)?.newValue));
+      }
+      if (!changedByProvider.size) return;
+
+      advanceObservationGeneration();
+      // The durable event supersedes any older handoff read. Its promise may still settle,
+      // but generation + identity checks prevent it from committing or clearing newer work.
+      handoffInFlightRef.current = null;
+
+      const changed = SYNC_PROVIDER_SCAN_ORDER.filter((provider) => changedByProvider.has(provider)).map(
+        (provider) => ({ provider, job: changedByProvider.get(provider) ?? null }),
+      );
+      const current = feedbackRef.current;
+
+      if (current.phase === 'running' && current.provider) {
+        const ownChange = changed.find((item) => item.provider === current.provider);
+        if (!ownChange) return;
+        if (ownChange.job?.status === 'running') {
+          ensureActiveRun(current.provider);
+          commitFeedback(toFeedbackFromJob(ownChange.job));
           return;
         }
-        await refreshFromBackground(provider);
-      } catch (_error) {
-        // A failed status read is not equivalent to active=false; keep the current run and retry.
+        if (ownChange.job) {
+          void startHandoff({ preferredProvider: current.provider, terminalSeed: ownChange.job });
+          return;
+        }
+        void startHandoff({ preferredProvider: current.provider });
+        return;
       }
+
+      const runningChange = changed.find((item) => item.job?.status === 'running');
+      if (runningChange?.job) {
+        ensureActiveRun(runningChange.provider);
+        commitFeedback(toFeedbackFromJob(runningChange.job));
+        return;
+      }
+
+      if (current.summary != null && current.provider) {
+        const ownChange = changed.find((item) => item.provider === current.provider);
+        if (!ownChange) return;
+        if (ownChange.job && ownChange.job.status !== 'running') {
+          void startHandoff({ preferredProvider: current.provider, terminalSeed: ownChange.job });
+          return;
+        }
+        if (!ownChange.job) void startHandoff({ preferredProvider: current.provider });
+        return;
+      }
+
+      const terminalChanges = changed
+        .filter((item) => item.job && item.job.status !== 'running')
+        .sort((left, right) => (Number(right.job?.updatedAt) || 0) - (Number(left.job?.updatedAt) || 0));
+      const terminal = terminalChanges[0];
+      if (terminal?.job) {
+        void startHandoff({ preferredProvider: terminal.provider, terminalSeed: terminal.job });
+        return;
+      }
+
+      if (
+        current.provider &&
+        changedByProvider.has(current.provider) &&
+        changedByProvider.get(current.provider) == null
+      ) {
+        void startHandoff({ preferredProvider: current.provider });
+      }
+    });
+  }, [advanceObservationGeneration, commitFeedback, ensureActiveRun, startHandoff]);
+
+  useEffect(() => {
+    if (!activeRun) return;
+    const token = activeRun.token;
+    const provider = activeRun.provider;
+    let disposed = false;
+
+    const launchPoll = () => {
+      if (disposed || disposedRef.current || handoffInFlightRef.current || activePollInFlightRef.current) return;
+      const generation = advanceObservationGeneration();
+      const promise = (async () => {
+        const outcome = await readProviderStatus(provider);
+        if (
+          disposed ||
+          disposedRef.current ||
+          runTokenRef.current !== token ||
+          observationGenerationRef.current !== generation
+        ) {
+          return;
+        }
+        if (!outcome.ok) return;
+
+        const observation = outcome.observation;
+        if (observation.active) {
+          if (observation.job?.status === 'running') commitFeedback(toFeedbackFromJob(observation.job));
+          return;
+        }
+
+        if (observation.job && observation.job.status !== 'running') {
+          await startHandoff({
+            preferredProvider: provider,
+            terminalSeed: observation.job,
+            trustedInactiveProvider: provider,
+          });
+          return;
+        }
+        await startHandoff({ preferredProvider: provider, trustedInactiveProvider: provider });
+      })();
+      activePollInFlightRef.current = promise;
+      void promise.finally(() => {
+        if (activePollInFlightRef.current === promise) activePollInFlightRef.current = null;
+      });
     };
 
-    void poll();
-    const timer = window.setInterval(() => {
-      void poll();
-    }, 500);
-
+    const timer = window.setInterval(launchPoll, 500);
     return () => {
       disposed = true;
       window.clearInterval(timer);
+      if (runTokenRef.current !== token) activePollInFlightRef.current = null;
     };
-  }, [
-    activeRun,
-    getNotionSyncJobStatus,
-    getObsidianSyncStatus,
-    getFeishuSyncStatus,
-    getGithubSyncStatus,
-    refreshFromBackground,
-  ]);
+  }, [activeRun, advanceObservationGeneration, commitFeedback, readProviderStatus, startHandoff]);
 
   const clearFeedback = useCallback(() => {
-    const current = feedback;
+    const current = feedbackRef.current;
     if (current.phase === 'running') return;
-    observationGenerationRef.current += 1;
+    advanceObservationGeneration();
+    handoffInFlightRef.current = null;
+    activePollInFlightRef.current = null;
     if (!current.provider) {
-      feedbackRef.current = IDLE_FEEDBACK;
-      setFeedback(IDLE_FEEDBACK);
+      commitFeedback(IDLE_FEEDBACK);
       return;
     }
 
-    feedbackRef.current = IDLE_FEEDBACK;
-    setFeedback(IDLE_FEEDBACK);
+    commitFeedback(IDLE_FEEDBACK);
     const clear = (() => {
       switch (current.provider) {
         case 'notion':
@@ -547,100 +720,28 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     })();
     void clear()
       .catch(() => undefined)
-      .then(() => refreshFromBackground());
+      .then(() => startHandoff({ preferredProvider: current.provider }));
   }, [
+    advanceObservationGeneration,
     clearNotionSyncJobStatus,
     clearObsidianSyncStatus,
     clearFeishuSyncStatus,
     clearGithubSyncStatus,
-    feedback,
-    refreshFromBackground,
+    commitFeedback,
+    startHandoff,
   ]);
 
   const startSync = useCallback(
     async (provider: SyncProvider, conversationIds: number[]): Promise<SyncStartAck | null> => {
       const ids = normalizeIds(conversationIds);
       if (!ids.length) return null;
-      observationGenerationRef.current += 1;
-
-      if (provider === 'obsidian') {
-        const token = runTokenRef.current + 1;
-        runTokenRef.current = token;
-
-        try {
-          const ack = await syncObsidianConversations(ids);
-          if (disposedRef.current) return ack;
-
-          const nextRun: ActiveRun = { provider, token };
-          activeRunRef.current = nextRun;
-          setActiveRun(nextRun);
-
-          const runningFeedback: ConversationSyncFeedbackState = {
-            provider,
-            phase: 'running',
-            total: ids.length,
-            done: 0,
-            currentConversationId: null,
-            currentConversationTitle: '',
-            currentStage: 'preparing_queue',
-            failures: [],
-            warnings: [],
-            message: buildRunningMessage(provider, 0, ids.length),
-            updatedAt: Date.now(),
-            summary: null,
-          };
-          feedbackRef.current = runningFeedback;
-          setFeedback(runningFeedback);
-
-          await refreshFromBackground(provider);
-          return ack;
-        } catch (error) {
-          if (disposedRef.current) throw error;
-
-          const code = errorCode(error);
-          if (code === 'sync_already_running') {
-            await refreshFromBackground(provider);
-            return null;
-          }
-
-          const disabledByGate = code === 'sync_provider_disabled';
-          const failureText = disabledByGate
-            ? t('syncProviderDisabled')
-            : error instanceof Error
-              ? error.message
-              : String(error || 'sync failed');
-          const message = disabledByGate
-            ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
-            : toErrorMessage(provider, error);
-
-          observationGenerationRef.current += 1;
-          runTokenRef.current += 1;
-          activeRunRef.current = null;
-          setActiveRun((current) => (current?.token === token ? null : current));
-          const failedFeedback: ConversationSyncFeedbackState = {
-            provider,
-            phase: 'failed',
-            total: 0,
-            done: 0,
-            currentConversationId: null,
-            currentConversationTitle: '',
-            currentStage: '',
-            failures: [{ conversationId: 0, error: failureText }],
-            warnings: [],
-            message,
-            updatedAt: Date.now(),
-            summary: null,
-          };
-          feedbackRef.current = failedFeedback;
-          setFeedback(failedFeedback);
-          throw error;
-        }
-      }
 
       const starter = (() => {
         switch (provider) {
           case 'notion':
             return syncNotionConversations;
+          case 'obsidian':
+            return syncObsidianConversations;
           case 'feishu':
             return syncFeishuConversations;
           case 'github':
@@ -650,11 +751,13 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         }
       })();
 
+      advanceObservationGeneration();
+      handoffInFlightRef.current = null;
+      activePollInFlightRef.current = null;
       const token = runTokenRef.current + 1;
       runTokenRef.current = token;
       const nextRun: ActiveRun = { provider, token };
-      activeRunRef.current = nextRun;
-      setActiveRun(nextRun);
+      commitActiveRun(nextRun);
 
       const runningFeedback: ConversationSyncFeedbackState = {
         provider,
@@ -670,20 +773,19 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         updatedAt: Date.now(),
         summary: null,
       };
-      feedbackRef.current = runningFeedback;
-      setFeedback(runningFeedback);
+      commitFeedback(runningFeedback);
 
       try {
         const ack = await starter(ids);
         if (disposedRef.current) return ack;
-        await refreshFromBackground(provider);
+        await convergeKnownProvider(provider);
         return ack;
       } catch (error) {
         if (disposedRef.current) throw error;
 
         const code = errorCode(error);
         if (code === 'sync_already_running') {
-          await refreshFromBackground(provider);
+          await convergeKnownProvider(provider);
           return null;
         }
 
@@ -697,10 +799,10 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
           : toErrorMessage(provider, error);
 
-        observationGenerationRef.current += 1;
-        runTokenRef.current += 1;
-        activeRunRef.current = null;
-        setActiveRun((current) => (current?.token === token ? null : current));
+        advanceObservationGeneration();
+        handoffInFlightRef.current = null;
+        activePollInFlightRef.current = null;
+        if (activeRunRef.current?.token === token) clearActiveRun();
         const failedFeedback: ConversationSyncFeedbackState = {
           provider,
           phase: 'failed',
@@ -715,13 +817,16 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           updatedAt: Date.now(),
           summary: null,
         };
-        feedbackRef.current = failedFeedback;
-        setFeedback(failedFeedback);
+        commitFeedback(failedFeedback);
         throw error;
       }
     },
     [
-      refreshFromBackground,
+      advanceObservationGeneration,
+      clearActiveRun,
+      commitActiveRun,
+      commitFeedback,
+      convergeKnownProvider,
       syncNotionConversations,
       syncObsidianConversations,
       syncFeishuConversations,
