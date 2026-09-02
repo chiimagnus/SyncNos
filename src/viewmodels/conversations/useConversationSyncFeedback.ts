@@ -214,7 +214,11 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
     Array.isArray(job.perConversation) ? job.perConversation.length : 0,
     (Number(job.okCount) || 0) + (Number(job.failCount) || 0),
   );
-  const total = Math.max(completed, Array.isArray(job.conversationIds) ? job.conversationIds.length : 0);
+  const total = Math.max(
+    completed,
+    Number.isSafeInteger(job.totalCount) && Number(job.totalCount) >= 0 ? Number(job.totalCount) : 0,
+    Array.isArray(job.conversationIds) ? job.conversationIds.length : 0,
+  );
   const failures = toFailureSummariesFromRows(job.perConversation);
   const warnings = toWarningSummariesFromRows(job.perConversation);
 

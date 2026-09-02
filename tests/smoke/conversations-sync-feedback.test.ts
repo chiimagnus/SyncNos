@@ -395,6 +395,32 @@ describe('Conversations sync feedback', () => {
     expect(notionButton?.disabled).toBe(true);
   });
 
+  it('hydrates compact running progress from totalCount without durable queue or result rows', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: notionRunningJob({
+        totalCount: 5,
+        conversationIds: [],
+        currentConversationId: 22,
+        okCount: 2,
+        failCount: 1,
+        perConversation: [],
+      }),
+    });
+
+    await renderFeedbackProbe();
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      total: 5,
+      done: 3,
+      currentConversationId: 22,
+      currentConversationTitle: 'Current sync target',
+    });
+  });
+
   it('hydrates a reload-aborted notion job instead of keeping the running progress visible', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',

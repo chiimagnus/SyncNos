@@ -1,5 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
-import type { SyncJobSnapshot, SyncProvider } from '@services/sync/models';
+import type { SyncJobSnapshot, SyncPerConversationResult, SyncProvider, SyncWarning } from '@services/sync/models';
 
 const DEFAULT_STALE_MS = 5 * 60 * 1000;
 
@@ -10,51 +10,102 @@ export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
   github: 'github_sync_job_v1',
 };
 
-function normalizeConversationIds(ids: unknown): number[] {
-  if (!Array.isArray(ids)) return [];
-  return Array.from(new Set(ids.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)));
+function positiveSafeInteger(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
 }
 
-function normalizePerConversation(rows: unknown) {
+function nonNegativeSafeInteger(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number >= 0 ? number : null;
+}
+
+function nonNegativeFinite(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function normalizeConversationIds(ids: unknown): number[] {
+  if (!Array.isArray(ids)) return [];
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const value of ids) {
+    const id = positiveSafeInteger(value);
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function normalizeWarnings(value: unknown): SyncWarning[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((warning) => warning && typeof warning === 'object' && !Array.isArray(warning))
+    .map((warning) => {
+      const raw = warning as Record<string, unknown>;
+      return {
+        code: String(raw.code || '').trim(),
+        message: String(raw.message || '').trim(),
+        ...(raw.extra === undefined ? {} : { extra: raw.extra }),
+      };
+    });
+}
+
+function normalizePerConversation(rows: unknown): SyncPerConversationResult[] {
   if (!Array.isArray(rows)) return [];
-  return rows.map((row) => {
-    const value = row && typeof row === 'object' ? (row as Record<string, unknown>) : {};
-    return {
-      conversationId: Number(value.conversationId) || 0,
+  const out: SyncPerConversationResult[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const value = row as Record<string, unknown>;
+    const conversationId = positiveSafeInteger(value.conversationId);
+    if (conversationId == null) continue;
+    const appended = Number(value.appended);
+    out.push({
+      conversationId,
       conversationTitle: value.conversationTitle == null ? undefined : String(value.conversationTitle || ''),
       ok: value.ok === true,
       mode: String(value.mode || (value.ok === true ? 'ok' : 'failed')),
-      appended: Number(value.appended) || 0,
+      appended: Number.isFinite(appended) ? appended : 0,
       error: String(value.error || ''),
-      warnings: Array.isArray(value.warnings) ? value.warnings : undefined,
-      at: Number(value.at) || Date.now(),
-    };
-  });
+      warnings: normalizeWarnings(value.warnings),
+      at: nonNegativeFinite(value.at) ?? 0,
+    });
+  }
+  return out;
 }
 
-function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
-  if (!job || typeof job !== 'object') return null;
+export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
+  if (!job || typeof job !== 'object' || Array.isArray(job)) return null;
   const value = job as Record<string, unknown>;
+  const status = value.status;
+  if (status !== 'running' && status !== 'done' && status !== 'aborted') return null;
+
   const perConversation = normalizePerConversation(value.perConversation);
-  const okCount = Number(value.okCount);
-  const failCount = Number(value.failCount);
+  const startedAt = nonNegativeFinite(value.startedAt) ?? 0;
+  const finishedAt = value.finishedAt == null ? null : nonNegativeFinite(value.finishedAt);
+  const updatedAt = nonNegativeFinite(value.updatedAt) ?? Math.max(startedAt, finishedAt ?? 0);
+  const okCount = nonNegativeSafeInteger(value.okCount) ?? perConversation.filter((row) => row.ok).length;
+  const failCount = nonNegativeSafeInteger(value.failCount) ?? perConversation.filter((row) => !row.ok).length;
+  const totalCount = nonNegativeSafeInteger(value.totalCount);
+  const currentConversationId = positiveSafeInteger(value.currentConversationId);
+
   return {
     id: value.id == null ? undefined : String(value.id || ''),
     provider,
     instanceId: value.instanceId == null ? undefined : String(value.instanceId || ''),
-    status: String(value.status || 'done') as SyncJobSnapshot['status'],
-    startedAt: Number(value.startedAt) || 0,
-    updatedAt: Number(value.updatedAt) || Date.now(),
-    finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,
+    status,
+    startedAt,
+    updatedAt,
+    finishedAt,
+    ...(totalCount == null ? {} : { totalCount }),
     conversationIds: normalizeConversationIds(value.conversationIds),
-    currentConversationId: Number.isFinite(Number(value.currentConversationId))
-      ? Number(value.currentConversationId)
-      : undefined,
+    currentConversationId: currentConversationId ?? undefined,
     currentConversationTitle:
       value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),
     currentStage: value.currentStage == null ? undefined : String(value.currentStage || ''),
-    okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((row) => row.ok).length,
-    failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((row) => !row.ok).length,
+    okCount,
+    failCount,
     perConversation,
     abortedReason: value.abortedReason == null ? undefined : String(value.abortedReason || ''),
   };
