@@ -8,7 +8,7 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   attachOrphanArticleCommentsToConversation: vi.fn(),
   recordObsidianRemoteWrite: vi.fn(),
 }));
-const imageCacheMocks = vi.hoisted(() => ({ getImageCacheAssetById: vi.fn() }));
+const imageCacheMocks = vi.hoisted(() => ({ getImageCacheAssetsByIds: vi.fn() }));
 
 vi.mock('@services/conversations/background/storage', () => ({
   backgroundStorage: {
@@ -267,18 +267,37 @@ describe('obsidian-sync-orchestrator', () => {
       {
         messageKey: 'm1',
         sequence: 1,
-        contentMarkdown: 'before\n\n![diagram](<syncnos-asset://7> "caption")\n\nafter',
+        contentMarkdown:
+          'before\n\n![diagram](<syncnos-asset://7> "caption")\n\n![again](syncnos-asset://7)\n\n![photo](syncnos-asset://8)\n\nafter',
         updatedAt: 1,
       },
     ]);
-    imageCacheMocks.getImageCacheAssetById.mockResolvedValue({
-      id: 7,
-      conversationId: 1,
-      url: 'https://example.com/diagram.png',
-      blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
-      byteSize: 3,
-      contentType: 'image/png',
-    });
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
+      new Map([
+        [
+          7,
+          {
+            id: 7,
+            conversationId: 1,
+            url: 'https://example.com/diagram.png',
+            blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+            byteSize: 3,
+            contentType: 'image/png',
+          },
+        ],
+        [
+          8,
+          {
+            id: 8,
+            conversationId: 1,
+            url: 'https://example.com/photo.webp',
+            blob: new Blob([new Uint8Array([4, 5])], { type: 'image/webp' }),
+            byteSize: 2,
+            contentType: 'image/webp',
+          },
+        ],
+      ]),
+    );
 
     const seen: Array<{ method: string; url: string; body: unknown }> = [];
     // @ts-expect-error test global
@@ -303,15 +322,72 @@ describe('obsidian-sync-orchestrator', () => {
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(syncRes.results[0].ok).toBe(true);
-    expect(imageCacheMocks.getImageCacheAssetById).toHaveBeenCalledWith({ id: 7 });
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8] });
 
-    const encodedAttachmentName = encodeURIComponent(`${noteBasename}-1.png`);
+    const encodedAttachmentNames = [
+      encodeURIComponent(`${noteBasename}-1.png`),
+      encodeURIComponent(`${noteBasename}-2.webp`),
+    ];
+    const binaryPuts = seen.filter(
+      (call) => call.method === 'PUT' && encodedAttachmentNames.some((name) => call.url.endsWith(name)),
+    );
+    expect(binaryPuts.map((call) => call.url.split('/').at(-1))).toEqual(encodedAttachmentNames);
     const encodedNoteName = encodeURIComponent(`${noteBasename}.md`);
-    const binaryPut = seen.find((call) => call.method === 'PUT' && call.url.endsWith(encodedAttachmentName));
-    expect(binaryPut?.url).toContain(`/vault/SyncNos-AIChats/${encodedAttachmentName}`);
     const markdownPut = seen.find((call) => call.method === 'PUT' && call.url.endsWith(encodedNoteName));
     expect(String(markdownPut?.body || '')).toContain(`![diagram](<${noteBasename}-1.png> "caption")`);
+    expect(String(markdownPut?.body || '')).toContain(`![again](${noteBasename}-1.png)`);
+    expect(String(markdownPut?.body || '')).toContain(`![photo](${noteBasename}-2.webp)`);
     expect(String(markdownPut?.body || '')).not.toContain('syncnos-asset://');
+  });
+
+  it.each([
+    ['missing asset', 'missing'],
+    ['bulk read rejection', 'reject'],
+  ] as const)('fails sync when an Obsidian local asset is unavailable: %s', async (_label, mode) => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: `asset-${mode}`,
+      title: 'Asset failure',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'm1', sequence: 1, contentMarkdown: '![asset](syncnos-asset://7)', updatedAt: 1 },
+    ]);
+    if (mode === 'reject') imageCacheMocks.getImageCacheAssetsByIds.mockRejectedValue(new Error('idb unavailable'));
+    else imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+
+    let putCount = 0;
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        putCount += 1;
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7] });
+    expect(syncRes.results[0]).toMatchObject({ ok: false, mode: 'failed' });
+    expect(putCount).toBe(0);
   });
 
   it('does not record generation when only attachments succeed and the main note PUT fails', async () => {
@@ -334,14 +410,21 @@ describe('obsidian-sync-orchestrator', () => {
         updatedAt: 1,
       },
     ]);
-    imageCacheMocks.getImageCacheAssetById.mockResolvedValue({
-      id: 7,
-      conversationId: 1,
-      url: 'https://example.com/a.png',
-      blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
-      byteSize: 3,
-      contentType: 'image/png',
-    });
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
+      new Map([
+        [
+          7,
+          {
+            id: 7,
+            conversationId: 1,
+            url: 'https://example.com/a.png',
+            blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+            byteSize: 3,
+            contentType: 'image/png',
+          },
+        ],
+      ]),
+    );
 
     let binaryPutCount = 0;
     let notePutCount = 0;
@@ -952,7 +1035,7 @@ afterEach(() => {
   backgroundStorageMocks.getArticleCommentsByConversationId.mockReset();
   backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockReset();
   backgroundStorageMocks.recordObsidianRemoteWrite.mockReset();
-  imageCacheMocks.getImageCacheAssetById.mockReset();
+  imageCacheMocks.getImageCacheAssetsByIds.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup
