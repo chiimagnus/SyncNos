@@ -273,24 +273,19 @@ describe('background-router conversations', () => {
     );
   });
 
-  it('coalesces backfill progress into durable auto-sync change signals without a UI event bus', async () => {
+  it('emits exactly one backfillImages signal after durable backfill changes', async () => {
     const onConversationChanged = vi.fn(async () => {});
-    backfillJobMocks.backfillConversationImages.mockImplementation(async (input: any) => {
-      await input?.onProgress?.({ updatedMessages: 1 });
-      await input?.onProgress?.({ updatedMessages: 2 });
-      return {
-        scannedMessages: 2,
-        updatedMessages: 2,
-        inlinedCount: 2,
-        fromCacheCount: 1,
-        downloadedCount: 1,
-        inlinedBytes: 2048,
-        warningFlags: [],
-      };
+    backfillJobMocks.backfillConversationImages.mockResolvedValue({
+      scannedMessages: 2,
+      updatedMessages: 2,
+      inlinedCount: 2,
+      fromCacheCount: 1,
+      downloadedCount: 1,
+      inlinedBytes: 2048,
+      warningFlags: [],
     });
 
     const router = createRouter({ onConversationChanged });
-
     const res = await router.__handleMessageForTests({
       type: 'backfillConversationImages',
       conversationId: 888,
@@ -298,16 +293,53 @@ describe('background-router conversations', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 888,
-        conversationUrl: 'https://example.com/a',
-      }),
-    );
+    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({
+      conversationId: 888,
+      conversationUrl: 'https://example.com/a',
+    });
     await Promise.resolve();
-    expect(onConversationChanged).toHaveBeenCalledTimes(2);
-    expect(onConversationChanged).toHaveBeenNthCalledWith(1, 888, 'backfillImages');
-    expect(onConversationChanged).toHaveBeenNthCalledWith(2, 888, 'backfillImages');
+    expect(onConversationChanged).toHaveBeenCalledTimes(1);
+    expect(onConversationChanged).toHaveBeenCalledWith(888, 'backfillImages');
+  });
+
+  it('does not emit backfillImages for no-op or conflict-only durable results', async () => {
+    const onConversationChanged = vi.fn(async () => {});
+    backfillJobMocks.backfillConversationImages.mockResolvedValue({
+      scannedMessages: 2,
+      updatedMessages: 0,
+      inlinedCount: 2,
+      fromCacheCount: 1,
+      downloadedCount: 1,
+      inlinedBytes: 2048,
+      warningFlags: [],
+    });
+
+    const router = createRouter({ onConversationChanged });
+    const res = await router.__handleMessageForTests({
+      type: 'backfillConversationImages',
+      conversationId: 889,
+      conversationUrl: 'https://example.com/b',
+    });
+
+    expect(res.ok).toBe(true);
+    await Promise.resolve();
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not emit backfillImages when the backfill job fails', async () => {
+    const onConversationChanged = vi.fn(async () => {});
+    backfillJobMocks.backfillConversationImages.mockRejectedValue(new Error('conditional patch failed'));
+
+    const router = createRouter({ onConversationChanged });
+    const res = await router.__handleMessageForTests({
+      type: 'backfillConversationImages',
+      conversationId: 890,
+      conversationUrl: 'https://example.com/c',
+    });
+
+    expect(res).toMatchObject({ ok: false, error: { message: 'conditional patch failed' } });
+    await Promise.resolve();
+    expect(onConversationChanged).not.toHaveBeenCalled();
   });
 
   it('marks the kept conversation dirty and wakes remote cleanup after a real merge', async () => {

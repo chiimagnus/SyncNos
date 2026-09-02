@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBDatabase, IDBIndex, IDBKeyRange, IDBObjectStore, indexedDB } from 'fake-indexeddb';
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
@@ -21,6 +21,7 @@ import {
   getMessagesTailByConversationId,
   getSyncMappingByConversation,
   mergeConversationsByIds,
+  patchConversationMessageMarkdownBatch,
   patchSyncMapping,
   setConversationNotionPageId,
   setSyncCursor,
@@ -647,6 +648,162 @@ describe('conversations storage-idb', () => {
       ['m3', 2],
       ['m4', 3],
     ]);
+  });
+
+  it('patches multiple message Markdown rows in one tracked transaction while preserving latest non-Markdown fields', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'markdown-patch-batch',
+      title: 'Patch batch',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'm1',
+        role: 'user',
+        authorName: 'Alice',
+        contentText: 'text one',
+        contentMarkdown: 'before one',
+        sequence: 7,
+        updatedAt: 101,
+      },
+      {
+        messageKey: 'm2',
+        role: 'assistant',
+        authorName: 'Bot',
+        contentText: 'text two',
+        contentMarkdown: 'before two',
+        sequence: 8,
+        updatedAt: 102,
+      },
+    ]);
+    const beforeRows = await getMessagesByConversationId(id);
+    const beforeRevision = await readDataRevision('messages');
+
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    const result = await patchConversationMessageMarkdownBatch(id, [
+      { messageKey: 'm1', beforeMarkdown: 'before one', afterMarkdown: 'after one' },
+      { messageKey: 'm2', beforeMarkdown: 'before two', afterMarkdown: 'after two' },
+    ]);
+    const messageTransactions = transactionSpy.mock.calls.filter(([storeNames]) => {
+      const names = Array.isArray(storeNames) ? storeNames : [storeNames];
+      return names.includes('messages');
+    });
+    transactionSpy.mockRestore();
+
+    expect(result).toEqual({ updated: 2, conflicts: 0 });
+    expect(messageTransactions).toHaveLength(1);
+    expect(await readDataRevision('messages')).toBe(beforeRevision + 1);
+
+    const afterRows = await getMessagesByConversationId(id);
+    expect(afterRows.map((row) => row.contentMarkdown)).toEqual(['after one', 'after two']);
+    expect(
+      afterRows.map(({ id: rowId, messageKey, role, authorName, contentText, sequence, updatedAt }) => ({
+        id: rowId,
+        messageKey,
+        role,
+        authorName,
+        contentText,
+        sequence,
+        updatedAt,
+      })),
+    ).toEqual(
+      beforeRows.map(({ id: rowId, messageKey, role, authorName, contentText, sequence, updatedAt }) => ({
+        id: rowId,
+        messageKey,
+        role,
+        authorName,
+        contentText,
+        sequence,
+        updatedAt,
+      })),
+    );
+  });
+
+  it('skips stale or missing Markdown patches and bumps revision only for durable matches', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'markdown-patch-conflict',
+      title: 'Patch conflict',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', contentMarkdown: 'latest one', sequence: 0 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', contentMarkdown: 'before two', sequence: 1 },
+    ]);
+    const beforeRevision = await readDataRevision('messages');
+
+    const result = await patchConversationMessageMarkdownBatch(id, [
+      { messageKey: 'm1', beforeMarkdown: 'stale one', afterMarkdown: 'must not win' },
+      { messageKey: 'm2', beforeMarkdown: 'before two', afterMarkdown: 'after two' },
+      { messageKey: 'missing', beforeMarkdown: '', afterMarkdown: 'new' },
+    ]);
+
+    expect(result).toEqual({ updated: 1, conflicts: 2 });
+    expect(await readDataRevision('messages')).toBe(beforeRevision + 1);
+    expect((await getMessagesByConversationId(id)).map((row) => row.contentMarkdown)).toEqual([
+      'latest one',
+      'after two',
+    ]);
+  });
+
+  it('keeps no-op/conflict-only patches revision-free and rejects conflicting duplicate definitions before opening IDB', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'markdown-patch-noop',
+      title: 'Patch no-op',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', contentMarkdown: 'stable', sequence: 0 },
+    ]);
+    const beforeRevision = await readDataRevision('messages');
+
+    expect(
+      await patchConversationMessageMarkdownBatch(id, [
+        { messageKey: 'm1', beforeMarkdown: 'stable', afterMarkdown: 'stable' },
+        { messageKey: 'm1', beforeMarkdown: 'stable', afterMarkdown: 'stable' },
+      ]),
+    ).toEqual({ updated: 0, conflicts: 0 });
+    expect(
+      await patchConversationMessageMarkdownBatch(id, [
+        { messageKey: 'm1', beforeMarkdown: 'stale', afterMarkdown: 'other' },
+      ]),
+    ).toEqual({ updated: 0, conflicts: 1 });
+    expect(await readDataRevision('messages')).toBe(beforeRevision);
+
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put');
+    expect(
+      await patchConversationMessageMarkdownBatch(id, [
+        { messageKey: 'm1', beforeMarkdown: 'stable', afterMarkdown: 'patched' },
+        { messageKey: 'm1', beforeMarkdown: 'stable', afterMarkdown: 'patched' },
+      ]),
+    ).toEqual({ updated: 1, conflicts: 0 });
+    const messagePuts = putSpy.mock.contexts.filter(
+      (context) => String((context as IDBObjectStore)?.name || '') === 'messages',
+    );
+    expect(messagePuts).toHaveLength(1);
+    putSpy.mockRestore();
+    expect(await readDataRevision('messages')).toBe(beforeRevision + 1);
+
+    const revisionAfterDuplicate = await readDataRevision('messages');
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    await expect(
+      patchConversationMessageMarkdownBatch(id, [
+        { messageKey: 'm1', beforeMarkdown: 'stable', afterMarkdown: 'first' },
+        { messageKey: 'm1', beforeMarkdown: 'stable', afterMarkdown: 'second' },
+      ]),
+    ).rejects.toThrow('conflicting Markdown patches');
+    expect(transactionSpy).not.toHaveBeenCalled();
+    transactionSpy.mockRestore();
+    expect(await readDataRevision('messages')).toBe(revisionAfterDuplicate);
+    expect((await getMessagesByConversationId(id))[0]?.contentMarkdown).toBe('patched');
   });
 
   it('syncs messages incrementally without snapshot cleanup', async () => {

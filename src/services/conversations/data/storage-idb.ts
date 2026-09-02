@@ -785,6 +785,67 @@ function mergeAnchoredMessageOrder(
   return { keys: merged, anchored: true, changed };
 }
 
+export type ConversationMessageMarkdownPatch = {
+  messageKey: string;
+  beforeMarkdown: string;
+  afterMarkdown: string;
+};
+
+export async function patchConversationMessageMarkdownBatch(
+  conversationId: number,
+  patches: ConversationMessageMarkdownPatch[],
+): Promise<{ updated: number; conflicts: number }> {
+  const safeConversationId = Number(conversationId);
+  if (!Number.isFinite(safeConversationId) || safeConversationId <= 0) throw new Error('invalid conversationId');
+
+  const uniqueByKey = new Map<string, ConversationMessageMarkdownPatch>();
+  for (const rawPatch of Array.isArray(patches) ? patches : []) {
+    const messageKey = String(rawPatch?.messageKey || '');
+    if (!messageKey.trim()) continue;
+    const patch: ConversationMessageMarkdownPatch = {
+      messageKey,
+      beforeMarkdown: String(rawPatch?.beforeMarkdown ?? ''),
+      afterMarkdown: String(rawPatch?.afterMarkdown ?? ''),
+    };
+    const previous = uniqueByKey.get(messageKey);
+    if (previous) {
+      if (previous.beforeMarkdown !== patch.beforeMarkdown || previous.afterMarkdown !== patch.afterMarkdown) {
+        throw new Error(`conflicting Markdown patches for messageKey: ${messageKey}`);
+      }
+      continue;
+    }
+    uniqueByKey.set(messageKey, patch);
+  }
+
+  const effectivePatches = Array.from(uniqueByKey.values()).filter(
+    (patch) => patch.beforeMarkdown !== patch.afterMarkdown,
+  );
+  if (!effectivePatches.length) return { updated: 0, conflicts: 0 };
+
+  const db = await openDb();
+  return runTrackedTransaction(
+    { db, stores: ['messages'], revisionScopes: ['messages'] },
+    async ({ stores, markChanged }) => {
+      const idx = stores.messages.index('by_conversationId_messageKey');
+      let updated = 0;
+      let conflicts = 0;
+
+      for (const patch of effectivePatches) {
+        const latest = (await reqToPromise(idx.get([safeConversationId, patch.messageKey]) as any)) as any;
+        if (!latest || String(latest.contentMarkdown || '') !== patch.beforeMarkdown) {
+          conflicts += 1;
+          continue;
+        }
+        await reqToPromise(stores.messages.put({ ...latest, contentMarkdown: patch.afterMarkdown }));
+        markChanged('messages');
+        updated += 1;
+      }
+
+      return { updated, conflicts };
+    },
+  );
+}
+
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
