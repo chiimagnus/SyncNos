@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
@@ -384,6 +384,269 @@ describe('conversations storage-idb', () => {
     const stored = await getMessagesByConversationId(Number(convo.id));
     expect(Number(stored[0]?.updatedAt)).toBeGreaterThanOrEqual(before);
     expect(Number(stored[0]?.updatedAt)).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('materializes the snapshot working set once without per-key existing lookups', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'snapshot-working-set',
+      title: 'Working set',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1, updatedAt: 2 },
+      { messageKey: 'm3', role: 'user', contentText: 'remove', sequence: 2, updatedAt: 3 },
+    ]);
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    try {
+      const result = await syncConversationMessages(id, [
+        { messageKey: 'm1', role: 'user', contentText: 'one updated', sequence: 0, updatedAt: 4 },
+        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1, updatedAt: 2 },
+        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 2, updatedAt: 5 },
+      ]);
+      expect(result).toEqual({ upserted: 3, deleted: 1 });
+
+      const sequenceReads = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_sequence',
+      );
+      const perKeyReads = getSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_messageKey',
+      );
+      expect(sequenceReads).toHaveLength(1);
+      expect(perKeyReads).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+      getSpy.mockRestore();
+    }
+
+    expect((await getMessagesByConversationId(id)).map((message) => [message.messageKey, message.contentText])).toEqual([
+      ['m1', 'one updated'],
+      ['m2', 'two'],
+      ['m4', 'four'],
+    ]);
+  });
+
+  it('keeps duplicate snapshot message keys on one row with the last incoming value', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'snapshot-duplicate-key',
+      title: 'Duplicate',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+
+    const result = await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'first', sequence: 0, updatedAt: 1 },
+      { messageKey: 'm1', role: 'assistant', contentText: 'second', sequence: 1, updatedAt: 2 },
+    ]);
+
+    expect(result).toEqual({ upserted: 2, deleted: 0 });
+    expect(await getMessagesByConversationId(id)).toMatchObject([
+      { messageKey: 'm1', role: 'assistant', contentText: 'second', sequence: 1, updatedAt: 2 },
+    ]);
+  });
+
+  it('keeps ordinary append deltas on per-key reads without materializing the conversation', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append-delta-read-shape',
+      title: 'Delta',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'old', sequence: 0 }]);
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    try {
+      await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'new', sequence: 0 }], {
+        mode: 'append',
+        diff: { added: [], updated: ['m1'], removed: [] },
+      });
+
+      const sequenceReads = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_sequence',
+      );
+      const perKeyReads = getSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_messageKey',
+      );
+      expect(sequenceReads).toHaveLength(0);
+      expect(perKeyReads).toHaveLength(1);
+    } finally {
+      getAllSpy.mockRestore();
+      getSpy.mockRestore();
+    }
+  });
+
+  it('reuses the preserve-tail working set without redundant per-key reads', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append-tail-read-shape',
+      title: 'Tail',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
+    ]);
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    try {
+      await syncConversationMessages(
+        id,
+        [
+          {
+            messageKey: 'm2',
+            role: 'assistant',
+            contentText: 'two updated',
+            sequence: 0,
+            captureSequencePolicy: 'preserve-existing-tail',
+          },
+          {
+            messageKey: 'm3',
+            role: 'user',
+            contentText: 'three',
+            sequence: 0,
+            captureSequencePolicy: 'preserve-existing-tail',
+          },
+        ],
+        { mode: 'append', diff: { added: ['m3'], updated: ['m2'], removed: [] } },
+      );
+
+      const sequenceReads = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_sequence',
+      );
+      const perKeyReads = getSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_messageKey',
+      );
+      expect(sequenceReads).toHaveLength(1);
+      expect(perKeyReads).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+      getSpy.mockRestore();
+    }
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 10],
+      ['m2', 20],
+      ['m3', 21],
+    ]);
+  });
+
+  it('keeps exact stored message-key matching when reusing an append working set', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append-exact-key',
+      title: 'Exact key',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: ' m1 ', role: 'user', contentText: 'legacy spaced key', sequence: 0 },
+    ]);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentText: 'normalized incoming key',
+          sequence: 0,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+      ],
+      { mode: 'append', diff: { added: ['m1'], updated: [], removed: [] } },
+    );
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      [' m1 ', 0],
+      ['m1', 1],
+    ]);
+  });
+
+  it('reuses the append reconciliation working set without redundant per-key reads', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'append-reconcile-read-shape',
+      title: 'Reconcile',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
+      { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+    ]);
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    try {
+      await syncConversationMessages(
+        id,
+        [
+          {
+            messageKey: 'm1',
+            role: 'user',
+            contentText: 'one',
+            sequence: 0,
+            captureSequencePolicy: 'reconcile-existing-order',
+          },
+          {
+            messageKey: 'm2',
+            role: 'assistant',
+            contentText: 'two',
+            sequence: 1,
+            captureSequencePolicy: 'reconcile-existing-order',
+          },
+          {
+            messageKey: 'm3',
+            role: 'user',
+            contentText: 'three',
+            sequence: 2,
+            captureSequencePolicy: 'reconcile-existing-order',
+          },
+          {
+            messageKey: 'm4',
+            role: 'assistant',
+            contentText: 'four',
+            sequence: 3,
+            captureSequencePolicy: 'reconcile-existing-order',
+          },
+        ],
+        { mode: 'append', diff: { added: ['m1', 'm2'], updated: ['m3', 'm4'], removed: [] } },
+      );
+
+      const sequenceReads = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_sequence',
+      );
+      const perKeyReads = getSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_messageKey',
+      );
+      expect(sequenceReads).toHaveLength(1);
+      expect(perKeyReads).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+      getSpy.mockRestore();
+    }
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['m3', 2],
+      ['m4', 3],
+    ]);
   });
 
   it('syncs messages incrementally without snapshot cleanup', async () => {
