@@ -452,7 +452,8 @@ describe('conversations pagination storage-idb', () => {
       request.onerror = () => reject(request.error);
     });
     const rawTx = rawDb.transaction(['article_comments'], 'readwrite');
-    rawTx.objectStore('article_comments').add({
+    const rawStore = rawTx.objectStore('article_comments');
+    rawStore.add({
       conversationId: Number(article.id),
       canonicalUrl: 'https://example.com/thread',
       authorName: '',
@@ -462,6 +463,30 @@ describe('conversations pagination storage-idb', () => {
       parentId: 999,
       createdAt: 3,
       updatedAt: 3,
+    });
+    rawStore.add({
+      id: 1001,
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread',
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle a',
+      locator: null,
+      parentId: 1002,
+      createdAt: 4,
+      updatedAt: 4,
+    });
+    rawStore.add({
+      id: 1002,
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread',
+      authorName: '',
+      quoteText: '',
+      commentText: 'cycle b',
+      locator: null,
+      parentId: 1001,
+      createdAt: 5,
+      updatedAt: 5,
     });
     await new Promise<void>((resolve, reject) => {
       rawTx.oncomplete = () => resolve();
@@ -474,7 +499,90 @@ describe('conversations pagination storage-idb', () => {
     const articleItem = page.items.find((item) => item.sourceType === 'article');
     const chatItem = page.items.find((item) => item.sourceType !== 'article');
 
-    expect(articleItem?.commentThreadCount).toBe(2);
+    expect(articleItem?.commentThreadCount).toBe(3);
     expect(chatItem?.commentThreadCount).toBeUndefined();
+  });
+
+  it('hydrates multiple article rows with shared orphan URL comments without mixing conversation-owned rows', async () => {
+    const now = Date.now();
+    const canonical = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/shared',
+      title: 'canonical',
+      url: 'https://example.com/shared',
+      lastCapturedAt: now,
+    });
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'after-shared',
+      title: 'after',
+      url: 'https://chatgpt.com/c/after-shared',
+      lastCapturedAt: now - 2,
+    });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    const duplicateId = Number(
+      await reqToPromise(
+        rawTx.objectStore('conversations').add({
+          sourceType: 'article',
+          source: 'web',
+          conversationKey: 'article:historical-shared-copy',
+          title: 'historical duplicate',
+          url: 'https://example.com/shared#historical',
+          lastCapturedAt: now - 1,
+          listSourceKey: 'web',
+          listSiteKey: 'domain:example.com',
+        }),
+      ),
+    );
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+    rawDb.close();
+
+    await addArticleComment({
+      conversationId: Number(canonical.id),
+      canonicalUrl: 'https://example.com/shared',
+      commentText: 'canonical owned root',
+      parentId: null,
+      createdAt: 1,
+    });
+    await addArticleComment({
+      conversationId: duplicateId,
+      canonicalUrl: 'https://example.com/shared',
+      commentText: 'duplicate owned root',
+      parentId: null,
+      createdAt: 2,
+    });
+    await addArticleComment({
+      conversationId: null,
+      canonicalUrl: 'https://example.com/shared',
+      commentText: 'shared orphan root',
+      parentId: null,
+      createdAt: 3,
+    });
+
+    const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 2 });
+    expect(first.items.map((item) => item.conversationKey)).toEqual([
+      'article:https://example.com/shared',
+      'article:historical-shared-copy',
+    ]);
+    expect(first.items.map((item) => item.commentThreadCount)).toEqual([2, 2]);
+    expect(first.hasMore).toBe(true);
+    expect(first.cursor).toEqual({ lastCapturedAt: now - 1, id: duplicateId });
+
+    const second = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 2 }, first.cursor!);
+    expect(second.items.map((item) => item.conversationKey)).toEqual(['after-shared']);
+    expect(second.items[0]?.commentThreadCount).toBeUndefined();
+    expect(second.hasMore).toBe(false);
   });
 });

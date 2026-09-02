@@ -1150,6 +1150,66 @@ function buildListTimestampRange(
   );
 }
 
+async function hydrateConversationListArticleCommentThreadCounts(
+  items: Conversation[],
+  articleCommentsStore: IDBObjectStore,
+): Promise<void> {
+  const keyRangeApi = globalThis.IDBKeyRange;
+  const byConversation = articleCommentsStore.index('by_conversationId_createdAt');
+  const byCanonicalUrl = articleCommentsStore.index('by_canonicalUrl_createdAt');
+  const orphanRowsByCanonicalUrl = new Map<string, Promise<any[]>>();
+  const reads: Array<{
+    item: Conversation;
+    linkedRows: Promise<any[]>;
+    orphanRows: Promise<any[]>;
+  }> = [];
+
+  for (const item of items) {
+    if (safeString((item as any).sourceType).toLowerCase() !== 'article') continue;
+
+    const conversationId = Number((item as any).id);
+    const canonicalUrl = canonicalizeArticleUrl((item as any).url);
+    const linkedRows =
+      keyRangeApi && Number.isSafeInteger(conversationId) && conversationId > 0
+        ? reqToPromise<any[]>(
+            byConversation.getAll(
+              keyRangeApi.bound(
+                [conversationId, -Infinity] as any,
+                [conversationId, Infinity] as any,
+              ),
+            ) as any,
+          )
+        : Promise.resolve([]);
+
+    let orphanRows = Promise.resolve<any[]>([]);
+    if (keyRangeApi && canonicalUrl) {
+      orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || Promise.resolve([]);
+      if (!orphanRowsByCanonicalUrl.has(canonicalUrl)) {
+        orphanRows = reqToPromise<any[]>(
+          byCanonicalUrl.getAll(
+            keyRangeApi.bound(
+              [canonicalUrl, -Infinity] as any,
+              [canonicalUrl, Infinity] as any,
+            ),
+          ) as any,
+        );
+        orphanRowsByCanonicalUrl.set(canonicalUrl, orphanRows);
+      }
+    }
+
+    reads.push({ item, linkedRows, orphanRows });
+  }
+
+  await Promise.all(
+    reads.map(async ({ item, linkedRows, orphanRows }) => {
+      const [linked, byUrl] = await Promise.all([linkedRows, orphanRows]);
+      const comments = [...(Array.isArray(linked) ? linked : [])];
+      comments.push(...(Array.isArray(byUrl) ? byUrl.filter((row) => row?.conversationId == null) : []));
+      (item as any).commentThreadCount = computeArticleCommentThreadCount(comments);
+    }),
+  );
+}
+
 async function readConversationListPageItems(input: {
   store: IDBObjectStore;
   articleCommentsStore: IDBObjectStore;
@@ -1176,30 +1236,7 @@ async function readConversationListPageItems(input: {
 
   const hasMore = rows.length > safeLimit;
   const pageItems = hasMore ? rows.slice(0, safeLimit) : rows;
-  const byConversation = articleCommentsStore.index('by_conversationId_createdAt');
-  const byCanonicalUrl = articleCommentsStore.index('by_canonicalUrl_createdAt');
-  for (const item of pageItems) {
-    if (safeString((item as any).sourceType).toLowerCase() !== 'article') continue;
-    const conversationId = Number((item as any).id);
-    const canonicalUrl = canonicalizeArticleUrl((item as any).url);
-    const comments: any[] = [];
-    if (globalThis.IDBKeyRange?.bound && Number.isSafeInteger(conversationId) && conversationId > 0) {
-      const byConversationRange = globalThis.IDBKeyRange.bound(
-        [conversationId, -Infinity] as any,
-        [conversationId, Infinity] as any,
-      );
-      comments.push(...((await reqToPromise<any[]>(byConversation.getAll(byConversationRange) as any)) || []));
-    }
-    if (globalThis.IDBKeyRange?.bound && canonicalUrl) {
-      const byUrlRange = globalThis.IDBKeyRange.bound(
-        [canonicalUrl, -Infinity] as any,
-        [canonicalUrl, Infinity] as any,
-      );
-      const urlRows = (await reqToPromise<any[]>(byCanonicalUrl.getAll(byUrlRange) as any)) || [];
-      comments.push(...urlRows.filter((row) => row?.conversationId == null));
-    }
-    (item as any).commentThreadCount = computeArticleCommentThreadCount(comments);
-  }
+  await hydrateConversationListArticleCommentThreadCounts(pageItems as Conversation[], articleCommentsStore);
 
   const tail = pageItems.length ? pageItems[pageItems.length - 1] : null;
   const nextCursor =
