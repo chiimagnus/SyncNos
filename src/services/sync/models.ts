@@ -43,6 +43,7 @@ export type SyncJobSnapshot = {
   startedAt: number;
   updatedAt: number;
   finishedAt: number | null;
+  totalCount: number;
   conversationIds: number[];
   currentConversationId?: number;
   currentConversationTitle?: string;
@@ -55,6 +56,7 @@ export type SyncJobSnapshot = {
 
 export type SyncJobStatusResponse = {
   provider: SyncProvider;
+  active: boolean;
   job: SyncJobSnapshot | null;
   instanceId?: string;
 };

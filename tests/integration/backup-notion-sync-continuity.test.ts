@@ -114,12 +114,6 @@ function createMemoryJobStore() {
       job = next;
       return true;
     },
-    isRunningJob(value: any) {
-      return Boolean(value && value.status === 'running');
-    },
-    async abortRunningJobIfFromOtherInstance() {
-      return job;
-    },
   };
 }
 

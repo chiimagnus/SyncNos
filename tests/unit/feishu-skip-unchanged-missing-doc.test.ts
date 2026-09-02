@@ -27,16 +27,12 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
-  abortRunningJobIfFromOtherInstance: vi.fn(),
-  isRunningJob: vi.fn(),
   setJob: vi.fn(),
   getJob: vi.fn(),
 }));
 
 vi.mock('@services/sync/sync-job-store', () => ({
   createSyncJobStore: () => ({
-    abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
-    isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
   }),
@@ -102,8 +98,6 @@ describe('feishu skip unchanged missing doc', () => {
   it('creates a new doc when content unchanged but existing doc is gone', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     const hash = await sha256Hex('![img](https://example.com/a.png)');
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
@@ -140,8 +134,6 @@ describe('feishu skip unchanged missing doc', () => {
   it('does not record provider freshness when remote content upload fails', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 2, title: 'fail upload' },
       mapping: null,

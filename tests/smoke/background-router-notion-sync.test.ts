@@ -54,8 +54,10 @@ function createInMemoryJobStore() {
       job = next;
       return true;
     },
-    isRunningJob: (value: any) => !!value && value.status === 'running',
-    abortRunningJobIfFromOtherInstance: async () => job,
+    abortRunningJob: async () => {
+      if (job?.status === 'running') job = { ...job, status: 'aborted', abortedReason: 'extension reloaded' };
+      return job;
+    },
     __getJob: () => job,
   };
 }
@@ -85,22 +87,23 @@ async function waitForJobDone(jobStore: { __getJob: () => any }, label = 'sync j
 
 function createDelayedJobStore() {
   let job: any = null;
-  const runningCounts: number[] = [];
+  const runningSnapshots: any[] = [];
   return {
-    runningCounts,
+    runningSnapshots,
     getJob: async () => job,
     setJob: async (next: any) => {
-      const count = Array.isArray(next?.perConversation) ? next.perConversation.length : 0;
-      const delayMs = next?.status === 'running' && count === 0 ? 20 : 0;
+      const delayMs = next?.status === 'running' ? 20 : 0;
       if (delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
       job = next;
-      if (next?.status === 'running') runningCounts.push(count);
+      if (next?.status === 'running') runningSnapshots.push(structuredClone(next));
       return true;
     },
-    isRunningJob: (value: any) => !!value && value.status === 'running',
-    abortRunningJobIfFromOtherInstance: async () => job,
+    abortRunningJob: async () => {
+      if (job?.status === 'running') job = { ...job, status: 'aborted', abortedReason: 'extension reloaded' };
+      return job;
+    },
     __getJob: () => job,
   };
 }
@@ -150,20 +153,32 @@ function createRouter({
     conversationKinds,
   });
 
-  registerNotionSettingsHandlers(router as any, { conversationKinds });
+  registerNotionSettingsHandlers(router as any, {
+    conversationKinds,
+    runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
+  });
 
   registerSyncHandlers(router as any, {
     getInstanceId: () => instanceId,
     notionSyncOrchestrator,
     obsidianSyncOrchestrator: {
+      testConnection: async () => ({ ok: true }),
       getSyncStatus: async () => ({ job: null }),
       clearSyncStatus: async () => ({ job: null }),
       syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+      isRunActive: () => false,
+    },
+    feishuSyncOrchestrator: {
+      getSyncStatus: async () => ({ job: null }),
+      clearSyncStatus: async () => ({ job: null }),
+      syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+      isRunActive: () => false,
     },
     githubSyncOrchestrator: {
       getSyncStatus: async () => ({ job: null }),
       clearSyncStatus: async () => ({ job: null }),
       sync: async () => ({ summary: { syncedCount: 0, failedCount: 0 } }),
+      isRunActive: () => false,
     },
   });
 
@@ -245,7 +260,7 @@ describe('background-router notion sync', () => {
         storage: null,
         dbManager: null,
         syncService: null,
-        jobStore: null,
+        jobStore: createInMemoryJobStore(),
       },
     });
 
@@ -259,7 +274,130 @@ describe('background-router notion sync', () => {
     expect(removedFlatten).toContain('notion_db_id_syncnos_web_articles');
     expect(removedFlatten).toContain('notion_oauth_pending_state');
     expect(removedFlatten).toContain('notion_oauth_last_error');
-    expect(removedFlatten).toContain(SYNC_JOB_STORAGE_KEYS.notion);
+    expect(removedFlatten).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
+    expect(res.data?.clearedKeys).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
+  });
+
+  it('rejects disconnect while a live notion run owns the provider before deleting credentials or config', async () => {
+    const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
+    const mappingGate = deferred<any>();
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        storage: {
+          getSyncMappingByConversation: async () => await mappingGate.promise,
+          getMessagesByConversationId: async () => [],
+        },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'unused' }) },
+        syncService: {
+          createPageInDatabase: async () => ({ id: 'unused' }),
+          appendChildren: async () => ({ ok: true }),
+          messagesToBlocks: () => [],
+        },
+        jobStore,
+      },
+    });
+
+    const started = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(started).toMatchObject({ ok: true, data: { started: true, provider: 'notion' } });
+    await waitFor(() => jobStore.__getJob()?.status === 'running', 'notion running claim');
+
+    const disconnected = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+    expect(disconnected).toMatchObject({
+      ok: false,
+      error: { extra: { code: 'sync_already_running' } },
+    });
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeTruthy();
+    expect(chromeMock.__store.notion_parent_page_id).toBe('parent_page');
+    expect(chromeMock.__removed.flat()).not.toContain('notion_oauth_token_v1');
+    expect(jobStore.__getJob()?.status).toBe('running');
+
+    mappingGate.resolve(null);
+    await waitForJobDone(jobStore);
+  });
+
+  it('clears a residual running notion snapshot together with credentials inside one idle maintenance lease', async () => {
+    const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
+    await jobStore.setJob({
+      id: 'residual-running',
+      provider: 'notion',
+      instanceId: 'old-instance',
+      status: 'running',
+      startedAt: 1,
+      updatedAt: 2,
+      finishedAt: null,
+      conversationIds: [1],
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    });
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => null },
+        storage: null,
+        dbManager: null,
+        syncService: null,
+        jobStore,
+      },
+    });
+
+    const disconnected = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+
+    expect(disconnected.ok).toBe(true);
+    expect(jobStore.__getJob()).toBeNull();
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+    expect(disconnected.data?.clearedKeys).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
+    expect(chromeMock.__removed.flat()).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
+  });
+
+  it('reports disconnect failure when the final canonical job clear fails after credential cleanup', async () => {
+    const chromeMock = mockChromeStorage();
+    let canonicalJob: any = {
+      id: 'residual-running',
+      provider: 'notion',
+      status: 'running',
+      startedAt: 1,
+      updatedAt: 2,
+      finishedAt: null,
+      conversationIds: [1],
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    };
+    const jobStore = {
+      getJob: async () => canonicalJob,
+      setJob: async (next: any) => {
+        if (next == null) return false;
+        canonicalJob = next;
+        return true;
+      },
+      abortRunningJob: async () => canonicalJob,
+    };
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => null },
+        storage: null,
+        dbManager: null,
+        syncService: null,
+        jobStore,
+      },
+    });
+
+    const disconnected = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+
+    expect(disconnected).toMatchObject({
+      ok: false,
+      error: { extra: { code: 'notion_sync_job_persist_failed' } },
+    });
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+    expect(canonicalJob).toMatchObject({ id: 'residual-running', status: 'running' });
   });
 
   it('recreates page when existing page is missing', async () => {
@@ -1141,7 +1279,7 @@ describe('background-router notion sync', () => {
     expect(job.perConversation.every((row: any) => row.ok)).toBe(true);
   });
 
-  it('keeps running job progress monotonic when concurrent workers write status updates', async () => {
+  it('keeps concurrent Notion running milestones compact while preserving active-item fallback and terminal order', async () => {
     vi.useFakeTimers();
     const chromeMock = mockChromeStorage();
     try {
@@ -1189,10 +1327,41 @@ describe('background-router notion sync', () => {
       const result = await syncPromise;
 
       expect(result.okCount).toBe(2);
-      const runningCounts = delayedJobStore.runningCounts;
-      for (let i = 1; i < runningCounts.length; i += 1) {
-        expect(runningCounts[i]).toBeGreaterThanOrEqual(runningCounts[i - 1]);
-      }
+      const runningSnapshots = delayedJobStore.runningSnapshots;
+      expect(runningSnapshots.length).toBeGreaterThanOrEqual(5);
+      expect(
+        runningSnapshots.every(
+          (snapshot: any) =>
+            snapshot.totalCount === 2 &&
+            Array.isArray(snapshot.conversationIds) &&
+            snapshot.conversationIds.length === 0 &&
+            Array.isArray(snapshot.perConversation) &&
+            snapshot.perConversation.length === 0,
+        ),
+      ).toBe(true);
+
+      const itemStarts = runningSnapshots.filter(
+        (snapshot: any) =>
+          snapshot.currentStage === 'preparing_sync' &&
+          Number(snapshot.okCount || 0) + Number(snapshot.failCount || 0) === 0,
+      );
+      expect(itemStarts.map((snapshot: any) => snapshot.currentConversationId).sort()).toEqual([1, 2]);
+
+      const completionSnapshots = runningSnapshots.filter(
+        (snapshot: any) => Number(snapshot.okCount || 0) + Number(snapshot.failCount || 0) > 0,
+      );
+      expect(completionSnapshots.map((snapshot: any) => snapshot.okCount + snapshot.failCount)).toEqual([1, 2]);
+      expect(completionSnapshots[0]?.currentConversationId).toEqual(expect.any(Number));
+      expect(completionSnapshots[1]?.currentConversationId).toBeUndefined();
+
+      expect(delayedJobStore.__getJob()).toMatchObject({
+        status: 'done',
+        conversationIds: [1, 2],
+        currentConversationId: undefined,
+        okCount: 2,
+        failCount: 0,
+      });
+      expect(delayedJobStore.__getJob()?.perConversation.map((row: any) => row.conversationId)).toEqual([1, 2]);
     } finally {
       vi.useRealTimers();
       delete (globalThis as any).chrome;
@@ -1601,23 +1770,10 @@ describe('background-router notion sync', () => {
     expect(ensureCalls).toEqual(['db_stale', 'db_new']);
   });
 
-  it('returns structured already-running sync error metadata', async () => {
+  it('returns structured already-running metadata for a live detached/orchestrator run', async () => {
     const chromeMock = mockChromeStorage();
-    const runningJobStore = createInMemoryJobStore();
-    await runningJobStore.setJob({
-      id: 'job-running',
-      provider: 'notion',
-      instanceId: 'same-instance',
-      status: 'running',
-      startedAt: Date.now(),
-      updatedAt: Date.now(),
-      finishedAt: null,
-      conversationIds: [1],
-      okCount: 0,
-      failCount: 0,
-      perConversation: [],
-    });
-
+    const jobStore = createInMemoryJobStore();
+    const blockedLookup = deferred<any>();
     const router = createRouter({
       chromeMock,
       instanceId: 'same-instance',
@@ -1625,7 +1781,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
-          getSyncMappingByConversation: async () => null,
+          getSyncMappingByConversation: async () => await blockedLookup.promise,
           getMessagesByConversationId: async () => [],
         },
         syncService: {
@@ -1633,14 +1789,19 @@ describe('background-router notion sync', () => {
           appendChildren: async () => ({ ok: true }),
           messagesToBlocks: () => [],
         },
-        jobStore: runningJobStore,
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const first = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(first).toMatchObject({ ok: true, data: { started: true, provider: 'notion' } });
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [2] });
     expect(res.ok).toBe(false);
     expect(res.error?.message).toBe('sync already in progress');
     expect(res.error?.extra?.code).toBe('sync_already_running');
+
+    blockedLookup.resolve(null);
+    await waitForJobDone(jobStore);
   });
 
   it('returns structured provider-disabled sync error metadata', async () => {
@@ -1665,11 +1826,26 @@ describe('background-router notion sync', () => {
         syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
         getSyncJobStatus: async () => ({ job: null, instanceId }),
         clearSyncJobStatus: async () => ({ job: null, instanceId }),
+        isRunActive: () => false,
       },
       obsidianSyncOrchestrator: {
+        testConnection: async () => ({ ok: true }),
         syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
         getSyncStatus: async () => ({ job: null, instanceId }),
         clearSyncStatus: async () => ({ job: null, instanceId }),
+        isRunActive: () => false,
+      },
+      feishuSyncOrchestrator: {
+        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+        getSyncStatus: async () => ({ job: null, instanceId }),
+        clearSyncStatus: async () => ({ job: null, instanceId }),
+        isRunActive: () => false,
+      },
+      githubSyncOrchestrator: {
+        sync: async () => ({}),
+        getSyncStatus: async () => ({ job: null, instanceId }),
+        clearSyncStatus: async () => ({ job: null, instanceId }),
+        isRunActive: () => false,
       },
     });
 

@@ -70,13 +70,6 @@ function fakeServices(input: {
   let persistedJob = input.initialJob ? structuredClone(input.initialJob) : null;
   let jobSetCalls = 0;
   const cloneJob = (job: SyncJobSnapshot | null) => (job ? structuredClone(job) : null);
-  const isRunningJob = (job: SyncJobSnapshot | null | undefined, staleMs?: number) => {
-    if (!job || job.status !== 'running') return false;
-    const updatedAt = Number(job.updatedAt) || 0;
-    if (!updatedAt) return true;
-    const maxAge = Number.isFinite(Number(staleMs)) ? Math.max(60_000, Number(staleMs)) : 5 * 60 * 1000;
-    return Date.now() - updatedAt < maxAge;
-  };
   const jobStore: GithubOrchestratorServices['jobStore'] = {
     getJob: vi.fn(async () => cloneJob(persistedJob)),
     setJob: vi.fn(async (job) => {
@@ -86,15 +79,9 @@ function fakeServices(input: {
       persistedJob = cloneJob(job);
       return true;
     }),
-    isRunningJob: vi.fn(isRunningJob),
-    abortRunningJobIfFromOtherInstance: vi.fn(async (instanceId, options) => {
+    abortRunningJob: vi.fn(async () => {
       const current = cloneJob(persistedJob);
       if (!current || current.status !== 'running') return current;
-      const owner = String(current.instanceId || '');
-      if (!owner || owner === String(instanceId || '')) return current;
-      const forceAbort = options?.forceAbort === true;
-      const staleMs = options?.staleMs;
-      if (!forceAbort && isRunningJob(current, staleMs)) return current;
       const now = Date.now();
       persistedJob = {
         ...current,
@@ -409,35 +396,23 @@ describe('github sync orchestrator staging through production sync', () => {
 });
 
 describe('github sync orchestrator job lifecycle', () => {
-  it('rejects a concurrent run before a second caller can enter the persisted job claim', async () => {
+  it('rejects a concurrent run synchronously before a second caller can enter the durable claim', async () => {
     const { services, jobStore } = fakeServices({
       rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
     });
-    let releaseFirstClaimRead!: (value: SyncJobSnapshot | null) => void;
-    const firstClaimRead = new Promise<SyncJobSnapshot | null>((resolve) => {
-      releaseFirstClaimRead = resolve;
-    });
-    (jobStore.abortRunningJobIfFromOtherInstance as any)
-      .mockImplementationOnce(async () => await firstClaimRead)
-      .mockResolvedValue(null);
-
     const orchestrator = createGithubSyncOrchestrator(services);
     const firstRun = orchestrator.sync({ conversationIds: [1], instanceId: 'instance-a' });
-    await vi.waitFor(() => expect(jobStore.abortRunningJobIfFromOtherInstance).toHaveBeenCalledTimes(1));
 
-    const secondRun = orchestrator.sync({ conversationIds: [2], instanceId: 'instance-a' });
-    await Promise.resolve();
-    const claimReadsWhileFirstBlocked = (jobStore.abortRunningJobIfFromOtherInstance as any).mock.calls.length;
-
-    releaseFirstClaimRead(null);
-    const [firstResult, secondResult] = await Promise.allSettled([firstRun, secondRun]);
-
-    expect(claimReadsWhileFirstBlocked).toBe(1);
-    expect(firstResult.status).toBe('fulfilled');
-    expect(secondResult.status).toBe('rejected');
-    if (secondResult.status === 'rejected') {
-      expect(secondResult.reason).toMatchObject({ code: 'sync_already_running' });
+    let conflict: unknown = null;
+    try {
+      orchestrator.sync({ conversationIds: [2], instanceId: 'instance-a' });
+    } catch (error) {
+      conflict = error;
     }
+
+    expect(conflict).toMatchObject({ code: 'sync_already_running' });
+    expect(jobStore.setJob).toHaveBeenCalledTimes(1);
+    await firstRun;
   });
 
   it('claims the generic job before preflight and persists the terminal conversation result', async () => {
@@ -462,11 +437,30 @@ describe('github sync orchestrator job lifecycle', () => {
       provider: 'github',
       instanceId: 'instance-a',
       status: 'running',
-      conversationIds: [1],
+      totalCount: 1,
+      conversationIds: [],
+      perConversation: [],
       currentStage: 'preparing_queue',
     });
+    const runningJobs = (jobStore.setJob as any).mock.calls
+      .map(([job]: any[]) => job)
+      .filter((job: any) => job?.status === 'running');
+    expect(
+      runningJobs.every(
+        (job: any) =>
+          job.totalCount === 1 &&
+          Array.isArray(job.conversationIds) &&
+          job.conversationIds.length === 0 &&
+          Array.isArray(job.perConversation) &&
+          job.perConversation.length === 0,
+      ),
+    ).toBe(true);
+    expect(
+      runningJobs.filter((job: any) => job.currentConversationId === 1 && job.currentStage === 'staging_projection'),
+    ).toHaveLength(1);
     expect((jobStore.setJob as any).mock.calls[0]?.[0]?.currentConversationId).toBeUndefined();
     expect((jobStore.setJob as any).mock.calls[0]?.[0]?.currentConversationTitle).toBeUndefined();
+    expect(jobStore.getJob).not.toHaveBeenCalled();
     expect((jobStore.setJob as any).mock.invocationCallOrder[0]).toBeLessThan(
       (services.preflight as any).mock.invocationCallOrder[0],
     );
@@ -520,33 +514,39 @@ describe('github sync orchestrator job lifecycle', () => {
     });
   });
 
-  it('rejects an active same-instance job before preflight or remote mutation', async () => {
-    const activeJob: SyncJobSnapshot = {
-      id: 'active',
+  it('treats a durable running snapshot as residue and overwrites it with the live owner claim', async () => {
+    const residue: SyncJobSnapshot = {
+      id: 'old-residue',
       provider: 'github',
-      instanceId: 'instance-a',
+      instanceId: 'same-instance',
       status: 'running',
       startedAt: Date.now(),
       updatedAt: Date.now(),
       finishedAt: null,
-      conversationIds: [1],
+      conversationIds: [9],
       okCount: 0,
       failCount: 0,
       perConversation: [],
     };
-    const { services, commit } = fakeServices({ rows: { 1: { conversation: chat(1) } }, initialJob: activeJob });
+    const { services, getPersistedJob } = fakeServices({
+      rows: { 1: { conversation: chat(1) } },
+      initialJob: residue,
+      commitImpl: async ({ operations }) => ({
+        status: 'committed',
+        treeSha: 'f'.repeat(40),
+        commitSha: '1'.repeat(40),
+        files: resolvedFiles(operations),
+      }),
+    });
 
-    await expect(
-      createGithubSyncOrchestrator(services).sync({ conversationIds: [1], instanceId: 'instance-a' }),
-    ).rejects.toMatchObject({ code: 'sync_already_running' });
-    expect(services.preflight).not.toHaveBeenCalled();
-    expect(services.createBlob).not.toHaveBeenCalled();
-    expect(commit).not.toHaveBeenCalled();
+    await createGithubSyncOrchestrator(services).sync({ conversationIds: [1], instanceId: 'same-instance' });
+    expect(services.preflight).toHaveBeenCalledTimes(1);
+    expect(getPersistedJob()).toMatchObject({ status: 'done', instanceId: 'same-instance', conversationIds: [1] });
   });
 
-  it('reconciles a stale foreign job before claiming the new run', async () => {
-    const staleJob: SyncJobSnapshot = {
-      id: 'foreign',
+  it('does not revive the old five-minute lease for a very old durable running residue', async () => {
+    const residue: SyncJobSnapshot = {
+      id: 'foreign-old',
       provider: 'github',
       instanceId: 'old-instance',
       status: 'running',
@@ -558,9 +558,9 @@ describe('github sync orchestrator job lifecycle', () => {
       failCount: 0,
       perConversation: [],
     };
-    const { services, jobStore, getPersistedJob } = fakeServices({
+    const { services, getPersistedJob } = fakeServices({
       rows: { 1: { conversation: chat(1) } },
-      initialJob: staleJob,
+      initialJob: residue,
       commitImpl: async ({ operations }) => ({
         status: 'committed',
         treeSha: 'f'.repeat(40),
@@ -570,8 +570,6 @@ describe('github sync orchestrator job lifecycle', () => {
     });
 
     await createGithubSyncOrchestrator(services).sync({ conversationIds: [1], instanceId: 'new-instance' });
-
-    expect(jobStore.abortRunningJobIfFromOtherInstance).toHaveBeenCalledWith('new-instance');
     expect(getPersistedJob()).toMatchObject({ status: 'done', instanceId: 'new-instance', conversationIds: [1] });
   });
 
@@ -613,6 +611,114 @@ describe('github sync orchestrator job lifecycle', () => {
     expect(result.items[0]?.status).toBe('synced');
     expect(result.cleanupWarnings).toContain('github_sync_job_persist_failed');
     expect(getPersistedJob()).toMatchObject({ status: 'running', currentStage: 'preparing_queue' });
+  });
+
+  it('fails clear status instead of reporting fake null when canonical persistence rejects the clear', async () => {
+    const residue: SyncJobSnapshot = {
+      id: 'clear-residue',
+      provider: 'github',
+      instanceId: 'old-instance',
+      status: 'done',
+      startedAt: 1,
+      updatedAt: 2,
+      finishedAt: 2,
+      conversationIds: [1],
+      okCount: 1,
+      failCount: 0,
+      perConversation: [],
+    };
+    const { services, getPersistedJob } = fakeServices({
+      rows: {},
+      initialJob: residue,
+      jobSetFailureCalls: new Set([1]),
+    });
+    const orchestrator = createGithubSyncOrchestrator(services);
+
+    await expect(orchestrator.clearSyncStatus({ instanceId: 'clear-test' })).rejects.toMatchObject({
+      code: 'github_sync_job_persist_failed',
+    });
+    expect(getPersistedJob()).toEqual(residue);
+  });
+
+  it('serializes startup recovery against new runs in both acquisition orders', async () => {
+    const oldRunning: SyncJobSnapshot = {
+      id: 'startup-old',
+      provider: 'github',
+      instanceId: 'old-instance',
+      status: 'running',
+      startedAt: 1,
+      updatedAt: 2,
+      finishedAt: null,
+      conversationIds: [9],
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    };
+
+    {
+      const { services, jobStore, getPersistedJob } = fakeServices({
+        rows: { 1: { conversation: chat(1) } },
+        initialJob: oldRunning,
+      });
+      let releaseRecovery!: () => void;
+      const recoveryGate = new Promise<void>((resolve) => {
+        releaseRecovery = resolve;
+      });
+      (jobStore.abortRunningJob as any).mockImplementationOnce(async () => {
+        await recoveryGate;
+        const current = await jobStore.getJob();
+        const aborted = {
+          ...current!,
+          status: 'aborted' as const,
+          updatedAt: 3,
+          finishedAt: 3,
+          abortedReason: 'extension reloaded',
+        };
+        await jobStore.setJob(aborted);
+        return aborted;
+      });
+      const orchestrator = createGithubSyncOrchestrator(services);
+      const recovery = orchestrator.reconcileStartupSyncJob();
+
+      expect(() => orchestrator.sync({ conversationIds: [1], instanceId: 'new-instance' })).toThrowError(
+        expect.objectContaining({ code: 'sync_already_running' }),
+      );
+      expect(services.preflight).not.toHaveBeenCalled();
+      releaseRecovery();
+      await recovery;
+      expect(getPersistedJob()).toMatchObject({ id: 'startup-old', status: 'aborted' });
+    }
+
+    {
+      const { services, jobStore, getPersistedJob } = fakeServices({
+        rows: { 1: { conversation: chat(1) } },
+        initialJob: oldRunning,
+      });
+      const originalSetJob = jobStore.setJob.bind(jobStore);
+      let releaseClaim!: () => void;
+      const claimGate = new Promise<void>((resolve) => {
+        releaseClaim = resolve;
+      });
+      let firstWrite = true;
+      jobStore.setJob = vi.fn(async (job) => {
+        if (firstWrite) {
+          firstWrite = false;
+          await claimGate;
+        }
+        return await originalSetJob(job);
+      });
+      const orchestrator = createGithubSyncOrchestrator(services);
+      const run = orchestrator.sync({ conversationIds: [1], instanceId: 'new-instance' });
+
+      expect(() => orchestrator.reconcileStartupSyncJob()).toThrowError(
+        expect.objectContaining({ code: 'sync_already_running' }),
+      );
+      expect(jobStore.abortRunningJob).not.toHaveBeenCalled();
+      releaseClaim();
+      await run;
+      expect(getPersistedJob()).toMatchObject({ status: 'done', instanceId: 'new-instance' });
+      expect(getPersistedJob()?.status).not.toBe('aborted');
+    }
   });
 
   it('persists a safe terminal failure when preflight fails after the job claim', async () => {

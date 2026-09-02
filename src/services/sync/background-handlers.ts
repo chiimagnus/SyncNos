@@ -8,6 +8,7 @@ import { storageGet } from '@platform/storage/local';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { ensureSyncProviderEnabled } from '@services/sync/sync-provider-gate';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -26,6 +27,7 @@ type Deps = {
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
     getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
     clearSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
+    isRunActive: () => boolean;
   };
   obsidianSyncOrchestrator: {
     testConnection: (input: { instanceId: string }) => Promise<any>;
@@ -36,11 +38,13 @@ type Deps = {
     }) => Promise<unknown>;
     getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
     clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+    isRunActive: () => boolean;
   };
   feishuSyncOrchestrator: {
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
     getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
     clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+    isRunActive: () => boolean;
   };
   githubSyncOrchestrator: {
     sync: (input: {
@@ -50,6 +54,7 @@ type Deps = {
     }) => Promise<unknown>;
     getSyncStatus: (input: { instanceId?: string }) => Promise<unknown>;
     clearSyncStatus: (input: { instanceId?: string }) => Promise<unknown>;
+    isRunActive: () => boolean;
   };
 };
 
@@ -86,11 +91,6 @@ function buildObsidianPreflightFailure(preflight: any) {
   };
 }
 
-function normalizeIds(ids: unknown): number[] {
-  if (!Array.isArray(ids)) return [];
-  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
-}
-
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     let lock: Promise<unknown> | null = null;
@@ -105,7 +105,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
       // Acquire the lock before any async work, so concurrent requests can't race past the check.
@@ -113,9 +113,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       notionDetachedRun = lock;
 
       const instanceId = deps.getInstanceId();
-      const status = await deps.notionSyncOrchestrator.getSyncJobStatus({ instanceId });
-      const currentJob = (status as any)?.job;
-      if (currentJob?.status === 'running') {
+      if (deps.notionSyncOrchestrator.isRunActive()) {
         releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
@@ -148,23 +146,42 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS, async () => {
-    const data = await deps.notionSyncOrchestrator.getSyncJobStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.notionSyncOrchestrator.getSyncJobStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: Boolean(notionDetachedRun) || deps.notionSyncOrchestrator.isRunActive() });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(NOTION_MESSAGE_TYPES.CLEAR_SYNC_JOB_STATUS, async () => {
-    const data = await deps.notionSyncOrchestrator.clearSyncJobStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.notionSyncOrchestrator.clearSyncJobStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: false });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
-    const data = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({
+        ...data,
+        active: Boolean(obsidianDetachedRun) || deps.obsidianSyncOrchestrator.isRunActive(),
+      });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.CLEAR_SYNC_STATUS, async () => {
-    const data = await deps.obsidianSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.obsidianSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: false });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
@@ -180,19 +197,17 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
-      const forceFullConversationIds = normalizeIds(msg?.forceFullConversationIds);
+      const forceFullConversationIds = normalizeSyncConversationIds(msg?.forceFullConversationIds);
 
       // Acquire the lock before any async work, so concurrent requests can't race past the check.
       lock = Promise.resolve();
       obsidianDetachedRun = lock;
 
       const instanceId = deps.getInstanceId();
-      const status = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId });
-      const currentJob = (status as any)?.job;
-      if (currentJob?.status === 'running') {
+      if (deps.obsidianSyncOrchestrator.isRunActive()) {
         releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
@@ -238,7 +253,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
       // Acquire the lock before any async work, so concurrent requests can't race past the check.
@@ -246,9 +261,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       feishuDetachedRun = lock;
 
       const instanceId = deps.getInstanceId();
-      const status = await deps.feishuSyncOrchestrator.getSyncStatus({ instanceId });
-      const currentJob = (status as any)?.job;
-      if (currentJob?.status === 'running') {
+      if (deps.feishuSyncOrchestrator.isRunActive()) {
         releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
@@ -274,13 +287,21 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(FEISHU_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
-    const data = await deps.feishuSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.feishuSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: Boolean(feishuDetachedRun) || deps.feishuSyncOrchestrator.isRunActive() });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(FEISHU_MESSAGE_TYPES.CLEAR_SYNC_STATUS, async () => {
-    const data = await deps.feishuSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.feishuSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: false });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
@@ -293,14 +314,13 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (gateError) return router.err('sync provider disabled', gateError);
       if (githubDetachedRun) return router.err('sync already in progress', { code: 'sync_already_running' });
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
       lock = Promise.resolve();
       githubDetachedRun = lock;
       const instanceId = deps.getInstanceId();
-      const status = await deps.githubSyncOrchestrator.getSyncStatus({ instanceId });
-      if ((status as any)?.job?.status === 'running') {
+      if (deps.githubSyncOrchestrator.isRunActive()) {
         releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
@@ -320,12 +340,20 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
-    const data = await deps.githubSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.githubSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: Boolean(githubDetachedRun) || deps.githubSyncOrchestrator.isRunActive() });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS, async () => {
-    const data = await deps.githubSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
-    return router.ok(data);
+    try {
+      const data: any = await deps.githubSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
+      return router.ok({ ...data, active: false });
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 }

@@ -25,16 +25,12 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
-  abortRunningJobIfFromOtherInstance: vi.fn(),
-  isRunningJob: vi.fn(),
   setJob: vi.fn(),
   getJob: vi.fn(),
 }));
 
 vi.mock('@services/sync/sync-job-store', () => ({
   createSyncJobStore: () => ({
-    abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
-    isRunningJob: jobStoreMocks.isRunningJob,
     setJob: jobStoreMocks.setJob,
     getJob: jobStoreMocks.getJob,
   }),
@@ -120,8 +116,6 @@ describe('feishu docx image bind flow', () => {
   it('converts markdown then binds images by order (best-effort)', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -175,8 +169,6 @@ describe('feishu docx image bind flow', () => {
   it('records warnings when image blocks are fewer than markdown images', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },

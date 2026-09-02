@@ -47,5 +47,9 @@ export function createNotionAutoSyncScheduler(
     isProviderEnabled: () => isSyncProviderEnabled('notion'),
     syncConversations: (conversationIds, instanceId) =>
       deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId } as any) as any,
+    getFailureRetryDelayMs: (error) =>
+      String((error as any)?.code || '').trim() === 'notion_sync_job_persist_failed'
+        ? NOTION_AUTO_SYNC_DEBOUNCE_MS
+        : null,
   });
 }

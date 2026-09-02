@@ -66,6 +66,24 @@ describe('github-auto-sync-scheduler', () => {
     expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({});
   });
 
+  it('retains dirty ids after an initial job persistence failure using the transient retry cadence', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '6': 9_999 };
+    const sync = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('persist failed'), { code: 'github_sync_job_persist_failed' }));
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-auto-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flush();
+
+    expect(storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY]).toEqual({
+      '6': 10_000 + GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS,
+    });
+  });
+
   it('retains dirty ids after an auth/preflight failure instead of dropping them', async () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '7': 9_999 };
@@ -245,6 +263,24 @@ describe('github-auto-sync-scheduler', () => {
     await scheduler.flushCleanup();
 
     expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, { when: 45_678 });
+  });
+
+  it('reschedules cleanup with the transient cadence when cleanup-only job persistence fails', async () => {
+    storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
+    const sync = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('persist failed'), { code: 'github_sync_job_persist_failed' }));
+    const scheduler = createGithubAutoSyncScheduler(
+      { getInstanceId: () => 'github-cleanup-instance', githubSyncOrchestrator: { sync } as any },
+      { now: () => 10_000 },
+    );
+
+    await scheduler.flushCleanup();
+
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(alarmsMocks.create).toHaveBeenCalledWith(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, {
+      when: 10_000 + GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS,
+    });
   });
 
   it('reschedules cleanup in the future when the shared GitHub job is busy', async () => {

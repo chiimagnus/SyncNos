@@ -10,6 +10,9 @@ import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts
 import {
   clearSyncStatus as clearObsidianSyncStatus,
   getSyncStatus as getObsidianSyncStatus,
+  isRunActive as isObsidianRunActive,
+  reconcileStartupSyncJob as reconcileObsidianStartupSyncJob,
+  runExclusiveMaintenance as runObsidianExclusiveMaintenance,
   syncConversations as obsidianSyncConversations,
   testConnection as testObsidianConnection,
 } from '@services/sync/obsidian/obsidian-sync-orchestrator.ts';
@@ -17,6 +20,9 @@ import {
 import {
   clearSyncStatus as clearFeishuSyncStatus,
   getSyncStatus as getFeishuSyncStatus,
+  isRunActive as isFeishuRunActive,
+  reconcileStartupSyncJob as reconcileFeishuStartupSyncJob,
+  runExclusiveMaintenance as runFeishuExclusiveMaintenance,
   syncConversations as feishuSyncConversations,
 } from '@services/sync/feishu/feishu-sync-orchestrator.ts';
 import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
@@ -52,13 +58,21 @@ import {
 } from '@services/sync/auto-sync/auto-sync-keys';
 import { storageGet } from '@services/shared/storage';
 
-export type NotionSyncOrchestrator = {
+type ExclusiveMaintenance = <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
+
+type SyncOwnershipSurface = {
+  isRunActive: () => boolean;
+  runExclusiveMaintenance: ExclusiveMaintenance;
+  reconcileStartupSyncJob: () => Promise<unknown>;
+};
+
+export type NotionSyncOrchestrator = SyncOwnershipSurface & {
   syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
   getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
   clearSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
 };
 
-export type ObsidianSyncOrchestrator = {
+export type ObsidianSyncOrchestrator = SyncOwnershipSurface & {
   syncConversations: (input: {
     conversationIds?: unknown[];
     forceFullConversationIds?: unknown[];
@@ -69,7 +83,7 @@ export type ObsidianSyncOrchestrator = {
   testConnection: (input: { instanceId: string }) => Promise<unknown>;
 };
 
-export type FeishuSyncOrchestrator = {
+export type FeishuSyncOrchestrator = SyncOwnershipSurface & {
   syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
   getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
   clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
@@ -111,11 +125,17 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
     getSyncStatus: getObsidianSyncStatus,
     clearSyncStatus: clearObsidianSyncStatus,
     testConnection: testObsidianConnection,
+    isRunActive: isObsidianRunActive,
+    runExclusiveMaintenance: runObsidianExclusiveMaintenance,
+    reconcileStartupSyncJob: reconcileObsidianStartupSyncJob,
   };
   const feishuSyncOrchestrator: FeishuSyncOrchestrator = {
     syncConversations: feishuSyncConversations,
     getSyncStatus: getFeishuSyncStatus,
     clearSyncStatus: clearFeishuSyncStatus,
+    isRunActive: isFeishuRunActive,
+    runExclusiveMaintenance: runFeishuExclusiveMaintenance,
+    reconcileStartupSyncJob: reconcileFeishuStartupSyncJob,
   };
   const githubSyncOrchestrator = createGithubSyncOrchestrator();
 

@@ -24,22 +24,6 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
   setFeishuOAuthToken: tokenMocks.setFeishuOAuthToken,
 }));
 
-const jobStoreMocks = vi.hoisted(() => ({
-  abortRunningJobIfFromOtherInstance: vi.fn(),
-  isRunningJob: vi.fn(),
-  setJob: vi.fn(),
-  getJob: vi.fn(),
-}));
-
-vi.mock('@services/sync/sync-job-store', () => ({
-  createSyncJobStore: () => ({
-    abortRunningJobIfFromOtherInstance: jobStoreMocks.abortRunningJobIfFromOtherInstance,
-    isRunningJob: jobStoreMocks.isRunningJob,
-    setJob: jobStoreMocks.setJob,
-    getJob: jobStoreMocks.getJob,
-  }),
-}));
-
 const fetchFeishuJsonMock = vi.hoisted(() => vi.fn());
 vi.mock('@services/sync/feishu/feishu-api', () => ({
   fetchFeishuJson: fetchFeishuJsonMock,
@@ -110,9 +94,8 @@ function mockDefaultFeishuFolderLayout(path: string, init?: RequestInit) {
 }
 
 describe('feishu orchestrator warnings sanitization', () => {
-  it('does not force-abort running jobs when status is read without instanceId', async () => {
-    setupChromeStorage();
-    jobStoreMocks.getJob.mockResolvedValue({
+  it('reads persisted canonical running status without mutating it', async () => {
+    const persisted = {
       id: 'job_running',
       provider: 'feishu',
       instanceId: 'background-old',
@@ -120,25 +103,27 @@ describe('feishu orchestrator warnings sanitization', () => {
       startedAt: Date.now() - 3_000,
       updatedAt: Date.now() - 1_000,
       finishedAt: null,
-      conversationIds: [1],
+      totalCount: 1,
+      conversationIds: [],
+      currentConversationId: 1,
+      currentConversationTitle: 'Current',
+      currentStage: 'preparing_sync',
       okCount: 0,
       failCount: 0,
       perConversation: [],
-    });
+    };
+    const store = setupChromeStorage({ feishu_sync_job_v2: persisted });
 
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
     const status = await orch.getSyncStatus();
 
-    expect(jobStoreMocks.abortRunningJobIfFromOtherInstance).not.toHaveBeenCalled();
-    expect(jobStoreMocks.getJob).toHaveBeenCalledTimes(1);
-    expect(status.job?.status).toBe('running');
+    expect(status.job).toEqual(persisted);
+    expect(store.feishu_sync_job_v2).toEqual(persisted);
   });
 
   it('sanitizes query values even when binder throws', async () => {
-    setupChromeStorage();
+    const store = setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
-    jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
-    jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -167,5 +152,14 @@ describe('feishu orchestrator warnings sanitization', () => {
     const warnings = String(res.results?.[0]?.warnings?.join('\n') || '');
     expect(warnings).toContain('https://example.com/a.png?keys=sig,x');
     expect(warnings).not.toContain('SECRET');
+
+    const persisted = store.feishu_sync_job_v2 as any;
+    expect(persisted?.status).toBe('done');
+    expect(persisted?.perConversation?.[0]?.warnings).toEqual([
+      { code: 'feishu_sync_warning', message: expect.stringContaining('https://example.com/a.png?keys=sig,x') },
+    ]);
+    const status = await orch.getSyncStatus();
+    expect(status.job?.status).toBe('done');
+    expect(status.job?.perConversation?.[0]?.warnings).toEqual(persisted.perConversation[0].warnings);
   });
 });

@@ -2,7 +2,6 @@ import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet, storageRemove } from '@platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { listNotionParentPages } from '@services/sync/notion/notion-parent-pages.ts';
-import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -12,6 +11,7 @@ type AnyRouter = {
 
 type Deps = {
   conversationKinds: { getNotionStorageKeys?: () => unknown[] } | null;
+  runExclusiveMaintenance: <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
 };
 
 function getNotionDisconnectStorageKeys(deps: Deps): string[] {
@@ -32,7 +32,7 @@ function getNotionDisconnectStorageKeys(deps: Deps): string[] {
     return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles', 'notion_db_id_syncnos_videos'];
   })();
 
-  return Array.from(new Set([...base, ...notionDbKeys, SYNC_JOB_STORAGE_KEYS.notion]));
+  return Array.from(new Set([...base, ...notionDbKeys]));
 }
 
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
@@ -75,9 +75,21 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
-    await clearNotionOAuthToken();
-    const clearedKeys = getNotionDisconnectStorageKeys(deps);
-    await storageRemove(clearedKeys);
-    return router.ok({ disconnected: true, clearedKeys });
+    try {
+      const clearedKeys = await deps.runExclusiveMaintenance(
+        async () => {
+          await clearNotionOAuthToken();
+          const keys = getNotionDisconnectStorageKeys(deps);
+          await storageRemove(keys);
+          return keys;
+        },
+        { clearStatusAfter: true },
+      );
+      return router.ok({ disconnected: true, clearedKeys });
+    } catch (error) {
+      const message = String((error as any)?.message ?? error ?? 'notion disconnect failed');
+      const code = String((error as any)?.extra?.code ?? (error as any)?.code ?? '').trim();
+      return code ? router.err(message, { code }) : router.err(message);
+    }
   });
 }

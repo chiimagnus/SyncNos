@@ -1,4 +1,5 @@
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncRunSummary } from '@services/sync/models';
+import { normalizeSyncConversationId, normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 type SyncJobResultInput = Record<string, any> & {
   conversationId: number;
@@ -15,8 +16,15 @@ type PersistSyncJob = (job: SyncJobSnapshot) => boolean | void | Promise<boolean
 
 type SyncJobLifecycleOptions = {
   initialJob: SyncJobSnapshot;
+  configuredConversationIds: readonly unknown[];
   persist: PersistSyncJob;
   now?: () => number;
+};
+
+type ActiveItem = {
+  id: number;
+  title: string;
+  stage: string;
 };
 
 function safeString(value: unknown): string {
@@ -24,8 +32,8 @@ function safeString(value: unknown): string {
 }
 
 function positiveId(value: unknown): number {
-  const id = Number(value);
-  if (!Number.isSafeInteger(id) || id <= 0) throw new Error('invalid conversation id');
+  const id = normalizeSyncConversationId(value);
+  if (id == null) throw new Error('invalid conversation id');
   return id;
 }
 
@@ -62,19 +70,30 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   const now = options.now ?? Date.now;
   const titles = new Map<number, string>();
   const results = new Map<number, SyncPerConversationResult & Record<string, any>>();
-  const configuredIds = options.initialJob.conversationIds.map(positiveId);
+  const activeItems = new Map<number, ActiveItem>();
+  const configuredIds = normalizeSyncConversationIds(options.configuredConversationIds);
   const configuredIdSet = new Set(configuredIds);
+  let okCount = 0;
+  let failCount = 0;
+  const totalCount = configuredIds.length;
   let snapshot: SyncJobSnapshot = {
     ...options.initialJob,
-    conversationIds: [...configuredIds],
+    totalCount,
+    conversationIds: [],
     perConversation: [],
+    okCount: 0,
+    failCount: 0,
   };
   let persistChain: Promise<boolean> = Promise.resolve(true);
 
   const rememberTitle = (conversationId: number, candidate: unknown): string => {
     const id = positiveId(conversationId);
     const next = safeString(candidate);
-    if (next) titles.set(id, next);
+    if (next) {
+      titles.set(id, next);
+      const active = activeItems.get(id);
+      if (active) active.title = next;
+    }
     return titles.get(id) ?? '';
   };
 
@@ -90,18 +109,45 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     return rows;
   };
 
-  const refreshResultSnapshot = () => {
-    const perConversation = orderedResults();
+  const latestActiveItem = (): ActiveItem | null => {
+    let latest: ActiveItem | null = null;
+    for (const item of activeItems.values()) latest = item;
+    return latest;
+  };
+
+  const applyCurrentItem = (item: ActiveItem | null) => {
     snapshot = {
       ...snapshot,
-      okCount: perConversation.filter((row) => row.ok).length,
-      failCount: perConversation.filter((row) => !row.ok).length,
-      perConversation,
+      currentConversationId: item?.id,
+      currentConversationTitle: item?.title || undefined,
+      currentStage: item?.stage,
     };
   };
 
+  const materializeSnapshot = (): SyncJobSnapshot => {
+    if (snapshot.status === 'running') {
+      return cloneSnapshot({
+        ...snapshot,
+        totalCount,
+        okCount,
+        failCount,
+        conversationIds: [],
+        perConversation: [],
+      });
+    }
+
+    return cloneSnapshot({
+      ...snapshot,
+      totalCount,
+      okCount,
+      failCount,
+      conversationIds: [...configuredIds],
+      perConversation: orderedResults(),
+    });
+  };
+
   const persistCurrent = async (): Promise<boolean> => {
-    const value = cloneSnapshot(snapshot);
+    const value = materializeSnapshot();
     const next = persistChain
       .catch(() => false)
       .then(async () => {
@@ -134,18 +180,21 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     } as T & SyncPerConversationResult;
   };
 
-  const recordResult = <T extends SyncJobResultInput>(input: T): T & SyncPerConversationResult => {
+  const upsertResult = <T extends SyncJobResultInput>(input: T): T & SyncPerConversationResult => {
     const row = normalizeResult(input);
+    const previous = results.get(row.conversationId);
+    if (previous) {
+      if (previous.ok) okCount -= 1;
+      else failCount -= 1;
+    }
     results.set(row.conversationId, cloneRow(row));
-    refreshResultSnapshot();
+    if (row.ok) okCount += 1;
+    else failCount += 1;
+    snapshot = { ...snapshot, okCount, failCount };
     return cloneRow(row);
   };
 
-  for (const row of options.initialJob.perConversation) recordResult(row as SyncJobResultInput);
-  if (options.initialJob.currentConversationId) {
-    rememberTitle(options.initialJob.currentConversationId, options.initialJob.currentConversationTitle);
-  }
-  refreshResultSnapshot();
+  const recordResult = <T extends SyncJobResultInput>(input: T): T & SyncPerConversationResult => upsertResult(input);
 
   const setItem = async (
     conversationId: number,
@@ -153,18 +202,24 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   ): Promise<boolean> => {
     const id = positiveId(conversationId);
     const title = rememberTitle(id, input.conversationTitle);
+    const stage = safeString(input.currentStage);
+    activeItems.delete(id);
+    activeItems.set(id, { id, title, stage });
     snapshot = {
       ...snapshot,
       status: 'running',
       updatedAt: now(),
       currentConversationId: id,
       currentConversationTitle: title || undefined,
-      currentStage: safeString(input.currentStage),
+      currentStage: stage,
+      okCount,
+      failCount,
     };
     return persistCurrent();
   };
 
   const setRunStage = async (currentStage: string): Promise<boolean> => {
+    activeItems.clear();
     snapshot = {
       ...snapshot,
       status: 'running',
@@ -172,30 +227,32 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
       currentConversationId: undefined,
       currentConversationTitle: undefined,
       currentStage: safeString(currentStage),
+      okCount,
+      failCount,
     };
     return persistCurrent();
   };
 
-  const finishItem = async (conversationId: number, currentStage = 'finishing_current_item'): Promise<boolean> => {
+  const finishItem = async (conversationId: number, input: { persist?: boolean } = {}): Promise<boolean> => {
     const id = positiveId(conversationId);
-    const title = titles.get(id) ?? '';
+    const wasActive = activeItems.delete(id);
+    if (wasActive && snapshot.currentConversationId === id) applyCurrentItem(latestActiveItem());
     snapshot = {
       ...snapshot,
       status: 'running',
       updatedAt: now(),
-      currentConversationId: id,
-      currentConversationTitle: title || undefined,
-      currentStage: safeString(currentStage),
+      okCount,
+      failCount,
     };
+    if (input.persist === false) return true;
     return persistCurrent();
   };
 
   const completeItem = async <T extends SyncJobResultInput>(
     input: T,
-    currentStage = 'finishing_current_item',
   ): Promise<{ row: T & SyncPerConversationResult; persisted: boolean }> => {
     const row = recordResult(input);
-    const persisted = await finishItem(row.conversationId, currentStage);
+    const persisted = await finishItem(row.conversationId);
     return { row, persisted };
   };
 
@@ -205,9 +262,11 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   ): Promise<boolean> => {
     if (rows) {
       results.clear();
-      for (const row of rows) recordResult(row);
+      okCount = 0;
+      failCount = 0;
+      for (const row of rows) upsertResult(row);
     }
-    refreshResultSnapshot();
+    activeItems.clear();
     const finishedAt = now();
     snapshot = {
       ...snapshot,
@@ -217,17 +276,18 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
       currentConversationId: undefined,
       currentConversationTitle: undefined,
       currentStage: input.currentStage == null ? undefined : safeString(input.currentStage),
+      okCount,
+      failCount,
     };
     return persistCurrent();
   };
 
   const summary = (): SyncRunSummary => {
     const rows = orderedResults();
-    const okCount = rows.filter((row) => row.ok).length;
     return {
       provider: snapshot.provider,
       okCount,
-      failCount: rows.length - okCount,
+      failCount,
       failures: rows
         .filter((row) => !row.ok)
         .map((row) => ({
@@ -247,7 +307,7 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
     const message = safeString((error as any)?.code || (error as any)?.message || error || 'sync failed');
     for (const conversationId of configuredIds) {
       if (results.has(conversationId)) continue;
-      recordResult({
+      upsertResult({
         conversationId,
         conversationTitle: titles.get(conversationId),
         ok: false,

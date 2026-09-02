@@ -6,6 +6,7 @@ import {
 } from '@platform/messaging/message-contracts';
 import { send } from '@platform/runtime/runtime';
 import type { SyncJobStatusResponse, SyncProvider } from '@services/sync/models';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 export type SyncStartAck = {
   provider: SyncProvider;
@@ -64,14 +65,8 @@ export async function clearGithubSyncStatus(): Promise<SyncJobStatusResponse> {
   return unwrap(res);
 }
 
-function normalizeIds(ids: unknown): number[] {
-  return Array.isArray(ids)
-    ? Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)))
-    : [];
-}
-
 export async function syncNotionConversations(conversationIds: number[]): Promise<SyncStartAck> {
-  const ids = normalizeIds(conversationIds);
+  const ids = normalizeSyncConversationIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
   const res = await send<ApiResponse<SyncStartAck>>(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
   return unwrap(res);
@@ -81,9 +76,9 @@ export async function syncObsidianConversations(
   conversationIds: number[],
   { forceFullConversationIds }: { forceFullConversationIds?: number[] } = {},
 ): Promise<SyncStartAck> {
-  const ids = normalizeIds(conversationIds);
+  const ids = normalizeSyncConversationIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
-  const forceFull = normalizeIds(forceFullConversationIds);
+  const forceFull = normalizeSyncConversationIds(forceFullConversationIds);
   const res = await send<ApiResponse<SyncStartAck>>(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, {
     conversationIds: ids,
     forceFullConversationIds: forceFull.length ? forceFull : undefined,
@@ -92,14 +87,14 @@ export async function syncObsidianConversations(
 }
 
 export async function syncFeishuConversations(conversationIds: number[]): Promise<SyncStartAck> {
-  const ids = normalizeIds(conversationIds);
+  const ids = normalizeSyncConversationIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
   const res = await send<ApiResponse<SyncStartAck>>(FEISHU_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
   return unwrap(res);
 }
 
 export async function syncGithubConversations(conversationIds: number[]): Promise<SyncStartAck> {
-  const ids = normalizeIds(conversationIds);
+  const ids = normalizeSyncConversationIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
   const res = await send<ApiResponse<SyncStartAck>>(GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
   return unwrap(res);

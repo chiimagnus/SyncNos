@@ -14,6 +14,7 @@ import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-b
 import {
   clearSyncStatus as clearObsidianSyncStatus,
   getSyncStatus as getObsidianSyncStatus,
+  isRunActive as isObsidianRunActive,
   syncConversations as obsidianSyncConversations,
   testConnection as testObsidianConnection,
 } from '@services/sync/obsidian/obsidian-sync-orchestrator.ts';
@@ -47,7 +48,10 @@ export function createTestBackgroundRouter(
     onRemoteCleanupPending: async () => {},
   });
   registerWebArticleHandlers(router, { onConversationChanged: options.onArticleConversationChanged });
-  registerNotionSettingsHandlers(router, { conversationKinds });
+  registerNotionSettingsHandlers(router, {
+    conversationKinds,
+    runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
+  });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
   registerUiMessageHandlers(router);
   registerSyncHandlers(router, {
@@ -57,11 +61,19 @@ export function createTestBackgroundRouter(
       clearSyncStatus: clearObsidianSyncStatus,
       syncConversations: obsidianSyncConversations,
       getSyncStatus: getObsidianSyncStatus,
+      isRunActive: isObsidianRunActive,
+    },
+    feishuSyncOrchestrator: {
+      getSyncStatus: async () => ({ provider: 'feishu', job: null }),
+      clearSyncStatus: async () => ({ provider: 'feishu', job: null }),
+      syncConversations: async () => ({ provider: 'feishu', okCount: 0, failCount: 0, results: [] }),
+      isRunActive: () => false,
     },
     githubSyncOrchestrator: {
       getSyncStatus: async () => ({ job: null }),
       clearSyncStatus: async () => ({ job: null }),
       sync: async () => ({ summary: { syncedCount: 0, failedCount: 0 } }),
+      isRunActive: () => false,
     },
   });
 

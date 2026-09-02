@@ -14,7 +14,6 @@ import {
   ensureDefaultFeishuOAuthProxyUrl,
   setupFeishuOAuthNavigationListener,
 } from '@services/sync/feishu/auth/oauth';
-import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerFeishuSettingsHandlers } from '@services/sync/feishu/settings-background-handlers';
@@ -73,14 +72,19 @@ export default defineBackground(() => {
   registerChatgptDeepResearchHandlers(router);
   registerNotionSettingsHandlers(router, {
     conversationKinds: services.conversationKinds,
+    runExclusiveMaintenance: services.notionSyncOrchestrator.runExclusiveMaintenance,
   });
-  registerFeishuSettingsHandlers(router);
+  registerFeishuSettingsHandlers(router, {
+    runExclusiveMaintenance: services.feishuSyncOrchestrator.runExclusiveMaintenance,
+  });
   registerObsidianSettingsHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
   });
   try {
-    registerGithubSettingsHandlers(router);
+    registerGithubSettingsHandlers(router, {
+      runExclusiveMaintenance: services.githubSyncOrchestrator.runExclusiveMaintenance,
+    });
   } catch (_error) {
     // GitHub Settings is optional during startup; a registration failure must not block the core router.
   }
@@ -148,11 +152,10 @@ export default defineBackground(() => {
   void ensureDefaultFeishuOAuthClientId().catch(() => {});
   void ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
 
-  const id = getBackgroundInstanceId();
-  for (const provider of ['notion', 'obsidian', 'feishu', 'github'] as const) {
-    const jobStore = createSyncJobStore(provider);
-    runBestEffort(() => jobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }));
-  }
+  runBestEffort(() => services.notionSyncOrchestrator.reconcileStartupSyncJob());
+  runBestEffort(() => services.obsidianSyncOrchestrator.reconcileStartupSyncJob());
+  runBestEffort(() => services.feishuSyncOrchestrator.reconcileStartupSyncJob());
+  runBestEffort(() => services.githubSyncOrchestrator.reconcileStartupSyncJob());
 
   // Best-effort recovery complements alarm wakeups after MV3 worker reloads.
   // Each provider is isolated so one synchronous or asynchronous failure cannot
