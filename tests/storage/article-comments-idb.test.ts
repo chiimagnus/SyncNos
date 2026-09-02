@@ -100,9 +100,9 @@ describe('article comments storage-idb', () => {
     const before = await readDataRevision('article_comments');
     expect(await deleteArticleCommentById(999_999)).toEqual({ deleted: false, conversationId: null });
     expect(await readDataRevision('article_comments')).toBe(before);
-    expect((await listArticleCommentsByCanonicalUrl('https://example.com/missing-parent')).map((item) => item.id)).toEqual([
-      childId,
-    ]);
+    expect(
+      (await listArticleCommentsByCanonicalUrl('https://example.com/missing-parent')).map((item) => item.id),
+    ).toEqual([childId]);
   });
 
   it('round-trips author metadata and V1/V2 locators without field loss', async () => {

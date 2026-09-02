@@ -1142,12 +1142,7 @@ function buildListTimestampRange(
       true,
     );
   }
-  return keyRangeApi.bound(
-    [startInclusive, MIN_ID] as any,
-    [endExclusive, MIN_ID] as any,
-    false,
-    true,
-  );
+  return keyRangeApi.bound([startInclusive, MIN_ID] as any, [endExclusive, MIN_ID] as any, false, true);
 }
 
 async function hydrateConversationListArticleCommentThreadCounts(
@@ -1173,10 +1168,7 @@ async function hydrateConversationListArticleCommentThreadCounts(
       keyRangeApi && Number.isSafeInteger(conversationId) && conversationId > 0
         ? reqToPromise<any[]>(
             byConversation.getAll(
-              keyRangeApi.bound(
-                [conversationId, -Infinity] as any,
-                [conversationId, Infinity] as any,
-              ),
+              keyRangeApi.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any),
             ) as any,
           )
         : Promise.resolve([]);
@@ -1187,10 +1179,7 @@ async function hydrateConversationListArticleCommentThreadCounts(
       if (!orphanRowsByCanonicalUrl.has(canonicalUrl)) {
         orphanRows = reqToPromise<any[]>(
           byCanonicalUrl.getAll(
-            keyRangeApi.bound(
-              [canonicalUrl, -Infinity] as any,
-              [canonicalUrl, Infinity] as any,
-            ),
+            keyRangeApi.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any),
           ) as any,
         );
         orphanRowsByCanonicalUrl.set(canonicalUrl, orphanRows);
