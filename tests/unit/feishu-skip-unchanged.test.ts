@@ -85,6 +85,19 @@ afterEach(() => {
 });
 
 describe('feishu skip unchanged', () => {
+  it('ignores fractional conversation ids without creating a running job', async () => {
+    setupChromeStorage();
+    jobStoreMocks.setJob.mockResolvedValue(true);
+
+    const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
+    const result = await orch.syncConversations({ conversationIds: [1.5], instanceId: 'fractional' });
+
+    expect(result).toMatchObject({ okCount: 0, failCount: 0, results: [] });
+    expect(jobStoreMocks.setJob).not.toHaveBeenCalled();
+    expect(backgroundStorageMocks.getSyncMappingByConversation).not.toHaveBeenCalled();
+    expect(fetchFeishuJsonMock).not.toHaveBeenCalled();
+  });
+
   it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
     setupChromeStorage();
     tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });

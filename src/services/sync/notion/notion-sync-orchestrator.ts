@@ -18,6 +18,7 @@ import {
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import type { SyncJobSnapshot } from '@services/sync/models';
 
 const SYNC_PROVIDER = 'notion';
@@ -405,17 +406,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
   async function runSyncConversations(input: any) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    const conversationIds = input ? input.conversationIds : undefined;
-    const ids = Array.isArray(conversationIds)
-      ? Array.from(
-          new Set(
-            conversationIds
-              .map((x) => Number(x))
-              .filter((x) => Number.isFinite(x) && x > 0)
-              .map((x) => Math.floor(x)),
-          ),
-        )
-      : [];
+    const ids = normalizeSyncConversationIds(input?.conversationIds);
     if (!ids.length) throw new Error('no conversationIds');
 
     const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;

@@ -8,6 +8,7 @@ import { storageGet } from '@platform/storage/local';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { ensureSyncProviderEnabled } from '@services/sync/sync-provider-gate';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -90,11 +91,6 @@ function buildObsidianPreflightFailure(preflight: any) {
   };
 }
 
-function normalizeIds(ids: unknown): number[] {
-  if (!Array.isArray(ids)) return [];
-  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
-}
-
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     let lock: Promise<unknown> | null = null;
@@ -109,7 +105,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
       // Acquire the lock before any async work, so concurrent requests can't race past the check.
@@ -201,10 +197,10 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
-      const forceFullConversationIds = normalizeIds(msg?.forceFullConversationIds);
+      const forceFullConversationIds = normalizeSyncConversationIds(msg?.forceFullConversationIds);
 
       // Acquire the lock before any async work, so concurrent requests can't race past the check.
       lock = Promise.resolve();
@@ -257,7 +253,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
       // Acquire the lock before any async work, so concurrent requests can't race past the check.
@@ -318,7 +314,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (gateError) return router.err('sync provider disabled', gateError);
       if (githubDetachedRun) return router.err('sync already in progress', { code: 'sync_already_running' });
 
-      const conversationIds = normalizeIds(msg?.conversationIds);
+      const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
       lock = Promise.resolve();

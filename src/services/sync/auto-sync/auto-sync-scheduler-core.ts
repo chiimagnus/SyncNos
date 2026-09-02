@@ -1,3 +1,5 @@
+import { normalizeSyncConversationId, normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
+
 export type AutoSyncSchedulerInfra = {
   now: () => number;
   storage: {
@@ -22,8 +24,8 @@ function normalizeQueue(value: unknown): QueueMap {
   if (!value || typeof value !== 'object') return {};
   const out: QueueMap = {};
   for (const [key, rawDueAt] of Object.entries(value as Record<string, unknown>)) {
-    const conversationId = Number(key);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+    const conversationId = normalizeSyncConversationId(key);
+    if (conversationId == null) continue;
     const dueAt = Number(rawDueAt);
     if (!Number.isFinite(dueAt) || dueAt <= 0) continue;
     out[String(conversationId)] = Math.floor(dueAt);
@@ -50,17 +52,6 @@ function pickEarliestDueAt(queue: QueueMap): number | null {
     if (earliest == null || value < earliest) earliest = value;
   }
   return earliest;
-}
-
-function normalizeIds(ids: string[]) {
-  return Array.from(
-    new Set(
-      ids
-        .map((x) => Number(x))
-        .filter((x) => Number.isFinite(x) && x > 0)
-        .map((x) => Math.floor(x)),
-    ),
-  );
 }
 
 function isAlreadyRunningError(error: unknown): boolean {
@@ -115,8 +106,8 @@ export function createAutoSyncSchedulerCore(config: {
   };
 
   const enqueue = async (conversationId: number, _reason: string) => {
-    const id = Number(conversationId);
-    if (!Number.isFinite(id) || id <= 0) return;
+    const id = normalizeSyncConversationId(conversationId);
+    if (id == null) return;
 
     const local = await infra.storage.get([enabledStorageKey]).catch(() => ({}) as any);
     const autoSyncEnabled = (local as any)?.[enabledStorageKey] === true;
@@ -129,7 +120,7 @@ export function createAutoSyncSchedulerCore(config: {
     const nextDueAt = now + debounceMs;
 
     const queue = await readQueue();
-    const key = String(Math.floor(id));
+    const key = String(id);
     const prevDueAt = Number(queue[key]);
     if (Number.isFinite(prevDueAt) && prevDueAt >= nextDueAt) {
       await scheduleNextAlarm(queue);
@@ -156,7 +147,7 @@ export function createAutoSyncSchedulerCore(config: {
     const queue = await readQueue();
 
     const dueKeys = Object.keys(queue).filter((key) => Number(queue[key]) <= now);
-    const dueConversationIds = normalizeIds(dueKeys);
+    const dueConversationIds = normalizeSyncConversationIds(dueKeys);
     if (!dueConversationIds.length) {
       await scheduleNextAlarm(queue);
       return;

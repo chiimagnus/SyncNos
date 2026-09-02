@@ -69,6 +69,28 @@ describe('auto-sync-scheduler-core', () => {
     syncConversations = vi.fn().mockResolvedValue(undefined);
   });
 
+  it('does not floor fractional ids into another conversation', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    infraPack.storage[QUEUE_KEY] = { '1.5': infraPack.infra.now() - 1 };
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-fractional',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await scheduler.enqueue(2.5, 'invalid');
+    await scheduler.flush();
+
+    expect(syncConversations).not.toHaveBeenCalled();
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '1.5': infraPack.infra.now() - 1 });
+  });
+
   it('updates dueAt on repeated enqueue for same conversation', async () => {
     infraPack.storage[ENABLED_KEY] = true;
     const scheduler = createAutoSyncSchedulerCore({

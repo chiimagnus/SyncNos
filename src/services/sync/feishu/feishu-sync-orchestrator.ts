@@ -16,6 +16,7 @@ import { bindFeishuDocxImagesByOrder } from '@services/sync/feishu/docx/image-bl
 import { sha256Hex } from '@services/sync/shared/content-hash';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 const SYNC_PROVIDER = 'feishu';
 const feishuSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
@@ -78,11 +79,6 @@ function normalizeOAuthTokenResponse(
     refresh_token: typeof data?.refresh_token === 'string' ? data.refresh_token : undefined,
     expires_in: Number.isFinite(Number(data?.expires_in)) ? Number(data.expires_in) : undefined,
   };
-}
-
-function normalizeIds(list: unknown) {
-  const ids = Array.isArray(list) ? list : [];
-  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
 function buildJobPersistenceError() {
@@ -644,7 +640,7 @@ async function runSyncConversations({
   conversationIds?: unknown[];
   instanceId?: string;
 } = {}) {
-  const ids = normalizeIds(conversationIds);
+  const ids = normalizeSyncConversationIds(conversationIds);
   if (!ids.length) {
     return {
       provider: SYNC_PROVIDER,

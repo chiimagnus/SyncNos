@@ -21,6 +21,7 @@ import {
 import type { GithubSettings } from '@services/sync/github/settings-store';
 import { createSyncJobLifecycle, type SyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@services/sync/models';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -74,11 +75,6 @@ export type GithubSyncRunResult = {
   deferredReplacementConversationIds: number[];
   cleanupWarnings: string[];
 };
-
-function normalizeIds(input: readonly unknown[] | undefined): number[] {
-  const ids = (Array.isArray(input) ? input : []).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0);
-  return [...new Set(ids)];
-}
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
@@ -377,7 +373,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     mode?: GithubSyncPlannerMode;
     instanceId?: string;
   }): Promise<GithubSyncRunResult> {
-    const ids = normalizeIds(input.conversationIds);
+    const ids = normalizeSyncConversationIds(input.conversationIds);
     const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
     const instanceId = safeString(input.instanceId);
     const runNow = services.now();

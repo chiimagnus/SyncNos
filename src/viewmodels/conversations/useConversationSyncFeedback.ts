@@ -15,6 +15,7 @@ import {
   syncObsidianConversations as defaultSyncObsidianConversations,
 } from '@services/sync/repo';
 import { normalizeSyncJobSnapshot, SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import { storageOnChanged } from '@services/shared/storage';
 import type {
   SyncFailureSummary,
@@ -90,12 +91,6 @@ function providerLabel(provider: SyncProvider) {
   const labelKey = definition?.labelKey;
   const label = labelKey ? t(labelKey as any) : '';
   return label || String(provider || '');
-}
-
-function normalizeIds(ids: number[]) {
-  return Array.from(
-    new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
-  );
 }
 
 function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
@@ -733,7 +728,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
 
   const startSync = useCallback(
     async (provider: SyncProvider, conversationIds: number[]): Promise<SyncStartAck | null> => {
-      const ids = normalizeIds(conversationIds);
+      const ids = normalizeSyncConversationIds(conversationIds);
       if (!ids.length) return null;
 
       const starter = (() => {

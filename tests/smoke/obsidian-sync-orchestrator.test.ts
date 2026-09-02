@@ -64,6 +64,21 @@ beforeEach(() => {
 });
 
 describe('obsidian-sync-orchestrator', () => {
+  it('ignores fractional conversation ids without creating a running job', async () => {
+    const { syncJobSetPayloads } = setupChromeStorage();
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    const result = await orch.syncConversations({
+      conversationIds: [1.5],
+      forceFullConversationIds: [1.5],
+      instanceId: 'fractional',
+    });
+
+    expect(result).toMatchObject({ okCount: 0, failCount: 0, results: [] });
+    expect(syncJobSetPayloads).toEqual([]);
+    expect(backgroundStorageMocks.getConversationById).not.toHaveBeenCalled();
+  });
+
   it('reports missing_api_key when api key is not configured', async () => {
     setupChromeStorage();
     await loadModule('@services/sync/obsidian/obsidian-local-rest-client.ts');

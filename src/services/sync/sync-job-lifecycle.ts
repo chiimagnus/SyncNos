@@ -1,4 +1,5 @@
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncRunSummary } from '@services/sync/models';
+import { normalizeSyncConversationId, normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 type SyncJobResultInput = Record<string, any> & {
   conversationId: number;
@@ -31,21 +32,9 @@ function safeString(value: unknown): string {
 }
 
 function positiveId(value: unknown): number {
-  const id = Number(value);
-  if (!Number.isSafeInteger(id) || id <= 0) throw new Error('invalid conversation id');
+  const id = normalizeSyncConversationId(value);
+  if (id == null) throw new Error('invalid conversation id');
   return id;
-}
-
-function normalizeConfiguredIds(values: readonly unknown[]): number[] {
-  const out: number[] = [];
-  const seen = new Set<number>();
-  for (const value of values) {
-    const id = Number(value);
-    if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out;
 }
 
 function nonNegativeSafeInteger(value: unknown): number | null {
@@ -87,7 +76,9 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
   const titles = new Map<number, string>();
   const results = new Map<number, SyncPerConversationResult & Record<string, any>>();
   const activeItems = new Map<number, ActiveItem>();
-  const configuredIds = normalizeConfiguredIds(options.configuredConversationIds ?? options.initialJob.conversationIds);
+  const configuredIds = normalizeSyncConversationIds(
+    options.configuredConversationIds ?? options.initialJob.conversationIds,
+  );
   const configuredIdSet = new Set(configuredIds);
   let okCount = 0;
   let failCount = 0;

@@ -22,6 +22,7 @@ import {
 } from '@services/sync/shared/markdown-asset-refs';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 const SYNC_PROVIDER = 'obsidian';
 const obsidianSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
@@ -131,11 +132,6 @@ async function materializeMarkdownAssetsForObsidian({
   }
 
   return replaceSyncnosAssetImageTargets(targetMarkdown, attachmentNameByAssetId);
-}
-
-function normalizeIds(list: unknown) {
-  const ids = Array.isArray(list) ? list : [];
-  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
 function buildJobPersistenceError() {
@@ -454,8 +450,8 @@ async function runSyncConversations({
   forceFullConversationIds?: unknown[];
   instanceId?: string;
 } = {}) {
-  const ids = normalizeIds(conversationIds);
-  const forceFullIds = new Set(normalizeIds(forceFullConversationIds));
+  const ids = normalizeSyncConversationIds(conversationIds);
+  const forceFullIds = new Set(normalizeSyncConversationIds(forceFullConversationIds));
   if (!ids.length) {
     return {
       provider: SYNC_PROVIDER,

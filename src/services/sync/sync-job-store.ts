@@ -1,5 +1,6 @@
 import { storageGet, storageSet } from '@platform/storage/local';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncProvider, SyncWarning } from '@services/sync/models';
+import { normalizeSyncConversationId, normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
 export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
   notion: 'notion_sync_job_v1',
@@ -7,11 +8,6 @@ export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
   feishu: 'feishu_sync_job_v1',
   github: 'github_sync_job_v1',
 };
-
-function positiveSafeInteger(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isSafeInteger(number) && number > 0 ? number : null;
-}
 
 function nonNegativeSafeInteger(value: unknown): number | null {
   const number = Number(value);
@@ -21,19 +17,6 @@ function nonNegativeSafeInteger(value: unknown): number | null {
 function nonNegativeFinite(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
-}
-
-function normalizeConversationIds(ids: unknown): number[] {
-  if (!Array.isArray(ids)) return [];
-  const out: number[] = [];
-  const seen = new Set<number>();
-  for (const value of ids) {
-    const id = positiveSafeInteger(value);
-    if (id == null || seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out;
 }
 
 function normalizeWarnings(value: unknown): SyncWarning[] | undefined {
@@ -56,7 +39,7 @@ function normalizePerConversation(rows: unknown): SyncPerConversationResult[] {
   for (const row of rows) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
     const value = row as Record<string, unknown>;
-    const conversationId = positiveSafeInteger(value.conversationId);
+    const conversationId = normalizeSyncConversationId(value.conversationId);
     if (conversationId == null) continue;
     const appended = Number(value.appended);
     out.push({
@@ -86,7 +69,7 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   const okCount = nonNegativeSafeInteger(value.okCount) ?? perConversation.filter((row) => row.ok).length;
   const failCount = nonNegativeSafeInteger(value.failCount) ?? perConversation.filter((row) => !row.ok).length;
   const totalCount = nonNegativeSafeInteger(value.totalCount);
-  const currentConversationId = positiveSafeInteger(value.currentConversationId);
+  const currentConversationId = normalizeSyncConversationId(value.currentConversationId);
 
   return {
     id: value.id == null ? undefined : String(value.id || ''),
@@ -97,7 +80,7 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
     updatedAt,
     finishedAt,
     ...(totalCount == null ? {} : { totalCount }),
-    conversationIds: normalizeConversationIds(value.conversationIds),
+    conversationIds: normalizeSyncConversationIds(value.conversationIds),
     currentConversationId: currentConversationId ?? undefined,
     currentConversationTitle:
       value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),

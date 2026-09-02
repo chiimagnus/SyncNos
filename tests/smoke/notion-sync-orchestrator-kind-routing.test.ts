@@ -387,6 +387,41 @@ describe('notion-sync-orchestrator kind routing', () => {
     });
   });
 
+  it('rejects fractional conversation ids before durable claim or remote work', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    const setJob = vi.fn(async () => true);
+    const getToken = vi.fn(async () => ({ accessToken: 't' }));
+    const getSyncMappingByConversation = vi.fn(async () => null);
+    const ensureDatabase = vi.fn(async () => ({ databaseId: 'unused' }));
+    const createPageInDatabase = vi.fn(async () => ({ id: 'unused' }));
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken },
+      storage: {
+        getSyncMappingByConversation,
+        getMessagesByConversationId: async () => [],
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase },
+      syncService: {
+        createPageInDatabase,
+        appendChildren: async () => ({ ok: true, results: [] }),
+        messagesToBlocks: () => [],
+      },
+      jobStore: { getJob: async () => null, setJob, abortRunningJob: async () => null },
+    } as any);
+
+    await expect(orchestrator.syncConversations({ conversationIds: [1.5], instanceId: 'fractional' })).rejects.toThrow(
+      'no conversationIds',
+    );
+    expect(setJob).not.toHaveBeenCalled();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(getSyncMappingByConversation).not.toHaveBeenCalled();
+    expect(ensureDatabase).not.toHaveBeenCalled();
+    expect(createPageInDatabase).not.toHaveBeenCalled();
+  });
+
   it('rejects a second direct sync synchronously while the first durable claim is still pending', async () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
