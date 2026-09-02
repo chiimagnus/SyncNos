@@ -17,6 +17,7 @@ import { sha256Hex } from '@services/sync/shared/content-hash';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
+import type { SyncJobSnapshot, SyncWarning } from '@services/sync/models';
 
 const SYNC_PROVIDER = 'feishu';
 const feishuSyncJobStore = createSyncJobStore(SYNC_PROVIDER);
@@ -56,6 +57,34 @@ function limitWarnings(warnings: string[], maxCount: number): string[] {
   if (list.length <= max) return list;
   const remain = list.length - max;
   return [...list.slice(0, max), `(+${remain} more)`];
+}
+
+function encodeSyncWarning(warning: unknown): SyncWarning {
+  if (warning && typeof warning === 'object' && !Array.isArray(warning)) {
+    const raw = warning as Record<string, unknown>;
+    if (typeof raw.code === 'string' && typeof raw.message === 'string') {
+      return {
+        code: raw.code,
+        message: raw.message,
+        ...(raw.extra === undefined ? {} : { extra: raw.extra }),
+      };
+    }
+  }
+  return { code: 'feishu_sync_warning', message: safeString(warning) };
+}
+
+function encodeSyncJobWarnings(job: SyncJobSnapshot): SyncJobSnapshot {
+  if (!job.perConversation.length) return job;
+  return {
+    ...job,
+    perConversation: job.perConversation.map((row) => {
+      const warnings = (row as { warnings?: unknown }).warnings;
+      return {
+        ...row,
+        warnings: Array.isArray(warnings) ? warnings.map(encodeSyncWarning) : undefined,
+      };
+    }),
+  };
 }
 
 function normalizeOAuthTokenResponse(
@@ -671,7 +700,7 @@ async function runSyncConversations({
       perConversation: [],
     },
     configuredConversationIds: ids,
-    persist: (job) => feishuSyncJobStore.setJob(job),
+    persist: (job) => feishuSyncJobStore.setJob(encodeSyncJobWarnings(job)),
   });
 
   await lifecycle.setRunStage('preparing_queue');
