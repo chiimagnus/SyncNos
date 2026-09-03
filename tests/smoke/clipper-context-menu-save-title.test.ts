@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/platform/webext/tabs', () => ({
   tabsQuery: vi.fn(),
@@ -6,10 +6,15 @@ vi.mock('../../src/platform/webext/tabs', () => ({
 }));
 
 import { tabsSendMessage } from '../../src/platform/webext/tabs';
-import {
-  registerClipperContextMenu,
-  unregisterClipperContextMenu,
-} from '../../src/platform/context-menus/clipper-context-menu';
+
+async function registerMenu(options: {
+  ready: Promise<unknown>;
+  readDisplayMode: () => Promise<'supported' | 'all' | 'off'>;
+  setDisplayMode: (mode: 'supported' | 'all' | 'off') => Promise<unknown>;
+}) {
+  const { registerClipperContextMenu } = await import('../../src/platform/context-menus/clipper-context-menu');
+  registerClipperContextMenu(options);
+}
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -54,9 +59,12 @@ function createMenusApi() {
   return api;
 }
 
+beforeEach(() => {
+  vi.resetModules();
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
-  unregisterClipperContextMenu();
   // @ts-expect-error test global cleanup
   delete globalThis.chrome;
 });
@@ -86,7 +94,7 @@ describe('clipper context menu save title', () => {
       error: null,
     } as any);
 
-    registerClipperContextMenu({
+    await registerMenu({
       ready: Promise.resolve(),
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,
@@ -104,7 +112,6 @@ describe('clipper context menu save title', () => {
     const menusApi = createMenusApi();
     const locale = deferred<void>();
     const storageSet = vi.fn((_value: any, cb: any) => cb?.());
-    const removeStorageListener = vi.fn();
 
     // @ts-expect-error test global
     globalThis.chrome = {
@@ -119,12 +126,12 @@ describe('clipper context menu save title', () => {
         },
         onChanged: {
           addListener: vi.fn(),
-          removeListener: removeStorageListener,
+          removeListener: vi.fn(),
         },
       },
     };
 
-    registerClipperContextMenu({
+    await registerMenu({
       ready: locale.promise,
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,
@@ -147,9 +154,6 @@ describe('clipper context menu save title', () => {
     expect(menusApi.create).toHaveBeenCalled();
     expect(tabsSendMessage).toHaveBeenCalled();
     expect(menusApi.refresh).toHaveBeenCalled();
-
-    unregisterClipperContextMenu();
-    expect(removeStorageListener).toHaveBeenCalledTimes(1);
   });
 
   it('falls back after locale readiness rejects instead of permanently blocking menus', async () => {
@@ -171,7 +175,7 @@ describe('clipper context menu save title', () => {
       },
     };
 
-    registerClipperContextMenu({
+    await registerMenu({
       ready: locale.promise,
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,

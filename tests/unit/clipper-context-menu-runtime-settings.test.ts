@@ -18,7 +18,14 @@ vi.mock('@platform/storage/local', async (importOriginal) => {
 });
 vi.mock('@platform/webext/tabs', () => ({ tabsQuery: tabsMocks.query, tabsSendMessage: tabsMocks.send }));
 
-import { registerClipperContextMenu, unregisterClipperContextMenu } from '@platform/context-menus/clipper-context-menu';
+async function registerMenu(options: {
+  ready: Promise<unknown>;
+  readDisplayMode: () => Promise<'supported' | 'all' | 'off'>;
+  setDisplayMode: (mode: 'supported' | 'all' | 'off') => Promise<unknown>;
+}) {
+  const { registerClipperContextMenu } = await import('@platform/context-menus/clipper-context-menu');
+  registerClipperContextMenu(options);
+}
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -56,6 +63,7 @@ function createMenusApi() {
 let storageListener: ((changes: any, areaName: string) => void) | null = null;
 
 beforeEach(() => {
+  vi.resetModules();
   vi.clearAllMocks();
   storageListener = null;
   storageMocks.get.mockResolvedValue({ ai_chat_auto_save_enabled: true });
@@ -72,7 +80,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  unregisterClipperContextMenu();
   // @ts-expect-error test global
   delete globalThis.chrome;
 });
@@ -82,7 +89,7 @@ describe('clipper context menu runtime settings', () => {
     const api = (globalThis.chrome as any).contextMenus;
     const ready = deferred<void>();
     const readDisplayMode = vi.fn().mockResolvedValue('off');
-    registerClipperContextMenu({ ready: ready.promise, readDisplayMode, setDisplayMode: vi.fn() });
+    await registerMenu({ ready: ready.promise, readDisplayMode, setDisplayMode: vi.fn() });
     expect(api.create).not.toHaveBeenCalled();
     ready.resolve();
     await flush();
@@ -93,7 +100,7 @@ describe('clipper context menu runtime settings', () => {
   it('display clicks use injected writer and never storageSet the display key', async () => {
     const api = (globalThis.chrome as any).contextMenus;
     const setDisplayMode = vi.fn().mockResolvedValue('off');
-    registerClipperContextMenu({
+    await registerMenu({
       ready: Promise.resolve(),
       readDisplayMode: vi.fn().mockResolvedValue('all'),
       setDisplayMode,
@@ -111,7 +118,7 @@ describe('clipper context menu runtime settings', () => {
     const api = (globalThis.chrome as any).contextMenus;
     const readDisplayMode = vi.fn().mockResolvedValue('all');
     const setDisplayMode = vi.fn().mockRejectedValue(new Error('write failed'));
-    registerClipperContextMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode });
+    await registerMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode });
     await flush();
     api.update.mockClear();
     api.emitClick('syncnos_clipper_mode_off');
@@ -124,7 +131,7 @@ describe('clipper context menu runtime settings', () => {
   it('canonical display and autosave wakes converge checked state without legacy listener support', async () => {
     const api = (globalThis.chrome as any).contextMenus;
     const readDisplayMode = vi.fn().mockResolvedValue('all');
-    registerClipperContextMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode: vi.fn() });
+    await registerMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode: vi.fn() });
     await flush();
     api.update.mockClear();
     readDisplayMode.mockResolvedValue('supported');
@@ -145,7 +152,7 @@ describe('clipper context menu runtime settings', () => {
   it('onShown re-reads stale checked truth and still refreshes Save title when setting read fails', async () => {
     const api = (globalThis.chrome as any).contextMenus;
     const readDisplayMode = vi.fn().mockResolvedValue('all');
-    registerClipperContextMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode: vi.fn() });
+    await registerMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode: vi.fn() });
     await flush();
     api.update.mockClear();
     readDisplayMode.mockResolvedValueOnce('off');

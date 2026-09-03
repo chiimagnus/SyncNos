@@ -194,9 +194,6 @@ async function updateCheckedStates(api: any, state: { mode: InpageDisplayMode; a
   }
 }
 
-let registered = false;
-let removeStorageListener: (() => void) | null = null;
-
 type ContextMenuRegistrationOptions = {
   ready: Promise<unknown>;
   readDisplayMode: () => Promise<InpageDisplayMode>;
@@ -204,9 +201,6 @@ type ContextMenuRegistrationOptions = {
 };
 
 export function registerClipperContextMenu(options: ContextMenuRegistrationOptions): void {
-  if (registered) return;
-  registered = true;
-
   const api = getMenusApi();
   if (!api) return;
 
@@ -275,7 +269,7 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
     // ignore
   }
 
-  removeStorageListener = storageOnChanged((changes: any, areaName: string) => {
+  storageOnChanged((changes: any, areaName: string) => {
     if (areaName !== 'local') return;
     const keys = changes ? Object.keys(changes) : [];
     if (!keys.length) return;
@@ -284,14 +278,4 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
       .then((state) => updateCheckedStates(api, state))
       .catch(() => {});
   });
-}
-
-export function unregisterClipperContextMenu(): void {
-  registered = false;
-  try {
-    removeStorageListener?.();
-  } catch (_e) {
-    // ignore
-  }
-  removeStorageListener = null;
 }
