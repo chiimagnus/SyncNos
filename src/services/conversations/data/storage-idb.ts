@@ -27,8 +27,16 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
-import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import {
+  deriveConversationListStoredSiteKeyFromUrl,
+  normalizeConversationListRecord,
+} from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
+import {
+  DATA_REVISION_RECORD_KEY,
+  DATA_REVISION_STORE_BY_SCOPE,
+  normalizeDataRevisionRecord,
+} from '@platform/idb/data-revision-record';
 import {
   areSyncMappingsBusinessEquivalent,
   mergeSyncMappingForIdentityMove,
@@ -205,11 +213,33 @@ async function findExistingArticleConversationByUrl(
 ): Promise<any | null> {
   const normalizedUrl = canonicalizeArticleUrl(rawUrl);
   if (!normalizedUrl) return null;
-  const rows = (await reqToPromise(conversationsStore.getAll() as any)) as any[];
-  const matched = rows.filter((row) => {
-    if (safeString(row?.sourceType).toLowerCase() !== 'article') return false;
-    return canonicalizeArticleUrl(row?.url) === normalizedUrl;
+  const siteKey = deriveConversationListStoredSiteKeyFromUrl(normalizedUrl);
+  if (!siteKey || siteKey === 'unknown') return null;
+
+  const index = conversationsStore.index('by_listSiteKey_lastCapturedAt_id');
+  const range = globalThis.IDBKeyRange.bound(
+    [siteKey, -Infinity, -Infinity] as any,
+    [siteKey, Infinity, Infinity] as any,
+  );
+  const matched: any[] = [];
+  const cursorReq = index.openCursor(range);
+  await new Promise<void>((resolve, reject) => {
+    cursorReq.onerror = () => reject(cursorReq.error || new Error('article identity cursor failed'));
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result as IDBCursorWithValue | null;
+      if (!cursor) return resolve();
+      const row = cursor.value as any;
+      if (
+        safeString(row?.sourceType).toLowerCase() === 'article' &&
+        canonicalizeArticleUrl(row?.url) === normalizedUrl
+      ) {
+        matched.push(row);
+      }
+      cursor.continue();
+    };
   });
+
+  // ponytail: 同站点 fallback 仍是 O(site rows)；只有实测成为热点时才值得新增 canonical URL identity index。
   return pickPreferredArticleConversation(matched);
 }
 
@@ -242,15 +272,6 @@ async function findExistingConversationForPayload(
     existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
   }
   return existing || null;
-}
-
-export async function hasConversation(payload: any): Promise<boolean> {
-  if (!payload) return false;
-  const db = await openDb();
-  const { t, stores } = tx(db, ['conversations'], 'readonly');
-  const existing = await findExistingConversationForPayload(stores.conversations, payload);
-  await txDone(t);
-  return !!existing;
 }
 
 function pickMaxFiniteNumber(...values: unknown[]): number | null {
@@ -418,7 +439,7 @@ async function migrateSyncMappingKey(
   return { syncMappingChanged };
 }
 
-export async function upsertConversation(payload: any): Promise<Conversation> {
+export async function upsertConversation(payload: any): Promise<Conversation & { __isNew: boolean }> {
   const db = await openDb();
   const outcome = await runTrackedTransaction(
     {
@@ -504,18 +525,18 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
           await reqToPromise(stores.conversations.put(record));
           markChanged('conversations');
         }
-        return { record, conversationChanged };
+        return { record, conversationChanged, isNew: false };
       }
 
       const id = await reqToPromise(stores.conversations.add(record));
       record.id = id as any;
       markChanged('conversations');
-      return { record, conversationChanged: true };
+      return { record, conversationChanged: true, isNew: true };
     },
   );
 
   if (outcome.conversationChanged) invalidateConversationListStatsCache();
-  return outcome.record;
+  return { ...outcome.record, __isNew: outcome.isNew };
 }
 
 export async function mergeConversationsByIds(input: {
@@ -1678,22 +1699,13 @@ export async function getConversationById(conversationId: number): Promise<Conve
   return row ? (normalizeConversationListRecord(row) as Conversation) : null;
 }
 
-function normalizeMentionCandidateLimit(value: unknown): number {
-  if (value == null || value === '') return 20;
-  const limit = Number(value);
-  if (!Number.isFinite(limit) || limit <= 0) return 20;
-  return Math.min(Math.floor(limit), 50);
-}
-
 function stripDomainPrefix(listSiteKey: string): string {
   const text = safeString(listSiteKey).toLowerCase();
   if (!text.startsWith('domain:')) return '';
   return text.slice('domain:'.length);
 }
 
-export async function searchConversationMentionCandidates(input?: {
-  query?: unknown;
-  limit?: unknown;
+export async function readConversationMentionCandidatePool(input?: {
   maxScan?: number;
   maxDurationMs?: number;
 }): Promise<{
@@ -1708,9 +1720,9 @@ export async function searchConversationMentionCandidates(input?: {
   }>;
   scannedCount: number;
   truncatedByScanLimit: boolean;
+  revision: number;
 }> {
-  const query = safeString(input?.query).toLowerCase();
-  const limit = normalizeMentionCandidateLimit(input?.limit);
+  // ponytail: Item Mention intentionally searches only a bounded recent pool; FTS/global indexing stays out of scope.
   const maxScan =
     Number.isFinite(input?.maxScan) && (input?.maxScan as number) > 0 ? Math.floor(input!.maxScan!) : 2000;
   const maxDurationMs =
@@ -1719,7 +1731,10 @@ export async function searchConversationMentionCandidates(input?: {
       : 300;
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  const revisionStoreName = DATA_REVISION_STORE_BY_SCOPE.conversations;
+  const { t, stores } = tx(db, ['conversations', revisionStoreName], 'readonly');
+  const done = txDone(t);
+  const revisionPromise = reqToPromise(stores[revisionStoreName].get(DATA_REVISION_RECORD_KEY));
   const idx = stores.conversations.index('by_lastCapturedAt_id');
 
   const candidates: Array<{
@@ -1736,47 +1751,30 @@ export async function searchConversationMentionCandidates(input?: {
   const startedAt = Date.now();
 
   const cursorReq = idx.openCursor(null, 'prev');
-  await new Promise<void>((resolve, reject) => {
+  const cursorDone = new Promise<void>((resolve, reject) => {
     cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
     cursorReq.onsuccess = () => {
       const cursor = cursorReq.result as IDBCursorWithValue | null;
       if (!cursor) return resolve();
 
       scannedCount += 1;
-      const record = normalizeConversationListRecord(cursor.value as any) as any;
+      const record = cursor.value as any;
       const conversationId = Number(record?.id);
-      const lastCapturedAt = Number(record?.lastCapturedAt) || 0;
-      const title = safeString(record?.title);
-      const source = safeString(record?.source);
-      const url = safeString(record?.url);
-      const sourceType = safeString(record?.sourceType) || 'chat';
-      const domain = stripDomainPrefix(safeString(record?.listSiteKey));
-
-      const shouldKeep = (() => {
-        if (!Number.isFinite(conversationId) || conversationId <= 0) return false;
-        if (!query) return true;
-        const q = query;
-        if (title.toLowerCase().includes(q)) return true;
-        if (source.toLowerCase().includes(q)) return true;
-        if (domain && domain.toLowerCase().includes(q)) return true;
-        return false;
-      })();
-
-      if (shouldKeep) {
+      if (Number.isFinite(conversationId) && conversationId > 0) {
         candidates.push({
           conversationId,
-          title,
-          source,
-          url,
-          domain,
-          sourceType,
-          lastCapturedAt,
+          title: safeString(record?.title),
+          source: safeString(record?.source),
+          url: safeString(record?.url),
+          domain: stripDomainPrefix(safeString(record?.listSiteKey)),
+          sourceType: safeString(record?.sourceType) || 'chat',
+          lastCapturedAt: Number(record?.lastCapturedAt) || 0,
         });
       }
 
       const elapsed = Date.now() - startedAt;
-      if (candidates.length >= limit || scannedCount >= maxScan || elapsed >= maxDurationMs) {
-        if (scannedCount >= maxScan || elapsed >= maxDurationMs) truncatedByScanLimit = true;
+      if (scannedCount >= maxScan || elapsed >= maxDurationMs) {
+        truncatedByScanLimit = true;
         return resolve();
       }
 
@@ -1784,8 +1782,15 @@ export async function searchConversationMentionCandidates(input?: {
     };
   });
 
-  await txDone(t);
-  return { candidates, scannedCount, truncatedByScanLimit };
+  try {
+    await cursorDone;
+    const revision = normalizeDataRevisionRecord(await revisionPromise).revision;
+    await done;
+    return { candidates, scannedCount, truncatedByScanLimit, revision };
+  } catch (error) {
+    await done.catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function getSyncMappingByConversation(

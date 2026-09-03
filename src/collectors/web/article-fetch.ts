@@ -1,6 +1,5 @@
 import {
   getConversationBySourceConversationKey,
-  hasConversation,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage';
@@ -231,17 +230,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   if (!textContent) throw toError('No article content detected');
 
   const capturedAt = Date.now();
-  let existed = false;
-  try {
-    existed = await hasConversation({
-      sourceType: ARTICLE_SOURCE_TYPE,
-      source: WEB_ARTICLE_SOURCE,
-      conversationKey: buildCanonicalWebArticleIdentity(canonicalUrl)?.conversationKey || '',
-      url: canonicalUrl,
-    });
-  } catch (_e) {
-    existed = false;
-  }
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: WEB_ARTICLE_SOURCE,
@@ -315,7 +303,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   await syncConversationMessages(conversationId, messagesToSave);
 
   return {
-    isNew: !existed,
+    isNew: conversation.__isNew,
     conversationId,
     url: canonicalUrl,
     title,

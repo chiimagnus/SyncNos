@@ -16,19 +16,6 @@ function normalizeField(value: unknown): string {
   return safeText(value).toLowerCase();
 }
 
-function parseDomainFromUrl(url: unknown): string {
-  const raw = safeText(url);
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    const protocol = String(parsed.protocol || '').toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    return normalizeField(parsed.hostname);
-  } catch (_e) {
-    return '';
-  }
-}
-
 export function normalizeMentionCandidate(
   input: Partial<MentionCandidate> & Record<string, unknown>,
 ): MentionCandidate {
@@ -39,7 +26,7 @@ export function normalizeMentionCandidate(
     title: safeText((input as any).title),
     source: safeText((input as any).source),
     url: safeText((input as any).url),
-    domain: safeText((input as any).domain) || parseDomainFromUrl((input as any).url),
+    domain: safeText((input as any).domain),
     sourceType: safeText((input as any).sourceType) || 'chat',
     lastCapturedAt: Number.isFinite(lastCapturedAt) && lastCapturedAt > 0 ? lastCapturedAt : 0,
   };

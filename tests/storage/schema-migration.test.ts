@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { forceCloseDatabase, IDBKeyRange, IDBVersionChangeEvent, indexedDB } from 'fake-indexeddb';
+import { forceCloseDatabase, IDBKeyRange, IDBObjectStore, IDBVersionChangeEvent, indexedDB } from 'fake-indexeddb';
 import {
   DATA_REVISION_RECORD_KEY,
   DATA_REVISION_SCOPES,
@@ -8,6 +8,7 @@ import {
   normalizeDataRevisionRecord,
 } from '@platform/idb/data-revision-record';
 import { closeDbForTests, DB_VERSION, openDb } from '../../src/platform/idb/schema';
+import { upsertConversation } from '@services/conversations/data/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -127,6 +128,21 @@ async function openV9Db() {
     cleanup.createIndex('by_remoteKey_nextAttemptAt_createdAt', ['remoteKey', 'nextAttemptAt', 'createdAt'], {
       unique: false,
     });
+  };
+  return reqToPromise(req);
+}
+
+async function openV10Db() {
+  const db9 = await openV9Db();
+  db9.close();
+
+  const req = indexedDB.open('webclipper', 10);
+  req.onupgradeneeded = () => {
+    const db = req.result;
+    for (const scope of DATA_REVISION_SCOPES) {
+      const storeName = DATA_REVISION_STORE_BY_SCOPE[scope];
+      if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName);
+    }
   };
   return reqToPromise(req);
 }
@@ -288,7 +304,13 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     await txDone(t1);
     db1.close();
 
+    const objectStoreCursorSpy = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
     const db2 = await openDb();
+    const fullMessageStoreScans = objectStoreCursorSpy.mock.contexts.filter(
+      (context) => (context as IDBObjectStore | undefined)?.name === 'messages',
+    );
+    expect(fullMessageStoreScans).toHaveLength(0);
+    objectStoreCursorSpy.mockRestore();
 
     const t2 = db2.transaction(['conversations', 'messages'], 'readonly');
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
@@ -303,9 +325,11 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     expect(msgs.some((m) => Number(m.conversationId) === legacyId)).toBe(false);
     expect(msgs.filter((m) => Number(m.conversationId) === stableId).length).toBe(2);
 
-    // Canonical URL should be enforced on the remaining record.
+    // Canonical URL and persisted list keys should reflect the final migrated row.
     const remaining = convs.find((c) => c.conversationKey === stableKey);
     expect(String(remaining.url)).toBe(`https://app.notion.com/chat?t=${threadId}&wfv=chat`);
+    expect(remaining.listSourceKey).toBe('notionai');
+    expect(remaining.listSiteKey).toBe('domain:app.notion.com');
   });
 
   it('merges legacy mapping metadata into an existing stable mapping without mixing provider targets', async () => {
@@ -525,8 +549,98 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
   });
 });
 
+describe('storage schema migration (v11 conversation hygiene)', () => {
+  it('repairs final persisted list keys and removes retired migration residue without changing schema shape', async () => {
+    const db10 = await openV10Db();
+    const schemaTx = db10.transaction(['conversations'], 'readonly');
+    const conversationsStore = schemaTx.objectStore('conversations');
+    const storeNamesBefore = Array.from(db10.objectStoreNames);
+    const conversationIndexNamesBefore = Array.from(conversationsStore.indexNames);
+    await txDone(schemaTx);
+
+    const tx10 = db10.transaction(['conversations'], 'readwrite');
+    const store10 = tx10.objectStore('conversations');
+    await reqToPromise(
+      store10.add({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/a',
+        title: 'article',
+        url: 'https://example.com/a#fragment',
+        listSourceKey: 'article',
+        listSiteKey: 'domain:stale.example',
+        description: 'retired',
+        __canonicalUrl: 'https://stale.example/a',
+        __canonicalKey: 'article:https://stale.example/a',
+        lastCapturedAt: 1,
+      }),
+    );
+    await reqToPromise(
+      store10.add({
+        sourceType: 'chat',
+        source: 'notionai',
+        conversationKey: 'notionai_t_30cbe9d6386a807c83e900a970ea41b2',
+        title: 'notion',
+        url: 'https://app.notion.com/chat?t=30cbe9d6386a807c83e900a970ea41b2&wfv=chat',
+        listSourceKey: 'notionai',
+        listSiteKey: 'domain:www.notion.so',
+        lastCapturedAt: 2,
+      }),
+    );
+    await reqToPromise(
+      store10.add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'already-clean',
+        title: 'clean',
+        url: 'https://chatgpt.com/c/already-clean',
+        listSourceKey: 'chatgpt',
+        listSiteKey: 'domain:chatgpt.com',
+        futureMetadata: { keep: true },
+        lastCapturedAt: 3,
+      }),
+    );
+    await txDone(tx10);
+    db10.close();
+
+    const currentDb = await openDb();
+    expect(currentDb.version).toBe(DB_VERSION);
+    expect(Array.from(currentDb.objectStoreNames)).toEqual(storeNamesBefore);
+    const currentSchemaTx = currentDb.transaction(['conversations'], 'readonly');
+    const currentStore = currentSchemaTx.objectStore('conversations');
+    expect(Array.from(currentStore.indexNames)).toEqual(conversationIndexNamesBefore);
+    const rows = await reqToPromise<any[]>(currentStore.getAll());
+    await txDone(currentSchemaTx);
+
+    const article = rows.find((row) => row.conversationKey === 'article:https://example.com/a');
+    expect(article).toMatchObject({
+      source: 'web',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
+    });
+    expect(Object.prototype.hasOwnProperty.call(article, 'description')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(article, '__canonicalUrl')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(article, '__canonicalKey')).toBe(false);
+
+    const notion = rows.find((row) => row.conversationKey === 'notionai_t_30cbe9d6386a807c83e900a970ea41b2');
+    expect(notion).toMatchObject({
+      listSourceKey: 'notionai',
+      listSiteKey: 'domain:app.notion.com',
+    });
+
+    const clean = rows.find((row) => row.conversationKey === 'already-clean');
+    expect(clean).toMatchObject({
+      source: 'chatgpt',
+      url: 'https://chatgpt.com/c/already-clean',
+      listSourceKey: 'chatgpt',
+      listSiteKey: 'domain:chatgpt.com',
+      futureMetadata: { keep: true },
+    });
+  });
+});
+
 describe('storage schema migration (v10 data revisions)', () => {
-  it('upgrades v8 to v10, repairs persisted list keys, and preserves existing business data', async () => {
+  it('upgrades v8 to the current schema, repairs persisted list keys, and preserves existing business data', async () => {
     const db8 = await openV8Db();
     const tx8 = db8.transaction(
       ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
@@ -566,7 +680,7 @@ describe('storage schema migration (v10 data revisions)', () => {
     db8.close();
 
     const db10 = await openDb();
-    expect(db10.version).toBe(10);
+    expect(db10.version).toBe(DB_VERSION);
     expect(db10.objectStoreNames.contains('github_cleanup_outbox')).toBe(true);
     for (const scope of DATA_REVISION_SCOPES) {
       expect(db10.objectStoreNames.contains(DATA_REVISION_STORE_BY_SCOPE[scope])).toBe(true);
@@ -593,7 +707,7 @@ describe('storage schema migration (v10 data revisions)', () => {
     await txDone(tx10);
   });
 
-  it('upgrades v9 to v10 without losing cleanup or business rows and repairs missing persisted keys', async () => {
+  it('upgrades v9 to the current schema without losing cleanup or business rows and repairs missing persisted keys', async () => {
     const db9 = await openV9Db();
     const tx9 = db9.transaction(
       ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', 'github_cleanup_outbox'],
@@ -640,7 +754,7 @@ describe('storage schema migration (v10 data revisions)', () => {
     db9.close();
 
     const db10 = await openDb();
-    expect(db10.version).toBe(10);
+    expect(db10.version).toBe(DB_VERSION);
     const tx10 = db10.transaction(
       ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments', 'github_cleanup_outbox'],
       'readonly',
@@ -661,7 +775,7 @@ describe('storage schema migration (v10 data revisions)', () => {
 
   it('creates five out-of-line revision stores and uses the fixed current key protocol', async () => {
     const db = await openDb();
-    expect(db.version).toBe(10);
+    expect(db.version).toBe(DB_VERSION);
 
     for (const scope of DATA_REVISION_SCOPES) {
       const storeName = DATA_REVISION_STORE_BY_SCOPE[scope];
@@ -768,7 +882,22 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     await txDone(t1);
     db1.close();
 
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put');
     const db2 = await openDb();
+    const migrationPut = putSpy.mock.calls.find((call, index) => {
+      const store = putSpy.mock.contexts[index] as IDBObjectStore | undefined;
+      const value = call[0] as Record<string, unknown> | undefined;
+      return store?.name === 'conversations' && value?.conversationKey === 'article:https://example.com/post';
+    })?.[0] as Record<string, unknown> | undefined;
+    expect(migrationPut).toMatchObject({
+      source: 'web',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
+    });
+    expect(Object.prototype.hasOwnProperty.call(migrationPut, '__canonicalUrl')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(migrationPut, '__canonicalKey')).toBe(false);
+    putSpy.mockRestore();
+
     const t2 = db2.transaction(['conversations', 'messages', 'sync_mappings'], 'readonly');
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());
@@ -783,7 +912,11 @@ describe('storage schema migration (v4 legacy article rows)', () => {
       conversationKey: 'article:https://example.com/post',
       url: 'https://example.com/post',
       notionPageId: 'page_old',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
     });
+    expect(Object.prototype.hasOwnProperty.call(convs[0], '__canonicalUrl')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(convs[0], '__canonicalKey')).toBe(false);
     expect(msgs).toHaveLength(1);
     expect(msgs[0]).toMatchObject({
       conversationId: legacyId,
@@ -802,6 +935,92 @@ describe('storage schema migration (v4 legacy article rows)', () => {
       notionSectionDigests: { article: { digest: 'digest-old', lastSyncedAt: 10 } },
       feishuDocId: 'doc-old',
       feishuLastContentHash: 'hash-old',
+      futureMetadata: { keep: true },
+    });
+  });
+
+  it('keeps weakly normalized Discourse migration rows reachable for runtime topic-level convergence', async () => {
+    const db1 = await openV1Db();
+    const t1 = db1.transaction(['conversations', 'sync_mappings'], 'readwrite');
+    const legacyId = await reqToPromise<number>(
+      t1.objectStore('conversations').add({
+        sourceType: 'article',
+        source: 'article',
+        conversationKey: 'article_https://linux.do/t/topic/1870532/820?u=abc',
+        title: 'Legacy Discourse article',
+        url: 'https://linux.do/t/topic/1870532/820?u=abc#reply-9',
+        notionPageId: 'page-discourse',
+        warningFlags: [],
+        lastCapturedAt: 10,
+      }),
+    );
+    await reqToPromise(
+      t1.objectStore('sync_mappings').add({
+        source: 'article',
+        conversationKey: 'article_https://linux.do/t/topic/1870532/820?u=abc',
+        notionPageId: 'page-discourse',
+        notionPageUrl: 'https://notion.so/page-discourse',
+        feishuDocId: 'doc-discourse',
+        futureMetadata: { keep: true },
+        updatedAt: 10,
+      }),
+    );
+    await txDone(t1);
+    db1.close();
+
+    const db11 = await openDb();
+    const beforeTx = db11.transaction(['conversations', 'sync_mappings'], 'readonly');
+    const beforeConversation = await reqToPromise<any>(beforeTx.objectStore('conversations').get(legacyId));
+    const beforeMappings = await reqToPromise<any[]>(beforeTx.objectStore('sync_mappings').getAll());
+    await txDone(beforeTx);
+    expect(beforeConversation).toMatchObject({
+      id: legacyId,
+      source: 'web',
+      conversationKey: 'article:https://linux.do/t/topic/1870532/820?u=abc',
+      url: 'https://linux.do/t/topic/1870532/820?u=abc',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:linux.do',
+    });
+    expect(beforeMappings).toMatchObject([
+      {
+        source: 'web',
+        conversationKey: 'article:https://linux.do/t/topic/1870532/820?u=abc',
+        notionPageId: 'page-discourse',
+        feishuDocId: 'doc-discourse',
+        futureMetadata: { keep: true },
+      },
+    ]);
+
+    const converged = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://linux.do/t/topic/1870532',
+      title: 'Current topic',
+      url: 'https://linux.do/t/topic/1870532',
+      lastCapturedAt: 20,
+    });
+    expect(Number(converged.id)).toBe(legacyId);
+    expect(converged.__isNew).toBe(false);
+
+    const verifyTx = db11.transaction(['conversations', 'sync_mappings'], 'readonly');
+    const conversations = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll());
+    const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
+    await txDone(verifyTx);
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0]).toMatchObject({
+      id: legacyId,
+      source: 'web',
+      conversationKey: 'article:https://linux.do/t/topic/1870532',
+      url: 'https://linux.do/t/topic/1870532',
+      listSiteKey: 'domain:linux.do',
+    });
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0]).toMatchObject({
+      source: 'web',
+      conversationKey: 'article:https://linux.do/t/topic/1870532',
+      notionPageId: 'page-discourse',
+      notionPageUrl: 'https://notion.so/page-discourse',
+      feishuDocId: 'doc-discourse',
       futureMetadata: { keep: true },
     });
   });

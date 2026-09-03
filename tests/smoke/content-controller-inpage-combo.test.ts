@@ -169,7 +169,7 @@ describe('content-controller inpage combo', () => {
         };
       },
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 11 } };
+        if (type === 'upsertConversation') return { ok: true, data: { id: 11, __isNew: true } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
@@ -206,7 +206,7 @@ describe('content-controller inpage combo', () => {
         prepareImpl,
         captureImpl,
         sendImpl: async (type: string) => {
-          if (type === 'upsertConversation') return { ok: true, data: { id: 11 } };
+          if (type === 'upsertConversation') return { ok: true, data: { id: 11, __isNew: true } };
           if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
           return { ok: true, data: {} };
         },
@@ -251,7 +251,7 @@ describe('content-controller inpage combo', () => {
       captureImpl: () => snapshot,
       incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 22 } };
+        if (type === 'upsertConversation') return { ok: true, data: { id: 22, __isNew: true } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
@@ -336,7 +336,7 @@ describe('content-controller inpage combo', () => {
             },
           };
         }
-        if (type === 'upsertConversation') return { ok: true, data: { id: 33 } };
+        if (type === 'upsertConversation') return { ok: true, data: { id: 33, __isNew: true } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
@@ -373,7 +373,7 @@ describe('content-controller inpage combo', () => {
         diff: { added: ['user_u1'], updated: [], removed: [] },
       }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 31 } };
+        if (type === 'upsertConversation') return { ok: true, data: { id: 31, __isNew: true } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
@@ -415,7 +415,7 @@ describe('content-controller inpage combo', () => {
         diff: { added: ['user_u2'], updated: [], removed: [] },
       }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 32 } };
+        if (type === 'upsertConversation') return { ok: true, data: { id: 32, __isNew: true } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
@@ -450,7 +450,7 @@ describe('content-controller inpage combo', () => {
       captureImpl: () => snapshot,
       incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 22 } };
+        if (type === 'upsertConversation') return { ok: true, data: { id: 22, __isNew: true } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
@@ -480,7 +480,7 @@ describe('content-controller inpage combo', () => {
       sendImpl: async (type: string) => {
         if (type === 'upsertConversation') {
           await upsertPending;
-          return { ok: true, data: { id: 31 } };
+          return { ok: true, data: { id: 31, __isNew: true } };
         }
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };

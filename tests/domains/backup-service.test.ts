@@ -7,6 +7,7 @@ import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
+import { upsertConversation } from '@services/conversations/data/storage-idb';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -18,6 +19,142 @@ function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
 async function deleteDb(name: string) {
   const req = indexedDB.deleteDatabase(name);
   await reqToPromise(req as any);
+}
+
+const LEGACY_ARTICLE_SOURCE = 'legacy-web-clipper';
+const LEGACY_ARTICLE_KEY = 'legacy-article-example-a';
+const LEGACY_ARTICLE_URL = 'https://example.com/a#legacy';
+const CANONICAL_ARTICLE_URL = 'https://example.com/a';
+const CANONICAL_ARTICLE_KEY = `article:${CANONICAL_ARTICLE_URL}`;
+
+function legacyArticleConversationForImport() {
+  return {
+    id: 901,
+    sourceType: 'article',
+    source: LEGACY_ARTICLE_SOURCE,
+    conversationKey: LEGACY_ARTICLE_KEY,
+    title: 'Legacy article',
+    url: LEGACY_ARTICLE_URL,
+    notionPageId: 'notion-page-legacy',
+    warningFlags: ['legacy'],
+    lastCapturedAt: 10,
+    __canonicalUrl: 'https://stale.example/private',
+    __canonicalKey: 'article:https://stale.example/private',
+  };
+}
+
+function legacyArticleMappingForImport() {
+  return {
+    source: LEGACY_ARTICLE_SOURCE,
+    conversationKey: LEGACY_ARTICLE_KEY,
+    notionPageId: 'notion-page-legacy',
+    notionPageUrl: 'https://www.notion.so/workspace/notion-page-legacy',
+    notionWorkspaceSlug: 'workspace',
+    feishuDocId: 'feishu-doc-legacy',
+    feishuLastContentHash: 'feishu-hash-legacy',
+    futureProviderMetadata: { nested: { keep: true } },
+    updatedAt: 11,
+  };
+}
+
+function legacyArticleZipEntriesForImport(): Map<string, Uint8Array> {
+  const encoder = new TextEncoder();
+  const bundlePath = 'sources/legacy-web-clipper/legacy-article.json';
+  const encode = (value: unknown) => encoder.encode(JSON.stringify(value));
+  return new Map([
+    [
+      'manifest.json',
+      encode({
+        backupSchemaVersion: 2,
+        exportedAt: '2026-09-03T00:00:00.000Z',
+        db: { name: 'webclipper', version: 10 },
+        counts: { conversations: 1, messages: 0, sync_mappings: 1 },
+        config: { storageLocalPath: 'config/storage-local.json' },
+        index: { conversationsCsvPath: 'sources/conversations.csv' },
+        sources: [{ source: LEGACY_ARTICLE_SOURCE, conversationCount: 1, files: [bundlePath] }],
+      }),
+    ],
+    ['config/storage-local.json', encode({ schemaVersion: 1, storageLocal: {} })],
+    ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+    [
+      bundlePath,
+      encode({
+        schemaVersion: 1,
+        conversation: legacyArticleConversationForImport(),
+        messages: [],
+        syncMapping: legacyArticleMappingForImport(),
+      }),
+    ],
+  ]);
+}
+
+async function assertLegacyArticleImportConvergesToCanonicalIdentity(): Promise<void> {
+  const importedDb = await openDb();
+  const beforeTx = importedDb.transaction(['conversations', 'sync_mappings'], 'readonly');
+  const beforeConversations = await reqToPromise<any[]>(beforeTx.objectStore('conversations').getAll() as any);
+  const beforeMappings = await reqToPromise<any[]>(beforeTx.objectStore('sync_mappings').getAll() as any);
+  await new Promise<void>((resolve, reject) => {
+    beforeTx.oncomplete = () => resolve();
+    beforeTx.onerror = () => reject(beforeTx.error);
+    beforeTx.onabort = () => reject(beforeTx.error);
+  });
+
+  expect(beforeConversations).toHaveLength(1);
+  const localId = Number(beforeConversations[0]?.id);
+  expect(localId).toBeGreaterThan(0);
+  expect(beforeConversations[0]).toMatchObject({
+    source: LEGACY_ARTICLE_SOURCE,
+    conversationKey: LEGACY_ARTICLE_KEY,
+    listSourceKey: LEGACY_ARTICLE_SOURCE,
+    listSiteKey: 'domain:example.com',
+  });
+  expect(Object.prototype.hasOwnProperty.call(beforeConversations[0], '__canonicalUrl')).toBe(false);
+  expect(Object.prototype.hasOwnProperty.call(beforeConversations[0], '__canonicalKey')).toBe(false);
+  expect(beforeMappings).toHaveLength(1);
+
+  const converged = await upsertConversation({
+    sourceType: 'article',
+    source: 'web',
+    conversationKey: CANONICAL_ARTICLE_KEY,
+    title: 'Canonical article',
+    url: CANONICAL_ARTICLE_URL,
+    lastCapturedAt: 20,
+  });
+  expect(Number(converged.id)).toBe(localId);
+  expect(converged.__isNew).toBe(false);
+
+  const verifyDb = await openDb();
+  const verifyTx = verifyDb.transaction(['conversations', 'sync_mappings'], 'readonly');
+  const conversations = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll() as any);
+  const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll() as any);
+  await new Promise<void>((resolve, reject) => {
+    verifyTx.oncomplete = () => resolve();
+    verifyTx.onerror = () => reject(verifyTx.error);
+    verifyTx.onabort = () => reject(verifyTx.error);
+  });
+
+  expect(conversations).toHaveLength(1);
+  expect(conversations[0]).toMatchObject({
+    id: localId,
+    source: 'web',
+    conversationKey: CANONICAL_ARTICLE_KEY,
+    url: CANONICAL_ARTICLE_URL,
+    notionPageId: 'notion-page-legacy',
+    feishuDocId: 'feishu-doc-legacy',
+    listSourceKey: 'web',
+    listSiteKey: 'domain:example.com',
+  });
+  expect(mappings).toHaveLength(1);
+  expect(mappings[0]).toMatchObject({
+    source: 'web',
+    conversationKey: CANONICAL_ARTICLE_KEY,
+    notionPageId: 'notion-page-legacy',
+    notionPageUrl: 'https://www.notion.so/workspace/notion-page-legacy',
+    notionWorkspaceSlug: 'workspace',
+    feishuDocId: 'feishu-doc-legacy',
+    feishuLastContentHash: 'feishu-hash-legacy',
+    futureProviderMetadata: { nested: { keep: true } },
+  });
 }
 
 function mockChromeStorage(initial: Record<string, unknown> = {}) {
@@ -112,6 +249,29 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
+  it.each([
+    [
+      'legacy JSON',
+      () =>
+        importBackupLegacyJsonMerge({
+          schemaVersion: 1,
+          stores: {
+            conversations: [legacyArticleConversationForImport()],
+            messages: [],
+            sync_mappings: [legacyArticleMappingForImport()],
+          },
+          storageLocal: {},
+        }),
+    ],
+    ['ZIP v2', () => importBackupZipV2Merge(legacyArticleZipEntriesForImport())],
+  ])(
+    'keeps post-v11 %s legacy article identity reachable until canonical runtime convergence',
+    async (_label, runImport) => {
+      await runImport();
+      await assertLegacyArticleImportConvergesToCanonicalIdentity();
+    },
+  );
+
   it('restores canonical JSON display settings only through the background owner route', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

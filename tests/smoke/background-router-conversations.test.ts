@@ -14,7 +14,6 @@ const storageMocks = vi.hoisted(() => ({
   findConversationBySourceAndKey: vi.fn(),
   findConversationById: vi.fn(),
   getConversationDetail: vi.fn(),
-  hasConversation: vi.fn(),
   mergeConversationsByIds: vi.fn(),
 }));
 
@@ -42,7 +41,6 @@ vi.mock('@services/conversations/data/storage', () => ({
   findConversationBySourceAndKey: storageMocks.findConversationBySourceAndKey,
   findConversationById: storageMocks.findConversationById,
   getConversationDetail: storageMocks.getConversationDetail,
-  hasConversation: storageMocks.hasConversation,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
 }));
 
@@ -114,7 +112,6 @@ afterEach(() => {
   storageMocks.findConversationBySourceAndKey.mockReset();
   storageMocks.findConversationById.mockReset();
   storageMocks.getConversationDetail.mockReset();
-  storageMocks.hasConversation.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
   localStorageMocks.storageGet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
@@ -122,6 +119,36 @@ afterEach(() => {
 });
 
 describe('background-router conversations', () => {
+  it.each([
+    [true, 'createConversation'],
+    [false, 'upsertConversation'],
+  ])('uses mutation __isNew=%s for the UPSERT response and auto-sync reason', async (__isNew, expectedReason) => {
+    const onConversationChanged = vi.fn(async () => {});
+    writeMocks.writeConversationSnapshot.mockResolvedValue({
+      id: 321,
+      source: 'chatgpt',
+      conversationKey: 'k-321',
+      __isNew,
+    });
+    const router = createRouter({ onConversationChanged });
+
+    const res = await router.__handleMessageForTests({
+      type: 'upsertConversation',
+      payload: { source: 'chatgpt', conversationKey: 'k-321', title: 'Title' },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.data).toMatchObject({ id: 321, __isNew });
+    expect(writeMocks.writeConversationSnapshot).toHaveBeenCalledTimes(1);
+    expect(writeMocks.writeConversationSnapshot).toHaveBeenCalledWith({
+      source: 'chatgpt',
+      conversationKey: 'k-321',
+      title: 'Title',
+    });
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenCalledWith(321, expectedReason);
+  });
+
   it('persists syncConversationMessages and emits the durable auto-sync change signal', async () => {
     const onConversationChanged = vi.fn(async () => {});
     writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });

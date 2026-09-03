@@ -8,7 +8,6 @@ import {
   getConversationListPage,
   getConversationDetail,
   getConversationTailWindowBySourceAndKey,
-  hasConversation,
   mergeConversationsByIds,
 } from '@services/conversations/data/storage';
 import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
@@ -176,25 +175,19 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const payload = msg.payload || {};
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
-    let existed = false;
-    try {
-      existed = await hasConversation(payload);
-    } catch (_e) {
-      existed = false;
-    }
     const convo = await writeConversationSnapshot(payload);
     const conversationId = Number((convo as any)?.id);
     if (Number.isFinite(conversationId) && conversationId > 0) {
       fireAndForget(
         deps.onConversationChanged(
           conversationId,
-          existed
-            ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation
-            : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation,
+          convo.__isNew
+            ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
+            : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
         ),
       );
     }
-    return router.ok({ ...(convo as any), __isNew: !existed });
+    return router.ok(convo);
   });
 
   router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {

@@ -53,13 +53,10 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     return runtime.send(type, payload);
   }
 
-  async function captureVideoTranscript(): Promise<{
-    conversationId: number | null;
-    title?: string;
-    isNew?: boolean;
-    url?: string;
-    subtitleStatus?: 'ok' | 'empty';
-  }> {
+  async function captureVideoTranscript(): Promise<
+    | { conversationId: null; title?: string; url?: string; subtitleStatus: 'empty' }
+    | { conversationId: number; title?: string; isNew: boolean; url?: string; subtitleStatus: 'ok' }
+  > {
     const extracted = await extractVideoTranscriptFromCurrentPage();
     const capturedAt = Date.now();
 
@@ -142,13 +139,14 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       throw toError(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    const rawIsNew = (conversation as any)?.__isNew;
+    const isNew = (conversation as any)?.__isNew;
+    if (typeof isNew !== 'boolean') throw toError('invalid upsertConversation response');
     return {
       conversationId,
       title: title || undefined,
       url,
-      isNew: typeof rawIsNew === 'boolean' ? rawIsNew : undefined,
-      subtitleStatus,
+      isNew,
+      subtitleStatus: 'ok',
     };
   }
 

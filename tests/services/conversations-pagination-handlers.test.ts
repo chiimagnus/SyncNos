@@ -11,7 +11,6 @@ const storageMocks = vi.hoisted(() => ({
   getConversationListPage: vi.fn(),
   getConversationDetail: vi.fn(),
   getConversationTailWindowBySourceAndKey: vi.fn(),
-  hasConversation: vi.fn(),
   mergeConversationsByIds: vi.fn(),
 }));
 
@@ -28,7 +27,6 @@ vi.mock('@services/conversations/data/storage', () => ({
   getConversationListPage: storageMocks.getConversationListPage,
   getConversationDetail: storageMocks.getConversationDetail,
   getConversationTailWindowBySourceAndKey: storageMocks.getConversationTailWindowBySourceAndKey,
-  hasConversation: storageMocks.hasConversation,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
 }));
 
@@ -61,7 +59,6 @@ afterEach(() => {
   storageMocks.getConversationListPage.mockReset();
   storageMocks.getConversationDetail.mockReset();
   storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
-  storageMocks.hasConversation.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
   writeMocks.writeConversationMessagesSnapshot.mockReset();
   writeMocks.writeConversationSnapshot.mockReset();
