@@ -55,10 +55,7 @@ function pickEarliestDueAt(queue: QueueMap): number | null {
 }
 
 function isAlreadyRunningError(error: unknown): boolean {
-  const code = String((error as any)?.code || '').trim();
-  if (code === 'sync_already_running') return true;
-  const message = error instanceof Error ? error.message : String(error || '').trim();
-  return message.toLowerCase().includes('sync already in progress');
+  return String((error as any)?.code || '').trim() === 'sync_already_running';
 }
 
 export function createAutoSyncSchedulerCore(config: {

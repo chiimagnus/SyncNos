@@ -240,6 +240,27 @@ describe('auto-sync-scheduler-core', () => {
     expect(after).toBeGreaterThan(before);
   });
 
+  it('does not classify a message-only error as an ownership conflict', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1 };
+    syncConversations.mockRejectedValue(new Error('sync already in progress'));
+
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-message-only',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await scheduler.flush();
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({});
+  });
+
   it('optionally retains due items with a caller-defined retry delay after sync failure', async () => {
     infraPack.storage[ENABLED_KEY] = true;
     infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1, '2': infraPack.infra.now() + 30_000 };
