@@ -387,13 +387,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     });
   }
 
-  function runExclusiveMaintenance<T>(
-    mutation: () => Promise<T>,
-    options: { clearStatusAfter?: boolean } = {},
-  ): Promise<T> {
+  function runExclusiveMaintenance<T>(mutation: () => Promise<T>): Promise<T> {
     return ownership.runExclusiveMutation(async () => {
       const result = await mutation();
-      if (options.clearStatusAfter === true && !(await notionJobStore.setJob(null))) throw buildJobPersistenceError();
+      if (!(await notionJobStore.setJob(null))) throw buildJobPersistenceError();
       return result;
     });
   }

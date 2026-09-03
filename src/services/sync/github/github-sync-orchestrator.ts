@@ -348,16 +348,8 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     });
   }
 
-  function runExclusiveMaintenance<T>(
-    mutation: () => Promise<T>,
-    options: { clearStatusAfter?: boolean } = {},
-  ): Promise<T> {
-    return ownership.runExclusiveMutation(async () => {
-      const result = await mutation();
-      if (options.clearStatusAfter === true && !(await services.jobStore.setJob(null)))
-        throw buildJobPersistenceError();
-      return result;
-    });
+  function runExclusiveMaintenance<T>(mutation: () => Promise<T>): Promise<T> {
+    return ownership.runExclusiveMutation(mutation);
   }
 
   function reconcileStartupSyncJob() {

@@ -513,13 +513,10 @@ function clearSyncStatus() {
   });
 }
 
-function runExclusiveMaintenance<T>(
-  mutation: () => Promise<T>,
-  options: { clearStatusAfter?: boolean } = {},
-): Promise<T> {
+function runExclusiveMaintenance<T>(mutation: () => Promise<T>): Promise<T> {
   return feishuSyncOwnership.runExclusiveMutation(async () => {
     const result = await mutation();
-    if (options.clearStatusAfter === true && !(await feishuSyncJobStore.setJob(null))) throw buildJobPersistenceError();
+    if (!(await feishuSyncJobStore.setJob(null))) throw buildJobPersistenceError();
     return result;
   });
 }

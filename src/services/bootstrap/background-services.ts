@@ -57,7 +57,7 @@ import {
 } from '@services/sync/auto-sync/auto-sync-keys';
 import { storageGet } from '@services/shared/storage';
 
-type ExclusiveMaintenance = <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
+type ExclusiveMaintenance = <T>(mutation: () => Promise<T>) => Promise<T>;
 
 type SyncOwnershipSurface = {
   isRunActive: () => boolean;
