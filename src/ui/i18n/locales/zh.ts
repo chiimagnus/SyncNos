@@ -107,7 +107,6 @@ export const zh: { [K in TranslationKey]: string } = {
   inpageDisplayModeSupported: '仅在支持站点显示',
   inpageDisplayModeAll: '所有站点显示',
   inpageDisplayModeOff: '全部关闭',
-  inpageDisplayModeHint: '需刷新页面生效。',
   markdownReadingProfileMediumLabel: 'Medium 风格',
   markdownReadingProfileNotionLabel: 'Notion 风格',
   markdownReadingProfileBookLabel: 'Book 风格',
@@ -171,7 +170,6 @@ export const zh: { [K in TranslationKey]: string } = {
   readerFormatAac: 'AAC',
   readerFormatFlac: 'FLAC',
   aiChatAutoSaveLabel: '自动保存 AI 对话',
-  aiChatAutoSaveHint: '支持站点需刷新后生效。',
   aiChatCacheImagesLabel: '自动保存 AI 对话图片到本地',
   webArticleCacheImagesLabel: '自动保存网页文章图片到本地',
   xiaohongshuCommentsHeading: '小红书笔记',
@@ -190,8 +188,6 @@ export const zh: { [K in TranslationKey]: string } = {
   aiChatDollarMentionLabel: '启用 $ 插入条目',
   aiChatDollarMentionHint: '在支持的 AI 对话中输入 $，搜索并插入已保存条目。',
   betaTag: 'Beta',
-  inpageSupportedOnlyLabel: '仅在支持站点显示 Inpage 按钮',
-  inpageSupportedOnlyHint: '切换后需刷新页面以生效。',
 
   // BackupSection
   databaseBackup: '数据库备份',

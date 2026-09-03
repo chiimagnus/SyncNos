@@ -1,3 +1,11 @@
+import {
+  INPAGE_DISPLAY_MODE_STORAGE_KEY,
+  normalizeInpageDisplayMode,
+  readEffectiveInpageDisplayMode,
+  type InpageDisplayMode,
+} from '@services/shared/inpage-display-mode';
+import { storageOnChanged } from '@services/shared/storage';
+
 type RuntimeClient = {
   onInvalidated?: (listener: (error: Error) => void) => () => void;
   getURL?: (path: string) => string;
@@ -12,23 +20,6 @@ type StartContentBootstrapInput = {
   createController: () => ControllerFactory;
   inpageButton?: { initRuntime?: (runtime: { getURL?: (path: string) => string } | null) => void };
 };
-
-const STORAGE_KEY_SUPPORTED_ONLY = 'inpage_supported_only';
-const STORAGE_KEY_DISPLAY_MODE = 'inpage_display_mode';
-
-type InpageDisplayMode = 'supported' | 'all' | 'off';
-
-function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
-  const raw = String(value || '')
-    .trim()
-    .toLowerCase();
-  if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
-  return null;
-}
-
-function displayModeFromLegacySupportedOnly(value: unknown): InpageDisplayMode {
-  return value === true ? 'supported' : 'all';
-}
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
   'chat.openai.com',
@@ -61,23 +52,21 @@ function isSupportedHost(hostname: string): boolean {
 export function startContentBootstrap(input: StartContentBootstrapInput) {
   const runtime = input.runtime || null;
   const inpageButton = input.inpageButton;
-
-  try {
-    inpageButton?.initRuntime?.(runtime);
-  } catch (_e) {
-    // ignore
-  }
-
   const wrapper = input.createController();
+  const supportedHost = isSupportedHost(globalThis.location?.hostname || '');
   let active: { stop?: () => void } | null = null;
+  let disposed = false;
+  let modeGeneration = 0;
+  let removeRuntimeInvalidation = () => {};
+  let removeDisplayListener = () => {};
 
   function startController() {
+    if (disposed) return;
     try {
       active = wrapper?.start?.() || null;
     } catch (_e) {
       active = null;
     }
-    return active;
   }
 
   function stopController() {
@@ -90,27 +79,8 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
     }
   }
 
-  const supportedHost = isSupportedHost(location?.hostname || '');
-
-  const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-
-  function readDisplayMode(): Promise<InpageDisplayMode> {
-    return new Promise((resolve) => {
-      try {
-        const local = storageApi?.local;
-        if (!local?.get) return resolve('all');
-        local.get([STORAGE_KEY_DISPLAY_MODE, STORAGE_KEY_SUPPORTED_ONLY], (res: any) => {
-          const normalized = normalizeInpageDisplayMode(res?.[STORAGE_KEY_DISPLAY_MODE]);
-          if (normalized) return resolve(normalized);
-          return resolve(displayModeFromLegacySupportedOnly(res?.[STORAGE_KEY_SUPPORTED_ONLY]));
-        });
-      } catch (_e) {
-        resolve('all');
-      }
-    });
-  }
-
   function applyDisplayMode(mode: InpageDisplayMode) {
+    if (disposed) return;
     if (mode === 'off') {
       if (active) stopController();
       return;
@@ -128,14 +98,50 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
     if (!active) startController();
   }
 
-  // Initial start decision.
-  readDisplayMode()
-    .then((mode) => applyDisplayMode(mode))
-    .catch(() => applyDisplayMode('all'));
+  function applyEffectiveRead(generation: number) {
+    void readEffectiveInpageDisplayMode().then(
+      (mode) => {
+        if (!disposed && modeGeneration === generation) applyDisplayMode(mode);
+      },
+      () => {
+        if (!disposed && modeGeneration === generation) applyDisplayMode('all');
+      },
+    );
+  }
 
-  return {
-    stop() {
-      stopController();
-    },
-  };
+  function stop() {
+    if (disposed) return;
+    disposed = true;
+    modeGeneration += 1;
+    removeRuntimeInvalidation();
+    removeDisplayListener();
+    stopController();
+  }
+
+  removeRuntimeInvalidation = runtime?.onInvalidated?.(() => stop()) || (() => {});
+
+  try {
+    inpageButton?.initRuntime?.(runtime);
+  } catch (_e) {
+    // ignore
+  }
+
+  if (!disposed) {
+    removeDisplayListener = storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      if (!changes || !Object.prototype.hasOwnProperty.call(changes, INPAGE_DISPLAY_MODE_STORAGE_KEY)) return;
+      const generation = ++modeGeneration;
+      const normalized = normalizeInpageDisplayMode(changes[INPAGE_DISPLAY_MODE_STORAGE_KEY]?.newValue);
+      if (normalized) {
+        applyDisplayMode(normalized);
+        return;
+      }
+      applyEffectiveRead(generation);
+    });
+
+    const initialGeneration = modeGeneration;
+    applyEffectiveRead(initialGeneration);
+  }
+
+  return { stop };
 }

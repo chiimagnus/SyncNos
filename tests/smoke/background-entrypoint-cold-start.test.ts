@@ -25,6 +25,9 @@ const mocks = vi.hoisted(() => ({
   storageOnChanged: vi.fn(),
   openOrFocusExtensionAppTab: vi.fn(),
   reconcileStartupSyncJob: vi.fn(),
+  ensureDisplayMode: vi.fn(),
+  readDisplayMode: vi.fn(),
+  setDisplayMode: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -78,6 +81,13 @@ vi.mock('@platform/context-menus/clipper-context-menu', () => ({
 }));
 vi.mock('@platform/alarms/alarms', () => ({ onAlarm: mocks.onAlarm }));
 vi.mock('@platform/storage/local', () => ({ storageOnChanged: mocks.storageOnChanged }));
+vi.mock('@services/shared/inpage-display-mode', () => ({
+  ensureCanonicalInpageDisplayMode: mocks.ensureDisplayMode,
+  readEffectiveInpageDisplayMode: mocks.readDisplayMode,
+  setCanonicalInpageDisplayMode: mocks.setDisplayMode,
+}));
+
+import { INPAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -147,6 +157,12 @@ beforeEach(() => {
   mocks.ensureDefaultFeishuOAuthClientId.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthProxyUrl.mockResolvedValue(undefined);
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);
+  mocks.ensureDisplayMode.mockResolvedValue('all');
+  mocks.readDisplayMode.mockResolvedValue('all');
+  mocks.setDisplayMode.mockImplementation(async (mode: unknown) => {
+    if (mode === 'supported' || mode === 'all' || mode === 'off') return mode;
+    throw new Error('invalid inpage display mode');
+  });
   mocks.storageOnChanged.mockImplementation(() => () => {});
   mocks.createBackgroundServices.mockReturnValue(createServices());
   // @ts-expect-error test global cleanup
@@ -182,7 +198,11 @@ describe('background entrypoint cold start', () => {
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
     expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
     expect(mocks.registerUiMessageHandlers.mock.calls[0]?.[1]?.localeReady).toBe(locale.promise);
-    expect(mocks.registerClipperContextMenu.mock.calls[0]?.[0]?.localeReady).toBe(locale.promise);
+    const menuOptions = mocks.registerClipperContextMenu.mock.calls[0]?.[0];
+    expect(menuOptions).not.toHaveProperty('localeReady');
+    expect(menuOptions.readDisplayMode).toBe(mocks.readDisplayMode);
+    expect(menuOptions.setDisplayMode).toBe(mocks.setDisplayMode);
+    expect(menuOptions.ready).toBeInstanceOf(Promise);
     expect(mocks.registerGithubSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerSyncHandlers.mock.calls[0]?.[1]?.githubSyncOrchestrator).toBe(
       mocks.createBackgroundServices.mock.results[0]?.value.githubSyncOrchestrator,
@@ -194,8 +214,29 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
 
-    const sendResponse = vi.fn();
+    const displayResponse = vi.fn();
     expect(runtimeMessageListener).not.toBeNull();
+    expect(
+      runtimeMessageListener?.({ type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'off' }, null, displayResponse),
+    ).toBe(true);
+    await flushMicrotasks();
+    expect(displayResponse).toHaveBeenCalledWith({ ok: true, data: { mode: 'off' }, error: null });
+    expect(mocks.setDisplayMode).toHaveBeenCalledWith('off');
+
+    const invalidDisplayResponse = vi.fn();
+    runtimeMessageListener?.(
+      { type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'bad' },
+      null,
+      invalidDisplayResponse,
+    );
+    await flushMicrotasks();
+    expect(invalidDisplayResponse).toHaveBeenCalledWith({
+      ok: false,
+      data: null,
+      error: { message: 'invalid inpage display mode', extra: null },
+    });
+
+    const sendResponse = vi.fn();
     expect(runtimeMessageListener?.({ type: 'cold-start-probe' }, null, sendResponse)).toBe(true);
     await flushMicrotasks();
     expect(sendResponse).toHaveBeenCalledWith({
@@ -203,6 +244,20 @@ describe('background entrypoint cold start', () => {
       data: null,
       error: { message: 'unknown message type: cold-start-probe', extra: null },
     });
+  });
+
+  it('display migration failure does not block router or context-menu startup', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.ensureDisplayMode.mockRejectedValueOnce(new Error('migration failed'));
+    const onMessageAddListener = vi.fn();
+    // @ts-expect-error test global
+    globalThis.chrome = { runtime: { onMessage: { addListener: onMessageAddListener } } };
+
+    const callback = await loadBackground();
+    expect(() => callback()).not.toThrow();
+    expect(onMessageAddListener).toHaveBeenCalledTimes(1);
+    expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
+    await expect(mocks.registerClipperContextMenu.mock.calls[0]?.[0]?.ready).resolves.toBeUndefined();
   });
 
   it('isolates optional listener registration failures from sibling listeners', async () => {

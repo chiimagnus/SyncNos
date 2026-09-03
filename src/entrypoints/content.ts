@@ -9,8 +9,8 @@ import { registerVideoTranscriptCaptureContentHandlers } from '@services/bootstr
 import { createCollectorEnv } from '@collectors/collector-env.ts';
 import { registerAllCollectors } from '@collectors/register-all.ts';
 import { createCollectorsRegistry } from '@collectors/registry.ts';
-import runtimeObserverApi from '@collectors/runtime-observer.ts';
-import incrementalUpdaterApi from '@services/conversations/content/incremental-updater.ts';
+import { createObserver } from '@collectors/runtime-observer.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 import { createItemMentionController } from '@services/integrations/item-mention/content/mention-controller';
 import normalizeApi from '@services/shared/normalize.ts';
 import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
@@ -21,7 +21,7 @@ import { createInpageCommentsDomSource, getInpageCommentsPanelApi } from '@ui/in
 import { createRuntimeClient } from '@platform/runtime/client.ts';
 
 export default defineContentScript({
-  // Inpage visibility is controlled at runtime by `inpage_display_mode` (and legacy `inpage_supported_only`).
+  // Inpage visibility is controlled at runtime by canonical `inpage_display_mode`.
   // This avoids browser-specific dynamic content-script registration support gaps.
   matches: ['http://*/*', 'https://*/*'],
   async main() {
@@ -34,11 +34,19 @@ export default defineContentScript({
       runtime,
       collectorsRegistry,
     });
+    const incrementalEngine = createAutoSaveIncrementalEngine();
+    let captureCurrentPage = currentPageCapture.captureCurrentPage;
 
-    registerCurrentPageCaptureContentHandlers(currentPageCapture, {
-      inpageTip: inpageTipApi,
-      localeReady,
-    });
+    registerCurrentPageCaptureContentHandlers(
+      {
+        getCurrentPageCaptureState: currentPageCapture.getCurrentPageCaptureState,
+        captureCurrentPage: (input) => captureCurrentPage(input),
+      },
+      {
+        inpageTip: inpageTipApi,
+        localeReady,
+      },
+    );
     registerInpageCommentsPanelContentHandlers(runtime, {
       localeReady,
       createPanelApi: () => getInpageCommentsPanelApi(),
@@ -62,10 +70,11 @@ export default defineContentScript({
       currentPageCapture,
       inpageButton: inpageButtonApi,
       inpageTip: inpageTipApi,
-      runtimeObserver: runtimeObserverApi,
-      incrementalUpdater: incrementalUpdaterApi,
+      createRuntimeObserver: createObserver,
+      incrementalEngine,
       itemMention: itemMentionController,
     });
+    captureCurrentPage = controller.captureCurrentPage;
     startContentBootstrap({
       runtime,
       inpageButton: inpageButtonApi,

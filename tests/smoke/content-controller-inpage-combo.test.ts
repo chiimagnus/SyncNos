@@ -77,16 +77,24 @@ function createHarness(options?: {
       },
       cleanupButtons: () => {},
     },
-    runtimeObserver: {
-      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
-        tickRef = onTick || null;
-        return { start: () => {}, stop: () => {} };
-      },
+    createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+      tickRef = onTick || null;
+      return { start: () => {}, stop: () => {} };
     },
-    incrementalUpdater: {
-      computeIncremental: (snapshot: any) => {
-        if (typeof options?.incrementalImpl === 'function') return options.incrementalImpl(snapshot);
-        return { changed: false };
+    incrementalEngine: {
+      prepare: (snapshot: any) => {
+        const result =
+          typeof options?.incrementalImpl === 'function' ? options.incrementalImpl(snapshot) : { changed: false };
+        return {
+          changed: result?.changed === true,
+          snapshot: result?.snapshot || {
+            ...snapshot,
+            conversation: { ...(snapshot?.conversation || {}) },
+            messages: [],
+          },
+          diff: result?.diff || { added: [], updated: [], removed: [] },
+          commit: typeof result?.commit === 'function' ? result.commit : () => true,
+        };
       },
     },
     itemMention: null,
@@ -98,6 +106,7 @@ function createHarness(options?: {
     sendCalls,
     runTick: async () => {
       if (tickRef) await tickRef();
+      for (let i = 0; i < 16; i += 1) await Promise.resolve();
     },
     getButtonConfig: () => buttonConfig,
   };
@@ -370,6 +379,11 @@ describe('content-controller inpage combo', () => {
       },
     });
 
+    // T2 starts resident autosave only after the first authoritative settings observation.
+    // This harness has no storage API, so wait for the intentional fail-open observation before simulating a real user click.
+    await Promise.resolve();
+    await Promise.resolve();
+
     const button = document.createElement('div');
     button.setAttribute('role', 'button');
     button.setAttribute('data-testid', 'agent-send-message-button');
@@ -479,7 +493,7 @@ describe('content-controller inpage combo', () => {
 
     const firstClick = cfg.onClick();
     const secondClick = cfg.onClick();
-    await Promise.resolve();
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
 
     expect(harness.sendCalls.filter((c) => c.type === 'upsertConversation')).toHaveLength(1);
 

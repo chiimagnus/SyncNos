@@ -1,4 +1,5 @@
 import {
+  classifyPrefixOrFillingUpdate,
   computeRequiredOverlap,
   fingerprintHash,
   getMessageIdentityMeta,
@@ -31,39 +32,16 @@ function toComparable(messages: any[]): BackfillComparable[] {
   });
 }
 
-function isPrefixOrFillingUpdate(
-  prev: { text: string; markdown: string },
-  next: { text: string; markdown: string },
-): { acceptable: boolean } {
-  const prevText = prev.text || '';
-  const nextText = next.text || '';
-  const prevMarkdown = prev.markdown || '';
-  const nextMarkdown = next.markdown || '';
-
-  const textFilled = !prevText && !!nextText;
-  const markdownFilled = !prevMarkdown && !!nextMarkdown;
-
-  const textGrew = !!(prevText && nextText && nextText.startsWith(prevText) && nextText.length > prevText.length);
-  const markdownGrew = !!(
-    prevMarkdown &&
-    nextMarkdown &&
-    nextMarkdown.startsWith(prevMarkdown) &&
-    nextMarkdown.length > prevMarkdown.length
-  );
-
-  return { acceptable: textFilled || markdownFilled || textGrew || markdownGrew };
-}
-
 function comparableMatches(a: BackfillComparable | undefined, b: BackfillComparable | undefined): boolean {
   if (!a || !b) return false;
   if (a.role === b.role && a.stableKey && b.stableKey && a.stableKey === b.stableKey) {
     if (a.weakIdentityHash && a.weakIdentityHash === b.weakIdentityHash) return true;
-    const decision = isPrefixOrFillingUpdate(
+    const decision = classifyPrefixOrFillingUpdate(
       { text: a.text || '', markdown: a.markdown || '' },
       { text: b.text || '', markdown: b.markdown || '' },
     );
     if (decision.acceptable) return true;
-    const reverseDecision = isPrefixOrFillingUpdate(
+    const reverseDecision = classifyPrefixOrFillingUpdate(
       { text: b.text || '', markdown: b.markdown || '' },
       { text: a.text || '', markdown: a.markdown || '' },
     );
@@ -75,13 +53,13 @@ function comparableMatches(a: BackfillComparable | undefined, b: BackfillCompara
   if (a.weakIdentityHash && a.weakIdentityHash === b.weakIdentityHash) return true;
   if (a.role !== b.role) return false;
 
-  const decision = isPrefixOrFillingUpdate(
+  const decision = classifyPrefixOrFillingUpdate(
     { text: a.text || '', markdown: a.markdown || '' },
     { text: b.text || '', markdown: b.markdown || '' },
   );
   if (decision.acceptable) return true;
 
-  const reverseDecision = isPrefixOrFillingUpdate(
+  const reverseDecision = classifyPrefixOrFillingUpdate(
     { text: b.text || '', markdown: b.markdown || '' },
     { text: a.text || '', markdown: a.markdown || '' },
   );
@@ -158,25 +136,19 @@ function normalizeStableIncomingKey(message: any): string {
   return incomingKeyRaw;
 }
 
-function findStableTailAnchor(
-  localMessages: any[],
-  pageMessages: any[],
-): { pageIndex: number; localIndex: number } | null {
-  const localKeyToLastIndex = new Map<string, number>();
-  for (let index = 0; index < localMessages.length; index += 1) {
-    const key = normalizeStableIncomingKey(localMessages[index]);
-    if (!key) continue;
-    localKeyToLastIndex.set(key, index);
+function findStableTailAnchor(localMessages: any[], pageMessages: any[]): { pageIndex: number } | null {
+  const localKeys = new Set<string>();
+  for (const message of localMessages) {
+    const key = normalizeStableIncomingKey(message);
+    if (key) localKeys.add(key);
   }
 
-  if (!localKeyToLastIndex.size) return null;
+  if (!localKeys.size) return null;
 
   for (let pageIndex = pageMessages.length - 1; pageIndex >= 0; pageIndex -= 1) {
     const key = normalizeStableIncomingKey(pageMessages[pageIndex]);
-    if (!key) continue;
-    const localIndex = localKeyToLastIndex.get(key);
-    if (typeof localIndex !== 'number') continue;
-    return { pageIndex, localIndex };
+    if (!key || !localKeys.has(key)) continue;
+    return { pageIndex };
   }
 
   return null;

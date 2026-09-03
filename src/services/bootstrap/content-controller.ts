@@ -7,6 +7,7 @@ import {
 } from '@collectors/registry';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import normalizeApi from '@services/shared/normalize.ts';
+import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
 import {
@@ -21,7 +22,6 @@ const NOTION_AI_COMPOSER_SELECTOR = 'div[role="textbox"][data-content-editable-l
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
-  onInvalidated?: (listener: (error: Error) => void) => () => void;
   isInvalidContextError?: (error: unknown) => boolean;
 };
 
@@ -42,14 +42,12 @@ type InpageTipApi = {
   showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
 };
 
-type RuntimeObserverApi = {
-  createObserver?: (input: {
-    debounceMs?: number;
-    getRoot?: () => Node | null;
-    onTick?: () => void | Promise<void>;
-    leading?: boolean;
-  }) => { start?: () => void; stop?: () => void } | null;
-};
+type RuntimeObserverFactory = (input: {
+  debounceMs?: number;
+  getRoot?: () => Node | null;
+  onTick?: () => void | Promise<void>;
+  leading?: boolean;
+}) => { start?: () => void; stop?: () => void } | null;
 
 type Deps = {
   runtime: RuntimeClient | null;
@@ -57,8 +55,8 @@ type Deps = {
   currentPageCapture: CurrentPageCaptureService;
   inpageButton: InpageButtonApi | null;
   inpageTip: InpageTipApi | null;
-  runtimeObserver: RuntimeObserverApi | null;
-  incrementalUpdater: { computeIncremental?: (snapshot: unknown) => any } | null;
+  createRuntimeObserver: RuntimeObserverFactory | null;
+  incrementalEngine: { prepare?: (snapshot: unknown) => any } | null;
   itemMention: { start?: () => { stop?: () => void } | null } | null;
 };
 
@@ -73,36 +71,6 @@ function pickLineByLevel(level: number): string {
   if (!Array.isArray(lines) || !lines.length) return '';
   const index = Math.floor(Math.random() * lines.length);
   return lines[index] || lines[0] || '';
-}
-
-function readAiChatAutoSaveEnabled(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-      const local = storageApi?.local;
-      if (!local?.get) return resolve(true);
-      local.get([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED], (res: any) => {
-        resolve(res?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false);
-      });
-    } catch (_e) {
-      resolve(true);
-    }
-  });
-}
-
-function readAiChatDollarMentionEnabled(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-      const local = storageApi?.local;
-      if (!local?.get) return resolve(true);
-      local.get([STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED], (res: any) => {
-        resolve(res?.[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] !== false);
-      });
-    } catch (_e) {
-      resolve(true);
-    }
-  });
 }
 
 function normalizeConversationMeta(value: unknown): string {
@@ -121,8 +89,8 @@ export function createContentController(deps: Deps) {
   const currentPageCapture = deps.currentPageCapture;
   const inpageButton = deps.inpageButton;
   const inpageTip = deps.inpageTip;
-  const runtimeObserver = deps.runtimeObserver;
-  const incrementalUpdater = deps.incrementalUpdater;
+  const createRuntimeObserver = deps.createRuntimeObserver;
+  const incrementalEngine = deps.incrementalEngine;
   const itemMention = deps.itemMention;
   const doc = typeof document !== 'undefined' ? document : null;
 
@@ -181,20 +149,144 @@ export function createContentController(deps: Deps) {
     return { conversationId: conversation.id, isNew };
   }
 
-  function createAutoCaptureController() {
+  type ResidentAutoSaveHandle = {
+    ownerToken: number;
+    isActive: () => boolean;
+    isAutoSaveEnabled: () => boolean;
+    runAutoSaveTick: () => Promise<void>;
+  };
+  type ManualPersistenceSlot = { ownerToken: number | null; state: 'pending' | 'inflight' };
+
+  let residentOwnerSequence = 0;
+  let activeResidentOwnerToken = 0;
+  let currentResidentAutoSaveHandle: ResidentAutoSaveHandle | null = null;
+  let autoSaveRunInFlight: Promise<void> | null = null;
+  let latestTrailingAutoSaveOwnerToken: number | null = null;
+  let manualPersistence: ManualPersistenceSlot | null = null;
+
+  function isCurrentResidentOwner(ownerToken: number): boolean {
+    return (
+      ownerToken > 0 &&
+      activeResidentOwnerToken === ownerToken &&
+      currentResidentAutoSaveHandle?.ownerToken === ownerToken &&
+      currentResidentAutoSaveHandle.isActive()
+    );
+  }
+
+  function cancelAutoSaveTrailingForOwner(ownerToken: number) {
+    if (latestTrailingAutoSaveOwnerToken === ownerToken) latestTrailingAutoSaveOwnerToken = null;
+  }
+
+  function drainLatestAutoSaveRequest() {
+    if (autoSaveRunInFlight || manualPersistence) return;
+    const ownerToken = latestTrailingAutoSaveOwnerToken;
+    latestTrailingAutoSaveOwnerToken = null;
+    if (!ownerToken) return;
+    startAutoSaveRequest(ownerToken);
+  }
+
+  function startAutoSaveRequest(ownerToken: number) {
+    if (autoSaveRunInFlight || manualPersistence) {
+      latestTrailingAutoSaveOwnerToken = ownerToken;
+      return;
+    }
+    const handle = currentResidentAutoSaveHandle;
+    if (
+      !handle ||
+      handle.ownerToken !== ownerToken ||
+      !isCurrentResidentOwner(ownerToken) ||
+      !handle.isAutoSaveEnabled()
+    ) {
+      return;
+    }
+
+    const run = Promise.resolve().then(() => handle.runAutoSaveTick());
+    autoSaveRunInFlight = run;
+    void run
+      .catch((error) => {
+        console.error('[WebClipper] autosave scheduler failed:', error);
+      })
+      .finally(() => {
+        if (autoSaveRunInFlight !== run) return;
+        autoSaveRunInFlight = null;
+        if (!manualPersistence) drainLatestAutoSaveRequest();
+      });
+  }
+
+  function requestAutoSave(ownerToken: number) {
+    const handle = currentResidentAutoSaveHandle;
+    if (
+      !handle ||
+      handle.ownerToken !== ownerToken ||
+      !isCurrentResidentOwner(ownerToken) ||
+      !handle.isAutoSaveEnabled()
+    ) {
+      return;
+    }
+    if (autoSaveRunInFlight || manualPersistence) {
+      latestTrailingAutoSaveOwnerToken = ownerToken;
+      return;
+    }
+    startAutoSaveRequest(ownerToken);
+  }
+
+  function cancelPendingManualPersistenceForOwner(ownerToken: number) {
+    if (manualPersistence?.ownerToken !== ownerToken || manualPersistence.state !== 'pending') return;
+    manualPersistence = null;
+    drainLatestAutoSaveRequest();
+  }
+
+  function releaseResidentOwner(ownerToken: number) {
+    cancelAutoSaveTrailingForOwner(ownerToken);
+    cancelPendingManualPersistenceForOwner(ownerToken);
+    if (activeResidentOwnerToken !== ownerToken || currentResidentAutoSaveHandle?.ownerToken !== ownerToken) return;
+    activeResidentOwnerToken = 0;
+    currentResidentAutoSaveHandle = null;
+  }
+
+  async function enterManualPersistence(
+    ownerToken: number | null,
+    canStart: () => boolean,
+  ): Promise<ManualPersistenceSlot | null> {
+    if (manualPersistence) return null;
+    const slot: ManualPersistenceSlot = { ownerToken, state: 'pending' };
+    manualPersistence = slot;
+
+    const activeAutoSave = autoSaveRunInFlight;
+    if (activeAutoSave) {
+      try {
+        await activeAutoSave;
+      } catch (_error) {
+        // A failed autosave must still release explicit manual persistence.
+      }
+    }
+
+    if (manualPersistence !== slot || slot.state !== 'pending') return null;
+    if (!canStart()) {
+      manualPersistence = null;
+      drainLatestAutoSaveRequest();
+      return null;
+    }
+
+    slot.state = 'inflight';
+    return slot;
+  }
+
+  function exitManualPersistence(slot: ManualPersistenceSlot) {
+    if (manualPersistence !== slot) return;
+    manualPersistence = null;
+    drainLatestAutoSaveRequest();
+  }
+
+  function createAutoCaptureController(ownerToken: number) {
     let stopped = false;
-    let manualSaveInFlight = false;
     let observer: { start?: () => void; stop?: () => void } | null = null;
     const BACKFILL_WINDOW_LIMIT = 200;
     const BACKFILL_RETRY_THROTTLE_MS = 10_000;
     const BACKFILL_RETRY_MAX_ATTEMPTS = 6;
     const BACKFILL_RETRY_MAX_DURATION_MS = 2 * 60_000;
-    const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-    const hasStorageGet = !!storageApi?.local?.get;
-    // Default to enabled when storage API is unavailable (e.g. tests).
-    // When storage is available, wait for the async read to avoid a "first tick" auto-save surprise for users who disabled it.
-    let aiChatAutoSaveEnabled: boolean | null = hasStorageGet ? null : true;
-    let savingDepth = 0;
+    let aiChatAutoSaveEnabled: boolean | null = null;
+    let liveGeneration = 0;
     let inpageButtonPosition: any = null;
     let inpageButtonPositionLoaded = false;
     let inpageButtonPositionLoadPromise: Promise<any> | null = null;
@@ -214,14 +306,6 @@ export function createContentController(deps: Deps) {
     >();
     const NOTION_AI_PROACTIVE_CAPTURE_DELAYS_MS = [0, 120, 450, 1000] as const;
     const NOTION_AI_PROACTIVE_CAPTURE_COOLDOWN_MS = 160;
-
-    void readAiChatAutoSaveEnabled()
-      .then((enabled) => {
-        aiChatAutoSaveEnabled = enabled === true;
-      })
-      .catch(() => {
-        aiChatAutoSaveEnabled = true;
-      });
 
     async function ensureInpageButtonPositionLoadedOnce(): Promise<any | null> {
       if (inpageButtonPositionLoaded) return inpageButtonPosition;
@@ -252,21 +336,34 @@ export function createContentController(deps: Deps) {
       return inpageButtonPosition;
     }
 
+    function clearProactiveTimers() {
+      for (const timer of proactiveNotionAiBurstTimers) clearTimeout(timer);
+      proactiveNotionAiBurstTimers.clear();
+    }
+
+    function setAutoSaveEnabled(enabled: boolean) {
+      const next = enabled === true;
+      if (aiChatAutoSaveEnabled === true && !next) {
+        liveGeneration += 1;
+        clearProactiveTimers();
+        cancelAutoSaveTrailingForOwner(ownerToken);
+      }
+      aiChatAutoSaveEnabled = next;
+    }
+
     function stop() {
       if (stopped) return;
       stopped = true;
-      savingDepth = 0;
+      liveGeneration += 1;
+      releaseResidentOwner(ownerToken);
       inpageButton?.setSaving?.(false);
       inpageButton?.cleanupButtons?.('');
       backfillStateByConversation.clear();
       observer?.stop?.();
-      for (const timer of proactiveNotionAiBurstTimers) clearTimeout(timer);
-      proactiveNotionAiBurstTimers.clear();
+      clearProactiveTimers();
       doc?.removeEventListener('click', onDocumentClickCapture, true);
       doc?.removeEventListener('keydown', onDocumentKeydownCapture, true);
     }
-
-    runtime?.onInvalidated?.(() => stop());
 
     function isNotionAiCollectorActive(): boolean {
       const collector = resolveActiveCollector(collectorsRegistry);
@@ -290,7 +387,7 @@ export function createContentController(deps: Deps) {
         const timer = setTimeout(() => {
           proactiveNotionAiBurstTimers.delete(timer);
           if (stopped) return;
-          void handleTick();
+          requestAutoSave(ownerToken);
         }, delay);
         proactiveNotionAiBurstTimers.add(timer);
       }
@@ -485,36 +582,32 @@ export function createContentController(deps: Deps) {
       };
     }
 
-    function beginSaving() {
-      savingDepth += 1;
-      if (savingDepth === 1) inpageButton?.setSaving?.(true);
-    }
-
-    function endSaving() {
-      savingDepth = Math.max(0, savingDepth - 1);
-      if (savingDepth === 0) inpageButton?.setSaving?.(false);
+    function setResidentSaving(saving: boolean) {
+      if (!stopped) inpageButton?.setSaving?.(saving);
     }
 
     const clickSave = async () => {
       if (stopped) return;
-      if (manualSaveInFlight) {
-        inpageButton?.setSaving?.(true);
-        return;
-      }
-
-      manualSaveInFlight = true;
-      beginSaving();
+      let manualSlot: ManualPersistenceSlot | null = null;
       try {
-        await currentPageCapture.captureCurrentPage({
-          onProgress: (progress) => {
-            showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
-          },
-        });
+        manualSlot = await enterManualPersistence(ownerToken, () => !stopped && isCurrentResidentOwner(ownerToken));
+        if (!manualSlot) return;
+        setResidentSaving(true);
+        try {
+          await currentPageCapture.captureCurrentPage({
+            onProgress: (progress) => {
+              if (!stopped && isCurrentResidentOwner(ownerToken)) {
+                showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
+              }
+            },
+          });
+        } finally {
+          setResidentSaving(false);
+        }
       } catch (_error) {
         // tip already shown in progress callback
       } finally {
-        manualSaveInFlight = false;
-        endSaving();
+        if (manualSlot) exitManualPersistence(manualSlot);
       }
     };
 
@@ -537,9 +630,10 @@ export function createContentController(deps: Deps) {
     };
 
     async function refreshInpageButton() {
+      const positionState = await ensureInpageButtonPositionLoadedOnce();
+      if (stopped) return null;
       const collector = resolveActiveCollector(collectorsRegistry);
       const inpageCollector = collector || resolveActiveOrInpageCollector(collectorsRegistry);
-      const positionState = await ensureInpageButtonPositionLoadedOnce();
       inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
       inpageButton?.ensureInpageButton?.({
         collectorId: inpageCollector?.id,
@@ -548,94 +642,155 @@ export function createContentController(deps: Deps) {
         onCombo: showComboLine,
         positionState,
         onPositionChange: (state: any) => {
+          if (stopped) return;
           inpageButtonPosition = state;
           void writeInpageButtonGlobalPosition(state);
         },
       });
+      if (stopped) {
+        inpageButton?.cleanupButtons?.('');
+        return null;
+      }
       return collector;
     }
 
-    async function handleTick() {
+    function isAutoSaveRequestAllowed(generation: number) {
+      return (
+        !stopped &&
+        aiChatAutoSaveEnabled === true &&
+        liveGeneration === generation &&
+        isCurrentResidentOwner(ownerToken)
+      );
+    }
+
+    function isAutoSavePreSaveAllowed(generation: number) {
+      return isAutoSaveRequestAllowed(generation) && manualPersistence === null;
+    }
+
+    function rollbackBackfillAttempt(backfill: {
+      changed: boolean;
+      stateKey: string | null;
+      pageSignature: string | null;
+    }) {
+      if (!backfill.changed || !backfill.stateKey || !backfill.pageSignature) return;
+      const state = backfillStateByConversation.get(backfill.stateKey);
+      if (state && state.lastAttemptedPageSignature === backfill.pageSignature) {
+        state.lastAttemptedPageSignature = '';
+      }
+    }
+
+    function dedupeKeys(values: unknown): string[] {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const value of Array.isArray(values) ? values : []) {
+        const key = String(value || '').trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(key);
+      }
+      return out;
+    }
+
+    function mergeAutoSaveSnapshots(snapshot: any, backfill: any, incremental: any) {
+      const effectiveConversation = incremental?.snapshot?.conversation || snapshot?.conversation;
+      if (backfill.changed && incremental?.changed) {
+        const mergedByKey = new Map<string, any>();
+        const mergedUnkeyed: any[] = [];
+        const pushMessage = (message: any) => {
+          if (!message) return;
+          const key = String(message?.messageKey || '').trim();
+          if (!key) {
+            mergedUnkeyed.push(message);
+            return;
+          }
+          if (mergedByKey.has(key)) {
+            mergedByKey.set(key, { ...(mergedByKey.get(key) || {}), ...message });
+            return;
+          }
+          mergedByKey.set(key, message);
+        };
+        for (const message of Array.isArray(backfill.snapshot?.messages) ? backfill.snapshot.messages : []) {
+          pushMessage(message);
+        }
+        for (const message of Array.isArray(incremental.snapshot?.messages) ? incremental.snapshot.messages : []) {
+          pushMessage(message);
+        }
+        return {
+          snapshot: {
+            ...(incremental.snapshot || backfill.snapshot || snapshot),
+            conversation: effectiveConversation,
+            messages: [...Array.from(mergedByKey.values()), ...mergedUnkeyed],
+          },
+          diff: {
+            added: dedupeKeys([...(backfill.diff?.added || []), ...(incremental.diff?.added || [])]),
+            updated: dedupeKeys([...(backfill.diff?.updated || []), ...(incremental.diff?.updated || [])]),
+            removed: [],
+          },
+        };
+      }
+
+      if (backfill.changed) {
+        return {
+          snapshot: {
+            ...(backfill.snapshot || snapshot),
+            conversation: effectiveConversation,
+            messages: Array.isArray(backfill.snapshot?.messages) ? backfill.snapshot.messages : [],
+          },
+          diff: backfill.diff,
+        };
+      }
+
+      return { snapshot: incremental?.snapshot || null, diff: incremental?.diff || null };
+    }
+
+    async function runAutoSaveTick() {
       if (stopped) return;
+      const generation = liveGeneration;
+      let backfill: Awaited<ReturnType<typeof maybeRunBackfill>> | null = null;
 
       try {
-        const collector = await refreshInpageButton();
+        if (!isAutoSavePreSaveAllowed(generation)) return;
+        const collector = resolveActiveCollector(collectorsRegistry);
         if (!collector || typeof collector.capture !== 'function') return;
-        // ChatGPT and Google AI Studio are intentionally absent from AI_CHAT_AUTO_SAVE_COLLECTOR_IDS
-        // (manual-capture only), so this guard short-circuits them before any auto-save work.
+        // ChatGPT and Google AI Studio remain manual-capture only.
         if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
-        if (aiChatAutoSaveEnabled !== true) return;
 
         const snapshot = await Promise.resolve(collector.capture());
+        if (!isAutoSavePreSaveAllowed(generation)) return;
         if (!snapshot) return;
 
-        const backfill = await maybeRunBackfill(snapshot);
-        const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
-        const incrementalChanged = !!(incremental && incremental.changed);
-        if (!backfill.changed && !incrementalChanged) return;
-
-        let appendSnapshot = backfill.changed ? backfill.snapshot : incremental?.snapshot;
-        let appendDiff = backfill.changed ? backfill.diff : incremental?.diff;
-
-        if (backfill.changed && incrementalChanged) {
-          const mergedByKey = new Map<string, any>();
-          const mergedUnkeyed: any[] = [];
-          const pushMessage = (message: any) => {
-            if (!message) return;
-            const key = String(message?.messageKey || '').trim();
-            if (!key) {
-              mergedUnkeyed.push(message);
-              return;
-            }
-            if (mergedByKey.has(key)) {
-              mergedByKey.set(key, { ...(mergedByKey.get(key) || {}), ...message });
-              return;
-            }
-            mergedByKey.set(key, message);
-          };
-          for (const message of Array.isArray(backfill.snapshot?.messages) ? backfill.snapshot.messages : []) {
-            pushMessage(message);
-          }
-          for (const message of Array.isArray(incremental?.snapshot?.messages) ? incremental.snapshot.messages : []) {
-            pushMessage(message);
-          }
-
-          const dedupeKeys = (values: unknown): string[] => {
-            const seen = new Set<string>();
-            const out: string[] = [];
-            for (const value of Array.isArray(values) ? values : []) {
-              const key = String(value || '').trim();
-              if (!key || seen.has(key)) continue;
-              seen.add(key);
-              out.push(key);
-            }
-            return out;
-          };
-
-          appendSnapshot = {
-            ...(incremental?.snapshot || backfill.snapshot || snapshot),
-            messages: [...Array.from(mergedByKey.values()), ...mergedUnkeyed],
-          };
-          appendDiff = {
-            added: dedupeKeys([...(backfill.diff?.added || []), ...(incremental?.diff?.added || [])]),
-            updated: dedupeKeys([...(backfill.diff?.updated || []), ...(incremental?.diff?.updated || [])]),
-            removed: [],
-          };
+        backfill = await maybeRunBackfill(snapshot);
+        if (!isAutoSavePreSaveAllowed(generation)) {
+          rollbackBackfillAttempt(backfill);
+          return;
         }
 
-        if (!appendSnapshot || !appendDiff) return;
-        const appendMessages = Array.isArray(appendSnapshot?.messages) ? appendSnapshot.messages : [];
-        if (!appendMessages.length && !(appendDiff.added || []).length && !(appendDiff.updated || []).length) return;
-
-        beginSaving();
-        try {
-          const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
-          if (saved && (incrementalChanged || backfill.changed)) {
-            showInpageTip(
-              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
-              'ok',
-            );
+        const incremental = incrementalEngine?.prepare?.(snapshot) || null;
+        const incrementalChanged = incremental?.changed === true;
+        if (incremental && !incrementalChanged) {
+          try {
+            incremental.commit();
+          } catch (error) {
+            rollbackBackfillAttempt(backfill);
+            console.error('[WebClipper] autosave incremental pre-save commit invariant failed:', error);
+            return;
           }
+        }
+
+        if (!backfill.changed && !incrementalChanged) return;
+        const merged = mergeAutoSaveSnapshots(snapshot, backfill, incremental);
+        if (!merged.snapshot || !merged.diff) return;
+
+        setResidentSaving(true);
+        try {
+          let saved: Awaited<ReturnType<typeof saveSnapshot>>;
+          try {
+            saved = await saveSnapshot(merged.snapshot, { mode: 'append', diff: merged.diff });
+          } catch (error) {
+            rollbackBackfillAttempt(backfill);
+            throw error;
+          }
+
           if (saved && backfill.changed && backfill.logInfo) {
             if (backfill.stateKey) {
               const state = backfillStateByConversation.get(backfill.stateKey);
@@ -643,16 +798,24 @@ export function createContentController(deps: Deps) {
             }
             console.info('[WebClipper] auto-save backfill applied', backfill.logInfo);
           }
-        } catch (error) {
-          if (backfill.changed && backfill.stateKey) {
-            const state = backfillStateByConversation.get(backfill.stateKey);
-            if (state && backfill.pageSignature && state.lastAttemptedPageSignature === backfill.pageSignature) {
-              state.lastAttemptedPageSignature = '';
+
+          if (saved && incrementalChanged) {
+            try {
+              incremental.commit();
+            } catch (error) {
+              console.error('[WebClipper] autosave incremental durable commit invariant failed:', error);
+              return;
             }
           }
-          throw error;
+
+          if (saved && isCurrentResidentOwner(ownerToken) && !stopped && (incrementalChanged || backfill.changed)) {
+            showInpageTip(
+              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: merged.snapshot?.conversation?.title }),
+              'ok',
+            );
+          }
         } finally {
-          endSaving();
+          setResidentSaving(false);
         }
       } catch (error) {
         if (runtime?.isInvalidContextError?.(error)) {
@@ -663,41 +826,69 @@ export function createContentController(deps: Deps) {
       }
     }
 
+    async function handleObserverTick() {
+      if (stopped) return;
+      const generation = liveGeneration;
+      try {
+        await refreshInpageButton();
+        if (!isAutoSaveRequestAllowed(generation)) return;
+        requestAutoSave(ownerToken);
+      } catch (error) {
+        if (runtime?.isInvalidContextError?.(error)) stop();
+      }
+    }
+
     doc?.addEventListener('click', onDocumentClickCapture, true);
     doc?.addEventListener('keydown', onDocumentKeydownCapture, true);
 
     observer =
-      runtimeObserver?.createObserver?.({
+      createRuntimeObserver?.({
         debounceMs: 600,
         getRoot: () => {
           if (stopped) return null;
           const collector = resolveActiveCollector(collectorsRegistry);
           return collector && typeof collector.getRoot === 'function' ? collector.getRoot() : null;
         },
-        onTick: handleTick,
+        onTick: handleObserverTick,
       }) || null;
 
     return {
+      ownerToken,
       start() {
         if (!stopped) observer?.start?.();
       },
+      isActive: () => !stopped,
+      isAutoSaveEnabled: () => !stopped && aiChatAutoSaveEnabled === true,
+      runAutoSaveTick,
+      setAutoSaveEnabled,
       stop,
     };
   }
 
   return {
+    async captureCurrentPage(
+      input?: Parameters<CurrentPageCaptureService['captureCurrentPage']>[0],
+    ): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
+      const manualSlot = await enterManualPersistence(null, () => true);
+      if (!manualSlot) throw new Error('manual_capture_in_progress');
+      try {
+        return await currentPageCapture.captureCurrentPage(input);
+      } finally {
+        exitManualPersistence(manualSlot);
+      }
+    },
     start() {
-      const controller = createAutoCaptureController();
-      controller.start();
-
-      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-      const hasStorageGet = !!storageApi?.local?.get;
-      // Default to enabled when storage API is unavailable (e.g. tests).
-      // When storage is available, wait for the async read to avoid "first keypress" enabling for users who disabled it.
-      let aiChatDollarMentionEnabled: boolean | null = hasStorageGet ? null : true;
+      const ownerToken = ++residentOwnerSequence;
+      const controller = createAutoCaptureController(ownerToken);
+      activeResidentOwnerToken = ownerToken;
+      currentResidentAutoSaveHandle = controller;
       let mentionController: { stop?: () => void } | null = null;
       let stopped = false;
-      let unsubscribeStorage: (() => void) | null = null;
+      let controllerStarted = false;
+      let aiChatDollarMentionEnabled: boolean | null = null;
+      let autoSaveObservationRevision = 0;
+      let mentionObservationRevision = 0;
+      let unsubscribeStorage = () => {};
 
       function stopMention() {
         const previous = mentionController;
@@ -710,70 +901,72 @@ export function createContentController(deps: Deps) {
       }
 
       function startMention() {
-        if (stopped) return;
-        if (aiChatDollarMentionEnabled !== true) return;
-        if (!itemMention || typeof itemMention.start !== 'function') return;
-        if (mentionController) return;
+        if (stopped || aiChatDollarMentionEnabled !== true) return;
+        if (!itemMention || typeof itemMention.start !== 'function' || mentionController) return;
         mentionController = itemMention.start() || null;
       }
 
       function applyMentionEnabled(enabled: boolean) {
         aiChatDollarMentionEnabled = enabled === true;
-        if (aiChatDollarMentionEnabled === true) startMention();
+        if (aiChatDollarMentionEnabled) startMention();
         else stopMention();
       }
 
-      if (!itemMention || typeof itemMention.start !== 'function') {
-        // No-op.
-      } else if (!hasStorageGet) {
-        applyMentionEnabled(true);
-      } else {
-        void readAiChatDollarMentionEnabled()
-          .then((enabled) => {
-            applyMentionEnabled(enabled === true);
-          })
-          .catch(() => {
-            applyMentionEnabled(true);
-          });
-
-        const onChanged = storageApi?.onChanged;
-        if (onChanged?.addListener && onChanged?.removeListener) {
-          const listener = (changes: Record<string, any> | null, areaName?: string) => {
-            if (stopped) return;
-            if (areaName && String(areaName) !== 'local') return;
-            const change = changes ? (changes as any)[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] : null;
-            if (!change) return;
-            applyMentionEnabled(change?.newValue !== false);
-          };
-          try {
-            onChanged.addListener(listener);
-            unsubscribeStorage = () => {
-              try {
-                onChanged.removeListener(listener);
-              } catch (_e) {
-                // ignore
-              }
-            };
-          } catch (_e) {
-            // ignore
-          }
-        }
+      function ensureControllerStarted() {
+        if (stopped || controllerStarted) return;
+        controllerStarted = true;
+        controller.start();
       }
+
+      function applyAutoSaveEnabled(enabled: boolean) {
+        controller.setAutoSaveEnabled(enabled === true);
+        ensureControllerStarted();
+      }
+
+      unsubscribeStorage = storageOnChanged((changes: Record<string, any> | null, areaName: string) => {
+        if (stopped || areaName !== 'local' || !changes) return;
+        if (Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)) {
+          autoSaveObservationRevision += 1;
+          applyAutoSaveEnabled(changes[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED]?.newValue !== false);
+        }
+        if (Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED)) {
+          mentionObservationRevision += 1;
+          applyMentionEnabled(changes[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED]?.newValue !== false);
+        }
+      });
+
+      const initialAutoSaveRevision = autoSaveObservationRevision;
+      const initialMentionRevision = mentionObservationRevision;
+      void storageGet([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED, STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED]).then(
+        (local) => {
+          if (stopped) return;
+          if (autoSaveObservationRevision === initialAutoSaveRevision) {
+            applyAutoSaveEnabled(local?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false);
+          }
+          if (mentionObservationRevision === initialMentionRevision) {
+            applyMentionEnabled(local?.[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] !== false);
+          }
+        },
+        () => {
+          if (stopped) return;
+          if (autoSaveObservationRevision === initialAutoSaveRevision) applyAutoSaveEnabled(true);
+          if (mentionObservationRevision === initialMentionRevision) applyMentionEnabled(true);
+        },
+      );
 
       return {
         stop() {
+          if (stopped) return;
           stopped = true;
+          autoSaveObservationRevision += 1;
+          mentionObservationRevision += 1;
           try {
-            unsubscribeStorage?.();
+            unsubscribeStorage();
           } catch (_e) {
             // ignore
           }
-          unsubscribeStorage = null;
-          try {
-            stopMention();
-          } catch (_e) {
-            // ignore
-          }
+          unsubscribeStorage = () => {};
+          stopMention();
           controller.stop();
         },
       };

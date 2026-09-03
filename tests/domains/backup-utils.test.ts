@@ -71,6 +71,13 @@ describe('backup backup-utils', () => {
     );
   });
 
+  it('keeps only the canonical inpage display setting', () => {
+    expect(filterStorageForBackup({ inpage_display_mode: 'supported' })).toEqual({ inpage_display_mode: 'supported' });
+    expect(filterStorageForBackup({ inpage_display_mode: 'off' })).toEqual({ inpage_display_mode: 'off' });
+    expect(filterStorageForBackup({ inpage_display_mode: 'bad' })).toEqual({});
+    expect(filterStorageForBackup({ inpage_retired_setting: true, keep: 1 })).toEqual({ keep: 1 });
+  });
+
   it('validateBackupDocument rejects unsupported version', () => {
     const res = validateBackupDocument({ schemaVersion: 999, stores: {} });
     expect(res.ok).toBe(false);

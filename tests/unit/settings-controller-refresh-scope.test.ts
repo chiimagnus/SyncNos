@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FEISHU_MESSAGE_TYPES, NOTION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  FEISHU_MESSAGE_TYPES,
+  INPAGE_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 
 const runtimeMocks = vi.hoisted(() => ({ send: vi.fn() }));
@@ -91,6 +95,7 @@ let notionGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let notionStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
+let displaySetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 
 function ControllerHarness() {
   const snapshot = useSettingsSceneController({ activeSection: 'notion' });
@@ -168,6 +173,7 @@ beforeEach(() => {
   feishuGetQueue = [];
   notionStartQueue = [];
   feishuStartQueue = [];
+  displaySetQueue = [];
 
   antiHotlinkMocks.load.mockResolvedValue([{ domain: 'initial.example', referer: 'https://initial.example/' }]);
   feishuSettingsMocks.getPathConfig.mockResolvedValue({
@@ -196,7 +202,7 @@ beforeEach(() => {
     };
   });
 
-  runtimeMocks.send.mockImplementation(async (type: string) => {
+  runtimeMocks.send.mockImplementation(async (type: string, payload?: Record<string, unknown>) => {
     if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS) {
       return await takeQueued(notionGetQueue, ok(notionStatus));
     }
@@ -212,6 +218,9 @@ beforeEach(() => {
     }
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
       return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
+    }
+    if (type === INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE) {
+      return await takeQueued(displaySetQueue, ok({ mode: String(payload?.mode || '') }));
     }
     if (type === 'obsidianGetSettings') {
       return ok({
@@ -260,11 +269,187 @@ describe('Settings scoped refresh', () => {
     expect(callsOf(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS)).toHaveLength(1);
     expect(callsOf('obsidianGetSettings')).toHaveLength(1);
     expect(callsOf('githubGetSettings')).toHaveLength(1);
-    expect(storageMocks.get).toHaveBeenCalledTimes(1);
-    expect(storageMocks.get.mock.calls[0]?.[0]).not.toContain('anti_hotlink_rules_v1');
+    expect(storageMocks.get).toHaveBeenCalledTimes(2);
+    const storageReads = storageMocks.get.mock.calls.map(([keys]) => keys as string[]);
+    const bulkRead = storageReads.find((keys) => keys.includes('notion_parent_page_id'))!;
+    const displayRead = storageReads.find((keys) => keys.includes('inpage_display_mode'))!;
+    expect(bulkRead).not.toContain('inpage_display_mode');
+    expect(bulkRead).not.toContain('anti_hotlink_rules_v1');
+    expect(displayRead).toEqual(['inpage_display_mode']);
+    expect(storageMocks.onChanged.mock.invocationCallOrder[0]).toBeLessThan(
+      storageMocks.get.mock.invocationCallOrder[0],
+    );
     expect(antiHotlinkMocks.load).toHaveBeenCalledTimes(1);
     expect(antiHotlinkMocks.load).toHaveBeenCalledWith({ forceRefresh: true });
     expect(feishuSettingsMocks.getPathConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('display wakes update only display state and removed canonical falls back through the shared reader', async () => {
+    storageState = { inpage_display_mode: 'all' };
+    await renderController();
+    expect(latestSnapshot!.inpageDisplayMode).toBe('all');
+    const baselineRuntime = runtimeMocks.send.mock.calls.length;
+    const baselineStorageReads = storageMocks.get.mock.calls.length;
+
+    dispatchStorage({ inpage_display_mode: { oldValue: 'all', newValue: 'off' } });
+    await flushReact();
+    expect(latestSnapshot!.inpageDisplayMode).toBe('off');
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
+
+    dispatchStorage({ inpage_display_mode: { oldValue: 'off', newValue: undefined } });
+    await flushReact();
+    expect(latestSnapshot!.inpageDisplayMode).toBe('all');
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads + 1);
+  });
+
+  it('a live display wake beats a late mount effective read', async () => {
+    const displayRead = deferred<Record<string, unknown>>();
+    const defaultGet = storageMocks.get.getMockImplementation()!;
+    storageMocks.get.mockImplementation(async (keys: string[]) => {
+      if ((keys || []).includes('inpage_display_mode')) return await displayRead.promise;
+      return await defaultGet(keys);
+    });
+
+    act(() => root!.render(createElement(ControllerHarness)));
+    await flushReact();
+    expect(storageListener).not.toBeNull();
+    dispatchStorage({ inpage_display_mode: { newValue: 'off' } });
+    await flushReact();
+    expect(latestSnapshot!.inpageDisplayMode).toBe('off');
+    displayRead.resolve({ inpage_display_mode: 'all' });
+    await flushReact();
+    expect(latestSnapshot!.inpageDisplayMode).toBe('off');
+  });
+
+  it('display action uses the background route, supports same-value-no-wake fallback, and rejects stale responses', async () => {
+    storageState = { inpage_display_mode: 'all' };
+    await renderController();
+    await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
+    expect(callsOf(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE)).toHaveLength(1);
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({ inpage_display_mode: expect.anything() }),
+    );
+    expect(latestSnapshot!.inpageDisplayMode).toBe('off');
+
+    const late = deferred<ApiResponse>();
+    displaySetQueue.push(late.promise);
+    const action = begin(() => latestSnapshot!.onChangeInpageDisplayMode('all'));
+    await flushReact();
+    dispatchStorage({ inpage_display_mode: { oldValue: 'off', newValue: 'supported' } });
+    late.resolve(ok({ mode: 'all' }));
+    await act(async () => action);
+    expect(latestSnapshot!.inpageDisplayMode).toBe('supported');
+  });
+
+  it('display route failure does not report a successful UI state', async () => {
+    storageState = { inpage_display_mode: 'all' };
+    await renderController();
+    displaySetQueue.push({ ok: false, data: null, error: { message: 'display write failed' } });
+    await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
+    expect(latestSnapshot!.inpageDisplayMode).toBe('all');
+    expect(latestSnapshot!.error).toBe('display write failed');
+  });
+
+  it('autosave and dollar wakes update only their own Settings state without a full refresh', async () => {
+    storageState = { ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: true };
+    await renderController();
+    const baselineRuntime = runtimeMocks.send.mock.calls.length;
+    const baselineStorageReads = storageMocks.get.mock.calls.length;
+
+    dispatchStorage({ ai_chat_auto_save_enabled: { oldValue: true, newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(true);
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
+
+    dispatchStorage({ ai_chat_dollar_mention_enabled: { oldValue: true, newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
+  });
+
+  it('an autosave wake beats only its own late hydrate while dollar still applies from that hydrate', async () => {
+    const bulkRead = deferred<Record<string, unknown>>();
+    const defaultGet = storageMocks.get.getMockImplementation()!;
+    storageMocks.get.mockImplementation(async (keys: string[]) => {
+      if ((keys || []).includes('notion_parent_page_id')) return await bulkRead.promise;
+      return await defaultGet(keys);
+    });
+
+    act(() => root!.render(createElement(ControllerHarness)));
+    await flushReact();
+    dispatchStorage({ ai_chat_auto_save_enabled: { newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+
+    bulkRead.resolve({ ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: false });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+  });
+
+  it('a dollar wake beats only its own late hydrate while autosave still applies from that hydrate', async () => {
+    const bulkRead = deferred<Record<string, unknown>>();
+    const defaultGet = storageMocks.get.getMockImplementation()!;
+    storageMocks.get.mockImplementation(async (keys: string[]) => {
+      if ((keys || []).includes('notion_parent_page_id')) return await bulkRead.promise;
+      return await defaultGet(keys);
+    });
+
+    act(() => root!.render(createElement(ControllerHarness)));
+    await flushReact();
+    dispatchStorage({ ai_chat_dollar_mention_enabled: { newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+
+    bulkRead.resolve({ ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: true });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+  });
+
+  it('runtime-setting actions use per-key fallback observations and newer same-key wakes win', async () => {
+    storageState = { ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: true };
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onToggleAiChatAutoSaveEnabled(true));
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(true);
+
+    await invoke(() => latestSnapshot!.onToggleAiChatDollarMentionEnabled(false));
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+
+    const pendingWrite = deferred<void>();
+    storageMocks.set.mockImplementationOnce(async () => {
+      await pendingWrite.promise;
+    });
+    const staleAutoAction = begin(() => latestSnapshot!.onToggleAiChatAutoSaveEnabled(false));
+    await flushReact();
+    dispatchStorage({ ai_chat_auto_save_enabled: { oldValue: true, newValue: true } });
+    pendingWrite.resolve();
+    await act(async () => staleAutoAction);
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(true);
+  });
+
+  it('an unrelated runtime-setting wake does not suppress another key action fallback', async () => {
+    storageState = { ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: true };
+    await renderController();
+    const pendingWrite = deferred<void>();
+    storageMocks.set.mockImplementationOnce(async (payload: Record<string, unknown>) => {
+      await pendingWrite.promise;
+      Object.assign(storageState, payload || {});
+    });
+
+    const autoAction = begin(() => latestSnapshot!.onToggleAiChatAutoSaveEnabled(true));
+    await flushReact();
+    dispatchStorage({ ai_chat_dollar_mention_enabled: { oldValue: true, newValue: false } });
+    pendingWrite.resolve();
+    await act(async () => autoAction);
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(true);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
   });
 
   it('Notion and Feishu token wakes rehydrate only their own safe auth status', async () => {

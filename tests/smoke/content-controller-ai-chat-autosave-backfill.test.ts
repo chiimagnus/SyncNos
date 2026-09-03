@@ -5,8 +5,23 @@ import { createContentController } from '@services/bootstrap/content-controller.
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 import normalizeApi from '@services/shared/normalize.ts';
 import { getMessageIdentityMeta } from '@services/conversations/content/autosave-identity-utils.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 
 type TickFn = (() => void | Promise<void>) | null;
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushMicrotasks() {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
+}
 
 function cloneSnapshot<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -17,6 +32,7 @@ function createHarness(options: {
   tailWindows?: Array<{ conversationId: number | null; messages: any[] }>;
   incrementalImpl?: (snapshot: any, callCount: number) => any;
   collectorId?: string;
+  collectorResolver?: () => { id: string; collector: any } | null;
   sendImpl?: (type: string, payload?: any) => Promise<any> | any;
 }) {
   let tickRef: TickFn = null;
@@ -25,6 +41,7 @@ function createHarness(options: {
   let captureCount = 0;
   let tailWindowCount = 0;
   let incrementalCallCount = 0;
+  let buttonConfig: any = null;
 
   const runtime = {
     send: async (type: string, payload?: any) => {
@@ -61,7 +78,7 @@ function createHarness(options: {
   };
 
   const collectorsRegistry = {
-    pickActive: () => ({ id: options.collectorId || 'gemini', collector }),
+    pickActive: () => options.collectorResolver?.() || { id: options.collectorId || 'gemini', collector },
     list: () => [],
   };
 
@@ -80,35 +97,56 @@ function createHarness(options: {
       },
     },
     inpageButton: {
-      ensureInpageButton: () => {},
+      ensureInpageButton: (config: any) => {
+        buttonConfig = config;
+      },
       cleanupButtons: () => {},
       setSaving: () => {},
     },
-    runtimeObserver: {
-      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
-        tickRef = onTick || null;
-        return { start: () => {}, stop: () => {} };
-      },
+    createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+      tickRef = onTick || null;
+      return { start: () => {}, stop: () => {} };
     },
-    incrementalUpdater: {
-      computeIncremental: (snapshot: any) => {
+    incrementalEngine: {
+      prepare: (snapshot: any) => {
         incrementalCallCount += 1;
-        if (typeof options.incrementalImpl === 'function') {
-          return options.incrementalImpl(snapshot, incrementalCallCount);
-        }
-        return { changed: false };
+        const result =
+          typeof options.incrementalImpl === 'function'
+            ? options.incrementalImpl(snapshot, incrementalCallCount)
+            : { changed: false };
+        return {
+          changed: result?.changed === true,
+          snapshot: result?.snapshot || {
+            ...snapshot,
+            conversation: { ...(snapshot?.conversation || {}) },
+            messages: [],
+          },
+          diff: result?.diff || { added: [], updated: [], removed: [] },
+          commit: typeof result?.commit === 'function' ? result.commit : () => true,
+        };
       },
     },
     itemMention: null,
   });
-  controller.start();
+  let resident = controller.start();
 
   return {
+    controller,
+    getResident: () => resident,
+    restartResident: () => {
+      resident?.stop?.();
+      resident = controller.start();
+      return resident;
+    },
+    stopResident: () => resident?.stop?.(),
     sendCalls,
     getCaptureCount: () => captureCount,
     tipCalls,
+    getButtonConfig: () => buttonConfig,
+    settle: flushMicrotasks,
     runTick: async () => {
       if (tickRef) await tickRef();
+      await flushMicrotasks();
     },
     getIncrementalCallCount: () => incrementalCallCount,
   };
@@ -449,6 +487,678 @@ describe('content-controller ai chat autosave backfill', () => {
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(2);
     expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+  });
+
+  it('does not commit incremental baseline until durable save succeeds', async () => {
+    const engine = createAutoSaveIncrementalEngine();
+    const page = makeSnapshot('transactional-retry', ['A', 'B']);
+    let syncAttempt = 0;
+    const harness = createHarness({
+      snapshots: [page, page, page],
+      tailWindows: [{ conversationId: 1, messages: page.messages }],
+      incrementalImpl: (snapshot) => engine.prepare(snapshot),
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncAttempt += 1;
+        if (syncAttempt === 1) return { ok: false, error: { message: 'save failed once' } };
+        return { ok: true, data: { upserted: 2 } };
+      },
+    });
+
+    await harness.runTick();
+    await harness.runTick();
+    await harness.runTick();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[1].payload.diff).toEqual(syncCalls[0].payload.diff);
+    expect(syncCalls[1].payload.messages.map((m: any) => m.messageKey)).toEqual(
+      syncCalls[0].payload.messages.map((m: any) => m.messageKey),
+    );
+  });
+
+  it('persists metadata-only incremental changes with an empty append message set', async () => {
+    const engine = createAutoSaveIncrementalEngine();
+    const base = {
+      conversation: { source: 'gemini', conversationKey: 'metadata-only', title: 'Old', url: 'https://a' },
+      messages: [{ messageKey: 'm1', role: 'user', contentText: 'A', sequence: 1 }],
+    };
+    const changed = {
+      conversation: { source: 'gemini', conversationKey: 'metadata-only', title: 'New', url: 'https://b' },
+      messages: [{ messageKey: 'm1', role: 'user', contentText: 'A', sequence: 1 }],
+    };
+    const harness = createHarness({
+      snapshots: [base, changed],
+      tailWindows: [{ conversationId: 1, messages: base.messages }],
+      incrementalImpl: (snapshot) => engine.prepare(snapshot),
+    });
+
+    await harness.runTick();
+    await harness.runTick();
+
+    const upserts = harness.sendCalls.filter((entry) => entry.type === 'upsertConversation');
+    const syncs = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(upserts).toHaveLength(2);
+    expect(upserts[1].payload.payload).toMatchObject({ title: 'New', url: 'https://b' });
+    expect(syncs[1].payload.messages).toEqual([]);
+    expect(syncs[1].payload.diff).toEqual({ added: [], updated: [], removed: [] });
+  });
+
+  it('uses incremental effective metadata when only backfill needs persistence', async () => {
+    vi.useFakeTimers();
+    const engine = createAutoSaveIncrementalEngine();
+    const messages = Array.from({ length: 7 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      contentText: `M${index + 1}`,
+      sequence: index + 1,
+    }));
+    const base = {
+      conversation: { source: 'gemini', conversationKey: 'carry-backfill', title: 'Kept', url: 'https://kept' },
+      messages,
+    };
+    const emptyMeta = {
+      conversation: { source: 'gemini', conversationKey: 'carry-backfill', title: '', url: '' },
+      messages,
+    };
+    let tailAttempt = 0;
+    const harness = createHarness({
+      snapshots: [base, emptyMeta],
+      tailWindows: [{ conversationId: 1, messages: messages.slice(0, -1) }],
+      incrementalImpl: (snapshot) => engine.prepare(snapshot),
+      sendImpl: (type: string) => {
+        if (type !== 'getConversationTailWindowBySourceAndKey') return undefined;
+        tailAttempt += 1;
+        if (tailAttempt === 1) return { ok: false, error: { message: 'tail unavailable once' } };
+        return undefined;
+      },
+    });
+
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'upsertConversation')).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await harness.runTick();
+
+    const upsert = harness.sendCalls.find((entry) => entry.type === 'upsertConversation');
+    expect(upsert?.payload.payload).toMatchObject({ title: 'Kept', url: 'https://kept' });
+  });
+
+  it('releases backfill marker when a changed=false preparation commit is stale before save', async () => {
+    vi.useFakeTimers();
+    let prepareCount = 0;
+    const harness = createHarness({
+      snapshots: [makeSnapshot('precommit-stale', ['A']), makeSnapshot('precommit-stale', ['A'])],
+      tailWindows: [
+        { conversationId: null, messages: [] },
+        { conversationId: null, messages: [] },
+      ],
+      incrementalImpl: (snapshot) => {
+        prepareCount += 1;
+        return {
+          changed: false,
+          snapshot: { ...snapshot, conversation: { ...snapshot.conversation }, messages: [] },
+          diff: { added: [], updated: [], removed: [] },
+          commit: () => {
+            if (prepareCount === 1) throw new Error('autosave_incremental_prepare_stale');
+            return true;
+          },
+        };
+      },
+    });
+
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      2,
+    );
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+  });
+
+  it('does not roll back durable backfill when incremental commit is stale after save', async () => {
+    let prepareCount = 0;
+    const harness = createHarness({
+      snapshots: [makeSnapshot('postcommit-stale', ['A']), makeSnapshot('postcommit-stale', ['A'])],
+      tailWindows: [{ conversationId: null, messages: [] }],
+      incrementalImpl: (snapshot) => {
+        prepareCount += 1;
+        return {
+          changed: true,
+          snapshot: {
+            ...snapshot,
+            conversation: { ...snapshot.conversation },
+            messages: [{ messageKey: 'inc-1', role: 'user', contentText: 'A', sequence: 1 }],
+          },
+          diff: { added: ['inc-1'], updated: [], removed: [] },
+          commit: () => {
+            if (prepareCount === 1) throw new Error('autosave_incremental_prepare_stale');
+            return true;
+          },
+        };
+      },
+    });
+
+    await harness.runTick();
+    expect(harness.tipCalls).toHaveLength(0);
+    await harness.runTick();
+
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      1,
+    );
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(2);
+    expect(harness.tipCalls).toHaveLength(1);
+  });
+
+  it('keeps one active autosave plus one latest trailing request and resolves the trailing collector fresh', async () => {
+    const firstSync = deferred<any>();
+    let syncCount = 0;
+    const captureA = vi.fn(() => makeSnapshot('scheduler-a', ['A']));
+    const captureB = vi.fn(() => makeSnapshot('scheduler-b', ['B']));
+    let current = { id: 'gemini', collector: { capture: captureA } };
+    const harness = createHarness({
+      snapshots: [makeSnapshot('unused', ['U'])],
+      collectorResolver: () => current,
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: `${snapshot.conversation.conversationKey}-delta` }],
+        },
+        diff: { added: [`${snapshot.conversation.conversationKey}-delta`], updated: [], removed: [] },
+        commit: () => true,
+      }),
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncCount += 1;
+        if (syncCount === 1) return firstSync.promise;
+        return { ok: true, data: { upserted: 1 } };
+      },
+    });
+    await harness.settle();
+
+    await harness.runTick();
+    expect(captureA).toHaveBeenCalledTimes(1);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+
+    await harness.runTick();
+    await harness.runTick();
+    expect(captureA).toHaveBeenCalledTimes(1);
+    current = { id: 'notionai', collector: { capture: captureB } };
+
+    firstSync.resolve({ ok: true, data: { upserted: 1 } });
+    await harness.settle();
+    await harness.settle();
+
+    expect(captureA).toHaveBeenCalledTimes(1);
+    expect(captureB).toHaveBeenCalledTimes(1);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(2);
+  });
+
+  it('drops a trailing autosave when the fresh page no longer has an autosave collector', async () => {
+    const firstSync = deferred<any>();
+    let syncCount = 0;
+    const captureA = vi.fn(() => makeSnapshot('scheduler-drop-a', ['A']));
+    const captureWeb = vi.fn(() => makeSnapshot('scheduler-drop-web', ['W']));
+    let current = { id: 'gemini', collector: { capture: captureA } };
+    const harness = createHarness({
+      snapshots: [makeSnapshot('unused', ['U'])],
+      collectorResolver: () => current,
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: { ...snapshot, conversation: { ...snapshot.conversation }, messages: [] },
+        diff: { added: [], updated: [], removed: [] },
+        commit: () => true,
+      }),
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncCount += 1;
+        if (syncCount === 1) return firstSync.promise;
+        return { ok: true, data: { upserted: 0 } };
+      },
+    });
+    await harness.settle();
+
+    await harness.runTick();
+    await harness.runTick();
+    current = { id: 'web', collector: { capture: captureWeb } };
+    firstSync.resolve({ ok: true, data: { upserted: 0 } });
+    await harness.settle();
+    await harness.settle();
+
+    expect(captureA).toHaveBeenCalledTimes(1);
+    expect(captureWeb).not.toHaveBeenCalled();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+  });
+
+  it('lets an old durable save finish across restart, then runs the new owner trailing request', async () => {
+    const firstSync = deferred<any>();
+    let syncCount = 0;
+    const captureA = vi.fn(() => makeSnapshot('restart-a', ['A']));
+    const captureB = vi.fn(() => makeSnapshot('restart-b', ['B']));
+    let current = { id: 'gemini', collector: { capture: captureA } };
+    const harness = createHarness({
+      snapshots: [makeSnapshot('unused', ['U'])],
+      collectorResolver: () => current,
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: `${snapshot.conversation.conversationKey}-delta` }],
+        },
+        diff: { added: [`${snapshot.conversation.conversationKey}-delta`], updated: [], removed: [] },
+        commit: () => true,
+      }),
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncCount += 1;
+        if (syncCount === 1) return firstSync.promise;
+        return { ok: true, data: { upserted: 1 } };
+      },
+    });
+    await harness.settle();
+    await harness.runTick();
+    expect(captureA).toHaveBeenCalledTimes(1);
+
+    current = { id: 'notionai', collector: { capture: captureB } };
+    harness.restartResident();
+    await harness.settle();
+    await harness.runTick();
+    expect(captureB).not.toHaveBeenCalled();
+
+    firstSync.resolve({ ok: true, data: { upserted: 1 } });
+    await harness.settle();
+    await harness.settle();
+    expect(captureB).toHaveBeenCalledTimes(1);
+    expect(harness.tipCalls).toHaveLength(1);
+  });
+
+  it('abandons an old pre-save run after restart and then runs the new owner trailing request', async () => {
+    const oldCapture = deferred<any>();
+    const captureA = vi.fn(() => oldCapture.promise);
+    const captureB = vi.fn(() => makeSnapshot('restart-pre-b', ['B']));
+    let current = { id: 'gemini', collector: { capture: captureA } };
+    const harness = createHarness({
+      snapshots: [makeSnapshot('unused', ['U'])],
+      collectorResolver: () => current,
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: 'delta' }],
+        },
+        diff: { added: ['delta'], updated: [], removed: [] },
+        commit: () => true,
+      }),
+    });
+    await harness.settle();
+    await harness.runTick();
+
+    current = { id: 'notionai', collector: { capture: captureB } };
+    harness.restartResident();
+    await harness.settle();
+    await harness.runTick();
+    oldCapture.resolve(makeSnapshot('restart-pre-a', ['A']));
+    await harness.settle();
+    await harness.settle();
+
+    expect(captureA).toHaveBeenCalledTimes(1);
+    expect(captureB).toHaveBeenCalledTimes(1);
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(1);
+    expect(syncCalls[0].payload.messages.some((m: any) => m.contentText === 'B')).toBe(true);
+  });
+
+  it('gives a pending manual save priority over an autosave still awaiting capture', async () => {
+    const autoCapture = deferred<any>();
+    const manualSnapshot = makeSnapshot('manual-priority', ['Manual']);
+    const capture = vi.fn((input?: any) => (input?.manual ? manualSnapshot : autoCapture.promise));
+    const harness = createHarness({
+      snapshots: [makeSnapshot('unused', ['U'])],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: { ...snapshot, conversation: { ...snapshot.conversation }, messages: [] },
+        diff: { added: [], updated: [], removed: [] },
+        commit: () => true,
+      }),
+    });
+    await harness.settle();
+    await harness.runTick();
+    const click = harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined;
+    const manualRun = click?.();
+    await harness.settle();
+
+    autoCapture.resolve(makeSnapshot('autosave-yield', ['Auto']));
+    await manualRun;
+    await harness.settle();
+
+    expect(capture).toHaveBeenCalledTimes(2);
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(1);
+    expect(syncCalls[0].payload.mode).not.toBe('append');
+    expect(syncCalls[0].payload.messages.some((m: any) => m.contentText === 'Manual')).toBe(true);
+  });
+
+  it.each([true, false])(
+    'waits for an already durable autosave to settle before manual persistence (success=%s)',
+    async (success) => {
+      const autoSync = deferred<any>();
+      let syncCount = 0;
+      const manualCapture = vi.fn(() => makeSnapshot(`manual-after-durable-${success}`, ['Manual']));
+      const autoCapture = vi.fn((input?: any) =>
+        input?.manual ? manualCapture() : makeSnapshot('auto-durable', ['Auto']),
+      );
+      const harness = createHarness({
+        snapshots: [makeSnapshot('unused', ['U'])],
+        collectorResolver: () => ({ id: 'gemini', collector: { capture: autoCapture } }),
+        incrementalImpl: (snapshot) => ({
+          changed: true,
+          snapshot: {
+            ...snapshot,
+            conversation: { ...snapshot.conversation },
+            messages: [{ ...snapshot.messages[0], messageKey: 'auto-durable-delta' }],
+          },
+          diff: { added: ['auto-durable-delta'], updated: [], removed: [] },
+          commit: () => true,
+        }),
+        sendImpl: (type: string) => {
+          if (type !== 'syncConversationMessages') return undefined;
+          syncCount += 1;
+          if (syncCount === 1) return autoSync.promise;
+          return { ok: true, data: { upserted: 1 } };
+        },
+      });
+      await harness.settle();
+      await harness.runTick();
+      const click = harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined;
+      const manualRun = click?.();
+      await harness.settle();
+      expect(manualCapture).not.toHaveBeenCalled();
+
+      autoSync.resolve(
+        success ? { ok: true, data: { upserted: 1 } } : { ok: false, error: { message: 'auto failed' } },
+      );
+      await manualRun;
+      await harness.settle();
+      expect(manualCapture).toHaveBeenCalledTimes(1);
+      expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(2);
+    },
+  );
+
+  it('coalesces autosave requests while manual persistence is in-flight and drains one trailing append afterwards', async () => {
+    const manualSync = deferred<any>();
+    let syncCount = 0;
+    let prepareCount = 0;
+    const page = makeSnapshot('manual-gate', ['A']);
+    const capture = vi.fn(() => page);
+    const harness = createHarness({
+      snapshots: [page],
+      tailWindows: [{ conversationId: 1, messages: page.messages }],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => {
+        prepareCount += 1;
+        if (prepareCount === 1) {
+          return {
+            changed: false,
+            snapshot: { ...snapshot, conversation: { ...snapshot.conversation }, messages: [] },
+            diff: { added: [], updated: [], removed: [] },
+            commit: () => true,
+          };
+        }
+        return {
+          changed: true,
+          snapshot: {
+            ...snapshot,
+            conversation: { ...snapshot.conversation },
+            messages: [{ ...snapshot.messages[0], messageKey: 'after-manual' }],
+          },
+          diff: { added: ['after-manual'], updated: [], removed: [] },
+          commit: () => true,
+        };
+      },
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncCount += 1;
+        if (syncCount === 1) return manualSync.promise;
+        return { ok: true, data: { upserted: 1 } };
+      },
+    });
+    await harness.settle();
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(0);
+
+    const manualRun = (harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined)?.();
+    await harness.settle();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+    await harness.runTick();
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+
+    manualSync.resolve({ ok: true, data: { upserted: 1 } });
+    await manualRun;
+    await harness.settle();
+    await harness.settle();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[0].payload.mode).not.toBe('append');
+    expect(syncCalls[1].payload.mode).toBe('append');
+    expect(prepareCount).toBe(2);
+  });
+
+  it('keeps an old-owner inflight manual exclusive across restart and drains the new-owner autosave trailing afterwards', async () => {
+    const manualSync = deferred<any>();
+    let syncCount = 0;
+    let prepareCount = 0;
+    const captureArgs: any[] = [];
+    const page = makeSnapshot('manual-inflight-restart', ['A']);
+    const capture = vi.fn((input?: any) => {
+      captureArgs.push(input || null);
+      return page;
+    });
+    const harness = createHarness({
+      snapshots: [page],
+      tailWindows: [{ conversationId: 1, messages: page.messages }],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => {
+        prepareCount += 1;
+        if (prepareCount === 1) {
+          return {
+            changed: false,
+            snapshot: { ...snapshot, conversation: { ...snapshot.conversation }, messages: [] },
+            diff: { added: [], updated: [], removed: [] },
+            commit: () => true,
+          };
+        }
+        return {
+          changed: true,
+          snapshot: {
+            ...snapshot,
+            conversation: { ...snapshot.conversation },
+            messages: [{ ...snapshot.messages[0], messageKey: 'after-restart-manual' }],
+          },
+          diff: { added: ['after-restart-manual'], updated: [], removed: [] },
+          commit: () => true,
+        };
+      },
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncCount += 1;
+        if (syncCount === 1) return manualSync.promise;
+        return { ok: true, data: { upserted: 1 } };
+      },
+    });
+    await harness.settle();
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(0);
+
+    const oldManualRun = (harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined)?.();
+    await harness.settle();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+
+    harness.restartResident();
+    await harness.settle();
+    await harness.runTick();
+    const newManualRun = (harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined)?.();
+    await harness.settle();
+    expect(captureArgs.filter((input) => input?.manual === true)).toHaveLength(1);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+
+    manualSync.resolve({ ok: true, data: { upserted: 1 } });
+    await oldManualRun;
+    await newManualRun;
+    await harness.settle();
+    await harness.settle();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[0].payload.mode).not.toBe('append');
+    expect(syncCalls[1].payload.mode).toBe('append');
+    expect(captureArgs.filter((input) => input?.manual === true)).toHaveLength(1);
+  });
+
+  it('cancels an old-owner manual pending before capture and lets the new owner manual run', async () => {
+    const oldAutoCapture = deferred<any>();
+    const captureArgs: any[] = [];
+    const capture = vi.fn((input?: any) => {
+      captureArgs.push(input || null);
+      if (!input?.manual && captureArgs.length === 1) return oldAutoCapture.promise;
+      return makeSnapshot('new-owner-manual', ['Manual']);
+    });
+    const harness = createHarness({
+      snapshots: [makeSnapshot('unused', ['U'])],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: { ...snapshot, conversation: { ...snapshot.conversation }, messages: [] },
+        diff: { added: [], updated: [], removed: [] },
+        commit: () => true,
+      }),
+    });
+    await harness.settle();
+    await harness.runTick();
+    const oldClick = harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined;
+    const oldManualRun = oldClick?.();
+    await harness.settle();
+
+    harness.restartResident();
+    await harness.settle();
+    await harness.runTick();
+    const newClick = harness.getButtonConfig()?.onClick as (() => Promise<void>) | undefined;
+    const newManualRun = newClick?.();
+    await harness.settle();
+
+    oldAutoCapture.resolve(makeSnapshot('old-auto', ['Auto']));
+    await oldManualRun;
+    await newManualRun;
+    await harness.settle();
+
+    const manualCalls = captureArgs.filter((input) => input?.manual === true);
+    expect(manualCalls).toHaveLength(1);
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[0].payload.mode).not.toBe('append');
+    expect(syncCalls[1].payload.mode).toBe('append');
+  });
+
+  it('lets external current-page manual capture preempt an autosave still before durable persistence', async () => {
+    const autoCapture = deferred<any>();
+    let manualCaptureCount = 0;
+    const autoSnapshot = makeSnapshot('external-manual-preempt', ['Auto']);
+    const manualSnapshot = makeSnapshot('external-manual-preempt', ['Manual']);
+    const capture = vi.fn((input?: any) => {
+      if (input?.manual) {
+        manualCaptureCount += 1;
+        return manualSnapshot;
+      }
+      return autoCapture.promise;
+    });
+    const harness = createHarness({
+      snapshots: [autoSnapshot],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: 'auto-preempt' }],
+        },
+        diff: { added: ['auto-preempt'], updated: [], removed: [] },
+        commit: () => true,
+      }),
+    });
+    await harness.settle();
+    await harness.runTick();
+
+    const manualRun = harness.controller.captureCurrentPage();
+    await harness.settle();
+    expect(manualCaptureCount).toBe(0);
+
+    autoCapture.resolve(autoSnapshot);
+    await manualRun;
+    await harness.settle();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(1);
+    expect(syncCalls[0].payload.mode).not.toBe('append');
+    expect(manualCaptureCount).toBe(1);
+  });
+
+  it('waits for an already durable autosave before external current-page manual persistence', async () => {
+    const autoSync = deferred<any>();
+    let manualCaptureCount = 0;
+    const autoSnapshot = makeSnapshot('external-manual-durable', ['Auto']);
+    const manualSnapshot = makeSnapshot('external-manual-durable', ['Manual']);
+    const capture = vi.fn((input?: any) => {
+      if (input?.manual) {
+        manualCaptureCount += 1;
+        return manualSnapshot;
+      }
+      return autoSnapshot;
+    });
+    const harness = createHarness({
+      snapshots: [autoSnapshot],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: 'auto-durable-external' }],
+        },
+        diff: { added: ['auto-durable-external'], updated: [], removed: [] },
+        commit: () => true,
+      }),
+      sendImpl: (type: string, payload?: any) => {
+        if (type === 'syncConversationMessages' && payload?.mode === 'append') return autoSync.promise;
+        return undefined;
+      },
+    });
+    await harness.settle();
+    await harness.runTick();
+    expect(
+      harness.sendCalls.filter(
+        (entry) => entry.type === 'syncConversationMessages' && entry.payload?.mode === 'append',
+      ),
+    ).toHaveLength(1);
+
+    const manualRun = harness.controller.captureCurrentPage();
+    await harness.settle();
+    expect(manualCaptureCount).toBe(0);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+
+    autoSync.resolve({ ok: true, data: { upserted: 1 } });
+    await manualRun;
+    await harness.settle();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[0].payload.mode).toBe('append');
+    expect(syncCalls[1].payload.mode).not.toBe('append');
+    expect(manualCaptureCount).toBe(1);
   });
 
   it('keeps virtualized providers out of the auto-save source set', () => {

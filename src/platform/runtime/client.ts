@@ -57,7 +57,12 @@ export function createRuntimeClient() {
   function wrappedGetURL(path: string): string {
     try {
       ensureAvailable();
-      return getURL(path);
+      const anyGlobal = globalThis as any;
+      const runtime = anyGlobal.browser?.runtime ?? anyGlobal.chrome?.runtime;
+      const hasGetUrlCapability = typeof runtime?.getURL === 'function';
+      const url = getURL(path);
+      if (hasGetUrlCapability && !url) notifyInvalidated(new Error(INVALIDATED_MESSAGE));
+      return url;
     } catch (error) {
       if (isInvalidContextError(error)) notifyInvalidated(error);
       return '';
@@ -66,6 +71,20 @@ export function createRuntimeClient() {
 
   function onInvalidated(listener: (error: Error) => void) {
     if (typeof listener !== 'function') return () => {};
+    if (invalidated) {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        try {
+          listener(new Error(INVALIDATED_MESSAGE));
+        } catch (_e) {
+          // ignore listener failures
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     listeners.add(listener);
     return () => listeners.delete(listener);
   }

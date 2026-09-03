@@ -3,6 +3,10 @@ import {
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
+import {
+  canonicalizeInpageDisplayModeStorageRecord,
+  INPAGE_DISPLAY_MODE_STORAGE_KEY,
+} from '@services/shared/inpage-display-mode';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
@@ -41,6 +45,8 @@ function shouldIncludeStorageKeyInBackup(key: string): boolean {
   if (k.startsWith('notion_oauth_token')) return false;
   if (k.startsWith('feishu_oauth_token_v')) return false;
   if (k.startsWith('github_auth_')) return false;
+  // Inpage settings are canonical-only; do not perpetuate retired inpage_* storage residue through backups.
+  if (k.startsWith('inpage_') && k !== INPAGE_DISPLAY_MODE_STORAGE_KEY) return false;
   return true;
 }
 
@@ -183,7 +189,7 @@ export function filterStorageForBackup(storageLocal: unknown): Record<string, un
     if (!shouldIncludeStorageKeyInBackup(key)) continue;
     out[key] = value;
   }
-  return out;
+  return canonicalizeInpageDisplayModeStorageRecord(out);
 }
 
 export function validateBackupDocument(doc: unknown): { ok: boolean; error: string } {

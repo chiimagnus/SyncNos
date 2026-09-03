@@ -32,6 +32,8 @@
 
 GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage backup 策略恢复。GitHub 三类输出目录固定为 `AIChats`、`WebArticles`、`VideosScripts`，不属于用户设置，也没有对应的 storage key。GitHub App Client ID 是公开应用配置；扩展中不存在 GitHub Client Secret 或 GitHub App private key。
 
+Inpage 显示设置只使用 `inpage_display_mode`（`supported | all | off`）。运行时、Settings、context menu 与 backup 都只读取和写入这一 canonical key；backup 会丢弃其它退役的 `inpage_*` storage residue。无设置或值非法时使用运行默认 `all`，startup 会清理非法 canonical residue，但不会为了默认值凭空物化 storage key。
+
 ## GitHub 恢复状态
 
 - GitHub auth/pending state 存在 `chrome.storage.local` 的 `github_auth_state_v1`，属于 secret/runtime state，不进入 Zip backup。
