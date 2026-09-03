@@ -22,12 +22,23 @@ describe('backup backup-utils', () => {
     const filtered = filterStorageForBackup({
       notion_oauth_client_id: 'abc',
       notion_oauth_client_secret: 'secret',
+      notion_oauth_pending_state: 'pending-state',
+      notion_oauth_last_error: 'oauth-error',
       notion_parent_page_id: 'p1',
       notion_db_id_syncnos_ai_chats: 'db1',
       notion_db_id_syncnos_web_articles: 'db2',
       popup_active_tab: 'settings',
       popup_source_filter_key: 'all',
       notion_oauth_token_v1: { accessToken: 'secret' },
+      feishu_oauth_client_id: 'feishu-app',
+      feishu_oauth_client_secret: 'FEISHU_SECRET_SENTINEL',
+      feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
+      feishu_oauth_token_v1: { accessToken: 'FEISHU_ACCESS_SENTINEL', refreshToken: 'FEISHU_REFRESH_SENTINEL' },
+      feishu_oauth_pending_state: 'FEISHU_PENDING_SENTINEL',
+      feishu_oauth_last_error: 'FEISHU_ERROR_SENTINEL',
+      feishu_chat_folder: 'AIChats',
+      feishu_article_folder: 'WebArticles',
+      feishu_video_folder: 'Videos',
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       obsidian_api_key: 'obsidian-key',
       github_repository: 'chiimagnus/SyncNos-Webclipper',
@@ -41,18 +52,22 @@ describe('backup backup-utils', () => {
       [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
     });
     expect(filtered).toEqual({
-      notion_oauth_client_id: 'abc',
       notion_parent_page_id: 'p1',
       notion_db_id_syncnos_ai_chats: 'db1',
       notion_db_id_syncnos_web_articles: 'db2',
       popup_active_tab: 'settings',
       popup_source_filter_key: 'all',
+      feishu_oauth_client_id: 'feishu-app',
+      feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
+      feishu_chat_folder: 'AIChats',
+      feishu_article_folder: 'WebArticles',
+      feishu_video_folder: 'Videos',
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       github_repository: 'chiimagnus/SyncNos-Webclipper',
       github_branch: 'main',
     });
     expect(JSON.stringify(filtered)).not.toMatch(
-      /ACCESS_SENTINEL_SECRET|REFRESH_SENTINEL_SECRET|DEVICE_SENTINEL_SECRET/,
+      /ACCESS_SENTINEL_SECRET|REFRESH_SENTINEL_SECRET|DEVICE_SENTINEL_SECRET|FEISHU_SECRET_SENTINEL|FEISHU_ACCESS_SENTINEL|FEISHU_REFRESH_SENTINEL|FEISHU_PENDING_SENTINEL|FEISHU_ERROR_SENTINEL/,
     );
   });
 

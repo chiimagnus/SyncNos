@@ -9,15 +9,17 @@ import {
   READER_TEXT_ALIGNS,
   type ReaderFontFamily,
   type ReaderPrefs,
+  type ReaderPrefsPatch,
   type ReaderTextAlign,
 } from '@services/protocols/reader-prefs';
 
-// Presentational, fully controlled. The owning surface (ReaderHeaderToolbar)
-// supplies `prefs` and an `update` that persists patches via the reader-prefs
-// view-model.
+// Presentational, fully controlled. Discrete actions persist through `update`;
+// continuous ranges only `preview` until an explicit interaction boundary commits.
 export type TextLayoutPanelProps = {
   prefs: ReaderPrefs;
-  update: (patch: Partial<ReaderPrefs>) => void | Promise<void>;
+  update: (patch: ReaderPrefsPatch) => void | Promise<void>;
+  preview: (patch: ReaderPrefsPatch) => void;
+  commitPreview: () => Promise<void>;
   className?: string;
 };
 
@@ -59,7 +61,24 @@ function Row({ label, value, children }: { label: string; value?: string; childr
  * the model re-clamps on write, so out-of-range values can never reach the CSS
  * variables.
  */
-export function TextLayoutPanel({ prefs, update, className }: TextLayoutPanelProps) {
+const RANGE_COMMIT_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+]);
+
+export function TextLayoutPanel({ prefs, update, preview, commitPreview, className }: TextLayoutPanelProps) {
+  const commitPreviewBestEffort = () => {
+    void commitPreview().catch(() => {});
+  };
+  const commitOnRangeKeyUp = (key: string) => {
+    if (RANGE_COMMIT_KEYS.has(key)) commitPreviewBestEffort();
+  };
   return (
     <div className={['tw-flex tw-flex-col tw-gap-3', className].filter(Boolean).join(' ')}>
       <Row label={t('readerTextPreset')}>
@@ -99,7 +118,11 @@ export function TextLayoutPanel({ prefs, update, className }: TextLayoutPanelPro
           max={READER_PREFS_LIMITS.fontSize.max}
           step={STEP.fontSize}
           value={prefs.fontSize}
-          onChange={(event) => void update({ fontSize: Number(event.target.value) })}
+          onChange={(event) => preview({ fontSize: Number(event.target.value) })}
+          onPointerUp={commitPreviewBestEffort}
+          onPointerCancel={commitPreviewBestEffort}
+          onBlur={commitPreviewBestEffort}
+          onKeyUp={(event) => commitOnRangeKeyUp(event.key)}
         />
       </Row>
 
@@ -112,7 +135,11 @@ export function TextLayoutPanel({ prefs, update, className }: TextLayoutPanelPro
           max={READER_PREFS_LIMITS.lineHeight.max}
           step={STEP.lineHeight}
           value={prefs.lineHeight}
-          onChange={(event) => void update({ lineHeight: Number(event.target.value) })}
+          onChange={(event) => preview({ lineHeight: Number(event.target.value) })}
+          onPointerUp={commitPreviewBestEffort}
+          onPointerCancel={commitPreviewBestEffort}
+          onBlur={commitPreviewBestEffort}
+          onKeyUp={(event) => commitOnRangeKeyUp(event.key)}
         />
       </Row>
 
@@ -125,7 +152,11 @@ export function TextLayoutPanel({ prefs, update, className }: TextLayoutPanelPro
           max={READER_PREFS_LIMITS.contentWidth.max}
           step={STEP.contentWidth}
           value={prefs.contentWidth}
-          onChange={(event) => void update({ contentWidth: Number(event.target.value) })}
+          onChange={(event) => preview({ contentWidth: Number(event.target.value) })}
+          onPointerUp={commitPreviewBestEffort}
+          onPointerCancel={commitPreviewBestEffort}
+          onBlur={commitPreviewBestEffort}
+          onKeyUp={(event) => commitOnRangeKeyUp(event.key)}
         />
       </Row>
 
@@ -138,7 +169,11 @@ export function TextLayoutPanel({ prefs, update, className }: TextLayoutPanelPro
           max={READER_PREFS_LIMITS.letterSpacing.max}
           step={STEP.letterSpacing}
           value={prefs.letterSpacing}
-          onChange={(event) => void update({ letterSpacing: Number(event.target.value) })}
+          onChange={(event) => preview({ letterSpacing: Number(event.target.value) })}
+          onPointerUp={commitPreviewBestEffort}
+          onPointerCancel={commitPreviewBestEffort}
+          onBlur={commitPreviewBestEffort}
+          onKeyUp={(event) => commitOnRangeKeyUp(event.key)}
         />
       </Row>
     </div>

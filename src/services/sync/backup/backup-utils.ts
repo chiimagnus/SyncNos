@@ -15,9 +15,14 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   // Never export tokens (explicit product constraint).
   'notion_oauth_token_v1',
   'feishu_oauth_token_v1',
-  // Not used by default (ensureDefaultNotionOAuthClientId removes it), but keep it out of backups.
+  // Notion fixed client-id mirror and OAuth attempt session state are local runtime data, not portable settings.
+  'notion_oauth_client_id',
   'notion_oauth_client_secret',
+  'notion_oauth_pending_state',
+  'notion_oauth_last_error',
   'feishu_oauth_client_secret',
+  'feishu_oauth_pending_state',
+  'feishu_oauth_last_error',
   // Removed feature: never carry the old Notion AI model preference through backups.
   'notion_ai_preferred_model_index',
   // Obsidian Local REST API key is a secret even though base URL is safe to export.
@@ -34,7 +39,7 @@ function shouldIncludeStorageKeyInBackup(key: string): boolean {
   if (STORAGE_BACKUP_DENYLIST_EXACT.has(k)) return false;
   // Forward-compat: if token key changes versions, keep excluding it.
   if (k.startsWith('notion_oauth_token')) return false;
-  if (k.startsWith('feishu_oauth_token')) return false;
+  if (k.startsWith('feishu_oauth_token_v')) return false;
   if (k.startsWith('github_auth_')) return false;
   return true;
 }

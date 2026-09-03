@@ -40,6 +40,10 @@ export type ReaderPrefs = {
   tts: ReaderTtsPrefs;
 };
 
+export type ReaderPrefsPatch = Omit<Partial<ReaderPrefs>, 'tts'> & {
+  tts?: Partial<ReaderTtsPrefs>;
+};
+
 export const READER_PREFS_LIMITS = {
   fontSize: { min: 14, max: 34 },
   lineHeight: { min: 1.2, max: 2.4 },

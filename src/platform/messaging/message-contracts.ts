@@ -18,6 +18,7 @@ export const DATA_REVISION_MESSAGE_TYPES = {
 
 export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
+  START_AUTH: 'notionStartAuth',
   DISCONNECT: 'notionDisconnect',
   LIST_PARENT_PAGES: 'listNotionParentPages',
   SYNC_CONVERSATIONS: 'notionSyncConversations',
@@ -36,6 +37,8 @@ export const OBSIDIAN_MESSAGE_TYPES = {
 
 export const FEISHU_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getFeishuAuthStatus',
+  START_AUTH: 'feishuStartAuth',
+  SAVE_AUTH_CONFIG: 'feishuSaveAuthConfig',
   DISCONNECT: 'feishuDisconnect',
   SYNC_CONVERSATIONS: 'feishuSyncConversations',
   GET_SYNC_STATUS: 'getFeishuSyncStatus',

@@ -10,9 +10,7 @@ import {
 } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
-import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { disconnectFeishu } from '@services/sync/feishu/auth/settings-client';
-import { getFeishuOAuthDefaults } from '@services/sync/feishu/auth/oauth';
 import {
   FEISHU_DEFAULTS,
   FEISHU_STORAGE_KEYS,
@@ -30,13 +28,6 @@ import {
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
-import {
-  READER_PREFS_STORAGE_KEY,
-  normalizeReaderPrefs,
-  resolveReaderPrefsFromStorage,
-  buildReaderPrefsStoragePatch,
-  type ReaderPrefs,
-} from '@services/protocols/reader-prefs';
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
@@ -291,12 +282,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [notionWorkspaceName, setNotionWorkspaceName] = useState<string>('');
   const [notionPendingState, setNotionPendingState] = useState<string>('');
   const [notionLastError, setNotionLastError] = useState<string>('');
-  const [notionClientId, setNotionClientId] = useState<string>('');
   const [notionParentPageId, setNotionParentPageId] = useState<string>('');
   const [notionParentPageTitle, setNotionParentPageTitle] = useState<string>('');
   const [notionPages, setNotionPages] = useState<NotionPageOption[]>([]);
   const [loadingNotionPages, setLoadingNotionPages] = useState(false);
   const [pollingNotion, setPollingNotion] = useState(false);
+  const notionConnectedRef = useRef<boolean | null>(null);
+  const notionPendingStateRef = useRef('');
+  const notionLastErrorRef = useRef('');
+  const notionPollingRef = useRef(false);
+  const notionAuthRequestSeqRef = useRef(0);
+  const notionAuthAppliedSeqRef = useRef(0);
+  const notionStartGenerationRef = useRef(0);
+  const notionAuthObservationRevisionRef = useRef(0);
+  const notionPendingObservationRevisionRef = useRef(0);
   const notionPagesAutoLoadRef = useRef(false);
   const [notionSyncEnabled, setNotionSyncEnabled] = useState(true);
   const [notionAutoSyncEnabled, setNotionAutoSyncEnabled] = useState(false);
@@ -309,6 +308,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [feishuClientSecret, setFeishuClientSecret] = useState<string>('');
   const [feishuTokenExchangeProxyUrl, setFeishuTokenExchangeProxyUrl] = useState<string>('');
   const [pollingFeishu, setPollingFeishu] = useState(false);
+  const feishuConnectedRef = useRef<boolean | null>(null);
+  const feishuPendingStateRef = useRef('');
+  const feishuLastErrorRef = useRef('');
+  const feishuPollingRef = useRef(false);
+  const feishuAuthRequestSeqRef = useRef(0);
+  const feishuAuthAppliedSeqRef = useRef(0);
+  const feishuStartGenerationRef = useRef(0);
+  const feishuAuthObservationRevisionRef = useRef(0);
+  const feishuPendingObservationRevisionRef = useRef(0);
   const [feishuSyncEnabled, setFeishuSyncEnabled] = useState(true);
   const [feishuAutoSyncEnabled, setFeishuAutoSyncEnabled] = useState(false);
   const [feishuChatFolder, setFeishuChatFolder] = useState<string>('');
@@ -379,10 +387,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   );
   const [antiHotlinkRuleErrors, setAntiHotlinkRuleErrors] = useState<AntiHotlinkRuleRowError[]>([]);
   const [aiChatDollarMentionEnabled, setAiChatDollarMentionEnabled] = useState<boolean>(true);
-  const [readerPrefs, setReaderPrefs] = useState<ReaderPrefs>(() => resolveReaderPrefsFromStorage(null));
-  // Mirror latest prefs so updateReaderPrefs can merge patches without stale closures.
-  const readerPrefsRef = useRef(readerPrefs);
-  readerPrefsRef.current = readerPrefs;
   const [localePreference, setLocalePreference] = useState<LocalePreference>(() => getLocalePreference());
 
   // Insight
@@ -437,6 +441,155 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     );
     return run;
   }, []);
+
+  const setNotionPollingState = useCallback((next: boolean) => {
+    notionPollingRef.current = next;
+    setPollingNotion(next);
+  }, []);
+
+  const setFeishuPollingState = useCallback((next: boolean) => {
+    feishuPollingRef.current = next;
+    setPollingFeishu(next);
+  }, []);
+
+  const applyNotionAuthStatus = useCallback(
+    (value: unknown, snapshotRequestSeq?: number): boolean => {
+      if (snapshotRequestSeq == null) {
+        const directSeq = notionAuthRequestSeqRef.current + 1;
+        notionAuthRequestSeqRef.current = directSeq;
+        notionAuthAppliedSeqRef.current = directSeq;
+      } else {
+        if (snapshotRequestSeq <= notionAuthAppliedSeqRef.current) return false;
+        notionAuthAppliedSeqRef.current = snapshotRequestSeq;
+      }
+
+      const raw = value as any;
+      const connected = raw?.connected === true;
+      notionConnectedRef.current = connected;
+      setNotionConnected(connected);
+      setNotionWorkspaceName(String(raw?.workspaceName || ''));
+      if (connected) {
+        notionStartGenerationRef.current += 1;
+        setNotionPollingState(false);
+      } else {
+        setLoadingNotionPages(false);
+        setNotionPages([]);
+      }
+      return true;
+    },
+    [setNotionPollingState],
+  );
+
+  const applyFeishuAuthStatus = useCallback(
+    (value: unknown, snapshotRequestSeq?: number): boolean => {
+      if (snapshotRequestSeq == null) {
+        const directSeq = feishuAuthRequestSeqRef.current + 1;
+        feishuAuthRequestSeqRef.current = directSeq;
+        feishuAuthAppliedSeqRef.current = directSeq;
+      } else {
+        if (snapshotRequestSeq <= feishuAuthAppliedSeqRef.current) return false;
+        feishuAuthAppliedSeqRef.current = snapshotRequestSeq;
+      }
+
+      const connected = (value as any)?.connected === true;
+      feishuConnectedRef.current = connected;
+      setFeishuConnected(connected);
+      if (connected) {
+        feishuStartGenerationRef.current += 1;
+        setFeishuPollingState(false);
+      }
+      return true;
+    },
+    [setFeishuPollingState],
+  );
+
+  const readNotionAuthStatus = useCallback(async () => {
+    const requestSeq = notionAuthRequestSeqRef.current + 1;
+    notionAuthRequestSeqRef.current = requestSeq;
+    const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
+    return applyNotionAuthStatus(status, requestSeq) ? status : null;
+  }, [applyNotionAuthStatus]);
+
+  const readFeishuAuthStatus = useCallback(async () => {
+    const requestSeq = feishuAuthRequestSeqRef.current + 1;
+    feishuAuthRequestSeqRef.current = requestSeq;
+    const status = unwrap(await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
+    return applyFeishuAuthStatus(status, requestSeq) ? status : null;
+  }, [applyFeishuAuthStatus]);
+
+  const applyNotionPendingStorageObservation = useCallback(
+    (value: unknown) => {
+      const next = String(value || '');
+      notionAuthObservationRevisionRef.current += 1;
+      notionPendingObservationRevisionRef.current += 1;
+      notionPendingStateRef.current = next;
+      setNotionPendingState(next);
+      if (!next) {
+        notionStartGenerationRef.current += 1;
+        setNotionPollingState(false);
+      }
+    },
+    [setNotionPollingState],
+  );
+
+  const applyNotionErrorStorageObservation = useCallback(
+    (value: unknown) => {
+      const next = String(value || '');
+      notionAuthObservationRevisionRef.current += 1;
+      notionLastErrorRef.current = next;
+      setNotionLastError(next);
+      if (next) {
+        notionStartGenerationRef.current += 1;
+        setNotionPollingState(false);
+      }
+    },
+    [setNotionPollingState],
+  );
+
+  const applyFeishuPendingStorageObservation = useCallback(
+    (value: unknown) => {
+      const next = String(value || '');
+      feishuAuthObservationRevisionRef.current += 1;
+      feishuPendingObservationRevisionRef.current += 1;
+      feishuPendingStateRef.current = next;
+      setFeishuPendingState(next);
+      if (!next) {
+        feishuStartGenerationRef.current += 1;
+        setFeishuPollingState(false);
+      }
+    },
+    [setFeishuPollingState],
+  );
+
+  const applyFeishuErrorStorageObservation = useCallback(
+    (value: unknown) => {
+      const next = String(value || '');
+      feishuAuthObservationRevisionRef.current += 1;
+      feishuLastErrorRef.current = next;
+      setFeishuLastError(next);
+      if (next) {
+        feishuStartGenerationRef.current += 1;
+        setFeishuPollingState(false);
+      }
+    },
+    [setFeishuPollingState],
+  );
+
+  const refreshNotionAuthFromStorageSignal = useCallback(async () => {
+    try {
+      await readNotionAuthStatus();
+    } catch (_error) {
+      // A token storage change is only a wake signal. Preserve the last-good safe status on read failure.
+    }
+  }, [readNotionAuthStatus]);
+
+  const refreshFeishuAuthFromStorageSignal = useCallback(async () => {
+    try {
+      await readFeishuAuthStatus();
+    } catch (_error) {
+      // A token storage change is only a wake signal. Preserve the last-good safe status on read failure.
+    }
+  }, [readFeishuAuthStatus]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -562,11 +715,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const refreshInternal = useCallback(async () => {
     const githubAuthRequestSeq = githubAuthRequestSeqRef.current + 1;
     githubAuthRequestSeqRef.current = githubAuthRequestSeq;
-    const [notionRes, feishuRes, local, obsidianRes, githubRes, antiHotlinkRulesDraft] = await Promise.all([
-      send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
-      send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
+    const notionAuthObservationAtStart = notionAuthObservationRevisionRef.current;
+    const feishuAuthObservationAtStart = feishuAuthObservationRevisionRef.current;
+    const [, , local, obsidianRes, githubRes, antiHotlinkRulesDraft] = await Promise.all([
+      readNotionAuthStatus(),
+      readFeishuAuthStatus(),
       storageGet([
-        'notion_oauth_client_id',
         'notion_oauth_pending_state',
         'notion_oauth_last_error',
         'notion_parent_page_id',
@@ -593,10 +747,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
         'xiaohongshu_comments_capture_enabled',
-        ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
         'ai_chat_dollar_mention_enabled',
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
-        READER_PREFS_STORAGE_KEY,
         LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ABOUT_YOU_USER_NAME_STORAGE_KEY,
       ]),
@@ -605,19 +757,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       loadAntiHotlinkRulesForSettings({ forceRefresh: true }),
     ]);
 
-    const notionStatus = unwrap(notionRes);
-    const connected = !!notionStatus?.connected;
-    setNotionConnected(connected);
-    setNotionWorkspaceName(String(notionStatus?.workspaceName || notionStatus?.token?.workspaceName || ''));
-    if (!connected) {
-      setPollingNotion(false);
-      setLoadingNotionPages(false);
-      setNotionPages([]);
+    if (notionAuthObservationRevisionRef.current === notionAuthObservationAtStart) {
+      const pending = String(local?.notion_oauth_pending_state || '');
+      const lastError = String(local?.notion_oauth_last_error || '');
+      notionPendingStateRef.current = pending;
+      notionLastErrorRef.current = lastError;
+      setNotionPendingState(pending);
+      setNotionLastError(lastError);
+      if (notionConnectedRef.current === true || lastError || !pending) setNotionPollingState(false);
     }
-
-    setNotionClientId(String(local?.notion_oauth_client_id || ''));
-    setNotionPendingState(String(local?.notion_oauth_pending_state || ''));
-    setNotionLastError(String(local?.notion_oauth_last_error || ''));
     setNotionParentPageId(String(local?.notion_parent_page_id || ''));
     setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
     setNotionChatDatabaseId(String(local?.[chatDbSpec.storageKey] || ''));
@@ -632,16 +780,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setGithubSyncEnabled(local?.[GITHUB_SYNC_PROVIDER_ENABLED_KEY] !== false);
     setGithubAutoSyncEnabled(local?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
 
-    const feishuStatus = unwrap(feishuRes);
-    const feishuIsConnected = !!feishuStatus?.connected;
-    setFeishuConnected(feishuIsConnected);
-    if (!feishuIsConnected) {
-      setPollingFeishu(false);
-    }
     setFeishuClientId(String(local?.feishu_oauth_client_id || ''));
     setFeishuClientSecret(String(local?.feishu_oauth_client_secret || ''));
-    setFeishuPendingState(String(local?.feishu_oauth_pending_state || ''));
-    setFeishuLastError(String(local?.feishu_oauth_last_error || ''));
+    if (feishuAuthObservationRevisionRef.current === feishuAuthObservationAtStart) {
+      const pending = String(local?.feishu_oauth_pending_state || '');
+      const lastError = String(local?.feishu_oauth_last_error || '');
+      feishuPendingStateRef.current = pending;
+      feishuLastErrorRef.current = lastError;
+      setFeishuPendingState(pending);
+      setFeishuLastError(lastError);
+      if (feishuConnectedRef.current === true || lastError || !pending) setFeishuPollingState(false);
+    }
     setFeishuTokenExchangeProxyUrl(String(local?.feishu_oauth_token_exchange_proxy_url || ''));
     const feishuPathConfig = await getFeishuPathConfig().catch(() => null);
     setFeishuChatFolder(String(feishuPathConfig?.chatFolder || FEISHU_DEFAULTS.chatFolder));
@@ -659,8 +808,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
     setAntiHotlinkRuleErrors([]);
     setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
-    // reader_prefs_v1 is the only source of truth for reader layout preferences.
-    setReaderPrefs(resolveReaderPrefsFromStorage(local));
     setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
     setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
 
@@ -677,15 +824,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     const githubSettings = unwrap(githubRes);
     applyGithubSettingsResponse(githubSettings, githubAuthRequestSeq);
-  }, [applyGithubSettingsResponse, articleDbSpec.storageKey, chatDbSpec.storageKey, videoDbSpec.storageKey]);
-
-  const refresh = useCallback(async () => {
-    await runTask(refreshInternal);
-  }, [refreshInternal, runTask]);
+  }, [
+    applyGithubSettingsResponse,
+    articleDbSpec.storageKey,
+    chatDbSpec.storageKey,
+    readFeishuAuthStatus,
+    readNotionAuthStatus,
+    setFeishuPollingState,
+    setNotionPollingState,
+    videoDbSpec.storageKey,
+  ]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void runTask(refreshInternal);
+  }, [refreshInternal, runTask]);
 
   useEffect(() => {
     if (activeSection !== 'github') return;
@@ -743,31 +895,36 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, GITHUB_AUTH_STATE_KEY)) {
         void refreshGithubAuthFromStorageSignal();
       }
-      if (Object.prototype.hasOwnProperty.call(changes, READER_PREFS_STORAGE_KEY)) {
-        const nextValue = changes[READER_PREFS_STORAGE_KEY]?.newValue;
-        setReaderPrefs(normalizeReaderPrefs(nextValue));
-      }
       if (Object.prototype.hasOwnProperty.call(changes, 'xiaohongshu_comments_capture_enabled')) {
         setXiaohongshuCommentsCaptureEnabled(changes.xiaohongshu_comments_capture_enabled?.newValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY)) {
-        void refresh();
+        void loadAntiHotlinkRulesForSettings({ forceRefresh: true })
+          .then((rules) => {
+            setAntiHotlinkRules(Array.isArray(rules) ? rules : []);
+            setAntiHotlinkRuleErrors([]);
+          })
+          .catch(() => {});
       }
 
-      if (
-        Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_token_v1') ||
-        Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_pending_state') ||
-        Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_last_error')
-      ) {
-        void refresh();
+      if (Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_pending_state')) {
+        applyNotionPendingStorageObservation(changes.notion_oauth_pending_state?.newValue);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_last_error')) {
+        applyNotionErrorStorageObservation(changes.notion_oauth_last_error?.newValue);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_token_v1')) {
+        void refreshNotionAuthFromStorageSignal();
       }
 
-      if (
-        Object.prototype.hasOwnProperty.call(changes, 'feishu_oauth_token_v1') ||
-        Object.prototype.hasOwnProperty.call(changes, 'feishu_oauth_pending_state') ||
-        Object.prototype.hasOwnProperty.call(changes, 'feishu_oauth_last_error')
-      ) {
-        void refresh();
+      if (Object.prototype.hasOwnProperty.call(changes, 'feishu_oauth_pending_state')) {
+        applyFeishuPendingStorageObservation(changes.feishu_oauth_pending_state?.newValue);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'feishu_oauth_last_error')) {
+        applyFeishuErrorStorageObservation(changes.feishu_oauth_last_error?.newValue);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'feishu_oauth_token_v1')) {
+        void refreshFeishuAuthFromStorageSignal();
       }
 
       if (Object.prototype.hasOwnProperty.call(changes, FEISHU_STORAGE_KEYS.chatFolder)) {
@@ -783,7 +940,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setFeishuVideoFolder(normalizeFeishuFolderPath(nextValue, FEISHU_DEFAULTS.videoFolder));
       }
     });
-  }, [refresh, refreshGithubAuthFromStorageSignal]);
+  }, [
+    applyFeishuErrorStorageObservation,
+    applyFeishuPendingStorageObservation,
+    applyNotionErrorStorageObservation,
+    applyNotionPendingStorageObservation,
+    refreshFeishuAuthFromStorageSignal,
+    refreshGithubAuthFromStorageSignal,
+    refreshNotionAuthFromStorageSignal,
+  ]);
 
   const onSaveFeishuPaths = useCallback(async () => {
     if (busy) return;
@@ -805,63 +970,45 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   useEffect(() => {
     if (!pollingNotion) return;
-
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      if (Date.now() - startedAt > 60_000) {
-        setPollingNotion(false);
-        return;
-      }
-      void refresh();
-    }, 750);
-
-    return () => clearInterval(timer);
-  }, [pollingNotion, refresh]);
+    const timer = setTimeout(() => setNotionPollingState(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [pollingNotion, setNotionPollingState]);
 
   useEffect(() => {
     if (!pollingNotion) return;
     if (notionConnected) {
-      setPollingNotion(false);
+      setNotionPollingState(false);
       return;
     }
     if (notionLastError) {
-      setPollingNotion(false);
+      setNotionPollingState(false);
       return;
     }
     if (!notionPendingState) {
-      setPollingNotion(false);
+      setNotionPollingState(false);
     }
-  }, [notionConnected, notionLastError, notionPendingState, pollingNotion]);
+  }, [notionConnected, notionLastError, notionPendingState, pollingNotion, setNotionPollingState]);
 
   useEffect(() => {
     if (!pollingFeishu) return;
-
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      if (Date.now() - startedAt > 60_000) {
-        setPollingFeishu(false);
-        return;
-      }
-      void refresh();
-    }, 750);
-
-    return () => clearInterval(timer);
-  }, [pollingFeishu, refresh]);
+    const timer = setTimeout(() => setFeishuPollingState(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [pollingFeishu, setFeishuPollingState]);
 
   useEffect(() => {
     if (!pollingFeishu) return;
     if (feishuConnected) {
-      setPollingFeishu(false);
+      setFeishuPollingState(false);
       return;
     }
     if (feishuLastError) {
-      setPollingFeishu(false);
+      setFeishuPollingState(false);
       return;
     }
     if (!feishuPendingState) {
-      setPollingFeishu(false);
+      setFeishuPollingState(false);
     }
-  }, [feishuConnected, feishuLastError, feishuPendingState, pollingFeishu]);
+  }, [feishuConnected, feishuLastError, feishuPendingState, pollingFeishu, setFeishuPollingState]);
 
   const notionPageOptions = useMemo(() => {
     const list = Array.isArray(notionPages) ? notionPages.slice() : [];
@@ -883,44 +1030,53 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [notionPages, notionParentPageId, notionParentPageTitle]);
 
   const onNotionConnectOrDisconnect = useCallback(async () => {
+    if (notionConnectedRef.current !== true && notionPollingRef.current) return;
+
     await runTask(async () => {
-      const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
-      if (status?.connected) {
+      if (notionConnectedRef.current !== true && notionPollingRef.current) return;
+      const status = await readNotionAuthStatus();
+      if (!status) return;
+
+      if (status.connected === true) {
         await disconnectNotion();
-        setNotionConnected(false);
-        setNotionWorkspaceName('');
+        notionAuthObservationRevisionRef.current += 1;
+        notionStartGenerationRef.current += 1;
+        applyNotionAuthStatus({ connected: false, workspaceName: '' });
+        notionPendingStateRef.current = '';
+        notionLastErrorRef.current = '';
         setNotionPendingState('');
         setNotionLastError('');
         setNotionPages([]);
         setNotionParentPageId('');
         setNotionParentPageTitle('');
-        setPollingNotion(false);
+        setNotionPollingState(false);
         setLoadingNotionPages(false);
-        await refreshInternal();
+        return;
+      }
+      if (notionPollingRef.current) return;
+
+      const requestGeneration = notionStartGenerationRef.current + 1;
+      notionStartGenerationRef.current = requestGeneration;
+      const pendingObservationRevisionAtStart = notionPendingObservationRevisionRef.current;
+      const started = unwrap(await send<ApiResponse<{ state: string }>>(NOTION_MESSAGE_TYPES.START_AUTH, {}));
+      const state = String(started?.state || '').trim();
+      if (!state) throw new Error('notion oauth start returned invalid state');
+      if (notionStartGenerationRef.current !== requestGeneration) return;
+      if (
+        notionPendingObservationRevisionRef.current !== pendingObservationRevisionAtStart &&
+        notionPendingStateRef.current !== state
+      ) {
         return;
       }
 
-      const clientId = String(notionClientId || '').trim();
-      if (!clientId) throw new Error('Notion OAuth client id not configured');
-
-      const cfg = getNotionOAuthDefaults();
-      const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-      await storageSet({ notion_oauth_pending_state: state, notion_oauth_last_error: '' });
+      notionAuthObservationRevisionRef.current += 1;
+      notionPendingStateRef.current = state;
+      notionLastErrorRef.current = '';
       setNotionPendingState(state);
       setNotionLastError('');
-
-      const url = new URL(cfg.authorizationUrl);
-      url.searchParams.set('client_id', clientId);
-      url.searchParams.set('response_type', cfg.responseType);
-      url.searchParams.set('owner', cfg.owner);
-      url.searchParams.set('redirect_uri', cfg.redirectUri);
-      url.searchParams.set('state', state);
-
-      const opened = openHttpUrl(url.toString());
-      if (!opened) throw new Error('Failed to open Notion OAuth tab');
-      setPollingNotion(true);
+      setNotionPollingState(true);
     });
-  }, [notionClientId, refreshInternal, runTask]);
+  }, [applyNotionAuthStatus, readNotionAuthStatus, runTask, setNotionPollingState]);
 
   const onToggleNotionSyncEnabled = useCallback(
     async (enabled: boolean) => {
@@ -1243,13 +1399,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const proxyUrl = proxyUrlRaw ? normalizeHttpsUrlOrEmpty(proxyUrlRaw) : '';
         if (proxyUrlRaw && !proxyUrl) throw new Error('Feishu token exchange proxy url must be https');
 
-        await storageSet({
-          feishu_oauth_client_id: clientId,
-          feishu_oauth_client_secret: clientSecret,
-          feishu_oauth_token_exchange_proxy_url: proxyUrl,
-        });
-        setFeishuTokenExchangeProxyUrl(proxyUrl);
-        setFeishuClientId(clientId);
+        const saved = unwrap(
+          await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, {
+            clientId,
+            clientSecret,
+            tokenExchangeProxyUrl: proxyUrl,
+          }),
+        );
+        setFeishuTokenExchangeProxyUrl(String(saved?.tokenExchangeProxyUrl || proxyUrl));
+        setFeishuClientId(String(saved?.clientId || clientId));
         setFeishuClientSecret(clientSecret);
       },
       { fallbackMessage: 'save feishu settings failed' },
@@ -1257,17 +1415,26 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [feishuClientId, feishuClientSecret, feishuTokenExchangeProxyUrl, runTask]);
 
   const onFeishuConnectOrDisconnect = useCallback(async () => {
+    if (feishuConnectedRef.current !== true && feishuPollingRef.current) return;
+
     await runTask(async () => {
-      const status = unwrap(await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
-      if (status?.connected) {
+      if (feishuConnectedRef.current !== true && feishuPollingRef.current) return;
+      const status = await readFeishuAuthStatus();
+      if (!status) return;
+
+      if (status.connected === true) {
         await disconnectFeishu();
-        setFeishuConnected(false);
+        feishuAuthObservationRevisionRef.current += 1;
+        feishuStartGenerationRef.current += 1;
+        applyFeishuAuthStatus({ connected: false });
+        feishuPendingStateRef.current = '';
+        feishuLastErrorRef.current = '';
         setFeishuPendingState('');
         setFeishuLastError('');
-        setPollingFeishu(false);
-        await refreshInternal();
+        setFeishuPollingState(false);
         return;
       }
+      if (feishuPollingRef.current) return;
 
       const clientId = String(feishuClientId || '').trim();
       if (!clientId) {
@@ -1281,34 +1448,42 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         throw new Error('Feishu OAuth requires client secret (direct) or token exchange proxy url (worker)');
       }
 
-      await storageSet({
-        feishu_oauth_client_id: clientId,
-        feishu_oauth_client_secret: clientSecret,
-        feishu_oauth_token_exchange_proxy_url: proxyUrl,
-      });
-      setFeishuTokenExchangeProxyUrl(proxyUrl);
-      setFeishuClientId(clientId);
-      setFeishuClientSecret(clientSecret);
+      const requestGeneration = feishuStartGenerationRef.current + 1;
+      feishuStartGenerationRef.current = requestGeneration;
+      const pendingObservationRevisionAtStart = feishuPendingObservationRevisionRef.current;
+      const started = unwrap(
+        await send<ApiResponse<{ state: string }>>(FEISHU_MESSAGE_TYPES.START_AUTH, {
+          clientId,
+          clientSecret,
+          tokenExchangeProxyUrl: proxyUrl,
+        }),
+      );
+      const state = String(started?.state || '').trim();
+      if (!state) throw new Error('feishu oauth start returned invalid state');
+      if (feishuStartGenerationRef.current !== requestGeneration) return;
+      if (
+        feishuPendingObservationRevisionRef.current !== pendingObservationRevisionAtStart &&
+        feishuPendingStateRef.current !== state
+      ) {
+        return;
+      }
 
-      const cfg = getFeishuOAuthDefaults();
-      const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-      await storageSet({ feishu_oauth_pending_state: state, feishu_oauth_last_error: '' });
+      feishuAuthObservationRevisionRef.current += 1;
+      feishuPendingStateRef.current = state;
+      feishuLastErrorRef.current = '';
       setFeishuPendingState(state);
       setFeishuLastError('');
-
-      const url = new URL(cfg.authorizationUrl);
-      url.searchParams.set('client_id', clientId);
-      url.searchParams.set('app_id', clientId);
-      url.searchParams.set('redirect_uri', cfg.redirectUri);
-      url.searchParams.set('state', state);
-      url.searchParams.set('response_type', cfg.responseType);
-      url.searchParams.set('scope', cfg.scope);
-
-      const opened = openHttpUrl(url.toString());
-      if (!opened) throw new Error('Failed to open Feishu OAuth tab');
-      setPollingFeishu(true);
+      setFeishuPollingState(true);
     });
-  }, [feishuClientId, feishuClientSecret, feishuTokenExchangeProxyUrl, refreshInternal, runTask]);
+  }, [
+    applyFeishuAuthStatus,
+    feishuClientId,
+    feishuClientSecret,
+    feishuTokenExchangeProxyUrl,
+    readFeishuAuthStatus,
+    runTask,
+    setFeishuPollingState,
+  ]);
 
   const feishuStatusText = useMemo(() => {
     if (feishuConnected == null) return t('statusUnknown');
@@ -1672,27 +1847,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         await storageSet({ ai_chat_dollar_mention_enabled: next === true });
         setAiChatDollarMentionEnabled(next === true);
       });
-    },
-    [runTask],
-  );
-
-  const updateReaderPrefs = useCallback(
-    async (patch: Partial<ReaderPrefs>) => {
-      const base = readerPrefsRef.current;
-      const merged = normalizeReaderPrefs({
-        ...base,
-        ...patch,
-        tts: { ...base.tts, ...(patch.tts ?? {}) },
-      });
-      // dev observability: which prefs keys changed (no values, no PII)
-      console.debug('[reader] prefs update', Object.keys(patch ?? {}));
-      await runTask(
-        async () => {
-          await storageSet(buildReaderPrefsStoragePatch(merged));
-          setReaderPrefs(merged);
-        },
-        { fallbackMessage: 'save reader prefs failed' },
-      );
     },
     [runTask],
   );
@@ -2136,9 +2290,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onResetAntiHotlinkRules,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
-    readerPrefs,
-    updateReaderPrefs,
-
     insightStats,
     insightLoadStatus,
     insightError,

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
+import { FEISHU_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
@@ -22,9 +23,41 @@ async function deleteDb(name: string) {
 function mockChromeStorage(initial: Record<string, unknown> = {}) {
   const store: Record<string, unknown> = { ...initial };
   const setPayloads: Record<string, unknown>[] = [];
+  const runtimeMessages: any[] = [];
 
   return {
-    runtime: { lastError: null as any },
+    runtime: {
+      lastError: null as any,
+      sendMessage(message: any, callback: (response: any) => void) {
+        runtimeMessages.push(structuredClone(message));
+        if (message?.type !== FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
+          callback({ ok: false, data: null, error: { message: `unexpected message: ${message?.type}`, extra: null } });
+          return;
+        }
+
+        const nextClientId = Object.prototype.hasOwnProperty.call(message, 'clientId')
+          ? String(message.clientId || '').trim()
+          : String(store.feishu_oauth_client_id || '').trim();
+        const nextProxy = Object.prototype.hasOwnProperty.call(message, 'tokenExchangeProxyUrl')
+          ? String(message.tokenExchangeProxyUrl || '').trim()
+          : String(store.feishu_oauth_token_exchange_proxy_url || '').trim();
+        const changed =
+          nextClientId !== String(store.feishu_oauth_client_id || '').trim() ||
+          nextProxy !== String(store.feishu_oauth_token_exchange_proxy_url || '').trim();
+        if (changed) delete store.feishu_oauth_pending_state;
+        store.feishu_oauth_client_id = nextClientId;
+        store.feishu_oauth_token_exchange_proxy_url = nextProxy;
+        callback({
+          ok: true,
+          data: {
+            clientId: nextClientId,
+            clientSecretPresent: !!String(store.feishu_oauth_client_secret || '').trim(),
+            tokenExchangeProxyUrl: nextProxy,
+          },
+          error: null,
+        });
+      },
+    },
     storage: {
       local: {
         get(keys: any, cb: (res: Record<string, unknown>) => void) {
@@ -50,6 +83,7 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
     },
     __store: store,
     __setPayloads: setPayloads,
+    __runtimeMessages: runtimeMessages,
   };
 }
 
@@ -71,8 +105,17 @@ describe('backup service', () => {
   it('exportBackupZipV2 emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',
+      notion_oauth_pending_state: 'pending-a',
+      notion_oauth_last_error: 'old-error',
       notion_parent_page_id: 'page',
       notion_oauth_token_v1: { accessToken: 'secret' },
+      feishu_oauth_token_v1: { accessToken: 'feishu-secret' },
+      feishu_oauth_client_id: 'feishu-app-id',
+      feishu_oauth_client_secret: 'feishu-client-secret',
+      feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
+      feishu_oauth_pending_state: 'feishu-pending-a',
+      feishu_oauth_last_error: 'feishu-error-a',
+      feishu_chat_folder: 'AIChats',
       github_repository: 'owner/repo',
       github_branch: 'main',
       github_auth_state_v1: {
@@ -173,9 +216,23 @@ describe('backup service', () => {
 
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
     expect(config.schemaVersion).toBe(1);
-    expect(config.storageLocal.notion_oauth_client_id).toBe('client_id');
+    expect(config.storageLocal.notion_oauth_client_id).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_last_error).toBeUndefined();
     expect(config.storageLocal.notion_parent_page_id).toBe('page');
     expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
+    expect(config.storageLocal.feishu_oauth_token_v1).toBeUndefined();
+    expect(config.storageLocal.feishu_oauth_client_secret).toBeUndefined();
+    expect(config.storageLocal.feishu_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.feishu_oauth_last_error).toBeUndefined();
+    expect(config.storageLocal).toMatchObject({
+      feishu_oauth_client_id: 'feishu-app-id',
+      feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
+      feishu_chat_folder: 'AIChats',
+    });
+    expect(config.storageLocal.notion_oauth_client_id).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_last_error).toBeUndefined();
     expect(config.storageLocal).toMatchObject({
       github_repository: 'owner/repo',
       github_branch: 'main',
@@ -205,6 +262,13 @@ describe('backup service', () => {
       state: 'connected',
       token: { accessToken: 'BROWSER_B_ACCESS_SECRET', refreshToken: 'BROWSER_B_REFRESH_SECRET', createdAt: 2 },
     };
+    chromeMock.__store.feishu_oauth_token_v1 = { accessToken: 'browser-b-feishu-token' };
+    chromeMock.__store.feishu_oauth_client_secret = 'browser-b-feishu-secret';
+    chromeMock.__store.feishu_oauth_pending_state = 'browser-b-feishu-pending';
+    chromeMock.__store.feishu_oauth_last_error = 'browser-b-feishu-error';
+    delete chromeMock.__store.feishu_oauth_client_id;
+    delete chromeMock.__store.feishu_oauth_token_exchange_proxy_url;
+    delete chromeMock.__store.feishu_chat_folder;
     delete chromeMock.__store.github_repository;
     delete chromeMock.__store.github_branch;
 
@@ -234,12 +298,26 @@ describe('backup service', () => {
     expect(chromeMock.__store).toMatchObject({
       github_repository: 'owner/repo',
       github_branch: 'main',
+      feishu_oauth_token_v1: { accessToken: 'browser-b-feishu-token' },
+      feishu_oauth_client_secret: 'browser-b-feishu-secret',
+      feishu_oauth_last_error: 'browser-b-feishu-error',
+      feishu_oauth_client_id: 'feishu-app-id',
+      feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
+      feishu_chat_folder: 'AIChats',
+    });
+    expect(chromeMock.__store.feishu_oauth_pending_state).toBeUndefined();
+    expect(chromeMock.__runtimeMessages).toContainEqual({
+      type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
+      clientId: 'feishu-app-id',
+      tokenExchangeProxyUrl: 'https://worker.example.com/exchange',
     });
   });
 
   it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client-a',
+      notion_oauth_pending_state: 'pending-a',
+      notion_oauth_last_error: 'error-a',
       notion_parent_page_id: 'parent-a',
       notion_oauth_token_v1: { accessToken: 'secret-a' },
     });
@@ -333,6 +411,8 @@ describe('backup service', () => {
 
     // Browser B keeps its own secret while restoring A's portable, non-secret settings.
     chromeMock.__store.notion_oauth_token_v1 = { accessToken: 'secret-b' };
+    chromeMock.__store.notion_oauth_pending_state = 'pending-b';
+    chromeMock.__store.notion_oauth_last_error = 'error-b';
     delete chromeMock.__store.notion_oauth_client_id;
     delete chromeMock.__store.notion_parent_page_id;
 
@@ -400,7 +480,9 @@ describe('backup service', () => {
       contentText: 'already synced',
     });
     expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'secret-b' });
-    expect(chromeMock.__store.notion_oauth_client_id).toBe('client-a');
+    expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending-b');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('error-b');
     expect(chromeMock.__store.notion_parent_page_id).toBe('parent-a');
   });
 
@@ -933,8 +1015,17 @@ describe('backup service', () => {
       },
       storageLocal: {
         notion_oauth_client_id: 'cid',
+        notion_oauth_pending_state: 'pending-legacy',
+        notion_oauth_last_error: 'legacy-error',
         notion_parent_page_id: 'pid',
         notion_oauth_token_v1: { accessToken: 'secret' },
+        feishu_oauth_token_v1: { accessToken: 'feishu-secret' },
+        feishu_oauth_client_id: 'legacy-feishu-app-id',
+        feishu_oauth_client_secret: 'legacy-feishu-client-secret',
+        feishu_oauth_token_exchange_proxy_url: 'https://legacy-worker.example.com/exchange',
+        feishu_oauth_pending_state: 'legacy-feishu-pending',
+        feishu_oauth_last_error: 'legacy-feishu-error',
+        feishu_chat_folder: 'LegacyChats',
       },
     };
 
@@ -989,7 +1080,46 @@ describe('backup service', () => {
     expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_token_v1'))).toBe(
       false,
     );
-    expect(chromeMock.__setPayloads.some((p) => (p as any).notion_oauth_client_id === 'cid')).toBe(true);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_client_id')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_pending_state')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_last_error')),
+    ).toBe(false);
+    expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_token_v1'))).toBe(
+      false,
+    );
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_client_secret')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_pending_state')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_last_error')),
+    ).toBe(false);
+    expect(chromeMock.__store).toMatchObject({
+      notion_parent_page_id: 'pid',
+      feishu_oauth_client_id: 'legacy-feishu-app-id',
+      feishu_oauth_token_exchange_proxy_url: 'https://legacy-worker.example.com/exchange',
+      feishu_chat_folder: 'LegacyChats',
+    });
+    expect(chromeMock.__runtimeMessages).toContainEqual({
+      type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
+      clientId: 'legacy-feishu-app-id',
+      tokenExchangeProxyUrl: 'https://legacy-worker.example.com/exchange',
+    });
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_client_id')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) =>
+        Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_token_exchange_proxy_url'),
+      ),
+    ).toBe(false);
   });
 
   it('keeps Legacy conversation remap on a no-op so later message rows target the existing local id', async () => {

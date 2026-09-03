@@ -103,7 +103,7 @@ export function ArticleReaderView({
       ? detail.messages.map((message: any) => String(message?.contentMarkdown || message?.contentText || ''))
       : [],
   });
-  const { prefs, update } = useReaderPrefs();
+  const { prefs, update, preview, commitPreview } = useReaderPrefs();
   const { mode: themeMode, update: updateThemeMode } = useAppThemeMode();
   const readerVars = readerPrefsToCssVars(prefs) as CSSProperties;
 
@@ -445,13 +445,25 @@ export function ArticleReaderView({
         features={features}
         prefs={prefs}
         update={update}
+        preview={preview}
+        commitPreview={commitPreview}
         themeMode={themeMode}
         updateThemeMode={updateThemeMode}
         narration={toolbarNarration}
       />,
       readerToolbarPortalTarget,
     );
-  }, [features, prefs, readerToolbarPortalTarget, themeMode, toolbarNarration, update, updateThemeMode]);
+  }, [
+    commitPreview,
+    features,
+    prefs,
+    preview,
+    readerToolbarPortalTarget,
+    themeMode,
+    toolbarNarration,
+    update,
+    updateThemeMode,
+  ]);
 
   const outlineRail = useMemo(
     () =>

@@ -28,7 +28,7 @@
 - 文章评论；
 - 非敏感设置。
 
-认证秘密必须被排除。当前过滤至少覆盖 Notion / Feishu OAuth token、相关 client secret、Obsidian Local REST API key，以及 `github_auth_state_v1` / `github_auth_*` 中的 GitHub access token、refresh token 和 pending Device Flow credential；实际过滤逻辑以 `src/services/sync/backup/backup-utils.ts` 为准。
+认证秘密与不可迁移的授权会话态必须被排除。当前过滤至少覆盖 Notion / Feishu OAuth token、相关 client secret、Notion 的固定 client-id 历史镜像、Notion / Feishu OAuth pending/error attempt state、Obsidian Local REST API key，以及 `github_auth_state_v1` / `github_auth_*` 中的 GitHub access token、refresh token 和 pending Device Flow credential；实际过滤逻辑以 `src/services/sync/backup/backup-utils.ts` 为准。OAuth pending/error 仍可保存在当前浏览器的 `storage.local` 中跨 MV3 worker/reload 协调同一台机器上的授权 callback，但不能通过 Zip backup 迁移到另一时刻或设备。Feishu client ID、HTTPS token-exchange proxy URL 与 chat/article/video folder path 属于真实可迁移配置，仍可按现有策略进入备份。
 
 GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage backup 策略恢复。GitHub 三类输出目录固定为 `AIChats`、`WebArticles`、`VideosScripts`，不属于用户设置，也没有对应的 storage key。GitHub App Client ID 是公开应用配置；扩展中不存在 GitHub Client Secret 或 GitHub App private key。
 

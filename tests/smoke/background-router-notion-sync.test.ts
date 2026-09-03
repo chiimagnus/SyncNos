@@ -6,6 +6,7 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
+import { cleanupLegacyNotionOAuthConfig } from '@services/sync/notion/auth/oauth';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = {
@@ -18,7 +19,9 @@ function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
     },
   };
   const removed: string[][] = [];
+  const createdTabs: any[] = [];
   return {
+    runtime: {},
     storage: {
       local: {
         get(keys: string[], cb: (res: Record<string, unknown>) => void) {
@@ -41,6 +44,16 @@ function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
         },
       },
     },
+    tabs: {
+      create(properties: any, cb: (tab: any) => void) {
+        createdTabs.push({ ...properties });
+        cb({ id: createdTabs.length, ...properties });
+      },
+      remove(_tabId: number, cb: () => void) {
+        cb();
+      },
+    },
+    __createdTabs: createdTabs,
     __removed: removed,
     __store: store,
   };
@@ -237,6 +250,62 @@ describe('background-router notion sync', () => {
       }
       return notionHttpResponse({ ok: true });
     });
+  });
+
+  it('returns a safe Notion auth summary without token material', async () => {
+    const chromeMock = mockChromeStorage();
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => null },
+        storage: null,
+        dbManager: null,
+        syncService: null,
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'getNotionAuthStatus' });
+    expect(res).toMatchObject({ ok: true, data: { connected: true, workspaceName: 'ws' } });
+    expect(res.data).not.toHaveProperty('token');
+    expect(JSON.stringify(res.data)).not.toContain('accessToken');
+  });
+
+  it('registers Notion START_AUTH and returns the durable attempt state', async () => {
+    const chromeMock = mockChromeStorage();
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => null },
+        storage: null,
+        dbManager: null,
+        syncService: null,
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionStartAuth' });
+    expect(res.ok).toBe(true);
+    expect(String(res.data?.state || '')).toMatch(/^[0-9a-f]{32}$/);
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe(res.data?.state);
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('');
+    expect(chromeMock.__createdTabs).toHaveLength(1);
+  });
+
+  it('legacy Notion OAuth config cleanup removes only obsolete mirror keys', async () => {
+    const chromeMock = mockChromeStorage();
+    chromeMock.__store.notion_oauth_client_id = 'legacy-id';
+    chromeMock.__store.notion_oauth_client_secret = 'legacy-secret';
+    chromeMock.__store.notion_oauth_pending_state = 'current-pending';
+    chromeMock.__store.notion_oauth_last_error = 'current-error';
+    globalThis.chrome = chromeMock as any;
+
+    await cleanupLegacyNotionOAuthConfig();
+
+    expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_client_secret).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('current-pending');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('current-error');
   });
 
   it('disconnect clears notion token and cached notion routing keys', async () => {

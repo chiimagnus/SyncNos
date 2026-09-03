@@ -16,14 +16,12 @@ vi.mock('@services/conversations/background/storage', () => ({
   },
 }));
 
-const tokenMocks = vi.hoisted(() => ({
-  getFeishuOAuthToken: vi.fn(),
-  setFeishuOAuthToken: vi.fn(),
+const authMocks = vi.hoisted(() => ({
+  resolveFeishuAccessToken: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/auth/token-store', () => ({
-  getFeishuOAuthToken: tokenMocks.getFeishuOAuthToken,
-  setFeishuOAuthToken: tokenMocks.setFeishuOAuthToken,
+vi.mock('@services/sync/feishu/auth/oauth', () => ({
+  resolveFeishuAccessToken: authMocks.resolveFeishuAccessToken,
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
@@ -97,7 +95,7 @@ afterEach(() => {
 describe('feishu skip unchanged missing doc', () => {
   it('creates a new doc when content unchanged but existing doc is gone', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     const hash = await sha256Hex('![img](https://example.com/a.png)');
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
@@ -133,7 +131,7 @@ describe('feishu skip unchanged missing doc', () => {
 
   it('does not record provider freshness when remote content upload fails', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 2, title: 'fail upload' },
       mapping: null,

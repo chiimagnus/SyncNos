@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
-import ReactDOM from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 import {
@@ -14,10 +14,12 @@ vi.mock('../../src/ui/shared/SelectMenu', () => ({
     ariaLabel,
     value,
     options,
+    onChange,
   }: {
     ariaLabel: string;
     value: string;
     options: Array<{ value: string; label: string }>;
+    onChange: (value: string) => void;
   }) =>
     createElement(
       'div',
@@ -31,6 +33,7 @@ vi.mock('../../src/ui/shared/SelectMenu', () => ({
           {
             key: option.value,
             'data-option-value': option.value,
+            onClick: () => onChange(option.value),
           },
           option.label,
         ),
@@ -75,11 +78,12 @@ function cleanupDom() {
 }
 
 describe('TextLayoutPanel', () => {
-  let root: ReactDOM.Root | null = null;
+  let root: Root | null = null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupDom();
-    root = ReactDOM.createRoot(document.getElementById('root')!);
+    const { createRoot } = await import('react-dom/client');
+    root = createRoot(document.getElementById('root')!);
   });
 
   afterEach(() => {
@@ -92,6 +96,8 @@ describe('TextLayoutPanel', () => {
 
   it('renders only reset and field controls', () => {
     const update = vi.fn();
+    const preview = vi.fn();
+    const commitPreview = vi.fn().mockResolvedValue(undefined);
     const prefs = {
       ...DEFAULT_READER_PREFS,
       fontFamily: 'mono' as const,
@@ -103,7 +109,7 @@ describe('TextLayoutPanel', () => {
     };
 
     act(() => {
-      root!.render(createElement(TextLayoutPanel, { prefs, update }));
+      root!.render(createElement(TextLayoutPanel, { prefs, update, preview, commitPreview }));
     });
 
     const buttons = Array.from(document.querySelectorAll('button'));
@@ -131,12 +137,16 @@ describe('TextLayoutPanel', () => {
 
   it('resets typography to the canonical default preset', () => {
     const update = vi.fn();
+    const preview = vi.fn();
+    const commitPreview = vi.fn().mockResolvedValue(undefined);
 
     act(() => {
       root!.render(
         createElement(TextLayoutPanel, {
           prefs: DEFAULT_READER_PREFS,
           update,
+          preview,
+          commitPreview,
         }),
       );
     });
@@ -150,5 +160,55 @@ describe('TextLayoutPanel', () => {
 
     expect(update).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledWith(DEFAULT_READER_TYPOGRAPHY_PRESET);
+  });
+
+  it('previews range changes and commits only at deterministic interaction boundaries', () => {
+    const update = vi.fn();
+    const preview = vi.fn();
+    const commitPreview = vi.fn().mockResolvedValue(undefined);
+    act(() => {
+      root!.render(createElement(TextLayoutPanel, { prefs: DEFAULT_READER_PREFS, update, preview, commitPreview }));
+    });
+
+    const input = document.querySelector('[aria-label="readerFontSizeAria"]') as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    act(() => {
+      valueSetter?.call(input, '25');
+      input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    expect(preview).toHaveBeenCalledWith({ fontSize: 25 });
+    expect(update).not.toHaveBeenCalled();
+    expect(commitPreview).not.toHaveBeenCalled();
+
+    act(() => input.dispatchEvent(new window.Event('pointerup', { bubbles: true })));
+    act(() => input.dispatchEvent(new window.Event('pointercancel', { bubbles: true })));
+    act(() => input.dispatchEvent(new window.KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' })));
+    act(() => input.dispatchEvent(new window.KeyboardEvent('keyup', { bubbles: true, key: 'Shift' })));
+    act(() => input.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true })));
+    expect(commitPreview).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps reset, font, and alignment as immediate durable updates', () => {
+    const update = vi.fn();
+    const preview = vi.fn();
+    const commitPreview = vi.fn().mockResolvedValue(undefined);
+    act(() => {
+      root!.render(createElement(TextLayoutPanel, { prefs: DEFAULT_READER_PREFS, update, preview, commitPreview }));
+    });
+
+    act(() =>
+      (document.querySelector('[data-select-aria="readerFontAria"] [data-option-value="mono"]') as HTMLElement).click(),
+    );
+    act(() =>
+      (
+        document.querySelector('[data-select-aria="readerAlignAria"] [data-option-value="justify"]') as HTMLElement
+      ).click(),
+    );
+    act(() => (document.querySelector('button') as HTMLButtonElement).click());
+
+    expect(update).toHaveBeenCalledWith({ fontFamily: 'mono' });
+    expect(update).toHaveBeenCalledWith({ textAlign: 'justify' });
+    expect(update).toHaveBeenCalledWith(DEFAULT_READER_TYPOGRAPHY_PRESET);
+    expect(preview).not.toHaveBeenCalled();
   });
 });

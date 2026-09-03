@@ -14,14 +14,12 @@ vi.mock('@services/conversations/background/storage', () => ({
   },
 }));
 
-const tokenMocks = vi.hoisted(() => ({
-  getFeishuOAuthToken: vi.fn(),
-  setFeishuOAuthToken: vi.fn(),
+const authMocks = vi.hoisted(() => ({
+  resolveFeishuAccessToken: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/auth/token-store', () => ({
-  getFeishuOAuthToken: tokenMocks.getFeishuOAuthToken,
-  setFeishuOAuthToken: tokenMocks.setFeishuOAuthToken,
+vi.mock('@services/sync/feishu/auth/oauth', () => ({
+  resolveFeishuAccessToken: authMocks.resolveFeishuAccessToken,
 }));
 
 const fetchFeishuJsonMock = vi.hoisted(() => vi.fn());
@@ -123,7 +121,7 @@ describe('feishu orchestrator warnings sanitization', () => {
 
   it('sanitizes query values even when binder throws', async () => {
     const store = setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },

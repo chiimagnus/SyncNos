@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   registerGithubSettingsHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
-  ensureDefaultNotionOAuthClientId: vi.fn(),
+  cleanupLegacyNotionOAuthConfig: vi.fn(),
   ensureDefaultFeishuOAuthClientId: vi.fn(),
   ensureDefaultFeishuOAuthProxyUrl: vi.fn(),
   registerClipperContextMenu: vi.fn(),
@@ -63,7 +63,7 @@ vi.mock('@services/sync/github/settings-background-handlers', () => ({
   registerGithubSettingsHandlers: mocks.registerGithubSettingsHandlers,
 }));
 vi.mock('@services/sync/notion/auth/oauth', () => ({
-  ensureDefaultNotionOAuthClientId: mocks.ensureDefaultNotionOAuthClientId,
+  cleanupLegacyNotionOAuthConfig: mocks.cleanupLegacyNotionOAuthConfig,
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
 }));
 vi.mock('@services/sync/feishu/auth/oauth', () => ({
@@ -143,7 +143,7 @@ async function loadBackground() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  mocks.ensureDefaultNotionOAuthClientId.mockResolvedValue(undefined);
+  mocks.cleanupLegacyNotionOAuthConfig.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthClientId.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthProxyUrl.mockResolvedValue(undefined);
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);

@@ -8,7 +8,7 @@ import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
-import { ensureDefaultNotionOAuthClientId, setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
+import { cleanupLegacyNotionOAuthConfig, setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
 import {
   ensureDefaultFeishuOAuthClientId,
   ensureDefaultFeishuOAuthProxyUrl,
@@ -116,7 +116,7 @@ export default defineBackground(() => {
   }
   try {
     onInstalled((details) => {
-      ensureDefaultNotionOAuthClientId().catch(() => {});
+      cleanupLegacyNotionOAuthConfig().catch(() => {});
       ensureDefaultFeishuOAuthClientId().catch(() => {});
       ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
       // Do not auto-open tabs after extension updates.
@@ -148,7 +148,7 @@ export default defineBackground(() => {
     // optional listener registration must not block sibling listeners
   }
 
-  void ensureDefaultNotionOAuthClientId().catch(() => {});
+  void cleanupLegacyNotionOAuthConfig().catch(() => {});
   void ensureDefaultFeishuOAuthClientId().catch(() => {});
   void ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
 

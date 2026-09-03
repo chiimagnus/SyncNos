@@ -88,7 +88,12 @@ export function NotionOAuthSection(props: {
           </span>
           <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{notionStatusText}</span>
         </div>
-        <button onClick={onConnectOrDisconnect} disabled={busy} type="button" className={buttonClassName}>
+        <button
+          onClick={onConnectOrDisconnect}
+          disabled={busy || (!notionConnected && pollingNotion)}
+          type="button"
+          className={buttonClassName}
+        >
           {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
         </button>
       </div>

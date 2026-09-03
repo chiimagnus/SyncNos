@@ -7,19 +7,20 @@ import {
   READER_TTS_AUDIO_FORMATS,
   READER_TTS_ENGINES,
   type ReaderPrefs,
+  type ReaderPrefsPatch,
   type ReaderTtsAudioFormat,
   type ReaderTtsEngineId,
   type ReaderTtsPrefs,
 } from '@services/protocols/reader-prefs';
 
-// Presentational, fully controlled. The owning surface (ReaderHeaderToolbar)
-// supplies `prefs` and an `update` that persists patches via the reader-prefs
-// view-model.
-// Narration prefs live under `reader_prefs_v1.tts`; we always pass the full merged
-// `tts` object so the patch is type-safe against Partial<ReaderPrefs>.
+// Presentational, fully controlled. Discrete TTS actions persist immediately;
+// editable AI text fields preview locally and commit on blur. TTS patches contain
+// only changed fields so stale siblings cannot overwrite newer durable values.
 export type NarrationPanelProps = {
   prefs: ReaderPrefs;
-  update: (patch: Partial<ReaderPrefs>) => void | Promise<void>;
+  update: (patch: ReaderPrefsPatch) => void | Promise<void>;
+  preview: (patch: ReaderPrefsPatch) => void;
+  commitPreview: () => Promise<void>;
   /** Last narration error surfaced from the engine (e.g. AI endpoint failure). */
   error?: string | null;
   /** Whether Web Speech can be used; gates the engine picker + fallback button. */
@@ -85,12 +86,24 @@ function Row({ label, value, children }: { label: string; value?: string; childr
  * NarrationPanel — configures the reader text-to-speech settings stored in
  * `reader_prefs_v1.tts`: engine (Web Speech / AI endpoint), speech rate, the Web
  * voice, and the OpenAI-compatible endpoint fields (endpoint/key/model/voice/format).
- * Fully controlled; all writes go through `update({ tts })` which the view-model
- * re-normalizes (rate clamped, enums validated) before persisting.
+ * Fully controlled; the view-model normalizes both preview and durable patches
+ * (rate clamped, enums validated) before they reach display/storage.
  */
-export function NarrationPanel({ prefs, update, error, webSpeechAvailable = true, className }: NarrationPanelProps) {
+export function NarrationPanel({
+  prefs,
+  update,
+  preview,
+  commitPreview,
+  error,
+  webSpeechAvailable = true,
+  className,
+}: NarrationPanelProps) {
   const tts = prefs.tts;
-  const updateTts = (patch: Partial<ReaderTtsPrefs>) => void update({ tts: { ...tts, ...patch } });
+  const updateTts = (patch: Partial<ReaderTtsPrefs>) => void update({ tts: patch });
+  const previewTts = (patch: Partial<ReaderTtsPrefs>) => preview({ tts: patch });
+  const commitPreviewBestEffort = () => {
+    void commitPreview().catch(() => {});
+  };
   const [webVoices, setWebVoices] = useState<Array<{ voiceURI: string; name: string }>>(() =>
     tts.engine === 'web' ? listWebVoices() : [],
   );
@@ -200,7 +213,8 @@ export function NarrationPanel({ prefs, update, error, webSpeechAvailable = true
               aria-label={t('readerNarrationEndpointAria')}
               placeholder="http://localhost:8880/v1"
               value={tts.aiEndpoint}
-              onChange={(event) => updateTts({ aiEndpoint: event.target.value })}
+              onChange={(event) => previewTts({ aiEndpoint: event.target.value })}
+              onBlur={commitPreviewBestEffort}
             />
           </Row>
 
@@ -212,7 +226,8 @@ export function NarrationPanel({ prefs, update, error, webSpeechAvailable = true
               placeholder="sk-..."
               autoComplete="off"
               value={tts.aiApiKey}
-              onChange={(event) => updateTts({ aiApiKey: event.target.value })}
+              onChange={(event) => previewTts({ aiApiKey: event.target.value })}
+              onBlur={commitPreviewBestEffort}
             />
           </Row>
 
@@ -223,7 +238,8 @@ export function NarrationPanel({ prefs, update, error, webSpeechAvailable = true
               aria-label={t('readerNarrationModelAria')}
               placeholder="kokoro"
               value={tts.aiModel}
-              onChange={(event) => updateTts({ aiModel: event.target.value })}
+              onChange={(event) => previewTts({ aiModel: event.target.value })}
+              onBlur={commitPreviewBestEffort}
             />
           </Row>
 
@@ -234,7 +250,8 @@ export function NarrationPanel({ prefs, update, error, webSpeechAvailable = true
               aria-label={t('readerNarrationAiVoiceAria')}
               placeholder="af_sky"
               value={tts.aiVoice}
-              onChange={(event) => updateTts({ aiVoice: event.target.value })}
+              onChange={(event) => previewTts({ aiVoice: event.target.value })}
+              onBlur={commitPreviewBestEffort}
             />
           </Row>
 

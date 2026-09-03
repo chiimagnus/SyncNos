@@ -16,14 +16,12 @@ vi.mock('@services/conversations/background/storage', () => ({
   },
 }));
 
-const tokenMocks = vi.hoisted(() => ({
-  getFeishuOAuthToken: vi.fn(),
-  setFeishuOAuthToken: vi.fn(),
+const authMocks = vi.hoisted(() => ({
+  resolveFeishuAccessToken: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/auth/token-store', () => ({
-  getFeishuOAuthToken: tokenMocks.getFeishuOAuthToken,
-  setFeishuOAuthToken: tokenMocks.setFeishuOAuthToken,
+vi.mock('@services/sync/feishu/auth/oauth', () => ({
+  resolveFeishuAccessToken: authMocks.resolveFeishuAccessToken,
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
@@ -100,7 +98,7 @@ describe('feishu skip unchanged', () => {
 
   it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
     jobStoreMocks.setJob.mockResolvedValue(false);
     jobStoreMocks.getJob.mockResolvedValue(null);
 
@@ -179,7 +177,7 @@ describe('feishu skip unchanged', () => {
 
   it('skips syncing when content hash unchanged and docId exists', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
     fetchFeishuJsonMock.mockResolvedValue({ document: { document_id: 'doc1', revision_id: 1, title: 't' } });
 
     const hash = await sha256Hex('# same content');
