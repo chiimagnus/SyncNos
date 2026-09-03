@@ -176,6 +176,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   act(() => root?.unmount());
   root = null;
   delete (globalThis as any).window;
@@ -204,6 +205,24 @@ describe('Settings OAuth actions', () => {
     expect(uiUtilsMocks.openHttpUrl).not.toHaveBeenCalled();
     expect(latestSnapshot!.pollingNotion).toBe(true);
     expect(latestSnapshot!.notionStatusText).toBe('statusWaiting');
+  });
+
+  it('rejects duplicate Notion START while waiting and allows retry after the 60s UI timeout', async () => {
+    vi.useFakeTimers();
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
+    await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
+    expect(callsOf(NOTION_MESSAGE_TYPES.START_AUTH)).toHaveLength(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
+    });
+    expect(latestSnapshot!.pollingNotion).toBe(false);
+
+    await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
+    expect(callsOf(NOTION_MESSAGE_TYPES.START_AUTH)).toHaveLength(2);
   });
 
   it('Notion Disconnect resets local state without triggering a full Settings refresh', async () => {
@@ -252,6 +271,29 @@ describe('Settings OAuth actions', () => {
     expect(latestSnapshot!.feishuPendingState).toBe('feishu-background-state');
     expect(latestSnapshot!.pollingFeishu).toBe(true);
     expect(latestSnapshot!.feishuStatusText).toBe('statusWaiting');
+  });
+
+  it('rejects duplicate Feishu START while waiting and allows retry after the 60s UI timeout', async () => {
+    vi.useFakeTimers();
+    storageState = {
+      feishu_oauth_client_id: 'feishu-app',
+      feishu_oauth_client_secret: 'feishu-secret',
+      feishu_oauth_token_exchange_proxy_url: '',
+    };
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
+    await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
+    });
+    expect(latestSnapshot!.pollingFeishu).toBe(false);
+
+    await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(2);
   });
 
   it('Feishu Advanced Save delegates SAVE_AUTH_CONFIG without direct auth config writes', async () => {

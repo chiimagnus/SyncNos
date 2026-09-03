@@ -88,7 +88,12 @@ export function FeishuOAuthSection(props: {
             </span>
             <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{feishuStatusText}</span>
           </div>
-          <button onClick={onConnectOrDisconnect} disabled={busy} type="button" className={buttonClassName}>
+          <button
+            onClick={onConnectOrDisconnect}
+            disabled={busy || (!feishuConnected && pollingFeishu)}
+            type="button"
+            className={buttonClassName}
+          >
             {feishuConnected ? t('disconnect') : pollingFeishu ? t('connectingDots') : t('connect')}
           </button>
         </div>
@@ -140,7 +145,7 @@ export function FeishuOAuthSection(props: {
               onChange={(e) => onChangeClientId(e.target.value)}
               onBlur={onSaveAdvanced}
               onKeyDown={onEnterToSaveAdvanced}
-              disabled={busy}
+              disabled={busy || pollingFeishu}
               spellCheck={false}
               placeholder="cli_xxx"
               aria-label={t('feishuOAuthClientIdLabel')}
@@ -154,7 +159,7 @@ export function FeishuOAuthSection(props: {
               onChange={(e) => onChangeClientSecret(e.target.value)}
               onBlur={onSaveAdvanced}
               onKeyDown={onEnterToSaveAdvanced}
-              disabled={busy}
+              disabled={busy || pollingFeishu}
               spellCheck={false}
               type="password"
               placeholder="••••••••"
@@ -169,7 +174,7 @@ export function FeishuOAuthSection(props: {
               onChange={(e) => onChangeTokenExchangeProxyUrl(e.target.value)}
               onBlur={onSaveAdvanced}
               onKeyDown={onEnterToSaveAdvanced}
-              disabled={busy}
+              disabled={busy || pollingFeishu}
               spellCheck={false}
               placeholder="https://.../feishu/oauth/exchange"
               aria-label={t('feishuTokenExchangeProxyUrlLabel')}
