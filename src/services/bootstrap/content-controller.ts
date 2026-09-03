@@ -289,7 +289,6 @@ export function createContentController(deps: Deps) {
 
   function createAutoCaptureController(ownerToken: number) {
     let stopped = false;
-    let manualSaveInFlight = false;
     let observer: { start?: () => void; stop?: () => void } | null = null;
     const BACKFILL_WINDOW_LIMIT = 200;
     const BACKFILL_RETRY_THROTTLE_MS = 10_000;
@@ -297,7 +296,6 @@ export function createContentController(deps: Deps) {
     const BACKFILL_RETRY_MAX_DURATION_MS = 2 * 60_000;
     let aiChatAutoSaveEnabled: boolean | null = null;
     let liveGeneration = 0;
-    let savingDepth = 0;
     let inpageButtonPosition: any = null;
     let inpageButtonPositionLoaded = false;
     let inpageButtonPositionLoadPromise: Promise<any> | null = null;
@@ -367,7 +365,6 @@ export function createContentController(deps: Deps) {
       stopped = true;
       liveGeneration += 1;
       releaseResidentOwner(ownerToken);
-      savingDepth = 0;
       inpageButton?.setSaving?.(false);
       inpageButton?.cleanupButtons?.('');
       backfillStateByConversation.clear();
@@ -594,29 +591,17 @@ export function createContentController(deps: Deps) {
       };
     }
 
-    function beginSaving() {
-      savingDepth += 1;
-      if (!stopped && savingDepth === 1) inpageButton?.setSaving?.(true);
-    }
-
-    function endSaving() {
-      savingDepth = Math.max(0, savingDepth - 1);
-      if (!stopped && savingDepth === 0) inpageButton?.setSaving?.(false);
+    function setResidentSaving(saving: boolean) {
+      if (!stopped) inpageButton?.setSaving?.(saving);
     }
 
     const clickSave = async () => {
       if (stopped) return;
-      if (manualSaveInFlight) {
-        inpageButton?.setSaving?.(true);
-        return;
-      }
-
-      manualSaveInFlight = true;
       let manualSlot: ManualPersistenceSlot | null = null;
       try {
         manualSlot = await enterManualPersistence(ownerToken, () => !stopped && isCurrentResidentOwner(ownerToken));
         if (!manualSlot) return;
-        beginSaving();
+        setResidentSaving(true);
         try {
           await currentPageCapture.captureCurrentPage({
             onProgress: (progress) => {
@@ -626,13 +611,12 @@ export function createContentController(deps: Deps) {
             },
           });
         } finally {
-          endSaving();
+          setResidentSaving(false);
         }
       } catch (_error) {
         // tip already shown in progress callback
       } finally {
         if (manualSlot) exitManualPersistence(manualSlot);
-        manualSaveInFlight = false;
       }
     };
 
@@ -806,7 +790,7 @@ export function createContentController(deps: Deps) {
         const merged = mergeAutoSaveSnapshots(snapshot, backfill, incremental);
         if (!merged.snapshot || !merged.diff) return;
 
-        beginSaving();
+        setResidentSaving(true);
         try {
           let saved: Awaited<ReturnType<typeof saveSnapshot>>;
           try {
@@ -840,7 +824,7 @@ export function createContentController(deps: Deps) {
             );
           }
         } finally {
-          endSaving();
+          setResidentSaving(false);
         }
       } catch (error) {
         if (runtime?.isInvalidContextError?.(error)) {
