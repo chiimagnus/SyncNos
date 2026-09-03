@@ -173,10 +173,6 @@ export function createContentController(deps: Deps) {
     );
   }
 
-  function hasManualPersistenceGate(): boolean {
-    return manualPersistence !== null;
-  }
-
   function cancelAutoSaveTrailingForOwner(ownerToken: number) {
     if (latestTrailingAutoSaveOwnerToken === ownerToken) latestTrailingAutoSaveOwnerToken = null;
   }
@@ -232,11 +228,6 @@ export function createContentController(deps: Deps) {
       return;
     }
     startAutoSaveRequest(ownerToken);
-  }
-
-  function installResidentAutoSaveHandle(handle: ResidentAutoSaveHandle) {
-    activeResidentOwnerToken = handle.ownerToken;
-    currentResidentAutoSaveHandle = handle;
   }
 
   function cancelPendingManualPersistenceForOwner(ownerToken: number) {
@@ -673,7 +664,7 @@ export function createContentController(deps: Deps) {
     }
 
     function isAutoSavePreSaveAllowed(generation: number) {
-      return isAutoSaveRequestAllowed(generation) && !hasManualPersistenceGate();
+      return isAutoSaveRequestAllowed(generation) && manualPersistence === null;
     }
 
     function rollbackBackfillAttempt(backfill: {
@@ -889,7 +880,8 @@ export function createContentController(deps: Deps) {
     start() {
       const ownerToken = ++residentOwnerSequence;
       const controller = createAutoCaptureController(ownerToken);
-      installResidentAutoSaveHandle(controller);
+      activeResidentOwnerToken = ownerToken;
+      currentResidentAutoSaveHandle = controller;
       let mentionController: { stop?: () => void } | null = null;
       let stopped = false;
       let controllerStarted = false;
