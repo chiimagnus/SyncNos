@@ -112,6 +112,7 @@ describe('normalizeSyncJobSnapshot', () => {
     ['fractional totalCount', { totalCount: 1.5 }],
     ['coerced timestamp', { startedAt: '1' }],
     ['coerced count', { okCount: '1' }],
+    ['completed counters exceed total', { okCount: 2, failCount: 1 }],
     ['coerced conversation id', { currentConversationId: '2' }],
     ['durable running queue', { conversationIds: [1, 2] }],
     [

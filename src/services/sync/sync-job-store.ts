@@ -98,6 +98,7 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   }
   if (!isNonNegativeSafeInteger(job.totalCount)) return null;
   if (!isNonNegativeSafeInteger(job.okCount) || !isNonNegativeSafeInteger(job.failCount)) return null;
+  if (job.okCount + job.failCount > job.totalCount) return null;
   if (job.currentConversationId !== undefined && !isPositiveSafeInteger(job.currentConversationId)) return null;
   if (!isOptionalString(job.currentConversationTitle) || !isOptionalString(job.currentStage)) return null;
   if (!isOptionalString(job.abortedReason)) return null;

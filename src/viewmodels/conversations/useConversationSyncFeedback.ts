@@ -127,7 +127,7 @@ function toWarningSummariesFromRows(rows: readonly SyncPerConversationResult[]):
 
 function buildRunningMessage(provider: SyncProvider, done: number, total: number) {
   const label = providerLabel(provider);
-  if (total > 0) return `${label} · ${t('phaseRunning')} ${Math.min(done, total)}/${total}`;
+  if (total > 0) return `${label} · ${t('phaseRunning')} ${done}/${total}`;
   return `${label} · ${t('phaseRunning')}`;
 }
 
@@ -211,7 +211,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       provider: job.provider,
       phase: 'running',
       total,
-      done: Math.min(completed, total),
+      done: completed,
       currentConversationId: job.currentConversationId ?? null,
       currentConversationTitle: job.currentConversationTitle ?? '',
       currentStage: job.currentStage ?? '',
@@ -228,7 +228,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       provider: job.provider,
       phase: 'failed',
       total,
-      done: Math.min(completed, total),
+      done: completed,
       currentConversationId: job.currentConversationId ?? null,
       currentConversationTitle: job.currentConversationTitle ?? '',
       currentStage: job.currentStage ?? '',
