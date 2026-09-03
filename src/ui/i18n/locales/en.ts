@@ -107,7 +107,6 @@ export const en = {
   inpageDisplayModeSupported: 'Only on supported sites',
   inpageDisplayModeAll: 'On all sites',
   inpageDisplayModeOff: 'Off',
-  inpageDisplayModeHint: 'Refresh to apply.',
   markdownReadingProfileMediumLabel: 'Medium-like',
   markdownReadingProfileNotionLabel: 'Notion-like',
   markdownReadingProfileBookLabel: 'Book-like',
@@ -174,7 +173,6 @@ export const en = {
   readerFormatAac: 'AAC',
   readerFormatFlac: 'FLAC',
   aiChatAutoSaveLabel: 'Auto-save AI chats',
-  aiChatAutoSaveHint: 'Supported sites; refresh to apply.',
   aiChatCacheImagesLabel: 'Auto-save AI chat images locally',
   webArticleCacheImagesLabel: 'Auto-save web article images locally',
   xiaohongshuCommentsHeading: 'Xiaohongshu notes',
@@ -193,8 +191,6 @@ export const en = {
   aiChatDollarMentionLabel: 'Enable $ mention',
   aiChatDollarMentionHint: 'Type $ in supported AI chats to search and insert saved items.',
   betaTag: 'BETA',
-  inpageSupportedOnlyLabel: 'Only show Inpage button on supported sites',
-  inpageSupportedOnlyHint: 'Non-supported sites require a refresh to apply.',
 
   // BackupSection
   databaseBackup: 'Database Backup',

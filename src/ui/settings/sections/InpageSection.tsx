@@ -153,9 +153,6 @@ export function InpageSection(props: {
               ]}
             />
           </div>
-          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-            {t('inpageDisplayModeHint')}
-          </div>
         </div>
       </section>
 
@@ -216,10 +213,6 @@ export function InpageSection(props: {
           />
           {t('aiChatAutoSaveLabel')}
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatAutoSaveHint')}
-        </div>
-
         <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
           <input
             type="checkbox"
