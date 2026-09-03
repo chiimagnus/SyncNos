@@ -85,7 +85,7 @@ describe('content-controller web inpage fetch', () => {
   it('routes single-click save to background article fetch for web collector', async () => {
     const harness = createHarness({
       sendImpl: async (type: string) => {
-        if (type === 'fetchActiveTabArticle') return { ok: true, data: { conversationId: 11 } };
+        if (type === 'fetchActiveTabArticle') return { ok: true, data: { conversationId: 11, isNew: true } };
         return { ok: true, data: {} };
       },
     });

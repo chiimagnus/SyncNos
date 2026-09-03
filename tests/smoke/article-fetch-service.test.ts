@@ -590,7 +590,7 @@ describe('article-fetch-service', () => {
   });
 
   it('rejects non-http active tab url', async () => {
-    storageMocks.upsertConversation.mockResolvedValue({ id: 1 });
+    storageMocks.upsertConversation.mockResolvedValue({ id: 1, __isNew: true });
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
 

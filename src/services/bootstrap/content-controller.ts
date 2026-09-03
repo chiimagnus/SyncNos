@@ -132,8 +132,8 @@ export function createContentController(deps: Deps) {
     }
 
     const conversation = conversationRes.data;
-    const rawIsNew = (conversation as any)?.__isNew;
-    const isNew = typeof rawIsNew === 'boolean' ? rawIsNew : undefined;
+    const isNew = (conversation as any)?.__isNew;
+    if (typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId: conversation.id,
       messages: snapshot.messages || [],

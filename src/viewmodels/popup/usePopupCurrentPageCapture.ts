@@ -4,6 +4,7 @@ import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
+import type { CurrentPageCaptureResult } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -74,16 +75,19 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     setFetching(true);
     setStatus(null);
     try {
-      const response = await send<ApiResponse<any>>(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, {});
+      const response = await send<ApiResponse<CurrentPageCaptureResult>>(
+        UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
+        {},
+      );
       const data = unwrap(response);
       await onCaptured?.();
       await refreshState();
       setStatus({
         kind: 'default',
         message:
-          (data as any)?.captureCompleteness === 'partial'
+          data.captureCompleteness === 'partial'
             ? t('partialCaptureSaved')
-            : buildCaptureSuccessTipMessage({ isNew: (data as any)?.isNew, title: (data as any)?.title }),
+            : buildCaptureSuccessTipMessage({ isNew: data.isNew, title: data.title }),
       });
       return data;
     } catch (error) {

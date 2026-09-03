@@ -76,7 +76,12 @@ describe('content message locale readiness', () => {
   it('keeps video listener registered while localized tip work waits for locale', async () => {
     const locale = deferred<void>();
     const runtime = installRuntime();
-    const captureVideoTranscript = vi.fn(async () => ({ title: 'Talk', isNew: true, subtitleStatus: 'ok' }));
+    const captureVideoTranscript = vi.fn(async () => ({
+      conversationId: 11,
+      title: 'Talk',
+      isNew: true,
+      subtitleStatus: 'ok',
+    }));
     const showSaveTip = vi.fn();
 
     registerVideoTranscriptCaptureContentHandlers({ captureVideoTranscript } as any, {
@@ -104,7 +109,11 @@ describe('content message locale readiness', () => {
   it('continues video capture after locale readiness rejects', async () => {
     const locale = deferred<void>();
     const runtime = installRuntime();
-    const captureVideoTranscript = vi.fn(async () => ({ title: 'Talk', isNew: false, subtitleStatus: 'empty' }));
+    const captureVideoTranscript = vi.fn(async () => ({
+      conversationId: null,
+      title: 'Talk',
+      subtitleStatus: 'empty',
+    }));
     const showSaveTip = vi.fn();
 
     registerVideoTranscriptCaptureContentHandlers({ captureVideoTranscript } as any, {

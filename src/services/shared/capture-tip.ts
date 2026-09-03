@@ -19,10 +19,10 @@ function truncateForTip(title: string, maxChars: number): string {
 
 export function buildCaptureSuccessTipMessage(input: {
   title?: unknown;
-  isNew?: unknown;
+  isNew: boolean;
   maxTitleChars?: number;
 }): string {
-  const isNew = input?.isNew !== false;
+  const isNew = input.isNew;
   const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
   const maxChars =
     input && typeof input.maxTitleChars === 'number' && Number.isFinite(input.maxTitleChars)

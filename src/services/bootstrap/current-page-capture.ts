@@ -34,7 +34,7 @@ export type CurrentPageCaptureResult = {
   collectorId: string | null;
   conversationId: number | null;
   title?: string;
-  isNew?: boolean;
+  isNew: boolean;
   captureCompleteness?: 'complete' | 'partial';
   captureReasons?: string[];
 };
@@ -174,10 +174,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    const rawIsNew = (conversation as any)?.__isNew;
+    const isNew = (conversation as any)?.__isNew;
+    if (typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
     return {
       conversationId: normalizeConversationId(conversation.id),
-      isNew: typeof rawIsNew === 'boolean' ? rawIsNew : undefined,
+      isNew,
       captureCompleteness: integrity.meta?.completeness,
       captureReasons: integrity.meta?.reasons?.slice(),
     };
@@ -205,7 +206,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           throw new Error(normalizedError || t('captureFailedFallback'));
         }
         const title = String(response?.data?.title || '');
-        const isNew = response?.data?.isNew !== false;
+        const isNew = response?.data?.isNew;
+        if (typeof isNew !== 'boolean') throw new Error('invalid article capture response');
         report(buildCaptureSuccessTipMessage({ isNew, title }), 'default');
         return {
           kind: 'article',
@@ -250,7 +252,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       }
 
       const title = String(snapshot?.conversation?.title || '');
-      const isNew = saved.isNew !== false;
+      const isNew = saved.isNew;
       report(
         saved.captureCompleteness === 'partial'
           ? t('partialCaptureSaved')
