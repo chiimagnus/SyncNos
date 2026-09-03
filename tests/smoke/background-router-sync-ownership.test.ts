@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
   ensureSyncProviderEnabled: vi.fn(),
   getNotionOAuthToken: vi.fn(),
   getFeishuOAuthToken: vi.fn(),
-  clearFeishuOAuthToken: vi.fn(),
+  startFeishuOAuthAttempt: vi.fn(),
+  saveFeishuOAuthConfig: vi.fn(),
+  clearFeishuOAuthAttemptAndToken: vi.fn(),
   storageGet: vi.fn(),
   storageRemove: vi.fn(),
 }));
@@ -28,7 +30,11 @@ vi.mock('@services/sync/notion/auth/token-store', () => ({
 }));
 vi.mock('@services/sync/feishu/auth/token-store', () => ({
   getFeishuOAuthToken: mocks.getFeishuOAuthToken,
-  clearFeishuOAuthToken: mocks.clearFeishuOAuthToken,
+}));
+vi.mock('@services/sync/feishu/auth/oauth', () => ({
+  startFeishuOAuthAttempt: mocks.startFeishuOAuthAttempt,
+  saveFeishuOAuthConfig: mocks.saveFeishuOAuthConfig,
+  clearFeishuOAuthAttemptAndToken: mocks.clearFeishuOAuthAttemptAndToken,
 }));
 vi.mock('@platform/storage/local', () => ({
   storageGet: mocks.storageGet,
@@ -136,7 +142,17 @@ beforeEach(() => {
   mocks.ensureSyncProviderEnabled.mockResolvedValue(null);
   mocks.getNotionOAuthToken.mockResolvedValue({ accessToken: 'notion-token' });
   mocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 'feishu-token' });
-  mocks.clearFeishuOAuthToken.mockResolvedValue(undefined);
+  mocks.startFeishuOAuthAttempt.mockResolvedValue({ state: 'feishu-state' });
+  mocks.saveFeishuOAuthConfig.mockResolvedValue({
+    clientId: 'app-id',
+    clientSecretPresent: true,
+    tokenExchangeProxyUrl: '',
+  });
+  mocks.clearFeishuOAuthAttemptAndToken.mockResolvedValue([
+    'feishu_oauth_token_v1',
+    'feishu_oauth_pending_state',
+    'feishu_oauth_last_error',
+  ]);
   mocks.storageGet.mockResolvedValue({ notion_parent_page_id: 'parent-page' });
   mocks.storageRemove.mockResolvedValue(undefined);
 });
@@ -304,13 +320,49 @@ describe('Feishu destructive settings ownership', () => {
     };
   }
 
+  it('registers safe auth status plus owner START/SAVE routes without exposing token secrets', async () => {
+    const harness = createFeishuSettingsHarness();
+    mocks.getFeishuOAuthToken.mockResolvedValueOnce({
+      accessToken: 'ACCESS_SECRET',
+      refreshToken: 'REFRESH_SECRET',
+      expiresAt: 100,
+      createdAt: 1,
+    });
+
+    const status = await harness.router.__handleMessageForTests({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS });
+    expect(status).toEqual({ ok: true, data: { connected: true }, error: null });
+    expect(JSON.stringify(status)).not.toMatch(/ACCESS_SECRET|REFRESH_SECRET/);
+
+    const start = await harness.router.__handleMessageForTests({
+      type: FEISHU_MESSAGE_TYPES.START_AUTH,
+      clientId: 'app-id',
+      clientSecret: 'secret',
+      tokenExchangeProxyUrl: '',
+    });
+    expect(start).toMatchObject({ ok: true, data: { state: 'feishu-state' } });
+    expect(mocks.startFeishuOAuthAttempt).toHaveBeenCalledWith({
+      clientId: 'app-id',
+      clientSecret: 'secret',
+      tokenExchangeProxyUrl: '',
+    });
+
+    const saved = await harness.router.__handleMessageForTests({
+      type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
+      clientId: 'app-id',
+      clientSecret: 'secret',
+      tokenExchangeProxyUrl: '',
+    });
+    expect(saved).toMatchObject({ ok: true, data: { clientId: 'app-id', clientSecretPresent: true } });
+    expect(mocks.saveFeishuOAuthConfig).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects active disconnect before deleting Feishu credentials or config', async () => {
     const harness = createFeishuSettingsHarness({ active: true, initialJob: { status: 'running' } });
 
     const response = await harness.router.__handleMessageForTests({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
 
     expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
-    expect(mocks.clearFeishuOAuthToken).not.toHaveBeenCalled();
+    expect(mocks.clearFeishuOAuthAttemptAndToken).not.toHaveBeenCalled();
     expect(mocks.storageRemove).not.toHaveBeenCalled();
     expect(harness.getJob()).toMatchObject({ status: 'running' });
     await harness.release();
@@ -326,9 +378,13 @@ describe('Feishu destructive settings ownership', () => {
 
     expect(response.ok).toBe(true);
     expect(harness.getJob()).toBeNull();
-    expect(mocks.clearFeishuOAuthToken).toHaveBeenCalledTimes(1);
-    expect(mocks.storageRemove).toHaveBeenCalledWith(['feishu_oauth_pending_state', 'feishu_oauth_last_error']);
-    expect(response.data?.clearedKeys).toEqual(['feishu_oauth_pending_state', 'feishu_oauth_last_error']);
+    expect(mocks.clearFeishuOAuthAttemptAndToken).toHaveBeenCalledTimes(1);
+    expect(mocks.storageRemove).not.toHaveBeenCalled();
+    expect(response.data?.clearedKeys).toEqual([
+      'feishu_oauth_token_v1',
+      'feishu_oauth_pending_state',
+      'feishu_oauth_last_error',
+    ]);
     expect(response.data?.clearedKeys).not.toContain('feishu_sync_job_v2');
   });
 
@@ -344,8 +400,8 @@ describe('Feishu destructive settings ownership', () => {
       ok: false,
       error: { extra: { code: 'feishu_sync_job_persist_failed' } },
     });
-    expect(mocks.clearFeishuOAuthToken).toHaveBeenCalledTimes(1);
-    expect(mocks.storageRemove).toHaveBeenCalledTimes(1);
+    expect(mocks.clearFeishuOAuthAttemptAndToken).toHaveBeenCalledTimes(1);
+    expect(mocks.storageRemove).not.toHaveBeenCalled();
     expect(harness.getJob()).toMatchObject({ id: 'residue', status: 'running' });
   });
 });

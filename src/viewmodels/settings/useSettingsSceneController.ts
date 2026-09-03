@@ -11,7 +11,6 @@ import {
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { disconnectFeishu } from '@services/sync/feishu/auth/settings-client';
-import { getFeishuOAuthDefaults } from '@services/sync/feishu/auth/oauth';
 import {
   FEISHU_DEFAULTS,
   FEISHU_STORAGE_KEYS,
@@ -1207,13 +1206,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const proxyUrl = proxyUrlRaw ? normalizeHttpsUrlOrEmpty(proxyUrlRaw) : '';
         if (proxyUrlRaw && !proxyUrl) throw new Error('Feishu token exchange proxy url must be https');
 
-        await storageSet({
-          feishu_oauth_client_id: clientId,
-          feishu_oauth_client_secret: clientSecret,
-          feishu_oauth_token_exchange_proxy_url: proxyUrl,
-        });
-        setFeishuTokenExchangeProxyUrl(proxyUrl);
-        setFeishuClientId(clientId);
+        const saved = unwrap(
+          await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, {
+            clientId,
+            clientSecret,
+            tokenExchangeProxyUrl: proxyUrl,
+          }),
+        );
+        setFeishuTokenExchangeProxyUrl(String(saved?.tokenExchangeProxyUrl || proxyUrl));
+        setFeishuClientId(String(saved?.clientId || clientId));
         setFeishuClientSecret(clientSecret);
       },
       { fallbackMessage: 'save feishu settings failed' },
@@ -1229,7 +1230,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setFeishuPendingState('');
         setFeishuLastError('');
         setPollingFeishu(false);
-        await refreshInternal();
         return;
       }
 
@@ -1245,34 +1245,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         throw new Error('Feishu OAuth requires client secret (direct) or token exchange proxy url (worker)');
       }
 
-      await storageSet({
-        feishu_oauth_client_id: clientId,
-        feishu_oauth_client_secret: clientSecret,
-        feishu_oauth_token_exchange_proxy_url: proxyUrl,
-      });
-      setFeishuTokenExchangeProxyUrl(proxyUrl);
-      setFeishuClientId(clientId);
-      setFeishuClientSecret(clientSecret);
-
-      const cfg = getFeishuOAuthDefaults();
-      const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-      await storageSet({ feishu_oauth_pending_state: state, feishu_oauth_last_error: '' });
+      const started = unwrap(
+        await send<ApiResponse<{ state: string }>>(FEISHU_MESSAGE_TYPES.START_AUTH, {
+          clientId,
+          clientSecret,
+          tokenExchangeProxyUrl: proxyUrl,
+        }),
+      );
+      const state = String(started?.state || '').trim();
+      if (!state) throw new Error('feishu oauth start returned invalid state');
       setFeishuPendingState(state);
       setFeishuLastError('');
-
-      const url = new URL(cfg.authorizationUrl);
-      url.searchParams.set('client_id', clientId);
-      url.searchParams.set('app_id', clientId);
-      url.searchParams.set('redirect_uri', cfg.redirectUri);
-      url.searchParams.set('state', state);
-      url.searchParams.set('response_type', cfg.responseType);
-      url.searchParams.set('scope', cfg.scope);
-
-      const opened = openHttpUrl(url.toString());
-      if (!opened) throw new Error('Failed to open Feishu OAuth tab');
       setPollingFeishu(true);
     });
-  }, [feishuClientId, feishuClientSecret, feishuTokenExchangeProxyUrl, refreshInternal, runTask]);
+  }, [feishuClientId, feishuClientSecret, feishuTokenExchangeProxyUrl, runTask]);
 
   const feishuStatusText = useMemo(() => {
     if (feishuConnected == null) return t('statusUnknown');

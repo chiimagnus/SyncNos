@@ -1,6 +1,8 @@
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
+import { FEISHU_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { send } from '@services/shared/runtime';
 import {
   areBackupValuesEqual,
   filterStorageForBackup,
@@ -135,6 +137,32 @@ function makeStats(): ImportStats {
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
+}
+
+const FEISHU_PORTABLE_AUTH_CONFIG_KEYS = {
+  clientId: 'feishu_oauth_client_id',
+  tokenExchangeProxyUrl: 'feishu_oauth_token_exchange_proxy_url',
+} as const;
+
+async function applyImportedStorageSettings(filteredSettings: Record<string, unknown>): Promise<void> {
+  const directSettings = { ...filteredSettings };
+  const feishuConfig: Record<string, unknown> = {};
+  if (Object.prototype.hasOwnProperty.call(directSettings, FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId)) {
+    feishuConfig.clientId = directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId];
+    delete directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId];
+  }
+  if (Object.prototype.hasOwnProperty.call(directSettings, FEISHU_PORTABLE_AUTH_CONFIG_KEYS.tokenExchangeProxyUrl)) {
+    feishuConfig.tokenExchangeProxyUrl = directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.tokenExchangeProxyUrl];
+    delete directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.tokenExchangeProxyUrl];
+  }
+
+  if (Object.keys(directSettings).length) await storageSet(directSettings);
+  if (!Object.keys(feishuConfig).length) return;
+
+  const response = await send<any>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, feishuConfig);
+  if (!response?.ok) {
+    throw new Error(String(response?.error?.message || 'restore feishu oauth config failed'));
+  }
 }
 
 function normalizeHttpUrl(raw: unknown): string {
@@ -382,7 +410,7 @@ export async function importBackupLegacyJsonMerge(
   progress.stage = 'settings';
   report();
   if (settingsKeys.length) {
-    await storageSet(filteredSettings);
+    await applyImportedStorageSettings(filteredSettings);
     stats.settingsApplied = settingsKeys.length;
     bump(settingsKeys.length, 'settings');
   }
@@ -939,7 +967,7 @@ export async function importBackupZipV2Merge(
   progress.stage = 'Settings';
   report();
   if (settingsKeys.length) {
-    await storageSet(filteredSettings);
+    await applyImportedStorageSettings(filteredSettings);
     stats.settingsApplied = settingsKeys.length;
     bump(settingsKeys.length, 'Settings');
   }

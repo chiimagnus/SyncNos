@@ -11,12 +11,6 @@ function unwrap<T>(res: ApiResponse<T>): T {
   throw new Error(message);
 }
 
-export async function getFeishuConnectionStatus(): Promise<{ connected: boolean }> {
-  const res = await send<ApiResponse<{ connected: boolean; token?: unknown }>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS);
-  const data = unwrap(res);
-  return { connected: !!data.connected };
-}
-
 export async function disconnectFeishu(): Promise<void> {
   const res = await send<ApiResponse<{ disconnected: boolean }>>(FEISHU_MESSAGE_TYPES.DISCONNECT);
   unwrap(res);

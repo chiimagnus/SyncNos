@@ -14,14 +14,12 @@ vi.mock('@services/conversations/background/storage', () => ({
   },
 }));
 
-const tokenMocks = vi.hoisted(() => ({
-  getFeishuOAuthToken: vi.fn(),
-  setFeishuOAuthToken: vi.fn(),
+const authMocks = vi.hoisted(() => ({
+  resolveFeishuAccessToken: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/auth/token-store', () => ({
-  getFeishuOAuthToken: tokenMocks.getFeishuOAuthToken,
-  setFeishuOAuthToken: tokenMocks.setFeishuOAuthToken,
+vi.mock('@services/sync/feishu/auth/oauth', () => ({
+  resolveFeishuAccessToken: authMocks.resolveFeishuAccessToken,
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
@@ -115,7 +113,7 @@ afterEach(() => {
 describe('feishu docx image bind flow', () => {
   it('converts markdown then binds images by order (best-effort)', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -168,7 +166,7 @@ describe('feishu docx image bind flow', () => {
 
   it('records warnings when image blocks are fewer than markdown images', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },

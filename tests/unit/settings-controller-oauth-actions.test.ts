@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NOTION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { FEISHU_MESSAGE_TYPES, NOTION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 
 const runtimeMocks = vi.hoisted(() => ({ send: vi.fn() }));
@@ -14,6 +14,7 @@ const storageMocks = vi.hoisted(() => ({
   onChanged: vi.fn(),
 }));
 const notionClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
+const feishuClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 const uiUtilsMocks = vi.hoisted(() => ({ openHttpUrl: vi.fn() }));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
@@ -24,6 +25,7 @@ vi.mock('@services/shared/storage', () => ({
   storageOnChanged: storageMocks.onChanged,
 }));
 vi.mock('@services/sync/notion/auth/settings-client', () => ({ disconnectNotion: notionClientMocks.disconnect }));
+vi.mock('@services/sync/feishu/auth/settings-client', () => ({ disconnectFeishu: feishuClientMocks.disconnect }));
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: vi.fn(),
   syncProviderEnabledStorageKey: (id: string) => `webclipper_sync_provider_${id}_enabled`,
@@ -64,6 +66,7 @@ let latestSnapshot: Snapshot | null = null;
 let root: ReactDOM.Root | null = null;
 let dom: JSDOM | null = null;
 let notionConnected = false;
+let feishuConnected = false;
 let storageState: Record<string, unknown> = {};
 
 const ok = (data: any): ApiResponse => ({ ok: true, data, error: null });
@@ -119,8 +122,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   latestSnapshot = null;
   notionConnected = false;
+  feishuConnected = false;
   storageState = {};
   notionClientMocks.disconnect.mockResolvedValue(undefined);
+  feishuClientMocks.disconnect.mockResolvedValue(undefined);
   uiUtilsMocks.openHttpUrl.mockReturnValue(true);
 
   storageMocks.get.mockImplementation(async (keys: string[]) => {
@@ -141,7 +146,11 @@ beforeEach(() => {
       return ok({ connected: notionConnected, workspaceName: notionConnected ? 'Workspace' : '' });
     }
     if (type === NOTION_MESSAGE_TYPES.START_AUTH) return ok({ state: 'background-state' });
-    if (type === 'getFeishuAuthStatus') return ok({ connected: false });
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) return ok({ connected: feishuConnected });
+    if (type === FEISHU_MESSAGE_TYPES.START_AUTH) return ok({ state: 'feishu-background-state' });
+    if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
+      return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
+    }
     if (type === 'obsidianGetSettings') {
       return ok({
         apiBaseUrl: 'http://127.0.0.1:27123',
@@ -200,7 +209,7 @@ describe('Settings OAuth actions', () => {
   it('Notion Disconnect resets local state without triggering a full Settings refresh', async () => {
     notionConnected = true;
     await renderController();
-    const feishuReadsBefore = callsOf('getFeishuAuthStatus').length;
+    const feishuReadsBefore = callsOf(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS).length;
     const obsidianReadsBefore = callsOf('obsidianGetSettings').length;
     const githubReadsBefore = callsOf('githubGetSettings').length;
 
@@ -208,10 +217,84 @@ describe('Settings OAuth actions', () => {
 
     expect(notionClientMocks.disconnect).toHaveBeenCalledTimes(1);
     expect(callsOf(NOTION_MESSAGE_TYPES.START_AUTH)).toHaveLength(0);
-    expect(callsOf('getFeishuAuthStatus')).toHaveLength(feishuReadsBefore);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS)).toHaveLength(feishuReadsBefore);
     expect(callsOf('obsidianGetSettings')).toHaveLength(obsidianReadsBefore);
     expect(callsOf('githubGetSettings')).toHaveLength(githubReadsBefore);
     expect(latestSnapshot!.notionConnected).toBe(false);
     expect(latestSnapshot!.pollingNotion).toBe(false);
+  });
+
+  it('Feishu Connect delegates START_AUTH to background without direct auth storage writes or URL opening', async () => {
+    storageState = {
+      feishu_oauth_client_id: 'feishu-app',
+      feishu_oauth_client_secret: 'feishu-secret',
+      feishu_oauth_token_exchange_proxy_url: '',
+    };
+    await renderController();
+    storageMocks.set.mockClear();
+    uiUtilsMocks.openHttpUrl.mockClear();
+
+    await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
+
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(1);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)[0]?.[1]).toEqual({
+      clientId: 'feishu-app',
+      clientSecret: 'feishu-secret',
+      tokenExchangeProxyUrl: '',
+    });
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({ feishu_oauth_pending_state: expect.anything() }),
+    );
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({ feishu_oauth_client_id: expect.anything() }),
+    );
+    expect(uiUtilsMocks.openHttpUrl).not.toHaveBeenCalled();
+    expect(latestSnapshot!.feishuPendingState).toBe('feishu-background-state');
+    expect(latestSnapshot!.pollingFeishu).toBe(true);
+    expect(latestSnapshot!.feishuStatusText).toBe('statusWaiting');
+  });
+
+  it('Feishu Advanced Save delegates SAVE_AUTH_CONFIG without direct auth config writes', async () => {
+    storageState = {
+      feishu_oauth_client_id: 'feishu-app',
+      feishu_oauth_client_secret: 'feishu-secret',
+      feishu_oauth_token_exchange_proxy_url: '',
+    };
+    await renderController();
+    storageMocks.set.mockClear();
+
+    await invoke(() => latestSnapshot!.onSaveFeishuAdvancedSettings());
+
+    expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)).toHaveLength(1);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)[0]?.[1]).toEqual({
+      clientId: 'feishu-app',
+      clientSecret: 'feishu-secret',
+      tokenExchangeProxyUrl: '',
+    });
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({ feishu_oauth_client_id: expect.anything() }),
+    );
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({ feishu_oauth_client_secret: expect.anything() }),
+    );
+    expect(latestSnapshot!.feishuClientId).toBe('feishu-app');
+  });
+
+  it('Feishu Disconnect resets local state without triggering a full Settings refresh', async () => {
+    feishuConnected = true;
+    await renderController();
+    const notionReadsBefore = callsOf(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS).length;
+    const obsidianReadsBefore = callsOf('obsidianGetSettings').length;
+    const githubReadsBefore = callsOf('githubGetSettings').length;
+
+    await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
+
+    expect(feishuClientMocks.disconnect).toHaveBeenCalledTimes(1);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(0);
+    expect(callsOf(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS)).toHaveLength(notionReadsBefore);
+    expect(callsOf('obsidianGetSettings')).toHaveLength(obsidianReadsBefore);
+    expect(callsOf('githubGetSettings')).toHaveLength(githubReadsBefore);
+    expect(latestSnapshot!.feishuConnected).toBe(false);
+    expect(latestSnapshot!.pollingFeishu).toBe(false);
   });
 });

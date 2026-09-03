@@ -14,14 +14,12 @@ vi.mock('@services/conversations/background/storage', () => ({
   },
 }));
 
-const tokenMocks = vi.hoisted(() => ({
-  getFeishuOAuthToken: vi.fn(),
-  setFeishuOAuthToken: vi.fn(),
+const authMocks = vi.hoisted(() => ({
+  resolveFeishuAccessToken: vi.fn(),
 }));
 
-vi.mock('@services/sync/feishu/auth/token-store', () => ({
-  getFeishuOAuthToken: tokenMocks.getFeishuOAuthToken,
-  setFeishuOAuthToken: tokenMocks.setFeishuOAuthToken,
+vi.mock('@services/sync/feishu/auth/oauth', () => ({
+  resolveFeishuAccessToken: authMocks.resolveFeishuAccessToken,
 }));
 
 const jobStoreMocks = vi.hoisted(() => ({
@@ -103,7 +101,7 @@ function mockDefaultFeishuFolderLayout(path: string, init?: RequestInit) {
 describe('feishu convert fallback', () => {
   it('uses descendant insertion when convert succeeds', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -136,7 +134,7 @@ describe('feishu convert fallback', () => {
 
   it('falls back to text blocks when convert is permission denied', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -173,7 +171,7 @@ describe('feishu convert fallback', () => {
 
   it('falls back to text blocks when descendant insertion fails', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -209,7 +207,7 @@ describe('feishu convert fallback', () => {
 
   it('falls back to text blocks when convert returns empty blocks', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
@@ -240,7 +238,7 @@ describe('feishu convert fallback', () => {
 
   it('batches descendant insertion when convert yields more than 1000 blocks', async () => {
     setupChromeStorage();
-    tokenMocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 't', expiresAt: Date.now() + 60_000 });
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
 
     backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },

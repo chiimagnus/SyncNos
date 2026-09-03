@@ -37,6 +37,8 @@ export const OBSIDIAN_MESSAGE_TYPES = {
 
 export const FEISHU_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getFeishuAuthStatus',
+  START_AUTH: 'feishuStartAuth',
+  SAVE_AUTH_CONFIG: 'feishuSaveAuthConfig',
   DISCONNECT: 'feishuDisconnect',
   SYNC_CONVERSATIONS: 'feishuSyncConversations',
   GET_SYNC_STATUS: 'getFeishuSyncStatus',
