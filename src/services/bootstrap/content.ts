@@ -61,13 +61,12 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
   let removeDisplayListener = () => {};
 
   function startController() {
-    if (disposed) return null;
+    if (disposed) return;
     try {
       active = wrapper?.start?.() || null;
     } catch (_e) {
       active = null;
     }
-    return active;
   }
 
   function stopController() {
