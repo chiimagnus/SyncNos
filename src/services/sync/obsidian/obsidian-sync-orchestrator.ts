@@ -426,18 +426,6 @@ function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
   });
 }
 
-function runExclusiveMaintenance<T>(
-  mutation: () => Promise<T>,
-  options: { clearStatusAfter?: boolean } = {},
-): Promise<T> {
-  return obsidianSyncOwnership.runExclusiveMutation(async () => {
-    const result = await mutation();
-    if (options.clearStatusAfter === true && !(await obsidianSyncJobStore.setJob(null)))
-      throw buildJobPersistenceError();
-    return result;
-  });
-}
-
 function reconcileStartupSyncJob() {
   return obsidianSyncOwnership.runExclusiveMutation(() => obsidianSyncJobStore.abortRunningJob());
 }
@@ -655,12 +643,4 @@ function syncConversations(input: Parameters<typeof runSyncConversations>[0] = {
 
 const isRunActive = () => obsidianSyncOwnership.isRunActive();
 
-export {
-  testConnection,
-  getSyncStatus,
-  clearSyncStatus,
-  syncConversations,
-  isRunActive,
-  runExclusiveMaintenance,
-  reconcileStartupSyncJob,
-};
+export { testConnection, getSyncStatus, clearSyncStatus, syncConversations, isRunActive, reconcileStartupSyncJob };
