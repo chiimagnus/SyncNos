@@ -136,25 +136,19 @@ function normalizeStableIncomingKey(message: any): string {
   return incomingKeyRaw;
 }
 
-function findStableTailAnchor(
-  localMessages: any[],
-  pageMessages: any[],
-): { pageIndex: number; localIndex: number } | null {
-  const localKeyToLastIndex = new Map<string, number>();
-  for (let index = 0; index < localMessages.length; index += 1) {
-    const key = normalizeStableIncomingKey(localMessages[index]);
-    if (!key) continue;
-    localKeyToLastIndex.set(key, index);
+function findStableTailAnchor(localMessages: any[], pageMessages: any[]): { pageIndex: number } | null {
+  const localKeys = new Set<string>();
+  for (const message of localMessages) {
+    const key = normalizeStableIncomingKey(message);
+    if (key) localKeys.add(key);
   }
 
-  if (!localKeyToLastIndex.size) return null;
+  if (!localKeys.size) return null;
 
   for (let pageIndex = pageMessages.length - 1; pageIndex >= 0; pageIndex -= 1) {
     const key = normalizeStableIncomingKey(pageMessages[pageIndex]);
-    if (!key) continue;
-    const localIndex = localKeyToLastIndex.get(key);
-    if (typeof localIndex !== 'number') continue;
-    return { pageIndex, localIndex };
+    if (!key || !localKeys.has(key)) continue;
+    return { pageIndex };
   }
 
   return null;
