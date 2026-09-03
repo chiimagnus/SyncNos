@@ -128,6 +128,22 @@ describe('background-router item mention', () => {
     expect(revisionMocks.readDataRevision).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores the retired text query alias and uses the canonical query field only', async () => {
+    storageMocks.readConversationMentionCandidatePool.mockResolvedValue(pool(1, [candidate(1, 'Recent')]));
+    const router = createRouter();
+
+    const response = await router.__handleMessageForTests({
+      type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES,
+      text: 'openai',
+      limit: 2,
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.data?.query).toEqual({ raw: '', normalized: '', empty: true });
+    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenCalledWith({ maxScan: 2, maxDurationMs: 300 });
+    expect(revisionMocks.readDataRevision).not.toHaveBeenCalled();
+  });
+
   it('reuses one full pool for consecutive non-empty queries at the same revision', async () => {
     revisionMocks.readDataRevision.mockResolvedValue(7);
     storageMocks.readConversationMentionCandidatePool.mockResolvedValue(pool(7, [candidate(1, 'OpenAI')]));
