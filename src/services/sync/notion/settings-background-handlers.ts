@@ -1,6 +1,7 @@
 import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet, storageRemove } from '@platform/storage/local';
-import { clearNotionOAuthToken, getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { clearNotionOAuthAttemptAndToken, startNotionOAuthAttempt } from '@services/sync/notion/auth/oauth';
+import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { listNotionParentPages } from '@services/sync/notion/notion-parent-pages.ts';
 
 type AnyRouter = {
@@ -15,12 +16,7 @@ type Deps = {
 };
 
 function getNotionDisconnectStorageKeys(deps: Deps): string[] {
-  const base = [
-    'notion_parent_page_id',
-    'notion_parent_page_title',
-    'notion_oauth_pending_state',
-    'notion_oauth_last_error',
-  ];
+  const base = ['notion_parent_page_id', 'notion_parent_page_title'];
 
   const notionDbKeys = (() => {
     try {
@@ -41,8 +37,15 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
     return router.ok({
       connected: !!(token && token.accessToken),
       workspaceName: token?.workspaceName ? String(token.workspaceName) : '',
-      token: token || null,
     });
+  });
+
+  router.register(NOTION_MESSAGE_TYPES.START_AUTH, async () => {
+    try {
+      return router.ok(await startNotionOAuthAttempt());
+    } catch (error) {
+      return router.err(String((error as any)?.message ?? error ?? 'notion oauth start failed'));
+    }
   });
 
   router.register(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, async () => {
@@ -78,10 +81,10 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
     try {
       const clearedKeys = await deps.runExclusiveMaintenance(
         async () => {
-          await clearNotionOAuthToken();
-          const keys = getNotionDisconnectStorageKeys(deps);
-          await storageRemove(keys);
-          return keys;
+          const authKeys = await clearNotionOAuthAttemptAndToken();
+          const configKeys = getNotionDisconnectStorageKeys(deps);
+          await storageRemove(configKeys);
+          return [...authKeys, ...configKeys];
         },
         { clearStatusAfter: true },
       );

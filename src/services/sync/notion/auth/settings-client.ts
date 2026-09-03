@@ -11,12 +11,6 @@ function unwrap<T>(res: ApiResponse<T>): T {
   throw new Error(message);
 }
 
-export async function getNotionConnectionStatus(): Promise<{ connected: boolean }> {
-  const res = await send<ApiResponse<{ connected: boolean; token?: unknown }>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS);
-  const data = unwrap(res);
-  return { connected: !!data.connected };
-}
-
 export async function disconnectNotion(): Promise<void> {
   const res = await send<ApiResponse<{ disconnected: boolean }>>(NOTION_MESSAGE_TYPES.DISCONNECT);
   unwrap(res);

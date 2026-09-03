@@ -71,6 +71,8 @@ describe('backup service', () => {
   it('exportBackupZipV2 emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',
+      notion_oauth_pending_state: 'pending-a',
+      notion_oauth_last_error: 'old-error',
       notion_parent_page_id: 'page',
       notion_oauth_token_v1: { accessToken: 'secret' },
       github_repository: 'owner/repo',
@@ -173,9 +175,14 @@ describe('backup service', () => {
 
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
     expect(config.schemaVersion).toBe(1);
-    expect(config.storageLocal.notion_oauth_client_id).toBe('client_id');
+    expect(config.storageLocal.notion_oauth_client_id).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_last_error).toBeUndefined();
     expect(config.storageLocal.notion_parent_page_id).toBe('page');
     expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_client_id).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.notion_oauth_last_error).toBeUndefined();
     expect(config.storageLocal).toMatchObject({
       github_repository: 'owner/repo',
       github_branch: 'main',
@@ -240,6 +247,8 @@ describe('backup service', () => {
   it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client-a',
+      notion_oauth_pending_state: 'pending-a',
+      notion_oauth_last_error: 'error-a',
       notion_parent_page_id: 'parent-a',
       notion_oauth_token_v1: { accessToken: 'secret-a' },
     });
@@ -333,6 +342,8 @@ describe('backup service', () => {
 
     // Browser B keeps its own secret while restoring A's portable, non-secret settings.
     chromeMock.__store.notion_oauth_token_v1 = { accessToken: 'secret-b' };
+    chromeMock.__store.notion_oauth_pending_state = 'pending-b';
+    chromeMock.__store.notion_oauth_last_error = 'error-b';
     delete chromeMock.__store.notion_oauth_client_id;
     delete chromeMock.__store.notion_parent_page_id;
 
@@ -400,7 +411,9 @@ describe('backup service', () => {
       contentText: 'already synced',
     });
     expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'secret-b' });
-    expect(chromeMock.__store.notion_oauth_client_id).toBe('client-a');
+    expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending-b');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('error-b');
     expect(chromeMock.__store.notion_parent_page_id).toBe('parent-a');
   });
 
@@ -933,6 +946,8 @@ describe('backup service', () => {
       },
       storageLocal: {
         notion_oauth_client_id: 'cid',
+        notion_oauth_pending_state: 'pending-legacy',
+        notion_oauth_last_error: 'legacy-error',
         notion_parent_page_id: 'pid',
         notion_oauth_token_v1: { accessToken: 'secret' },
       },
@@ -989,7 +1004,16 @@ describe('backup service', () => {
     expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_token_v1'))).toBe(
       false,
     );
-    expect(chromeMock.__setPayloads.some((p) => (p as any).notion_oauth_client_id === 'cid')).toBe(true);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_client_id')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_pending_state')),
+    ).toBe(false);
+    expect(
+      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_last_error')),
+    ).toBe(false);
+    expect(chromeMock.__store.notion_parent_page_id).toBe('pid');
   });
 
   it('keeps Legacy conversation remap on a no-op so later message rows target the existing local id', async () => {

@@ -10,7 +10,6 @@ import {
 } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
-import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { disconnectFeishu } from '@services/sync/feishu/auth/settings-client';
 import { getFeishuOAuthDefaults } from '@services/sync/feishu/auth/oauth';
 import {
@@ -291,7 +290,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [notionWorkspaceName, setNotionWorkspaceName] = useState<string>('');
   const [notionPendingState, setNotionPendingState] = useState<string>('');
   const [notionLastError, setNotionLastError] = useState<string>('');
-  const [notionClientId, setNotionClientId] = useState<string>('');
   const [notionParentPageId, setNotionParentPageId] = useState<string>('');
   const [notionParentPageTitle, setNotionParentPageTitle] = useState<string>('');
   const [notionPages, setNotionPages] = useState<NotionPageOption[]>([]);
@@ -566,7 +564,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
       send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
       storageGet([
-        'notion_oauth_client_id',
         'notion_oauth_pending_state',
         'notion_oauth_last_error',
         'notion_parent_page_id',
@@ -608,14 +605,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const notionStatus = unwrap(notionRes);
     const connected = !!notionStatus?.connected;
     setNotionConnected(connected);
-    setNotionWorkspaceName(String(notionStatus?.workspaceName || notionStatus?.token?.workspaceName || ''));
+    setNotionWorkspaceName(String(notionStatus?.workspaceName || ''));
     if (!connected) {
       setPollingNotion(false);
       setLoadingNotionPages(false);
       setNotionPages([]);
     }
 
-    setNotionClientId(String(local?.notion_oauth_client_id || ''));
     setNotionPendingState(String(local?.notion_oauth_pending_state || ''));
     setNotionLastError(String(local?.notion_oauth_last_error || ''));
     setNotionParentPageId(String(local?.notion_parent_page_id || ''));
@@ -896,31 +892,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setNotionParentPageTitle('');
         setPollingNotion(false);
         setLoadingNotionPages(false);
-        await refreshInternal();
         return;
       }
 
-      const clientId = String(notionClientId || '').trim();
-      if (!clientId) throw new Error('Notion OAuth client id not configured');
-
-      const cfg = getNotionOAuthDefaults();
-      const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-      await storageSet({ notion_oauth_pending_state: state, notion_oauth_last_error: '' });
+      const started = unwrap(await send<ApiResponse<{ state: string }>>(NOTION_MESSAGE_TYPES.START_AUTH, {}));
+      const state = String(started?.state || '').trim();
+      if (!state) throw new Error('notion oauth start returned invalid state');
       setNotionPendingState(state);
       setNotionLastError('');
-
-      const url = new URL(cfg.authorizationUrl);
-      url.searchParams.set('client_id', clientId);
-      url.searchParams.set('response_type', cfg.responseType);
-      url.searchParams.set('owner', cfg.owner);
-      url.searchParams.set('redirect_uri', cfg.redirectUri);
-      url.searchParams.set('state', state);
-
-      const opened = openHttpUrl(url.toString());
-      if (!opened) throw new Error('Failed to open Notion OAuth tab');
       setPollingNotion(true);
     });
-  }, [notionClientId, refreshInternal, runTask]);
+  }, [runTask]);
 
   const onToggleNotionSyncEnabled = useCallback(
     async (enabled: boolean) => {

@@ -1,7 +1,8 @@
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
-import { setNotionOAuthToken, type NotionOAuthTokenV1 } from '@services/sync/notion/auth/token-store';
-import { tabsRemove } from '@platform/webext/tabs';
+import { tabsCreate, tabsRemove } from '@platform/webext/tabs';
 import { webNavigationOnCommittedAddListener } from '@platform/webext/web-navigation';
+import { createSecureOAuthState, isExactOAuthRedirect } from '@services/sync/oauth-guard';
+import { NOTION_OAUTH_TOKEN_KEY, type NotionOAuthTokenV1 } from '@services/sync/notion/auth/token-store';
 
 const DEFAULT_NOTION_OAUTH_CLIENT_ID = '2a8d872b-594c-8060-9a2b-00377c27ec32';
 
@@ -9,6 +10,8 @@ const KEY_CLIENT_ID = 'notion_oauth_client_id';
 const KEY_CLIENT_SECRET = 'notion_oauth_client_secret';
 const KEY_PENDING_STATE = 'notion_oauth_pending_state';
 const KEY_LAST_ERROR = 'notion_oauth_last_error';
+
+let authMutationQueue: Promise<void> = Promise.resolve();
 
 export type NotionOAuthDefaults = {
   authorizationUrl: string;
@@ -28,22 +31,31 @@ export function getNotionOAuthDefaults(): NotionOAuthDefaults {
   };
 }
 
+function enqueueAuthMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const run = authMutationQueue.then(operation, operation);
+  authMutationQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
 }
 
 function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
   const ms = Number.isFinite(timeoutMs) ? timeoutMs : 12_000;
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), ms);
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await fetch(url, { ...(init || {}), signal: controller.signal });
   } finally {
-    clearTimeout(t);
+    clearTimeout(timer);
   }
 }
 
@@ -51,10 +63,10 @@ async function exchangeNotionCodeForToken(code: string, { fetchImpl = fetch }: {
   const cfg = getNotionOAuthDefaults();
   if (!cfg.tokenExchangeProxyUrl) throw toError('token exchange proxy url not configured');
 
-  let lastErr: any = null;
+  let lastError: unknown = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const res = await (fetchImpl === fetch
+      const response = await (fetchImpl === fetch
         ? fetchWithTimeout(
             cfg.tokenExchangeProxyUrl,
             {
@@ -76,56 +88,84 @@ async function exchangeNotionCodeForToken(code: string, { fetchImpl = fetch }: {
             body: JSON.stringify({ code, redirectUri: cfg.redirectUri }),
           }));
 
-      const text = await res.text();
-      if (!res.ok) throw toError(`token exchange failed: HTTP ${res.status} ${text}`);
+      const text = await response.text();
+      if (!response.ok) throw toError(`token exchange failed: HTTP ${response.status} ${text}`);
       const json = JSON.parse(text);
       if (!json || !json.access_token) throw toError('no access_token in response');
       return json;
-    } catch (e) {
-      lastErr = e;
-      const msg = String((e as any)?.message || e || '');
-      const transient = /aborted|timeout|network|fetch/i.test(msg);
+    } catch (error) {
+      lastError = error;
+      const message = String((error as any)?.message || error || '');
+      const transient = /aborted|timeout|network|fetch/i.test(message);
       if (attempt >= 2 || !transient) break;
-
       await sleep(700);
     }
   }
 
-  throw lastErr || toError('token exchange failed');
+  throw lastError || toError('token exchange failed');
 }
 
 function parseQueryFromUrl(url: string) {
   try {
-    const u = new URL(url);
+    const parsed = new URL(url);
     return {
-      code: u.searchParams.get('code') || '',
-      state: u.searchParams.get('state') || '',
-      error: u.searchParams.get('error') || '',
+      code: parsed.searchParams.get('code') || '',
+      state: parsed.searchParams.get('state') || '',
+      error: parsed.searchParams.get('error') || '',
     };
-  } catch (_e) {
-    return { code: '', state: '', error: 'invalid_url' };
+  } catch (_error) {
+    return { code: '', state: '', error: '' };
   }
+}
+
+async function readPendingState(): Promise<string> {
+  const values = await storageGet([KEY_PENDING_STATE]);
+  return String(values?.[KEY_PENDING_STATE] || '');
 }
 
 async function removeTab(tabId: number) {
   try {
     await tabsRemove(Number(tabId));
-  } catch (_e) {
-    // ignore
+  } catch (_error) {
+    // Closing the callback tab is best-effort after the durable auth commit succeeds.
   }
 }
 
-export async function ensureDefaultNotionOAuthClientId(): Promise<void> {
+export async function cleanupLegacyNotionOAuthConfig(): Promise<void> {
   try {
-    const res = await storageGet([KEY_CLIENT_ID]);
-    const currentId = res?.[KEY_CLIENT_ID] ? String(res[KEY_CLIENT_ID]) : '';
-    if (!currentId || currentId !== DEFAULT_NOTION_OAUTH_CLIENT_ID) {
-      await storageSet({ [KEY_CLIENT_ID]: DEFAULT_NOTION_OAUTH_CLIENT_ID });
-    }
-    await storageRemove([KEY_CLIENT_SECRET]);
-  } catch (_e) {
-    // ignore (best-effort)
+    await storageRemove([KEY_CLIENT_ID, KEY_CLIENT_SECRET]);
+  } catch (_error) {
+    // Startup cleanup is best-effort and must not block the background worker.
   }
+}
+
+export async function startNotionOAuthAttempt(): Promise<{ state: string }> {
+  return enqueueAuthMutation(async () => {
+    const state = createSecureOAuthState();
+    const cfg = getNotionOAuthDefaults();
+    const url = new URL(cfg.authorizationUrl);
+    url.searchParams.set('client_id', DEFAULT_NOTION_OAUTH_CLIENT_ID);
+    url.searchParams.set('response_type', cfg.responseType);
+    url.searchParams.set('owner', cfg.owner);
+    url.searchParams.set('redirect_uri', cfg.redirectUri);
+    url.searchParams.set('state', state);
+
+    await storageSet({ [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
+    try {
+      await tabsCreate({ url: url.toString(), active: true });
+    } catch (error) {
+      if ((await readPendingState()) === state) await storageRemove([KEY_PENDING_STATE]);
+      throw error;
+    }
+    return { state };
+  });
+}
+
+export async function clearNotionOAuthAttemptAndToken(): Promise<string[]> {
+  return enqueueAuthMutation(async () => {
+    await storageRemove([NOTION_OAUTH_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR]);
+    return [NOTION_OAUTH_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR];
+  });
 }
 
 export type NotionOAuthCallbackDetails = {
@@ -139,39 +179,51 @@ export async function handleNotionOAuthCallbackNavigation(
 ): Promise<boolean> {
   const cfg = getNotionOAuthDefaults();
   const url = String(details?.url || '');
-  if (!url || !url.startsWith(cfg.redirectUri)) return false;
+  if (!isExactOAuthRedirect(url, cfg.redirectUri)) return false;
 
   const { code, state, error } = parseQueryFromUrl(url);
+  if (!state) return false;
+
   if (error) {
-    await storageRemove([KEY_PENDING_STATE]);
-    await storageSet({ [KEY_LAST_ERROR]: error });
-    return true;
-  }
-  if (!code || !state) return false;
-
-  const res = await storageGet([KEY_PENDING_STATE]);
-  const pending = res?.[KEY_PENDING_STATE] ? String(res[KEY_PENDING_STATE]) : '';
-  if (!pending || pending !== state) return false;
-
-  try {
-    const tokenJson = await exchangeNotionCodeForToken(code, { fetchImpl });
-    const token: NotionOAuthTokenV1 = {
-      accessToken: String(tokenJson.access_token || ''),
-      workspaceId: String(tokenJson.workspace?.id || ''),
-      workspaceName: String(tokenJson.workspace?.name || ''),
-      createdAt: now(),
-    };
-    await setNotionOAuthToken(token);
-    await storageRemove([KEY_PENDING_STATE]);
-    await storageSet({ [KEY_LAST_ERROR]: '' });
-    await removeTab(Number(details?.tabId));
-  } catch (e) {
-    await storageRemove([KEY_PENDING_STATE]);
-    await storageSet({
-      [KEY_LAST_ERROR]: (e as any)?.message ? String((e as any).message) : String(e || 'token exchange failed'),
+    return enqueueAuthMutation(async () => {
+      if ((await readPendingState()) !== state) return false;
+      await storageSet({ [KEY_LAST_ERROR]: error });
+      await storageRemove([KEY_PENDING_STATE]);
+      return true;
     });
   }
+  if (!code) return false;
 
+  const current = await enqueueAuthMutation(async () => (await readPendingState()) === state);
+  if (!current) return false;
+
+  let tokenJson: any;
+  try {
+    tokenJson = await exchangeNotionCodeForToken(code, { fetchImpl });
+  } catch (error) {
+    const message = (error as any)?.message ? String((error as any).message) : String(error || 'token exchange failed');
+    await enqueueAuthMutation(async () => {
+      if ((await readPendingState()) !== state) return false;
+      await storageSet({ [KEY_LAST_ERROR]: message });
+      await storageRemove([KEY_PENDING_STATE]);
+      return true;
+    });
+    return true;
+  }
+
+  const token: NotionOAuthTokenV1 = {
+    accessToken: String(tokenJson.access_token || ''),
+    workspaceId: String(tokenJson.workspace?.id || ''),
+    workspaceName: String(tokenJson.workspace?.name || ''),
+    createdAt: now(),
+  };
+  const committed = await enqueueAuthMutation(async () => {
+    if ((await readPendingState()) !== state) return false;
+    await storageSet({ [NOTION_OAUTH_TOKEN_KEY]: token, [KEY_LAST_ERROR]: '' });
+    await storageRemove([KEY_PENDING_STATE]);
+    return true;
+  });
+  if (committed) await removeTab(Number(details?.tabId));
   return true;
 }
 

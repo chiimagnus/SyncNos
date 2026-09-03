@@ -18,6 +18,7 @@ export const DATA_REVISION_MESSAGE_TYPES = {
 
 export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
+  START_AUTH: 'notionStartAuth',
   DISCONNECT: 'notionDisconnect',
   LIST_PARENT_PAGES: 'listNotionParentPages',
   SYNC_CONVERSATIONS: 'notionSyncConversations',

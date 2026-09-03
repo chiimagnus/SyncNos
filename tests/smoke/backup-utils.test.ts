@@ -7,6 +7,8 @@ describe('backup-utils', () => {
     const filtered = backupUtils.filterStorageForBackup({
       notion_oauth_client_id: 'abc',
       notion_oauth_client_secret: 'secret',
+      notion_oauth_pending_state: 'pending-state',
+      notion_oauth_last_error: 'oauth-error',
       notion_parent_page_id: 'p1',
       notion_db_id_syncnos_ai_chats: 'db1',
       notion_db_id_syncnos_web_articles: 'db2',
@@ -19,7 +21,6 @@ describe('backup-utils', () => {
       [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
     });
     expect(filtered).toEqual({
-      notion_oauth_client_id: 'abc',
       notion_parent_page_id: 'p1',
       notion_db_id_syncnos_ai_chats: 'db1',
       notion_db_id_syncnos_web_articles: 'db2',
