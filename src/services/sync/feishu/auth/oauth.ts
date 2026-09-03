@@ -387,8 +387,7 @@ export async function handleFeishuOAuthCallbackNavigation(
   if (error) {
     return enqueueAuthMutation(async () => {
       if ((await readPendingState()) !== state) return false;
-      await storageRemove([KEY_PENDING_STATE]);
-      await storageSet({ [KEY_LAST_ERROR]: error });
+      await storageSet({ [KEY_PENDING_STATE]: '', [KEY_LAST_ERROR]: error });
       return true;
     });
   }
@@ -410,8 +409,7 @@ export async function handleFeishuOAuthCallbackNavigation(
         : String(networkError || 'token exchange failed');
     await enqueueAuthMutation(async () => {
       if ((await readPendingState()) !== state) return false;
-      await storageRemove([KEY_PENDING_STATE]);
-      await storageSet({ [KEY_LAST_ERROR]: message });
+      await storageSet({ [KEY_PENDING_STATE]: '', [KEY_LAST_ERROR]: message });
       return true;
     });
     return true;
@@ -428,8 +426,11 @@ export async function handleFeishuOAuthCallbackNavigation(
 
   const committed = await enqueueAuthMutation(async () => {
     if ((await readPendingState()) !== state) return false;
-    await storageSet({ [FEISHU_OAUTH_TOKEN_KEY]: token, [KEY_LAST_ERROR]: '' });
-    await storageRemove([KEY_PENDING_STATE]);
+    await storageSet({
+      [FEISHU_OAUTH_TOKEN_KEY]: token,
+      [KEY_PENDING_STATE]: '',
+      [KEY_LAST_ERROR]: '',
+    });
     return true;
   });
   if (committed) await removeTab(Number(details?.tabId));

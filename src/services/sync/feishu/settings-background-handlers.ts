@@ -3,6 +3,7 @@ import {
   clearFeishuOAuthAttemptAndToken,
   saveFeishuOAuthConfig,
   startFeishuOAuthAttempt,
+  type FeishuOAuthConfigInput,
 } from '@services/sync/feishu/auth/oauth';
 import { getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 
@@ -20,6 +21,17 @@ function errorResponse(router: AnyRouter, error: unknown, fallback: string) {
   const message = String((error as any)?.message ?? error ?? fallback);
   const code = String((error as any)?.extra?.code ?? (error as any)?.code ?? '').trim();
   return code ? router.err(message, { code }) : router.err(message);
+}
+
+function pickFeishuOAuthConfigInput(message: any): FeishuOAuthConfigInput {
+  const source = message && typeof message === 'object' ? message : {};
+  const input: FeishuOAuthConfigInput = {};
+  if (Object.prototype.hasOwnProperty.call(source, 'clientId')) input.clientId = source.clientId;
+  if (Object.prototype.hasOwnProperty.call(source, 'clientSecret')) input.clientSecret = source.clientSecret;
+  if (Object.prototype.hasOwnProperty.call(source, 'tokenExchangeProxyUrl')) {
+    input.tokenExchangeProxyUrl = source.tokenExchangeProxyUrl;
+  }
+  return input;
 }
 
 export function registerFeishuSettingsHandlers(router: AnyRouter, deps: Deps) {
@@ -44,13 +56,7 @@ export function registerFeishuSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, async (msg) => {
     try {
-      return router.ok(
-        await saveFeishuOAuthConfig({
-          clientId: msg?.clientId,
-          clientSecret: msg?.clientSecret,
-          tokenExchangeProxyUrl: msg?.tokenExchangeProxyUrl,
-        }),
-      );
+      return router.ok(await saveFeishuOAuthConfig(pickFeishuOAuthConfigInput(msg)));
     } catch (error) {
       return errorResponse(router, error, 'feishu oauth config save failed');
     }

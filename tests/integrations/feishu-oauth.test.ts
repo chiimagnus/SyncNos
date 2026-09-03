@@ -183,6 +183,85 @@ describe('Feishu OAuth owner', () => {
     expect(chromeMock.__store[ERROR_KEY]).toBe('');
   });
 
+  it('atomically records a current OAuth error and terminates only that attempt', async () => {
+    const { state } = await startFeishuOAuthAttempt(authConfig());
+
+    expect(
+      await handleFeishuOAuthCallbackNavigation({
+        url: `${getFeishuOAuthDefaults().redirectUri}?error=access_denied&state=${state}`,
+        tabId: 1,
+      }),
+    ).toBe(true);
+
+    expect(chromeMock.__store[PENDING_KEY]).toBe('');
+    expect(chromeMock.__store[ERROR_KEY]).toBe('access_denied');
+    expect(chromeMock.__store[TOKEN_KEY]).toBeUndefined();
+  });
+
+  it('does not clear a current attempt when its terminal OAuth error snapshot cannot be persisted', async () => {
+    const { state } = await startFeishuOAuthAttempt(authConfig());
+    chromeMock.failNextStorageSet();
+
+    await expect(
+      handleFeishuOAuthCallbackNavigation({
+        url: `${getFeishuOAuthDefaults().redirectUri}?error=access_denied&state=${state}`,
+        tabId: 1,
+      }),
+    ).rejects.toThrow('storage set failed');
+
+    expect(chromeMock.__store[PENDING_KEY]).toBe(state);
+    expect(chromeMock.__store[ERROR_KEY]).toBe('');
+    expect(chromeMock.__store[TOKEN_KEY]).toBeUndefined();
+  });
+
+  it('atomically commits a current token, terminates the attempt, and closes the callback tab', async () => {
+    const { state } = await startFeishuOAuthAttempt(authConfig());
+
+    expect(
+      await handleFeishuOAuthCallbackNavigation(
+        { url: `${getFeishuOAuthDefaults().redirectUri}?code=code-1&state=${state}`, tabId: 9 },
+        {
+          fetchImpl: vi.fn(async () =>
+            jsonResponse({ access_token: 'access-1', refresh_token: 'refresh-1', expires_in: 60 }),
+          ) as any,
+          now: () => 1000,
+        },
+      ),
+    ).toBe(true);
+
+    expect(chromeMock.__store[PENDING_KEY]).toBe('');
+    expect(chromeMock.__store[ERROR_KEY]).toBe('');
+    expect(chromeMock.__store[TOKEN_KEY]).toEqual({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      expiresAt: 61000,
+      createdAt: 1000,
+    });
+    expect(chromeMock.__tabsRemoved).toEqual([9]);
+  });
+
+  it('does not persist a token or close the callback tab when the terminal success snapshot fails', async () => {
+    const { state } = await startFeishuOAuthAttempt(authConfig());
+    chromeMock.failNextStorageSet();
+
+    await expect(
+      handleFeishuOAuthCallbackNavigation(
+        { url: `${getFeishuOAuthDefaults().redirectUri}?code=code-1&state=${state}`, tabId: 9 },
+        {
+          fetchImpl: vi.fn(async () =>
+            jsonResponse({ access_token: 'access-1', refresh_token: 'refresh-1', expires_in: 60 }),
+          ) as any,
+          now: () => 1000,
+        },
+      ),
+    ).rejects.toThrow('storage set failed');
+
+    expect(chromeMock.__store[PENDING_KEY]).toBe(state);
+    expect(chromeMock.__store[ERROR_KEY]).toBe('');
+    expect(chromeMock.__store[TOKEN_KEY]).toBeUndefined();
+    expect(chromeMock.__tabsRemoved).toEqual([]);
+  });
+
   it('keeps pending on a config no-op and invalidates it before a real config change', async () => {
     const { state } = await startFeishuOAuthAttempt(authConfig());
 

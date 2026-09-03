@@ -353,7 +353,24 @@ describe('Feishu destructive settings ownership', () => {
       tokenExchangeProxyUrl: '',
     });
     expect(saved).toMatchObject({ ok: true, data: { clientId: 'app-id', clientSecretPresent: true } });
-    expect(mocks.saveFeishuOAuthConfig).toHaveBeenCalledTimes(1);
+    expect(mocks.saveFeishuOAuthConfig).toHaveBeenCalledWith({
+      clientId: 'app-id',
+      clientSecret: 'secret',
+      tokenExchangeProxyUrl: '',
+    });
+
+    await harness.router.__handleMessageForTests({
+      type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
+      clientId: 'portable-app-id',
+      tokenExchangeProxyUrl: 'https://worker.example.com/exchange',
+    });
+    expect(mocks.saveFeishuOAuthConfig).toHaveBeenLastCalledWith({
+      clientId: 'portable-app-id',
+      tokenExchangeProxyUrl: 'https://worker.example.com/exchange',
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(mocks.saveFeishuOAuthConfig.mock.calls.at(-1)?.[0] ?? {}, 'clientSecret'),
+    ).toBe(false);
   });
 
   it('rejects active disconnect before deleting Feishu credentials or config', async () => {
