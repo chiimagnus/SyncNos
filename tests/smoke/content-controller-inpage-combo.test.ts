@@ -77,11 +77,9 @@ function createHarness(options?: {
       },
       cleanupButtons: () => {},
     },
-    runtimeObserver: {
-      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
-        tickRef = onTick || null;
-        return { start: () => {}, stop: () => {} };
-      },
+    createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+      tickRef = onTick || null;
+      return { start: () => {}, stop: () => {} };
     },
     incrementalEngine: {
       prepare: (snapshot: any) => {

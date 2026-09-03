@@ -103,13 +103,11 @@ function createHarness(options?: {
     inpageTip: {
       showSaveTip: (text: unknown) => tipCalls.push(String(text || '')),
     },
-    runtimeObserver: {
-      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
-        observerTicks.push(onTick || (() => {}));
-        const stop = vi.fn();
-        observerStops.push(stop);
-        return { start: vi.fn(), stop };
-      },
+    createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+      observerTicks.push(onTick || (() => {}));
+      const stop = vi.fn();
+      observerStops.push(stop);
+      return { start: vi.fn(), stop };
     },
     incrementalEngine: {
       prepare: (snapshot: any) => ({

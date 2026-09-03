@@ -47,7 +47,7 @@ vi.mock('@ui/inpage/inpage-comments-panel-shadow.ts', () => ({
 vi.mock('@ui/inpage/inpage-button-shadow.ts', () => ({ inpageButtonApi: {} }));
 vi.mock('@ui/inpage/inpage-item-mention-shadow.ts', () => ({ inpageItemMentionApi: {} }));
 vi.mock('@ui/inpage/inpage-tip-shadow.ts', () => ({ inpageTipApi: {} }));
-vi.mock('@collectors/runtime-observer.ts', () => ({ default: {} }));
+vi.mock('@collectors/runtime-observer.ts', () => ({ createObserver: vi.fn() }));
 vi.mock('@services/conversations/content/autosave-incremental-engine.ts', () => ({
   createAutoSaveIncrementalEngine: mocks.createAutoSaveIncrementalEngine,
 }));

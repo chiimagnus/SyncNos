@@ -42,14 +42,12 @@ type InpageTipApi = {
   showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
 };
 
-type RuntimeObserverApi = {
-  createObserver?: (input: {
-    debounceMs?: number;
-    getRoot?: () => Node | null;
-    onTick?: () => void | Promise<void>;
-    leading?: boolean;
-  }) => { start?: () => void; stop?: () => void } | null;
-};
+type RuntimeObserverFactory = (input: {
+  debounceMs?: number;
+  getRoot?: () => Node | null;
+  onTick?: () => void | Promise<void>;
+  leading?: boolean;
+}) => { start?: () => void; stop?: () => void } | null;
 
 type Deps = {
   runtime: RuntimeClient | null;
@@ -57,7 +55,7 @@ type Deps = {
   currentPageCapture: CurrentPageCaptureService;
   inpageButton: InpageButtonApi | null;
   inpageTip: InpageTipApi | null;
-  runtimeObserver: RuntimeObserverApi | null;
+  createRuntimeObserver: RuntimeObserverFactory | null;
   incrementalEngine: { prepare?: (snapshot: unknown) => any } | null;
   itemMention: { start?: () => { stop?: () => void } | null } | null;
 };
@@ -91,7 +89,7 @@ export function createContentController(deps: Deps) {
   const currentPageCapture = deps.currentPageCapture;
   const inpageButton = deps.inpageButton;
   const inpageTip = deps.inpageTip;
-  const runtimeObserver = deps.runtimeObserver;
+  const createRuntimeObserver = deps.createRuntimeObserver;
   const incrementalEngine = deps.incrementalEngine;
   const itemMention = deps.itemMention;
   const doc = typeof document !== 'undefined' ? document : null;
@@ -869,7 +867,7 @@ export function createContentController(deps: Deps) {
     doc?.addEventListener('keydown', onDocumentKeydownCapture, true);
 
     observer =
-      runtimeObserver?.createObserver?.({
+      createRuntimeObserver?.({
         debounceMs: 600,
         getRoot: () => {
           if (stopped) return null;

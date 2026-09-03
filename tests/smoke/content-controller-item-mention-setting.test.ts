@@ -68,7 +68,7 @@ describe('content-controller item mention setting', () => {
       currentPageCapture: {} as any,
       inpageButton: null,
       inpageTip: null,
-      runtimeObserver: null,
+      createRuntimeObserver: null,
       incrementalEngine: null,
       itemMention: { start },
     } as any);
@@ -93,7 +93,7 @@ describe('content-controller item mention setting', () => {
       currentPageCapture: {} as any,
       inpageButton: null,
       inpageTip: null,
-      runtimeObserver: null,
+      createRuntimeObserver: null,
       incrementalEngine: null,
       itemMention: { start },
     } as any);

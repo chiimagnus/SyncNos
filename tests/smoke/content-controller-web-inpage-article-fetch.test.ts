@@ -55,11 +55,9 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       },
       cleanupButtons: () => {},
     },
-    runtimeObserver: {
-      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
-        tickRef = onTick || null;
-        return { start: () => {}, stop: () => {} };
-      },
+    createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+      tickRef = onTick || null;
+      return { start: () => {}, stop: () => {} };
     },
     incrementalEngine: null,
   });

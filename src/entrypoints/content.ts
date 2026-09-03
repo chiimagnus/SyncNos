@@ -9,7 +9,7 @@ import { registerVideoTranscriptCaptureContentHandlers } from '@services/bootstr
 import { createCollectorEnv } from '@collectors/collector-env.ts';
 import { registerAllCollectors } from '@collectors/register-all.ts';
 import { createCollectorsRegistry } from '@collectors/registry.ts';
-import runtimeObserverApi from '@collectors/runtime-observer.ts';
+import { createObserver } from '@collectors/runtime-observer.ts';
 import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 import { createItemMentionController } from '@services/integrations/item-mention/content/mention-controller';
 import normalizeApi from '@services/shared/normalize.ts';
@@ -70,7 +70,7 @@ export default defineContentScript({
       currentPageCapture,
       inpageButton: inpageButtonApi,
       inpageTip: inpageTipApi,
-      runtimeObserver: runtimeObserverApi,
+      createRuntimeObserver: createObserver,
       incrementalEngine,
       itemMention: itemMentionController,
     });

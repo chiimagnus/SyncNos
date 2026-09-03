@@ -128,11 +128,9 @@ function createHarness(options: {
     currentPageCapture: { captureCurrentPage: vi.fn() } as any,
     inpageButton: { ensureInpageButton: ensureButton, cleanupButtons: vi.fn(), setSaving: vi.fn() },
     inpageTip: { showSaveTip: vi.fn() },
-    runtimeObserver: {
-      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
-        tick = onTick || null;
-        return { start: observerStart, stop: observerStop };
-      },
+    createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+      tick = onTick || null;
+      return { start: observerStart, stop: observerStop };
     },
     incrementalEngine: {
       prepare: (snapshot: any) => {

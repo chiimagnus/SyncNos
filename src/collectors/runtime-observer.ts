@@ -101,6 +101,3 @@ export function createObserver(input: ObserverInput): ObserverController {
     },
   };
 }
-
-const runtimeObserverApi = { createObserver };
-export default runtimeObserverApi;
