@@ -24,6 +24,13 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
         },
         set(payload: Record<string, unknown>, cb: () => void) {
           setPayloads.push({ ...(payload || {}) });
+          if (chromeMock.__failNextSet) {
+            chromeMock.__failNextSet = false;
+            chromeMock.runtime.lastError = { message: 'storage.set failed for test' };
+            cb();
+            delete chromeMock.runtime.lastError;
+            return;
+          }
           for (const [key, value] of Object.entries(payload || {})) store[key] = value;
           cb();
         },
@@ -65,6 +72,7 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
     __setPayloads: setPayloads,
     __createdTabs: createdTabs,
     __failNextTabCreate: false,
+    __failNextSet: false,
     __failNextRemove: false,
   };
   return chromeMock;
@@ -230,7 +238,7 @@ describe('notion oauth (ts)', () => {
         tabId: 1,
       }),
     ).toBe(true);
-    expect(chromeMock.__store.notion_oauth_pending_state).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
     expect(chromeMock.__store.notion_oauth_last_error).toBe('access_denied');
   });
 
@@ -291,10 +299,10 @@ describe('notion oauth (ts)', () => {
     expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
   });
 
-  it('does not mislabel a durable success-commit failure as a token-exchange failure', async () => {
+  it('fails a terminal success atomically without leaving a token behind a still-current pending state', async () => {
     const chromeMock = installChrome({ notion_oauth_pending_state: 's1', notion_oauth_last_error: 'old' });
     const { redirectUri } = getNotionOAuthDefaults();
-    chromeMock.__failNextRemove = true;
+    chromeMock.__failNextSet = true;
 
     await expect(
       handleNotionOAuthCallbackNavigation(
@@ -304,30 +312,12 @@ describe('notion oauth (ts)', () => {
           now: () => 456,
         },
       ),
-    ).rejects.toThrow('storage.remove failed for test');
+    ).rejects.toThrow('storage.set failed for test');
 
-    expect(chromeMock.__store.notion_oauth_token_v1).toEqual({
-      accessToken: 't',
-      workspaceId: 'w1',
-      workspaceName: 'W',
-      createdAt: 456,
-    });
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
     expect(chromeMock.__store.notion_oauth_pending_state).toBe('s1');
-    expect(chromeMock.__store.notion_oauth_last_error).toBe('');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('old');
     expect(chromeMock.__store.__tabsRemoved).toBeUndefined();
-
-    expect(
-      await handleNotionOAuthCallbackNavigation(
-        { url: `${redirectUri}?code=c2&state=s1`, tabId: 7 },
-        {
-          fetchImpl: mockFetchJsonOk({ access_token: 't2', workspace: { id: 'w1', name: 'W' } }) as any,
-          now: () => 789,
-        },
-      ),
-    ).toBe(true);
-    expect(chromeMock.__store.notion_oauth_pending_state).toBeUndefined();
-    expect(chromeMock.__store.notion_oauth_last_error).toBe('');
-    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({ accessToken: 't2', createdAt: 789 });
   });
 
   it('stores a current token, clears pending/error, and closes the callback tab', async () => {
@@ -343,7 +333,7 @@ describe('notion oauth (ts)', () => {
     );
 
     expect(handled).toBe(true);
-    expect(chromeMock.__store.notion_oauth_pending_state).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
     expect(chromeMock.__store.notion_oauth_last_error).toBe('');
     expect(chromeMock.__store.__tabsRemoved).toEqual([7]);
     expect(chromeMock.__store.notion_oauth_token_v1).toEqual({
@@ -364,7 +354,7 @@ describe('notion oauth (ts)', () => {
     );
 
     expect(handled).toBe(true);
-    expect(chromeMock.__store.notion_oauth_pending_state).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
     expect(chromeMock.__store.notion_oauth_last_error).toContain('token exchange failed');
     expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
   });

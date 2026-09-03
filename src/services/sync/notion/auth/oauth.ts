@@ -187,8 +187,7 @@ export async function handleNotionOAuthCallbackNavigation(
   if (error) {
     return enqueueAuthMutation(async () => {
       if ((await readPendingState()) !== state) return false;
-      await storageSet({ [KEY_LAST_ERROR]: error });
-      await storageRemove([KEY_PENDING_STATE]);
+      await storageSet({ [KEY_PENDING_STATE]: '', [KEY_LAST_ERROR]: error });
       return true;
     });
   }
@@ -204,8 +203,7 @@ export async function handleNotionOAuthCallbackNavigation(
     const message = (error as any)?.message ? String((error as any).message) : String(error || 'token exchange failed');
     await enqueueAuthMutation(async () => {
       if ((await readPendingState()) !== state) return false;
-      await storageSet({ [KEY_LAST_ERROR]: message });
-      await storageRemove([KEY_PENDING_STATE]);
+      await storageSet({ [KEY_PENDING_STATE]: '', [KEY_LAST_ERROR]: message });
       return true;
     });
     return true;
@@ -219,8 +217,11 @@ export async function handleNotionOAuthCallbackNavigation(
   };
   const committed = await enqueueAuthMutation(async () => {
     if ((await readPendingState()) !== state) return false;
-    await storageSet({ [NOTION_OAUTH_TOKEN_KEY]: token, [KEY_LAST_ERROR]: '' });
-    await storageRemove([KEY_PENDING_STATE]);
+    await storageSet({
+      [NOTION_OAUTH_TOKEN_KEY]: token,
+      [KEY_PENDING_STATE]: '',
+      [KEY_LAST_ERROR]: '',
+    });
     return true;
   });
   if (committed) await removeTab(Number(details?.tabId));
