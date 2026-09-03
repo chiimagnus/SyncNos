@@ -172,6 +172,63 @@ describe('useReaderPrefs', () => {
     expect(written).toMatchObject({ fontSize: 25, contentWidth: 1550 });
   });
 
+  it('fails closed when initial hydration cannot provide a durable base, then recovers from a storage observation', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    storageState.storageGetMock.mockRejectedValueOnce(new Error('read failed'));
+    await render();
+    storageState.storageSetMock.mockClear();
+
+    act(() => snapshot!.preview({ fontSize: 25 }));
+    let commitError: unknown = null;
+    await act(async () => {
+      try {
+        await snapshot!.commitPreview();
+      } catch (error) {
+        commitError = error;
+      }
+    });
+
+    expect(commitError).toBeInstanceOf(Error);
+    expect((commitError as Error).message).toBe('read failed');
+    expect(storageState.storageSetMock).toHaveBeenCalledTimes(0);
+    expect(snapshot?.prefs.fontSize).toBe(DEFAULT_READER_PREFS.fontSize);
+
+    dispatchStorage(snapshotFor({ contentWidth: 1650, lineHeight: 1.8 }));
+    await act(async () => snapshot!.update({ fontSize: 25 }));
+
+    expect(storageState.storageSetMock).toHaveBeenCalledTimes(1);
+    expect(storageState.storageSetMock.mock.calls[0]?.[0]?.[READER_PREFS_STORAGE_KEY]).toMatchObject({
+      fontSize: 25,
+      contentWidth: 1650,
+      lineHeight: 1.8,
+    });
+    warning.mockRestore();
+  });
+
+  it('rebases a pre-hydration dirty preview on the successful durable read before an unmount final commit', async () => {
+    const initialGet = deferred<Record<string, unknown>>();
+    storageState.storageGetMock.mockReturnValueOnce(initialGet.promise);
+    await render();
+    storageState.storageSetMock.mockClear();
+
+    act(() => snapshot!.preview({ fontSize: 26 }));
+    act(() => root?.unmount());
+    root = null;
+    expect(storageState.storageSetMock).toHaveBeenCalledTimes(0);
+
+    initialGet.resolve({
+      [READER_PREFS_STORAGE_KEY]: snapshotFor({ contentWidth: 1580, lineHeight: 1.85 }),
+    });
+    await flush();
+
+    expect(storageState.storageSetMock).toHaveBeenCalledTimes(1);
+    expect(storageState.storageSetMock.mock.calls[0]?.[0]?.[READER_PREFS_STORAGE_KEY]).toMatchObject({
+      fontSize: 26,
+      contentWidth: 1580,
+      lineHeight: 1.85,
+    });
+  });
+
   it('previews repeatedly with zero writes and commits the generation once', async () => {
     await render();
     storageState.storageSetMock.mockClear();

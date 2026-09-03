@@ -50,6 +50,7 @@ export function useReaderPrefs(): UseReaderPrefsResult {
   const durableObservationGenerationRef = useRef(0);
   const disposedRef = useRef(false);
   const writerPromiseRef = useRef<Promise<void> | null>(null);
+  const hydrationErrorRef = useRef<unknown>(null);
   const hydrationSettledRef = useRef(false);
   const hydrationReadyResolveRef = useRef<() => void>(() => {});
   const hydrationReadyPromiseRef = useRef<Promise<void> | null>(null);
@@ -84,7 +85,19 @@ export function useReaderPrefs(): UseReaderPrefsResult {
   }, []);
 
   const runWriter = useCallback(async () => {
+    const generationBeforeHydration = previewGenerationRef.current;
     await hydrationReadyPromiseRef.current;
+    if (hydrationErrorRef.current) {
+      const error = hydrationErrorRef.current;
+      if (previewGenerationRef.current === generationBeforeHydration) {
+        dirtyPatchRef.current = {};
+        publishDisplay(durablePrefsRef.current);
+      } else {
+        publishMergedDisplay();
+      }
+      throw error;
+    }
+
     while (hasPatch(dirtyPatchRef.current)) {
       const generationAtStart = previewGenerationRef.current;
       const next = applyPatch(durablePrefsRef.current, dirtyPatchRef.current);
@@ -163,6 +176,7 @@ export function useReaderPrefs(): UseReaderPrefsResult {
       if (disposedRef.current || (areaName && areaName !== 'local')) return;
       const change = changes?.[READER_PREFS_STORAGE_KEY];
       if (!change) return;
+      hydrationErrorRef.current = null;
       applyDurableObservation(normalizeReaderPrefs((change as { newValue?: unknown }).newValue ?? null));
       markHydrationReady();
     });
@@ -170,14 +184,23 @@ export function useReaderPrefs(): UseReaderPrefsResult {
     void (async () => {
       try {
         const stored = await storageGet([READER_PREFS_STORAGE_KEY]);
-        if (disposedRef.current || durableObservationGenerationRef.current !== hydrateGeneration) return;
+        if (durableObservationGenerationRef.current !== hydrateGeneration) return;
+        hydrationErrorRef.current = null;
+        // A successful initial read remains authoritative even after unmount. Updating
+        // refs here lets the best-effort final commit rebase onto the real durable base;
+        // publishDisplay already suppresses setState once disposed.
         applyDurableObservation(resolveReaderPrefsFromStorage(stored));
+        markHydrationReady();
       } catch (error) {
-        if (disposedRef.current) return;
-        console.warn('[reader] failed to load reader prefs', {
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
-      } finally {
+        if (durableObservationGenerationRef.current !== hydrateGeneration) return;
+        hydrationErrorRef.current = error;
+        if (!disposedRef.current) {
+          console.warn('[reader] failed to load reader prefs', {
+            error: error instanceof Error ? error.message : String(error || ''),
+          });
+        }
+        // Wake a waiting writer so it can fail closed instead of writing defaults. A
+        // later storage observation clears this error and restores commit capability.
         markHydrationReady();
       }
     })();
