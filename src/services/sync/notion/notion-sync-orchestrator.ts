@@ -376,16 +376,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     conversationKinds,
   } = services;
 
-  async function getSyncJobStatus(input: any) {
-    const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    return { provider: SYNC_PROVIDER, job: await notionJobStore.getJob(), instanceId };
+  async function getSyncJobStatus() {
+    return { provider: SYNC_PROVIDER, job: await notionJobStore.getJob() };
   }
 
-  function clearSyncJobStatus(input: any) {
-    const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
+  function clearSyncJobStatus() {
     return ownership.runExclusiveMutation(async () => {
       if (!(await notionJobStore.setJob(null))) throw buildJobPersistenceError();
-      return { provider: SYNC_PROVIDER, job: null, instanceId };
+      return { provider: SYNC_PROVIDER, job: null };
     });
   }
 

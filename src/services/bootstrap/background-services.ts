@@ -71,8 +71,8 @@ type SyncMaintenanceSurface = {
 export type NotionSyncOrchestrator = SyncOwnershipSurface &
   SyncMaintenanceSurface & {
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
-    getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
-    clearSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
+    getSyncJobStatus: () => Promise<unknown>;
+    clearSyncJobStatus: () => Promise<unknown>;
   };
 
 export type ObsidianSyncOrchestrator = SyncOwnershipSurface & {
@@ -81,16 +81,16 @@ export type ObsidianSyncOrchestrator = SyncOwnershipSurface & {
     forceFullConversationIds?: unknown[];
     instanceId: string;
   }) => Promise<unknown>;
-  getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
-  clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+  getSyncStatus: () => Promise<unknown>;
+  clearSyncStatus: () => Promise<unknown>;
   testConnection: (input: { instanceId: string }) => Promise<unknown>;
 };
 
 export type FeishuSyncOrchestrator = SyncOwnershipSurface &
   SyncMaintenanceSurface & {
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
-    getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
-    clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+    getSyncStatus: () => Promise<unknown>;
+    clearSyncStatus: () => Promise<unknown>;
   };
 
 export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestrator>;

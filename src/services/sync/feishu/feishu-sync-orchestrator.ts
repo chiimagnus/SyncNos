@@ -502,14 +502,14 @@ async function appendTextBlocks({
   return appended;
 }
 
-async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  return { provider: SYNC_PROVIDER, job: await feishuSyncJobStore.getJob(), instanceId: safeString(instanceId) };
+async function getSyncStatus() {
+  return { provider: SYNC_PROVIDER, job: await feishuSyncJobStore.getJob() };
 }
 
-function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+function clearSyncStatus() {
   return feishuSyncOwnership.runExclusiveMutation(async () => {
     if (!(await feishuSyncJobStore.setJob(null))) throw buildJobPersistenceError();
-    return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
+    return { provider: SYNC_PROVIDER, job: null };
   });
 }
 

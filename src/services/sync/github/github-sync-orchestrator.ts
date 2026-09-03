@@ -337,18 +337,14 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     };
   }
 
-  async function getSyncStatus(input: { instanceId?: string } = {}) {
-    return {
-      provider: 'github' as const,
-      job: await services.jobStore.getJob(),
-      instanceId: safeString(input.instanceId),
-    };
+  async function getSyncStatus() {
+    return { provider: 'github' as const, job: await services.jobStore.getJob() };
   }
 
-  function clearSyncStatus(input: { instanceId?: string } = {}) {
+  function clearSyncStatus() {
     return ownership.runExclusiveMutation(async () => {
       if (!(await services.jobStore.setJob(null))) throw buildJobPersistenceError();
-      return { provider: 'github' as const, job: null, instanceId: safeString(input.instanceId) };
+      return { provider: 'github' as const, job: null };
     });
   }
 

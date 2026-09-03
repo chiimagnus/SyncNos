@@ -660,7 +660,7 @@ describe('github sync orchestrator job lifecycle', () => {
     });
     const orchestrator = createGithubSyncOrchestrator(services);
 
-    await expect(orchestrator.clearSyncStatus({ instanceId: 'clear-test' })).rejects.toMatchObject({
+    await expect(orchestrator.clearSyncStatus()).rejects.toMatchObject({
       code: 'github_sync_job_persist_failed',
     });
     expect(getPersistedJob()).toEqual(residue);
