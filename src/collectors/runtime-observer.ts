@@ -44,8 +44,16 @@ export function createObserver(input: ObserverInput): ObserverController {
     return document.documentElement || document.body || null;
   }
 
-  function ensureObservedRoot(root?: Node | null) {
-    const nextRoot = root || getDefaultRoot();
+  function readRequestedRoot(): Node | null {
+    if (!getRoot) return getDefaultRoot();
+    try {
+      return getRoot();
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function ensureObservedRoot(nextRoot: Node | null) {
     if (!nextRoot) return;
     if (observedRoot === nextRoot && observer) return;
 
@@ -65,19 +73,14 @@ export function createObserver(input: ObserverInput): ObserverController {
       if (started) return;
       started = true;
 
-      ensureObservedRoot(getRoot ? getRoot() : getDefaultRoot());
+      ensureObservedRoot(readRequestedRoot());
       if (leading) onTick?.();
       else debouncedTick.trigger();
 
       if (getRoot && !rootRefreshTimer) {
         rootRefreshTimer = setInterval(() => {
           if (!started) return;
-          let nextRoot: Node | null = null;
-          try {
-            nextRoot = getRoot();
-          } catch (_error) {
-            nextRoot = null;
-          }
+          const nextRoot = readRequestedRoot();
           if (nextRoot && nextRoot !== observedRoot) {
             ensureObservedRoot(nextRoot);
             onTick?.();

@@ -38,6 +38,22 @@ afterEach(() => {
 });
 
 describe('runtime observer lifecycle', () => {
+  it('uses the document root only when no custom root resolver is provided', () => {
+    const documentRoot = {} as Node;
+    // @ts-expect-error minimal fake document
+    globalThis.document = { documentElement: documentRoot, body: documentRoot };
+    const observer = createObserver({ onTick: vi.fn() });
+
+    observer.start();
+
+    expect(observerRecords).toHaveLength(1);
+    expect(observerRecords[0]!.observe).toHaveBeenCalledWith(
+      documentRoot,
+      expect.objectContaining({ subtree: true, childList: true }),
+    );
+    observer.stop();
+  });
+
   it('cancels a mutation debounce when stopped', async () => {
     const root = {} as Node;
     const onTick = vi.fn();
@@ -62,7 +78,12 @@ describe('runtime observer lifecycle', () => {
     expect(onTick).not.toHaveBeenCalled();
   });
 
-  it('continues polling after an initially missing root and attaches when it appears', async () => {
+  it('continues polling after an initially missing custom root without observing the document fallback', async () => {
+    const documentRoot = {} as Node;
+    // A real browser always has documentElement/body. A custom provider root returning null
+    // must still mean "not ready yet", not "observe the entire document instead".
+    // @ts-expect-error minimal fake document
+    globalThis.document = { documentElement: documentRoot, body: documentRoot };
     let root: Node | null = null;
     const onTick = vi.fn();
     const getRoot = vi.fn(() => root);
