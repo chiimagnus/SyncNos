@@ -144,7 +144,7 @@ describe('clipper context menu runtime settings', () => {
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_mode_supported', { checked: true });
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_autosave', { checked: false });
     const reads = readDisplayMode.mock.calls.length;
-    storageListener?.({ inpage_supported_only: { newValue: true } }, 'local');
+    storageListener?.({ unrelated_setting: { newValue: true } }, 'local');
     await flush();
     expect(readDisplayMode).toHaveBeenCalledTimes(reads);
   });

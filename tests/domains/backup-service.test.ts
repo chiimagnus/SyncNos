@@ -37,7 +37,6 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
             return;
           }
           store.inpage_display_mode = mode;
-          delete store.inpage_supported_only;
           callback({ ok: true, data: { mode }, error: null });
           return;
         }
@@ -113,7 +112,7 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
-  it('restores legacy JSON display settings only through the canonical background owner route', async () => {
+  it('restores canonical JSON display settings only through the background owner route', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -123,7 +122,7 @@ describe('backup service', () => {
     const stats = await importBackupLegacyJsonMerge({
       schemaVersion: 1,
       stores: { conversations: [], messages: [], sync_mappings: [] },
-      storageLocal: { inpage_supported_only: true },
+      storageLocal: { inpage_display_mode: 'supported', inpage_retired_setting: true },
     });
 
     expect(stats.settingsApplied).toBe(1);
@@ -132,15 +131,11 @@ describe('backup service', () => {
       mode: 'supported',
     });
     expect(chromeMock.__store.inpage_display_mode).toBe('supported');
-    expect(chromeMock.__store.inpage_supported_only).toBeUndefined();
-    expect(
-      chromeMock.__setPayloads.some(
-        (payload) => 'inpage_display_mode' in payload || 'inpage_supported_only' in payload,
-      ),
-    ).toBe(false);
+    expect(chromeMock.__store.inpage_retired_setting).toBeUndefined();
+    expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
   });
 
-  it('restores legacy ZIP display settings as one canonical logical setting', async () => {
+  it('restores canonical ZIP display settings as one logical setting', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -164,7 +159,7 @@ describe('backup service', () => {
     );
     entries.set(
       'config/storage-local.json',
-      enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: { inpage_supported_only: false } })),
+      enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: { inpage_display_mode: 'all' } })),
     );
     entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
 
@@ -172,7 +167,6 @@ describe('backup service', () => {
     expect(stats.settingsApplied).toBe(1);
     expect(chromeMock.__runtimeMessages).toContainEqual({ type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'all' });
     expect(chromeMock.__store.inpage_display_mode).toBe('all');
-    expect(chromeMock.__store.inpage_supported_only).toBeUndefined();
   });
 
   it('rejects restore when the canonical display owner route rejects', async () => {

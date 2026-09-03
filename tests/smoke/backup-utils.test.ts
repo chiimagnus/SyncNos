@@ -45,15 +45,12 @@ describe('backup-utils', () => {
     });
   });
 
-  it('canonicalizes legacy inpage display settings at the backup boundary', () => {
-    expect(backupUtils.filterStorageForBackup({ inpage_supported_only: true })).toEqual({
-      inpage_display_mode: 'supported',
-    });
-    expect(backupUtils.filterStorageForBackup({ inpage_display_mode: 'off', inpage_supported_only: true })).toEqual({
+  it('canonicalizes only the current inpage display setting at the backup boundary', () => {
+    expect(backupUtils.filterStorageForBackup({ inpage_display_mode: 'off' })).toEqual({
       inpage_display_mode: 'off',
     });
     expect(backupUtils.filterStorageForBackup({ inpage_display_mode: 'invalid' })).toEqual({});
-    expect(backupUtils.filterStorageForBackup({ keep: 1 })).toEqual({ keep: 1 });
+    expect(backupUtils.filterStorageForBackup({ inpage_retired_setting: true, keep: 1 })).toEqual({ keep: 1 });
   });
 
   it('validateBackupDocument rejects unsupported version', () => {

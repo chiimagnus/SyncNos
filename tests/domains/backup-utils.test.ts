@@ -71,13 +71,11 @@ describe('backup backup-utils', () => {
     );
   });
 
-  it('canonicalizes display mode without propagating legacy or invalid values', () => {
-    expect(filterStorageForBackup({ inpage_supported_only: true })).toEqual({ inpage_display_mode: 'supported' });
-    expect(filterStorageForBackup({ inpage_supported_only: false })).toEqual({ inpage_display_mode: 'all' });
-    expect(filterStorageForBackup({ inpage_display_mode: 'supported', inpage_supported_only: false })).toEqual({
-      inpage_display_mode: 'supported',
-    });
+  it('keeps only the canonical inpage display setting', () => {
+    expect(filterStorageForBackup({ inpage_display_mode: 'supported' })).toEqual({ inpage_display_mode: 'supported' });
+    expect(filterStorageForBackup({ inpage_display_mode: 'off' })).toEqual({ inpage_display_mode: 'off' });
     expect(filterStorageForBackup({ inpage_display_mode: 'bad' })).toEqual({});
+    expect(filterStorageForBackup({ inpage_retired_setting: true, keep: 1 })).toEqual({ keep: 1 });
   });
 
   it('validateBackupDocument rejects unsupported version', () => {

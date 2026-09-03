@@ -272,11 +272,10 @@ describe('Settings scoped refresh', () => {
     expect(storageMocks.get).toHaveBeenCalledTimes(2);
     const storageReads = storageMocks.get.mock.calls.map(([keys]) => keys as string[]);
     const bulkRead = storageReads.find((keys) => keys.includes('notion_parent_page_id'))!;
-    const displayRead = storageReads.find((keys) => keys.includes('inpage_supported_only'))!;
+    const displayRead = storageReads.find((keys) => keys.includes('inpage_display_mode'))!;
     expect(bulkRead).not.toContain('inpage_display_mode');
-    expect(bulkRead).not.toContain('inpage_supported_only');
     expect(bulkRead).not.toContain('anti_hotlink_rules_v1');
-    expect(displayRead).toEqual(['inpage_display_mode', 'inpage_supported_only']);
+    expect(displayRead).toEqual(['inpage_display_mode']);
     expect(storageMocks.onChanged.mock.invocationCallOrder[0]).toBeLessThan(
       storageMocks.get.mock.invocationCallOrder[0],
     );
@@ -298,10 +297,9 @@ describe('Settings scoped refresh', () => {
     expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
     expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
 
-    storageState.inpage_supported_only = true;
     dispatchStorage({ inpage_display_mode: { oldValue: 'off', newValue: undefined } });
     await flushReact();
-    expect(latestSnapshot!.inpageDisplayMode).toBe('supported');
+    expect(latestSnapshot!.inpageDisplayMode).toBe('all');
     expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads + 1);
   });
 
@@ -309,7 +307,7 @@ describe('Settings scoped refresh', () => {
     const displayRead = deferred<Record<string, unknown>>();
     const defaultGet = storageMocks.get.getMockImplementation()!;
     storageMocks.get.mockImplementation(async (keys: string[]) => {
-      if ((keys || []).includes('inpage_supported_only')) return await displayRead.promise;
+      if ((keys || []).includes('inpage_display_mode')) return await displayRead.promise;
       return await defaultGet(keys);
     });
 
