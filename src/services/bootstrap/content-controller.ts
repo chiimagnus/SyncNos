@@ -151,21 +151,19 @@ export function createContentController(deps: Deps) {
     return { conversationId: conversation.id, isNew };
   }
 
-  type AutoSaveRequest = { ownerToken: number; sequence: number; reason: string };
   type ResidentAutoSaveHandle = {
     ownerToken: number;
     isActive: () => boolean;
     isAutoSaveEnabled: () => boolean;
-    runAutoSaveTick: (request: AutoSaveRequest) => Promise<void>;
+    runAutoSaveTick: () => Promise<void>;
   };
   type ManualPersistenceSlot = { ownerToken: number | null; state: 'pending' | 'inflight' };
 
   let residentOwnerSequence = 0;
   let activeResidentOwnerToken = 0;
   let currentResidentAutoSaveHandle: ResidentAutoSaveHandle | null = null;
-  let autoSaveRequestSequence = 0;
   let autoSaveRunInFlight: Promise<void> | null = null;
-  let latestTrailingAutoSaveRequest: AutoSaveRequest | null = null;
+  let latestTrailingAutoSaveOwnerToken: number | null = null;
   let manualPersistence: ManualPersistenceSlot | null = null;
 
   function isCurrentResidentOwner(ownerToken: number): boolean {
@@ -182,33 +180,33 @@ export function createContentController(deps: Deps) {
   }
 
   function cancelAutoSaveTrailingForOwner(ownerToken: number) {
-    if (latestTrailingAutoSaveRequest?.ownerToken === ownerToken) latestTrailingAutoSaveRequest = null;
+    if (latestTrailingAutoSaveOwnerToken === ownerToken) latestTrailingAutoSaveOwnerToken = null;
   }
 
   function drainLatestAutoSaveRequest() {
     if (autoSaveRunInFlight || manualPersistence) return;
-    const request = latestTrailingAutoSaveRequest;
-    latestTrailingAutoSaveRequest = null;
-    if (!request) return;
-    startAutoSaveRequest(request);
+    const ownerToken = latestTrailingAutoSaveOwnerToken;
+    latestTrailingAutoSaveOwnerToken = null;
+    if (!ownerToken) return;
+    startAutoSaveRequest(ownerToken);
   }
 
-  function startAutoSaveRequest(request: AutoSaveRequest) {
+  function startAutoSaveRequest(ownerToken: number) {
     if (autoSaveRunInFlight || manualPersistence) {
-      latestTrailingAutoSaveRequest = request;
+      latestTrailingAutoSaveOwnerToken = ownerToken;
       return;
     }
     const handle = currentResidentAutoSaveHandle;
     if (
       !handle ||
-      handle.ownerToken !== request.ownerToken ||
-      !isCurrentResidentOwner(request.ownerToken) ||
+      handle.ownerToken !== ownerToken ||
+      !isCurrentResidentOwner(ownerToken) ||
       !handle.isAutoSaveEnabled()
     ) {
       return;
     }
 
-    const run = Promise.resolve().then(() => handle.runAutoSaveTick(request));
+    const run = Promise.resolve().then(() => handle.runAutoSaveTick());
     autoSaveRunInFlight = run;
     void run
       .catch((error) => {
@@ -221,7 +219,7 @@ export function createContentController(deps: Deps) {
       });
   }
 
-  function requestAutoSave(ownerToken: number, reason: string) {
+  function requestAutoSave(ownerToken: number) {
     const handle = currentResidentAutoSaveHandle;
     if (
       !handle ||
@@ -231,16 +229,11 @@ export function createContentController(deps: Deps) {
     ) {
       return;
     }
-    const request: AutoSaveRequest = {
-      ownerToken,
-      sequence: ++autoSaveRequestSequence,
-      reason: String(reason || 'observer'),
-    };
     if (autoSaveRunInFlight || manualPersistence) {
-      latestTrailingAutoSaveRequest = request;
+      latestTrailingAutoSaveOwnerToken = ownerToken;
       return;
     }
-    startAutoSaveRequest(request);
+    startAutoSaveRequest(ownerToken);
   }
 
   function installResidentAutoSaveHandle(handle: ResidentAutoSaveHandle) {
@@ -408,7 +401,7 @@ export function createContentController(deps: Deps) {
         const timer = setTimeout(() => {
           proactiveNotionAiBurstTimers.delete(timer);
           if (stopped) return;
-          requestAutoSave(ownerToken, 'notionai-proactive');
+          requestAutoSave(ownerToken);
         }, delay);
         proactiveNotionAiBurstTimers.add(timer);
       }
@@ -777,7 +770,7 @@ export function createContentController(deps: Deps) {
       return { snapshot: incremental?.snapshot || null, diff: incremental?.diff || null };
     }
 
-    async function runAutoSaveTick(_request: AutoSaveRequest) {
+    async function runAutoSaveTick() {
       if (stopped) return;
       const generation = liveGeneration;
       let backfill: Awaited<ReturnType<typeof maybeRunBackfill>> | null = null;
@@ -866,7 +859,7 @@ export function createContentController(deps: Deps) {
       try {
         await refreshInpageButton();
         if (!isAutoSaveRequestAllowed(generation)) return;
-        requestAutoSave(ownerToken, 'observer');
+        requestAutoSave(ownerToken);
       } catch (error) {
         if (runtime?.isInvalidContextError?.(error)) stop();
       }
