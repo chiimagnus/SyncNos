@@ -144,23 +144,12 @@ function buildAbortedMessage(job: SyncJobSnapshot) {
   return reason ? `${label} · ${t('syncStopped')}: ${reason}` : `${label} · ${t('syncStopped')}`;
 }
 
-function toFailureSummaries(summary: SyncRunSummary) {
-  if (Array.isArray(summary.failures) && summary.failures.length) return summary.failures;
-  return summary.results
-    .filter((result) => !result.ok)
-    .map((result) => ({
-      conversationId: Number(result.conversationId) || 0,
-      conversationTitle: String(result.conversationTitle || '').trim(),
-      error: String(result.error || 'unknown error'),
-    }));
-}
-
 function toWarningSummaries(summary: SyncRunSummary) {
   return toWarningSummariesFromRows(summary.results);
 }
 
 function toTerminalFeedback(summary: SyncRunSummary, total: number): ConversationSyncFeedbackState {
-  const failures = toFailureSummaries(summary);
+  const failures = summary.failures;
   const warnings = toWarningSummaries(summary);
   const phase: ConversationSyncFeedbackPhase =
     summary.failCount <= 0 ? 'success' : summary.okCount > 0 ? 'partial-failed' : 'failed';
@@ -240,18 +229,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
     };
   }
 
-  return toTerminalFeedback(
-    {
-      provider: job.provider,
-      okCount: job.okCount,
-      failCount: job.failCount,
-      failures,
-      results: job.perConversation.slice(),
-      jobId: job.id,
-      instanceId: job.instanceId,
-    },
-    total,
-  );
+  return toTerminalFeedback(toSummaryFromJob(job)!, total);
 }
 
 type StatusObservation = {
