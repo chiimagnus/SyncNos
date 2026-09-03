@@ -372,6 +372,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const inpageDisplayObservationRevisionRef = useRef(0);
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
+  const aiChatAutoSaveObservationRevisionRef = useRef(0);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
   const [xiaohongshuCommentsCaptureEnabled, setXiaohongshuCommentsCaptureEnabled] = useState<boolean>(false);
@@ -381,6 +382,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   );
   const [antiHotlinkRuleErrors, setAntiHotlinkRuleErrors] = useState<AntiHotlinkRuleRowError[]>([]);
   const [aiChatDollarMentionEnabled, setAiChatDollarMentionEnabled] = useState<boolean>(true);
+  const aiChatDollarMentionObservationRevisionRef = useRef(0);
   const [localePreference, setLocalePreference] = useState<LocalePreference>(() => getLocalePreference());
 
   // Insight
@@ -712,6 +714,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const notionAuthObservationAtStart = notionAuthObservationRevisionRef.current;
     const feishuAuthObservationAtStart = feishuAuthObservationRevisionRef.current;
     const inpageDisplayObservationAtStart = inpageDisplayObservationRevisionRef.current;
+    const aiChatAutoSaveObservationAtStart = aiChatAutoSaveObservationRevisionRef.current;
+    const aiChatDollarMentionObservationAtStart = aiChatDollarMentionObservationRevisionRef.current;
     const [, , local, obsidianRes, githubRes, antiHotlinkRulesDraft, effectiveInpageDisplayMode] = await Promise.all([
       readNotionAuthStatus(),
       readFeishuAuthStatus(),
@@ -794,13 +798,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (inpageDisplayObservationRevisionRef.current === inpageDisplayObservationAtStart) {
       setInpageDisplayMode(effectiveInpageDisplayMode);
     }
-    setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
+    if (aiChatAutoSaveObservationRevisionRef.current === aiChatAutoSaveObservationAtStart) {
+      setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
+    }
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
     setXiaohongshuCommentsCaptureEnabled(local?.xiaohongshu_comments_capture_enabled === true);
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
     setAntiHotlinkRuleErrors([]);
-    setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
+    if (aiChatDollarMentionObservationRevisionRef.current === aiChatDollarMentionObservationAtStart) {
+      setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
+    }
     setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
     setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
 
@@ -883,6 +891,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       }
       if (Object.prototype.hasOwnProperty.call(changes, GITHUB_AUTH_STATE_KEY)) {
         void refreshGithubAuthFromStorageSignal();
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_auto_save_enabled')) {
+        aiChatAutoSaveObservationRevisionRef.current += 1;
+        setAiChatAutoSaveEnabled(changes.ai_chat_auto_save_enabled?.newValue !== false);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_dollar_mention_enabled')) {
+        aiChatDollarMentionObservationRevisionRef.current += 1;
+        setAiChatDollarMentionEnabled(changes.ai_chat_dollar_mention_enabled?.newValue !== false);
       }
       if (Object.prototype.hasOwnProperty.call(changes, INPAGE_DISPLAY_MODE_STORAGE_KEY)) {
         const revision = ++inpageDisplayObservationRevisionRef.current;
@@ -1728,8 +1744,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onToggleAiChatAutoSaveEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
-        await storageSet({ ai_chat_auto_save_enabled: next === true });
-        setAiChatAutoSaveEnabled(next === true);
+        const revision = aiChatAutoSaveObservationRevisionRef.current;
+        const normalized = next === true;
+        await storageSet({ ai_chat_auto_save_enabled: normalized });
+        if (aiChatAutoSaveObservationRevisionRef.current !== revision) return;
+        aiChatAutoSaveObservationRevisionRef.current += 1;
+        setAiChatAutoSaveEnabled(normalized);
       });
     },
     [runTask],
@@ -1859,8 +1879,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onToggleAiChatDollarMentionEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
-        await storageSet({ ai_chat_dollar_mention_enabled: next === true });
-        setAiChatDollarMentionEnabled(next === true);
+        const revision = aiChatDollarMentionObservationRevisionRef.current;
+        const normalized = next === true;
+        await storageSet({ ai_chat_dollar_mention_enabled: normalized });
+        if (aiChatDollarMentionObservationRevisionRef.current !== revision) return;
+        aiChatDollarMentionObservationRevisionRef.current += 1;
+        setAiChatDollarMentionEnabled(normalized);
       });
     },
     [runTask],

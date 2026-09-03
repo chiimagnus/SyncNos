@@ -10,24 +10,35 @@ type ObserverController = {
   stop: () => void;
 };
 
-function debounce(callback: () => void, wait: number): () => void {
+function debounce(callback: () => void, wait: number): { trigger: () => void; cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  return () => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => callback(), wait);
+  return {
+    trigger() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        callback();
+      }, wait);
+    },
+    cancel() {
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
+    },
   };
 }
 
 export function createObserver(input: ObserverInput): ObserverController {
   const onTick = typeof input?.onTick === 'function' ? input.onTick : null;
   const debounceMs = typeof input?.debounceMs === 'number' ? input.debounceMs : 500;
-  const tick = debounce(() => onTick?.(), debounceMs);
+  const debouncedTick = debounce(() => onTick?.(), debounceMs);
   const getRoot = typeof input?.getRoot === 'function' ? input.getRoot : null;
   const leading = input?.leading !== false;
 
   let observer: MutationObserver | null = null;
   let observedRoot: Node | null = null;
   let rootRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  let started = false;
 
   function getDefaultRoot(): Node | null {
     return document.documentElement || document.body || null;
@@ -40,7 +51,7 @@ export function createObserver(input: ObserverInput): ObserverController {
 
     if (observer) observer.disconnect();
     observedRoot = nextRoot;
-    observer = new MutationObserver(() => tick());
+    observer = new MutationObserver(() => debouncedTick.trigger());
     observer.observe(observedRoot, {
       subtree: true,
       childList: true,
@@ -51,18 +62,16 @@ export function createObserver(input: ObserverInput): ObserverController {
 
   return {
     start() {
-      if (observer) return;
+      if (started) return;
+      started = true;
 
       ensureObservedRoot(getRoot ? getRoot() : getDefaultRoot());
-      if (leading) {
-        onTick?.();
-      } else {
-        tick();
-      }
+      if (leading) onTick?.();
+      else debouncedTick.trigger();
 
       if (getRoot && !rootRefreshTimer) {
         rootRefreshTimer = setInterval(() => {
-          if (!observer) return;
+          if (!started) return;
           let nextRoot: Node | null = null;
           try {
             nextRoot = getRoot();
@@ -77,14 +86,15 @@ export function createObserver(input: ObserverInput): ObserverController {
       }
     },
     stop() {
-      if (!observer) return;
-      observer.disconnect();
-      observer = null;
-      observedRoot = null;
+      started = false;
+      debouncedTick.cancel();
       if (rootRefreshTimer) {
         clearInterval(rootRefreshTimer);
         rootRefreshTimer = null;
       }
+      observer?.disconnect();
+      observer = null;
+      observedRoot = null;
     },
   };
 }

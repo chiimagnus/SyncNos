@@ -7,6 +7,7 @@ import {
 } from '@collectors/registry';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import normalizeApi from '@services/shared/normalize.ts';
+import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
 import {
@@ -21,7 +22,6 @@ const NOTION_AI_COMPOSER_SELECTOR = 'div[role="textbox"][data-content-editable-l
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
-  onInvalidated?: (listener: (error: Error) => void) => () => void;
   isInvalidContextError?: (error: unknown) => boolean;
 };
 
@@ -73,36 +73,6 @@ function pickLineByLevel(level: number): string {
   if (!Array.isArray(lines) || !lines.length) return '';
   const index = Math.floor(Math.random() * lines.length);
   return lines[index] || lines[0] || '';
-}
-
-function readAiChatAutoSaveEnabled(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-      const local = storageApi?.local;
-      if (!local?.get) return resolve(true);
-      local.get([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED], (res: any) => {
-        resolve(res?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false);
-      });
-    } catch (_e) {
-      resolve(true);
-    }
-  });
-}
-
-function readAiChatDollarMentionEnabled(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-      const local = storageApi?.local;
-      if (!local?.get) return resolve(true);
-      local.get([STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED], (res: any) => {
-        resolve(res?.[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] !== false);
-      });
-    } catch (_e) {
-      resolve(true);
-    }
-  });
 }
 
 function normalizeConversationMeta(value: unknown): string {
@@ -189,11 +159,8 @@ export function createContentController(deps: Deps) {
     const BACKFILL_RETRY_THROTTLE_MS = 10_000;
     const BACKFILL_RETRY_MAX_ATTEMPTS = 6;
     const BACKFILL_RETRY_MAX_DURATION_MS = 2 * 60_000;
-    const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-    const hasStorageGet = !!storageApi?.local?.get;
-    // Default to enabled when storage API is unavailable (e.g. tests).
-    // When storage is available, wait for the async read to avoid a "first tick" auto-save surprise for users who disabled it.
-    let aiChatAutoSaveEnabled: boolean | null = hasStorageGet ? null : true;
+    let aiChatAutoSaveEnabled: boolean | null = null;
+    let liveGeneration = 0;
     let savingDepth = 0;
     let inpageButtonPosition: any = null;
     let inpageButtonPositionLoaded = false;
@@ -214,14 +181,6 @@ export function createContentController(deps: Deps) {
     >();
     const NOTION_AI_PROACTIVE_CAPTURE_DELAYS_MS = [0, 120, 450, 1000] as const;
     const NOTION_AI_PROACTIVE_CAPTURE_COOLDOWN_MS = 160;
-
-    void readAiChatAutoSaveEnabled()
-      .then((enabled) => {
-        aiChatAutoSaveEnabled = enabled === true;
-      })
-      .catch(() => {
-        aiChatAutoSaveEnabled = true;
-      });
 
     async function ensureInpageButtonPositionLoadedOnce(): Promise<any | null> {
       if (inpageButtonPositionLoaded) return inpageButtonPosition;
@@ -252,21 +211,33 @@ export function createContentController(deps: Deps) {
       return inpageButtonPosition;
     }
 
+    function clearProactiveTimers() {
+      for (const timer of proactiveNotionAiBurstTimers) clearTimeout(timer);
+      proactiveNotionAiBurstTimers.clear();
+    }
+
+    function setAutoSaveEnabled(enabled: boolean) {
+      const next = enabled === true;
+      if (aiChatAutoSaveEnabled === true && !next) {
+        liveGeneration += 1;
+        clearProactiveTimers();
+      }
+      aiChatAutoSaveEnabled = next;
+    }
+
     function stop() {
       if (stopped) return;
       stopped = true;
+      liveGeneration += 1;
       savingDepth = 0;
       inpageButton?.setSaving?.(false);
       inpageButton?.cleanupButtons?.('');
       backfillStateByConversation.clear();
       observer?.stop?.();
-      for (const timer of proactiveNotionAiBurstTimers) clearTimeout(timer);
-      proactiveNotionAiBurstTimers.clear();
+      clearProactiveTimers();
       doc?.removeEventListener('click', onDocumentClickCapture, true);
       doc?.removeEventListener('keydown', onDocumentKeydownCapture, true);
     }
-
-    runtime?.onInvalidated?.(() => stop());
 
     function isNotionAiCollectorActive(): boolean {
       const collector = resolveActiveCollector(collectorsRegistry);
@@ -487,12 +458,12 @@ export function createContentController(deps: Deps) {
 
     function beginSaving() {
       savingDepth += 1;
-      if (savingDepth === 1) inpageButton?.setSaving?.(true);
+      if (!stopped && savingDepth === 1) inpageButton?.setSaving?.(true);
     }
 
     function endSaving() {
       savingDepth = Math.max(0, savingDepth - 1);
-      if (savingDepth === 0) inpageButton?.setSaving?.(false);
+      if (!stopped && savingDepth === 0) inpageButton?.setSaving?.(false);
     }
 
     const clickSave = async () => {
@@ -507,7 +478,7 @@ export function createContentController(deps: Deps) {
       try {
         await currentPageCapture.captureCurrentPage({
           onProgress: (progress) => {
-            showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
+            if (!stopped) showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
           },
         });
       } catch (_error) {
@@ -537,9 +508,10 @@ export function createContentController(deps: Deps) {
     };
 
     async function refreshInpageButton() {
+      const positionState = await ensureInpageButtonPositionLoadedOnce();
+      if (stopped) return null;
       const collector = resolveActiveCollector(collectorsRegistry);
       const inpageCollector = collector || resolveActiveOrInpageCollector(collectorsRegistry);
-      const positionState = await ensureInpageButtonPositionLoadedOnce();
       inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
       inpageButton?.ensureInpageButton?.({
         collectorId: inpageCollector?.id,
@@ -548,28 +520,55 @@ export function createContentController(deps: Deps) {
         onCombo: showComboLine,
         positionState,
         onPositionChange: (state: any) => {
+          if (stopped) return;
           inpageButtonPosition = state;
           void writeInpageButtonGlobalPosition(state);
         },
       });
+      if (stopped) {
+        inpageButton?.cleanupButtons?.('');
+        return null;
+      }
       return collector;
+    }
+
+    function isAutoSaveAllowed(generation: number) {
+      return !stopped && aiChatAutoSaveEnabled === true && liveGeneration === generation;
+    }
+
+    function rollbackBackfillAttempt(backfill: {
+      changed: boolean;
+      stateKey: string | null;
+      pageSignature: string | null;
+    }) {
+      if (!backfill.changed || !backfill.stateKey || !backfill.pageSignature) return;
+      const state = backfillStateByConversation.get(backfill.stateKey);
+      if (state && state.lastAttemptedPageSignature === backfill.pageSignature) {
+        state.lastAttemptedPageSignature = '';
+      }
     }
 
     async function handleTick() {
       if (stopped) return;
+      const generation = liveGeneration;
 
       try {
         const collector = await refreshInpageButton();
+        if (!isAutoSaveAllowed(generation)) return;
         if (!collector || typeof collector.capture !== 'function') return;
         // ChatGPT and Google AI Studio are intentionally absent from AI_CHAT_AUTO_SAVE_COLLECTOR_IDS
         // (manual-capture only), so this guard short-circuits them before any auto-save work.
         if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
-        if (aiChatAutoSaveEnabled !== true) return;
 
         const snapshot = await Promise.resolve(collector.capture());
+        if (!isAutoSaveAllowed(generation)) return;
         if (!snapshot) return;
 
         const backfill = await maybeRunBackfill(snapshot);
+        if (!isAutoSaveAllowed(generation)) {
+          rollbackBackfillAttempt(backfill);
+          return;
+        }
         const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
         const incrementalChanged = !!(incremental && incremental.changed);
         if (!backfill.changed && !incrementalChanged) return;
@@ -630,7 +629,7 @@ export function createContentController(deps: Deps) {
         beginSaving();
         try {
           const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
-          if (saved && (incrementalChanged || backfill.changed)) {
+          if (!stopped && saved && (incrementalChanged || backfill.changed)) {
             showInpageTip(
               buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
               'ok',
@@ -644,12 +643,7 @@ export function createContentController(deps: Deps) {
             console.info('[WebClipper] auto-save backfill applied', backfill.logInfo);
           }
         } catch (error) {
-          if (backfill.changed && backfill.stateKey) {
-            const state = backfillStateByConversation.get(backfill.stateKey);
-            if (state && backfill.pageSignature && state.lastAttemptedPageSignature === backfill.pageSignature) {
-              state.lastAttemptedPageSignature = '';
-            }
-          }
+          rollbackBackfillAttempt(backfill);
           throw error;
         } finally {
           endSaving();
@@ -681,6 +675,7 @@ export function createContentController(deps: Deps) {
       start() {
         if (!stopped) observer?.start?.();
       },
+      setAutoSaveEnabled,
       stop,
     };
   }
@@ -688,16 +683,13 @@ export function createContentController(deps: Deps) {
   return {
     start() {
       const controller = createAutoCaptureController();
-      controller.start();
-
-      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-      const hasStorageGet = !!storageApi?.local?.get;
-      // Default to enabled when storage API is unavailable (e.g. tests).
-      // When storage is available, wait for the async read to avoid "first keypress" enabling for users who disabled it.
-      let aiChatDollarMentionEnabled: boolean | null = hasStorageGet ? null : true;
       let mentionController: { stop?: () => void } | null = null;
       let stopped = false;
-      let unsubscribeStorage: (() => void) | null = null;
+      let controllerStarted = false;
+      let aiChatDollarMentionEnabled: boolean | null = null;
+      let autoSaveObservationRevision = 0;
+      let mentionObservationRevision = 0;
+      let unsubscribeStorage = () => {};
 
       function stopMention() {
         const previous = mentionController;
@@ -710,70 +702,72 @@ export function createContentController(deps: Deps) {
       }
 
       function startMention() {
-        if (stopped) return;
-        if (aiChatDollarMentionEnabled !== true) return;
-        if (!itemMention || typeof itemMention.start !== 'function') return;
-        if (mentionController) return;
+        if (stopped || aiChatDollarMentionEnabled !== true) return;
+        if (!itemMention || typeof itemMention.start !== 'function' || mentionController) return;
         mentionController = itemMention.start() || null;
       }
 
       function applyMentionEnabled(enabled: boolean) {
         aiChatDollarMentionEnabled = enabled === true;
-        if (aiChatDollarMentionEnabled === true) startMention();
+        if (aiChatDollarMentionEnabled) startMention();
         else stopMention();
       }
 
-      if (!itemMention || typeof itemMention.start !== 'function') {
-        // No-op.
-      } else if (!hasStorageGet) {
-        applyMentionEnabled(true);
-      } else {
-        void readAiChatDollarMentionEnabled()
-          .then((enabled) => {
-            applyMentionEnabled(enabled === true);
-          })
-          .catch(() => {
-            applyMentionEnabled(true);
-          });
-
-        const onChanged = storageApi?.onChanged;
-        if (onChanged?.addListener && onChanged?.removeListener) {
-          const listener = (changes: Record<string, any> | null, areaName?: string) => {
-            if (stopped) return;
-            if (areaName && String(areaName) !== 'local') return;
-            const change = changes ? (changes as any)[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] : null;
-            if (!change) return;
-            applyMentionEnabled(change?.newValue !== false);
-          };
-          try {
-            onChanged.addListener(listener);
-            unsubscribeStorage = () => {
-              try {
-                onChanged.removeListener(listener);
-              } catch (_e) {
-                // ignore
-              }
-            };
-          } catch (_e) {
-            // ignore
-          }
-        }
+      function ensureControllerStarted() {
+        if (stopped || controllerStarted) return;
+        controllerStarted = true;
+        controller.start();
       }
+
+      function applyAutoSaveEnabled(enabled: boolean) {
+        controller.setAutoSaveEnabled(enabled === true);
+        ensureControllerStarted();
+      }
+
+      unsubscribeStorage = storageOnChanged((changes: Record<string, any> | null, areaName: string) => {
+        if (stopped || areaName !== 'local' || !changes) return;
+        if (Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)) {
+          autoSaveObservationRevision += 1;
+          applyAutoSaveEnabled(changes[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED]?.newValue !== false);
+        }
+        if (Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED)) {
+          mentionObservationRevision += 1;
+          applyMentionEnabled(changes[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED]?.newValue !== false);
+        }
+      });
+
+      const initialAutoSaveRevision = autoSaveObservationRevision;
+      const initialMentionRevision = mentionObservationRevision;
+      void storageGet([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED, STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED]).then(
+        (local) => {
+          if (stopped) return;
+          if (autoSaveObservationRevision === initialAutoSaveRevision) {
+            applyAutoSaveEnabled(local?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false);
+          }
+          if (mentionObservationRevision === initialMentionRevision) {
+            applyMentionEnabled(local?.[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] !== false);
+          }
+        },
+        () => {
+          if (stopped) return;
+          if (autoSaveObservationRevision === initialAutoSaveRevision) applyAutoSaveEnabled(true);
+          if (mentionObservationRevision === initialMentionRevision) applyMentionEnabled(true);
+        },
+      );
 
       return {
         stop() {
+          if (stopped) return;
           stopped = true;
+          autoSaveObservationRevision += 1;
+          mentionObservationRevision += 1;
           try {
-            unsubscribeStorage?.();
+            unsubscribeStorage();
           } catch (_e) {
             // ignore
           }
-          unsubscribeStorage = null;
-          try {
-            stopMention();
-          } catch (_e) {
-            // ignore
-          }
+          unsubscribeStorage = () => {};
+          stopMention();
           controller.stop();
         },
       };

@@ -5,7 +5,24 @@ import { INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY } from '@platform/storage/inp
 
 type TickFn = (() => void | Promise<void>) | null;
 
-function installChromeStorageLocalMock(initial?: Record<string, any>) {
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flush() {
+  for (let i = 0; i < 10; i += 1) await Promise.resolve();
+}
+
+function installChromeStorageLocalMock(
+  initial?: Record<string, any>,
+  options?: { positionRead?: ReturnType<typeof deferred<Record<string, any>>> },
+) {
   const store: Record<string, any> = { ...(initial || {}) };
   const setCalls: any[] = [];
 
@@ -16,6 +33,10 @@ function installChromeStorageLocalMock(initial?: Record<string, any>) {
       local: {
         get: (keys: any, cb: any) => {
           const list = Array.isArray(keys) ? keys : [];
+          if (list.includes(INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY) && options?.positionRead) {
+            options.positionRead.promise.then(cb);
+            return;
+          }
           const res: Record<string, any> = {};
           for (const k of list) res[k] = store[k];
           cb(res);
@@ -42,9 +63,19 @@ function installChromeStorageLocalMock(initial?: Record<string, any>) {
   };
 }
 
-function createHarness(options?: { collectorId?: string }) {
+function createHarness(options?: {
+  collectorId?: string;
+  getCollectorId?: () => string;
+  onEnsureButton?: (config: any) => void;
+}) {
   let tickRef: TickFn = null;
   let buttonConfig: any = null;
+  const ensureButton = vi.fn((config: any) => {
+    buttonConfig = config;
+    options?.onEnsureButton?.(config);
+  });
+  const cleanupButtons = vi.fn();
+  const capture = vi.fn(() => null);
 
   const runtime = {
     send: async () => ({ ok: true, data: {} }),
@@ -53,7 +84,7 @@ function createHarness(options?: { collectorId?: string }) {
   };
 
   const collectorsRegistry = {
-    pickActive: () => ({ id: options?.collectorId || 'gemini', collector: { capture: () => null } }),
+    pickActive: () => ({ id: options?.getCollectorId?.() || options?.collectorId || 'gemini', collector: { capture } }),
     list: () => [],
   };
 
@@ -68,10 +99,8 @@ function createHarness(options?: { collectorId?: string }) {
     currentPageCapture,
     inpageTip: null,
     inpageButton: {
-      ensureInpageButton: (cfg: any) => {
-        buttonConfig = cfg;
-      },
-      cleanupButtons: () => {},
+      ensureInpageButton: ensureButton,
+      cleanupButtons,
     },
     runtimeObserver: {
       createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
@@ -81,9 +110,13 @@ function createHarness(options?: { collectorId?: string }) {
     },
     incrementalUpdater: null,
   });
-  controller.start();
+  const resident = controller.start();
 
   return {
+    resident,
+    capture,
+    ensureButton,
+    cleanupButtons,
     runTick: async () => {
       if (tickRef) await tickRef();
     },
@@ -127,6 +160,84 @@ describe('content-controller inpage button global position', () => {
     expect(lastSet[INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY]).toEqual({ edge: 'right', ratio: 0.5 });
     expect(mock.store[INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY]).toEqual({ edge: 'right', ratio: 0.5 });
 
+    mock.cleanup();
+  });
+
+  it('does not recreate the button after stop while the global position read is pending', async () => {
+    const positionRead = deferred<Record<string, any>>();
+    const mock = installChromeStorageLocalMock(
+      { ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: false },
+      { positionRead },
+    );
+    const harness = createHarness({ collectorId: 'gemini' });
+    await flush();
+
+    const tick = harness.runTick();
+    await flush();
+    harness.resident?.stop?.();
+    positionRead.resolve({ [INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY]: { edge: 'left', ratio: 0.4 } });
+    await tick;
+
+    expect(harness.ensureButton).not.toHaveBeenCalled();
+    mock.cleanup();
+  });
+
+  it('re-resolves the active collector after the global position await', async () => {
+    const positionRead = deferred<Record<string, any>>();
+    const mock = installChromeStorageLocalMock(
+      { ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: false },
+      { positionRead },
+    );
+    let collectorId = 'collector-a';
+    const harness = createHarness({ getCollectorId: () => collectorId });
+    await flush();
+
+    const tick = harness.runTick();
+    await flush();
+    collectorId = 'collector-b';
+    positionRead.resolve({ [INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY]: { edge: 'right', ratio: 0.6 } });
+    await tick;
+
+    expect(harness.getButtonConfig()?.collectorId).toBe('collector-b');
+    expect(harness.capture).not.toHaveBeenCalled();
+    harness.resident?.stop?.();
+    mock.cleanup();
+  });
+
+  it('cleans a button created during a synchronous stop re-entry and aborts autosave', async () => {
+    const mock = installChromeStorageLocalMock({
+      ai_chat_auto_save_enabled: true,
+      ai_chat_dollar_mention_enabled: false,
+      [INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY]: { edge: 'right', ratio: 0.2 },
+    });
+    let resident: { stop?: () => void } | null = null;
+    const harness = createHarness({
+      collectorId: 'gemini',
+      onEnsureButton: () => resident?.stop?.(),
+    });
+    resident = harness.resident;
+    await flush();
+
+    await harness.runTick();
+    expect(harness.ensureButton).toHaveBeenCalledTimes(1);
+    expect(harness.cleanupButtons.mock.calls.some((args) => args[0] === '')).toBe(true);
+    expect(harness.capture).not.toHaveBeenCalled();
+    mock.cleanup();
+  });
+
+  it('keeps button refresh active while autosave is disabled', async () => {
+    const mock = installChromeStorageLocalMock({
+      ai_chat_auto_save_enabled: false,
+      ai_chat_dollar_mention_enabled: false,
+      [INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY]: { edge: 'left', ratio: 0.3 },
+    });
+    const harness = createHarness({ collectorId: 'gemini' });
+    await flush();
+
+    await harness.runTick();
+    expect(harness.ensureButton).toHaveBeenCalledTimes(1);
+    expect(harness.capture).not.toHaveBeenCalled();
+    harness.resident?.stop?.();
     mock.cleanup();
   });
 

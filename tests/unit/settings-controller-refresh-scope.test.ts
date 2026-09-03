@@ -353,6 +353,107 @@ describe('Settings scoped refresh', () => {
     expect(latestSnapshot!.error).toBe('display write failed');
   });
 
+  it('autosave and dollar wakes update only their own Settings state without a full refresh', async () => {
+    storageState = { ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: true };
+    await renderController();
+    const baselineRuntime = runtimeMocks.send.mock.calls.length;
+    const baselineStorageReads = storageMocks.get.mock.calls.length;
+
+    dispatchStorage({ ai_chat_auto_save_enabled: { oldValue: true, newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(true);
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
+
+    dispatchStorage({ ai_chat_dollar_mention_enabled: { oldValue: true, newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
+  });
+
+  it('an autosave wake beats only its own late hydrate while dollar still applies from that hydrate', async () => {
+    const bulkRead = deferred<Record<string, unknown>>();
+    const defaultGet = storageMocks.get.getMockImplementation()!;
+    storageMocks.get.mockImplementation(async (keys: string[]) => {
+      if ((keys || []).includes('notion_parent_page_id')) return await bulkRead.promise;
+      return await defaultGet(keys);
+    });
+
+    act(() => root!.render(createElement(ControllerHarness)));
+    await flushReact();
+    dispatchStorage({ ai_chat_auto_save_enabled: { newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+
+    bulkRead.resolve({ ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: false });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+  });
+
+  it('a dollar wake beats only its own late hydrate while autosave still applies from that hydrate', async () => {
+    const bulkRead = deferred<Record<string, unknown>>();
+    const defaultGet = storageMocks.get.getMockImplementation()!;
+    storageMocks.get.mockImplementation(async (keys: string[]) => {
+      if ((keys || []).includes('notion_parent_page_id')) return await bulkRead.promise;
+      return await defaultGet(keys);
+    });
+
+    act(() => root!.render(createElement(ControllerHarness)));
+    await flushReact();
+    dispatchStorage({ ai_chat_dollar_mention_enabled: { newValue: false } });
+    await flushReact();
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+
+    bulkRead.resolve({ ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: true });
+    await flushReact();
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(false);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+  });
+
+  it('runtime-setting actions use per-key fallback observations and newer same-key wakes win', async () => {
+    storageState = { ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: true };
+    await renderController();
+
+    await invoke(() => latestSnapshot!.onToggleAiChatAutoSaveEnabled(true));
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(true);
+
+    await invoke(() => latestSnapshot!.onToggleAiChatDollarMentionEnabled(false));
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+
+    const pendingWrite = deferred<void>();
+    storageMocks.set.mockImplementationOnce(async () => {
+      await pendingWrite.promise;
+    });
+    const staleAutoAction = begin(() => latestSnapshot!.onToggleAiChatAutoSaveEnabled(false));
+    await flushReact();
+    dispatchStorage({ ai_chat_auto_save_enabled: { oldValue: true, newValue: true } });
+    pendingWrite.resolve();
+    await act(async () => staleAutoAction);
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(true);
+  });
+
+  it('an unrelated runtime-setting wake does not suppress another key action fallback', async () => {
+    storageState = { ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: true };
+    await renderController();
+    const pendingWrite = deferred<void>();
+    storageMocks.set.mockImplementationOnce(async (payload: Record<string, unknown>) => {
+      await pendingWrite.promise;
+      Object.assign(storageState, payload || {});
+    });
+
+    const autoAction = begin(() => latestSnapshot!.onToggleAiChatAutoSaveEnabled(true));
+    await flushReact();
+    dispatchStorage({ ai_chat_dollar_mention_enabled: { oldValue: true, newValue: false } });
+    pendingWrite.resolve();
+    await act(async () => autoAction);
+    expect(latestSnapshot!.aiChatAutoSaveEnabled).toBe(true);
+    expect(latestSnapshot!.aiChatDollarMentionEnabled).toBe(false);
+  });
+
   it('Notion and Feishu token wakes rehydrate only their own safe auth status', async () => {
     await renderController();
     const baseline = {

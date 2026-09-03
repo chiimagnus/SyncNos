@@ -370,6 +370,11 @@ describe('content-controller inpage combo', () => {
       },
     });
 
+    // T2 starts resident autosave only after the first authoritative settings observation.
+    // This harness has no storage API, so wait for the intentional fail-open observation before simulating a real user click.
+    await Promise.resolve();
+    await Promise.resolve();
+
     const button = document.createElement('div');
     button.setAttribute('role', 'button');
     button.setAttribute('data-testid', 'agent-send-message-button');
