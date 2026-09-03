@@ -3,6 +3,7 @@ import {
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
+import { canonicalizeInpageDisplayModeStorageRecord } from '@services/shared/inpage-display-mode';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
@@ -183,7 +184,7 @@ export function filterStorageForBackup(storageLocal: unknown): Record<string, un
     if (!shouldIncludeStorageKeyInBackup(key)) continue;
     out[key] = value;
   }
-  return out;
+  return canonicalizeInpageDisplayModeStorageRecord(out);
 }
 
 export function validateBackupDocument(doc: unknown): { ok: boolean; error: string } {

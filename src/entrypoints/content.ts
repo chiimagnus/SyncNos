@@ -21,7 +21,7 @@ import { createInpageCommentsDomSource, getInpageCommentsPanelApi } from '@ui/in
 import { createRuntimeClient } from '@platform/runtime/client.ts';
 
 export default defineContentScript({
-  // Inpage visibility is controlled at runtime by `inpage_display_mode` (and legacy `inpage_supported_only`).
+  // Inpage visibility is controlled at runtime by canonical `inpage_display_mode`.
   // This avoids browser-specific dynamic content-script registration support gaps.
   matches: ['http://*/*', 'https://*/*'],
   async main() {

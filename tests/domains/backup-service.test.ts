@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
-import { FEISHU_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { FEISHU_MESSAGE_TYPES, INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
@@ -30,6 +30,17 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
       lastError: null as any,
       sendMessage(message: any, callback: (response: any) => void) {
         runtimeMessages.push(structuredClone(message));
+        if (message?.type === INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE) {
+          const mode = String(message?.mode || '');
+          if (mode !== 'supported' && mode !== 'all' && mode !== 'off') {
+            callback({ ok: false, data: null, error: { message: 'invalid inpage display mode', extra: null } });
+            return;
+          }
+          store.inpage_display_mode = mode;
+          delete store.inpage_supported_only;
+          callback({ ok: true, data: { mode }, error: null });
+          return;
+        }
         if (message?.type !== FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
           callback({ ok: false, data: null, error: { message: `unexpected message: ${message?.type}`, extra: null } });
           return;
@@ -102,6 +113,89 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
+  it('restores legacy JSON display settings only through the canonical background owner route', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const stats = await importBackupLegacyJsonMerge({
+      schemaVersion: 1,
+      stores: { conversations: [], messages: [], sync_mappings: [] },
+      storageLocal: { inpage_supported_only: true },
+    });
+
+    expect(stats.settingsApplied).toBe(1);
+    expect(chromeMock.__runtimeMessages).toContainEqual({
+      type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE,
+      mode: 'supported',
+    });
+    expect(chromeMock.__store.inpage_display_mode).toBe('supported');
+    expect(chromeMock.__store.inpage_supported_only).toBeUndefined();
+    expect(
+      chromeMock.__setPayloads.some(
+        (payload) => 'inpage_display_mode' in payload || 'inpage_supported_only' in payload,
+      ),
+    ).toBe(false);
+  });
+
+  it('restores legacy ZIP display settings as one canonical logical setting', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+    const enc = new TextEncoder();
+    const entries = new Map<string, Uint8Array>();
+    entries.set(
+      'manifest.json',
+      enc.encode(
+        JSON.stringify({
+          backupSchemaVersion: 2,
+          exportedAt: '2026-09-03T00:00:00.000Z',
+          db: { name: 'webclipper', version: 1 },
+          counts: { conversations: 0, messages: 0, sync_mappings: 0 },
+          config: { storageLocalPath: 'config/storage-local.json' },
+          index: { conversationsCsvPath: 'sources/conversations.csv' },
+          sources: [],
+        }),
+      ),
+    );
+    entries.set(
+      'config/storage-local.json',
+      enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: { inpage_supported_only: false } })),
+    );
+    entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
+
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.settingsApplied).toBe(1);
+    expect(chromeMock.__runtimeMessages).toContainEqual({ type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'all' });
+    expect(chromeMock.__store.inpage_display_mode).toBe('all');
+    expect(chromeMock.__store.inpage_supported_only).toBeUndefined();
+  });
+
+  it('rejects restore when the canonical display owner route rejects', async () => {
+    const chromeMock = mockChromeStorage();
+    chromeMock.runtime.sendMessage = (message: any, callback: (response: any) => void) => {
+      chromeMock.__runtimeMessages.push(structuredClone(message));
+      callback({ ok: false, data: null, error: { message: 'display owner failed', extra: null } });
+    };
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    await expect(
+      importBackupLegacyJsonMerge({
+        schemaVersion: 1,
+        stores: { conversations: [], messages: [], sync_mappings: [] },
+        storageLocal: { inpage_display_mode: 'off' },
+      }),
+    ).rejects.toThrow('display owner failed');
+    expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
+  });
+
   it('exportBackupZipV2 emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',

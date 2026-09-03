@@ -26,6 +26,12 @@ import { initializeLocale } from '@i18n';
 import { storageOnChanged } from '@platform/storage/local';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
+import { INPAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import {
+  ensureCanonicalInpageDisplayMode,
+  readEffectiveInpageDisplayMode,
+  setCanonicalInpageDisplayMode,
+} from '@services/shared/inpage-display-mode';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -47,6 +53,8 @@ function runBestEffort(task: () => unknown | Promise<unknown>): void {
 
 export default defineBackground(() => {
   const localeReady = initializeLocale();
+  const displayModeReady = ensureCanonicalInpageDisplayMode().catch(() => undefined);
+  const menuReady = Promise.all([localeReady.catch(() => undefined), displayModeReady]).then(() => undefined);
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
 
   const router = createBackgroundRouter({
@@ -89,6 +97,10 @@ export default defineBackground(() => {
     // GitHub Settings is optional during startup; a registration failure must not block the core router.
   }
   registerUiMessageHandlers(router, { localeReady });
+  router.register(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, async (msg) => {
+    const mode = await setCanonicalInpageDisplayMode(msg?.mode);
+    return router.ok({ mode });
+  });
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,
@@ -110,7 +122,11 @@ export default defineBackground(() => {
     // optional listener registration must not block sibling listeners
   }
   try {
-    registerClipperContextMenu({ localeReady });
+    registerClipperContextMenu({
+      ready: menuReady,
+      readDisplayMode: readEffectiveInpageDisplayMode,
+      setDisplayMode: setCanonicalInpageDisplayMode,
+    });
   } catch (_e) {
     // optional listener registration must not block sibling listeners
   }

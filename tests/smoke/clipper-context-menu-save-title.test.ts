@@ -86,7 +86,11 @@ describe('clipper context menu save title', () => {
       error: null,
     } as any);
 
-    registerClipperContextMenu();
+    registerClipperContextMenu({
+      ready: Promise.resolve(),
+      readDisplayMode: async () => 'all',
+      setDisplayMode: async (mode) => mode,
+    });
     menusApi.__emitShown({ id: 7, url: 'https://chatgpt.com/c/123' });
 
     await flushMicrotasks();
@@ -120,14 +124,18 @@ describe('clipper context menu save title', () => {
       },
     };
 
-    registerClipperContextMenu({ localeReady: locale.promise });
+    registerClipperContextMenu({
+      ready: locale.promise,
+      readDisplayMode: async () => 'all',
+      setDisplayMode: async (mode) => mode,
+    });
 
     expect(menusApi.onClicked.addListener).toHaveBeenCalledTimes(1);
     expect(menusApi.onShown.addListener).toHaveBeenCalledTimes(1);
     expect(menusApi.create).not.toHaveBeenCalled();
 
     menusApi.__emitClicked('syncnos_clipper_mode_off');
-    expect(storageSet).toHaveBeenCalledWith({ inpage_display_mode: 'off' }, expect.any(Function));
+    expect(storageSet).not.toHaveBeenCalledWith({ inpage_display_mode: 'off' }, expect.any(Function));
 
     menusApi.__emitShown({ id: 7, url: 'https://chatgpt.com/c/123' });
     await flushMicrotasks();
@@ -163,7 +171,11 @@ describe('clipper context menu save title', () => {
       },
     };
 
-    registerClipperContextMenu({ localeReady: locale.promise });
+    registerClipperContextMenu({
+      ready: locale.promise,
+      readDisplayMode: async () => 'all',
+      setDisplayMode: async (mode) => mode,
+    });
     locale.reject(new Error('locale failed'));
     await flushMicrotasks();
 

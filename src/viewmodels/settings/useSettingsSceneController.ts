@@ -22,6 +22,7 @@ import { normalizeNotionDatabaseIdInput } from '@services/sync/notion/notion-id-
 import {
   FEISHU_MESSAGE_TYPES,
   GITHUB_MESSAGE_TYPES,
+  INPAGE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
@@ -72,6 +73,12 @@ import {
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { getCurrentLocale, getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
+import {
+  INPAGE_DISPLAY_MODE_STORAGE_KEY,
+  normalizeInpageDisplayMode,
+  readEffectiveInpageDisplayMode,
+  type InpageDisplayMode,
+} from '@services/shared/inpage-display-mode';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
@@ -180,8 +187,6 @@ export type InsightLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 type InsightRevisionScope = 'conversations' | 'messages' | 'article_comments';
 const INSIGHT_REVISION_SCOPES: readonly InsightRevisionScope[] = ['conversations', 'messages', 'article_comments'];
 
-type InpageDisplayMode = 'supported' | 'all' | 'off';
-
 type GithubAuthSummary =
   | { state: 'disconnected' }
   | { state: 'connected' }
@@ -255,18 +260,6 @@ function normalizeGithubRepositoryOptions(value: unknown): GithubRepositoryOptio
       },
     ];
   });
-}
-
-function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
-  const raw = String(value || '')
-    .trim()
-    .toLowerCase();
-  if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
-  return null;
-}
-
-function inpageDisplayModeFromLegacySupportedOnly(value: unknown): InpageDisplayMode {
-  return value === true ? 'supported' : 'all';
 }
 
 export function useSettingsSceneController(args: UseSettingsSceneControllerArgs) {
@@ -377,6 +370,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   // Inpage
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
+  const inpageDisplayObservationRevisionRef = useRef(0);
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
@@ -717,7 +711,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     githubAuthRequestSeqRef.current = githubAuthRequestSeq;
     const notionAuthObservationAtStart = notionAuthObservationRevisionRef.current;
     const feishuAuthObservationAtStart = feishuAuthObservationRevisionRef.current;
-    const [, , local, obsidianRes, githubRes, antiHotlinkRulesDraft] = await Promise.all([
+    const inpageDisplayObservationAtStart = inpageDisplayObservationRevisionRef.current;
+    const [, , local, obsidianRes, githubRes, antiHotlinkRulesDraft, effectiveInpageDisplayMode] = await Promise.all([
       readNotionAuthStatus(),
       readFeishuAuthStatus(),
       storageGet([
@@ -741,8 +736,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
         FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
         GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
-        'inpage_display_mode',
-        'inpage_supported_only',
         'ai_chat_auto_save_enabled',
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
@@ -755,6 +748,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
       send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}),
       loadAntiHotlinkRulesForSettings({ forceRefresh: true }),
+      readEffectiveInpageDisplayMode(),
     ]);
 
     if (notionAuthObservationRevisionRef.current === notionAuthObservationAtStart) {
@@ -797,10 +791,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setFeishuArticleFolder(String(feishuPathConfig?.articleFolder || FEISHU_DEFAULTS.articleFolder));
     setFeishuVideoFolder(String(feishuPathConfig?.videoFolder || FEISHU_DEFAULTS.videoFolder));
 
-    const normalizedInpageMode = normalizeInpageDisplayMode(local?.inpage_display_mode);
-    setInpageDisplayMode(
-      normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only),
-    );
+    if (inpageDisplayObservationRevisionRef.current === inpageDisplayObservationAtStart) {
+      setInpageDisplayMode(effectiveInpageDisplayMode);
+    }
     setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
@@ -834,10 +827,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionPollingState,
     videoDbSpec.storageKey,
   ]);
-
-  useEffect(() => {
-    void runTask(refreshInternal);
-  }, [refreshInternal, runTask]);
 
   useEffect(() => {
     if (activeSection !== 'github') return;
@@ -895,6 +884,21 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, GITHUB_AUTH_STATE_KEY)) {
         void refreshGithubAuthFromStorageSignal();
       }
+      if (Object.prototype.hasOwnProperty.call(changes, INPAGE_DISPLAY_MODE_STORAGE_KEY)) {
+        const revision = ++inpageDisplayObservationRevisionRef.current;
+        const normalized = normalizeInpageDisplayMode(changes[INPAGE_DISPLAY_MODE_STORAGE_KEY]?.newValue);
+        if (normalized) {
+          setInpageDisplayMode(normalized);
+        } else {
+          void readEffectiveInpageDisplayMode()
+            .then((mode) => {
+              if (inpageDisplayObservationRevisionRef.current === revision) setInpageDisplayMode(mode);
+            })
+            .catch(() => {
+              if (inpageDisplayObservationRevisionRef.current === revision) setInpageDisplayMode('all');
+            });
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(changes, 'xiaohongshu_comments_capture_enabled')) {
         setXiaohongshuCommentsCaptureEnabled(changes.xiaohongshu_comments_capture_enabled?.newValue === true);
       }
@@ -949,6 +953,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     refreshGithubAuthFromStorageSignal,
     refreshNotionAuthFromStorageSignal,
   ]);
+
+  useEffect(() => {
+    void runTask(refreshInternal);
+  }, [refreshInternal, runTask]);
 
   const onSaveFeishuPaths = useCallback(async () => {
     if (busy) return;
@@ -1692,8 +1700,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onChangeInpageDisplayMode = useCallback(
     async (next: InpageDisplayMode) => {
       await runTask(async () => {
-        await storageSet({ inpage_display_mode: next });
-        setInpageDisplayMode(next);
+        const revision = inpageDisplayObservationRevisionRef.current;
+        const response = unwrap(
+          await send<ApiResponse<{ mode: InpageDisplayMode }>>(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, { mode: next }),
+        );
+        const mode = normalizeInpageDisplayMode(response?.mode);
+        if (!mode) throw new Error('invalid inpage display mode response');
+        if (inpageDisplayObservationRevisionRef.current !== revision) return;
+        inpageDisplayObservationRevisionRef.current += 1;
+        setInpageDisplayMode(mode);
       });
     },
     [runTask],

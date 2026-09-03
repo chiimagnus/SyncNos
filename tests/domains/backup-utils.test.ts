@@ -71,6 +71,15 @@ describe('backup backup-utils', () => {
     );
   });
 
+  it('canonicalizes display mode without propagating legacy or invalid values', () => {
+    expect(filterStorageForBackup({ inpage_supported_only: true })).toEqual({ inpage_display_mode: 'supported' });
+    expect(filterStorageForBackup({ inpage_supported_only: false })).toEqual({ inpage_display_mode: 'all' });
+    expect(filterStorageForBackup({ inpage_display_mode: 'supported', inpage_supported_only: false })).toEqual({
+      inpage_display_mode: 'supported',
+    });
+    expect(filterStorageForBackup({ inpage_display_mode: 'bad' })).toEqual({});
+  });
+
   it('validateBackupDocument rejects unsupported version', () => {
     const res = validateBackupDocument({ schemaVersion: 999, stores: {} });
     expect(res.ok).toBe(false);

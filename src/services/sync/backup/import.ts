@@ -1,7 +1,7 @@
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
-import { FEISHU_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { FEISHU_MESSAGE_TYPES, INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import {
   areBackupValuesEqual,
@@ -18,6 +18,7 @@ import {
 import { openDb } from '@platform/idb/schema';
 import { reqToPromise } from '@services/sync/backup/idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
+import { INPAGE_DISPLAY_MODE_STORAGE_KEY } from '@services/shared/inpage-display-mode';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
@@ -146,6 +147,9 @@ const FEISHU_PORTABLE_AUTH_CONFIG_KEYS = {
 
 async function applyImportedStorageSettings(filteredSettings: Record<string, unknown>): Promise<void> {
   const directSettings = { ...filteredSettings };
+  const hasDisplayMode = Object.prototype.hasOwnProperty.call(directSettings, INPAGE_DISPLAY_MODE_STORAGE_KEY);
+  const displayMode = directSettings[INPAGE_DISPLAY_MODE_STORAGE_KEY];
+  delete directSettings[INPAGE_DISPLAY_MODE_STORAGE_KEY];
   const feishuConfig: Record<string, unknown> = {};
   if (Object.prototype.hasOwnProperty.call(directSettings, FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId)) {
     feishuConfig.clientId = directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId];
@@ -157,11 +161,19 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
   }
 
   if (Object.keys(directSettings).length) await storageSet(directSettings);
-  if (!Object.keys(feishuConfig).length) return;
 
-  const response = await send<any>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, feishuConfig);
-  if (!response?.ok) {
-    throw new Error(String(response?.error?.message || 'restore feishu oauth config failed'));
+  if (hasDisplayMode) {
+    const response = await send<any>(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, { mode: displayMode });
+    if (!response?.ok) {
+      throw new Error(String(response?.error?.message || 'restore inpage display mode failed'));
+    }
+  }
+
+  if (Object.keys(feishuConfig).length) {
+    const response = await send<any>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, feishuConfig);
+    if (!response?.ok) {
+      throw new Error(String(response?.error?.message || 'restore feishu oauth config failed'));
+    }
   }
 }
 

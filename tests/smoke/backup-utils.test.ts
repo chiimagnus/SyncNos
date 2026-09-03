@@ -45,6 +45,17 @@ describe('backup-utils', () => {
     });
   });
 
+  it('canonicalizes legacy inpage display settings at the backup boundary', () => {
+    expect(backupUtils.filterStorageForBackup({ inpage_supported_only: true })).toEqual({
+      inpage_display_mode: 'supported',
+    });
+    expect(backupUtils.filterStorageForBackup({ inpage_display_mode: 'off', inpage_supported_only: true })).toEqual({
+      inpage_display_mode: 'off',
+    });
+    expect(backupUtils.filterStorageForBackup({ inpage_display_mode: 'invalid' })).toEqual({});
+    expect(backupUtils.filterStorageForBackup({ keep: 1 })).toEqual({ keep: 1 });
+  });
+
   it('validateBackupDocument rejects unsupported version', () => {
     const res = backupUtils.validateBackupDocument({ schemaVersion: 999, stores: {} });
     expect(res.ok).toBe(false);

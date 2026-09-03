@@ -6,7 +6,6 @@ import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
 const STORAGE_KEY_DISPLAY_MODE = 'inpage_display_mode';
-const STORAGE_KEY_SUPPORTED_ONLY = 'inpage_supported_only';
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
 const MENU_ROOT_ID = 'syncnos_clipper_root';
@@ -17,18 +16,6 @@ const MENU_AUTOSAVE_ID = 'syncnos_clipper_autosave';
 const MENU_MODE_SUPPORTED_ID = 'syncnos_clipper_mode_supported';
 const MENU_MODE_ALL_ID = 'syncnos_clipper_mode_all';
 const MENU_MODE_OFF_ID = 'syncnos_clipper_mode_off';
-
-function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
-  const raw = String(value || '')
-    .trim()
-    .toLowerCase();
-  if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
-  return null;
-}
-
-function displayModeFromLegacySupportedOnly(value: unknown): InpageDisplayMode {
-  return value === true ? 'supported' : 'all';
-}
 
 function getMenusApi(): any | null {
   const anyGlobal = globalThis as any;
@@ -51,20 +38,11 @@ function promisifyVoid(fn: (cb: () => void) => void): Promise<void> {
   });
 }
 
-async function readMenuState(): Promise<{ mode: InpageDisplayMode; autoSave: boolean }> {
-  try {
-    const local = await storageGet([
-      STORAGE_KEY_DISPLAY_MODE,
-      STORAGE_KEY_SUPPORTED_ONLY,
-      STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED,
-    ]);
-    const normalizedMode = normalizeInpageDisplayMode(local?.[STORAGE_KEY_DISPLAY_MODE]);
-    const mode = normalizedMode || displayModeFromLegacySupportedOnly(local?.[STORAGE_KEY_SUPPORTED_ONLY]);
-    const autoSave = local?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false;
-    return { mode, autoSave };
-  } catch (_e) {
-    return { mode: 'all', autoSave: true };
-  }
+async function readMenuState(
+  readDisplayMode: () => Promise<InpageDisplayMode>,
+): Promise<{ mode: InpageDisplayMode; autoSave: boolean }> {
+  const [mode, local] = await Promise.all([readDisplayMode(), storageGet([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED])]);
+  return { mode, autoSave: local?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false };
 }
 
 async function removeAllMenus(api: any): Promise<void> {
@@ -125,9 +103,9 @@ async function refreshSaveMenuTitle(api: any, tab: { id?: unknown; url?: unknown
   }
 }
 
-async function createOrRefreshMenus(api: any) {
+async function createOrRefreshMenus(api: any, readDisplayMode: () => Promise<InpageDisplayMode>) {
   if (!api?.create) return;
-  const state = await readMenuState();
+  const state = await readMenuState(readDisplayMode).catch(() => ({ mode: 'all' as const, autoSave: true }));
 
   await removeAllMenus(api);
 
@@ -220,18 +198,22 @@ let registered = false;
 let removeStorageListener: (() => void) | null = null;
 
 type ContextMenuRegistrationOptions = {
-  localeReady?: Promise<unknown>;
+  ready: Promise<unknown>;
+  readDisplayMode: () => Promise<InpageDisplayMode>;
+  setDisplayMode: (mode: InpageDisplayMode) => Promise<unknown>;
 };
 
-export function registerClipperContextMenu(options: ContextMenuRegistrationOptions = {}): void {
+export function registerClipperContextMenu(options: ContextMenuRegistrationOptions): void {
   if (registered) return;
   registered = true;
 
   const api = getMenusApi();
   if (!api) return;
 
-  const localeReady = options.localeReady || Promise.resolve();
-  void localeReady.catch(() => undefined).then(() => createOrRefreshMenus(api));
+  const ready = options.ready.catch(() => undefined);
+  const readDisplayMode = options.readDisplayMode;
+  const setDisplayMode = options.setDisplayMode;
+  void ready.then(() => createOrRefreshMenus(api, readDisplayMode));
 
   try {
     api.onClicked?.addListener?.((info: any, _tab: any) => {
@@ -254,17 +236,20 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
         return;
       }
 
-      if (id === MENU_MODE_SUPPORTED_ID) {
-        void storageSet({ [STORAGE_KEY_DISPLAY_MODE]: 'supported' }).catch(() => {});
-        return;
-      }
-      if (id === MENU_MODE_ALL_ID) {
-        void storageSet({ [STORAGE_KEY_DISPLAY_MODE]: 'all' }).catch(() => {});
-        return;
-      }
-      if (id === MENU_MODE_OFF_ID) {
-        void storageSet({ [STORAGE_KEY_DISPLAY_MODE]: 'off' }).catch(() => {});
-        return;
+      const requestedMode: InpageDisplayMode | null =
+        id === MENU_MODE_SUPPORTED_ID
+          ? 'supported'
+          : id === MENU_MODE_ALL_ID
+            ? 'all'
+            : id === MENU_MODE_OFF_ID
+              ? 'off'
+              : null;
+      if (requestedMode) {
+        void setDisplayMode(requestedMode).catch(() => {
+          void readMenuState(readDisplayMode)
+            .then((state) => updateCheckedStates(api, state))
+            .catch(() => {});
+        });
       }
     });
   } catch (_e) {
@@ -274,16 +259,17 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
   try {
     api.onShown?.addListener?.((info: any, tab: any) => {
       if (!info) return;
-      void localeReady
-        .catch(() => undefined)
-        .then(() => refreshSaveMenuTitle(api, tab || null))
-        .then(() => {
-          try {
-            api.refresh?.();
-          } catch (_e) {
-            // ignore
-          }
-        });
+      void ready.then(async () => {
+        await readMenuState(readDisplayMode)
+          .then((state) => updateCheckedStates(api, state))
+          .catch(() => {});
+        await refreshSaveMenuTitle(api, tab || null).catch(() => {});
+        try {
+          api.refresh?.();
+        } catch (_e) {
+          // ignore
+        }
+      });
     });
   } catch (_e) {
     // ignore
@@ -293,14 +279,10 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
     if (areaName !== 'local') return;
     const keys = changes ? Object.keys(changes) : [];
     if (!keys.length) return;
-    if (
-      !keys.includes(STORAGE_KEY_DISPLAY_MODE) &&
-      !keys.includes(STORAGE_KEY_SUPPORTED_ONLY) &&
-      !keys.includes(STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)
-    ) {
-      return;
-    }
-    void readMenuState().then((state) => updateCheckedStates(api, state));
+    if (!keys.includes(STORAGE_KEY_DISPLAY_MODE) && !keys.includes(STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)) return;
+    void readMenuState(readDisplayMode)
+      .then((state) => updateCheckedStates(api, state))
+      .catch(() => {});
   });
 }
 
