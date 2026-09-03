@@ -10,7 +10,7 @@ import { createCollectorEnv } from '@collectors/collector-env.ts';
 import { registerAllCollectors } from '@collectors/register-all.ts';
 import { createCollectorsRegistry } from '@collectors/registry.ts';
 import runtimeObserverApi from '@collectors/runtime-observer.ts';
-import incrementalUpdaterApi from '@services/conversations/content/incremental-updater.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 import { createItemMentionController } from '@services/integrations/item-mention/content/mention-controller';
 import normalizeApi from '@services/shared/normalize.ts';
 import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
@@ -34,6 +34,7 @@ export default defineContentScript({
       runtime,
       collectorsRegistry,
     });
+    const incrementalEngine = createAutoSaveIncrementalEngine();
     let captureCurrentPage = currentPageCapture.captureCurrentPage;
 
     registerCurrentPageCaptureContentHandlers(
@@ -70,7 +71,7 @@ export default defineContentScript({
       inpageButton: inpageButtonApi,
       inpageTip: inpageTipApi,
       runtimeObserver: runtimeObserverApi,
-      incrementalUpdater: incrementalUpdaterApi,
+      incrementalEngine,
       itemMention: itemMentionController,
     });
     captureCurrentPage = controller.captureCurrentPage;

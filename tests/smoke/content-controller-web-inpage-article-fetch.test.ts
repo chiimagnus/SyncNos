@@ -61,7 +61,7 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
         return { start: () => {}, stop: () => {} };
       },
     },
-    incrementalUpdater: null,
+    incrementalEngine: null,
   });
   controller.start();
 

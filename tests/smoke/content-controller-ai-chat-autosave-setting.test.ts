@@ -134,8 +134,8 @@ function createHarness(options: {
         return { start: observerStart, stop: observerStop };
       },
     },
-    incrementalUpdater: {
-      prepareIncremental: (snapshot: any) => {
+    incrementalEngine: {
+      prepare: (snapshot: any) => {
         const result = incremental(snapshot) || { changed: false };
         return {
           changed: result?.changed === true,

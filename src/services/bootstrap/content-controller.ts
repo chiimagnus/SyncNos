@@ -58,7 +58,7 @@ type Deps = {
   inpageButton: InpageButtonApi | null;
   inpageTip: InpageTipApi | null;
   runtimeObserver: RuntimeObserverApi | null;
-  incrementalUpdater: { prepareIncremental?: (snapshot: unknown) => any } | null;
+  incrementalEngine: { prepare?: (snapshot: unknown) => any } | null;
   itemMention: { start?: () => { stop?: () => void } | null } | null;
 };
 
@@ -92,7 +92,7 @@ export function createContentController(deps: Deps) {
   const inpageButton = deps.inpageButton;
   const inpageTip = deps.inpageTip;
   const runtimeObserver = deps.runtimeObserver;
-  const incrementalUpdater = deps.incrementalUpdater;
+  const incrementalEngine = deps.incrementalEngine;
   const itemMention = deps.itemMention;
   const doc = typeof document !== 'undefined' ? document : null;
 
@@ -792,7 +792,7 @@ export function createContentController(deps: Deps) {
           return;
         }
 
-        const incremental = incrementalUpdater?.prepareIncremental?.(snapshot) || null;
+        const incremental = incrementalEngine?.prepare?.(snapshot) || null;
         const incrementalChanged = incremental?.changed === true;
         if (incremental && !incrementalChanged) {
           try {

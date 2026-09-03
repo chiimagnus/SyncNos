@@ -111,8 +111,8 @@ function createHarness(options?: {
         return { start: vi.fn(), stop };
       },
     },
-    incrementalUpdater: {
-      prepareIncremental: (snapshot: any) => ({
+    incrementalEngine: {
+      prepare: (snapshot: any) => ({
         changed: false,
         snapshot: { ...snapshot, conversation: { ...(snapshot?.conversation || {}) }, messages: [] },
         diff: { added: [], updated: [], removed: [] },

@@ -109,8 +109,8 @@ function createHarness(options: {
         return { start: () => {}, stop: () => {} };
       },
     },
-    incrementalUpdater: {
-      prepareIncremental: (snapshot: any) => {
+    incrementalEngine: {
+      prepare: (snapshot: any) => {
         incrementalCallCount += 1;
         const result =
           typeof options.incrementalImpl === 'function'

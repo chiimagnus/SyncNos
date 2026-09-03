@@ -69,7 +69,7 @@ describe('content-controller item mention setting', () => {
       inpageButton: null,
       inpageTip: null,
       runtimeObserver: null,
-      incrementalUpdater: null,
+      incrementalEngine: null,
       itemMention: { start },
     } as any);
 
@@ -94,7 +94,7 @@ describe('content-controller item mention setting', () => {
       inpageButton: null,
       inpageTip: null,
       runtimeObserver: null,
-      incrementalUpdater: null,
+      incrementalEngine: null,
       itemMention: { start },
     } as any);
 

@@ -108,7 +108,7 @@ function createHarness(options?: {
         return { start: () => {}, stop: () => {} };
       },
     },
-    incrementalUpdater: null,
+    incrementalEngine: null,
   });
   const resident = controller.start();
 

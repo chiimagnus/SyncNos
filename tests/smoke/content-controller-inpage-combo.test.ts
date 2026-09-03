@@ -83,8 +83,8 @@ function createHarness(options?: {
         return { start: () => {}, stop: () => {} };
       },
     },
-    incrementalUpdater: {
-      prepareIncremental: (snapshot: any) => {
+    incrementalEngine: {
+      prepare: (snapshot: any) => {
         const result =
           typeof options?.incrementalImpl === 'function' ? options.incrementalImpl(snapshot) : { changed: false };
         return {
