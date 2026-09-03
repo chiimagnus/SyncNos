@@ -32,6 +32,31 @@ export function fingerprintHash(base: string): string {
   return base;
 }
 
+export function classifyPrefixOrFillingUpdate(
+  prev: { text: string; markdown: string },
+  next: { text: string; markdown: string },
+): { changed: boolean; acceptable: boolean } {
+  const prevText = prev.text || '';
+  const nextText = next.text || '';
+  const prevMarkdown = prev.markdown || '';
+  const nextMarkdown = next.markdown || '';
+
+  const textFilled = !prevText && !!nextText;
+  const markdownFilled = !prevMarkdown && !!nextMarkdown;
+  const textGrew = !!(prevText && nextText && nextText.startsWith(prevText) && nextText.length > prevText.length);
+  const markdownGrew = !!(
+    prevMarkdown &&
+    nextMarkdown &&
+    nextMarkdown.startsWith(prevMarkdown) &&
+    nextMarkdown.length > prevMarkdown.length
+  );
+
+  return {
+    changed: prevText !== nextText || prevMarkdown !== nextMarkdown,
+    acceptable: textFilled || markdownFilled || textGrew || markdownGrew,
+  };
+}
+
 export function getMessageIdentityMeta(
   message: any,
   identityPrefixLen: number = IDENTITY_PREFIX_LEN,

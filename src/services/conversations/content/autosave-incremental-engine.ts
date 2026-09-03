@@ -1,10 +1,11 @@
 import normalizeApi from '@services/shared/normalize.ts';
 import {
   IDENTITY_PREFIX_LEN,
+  classifyPrefixOrFillingUpdate,
   computeRequiredOverlap,
   computeSuffixPrefixOverlap,
-  getMessageIdentityBase,
   fingerprintHash,
+  getMessageIdentityBase,
 } from '@services/conversations/content/autosave-identity-utils.ts';
 
 type Diff = { added: string[]; updated: string[]; removed: string[] };
@@ -20,7 +21,6 @@ type TailEntry = {
 };
 
 type ConversationState = {
-  key: string;
   revision: number;
   lastTitle: string;
   lastUrl: string;
@@ -28,7 +28,6 @@ type ConversationState = {
   lastWindowIdentityHashes: string[];
   lastTail: TailEntry[];
   incomingKeyIdentities: Map<string, IncomingKeyIdentity>;
-  initialized: boolean;
 };
 
 type ConversationStateDraft = {
@@ -37,18 +36,13 @@ type ConversationStateDraft = {
   lastWindowIdentityHashes: string[];
   lastTail: TailEntry[];
   incomingKeyOverlay: Map<string, IncomingKeyIdentity>;
-  initialized: boolean;
 };
 
-export type AutoSaveIncrementalPreparation = {
+type AutoSaveIncrementalPreparation = {
   changed: boolean;
   snapshot: any | null;
   diff: Diff;
   commit: () => boolean;
-};
-
-export type AutoSaveIncrementalEngine = {
-  prepare: (snapshot: any) => AutoSaveIncrementalPreparation;
 };
 
 function normalizeMeta(value: unknown): string {
@@ -66,29 +60,6 @@ function makeConversationStateKey(snapshot: any): string {
   const conversationKey = normalizeMeta(snapshot?.conversation?.conversationKey);
   if (!source || !conversationKey) return '';
   return `${source}::${conversationKey}`;
-}
-
-function isPrefixOrFillingUpdate(prev: { text: string; markdown: string }, next: { text: string; markdown: string }) {
-  const prevText = prev.text || '';
-  const nextText = next.text || '';
-  const prevMarkdown = prev.markdown || '';
-  const nextMarkdown = next.markdown || '';
-
-  const textFilled = !prevText && !!nextText;
-  const markdownFilled = !prevMarkdown && !!nextMarkdown;
-
-  const textGrew = !!(prevText && nextText && nextText.startsWith(prevText) && nextText.length > prevText.length);
-  const markdownGrew = !!(
-    prevMarkdown &&
-    nextMarkdown &&
-    nextMarkdown.startsWith(prevMarkdown) &&
-    nextMarkdown.length > prevMarkdown.length
-  );
-
-  return {
-    changed: prevText !== nextText || prevMarkdown !== nextMarkdown,
-    acceptable: textFilled || markdownFilled || textGrew || markdownGrew,
-  };
 }
 
 function buildTailEntries(args: {
@@ -119,7 +90,7 @@ function buildTailEntries(args: {
 
     return tryPick((p) => {
       if (p.role !== cur.role) return false;
-      const decision = isPrefixOrFillingUpdate(
+      const decision = classifyPrefixOrFillingUpdate(
         { text: p.text, markdown: p.markdown },
         { text: cur.text, markdown: cur.markdown },
       );
@@ -165,7 +136,7 @@ function noOpPreparation(): AutoSaveIncrementalPreparation {
   };
 }
 
-export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
+export function createAutoSaveIncrementalEngine() {
   const byConversation = new Map<string, ConversationState>();
   const TAIL_UPDATE_WINDOW_SIZE = 2;
   const MAX_WINDOW_MESSAGES = 200;
@@ -205,14 +176,12 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
           baseState.lastUrl = draft.lastUrl;
           baseState.lastWindowIdentityHashes = draft.lastWindowIdentityHashes;
           baseState.lastTail = draft.lastTail;
-          baseState.initialized = draft.initialized;
           for (const [key, identity] of draft.incomingKeyOverlay) {
             baseState.incomingKeyIdentities.set(key, identity);
           }
           baseState.revision += 1;
         } else {
           byConversation.set(stateKey, {
-            key: stateKey,
             revision: 1,
             lastTitle: draft.lastTitle,
             lastUrl: draft.lastUrl,
@@ -220,7 +189,6 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
             lastWindowIdentityHashes: draft.lastWindowIdentityHashes,
             lastTail: draft.lastTail,
             incomingKeyIdentities: new Map(draft.incomingKeyOverlay),
-            initialized: draft.initialized,
           });
         }
 
@@ -240,7 +208,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const baseState = byConversation.get(stateKey) || null;
       const stateKeyHash = baseState?.stateKeyHash || computeStateKeyHash(stateKey);
       const effectiveConversation = { ...(inputSnapshot.conversation || {}) };
-      if (baseState?.initialized) {
+      if (baseState) {
         if (!normalizeMeta(effectiveConversation.title) && baseState.lastTitle)
           effectiveConversation.title = baseState.lastTitle;
         if (!normalizeMeta(effectiveConversation.url) && baseState.lastUrl)
@@ -249,8 +217,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
 
       const nextTitle = normalizeMeta(effectiveConversation.title);
       const nextUrl = normalizeMeta(effectiveConversation.url);
-      const metaChanged =
-        !!baseState?.initialized && (nextTitle !== baseState.lastTitle || nextUrl !== baseState.lastUrl);
+      const metaChanged = !!baseState && (nextTitle !== baseState.lastTitle || nextUrl !== baseState.lastUrl);
 
       const allMessages = Array.isArray(inputSnapshot.messages) ? inputSnapshot.messages : [];
       const windowStart = Math.max(0, allMessages.length - MAX_WINDOW_MESSAGES);
@@ -281,7 +248,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
             incomingKeyOverlay.set(incomingKeyRaw, { role, text, markdown });
             stableIncomingKey = incomingKeyRaw;
           } else if (existing.role === role) {
-            const decision = isPrefixOrFillingUpdate(existing, { text, markdown });
+            const decision = classifyPrefixOrFillingUpdate(existing, { text, markdown });
             if (decision.acceptable) {
               incomingKeyOverlay.set(incomingKeyRaw, { role, text, markdown });
               stableIncomingKey = incomingKeyRaw;
@@ -329,7 +296,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
         }
       };
 
-      if (!baseState?.initialized) {
+      if (!baseState) {
         nextLastWindowIdentityHashes = currentIdentityHashes;
         nextLastTail = currentComparable
           .slice(Math.max(0, currentComparable.length - TAIL_UPDATE_WINDOW_SIZE))
@@ -376,7 +343,6 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
               lastWindowIdentityHashes: nextLastWindowIdentityHashes,
               lastTail: nextLastTail,
               incomingKeyOverlay,
-              initialized: true,
             },
             changed: true,
             snapshot: {
@@ -398,7 +364,6 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
             lastWindowIdentityHashes: nextLastWindowIdentityHashes,
             lastTail: nextLastTail,
             incomingKeyOverlay,
-            initialized: true,
           },
           changed: false,
           snapshot: { ...inputSnapshot, conversation: effectiveConversation, messages: [] },
@@ -419,7 +384,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
         const prevEntry = prevTail[index];
         const curEntry = curTail[index];
         if (!prevEntry || !curEntry || prevEntry.role !== curEntry.role) continue;
-        const decision = isPrefixOrFillingUpdate(
+        const decision = classifyPrefixOrFillingUpdate(
           { text: prevEntry.text || '', markdown: prevEntry.markdown || '' },
           { text: curEntry.text, markdown: curEntry.markdown },
         );
@@ -487,7 +452,6 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
           lastWindowIdentityHashes: nextLastWindowIdentityHashes,
           lastTail: nextLastTail,
           incomingKeyOverlay,
-          initialized: true,
         },
         changed,
         snapshot: {
