@@ -90,6 +90,53 @@ beforeEach(() => {
 });
 
 describe('content entrypoint listener readiness', () => {
+  it('routes an early current-page manual request through the controller persistence gate after readiness', async () => {
+    const locale = deferred<void>();
+    mocks.initializeLocale.mockReturnValue(locale.promise);
+    const rawCapture = vi.fn(async () => ({ title: 'raw' }));
+    const gatedCapture = vi.fn(async () => ({ title: 'gated' }));
+    mocks.createCurrentPageCaptureService.mockReturnValue({
+      getCurrentPageCaptureState: vi.fn(() => ({ available: true })),
+      captureCurrentPage: rawCapture,
+    });
+    mocks.createContentController.mockReturnValue({ captureCurrentPage: gatedCapture });
+
+    const listeners: any[] = [];
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => listeners.push(listener)),
+          removeListener: vi.fn(),
+        },
+      },
+    };
+
+    const main = await loadContentMain();
+    const started = Promise.resolve(main());
+    await flushMicrotasks();
+    expect(listeners).toHaveLength(4);
+
+    let response: any = null;
+    expect(
+      listeners[0]?.({ type: 'captureCurrentPage', payload: { source: 'popup' } }, {}, (value: any) => {
+        response = value;
+      }),
+    ).toBe(true);
+    await flushMicrotasks();
+    expect(rawCapture).not.toHaveBeenCalled();
+    expect(gatedCapture).not.toHaveBeenCalled();
+
+    locale.resolve();
+    await started;
+    await flushMicrotasks();
+
+    expect(gatedCapture).toHaveBeenCalledTimes(1);
+    expect(rawCapture).not.toHaveBeenCalled();
+    expect(response?.ok).toBe(true);
+    expect(response?.data).toEqual({ title: 'gated' });
+  });
+
   it('registers content message listeners before locale readiness settles', async () => {
     const locale = deferred<void>();
     mocks.initializeLocale.mockReturnValue(locale.promise);

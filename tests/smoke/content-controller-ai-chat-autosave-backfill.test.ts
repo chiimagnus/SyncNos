@@ -1066,6 +1066,103 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls[1].payload.mode).toBe('append');
   });
 
+  it('lets external current-page manual capture preempt an autosave still before durable persistence', async () => {
+    const autoCapture = deferred<any>();
+    let manualCaptureCount = 0;
+    const autoSnapshot = makeSnapshot('external-manual-preempt', ['Auto']);
+    const manualSnapshot = makeSnapshot('external-manual-preempt', ['Manual']);
+    const capture = vi.fn((input?: any) => {
+      if (input?.manual) {
+        manualCaptureCount += 1;
+        return manualSnapshot;
+      }
+      return autoCapture.promise;
+    });
+    const harness = createHarness({
+      snapshots: [autoSnapshot],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: 'auto-preempt' }],
+        },
+        diff: { added: ['auto-preempt'], updated: [], removed: [] },
+        commit: () => true,
+      }),
+    });
+    await harness.settle();
+    await harness.runTick();
+
+    const manualRun = harness.controller.captureCurrentPage();
+    await harness.settle();
+    expect(manualCaptureCount).toBe(0);
+
+    autoCapture.resolve(autoSnapshot);
+    await manualRun;
+    await harness.settle();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(1);
+    expect(syncCalls[0].payload.mode).not.toBe('append');
+    expect(manualCaptureCount).toBe(1);
+  });
+
+  it('waits for an already durable autosave before external current-page manual persistence', async () => {
+    const autoSync = deferred<any>();
+    let manualCaptureCount = 0;
+    const autoSnapshot = makeSnapshot('external-manual-durable', ['Auto']);
+    const manualSnapshot = makeSnapshot('external-manual-durable', ['Manual']);
+    const capture = vi.fn((input?: any) => {
+      if (input?.manual) {
+        manualCaptureCount += 1;
+        return manualSnapshot;
+      }
+      return autoSnapshot;
+    });
+    const harness = createHarness({
+      snapshots: [autoSnapshot],
+      collectorResolver: () => ({ id: 'gemini', collector: { capture } }),
+      incrementalImpl: (snapshot) => ({
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          conversation: { ...snapshot.conversation },
+          messages: [{ ...snapshot.messages[0], messageKey: 'auto-durable-external' }],
+        },
+        diff: { added: ['auto-durable-external'], updated: [], removed: [] },
+        commit: () => true,
+      }),
+      sendImpl: (type: string, payload?: any) => {
+        if (type === 'syncConversationMessages' && payload?.mode === 'append') return autoSync.promise;
+        return undefined;
+      },
+    });
+    await harness.settle();
+    await harness.runTick();
+    expect(
+      harness.sendCalls.filter(
+        (entry) => entry.type === 'syncConversationMessages' && entry.payload?.mode === 'append',
+      ),
+    ).toHaveLength(1);
+
+    const manualRun = harness.controller.captureCurrentPage();
+    await harness.settle();
+    expect(manualCaptureCount).toBe(0);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+
+    autoSync.resolve({ ok: true, data: { upserted: 1 } });
+    await manualRun;
+    await harness.settle();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[0].payload.mode).toBe('append');
+    expect(syncCalls[1].payload.mode).not.toBe('append');
+    expect(manualCaptureCount).toBe(1);
+  });
+
   it('keeps virtualized providers out of the auto-save source set', () => {
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('chatgpt')).toBe(false);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('googleaistudio')).toBe(false);

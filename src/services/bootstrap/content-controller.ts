@@ -158,7 +158,7 @@ export function createContentController(deps: Deps) {
     isAutoSaveEnabled: () => boolean;
     runAutoSaveTick: (request: AutoSaveRequest) => Promise<void>;
   };
-  type ManualPersistenceSlot = { ownerToken: number; state: 'pending' | 'inflight' };
+  type ManualPersistenceSlot = { ownerToken: number | null; state: 'pending' | 'inflight' };
 
   let residentOwnerSequence = 0;
   let activeResidentOwnerToken = 0;
@@ -262,8 +262,11 @@ export function createContentController(deps: Deps) {
     currentResidentAutoSaveHandle = null;
   }
 
-  async function runManualPersistence(ownerToken: number, task: () => Promise<void>): Promise<boolean> {
-    if (manualPersistence) return false;
+  async function enterManualPersistence(
+    ownerToken: number | null,
+    canStart: () => boolean,
+  ): Promise<ManualPersistenceSlot | null> {
+    if (manualPersistence) return null;
     const slot: ManualPersistenceSlot = { ownerToken, state: 'pending' };
     manualPersistence = slot;
 
@@ -276,23 +279,21 @@ export function createContentController(deps: Deps) {
       }
     }
 
-    if (manualPersistence !== slot || slot.state !== 'pending') return false;
-    if (!isCurrentResidentOwner(ownerToken)) {
+    if (manualPersistence !== slot || slot.state !== 'pending') return null;
+    if (!canStart()) {
       manualPersistence = null;
       drainLatestAutoSaveRequest();
-      return false;
+      return null;
     }
 
     slot.state = 'inflight';
-    try {
-      await task();
-      return true;
-    } finally {
-      if (manualPersistence === slot) {
-        manualPersistence = null;
-        drainLatestAutoSaveRequest();
-      }
-    }
+    return slot;
+  }
+
+  function exitManualPersistence(slot: ManualPersistenceSlot) {
+    if (manualPersistence !== slot) return;
+    manualPersistence = null;
+    drainLatestAutoSaveRequest();
   }
 
   function createAutoCaptureController(ownerToken: number) {
@@ -620,25 +621,26 @@ export function createContentController(deps: Deps) {
       }
 
       manualSaveInFlight = true;
+      let manualSlot: ManualPersistenceSlot | null = null;
       try {
-        await runManualPersistence(ownerToken, async () => {
-          if (stopped || !isCurrentResidentOwner(ownerToken)) return;
-          beginSaving();
-          try {
-            await currentPageCapture.captureCurrentPage({
-              onProgress: (progress) => {
-                if (!stopped && isCurrentResidentOwner(ownerToken)) {
-                  showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
-                }
-              },
-            });
-          } finally {
-            endSaving();
-          }
-        });
+        manualSlot = await enterManualPersistence(ownerToken, () => !stopped && isCurrentResidentOwner(ownerToken));
+        if (!manualSlot) return;
+        beginSaving();
+        try {
+          await currentPageCapture.captureCurrentPage({
+            onProgress: (progress) => {
+              if (!stopped && isCurrentResidentOwner(ownerToken)) {
+                showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
+              }
+            },
+          });
+        } finally {
+          endSaving();
+        }
       } catch (_error) {
         // tip already shown in progress callback
       } finally {
+        if (manualSlot) exitManualPersistence(manualSlot);
         manualSaveInFlight = false;
       }
     };
@@ -898,6 +900,17 @@ export function createContentController(deps: Deps) {
   }
 
   return {
+    async captureCurrentPage(
+      input?: Parameters<CurrentPageCaptureService['captureCurrentPage']>[0],
+    ): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
+      const manualSlot = await enterManualPersistence(null, () => true);
+      if (!manualSlot) throw new Error('manual_capture_in_progress');
+      try {
+        return await currentPageCapture.captureCurrentPage(input);
+      } finally {
+        exitManualPersistence(manualSlot);
+      }
+    },
     start() {
       const ownerToken = ++residentOwnerSequence;
       const controller = createAutoCaptureController(ownerToken);

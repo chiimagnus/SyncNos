@@ -495,7 +495,7 @@ describe('content-controller inpage combo', () => {
 
     const firstClick = cfg.onClick();
     const secondClick = cfg.onClick();
-    await Promise.resolve();
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
 
     expect(harness.sendCalls.filter((c) => c.type === 'upsertConversation')).toHaveLength(1);
 

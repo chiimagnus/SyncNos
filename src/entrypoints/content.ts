@@ -34,11 +34,18 @@ export default defineContentScript({
       runtime,
       collectorsRegistry,
     });
+    let captureCurrentPage = currentPageCapture.captureCurrentPage;
 
-    registerCurrentPageCaptureContentHandlers(currentPageCapture, {
-      inpageTip: inpageTipApi,
-      localeReady,
-    });
+    registerCurrentPageCaptureContentHandlers(
+      {
+        getCurrentPageCaptureState: currentPageCapture.getCurrentPageCaptureState,
+        captureCurrentPage: (input) => captureCurrentPage(input),
+      },
+      {
+        inpageTip: inpageTipApi,
+        localeReady,
+      },
+    );
     registerInpageCommentsPanelContentHandlers(runtime, {
       localeReady,
       createPanelApi: () => getInpageCommentsPanelApi(),
@@ -66,6 +73,7 @@ export default defineContentScript({
       incrementalUpdater: incrementalUpdaterApi,
       itemMention: itemMentionController,
     });
+    captureCurrentPage = controller.captureCurrentPage;
     startContentBootstrap({
       runtime,
       inpageButton: inpageButtonApi,
