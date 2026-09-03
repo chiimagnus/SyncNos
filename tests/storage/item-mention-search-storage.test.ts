@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBDatabase, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { DATA_REVISION_STORE_BY_SCOPE } from '@platform/idb/data-revision-record';
-import { closeDbForTests } from '@platform/idb/schema';
+import { closeDbForTests, openDb } from '@platform/idb/schema';
 import {
   __resetConversationStorageStateForTests,
   readConversationMentionCandidatePool,
@@ -13,6 +13,14 @@ function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('indexedDB request failed'));
+  });
+}
+
+function txDone(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('indexedDB transaction failed'));
+    transaction.onabort = () => reject(transaction.error || new Error('indexedDB transaction aborted'));
   });
 }
 
@@ -68,6 +76,40 @@ describe('item mention candidate pool storage', () => {
     );
     expect(res.scannedCount).toBe(2);
     expect(res.revision).toBe(2);
+  });
+
+  it('projects domain from the raw persisted listSiteKey instead of reparsing the row URL', async () => {
+    const db = await openDb();
+    const writeTx = db.transaction(['conversations'], 'readwrite');
+    const store = writeTx.objectStore('conversations');
+    // Test-only sentinel: the mismatch distinguishes raw-key projection from read-time URL normalization;
+    // malformed rows still are not a runtime compatibility contract.
+    const conversationId = Number(
+      await reqToPromise(
+        store.add({
+          sourceType: 'chat',
+          source: 'chatgpt',
+          conversationKey: 'raw-persisted-site-key',
+          title: 'Persisted site key sentinel',
+          url: 'https://url-derived.example/path',
+          listSourceKey: 'chatgpt',
+          listSiteKey: 'domain:persisted-contract.example',
+          lastCapturedAt: 1,
+        }),
+      ),
+    );
+    await txDone(writeTx);
+
+    const res = await readConversationMentionCandidatePool({ maxScan: 10, maxDurationMs: 10_000 });
+
+    expect(res.candidates).toEqual([
+      expect.objectContaining({
+        conversationId,
+        url: 'https://url-derived.example/path',
+        domain: 'persisted-contract.example',
+      }),
+    ]);
+    expect(res.revision).toBe(0);
   });
 
   it('does not stop after the first 50 rows and leaves matching entirely to the scorer', async () => {
