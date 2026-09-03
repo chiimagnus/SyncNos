@@ -111,7 +111,14 @@ function createHarness(options?: {
         return { start: vi.fn(), stop };
       },
     },
-    incrementalUpdater: { computeIncremental: () => ({ changed: false }) },
+    incrementalUpdater: {
+      prepareIncremental: (snapshot: any) => ({
+        changed: false,
+        snapshot: { ...snapshot, conversation: { ...(snapshot?.conversation || {}) }, messages: [] },
+        diff: { added: [], updated: [], removed: [] },
+        commit: () => true,
+      }),
+    },
     itemMention: options?.mentionStart ? { start: options.mentionStart } : null,
   });
 
@@ -216,16 +223,20 @@ describe('content-controller resident lifecycle', () => {
     await flush();
     await h.observerTicks[1]?.();
     const newClick = h.buttonConfigs.at(-1)?.onClick as (() => Promise<void>) | undefined;
-    const newRun = newClick?.();
+    await newClick?.();
     await flush();
-    expect(h.savingCalls.at(-1)).toBe(true);
+    expect(h.progressCallbacks).toHaveLength(1);
+    expect(h.savingCalls.at(-1)).toBe(false);
 
     h.progressCallbacks[0]?.({ message: 'stale progress', kind: 'default' });
     oldManual.resolve();
     await oldRun;
     expect(h.tipCalls).not.toContain('stale progress');
-    expect(h.savingCalls.at(-1)).toBe(true);
 
+    const newRun = newClick?.();
+    await flush();
+    expect(h.progressCallbacks).toHaveLength(2);
+    expect(h.savingCalls.at(-1)).toBe(true);
     newManual.resolve();
     await newRun;
     expect(h.savingCalls.at(-1)).toBe(false);

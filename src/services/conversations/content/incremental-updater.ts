@@ -2,17 +2,12 @@ import { createAutoSaveIncrementalEngine } from '@services/conversations/content
 
 const engine = createAutoSaveIncrementalEngine();
 
-export function computeIncremental(snapshot: any) {
-  return engine.compute(snapshot);
-}
-
-export function __resetForTests() {
-  engine.reset();
+export function prepareIncremental(snapshot: any) {
+  return engine.prepare(snapshot);
 }
 
 const incrementalUpdaterApi = {
-  computeIncremental,
-  __resetForTests,
+  prepareIncremental,
 };
 
 export default incrementalUpdaterApi;

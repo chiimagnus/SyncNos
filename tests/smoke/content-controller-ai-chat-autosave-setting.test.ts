@@ -134,7 +134,21 @@ function createHarness(options: {
         return { start: observerStart, stop: observerStop };
       },
     },
-    incrementalUpdater: { computeIncremental: incremental },
+    incrementalUpdater: {
+      prepareIncremental: (snapshot: any) => {
+        const result = incremental(snapshot) || { changed: false };
+        return {
+          changed: result?.changed === true,
+          snapshot: result?.snapshot || {
+            ...snapshot,
+            conversation: { ...(snapshot?.conversation || {}) },
+            messages: [],
+          },
+          diff: result?.diff || { added: [], updated: [], removed: [] },
+          commit: typeof result?.commit === 'function' ? result.commit : () => true,
+        };
+      },
+    },
     itemMention: options.itemMentionStart ? { start: options.itemMentionStart } : null,
   });
   const resident = controller.start();
@@ -148,6 +162,7 @@ function createHarness(options: {
     sendCalls,
     runTick: async () => {
       if (tick) await tick();
+      await flush();
     },
   };
 }

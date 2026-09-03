@@ -84,9 +84,19 @@ function createHarness(options?: {
       },
     },
     incrementalUpdater: {
-      computeIncremental: (snapshot: any) => {
-        if (typeof options?.incrementalImpl === 'function') return options.incrementalImpl(snapshot);
-        return { changed: false };
+      prepareIncremental: (snapshot: any) => {
+        const result =
+          typeof options?.incrementalImpl === 'function' ? options.incrementalImpl(snapshot) : { changed: false };
+        return {
+          changed: result?.changed === true,
+          snapshot: result?.snapshot || {
+            ...snapshot,
+            conversation: { ...(snapshot?.conversation || {}) },
+            messages: [],
+          },
+          diff: result?.diff || { added: [], updated: [], removed: [] },
+          commit: typeof result?.commit === 'function' ? result.commit : () => true,
+        };
       },
     },
     itemMention: null,
@@ -98,6 +108,7 @@ function createHarness(options?: {
     sendCalls,
     runTick: async () => {
       if (tickRef) await tickRef();
+      for (let i = 0; i < 16; i += 1) await Promise.resolve();
     },
     getButtonConfig: () => buttonConfig,
   };
