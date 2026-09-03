@@ -14,7 +14,7 @@ type MigrationContext = {
   tx: IDBTransaction;
 };
 
-type MigrationDone = (result: { ok: boolean; changed?: boolean; hadAny?: boolean }) => void;
+type MigrationDone = (result: { ok: boolean }) => void;
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
@@ -135,7 +135,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone
   function migrateMappingKey(input: { legacyKey: string; stableKey: string; onDone: MigrationDone }): void {
     const { legacyKey, stableKey, onDone } = input;
     if (!legacyKey || legacyKey === stableKey) {
-      onDone({ ok: true, changed: false });
+      onDone({ ok: true });
       return;
     }
 
@@ -143,7 +143,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone
     mapReq.onsuccess = () => {
       const mapping = mapReq.result as Record<string, unknown> | undefined;
       if (!mapping) {
-        onDone({ ok: true, changed: false });
+        onDone({ ok: true });
         return;
       }
 
@@ -161,82 +161,33 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone
             mappingsStore.delete(mappingId);
           }
         }
-        onDone({ ok: true, changed: true });
+        onDone({ ok: true });
       };
-      targetReq.onerror = () => onDone({ ok: false, changed: false });
+      targetReq.onerror = () => onDone({ ok: false });
     };
-    mapReq.onerror = () => onDone({ ok: false, changed: false });
+    mapReq.onerror = () => onDone({ ok: false });
   }
 
   function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
     const { dupId, keepId, onDone } = input;
-    let hadAny = false;
     let ok = true;
 
     function done() {
-      onDone({ ok, hadAny });
+      onDone({ ok });
     }
 
-    function tryFallbackCursor(): void {
-      try {
-        const cursorReq = messagesStore.openCursor();
-        cursorReq.onsuccess = () => {
-          const cursor = cursorReq.result;
-          if (!cursor) return done();
-
-          const msg = cursor.value as Record<string, unknown> | undefined;
-          if (!msg || Number(msg.conversationId) !== dupId) {
-            cursor.continue();
-            return;
-          }
-          hadAny = true;
-
-          const messageKey = msg.messageKey ? String(msg.messageKey) : '';
-          if (!messageKey) {
-            cursor.delete();
-            cursor.continue();
-            return;
-          }
-
-          const existsReq = messagesByKeyIndex.get([keepId, messageKey]);
-          existsReq.onsuccess = () => {
-            const existing = existsReq.result;
-            if (existing) {
-              cursor.delete();
-            } else {
-              msg.conversationId = keepId;
-              cursor.update(msg);
-            }
-            cursor.continue();
-          };
-          existsReq.onerror = () => {
-            ok = false;
-            done();
-          };
-        };
-        cursorReq.onerror = () => {
-          ok = false;
-          done();
-        };
-      } catch (_e) {
-        ok = false;
-        done();
-      }
+    const keyRangeApi = globalThis.IDBKeyRange;
+    const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
+    if (!range) {
+      onDone({ ok: false });
+      return;
     }
 
     try {
-      const keyRangeApi = globalThis.IDBKeyRange;
-      const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
-      if (!range) {
-        tryFallbackCursor();
-        return;
-      }
-
       const msgCursorReq = messagesBySequenceIndex.openCursor(range);
       msgCursorReq.onsuccess = () => {
         const cursor = msgCursorReq.result;
         if (!cursor) return done();
-        hadAny = true;
 
         const msg = cursor.value as Record<string, unknown> | undefined;
         const messageKey = msg?.messageKey ? String(msg.messageKey) : '';
@@ -262,11 +213,9 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone
           done();
         };
       };
-      msgCursorReq.onerror = () => {
-        tryFallbackCursor();
-      };
+      msgCursorReq.onerror = () => onDone({ ok: false });
     } catch (_e) {
-      tryFallbackCursor();
+      onDone({ ok: false });
     }
   }
 
@@ -486,17 +435,16 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
 
   function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
     const { dupId, keepId, onDone } = input;
-    let hadAny = false;
     let ok = true;
 
     function done() {
-      onDone({ ok, hadAny });
+      onDone({ ok });
     }
 
     const keyRangeApi = globalThis.IDBKeyRange;
     const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
     if (!range) {
-      onDone({ ok: false, hadAny: false });
+      onDone({ ok: false });
       return;
     }
 
@@ -505,7 +453,6 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
       cursorReq.onsuccess = () => {
         const cursor = cursorReq.result;
         if (!cursor) return done();
-        hadAny = true;
 
         const msg = cursor.value as Record<string, unknown> | undefined;
         const messageKey = safeString(msg?.messageKey);
@@ -535,7 +482,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
         done();
       };
     } catch (_e) {
-      onDone({ ok: false, hadAny: false });
+      onDone({ ok: false });
     }
   }
 
@@ -552,7 +499,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
     const fallbackNotionPageId = safeString(input.fallbackNotionPageId);
 
     if (!canonicalKey) {
-      input.onDone({ ok: true, changed: false });
+      input.onDone({ ok: true });
       return;
     }
 
@@ -563,12 +510,12 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
       const identity = { source: 'web', conversationKey: canonicalKey, fallbackNotionPageId };
       if (!legacySource || !legacyKey || (legacySource === 'web' && legacyKey === canonicalKey)) {
         if (!target) {
-          input.onDone({ ok: true, changed: false });
+          input.onDone({ ok: true });
           return;
         }
         const merged = mergeSyncMappingForIdentityMove(target, null, identity);
         if (JSON.stringify(merged) !== JSON.stringify(target)) mappingsStore.put(merged);
-        input.onDone({ ok: true, changed: true });
+        input.onDone({ ok: true });
         return;
       }
 
@@ -580,13 +527,13 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
             const merged = mergeSyncMappingForIdentityMove(target, null, identity);
             if (JSON.stringify(merged) !== JSON.stringify(target)) mappingsStore.put(merged);
           }
-          input.onDone({ ok: true, changed: false });
+          input.onDone({ ok: true });
           return;
         }
 
         if (!target) {
           mappingsStore.put(mergeSyncMappingForIdentityMove(null, legacy, identity));
-          input.onDone({ ok: true, changed: true });
+          input.onDone({ ok: true });
           return;
         }
 
@@ -596,11 +543,11 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
         if (Number.isFinite(legacyId) && legacyId > 0 && legacyId !== Number((target as { id?: unknown }).id)) {
           mappingsStore.delete(legacyId);
         }
-        input.onDone({ ok: true, changed: true });
+        input.onDone({ ok: true });
       };
-      legacyReq.onerror = () => input.onDone({ ok: false, changed: false });
+      legacyReq.onerror = () => input.onDone({ ok: false });
     };
-    targetReq.onerror = () => input.onDone({ ok: false, changed: false });
+    targetReq.onerror = () => input.onDone({ ok: false });
   }
 
   const cursorReq = conversationsStore.openCursor();

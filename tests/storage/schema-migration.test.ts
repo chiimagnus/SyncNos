@@ -304,7 +304,13 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     await txDone(t1);
     db1.close();
 
+    const objectStoreCursorSpy = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
     const db2 = await openDb();
+    const fullMessageStoreScans = objectStoreCursorSpy.mock.contexts.filter(
+      (context) => (context as IDBObjectStore | undefined)?.name === 'messages',
+    );
+    expect(fullMessageStoreScans).toHaveLength(0);
+    objectStoreCursorSpy.mockRestore();
 
     const t2 = db2.transaction(['conversations', 'messages'], 'readonly');
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
