@@ -136,13 +136,15 @@ export function createSyncJobLifecycle(options: SyncJobLifecycleOptions) {
       });
     }
 
+    const perConversation = orderedResults();
+    const conversationIds = perConversation.map((row) => row.conversationId);
     return cloneSnapshot({
       ...snapshot,
-      totalCount,
+      totalCount: conversationIds.length,
       okCount,
       failCount,
-      conversationIds: [...configuredIds],
-      perConversation: orderedResults(),
+      conversationIds,
+      perConversation,
     });
   };
 

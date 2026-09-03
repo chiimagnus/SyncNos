@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { normalizeSyncJobSnapshot } from '@services/sync/sync-job-store';
 import type { SyncJobSnapshot } from '@services/sync/models';
 
 function runningJob(conversationIds = [1, 2], overrides: Partial<SyncJobSnapshot> = {}): SyncJobSnapshot {
@@ -141,7 +142,15 @@ describe('sync job lifecycle', () => {
 
     expect(lifecycle.summary().results.map((row) => row.conversationId)).toEqual([1, 2, 3, 99, 100]);
     await lifecycle.finish();
-    expect(persist.mock.calls.at(-1)?.[0].conversationIds).toEqual([1, 2, 3]);
+    const terminal = persist.mock.calls.at(-1)?.[0];
+    expect(terminal).toMatchObject({
+      totalCount: 5,
+      conversationIds: [1, 2, 3, 99, 100],
+      okCount: 5,
+      failCount: 0,
+    });
+    expect(terminal?.perConversation.map((row) => row.conversationId)).toEqual([1, 2, 3, 99, 100]);
+    expect(normalizeSyncJobSnapshot('github', terminal)).toEqual(terminal);
   });
 
   it('falls back to the latest still-active worker when the current worker finishes', async () => {
