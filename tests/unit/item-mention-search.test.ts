@@ -82,6 +82,22 @@ describe('item-mention-search', () => {
     expect(res.candidates.map((c) => c.conversationId)).toEqual([2, 1, 3]);
   });
 
+  it('scores the entire candidate array before applying the final limit', () => {
+    const candidates = Array.from({ length: 60 }, (_, index) => ({
+      conversationId: index + 1,
+      title: index === 55 ? 'OpenAI' : `Weak ${index + 1}`,
+      source: index < 55 ? 'openai-weak' : 'chatgpt',
+      url: `https://example.com/${index + 1}`,
+      lastCapturedAt: 10_000 - index,
+      sourceType: 'chat',
+    }));
+
+    const res = searchMentionCandidates({ query: 'openai', candidates, limit: 20 });
+
+    expect(res.candidates).toHaveLength(20);
+    expect(res.candidates[0]?.conversationId).toBe(56);
+  });
+
   it('enforces max limit', () => {
     const candidates = Array.from({ length: 200 }, (_, i) => ({
       conversationId: i + 1,

@@ -2,9 +2,13 @@ import { ITEM_MENTION_MESSAGE_TYPES } from '@platform/messaging/message-contract
 import {
   getConversationById,
   getConversationDetail,
-  searchConversationMentionCandidates,
+  readConversationMentionCandidatePool,
 } from '@services/conversations/data/storage';
-import { normalizeMentionSearchLimit } from '@services/integrations/item-mention/mention-contract';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
+import {
+  normalizeMentionQuery,
+  normalizeMentionSearchLimit,
+} from '@services/integrations/item-mention/mention-contract';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 
@@ -15,28 +19,56 @@ type AnyRouter = {
 };
 
 export function registerItemMentionHandlers(router: AnyRouter) {
-  router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
-    const rawQuery = msg?.query ?? msg?.text ?? '';
-    const query = String(rawQuery || '');
-    const limit = normalizeMentionSearchLimit(msg?.limit, { defaultLimit: 20, maxLimit: 50 });
+  type MentionCandidatePool = Awaited<ReturnType<typeof readConversationMentionCandidatePool>>;
 
-    const storageRes = await searchConversationMentionCandidates({
-      query,
-      limit: 50,
-      maxScan: 2000,
-      maxDurationMs: 300,
-    });
+  let mentionCandidatePoolCache: MentionCandidatePool | null = null;
+  let mentionCandidatePoolLoadInFlight: Promise<MentionCandidatePool> | null = null;
 
-    const res = searchMentionCandidates({
-      query,
-      candidates: storageRes.candidates,
-      limit,
-    });
+  const loadMentionCandidatePoolSingleFlight = (): Promise<MentionCandidatePool> => {
+    if (mentionCandidatePoolLoadInFlight) return mentionCandidatePoolLoadInFlight;
+
+    const load = readConversationMentionCandidatePool({ maxScan: 2000, maxDurationMs: 300 })
+      .then((pool) => {
+        mentionCandidatePoolCache = pool;
+        return pool;
+      })
+      .finally(() => {
+        if (mentionCandidatePoolLoadInFlight === load) mentionCandidatePoolLoadInFlight = null;
+      });
+    mentionCandidatePoolLoadInFlight = load;
+    return load;
+  };
+
+  const respondWithPool = (pool: MentionCandidatePool, query: string, limit: number) => {
+    const res = searchMentionCandidates({ query, candidates: pool.candidates, limit });
     return router.ok({
       ...res,
-      scannedCount: storageRes.scannedCount,
-      truncatedByScanLimit: storageRes.truncatedByScanLimit,
+      scannedCount: pool.scannedCount,
+      truncatedByScanLimit: pool.truncatedByScanLimit,
     });
+  };
+
+  router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
+    const mentionQuery = normalizeMentionQuery(msg?.query ?? msg?.text ?? '');
+    const limit = normalizeMentionSearchLimit(msg?.limit, { defaultLimit: 20, maxLimit: 50 });
+
+    if (mentionQuery.empty) {
+      const recentPool = await readConversationMentionCandidatePool({ maxScan: limit, maxDurationMs: 300 });
+      return respondWithPool(recentPool, mentionQuery.raw, limit);
+    }
+
+    const observedRevision = await readDataRevision('conversations');
+    if (mentionCandidatePoolCache?.revision === observedRevision) {
+      return respondWithPool(mentionCandidatePoolCache, mentionQuery.raw, limit);
+    }
+
+    let pool = await loadMentionCandidatePoolSingleFlight();
+    if (pool.revision !== observedRevision) {
+      const currentRevision = await readDataRevision('conversations');
+      if (pool.revision !== currentRevision) pool = await loadMentionCandidatePoolSingleFlight();
+    }
+
+    return respondWithPool(pool, mentionQuery.raw, limit);
   });
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, async (msg) => {
