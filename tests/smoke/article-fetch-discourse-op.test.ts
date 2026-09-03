@@ -2,24 +2,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = {
   getConversationBySourceConversationKey: vi.fn(),
-  hasConversation: vi.fn(),
   upsertConversation: vi.fn(),
   syncConversationMessages: vi.fn(),
 };
 
 const settingsMocks = {
   storageGet: vi.fn(),
+  storageSet: vi.fn(),
 };
 
 vi.mock('@services/conversations/data/storage', () => ({
   getConversationBySourceConversationKey: storageMocks.getConversationBySourceConversationKey,
-  hasConversation: storageMocks.hasConversation,
   upsertConversation: storageMocks.upsertConversation,
   syncConversationMessages: storageMocks.syncConversationMessages,
 }));
 
 vi.mock('@platform/storage/local', () => ({
   storageGet: settingsMocks.storageGet,
+  storageSet: settingsMocks.storageSet,
 }));
 
 vi.mock('@services/conversations/data/image-inline', () => ({
@@ -40,18 +40,17 @@ async function loadArticleFetchModule() {
 afterEach(() => {
   vi.restoreAllMocks();
   storageMocks.getConversationBySourceConversationKey.mockReset();
-  storageMocks.hasConversation.mockReset();
   storageMocks.upsertConversation.mockReset();
   storageMocks.syncConversationMessages.mockReset();
   settingsMocks.storageGet.mockReset();
+  settingsMocks.storageSet.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
 
 describe('article-fetch discourse OP', () => {
   it('keeps topic canonical url and OP content after /20 -> /1 fallback', async () => {
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(async (payload: any) => ({ id: 51, ...payload }));
+    storageMocks.upsertConversation.mockImplementation(async (payload: any) => ({ id: 51, ...payload, __isNew: true }));
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 

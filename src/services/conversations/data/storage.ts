@@ -59,10 +59,6 @@ export async function upsertConversation(payload: any) {
   return await idb.upsertConversation(payload);
 }
 
-export async function hasConversation(payload: any) {
-  return await idb.hasConversation(payload);
-}
-
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],

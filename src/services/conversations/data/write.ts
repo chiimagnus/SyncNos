@@ -1,7 +1,7 @@
 import type { Conversation } from '@services/conversations/domain/models';
 import { syncConversationMessages, upsertConversation } from '@services/conversations/data/storage';
 
-export async function writeConversationSnapshot(payload: any): Promise<Conversation> {
+export async function writeConversationSnapshot(payload: any): Promise<Conversation & { __isNew: boolean }> {
   return upsertConversation(payload);
 }
 

@@ -27,7 +27,10 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
-import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import {
+  deriveConversationListStoredSiteKeyFromUrl,
+  normalizeConversationListRecord,
+} from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
 import {
   areSyncMappingsBusinessEquivalent,
@@ -205,11 +208,33 @@ async function findExistingArticleConversationByUrl(
 ): Promise<any | null> {
   const normalizedUrl = canonicalizeArticleUrl(rawUrl);
   if (!normalizedUrl) return null;
-  const rows = (await reqToPromise(conversationsStore.getAll() as any)) as any[];
-  const matched = rows.filter((row) => {
-    if (safeString(row?.sourceType).toLowerCase() !== 'article') return false;
-    return canonicalizeArticleUrl(row?.url) === normalizedUrl;
+  const siteKey = deriveConversationListStoredSiteKeyFromUrl(normalizedUrl);
+  if (!siteKey || siteKey === 'unknown') return null;
+
+  const index = conversationsStore.index('by_listSiteKey_lastCapturedAt_id');
+  const range = globalThis.IDBKeyRange.bound(
+    [siteKey, -Infinity, -Infinity] as any,
+    [siteKey, Infinity, Infinity] as any,
+  );
+  const matched: any[] = [];
+  const cursorReq = index.openCursor(range);
+  await new Promise<void>((resolve, reject) => {
+    cursorReq.onerror = () => reject(cursorReq.error || new Error('article identity cursor failed'));
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result as IDBCursorWithValue | null;
+      if (!cursor) return resolve();
+      const row = cursor.value as any;
+      if (
+        safeString(row?.sourceType).toLowerCase() === 'article' &&
+        canonicalizeArticleUrl(row?.url) === normalizedUrl
+      ) {
+        matched.push(row);
+      }
+      cursor.continue();
+    };
   });
+
+  // ponytail: 同站点 fallback 仍是 O(site rows)；只有实测成为热点时才值得新增 canonical URL identity index。
   return pickPreferredArticleConversation(matched);
 }
 
@@ -242,15 +267,6 @@ async function findExistingConversationForPayload(
     existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
   }
   return existing || null;
-}
-
-export async function hasConversation(payload: any): Promise<boolean> {
-  if (!payload) return false;
-  const db = await openDb();
-  const { t, stores } = tx(db, ['conversations'], 'readonly');
-  const existing = await findExistingConversationForPayload(stores.conversations, payload);
-  await txDone(t);
-  return !!existing;
 }
 
 function pickMaxFiniteNumber(...values: unknown[]): number | null {
@@ -418,7 +434,7 @@ async function migrateSyncMappingKey(
   return { syncMappingChanged };
 }
 
-export async function upsertConversation(payload: any): Promise<Conversation> {
+export async function upsertConversation(payload: any): Promise<Conversation & { __isNew: boolean }> {
   const db = await openDb();
   const outcome = await runTrackedTransaction(
     {
@@ -504,18 +520,18 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
           await reqToPromise(stores.conversations.put(record));
           markChanged('conversations');
         }
-        return { record, conversationChanged };
+        return { record, conversationChanged, isNew: false };
       }
 
       const id = await reqToPromise(stores.conversations.add(record));
       record.id = id as any;
       markChanged('conversations');
-      return { record, conversationChanged: true };
+      return { record, conversationChanged: true, isNew: true };
     },
   );
 
   if (outcome.conversationChanged) invalidateConversationListStatsCache();
-  return outcome.record;
+  return { ...outcome.record, __isNew: outcome.isNew };
 }
 
 export async function mergeConversationsByIds(input: {

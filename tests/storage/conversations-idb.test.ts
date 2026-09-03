@@ -173,15 +173,55 @@ describe('conversations storage-idb', () => {
 
     const created = await upsertConversation(payload);
     expect(Number(created.id)).toBeGreaterThan(0);
+    expect(created.__isNew).toBe(true);
     expect(await readDataRevision('conversations')).toBe(1);
     expect(await readDataRevision('sync_mappings')).toBe(0);
     expect(await readDataRevision('article_comments')).toBe(0);
 
     const repeated = await upsertConversation(payload);
     expect(Number(repeated.id)).toBe(Number(created.id));
+    expect(repeated.__isNew).toBe(false);
     expect(await readDataRevision('conversations')).toBe(1);
     expect(await readDataRevision('sync_mappings')).toBe(0);
     expect(await readDataRevision('article_comments')).toBe(0);
+
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readonly');
+    const persisted = await reqToPromise<any>(tx.objectStore('conversations').get(Number(created.id)));
+    await txDone(tx);
+    expect(Object.prototype.hasOwnProperty.call(persisted, '__isNew')).toBe(false);
+  });
+
+  it('keeps canonical article exact hits on the exact index without running the site fallback cursor', async () => {
+    const created = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/exact',
+      title: 'Exact',
+      url: 'https://example.com/exact',
+      lastCapturedAt: 1,
+    });
+    expect(created.__isNew).toBe(true);
+
+    const openCursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
+    try {
+      const repeated = await upsertConversation({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/exact',
+        title: 'Exact updated',
+        url: 'https://example.com/exact#fragment',
+        lastCapturedAt: 2,
+      });
+      expect(Number(repeated.id)).toBe(Number(created.id));
+      expect(repeated.__isNew).toBe(false);
+      const siteFallbackCursors = openCursorSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_listSiteKey_lastCapturedAt_id',
+      );
+      expect(siteFallbackCursors).toHaveLength(0);
+    } finally {
+      openCursorSpy.mockRestore();
+    }
   });
 
   it('preserves persisted mapping mirrors and unknown fields across an identical upsert', async () => {
@@ -2560,16 +2600,18 @@ describe('conversations storage-idb', () => {
     const mappings = t.objectStore('sync_mappings');
 
     const legacyId = await reqToPromise<number>(
-      conversations.add({
-        sourceType: 'article',
-        source: 'article',
-        conversationKey: 'article_https://example.com/post',
-        title: 'Legacy title',
-        url: 'https://example.com/post#frag',
-        notionPageId: 'page_old',
-        warningFlags: [],
-        lastCapturedAt: 1,
-      }),
+      conversations.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'article',
+          conversationKey: 'article_https://example.com/post',
+          title: 'Legacy title',
+          url: 'https://example.com/post#frag',
+          notionPageId: 'page_old',
+          warningFlags: [],
+          lastCapturedAt: 1,
+        }),
+      ),
     );
 
     await reqToPromise(
@@ -2604,6 +2646,7 @@ describe('conversations storage-idb', () => {
     });
 
     expect(Number(conversation.id)).toBe(legacyId);
+    expect(conversation.__isNew).toBe(false);
     expect(conversation.source).toBe('web');
     expect(conversation.conversationKey).toBe('article:https://example.com/post');
     expect(conversation.url).toBe('https://example.com/post');
@@ -2621,7 +2664,10 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/post',
       url: 'https://example.com/post',
       notionPageId: 'page_old',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
     });
+    expect(Object.prototype.hasOwnProperty.call(verifyConversations[0], '__isNew')).toBe(false);
     expect(verifyMappings).toHaveLength(1);
     expect(verifyMappings[0]).toMatchObject({
       source: 'web',
@@ -2637,6 +2683,212 @@ describe('conversations storage-idb', () => {
       feishuLastContentHash: 'hash-old',
       futureMetadata: { keep: true },
     });
+  });
+
+  it('limits legacy article fallback to the target site without materializing the conversation store', async () => {
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations'], 'readwrite');
+    const store = seedTx.objectStore('conversations');
+    const targetId = await reqToPromise<number>(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-web-clipper',
+          conversationKey: 'legacy-target',
+          title: 'Legacy target',
+          url: 'https://example.com/post?legacy=1#frag',
+          lastCapturedAt: 10,
+        }),
+      ),
+    );
+    await reqToPromise(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-wrong-url',
+          conversationKey: 'legacy-wrong-url',
+          title: 'Wrong url',
+          url: 'https://example.com/other',
+          lastCapturedAt: 11,
+        }),
+      ),
+    );
+    for (const sourceType of ['chat', 'video']) {
+      await reqToPromise(
+        store.add(
+          normalizeConversationListRecord({
+            sourceType,
+            source: `legacy-${sourceType}`,
+            conversationKey: `legacy-${sourceType}`,
+            title: sourceType,
+            url: 'https://example.com/post?legacy=1',
+            lastCapturedAt: 12,
+          }),
+        ),
+      );
+    }
+    for (let index = 0; index < 30; index += 1) {
+      await reqToPromise(
+        store.add(
+          normalizeConversationListRecord({
+            sourceType: 'article',
+            source: `other-${index}`,
+            conversationKey: `other-${index}`,
+            title: `Other ${index}`,
+            url: `https://other-${index}.example.net/post`,
+            lastCapturedAt: 100 + index,
+          }),
+        ),
+      );
+    }
+    await txDone(seedTx);
+
+    const getAllSpy = vi.spyOn(IDBObjectStore.prototype, 'getAll');
+    const openCursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
+    try {
+      const conversation = await upsertConversation({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/post?legacy=1',
+        title: 'Canonical',
+        url: 'https://example.com/post?legacy=1',
+        lastCapturedAt: 200,
+      });
+      expect(Number(conversation.id)).toBe(targetId);
+      expect(conversation.__isNew).toBe(false);
+
+      const conversationGetAlls = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBObjectStore)?.name || '') === 'conversations',
+      );
+      expect(conversationGetAlls).toHaveLength(0);
+      const siteCursorCalls = openCursorSpy.mock.calls.filter(
+        (_call, index) =>
+          String((openCursorSpy.mock.contexts[index] as IDBIndex)?.name || '') === 'by_listSiteKey_lastCapturedAt_id',
+      );
+      expect(siteCursorCalls).toHaveLength(1);
+      const range = siteCursorCalls[0]?.[0] as IDBKeyRange;
+      expect((range.lower as any[])?.[0]).toBe('domain:example.com');
+      expect((range.upper as any[])?.[0]).toBe('domain:example.com');
+    } finally {
+      getAllSpy.mockRestore();
+      openCursorSpy.mockRestore();
+    }
+  });
+
+  it('prefers a notion-mapped legacy article over a newer unmapped same-url fallback candidate', async () => {
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    const store = tx.objectStore('conversations');
+    const mappedId = await reqToPromise<number>(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-mapped',
+          conversationKey: 'mapped',
+          title: 'Mapped',
+          url: 'https://example.com/preferred',
+          notionPageId: 'page-mapped',
+          lastCapturedAt: 10,
+        }),
+      ),
+    );
+    await reqToPromise(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-newer',
+          conversationKey: 'newer',
+          title: 'Newer',
+          url: 'https://example.com/preferred',
+          lastCapturedAt: 100,
+        }),
+      ),
+    );
+    await txDone(tx);
+
+    const conversation = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/preferred',
+      title: 'Canonical',
+      url: 'https://example.com/preferred',
+      lastCapturedAt: 200,
+    });
+    expect(Number(conversation.id)).toBe(mappedId);
+  });
+
+  it('prefers recency and then the larger id among unmapped same-url fallback candidates', async () => {
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    const store = tx.objectStore('conversations');
+    await reqToPromise(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-old',
+          conversationKey: 'old',
+          title: 'Old',
+          url: 'https://example.com/tiebreak',
+          lastCapturedAt: 10,
+        }),
+      ),
+    );
+    await reqToPromise(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-new-a',
+          conversationKey: 'new-a',
+          title: 'New A',
+          url: 'https://example.com/tiebreak',
+          lastCapturedAt: 100,
+        }),
+      ),
+    );
+    const expectedId = await reqToPromise<number>(
+      store.add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'legacy-new-b',
+          conversationKey: 'new-b',
+          title: 'New B',
+          url: 'https://example.com/tiebreak',
+          lastCapturedAt: 100,
+        }),
+      ),
+    );
+    await txDone(tx);
+
+    const conversation = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/tiebreak',
+      title: 'Canonical',
+      url: 'https://example.com/tiebreak',
+      lastCapturedAt: 200,
+    });
+    expect(Number(conversation.id)).toBe(expectedId);
+  });
+
+  it('does not run article URL fallback for non-article payloads', async () => {
+    const openCursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
+    try {
+      const conversation = await upsertConversation({
+        sourceType: 'chat',
+        source: 'web',
+        conversationKey: 'chat-no-article-fallback',
+        title: 'Chat',
+        url: 'https://example.com/preferred',
+        lastCapturedAt: 1,
+      });
+      expect(conversation.__isNew).toBe(true);
+      const siteFallbackCursors = openCursorSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_listSiteKey_lastCapturedAt_id',
+      );
+      expect(siteFallbackCursors).toHaveLength(0);
+    } finally {
+      openCursorSpy.mockRestore();
+    }
   });
 
   it('merges conversations by ids and migrates messages + sync mappings', async () => {

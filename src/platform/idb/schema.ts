@@ -7,7 +7,7 @@ import {
 import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 10;
+export const DB_VERSION = 11;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -52,10 +52,7 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   return Array.from(values);
 }
 
-function normalizeConversationListStoredKeys(
-  { db, tx }: MigrationContext,
-  options: { stripLegacyDescription?: boolean } = {},
-): void {
+function normalizeConversationRecordsForV11({ db, tx }: MigrationContext): void {
   if (!db.objectStoreNames.contains('conversations')) return;
   const conversationsStore = tx.objectStore('conversations');
   const req = conversationsStore.openCursor();
@@ -64,38 +61,16 @@ function normalizeConversationListStoredKeys(
     if (!cursor) return;
     const value = (cursor.value || {}) as Record<string, unknown>;
     const normalized = normalizeConversationListRecord(value);
-    const hasLegacyDescription =
-      options.stripLegacyDescription === true && Object.prototype.hasOwnProperty.call(value, 'description');
-    if (normalized !== value || hasLegacyDescription) {
-      const next = { ...normalized } as Record<string, unknown>;
-      if (hasLegacyDescription) delete (next as any).description;
-      cursor.update(next as any);
+    const next = { ...normalized } as Record<string, unknown>;
+    let changed = normalized !== value;
+    for (const key of ['description', '__canonicalUrl', '__canonicalKey']) {
+      if (!Object.prototype.hasOwnProperty.call(next, key)) continue;
+      delete next[key];
+      changed = true;
     }
+    if (changed) cursor.update(next as any);
     cursor.continue();
   };
-}
-
-function stripConversationDescriptionField({ db, tx }: MigrationContext): void {
-  if (!db.objectStoreNames.contains('conversations')) return;
-  const conversationsStore = tx.objectStore('conversations');
-
-  try {
-    const req = conversationsStore.openCursor();
-    req.onsuccess = () => {
-      const cursor = req.result;
-      if (!cursor) return;
-      const value = cursor.value as Record<string, unknown> | undefined;
-      if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'description')) {
-        const next = { ...(value as any) };
-        delete (next as any).description;
-        cursor.update(next as any);
-      }
-      cursor.continue();
-    };
-    req.onerror = () => {};
-  } catch (_e) {
-    // ignore
-  }
 }
 
 function pickMaxFiniteNumber(...values: unknown[]): number | null {
@@ -130,10 +105,10 @@ function notionAiCanonicalChatUrl(threadId: string): string {
   return threadId ? `https://app.notion.com/chat?t=${threadId}&wfv=chat` : '';
 }
 
-function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void {
-  if (!db.objectStoreNames.contains('conversations')) return;
-  if (!db.objectStoreNames.contains('messages')) return;
-  if (!db.objectStoreNames.contains('sync_mappings')) return;
+function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone: () => void): void {
+  if (!db.objectStoreNames.contains('conversations')) return onDone();
+  if (!db.objectStoreNames.contains('messages')) return onDone();
+  if (!db.objectStoreNames.contains('sync_mappings')) return onDone();
 
   const conversationsStore = tx.objectStore('conversations');
   const messagesStore = tx.objectStore('messages');
@@ -150,9 +125,9 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
     mappingIdx = mappingsStore.index('by_source_conversationKey');
     convoKeyIdx = conversationsStore.index('by_source_conversationKey');
   } catch (_e) {
-    return;
+    return onDone();
   }
-  if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return;
+  if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return onDone();
   const messagesBySequenceIndex = msgSeqIdx;
   const messagesByKeyIndex = msgKeyIdx;
   const mappingsBySourceConversationKeyIndex = mappingIdx;
@@ -323,7 +298,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
     let threadIndex = 0;
 
     const processNextThread = () => {
-      if (threadIndex >= threads.length) return;
+      if (threadIndex >= threads.length) return onDone();
       const [threadId, groupedConversations] = threads[threadIndex];
       threadIndex += 1;
 
@@ -461,12 +436,13 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
 
     processNextThread();
   };
+  cursorReq.onerror = () => onDone();
 }
 
-function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
-  if (!db.objectStoreNames.contains('conversations')) return;
-  if (!db.objectStoreNames.contains('messages')) return;
-  if (!db.objectStoreNames.contains('sync_mappings')) return;
+function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone: () => void): void {
+  if (!db.objectStoreNames.contains('conversations')) return onDone();
+  if (!db.objectStoreNames.contains('messages')) return onDone();
+  if (!db.objectStoreNames.contains('sync_mappings')) return onDone();
 
   const conversationsStore = tx.objectStore('conversations');
   const messagesStore = tx.objectStore('messages');
@@ -483,9 +459,9 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     mappingIdx = mappingsStore.index('by_source_conversationKey');
     convoKeyIdx = conversationsStore.index('by_source_conversationKey');
   } catch (_e) {
-    return;
+    return onDone();
   }
-  if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return;
+  if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return onDone();
 
   const messagesBySequenceIndex = msgSeqIdx;
   const messagesByKeyIndex = msgKeyIdx;
@@ -663,7 +639,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     let groupIndex = 0;
 
     const processNextGroup = () => {
-      if (groupIndex >= entries.length) return;
+      if (groupIndex >= entries.length) return onDone();
       const [canonicalKey, groupedConversations] = entries[groupIndex];
       groupIndex += 1;
       const canonicalUrl = safeString(groupedConversations[0]?.__canonicalUrl);
@@ -720,6 +696,8 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
           for (const conversation of mergedConversations) {
             mergedKeep = mergeConversationRecord(mergedKeep, conversation);
           }
+          delete mergedKeep.__canonicalUrl;
+          delete mergedKeep.__canonicalKey;
           conversationsStore.put(mergedKeep);
 
           migrateMappingToCanonical({
@@ -774,6 +752,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
 
     processNextGroup();
   };
+  cursorReq.onerror = () => onDone();
 }
 
 function ensureConversationsStore(db: IDBDatabase, tx: IDBTransaction | null): void {
@@ -943,34 +922,23 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureGithubCleanupOutboxStore(db, tx);
   ensureDataRevisionStores(db);
 
-  if (tx && oldVersion < 2) {
+  if (!tx || oldVersion === 0 || oldVersion >= 11) return;
+
+  const finish = () => normalizeConversationRecordsForV11({ db, tx });
+  const migrateArticles = () => {
+    if (oldVersion >= 4) return finish();
     try {
-      migrateNotionAiThreadConversations({ db, tx });
+      migrateLegacyArticleConversations({ db, tx }, finish);
     } catch (_e) {
-      // ignore migration failures to avoid open abortion
+      finish();
     }
-  }
-  if (tx && oldVersion < 4) {
-    try {
-      migrateLegacyArticleConversations({ db, tx });
-    } catch (_e) {
-      // ignore migration failures to avoid open abortion
-    }
-  }
-  if (tx && oldVersion < 6) {
-    try {
-      stripConversationDescriptionField({ db, tx });
-    } catch (_e) {
-      // ignore migration failures to avoid open abortion
-    }
-  }
-  if (tx && oldVersion < 8) {
-    // Consistency-critical migration for list pagination/filter keys.
-    // Do not swallow failures here, otherwise list indexes and record keys may drift.
-    normalizeConversationListStoredKeys({ db, tx }, { stripLegacyDescription: true });
-  } else if (tx && oldVersion < 10) {
-    // v8/v9 already have list indexes but may contain stale or malformed persisted keys.
-    normalizeConversationListStoredKeys({ db, tx });
+  };
+
+  if (oldVersion >= 2) return migrateArticles();
+  try {
+    migrateNotionAiThreadConversations({ db, tx }, migrateArticles);
+  } catch (_e) {
+    migrateArticles();
   }
 }
 
