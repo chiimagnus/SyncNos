@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { forceCloseDatabase, IDBKeyRange, IDBVersionChangeEvent, indexedDB } from 'fake-indexeddb';
+import { forceCloseDatabase, IDBKeyRange, IDBObjectStore, IDBVersionChangeEvent, indexedDB } from 'fake-indexeddb';
 import {
   DATA_REVISION_RECORD_KEY,
   DATA_REVISION_SCOPES,
@@ -876,7 +876,22 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     await txDone(t1);
     db1.close();
 
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put');
     const db2 = await openDb();
+    const migrationPut = putSpy.mock.calls.find((call, index) => {
+      const store = putSpy.mock.contexts[index] as IDBObjectStore | undefined;
+      const value = call[0] as Record<string, unknown> | undefined;
+      return store?.name === 'conversations' && value?.conversationKey === 'article:https://example.com/post';
+    })?.[0] as Record<string, unknown> | undefined;
+    expect(migrationPut).toMatchObject({
+      source: 'web',
+      listSourceKey: 'web',
+      listSiteKey: 'domain:example.com',
+    });
+    expect(Object.prototype.hasOwnProperty.call(migrationPut, '__canonicalUrl')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(migrationPut, '__canonicalKey')).toBe(false);
+    putSpy.mockRestore();
+
     const t2 = db2.transaction(['conversations', 'messages', 'sync_mappings'], 'readonly');
     const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll());
     const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll());

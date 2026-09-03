@@ -698,6 +698,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone:
           }
           delete mergedKeep.__canonicalUrl;
           delete mergedKeep.__canonicalKey;
+          mergedKeep = normalizeConversationListRecord(mergedKeep) as Record<string, unknown>;
           conversationsStore.put(mergedKeep);
 
           migrateMappingToCanonical({
