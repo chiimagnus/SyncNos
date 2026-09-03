@@ -5,75 +5,191 @@ import {
   normalizeReaderPrefs,
   resolveReaderPrefsFromStorage,
   type ReaderPrefs,
+  type ReaderPrefsPatch,
 } from '@services/protocols/reader-prefs';
 import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
 
 export type UseReaderPrefsResult = {
-  /** Current normalized reader preferences (always a valid, fully-populated object). */
   prefs: ReaderPrefs;
-  /**
-   * Shallow-merge a patch into the current prefs, persist it, and update local state.
-   * `tts` is merged one level deep so callers can patch a single TTS field.
-   */
-  update: (patch: Partial<ReaderPrefs>) => Promise<void>;
+  update: (patch: ReaderPrefsPatch) => Promise<void>;
+  preview: (patch: ReaderPrefsPatch) => void;
+  commitPreview: () => Promise<void>;
 };
 
-/**
- * Reader-preference view-model hook.
- *
- * Single source of truth is `chrome.storage.local` under `reader_prefs_v1`; this
- * hook mirrors that store into React state and keeps every open surface in sync
- * via `storage.onChanged`. The settings scene also reads/writes the same key, so
- * changes made there propagate here (and vice-versa) without prop drilling.
- *
- * Framework-agnostic logic (model, normalize, migrate, css vars) lives in
- * `@services/protocols/reader-prefs`; this hook only owns React wiring.
- */
-export function useReaderPrefs(): UseReaderPrefsResult {
-  const [prefs, setPrefs] = useState<ReaderPrefs>(() => resolveReaderPrefsFromStorage(null));
-  const prefsRef = useRef<ReaderPrefs>(prefs);
-  prefsRef.current = prefs;
+function mergePatch(left: ReaderPrefsPatch, right: ReaderPrefsPatch): ReaderPrefsPatch {
+  return {
+    ...left,
+    ...right,
+    ...(left.tts || right.tts ? { tts: { ...(left.tts ?? {}), ...(right.tts ?? {}) } } : {}),
+  };
+}
 
-  // Initial hydrate from storage.
+function applyPatch(base: ReaderPrefs, patch: ReaderPrefsPatch): ReaderPrefs {
+  return normalizeReaderPrefs({
+    ...base,
+    ...patch,
+    tts: { ...base.tts, ...(patch.tts ?? {}) },
+  });
+}
+
+function hasPatch(patch: ReaderPrefsPatch): boolean {
+  return Object.keys(patch).length > 0;
+}
+
+function prefsEqual(left: ReaderPrefs, right: ReaderPrefs): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function useReaderPrefs(): UseReaderPrefsResult {
+  const initial = resolveReaderPrefsFromStorage(null);
+  const [prefs, setPrefs] = useState<ReaderPrefs>(initial);
+  const durablePrefsRef = useRef<ReaderPrefs>(initial);
+  const dirtyPatchRef = useRef<ReaderPrefsPatch>({});
+  const displayPrefsRef = useRef<ReaderPrefs>(initial);
+  const previewGenerationRef = useRef(0);
+  const durableObservationGenerationRef = useRef(0);
+  const disposedRef = useRef(false);
+  const writerPromiseRef = useRef<Promise<void> | null>(null);
+  const hydrationSettledRef = useRef(false);
+  const hydrationReadyResolveRef = useRef<() => void>(() => {});
+  const hydrationReadyPromiseRef = useRef<Promise<void> | null>(null);
+  if (!hydrationReadyPromiseRef.current) {
+    hydrationReadyPromiseRef.current = new Promise<void>((resolve) => {
+      hydrationReadyResolveRef.current = resolve;
+    });
+  }
+
+  const publishDisplay = useCallback((next: ReaderPrefs) => {
+    displayPrefsRef.current = next;
+    if (!disposedRef.current) setPrefs(next);
+  }, []);
+
+  const publishMergedDisplay = useCallback(() => {
+    publishDisplay(applyPatch(durablePrefsRef.current, dirtyPatchRef.current));
+  }, [publishDisplay]);
+
+  const applyDurableObservation = useCallback(
+    (next: ReaderPrefs) => {
+      durablePrefsRef.current = normalizeReaderPrefs(next);
+      durableObservationGenerationRef.current += 1;
+      publishMergedDisplay();
+    },
+    [publishMergedDisplay],
+  );
+
+  const markHydrationReady = useCallback(() => {
+    if (hydrationSettledRef.current) return;
+    hydrationSettledRef.current = true;
+    hydrationReadyResolveRef.current();
+  }, []);
+
+  const runWriter = useCallback(async () => {
+    await hydrationReadyPromiseRef.current;
+    while (hasPatch(dirtyPatchRef.current)) {
+      const generationAtStart = previewGenerationRef.current;
+      const next = applyPatch(durablePrefsRef.current, dirtyPatchRef.current);
+
+      if (prefsEqual(next, durablePrefsRef.current)) {
+        if (previewGenerationRef.current === generationAtStart) {
+          dirtyPatchRef.current = {};
+          publishDisplay(durablePrefsRef.current);
+        }
+        continue;
+      }
+
+      const observationAtStart = durableObservationGenerationRef.current;
+      try {
+        await storageSet(buildReaderPrefsStoragePatch(next));
+      } catch (error) {
+        if (previewGenerationRef.current === generationAtStart) {
+          dirtyPatchRef.current = {};
+          publishDisplay(durablePrefsRef.current);
+          throw error;
+        }
+        continue;
+      }
+
+      const observationChanged = durableObservationGenerationRef.current !== observationAtStart;
+      const observedMatchesWrite = prefsEqual(durablePrefsRef.current, next);
+      if (!observationChanged) {
+        applyDurableObservation(next);
+      }
+
+      if (previewGenerationRef.current === generationAtStart && (!observationChanged || observedMatchesWrite)) {
+        dirtyPatchRef.current = {};
+        publishDisplay(durablePrefsRef.current);
+        continue;
+      }
+
+      // A newer preview or external durable observation won the race. Keep the local
+      // dirty intent and let the next loop rebase it onto the latest durable snapshot.
+      publishMergedDisplay();
+    }
+  }, [applyDurableObservation, publishDisplay, publishMergedDisplay]);
+
+  const requestCommit = useCallback((): Promise<void> => {
+    if (!hasPatch(dirtyPatchRef.current)) return Promise.resolve();
+    if (writerPromiseRef.current) return writerPromiseRef.current;
+
+    let tracked!: Promise<void>;
+    tracked = runWriter().finally(() => {
+      if (writerPromiseRef.current === tracked) writerPromiseRef.current = null;
+    });
+    writerPromiseRef.current = tracked;
+    return tracked;
+  }, [runWriter]);
+
+  const preview = useCallback(
+    (patch: ReaderPrefsPatch) => {
+      dirtyPatchRef.current = mergePatch(dirtyPatchRef.current, patch);
+      previewGenerationRef.current += 1;
+      publishMergedDisplay();
+    },
+    [publishMergedDisplay],
+  );
+
+  const update = useCallback(
+    (patch: ReaderPrefsPatch) => {
+      preview(patch);
+      return requestCommit();
+    },
+    [preview, requestCommit],
+  );
+
   useEffect(() => {
-    let disposed = false;
+    disposedRef.current = false;
+    const hydrateGeneration = durableObservationGenerationRef.current;
+    const unsubscribe = storageOnChanged((changes, areaName) => {
+      if (disposedRef.current || (areaName && areaName !== 'local')) return;
+      const change = changes?.[READER_PREFS_STORAGE_KEY];
+      if (!change) return;
+      applyDurableObservation(normalizeReaderPrefs((change as { newValue?: unknown }).newValue ?? null));
+      markHydrationReady();
+    });
+
     void (async () => {
       try {
         const stored = await storageGet([READER_PREFS_STORAGE_KEY]);
-        if (disposed) return;
-        setPrefs(resolveReaderPrefsFromStorage(stored));
+        if (disposedRef.current || durableObservationGenerationRef.current !== hydrateGeneration) return;
+        applyDurableObservation(resolveReaderPrefsFromStorage(stored));
       } catch (error) {
+        if (disposedRef.current) return;
         console.warn('[reader] failed to load reader prefs', {
           error: error instanceof Error ? error.message : String(error || ''),
         });
+      } finally {
+        markHydrationReady();
       }
     })();
+
     return () => {
-      disposed = true;
+      disposedRef.current = true;
+      unsubscribe();
+      if (hasPatch(dirtyPatchRef.current) && !writerPromiseRef.current) {
+        void requestCommit().catch(() => {});
+      }
     };
-  }, []);
+  }, [applyDurableObservation, markHydrationReady, requestCommit]);
 
-  // Cross-surface sync: mirror external writes to the same storage key.
-  useEffect(() => {
-    const unsubscribe = storageOnChanged((changes, areaName) => {
-      if (areaName && areaName !== 'local') return;
-      const change = changes?.[READER_PREFS_STORAGE_KEY];
-      if (!change) return;
-      setPrefs(normalizeReaderPrefs((change as { newValue?: unknown }).newValue ?? null));
-    });
-    return unsubscribe;
-  }, []);
-
-  const update = useCallback(async (patch: Partial<ReaderPrefs>) => {
-    const base = prefsRef.current;
-    const merged = normalizeReaderPrefs({
-      ...base,
-      ...patch,
-      tts: { ...base.tts, ...(patch.tts ?? {}) },
-    });
-    await storageSet(buildReaderPrefsStoragePatch(merged));
-    setPrefs(merged);
-  }, []);
-
-  return { prefs, update };
+  return { prefs, update, preview, commitPreview: requestCommit };
 }

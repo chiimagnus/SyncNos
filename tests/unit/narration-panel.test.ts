@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
-import ReactDOM from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 import { DEFAULT_READER_PREFS } from '../../src/services/protocols/reader-prefs';
@@ -10,10 +10,12 @@ vi.mock('../../src/ui/shared/SelectMenu', () => ({
     ariaLabel,
     value,
     options,
+    onChange,
   }: {
     ariaLabel: string;
     value: string;
     options: Array<{ value: string; label: string; disabled?: boolean }>;
+    onChange: (value: string) => void;
   }) =>
     createElement(
       'div',
@@ -28,6 +30,7 @@ vi.mock('../../src/ui/shared/SelectMenu', () => ({
             key: option.value,
             'data-option-value': option.value,
             'data-option-disabled': String(option.disabled ?? false),
+            onClick: () => onChange(option.value),
           },
           option.label,
         ),
@@ -107,17 +110,18 @@ function cleanupDom() {
 }
 
 describe('NarrationPanel', () => {
-  let root: ReactDOM.Root | null = null;
+  let root: Root | null = null;
   let speechSynthesisMock: FakeSpeechSynthesis;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupDom();
     speechSynthesisMock = createFakeSpeechSynthesis();
     Object.defineProperty(globalThis, 'speechSynthesis', {
       configurable: true,
       value: speechSynthesisMock,
     });
-    root = ReactDOM.createRoot(document.getElementById('root')!);
+    const { createRoot } = await import('react-dom/client');
+    root = createRoot(document.getElementById('root')!);
   });
 
   afterEach(() => {
@@ -139,6 +143,8 @@ describe('NarrationPanel', () => {
             tts: { ...DEFAULT_READER_PREFS.tts, engine: 'web', rate: 1.25 },
           },
           update,
+          preview: vi.fn(),
+          commitPreview: vi.fn().mockResolvedValue(undefined),
         }),
       );
     });
@@ -155,13 +161,7 @@ describe('NarrationPanel', () => {
         | undefined
     )?.click();
 
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tts: expect.objectContaining({
-          rate: 0.8,
-        }),
-      }),
-    );
+    expect(update).toHaveBeenCalledWith({ tts: { rate: 0.8 } });
   });
 
   it('disables the Web voice option when Web Speech is unavailable and keeps AI fields available', async () => {
@@ -175,6 +175,8 @@ describe('NarrationPanel', () => {
             tts: { ...DEFAULT_READER_PREFS.tts, engine: 'ai' },
           },
           update,
+          preview: vi.fn(),
+          commitPreview: vi.fn().mockResolvedValue(undefined),
           webSpeechAvailable: false,
         }),
       );
@@ -200,6 +202,8 @@ describe('NarrationPanel', () => {
             tts: { ...DEFAULT_READER_PREFS.tts, engine: 'web' },
           },
           update,
+          preview: vi.fn(),
+          commitPreview: vi.fn().mockResolvedValue(undefined),
         }),
       );
     });
@@ -217,5 +221,85 @@ describe('NarrationPanel', () => {
     expect(options).toHaveLength(2);
     expect(options[1]?.getAttribute('data-option-value')).toBe('voice-1');
     expect(options[1]?.textContent).toBe('Voice One');
+
+    act(() => (options[1] as HTMLElement).click());
+    expect(update).toHaveBeenCalledWith({ tts: { webVoiceURI: 'voice-1' } });
+  });
+
+  it('previews AI text fields and commits on blur without persisting stale TTS siblings', async () => {
+    const update = vi.fn();
+    const preview = vi.fn();
+    const commitPreview = vi.fn().mockResolvedValue(undefined);
+
+    act(() => {
+      root!.render(
+        createElement(NarrationPanel, {
+          prefs: {
+            ...DEFAULT_READER_PREFS,
+            tts: { ...DEFAULT_READER_PREFS.tts, engine: 'ai', rate: 1.5, aiVoice: 'existing-voice' },
+          },
+          update,
+          preview,
+          commitPreview,
+        }),
+      );
+    });
+
+    const endpoint = document.querySelector('[aria-label="readerNarrationEndpointAria"]') as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    act(() => {
+      valueSetter?.call(endpoint, 'https://example.test/v1');
+      endpoint.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+
+    expect(preview).toHaveBeenCalledWith({ tts: { aiEndpoint: 'https://example.test/v1' } });
+    expect(update).not.toHaveBeenCalled();
+    expect(commitPreview).not.toHaveBeenCalled();
+
+    act(() => endpoint.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true })));
+    expect(commitPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps engine, rate, and format as immediate single-field durable updates', () => {
+    const update = vi.fn();
+    act(() => {
+      root!.render(
+        createElement(NarrationPanel, {
+          prefs: {
+            ...DEFAULT_READER_PREFS,
+            tts: { ...DEFAULT_READER_PREFS.tts, engine: 'ai' },
+          },
+          update,
+          preview: vi.fn(),
+          commitPreview: vi.fn().mockResolvedValue(undefined),
+        }),
+      );
+    });
+
+    act(() =>
+      (
+        document.querySelector(
+          '[data-select-aria="readerNarrationEngineAria"] [data-option-value="web"]',
+        ) as HTMLElement
+      ).click(),
+    );
+    act(() =>
+      (
+        Array.from(document.querySelectorAll('button')).find(
+          (button) => button.textContent === '1.5x',
+        ) as HTMLButtonElement
+      ).click(),
+    );
+    act(() =>
+      (
+        document.querySelector(
+          '[data-select-aria="readerNarrationFormatAria"] [data-option-value="mp3"]',
+        ) as HTMLElement
+      ).click(),
+    );
+
+    expect(update).toHaveBeenCalledWith({ tts: { engine: 'web' } });
+    expect(update).toHaveBeenCalledWith({ tts: { rate: 1.5 } });
+    expect(update).toHaveBeenCalledWith({ tts: { aiFormat: 'mp3' } });
   });
 });

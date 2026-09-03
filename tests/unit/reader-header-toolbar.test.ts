@@ -7,6 +7,8 @@ import { DEFAULT_READER_PREFS } from '../../src/services/protocols/reader-prefs'
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
+  preview: vi.fn(),
+  commitPreview: vi.fn().mockResolvedValue(undefined),
   updateThemeMode: vi.fn(),
   toggle: vi.fn(),
   stop: vi.fn(),
@@ -140,6 +142,8 @@ describe('ReaderHeaderToolbar', () => {
   beforeEach(() => {
     setupDom();
     mocks.update.mockReset();
+    mocks.preview.mockReset();
+    mocks.commitPreview.mockReset().mockResolvedValue(undefined);
     mocks.updateThemeMode.mockReset();
     mocks.toggle.mockReset();
     mocks.stop.mockReset();
@@ -161,6 +165,8 @@ describe('ReaderHeaderToolbar', () => {
           features: { textLayout: true, theme: true, narration: true },
           prefs: DEFAULT_READER_PREFS,
           update: mocks.update,
+          preview: mocks.preview,
+          commitPreview: mocks.commitPreview,
           themeMode: 'system',
           updateThemeMode: mocks.updateThemeMode,
           narration: {
@@ -210,11 +216,13 @@ describe('ReaderHeaderToolbar', () => {
       (document.querySelector('[data-testid="theme-action"]') as HTMLButtonElement).click();
     });
     expect(mocks.updateThemeMode).toHaveBeenCalledWith('black');
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
 
     act(() => {
       (document.querySelector('[data-reader-header-trigger="narration"]') as HTMLButtonElement).click();
     });
     expect(document.querySelector('[data-testid="narration-action"]')).toBeTruthy();
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
     act(() => {
       (document.querySelector('[data-testid="narration-action"]') as HTMLButtonElement).click();
     });
@@ -225,5 +233,53 @@ describe('ReaderHeaderToolbar', () => {
     expect(mocks.update).toHaveBeenCalledWith({ tts: { rate: 1.5 } });
     expect(mocks.toggle).toHaveBeenCalledTimes(1);
     expect(mocks.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits dirty-capable panels on every exit and skips theme-only transitions', () => {
+    act(() => {
+      root!.render(
+        createElement(ReaderHeaderToolbar, {
+          features: { textLayout: true, theme: true, narration: true },
+          prefs: DEFAULT_READER_PREFS,
+          update: mocks.update,
+          preview: mocks.preview,
+          commitPreview: mocks.commitPreview,
+          themeMode: 'system',
+          updateThemeMode: mocks.updateThemeMode,
+          narration: {
+            state: 'paused',
+            isPlaying: false,
+            error: null,
+            webSpeechAvailable: true,
+            pause: vi.fn(),
+            stop: mocks.stop,
+            toggle: mocks.toggle,
+          },
+        }),
+      );
+    });
+
+    const clickTrigger = (panel: 'text' | 'theme' | 'narration') => {
+      act(() => {
+        (document.querySelector(`[data-reader-header-trigger="${panel}"]`) as HTMLButtonElement).click();
+      });
+    };
+
+    clickTrigger('theme');
+    clickTrigger('text');
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(0);
+
+    clickTrigger('narration');
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
+
+    clickTrigger('text');
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(2);
+
+    clickTrigger('text');
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(3);
+
+    clickTrigger('narration');
+    clickTrigger('theme');
+    expect(mocks.commitPreview).toHaveBeenCalledTimes(4);
   });
 });

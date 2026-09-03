@@ -13,13 +13,15 @@ import { NarrationPanel } from '@ui/reader/NarrationPanel';
 import { TextLayoutPanel } from '@ui/reader/TextLayoutPanel';
 import { ThemePanel } from '@ui/reader/ThemePanel';
 import type { ReaderToolbarFeatures, ReaderToolbarNarration } from '@ui/reader/ReaderToolbar';
-import type { ReaderPrefs } from '@services/protocols/reader-prefs';
+import type { ReaderPrefs, ReaderPrefsPatch } from '@services/protocols/reader-prefs';
 import type { AppThemeMode } from '@services/protocols/app-theme';
 
 type ReaderHeaderToolbarProps = {
   features: ReaderToolbarFeatures;
   prefs: ReaderPrefs;
-  update: (patch: Partial<ReaderPrefs>) => void | Promise<void>;
+  update: (patch: ReaderPrefsPatch) => void | Promise<void>;
+  preview: (patch: ReaderPrefsPatch) => void;
+  commitPreview: () => Promise<void>;
   themeMode: AppThemeMode;
   updateThemeMode: (mode: AppThemeMode) => void | Promise<void>;
   narration: ReaderToolbarNarration;
@@ -50,12 +52,20 @@ export function ReaderHeaderToolbar({
   features,
   prefs,
   update,
+  preview,
+  commitPreview,
   themeMode,
   updateThemeMode,
   narration,
   className,
 }: ReaderHeaderToolbarProps) {
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
+  const transitionPanel = (next: OpenPanel) => {
+    if ((openPanel === 'text' || openPanel === 'narration') && next !== openPanel) {
+      void commitPreview().catch(() => {});
+    }
+    setOpenPanel(next);
+  };
 
   if (!features.textLayout && !features.theme && !features.narration) return null;
 
@@ -73,7 +83,7 @@ export function ReaderHeaderToolbar({
       {features.textLayout ? (
         <MenuPopover
           open={openPanel === 'text'}
-          onOpenChange={(next) => setOpenPanel(next ? 'text' : null)}
+          onOpenChange={(next) => transitionPanel(next ? 'text' : null)}
           ariaLabel={LABELS.text}
           side="bottom"
           align="end"
@@ -96,7 +106,7 @@ export function ReaderHeaderToolbar({
           )}
         >
           <div className={PANEL_CONTENT_CLASS}>
-            <TextLayoutPanel prefs={prefs} update={update} />
+            <TextLayoutPanel prefs={prefs} update={update} preview={preview} commitPreview={commitPreview} />
           </div>
         </MenuPopover>
       ) : null}
@@ -104,7 +114,7 @@ export function ReaderHeaderToolbar({
       {features.theme ? (
         <MenuPopover
           open={openPanel === 'theme'}
-          onOpenChange={(next) => setOpenPanel(next ? 'theme' : null)}
+          onOpenChange={(next) => transitionPanel(next ? 'theme' : null)}
           ariaLabel={LABELS.theme}
           side="bottom"
           align="end"
@@ -135,7 +145,7 @@ export function ReaderHeaderToolbar({
       {features.narration ? (
         <MenuPopover
           open={openPanel === 'narration'}
-          onOpenChange={(next) => setOpenPanel(next ? 'narration' : null)}
+          onOpenChange={(next) => transitionPanel(next ? 'narration' : null)}
           ariaLabel={LABELS.narration}
           side="bottom"
           align="end"
@@ -183,6 +193,8 @@ export function ReaderHeaderToolbar({
             <NarrationPanel
               prefs={prefs}
               update={update}
+              preview={preview}
+              commitPreview={commitPreview}
               error={narration.error}
               webSpeechAvailable={narration.webSpeechAvailable}
             />
