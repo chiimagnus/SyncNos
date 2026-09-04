@@ -231,15 +231,19 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
           }
         }
         if (!keepConversation) {
-          keepConversation =
-            mergedConversations.slice().sort((a, b) => {
-              const at = Number(a?.lastCapturedAt) || 0;
-              const bt = Number(b?.lastCapturedAt) || 0;
-              if (bt !== at) return bt - at;
-              const aid = Number(a?.id) || 0;
-              const bid = Number(b?.id) || 0;
-              return bid - aid;
-            })[0] || null;
+          for (const conversation of mergedConversations) {
+            if (!keepConversation) {
+              keepConversation = conversation;
+              continue;
+            }
+            const capturedAt = Number(conversation?.lastCapturedAt) || 0;
+            const bestCapturedAt = Number(keepConversation?.lastCapturedAt) || 0;
+            const id = Number(conversation?.id) || 0;
+            const bestId = Number(keepConversation?.id) || 0;
+            if (capturedAt > bestCapturedAt || (capturedAt === bestCapturedAt && id > bestId)) {
+              keepConversation = conversation;
+            }
+          }
         }
 
         const keepId = keepConversation?.id ? Number(keepConversation.id) : 0;
@@ -449,26 +453,32 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
             ? groupedConversations.concat([{ ...exact, __canonicalUrl: canonicalUrl, __canonicalKey: canonicalKey }])
             : groupedConversations;
 
-        const keepConversation =
-          mergedConversations.slice().sort((a, b) => {
-            const aCanonical =
-              safeString(a?.source) === 'web' && safeString(a?.conversationKey) === canonicalKey ? 1 : 0;
-            const bCanonical =
-              safeString(b?.source) === 'web' && safeString(b?.conversationKey) === canonicalKey ? 1 : 0;
-            if (bCanonical !== aCanonical) return bCanonical - aCanonical;
+        let keepConversation: Record<string, unknown> | null = null;
+        for (const conversation of mergedConversations) {
+          if (!keepConversation) {
+            keepConversation = conversation;
+            continue;
+          }
+          const canonical =
+            safeString(conversation?.source) === 'web' && safeString(conversation?.conversationKey) === canonicalKey;
+          const bestCanonical =
+            safeString(keepConversation?.source) === 'web' && safeString(keepConversation?.conversationKey) === canonicalKey;
+          const mapped = !!safeString(conversation?.notionPageId);
+          const bestMapped = !!safeString(keepConversation?.notionPageId);
+          const capturedAt = Number(conversation?.lastCapturedAt) || 0;
+          const bestCapturedAt = Number(keepConversation?.lastCapturedAt) || 0;
+          const id = Number(conversation?.id) || 0;
+          const bestId = Number(keepConversation?.id) || 0;
 
-            const aMapped = safeString(a?.notionPageId) ? 1 : 0;
-            const bMapped = safeString(b?.notionPageId) ? 1 : 0;
-            if (bMapped !== aMapped) return bMapped - aMapped;
-
-            const at = Number(a?.lastCapturedAt) || 0;
-            const bt = Number(b?.lastCapturedAt) || 0;
-            if (bt !== at) return bt - at;
-
-            const aid = Number(a?.id) || 0;
-            const bid = Number(b?.id) || 0;
-            return bid - aid;
-          })[0] || null;
+          if (
+            (canonical && !bestCanonical) ||
+            (canonical === bestCanonical && mapped && !bestMapped) ||
+            (canonical === bestCanonical && mapped === bestMapped && capturedAt > bestCapturedAt) ||
+            (canonical === bestCanonical && mapped === bestMapped && capturedAt === bestCapturedAt && id > bestId)
+          ) {
+            keepConversation = conversation;
+          }
+        }
 
         const keepId = Number(keepConversation?.id);
         if (!Number.isFinite(keepId) || keepId <= 0) {
