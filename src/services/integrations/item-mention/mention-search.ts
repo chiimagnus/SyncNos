@@ -4,17 +4,13 @@ import type {
   MentionSearchResult,
 } from '@services/integrations/item-mention/mention-contract';
 
-function normalizeField(value: string): string {
-  return value.toLowerCase();
-}
-
 type MatchInfo = {
   matched: boolean;
   score: number;
 };
 
 function scoreField(fieldValue: string, query: MentionQuery, weight: number): MatchInfo {
-  const value = normalizeField(fieldValue);
+  const value = fieldValue.toLowerCase();
   if (!value) return { matched: false, score: 0 };
   const q = query.normalized;
   if (!q) return { matched: true, score: 0 };
