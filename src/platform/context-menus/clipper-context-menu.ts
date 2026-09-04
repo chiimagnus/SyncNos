@@ -28,26 +28,11 @@ function getMenusApi(): any | null {
   );
 }
 
-function promisifyVoid(fn: (cb: () => void) => void): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      fn(() => resolve());
-    } catch (_e) {
-      resolve();
-    }
-  });
-}
-
 async function readMenuState(
   readDisplayMode: () => Promise<InpageDisplayMode>,
 ): Promise<{ mode: InpageDisplayMode; autoSave: boolean }> {
   const [mode, local] = await Promise.all([readDisplayMode(), storageGet([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED])]);
   return { mode, autoSave: local?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false };
-}
-
-async function removeAllMenus(api: any): Promise<void> {
-  if (!api?.removeAll) return;
-  await promisifyVoid((cb) => api.removeAll(cb));
 }
 
 function isHttpUrl(raw: unknown) {
@@ -107,7 +92,15 @@ async function createOrRefreshMenus(api: any, readDisplayMode: () => Promise<Inp
   if (!api?.create) return;
   const state = await readMenuState(readDisplayMode).catch(() => ({ mode: 'all' as const, autoSave: true }));
 
-  await removeAllMenus(api);
+  if (api.removeAll) {
+    await new Promise<void>((resolve) => {
+      try {
+        api.removeAll(() => resolve());
+      } catch (_error) {
+        resolve();
+      }
+    });
+  }
 
   const base = {
     contexts: ['page', 'selection'],
