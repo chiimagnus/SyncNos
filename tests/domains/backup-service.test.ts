@@ -842,12 +842,25 @@ describe('backup service', () => {
     expect(md).not.toContain('![unsafe](syncnos-asset://9007199254740992)');
 
     const newerLocal = msgs.find((message) => message.messageKey === 'm-newer-local');
-    const localMarkdown = `local newer body\n\n![x](syncnos-asset://${referencedId})`;
-    const localEditTx = db2.transaction(['messages'], 'readwrite');
+    const localEditTx = db2.transaction(['messages', 'image_cache'], 'readwrite');
+    const manualAssetId = Number(
+      await reqToPromise(
+        localEditTx.objectStore('image_cache').add({
+          conversationId: convId,
+          url: 'https://img.example/user-selected.png',
+          blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }),
+          byteSize: 4,
+          contentType: 'image/png',
+          createdAt: 2,
+          updatedAt: 2,
+        }) as any,
+      ),
+    );
+    const localMarkdown = `backup body\n\n![x](syncnos-asset://${manualAssetId})`;
     await reqToPromise(
       localEditTx.objectStore('messages').put({
         ...newerLocal,
-        contentText: 'local newer body',
+        contentText: 'backup body',
         contentMarkdown: localMarkdown,
         updatedAt: 999,
       }) as any,
@@ -870,13 +883,14 @@ describe('backup service', () => {
       preservedLocalTx.onabort = () => reject(preservedLocalTx.error);
     });
     expect(preservedLocal).toMatchObject({
-      contentText: 'local newer body',
+      contentText: 'backup body',
       contentMarkdown: localMarkdown,
       updatedAt: 999,
     });
 
     const deleteAssetTx = db2.transaction(['image_cache'], 'readwrite');
     deleteAssetTx.objectStore('image_cache').delete(referencedId);
+    deleteAssetTx.objectStore('image_cache').delete(manualAssetId);
     await new Promise<void>((resolve, reject) => {
       deleteAssetTx.oncomplete = () => resolve();
       deleteAssetTx.onerror = () => reject(deleteAssetTx.error);

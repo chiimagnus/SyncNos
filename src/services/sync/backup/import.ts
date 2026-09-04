@@ -92,44 +92,6 @@ function getOrCreateScopedMap<V>(outer: Map<string, Map<number, V>>, uniqueKey: 
   return created;
 }
 
-function buildRestoreMarkdownComparisonKey(
-  markdown: unknown,
-  fallbackUrlByOldId: ReadonlyMap<number, string>,
-): string {
-  const source = String(markdown || '');
-  const references = collectMarkdownImageReferences(source);
-  if (!references.length) return JSON.stringify([source]);
-
-  const materializedTargets = new Set<string>([
-    SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
-    ...Array.from(fallbackUrlByOldId.values()),
-  ]);
-  const parts: unknown[] = [];
-  let cursor = 0;
-  for (const reference of references) {
-    parts.push(source.slice(cursor, reference.targetStart));
-    parts.push(
-      isSyncnosAssetUrl(reference.target) || materializedTargets.has(reference.target)
-        ? { syncnosAsset: true }
-        : { target: reference.target },
-    );
-    cursor = reference.targetEnd;
-  }
-  parts.push(source.slice(cursor));
-  return JSON.stringify(parts);
-}
-
-function canRefreshRestoredAssetMarkdown(input: {
-  existingMarkdown: unknown;
-  incomingMarkdown: unknown;
-  fallbackUrlByOldId: ReadonlyMap<number, string>;
-}): boolean {
-  return (
-    buildRestoreMarkdownComparisonKey(input.existingMarkdown, input.fallbackUrlByOldId) ===
-    buildRestoreMarkdownComparisonKey(input.incomingMarkdown, input.fallbackUrlByOldId)
-  );
-}
-
 export type ImportProgress = { done: number; total: number; stage: string };
 
 function reportImportProgressBestEffort(
@@ -840,11 +802,16 @@ export async function importBackupZipV2Merge(
           const bytes = blobPath ? entries.get(blobPath) : null;
           const remap = getOrCreateScopedMap(assetIdRemapByUniqueKey, uniqueKey);
           const fallbacks = getOrCreateScopedMap(fallbackUrlByOldIdByUniqueKey, uniqueKey);
-          fallbacks.set(assetId, normalizeFallbackImageUrl(safeUrl));
-          if (!bytes) continue;
+          if (!bytes) {
+            fallbacks.set(assetId, normalizeFallbackImageUrl(safeUrl));
+            continue;
+          }
           const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
           const byteSize = Number(asset.byteSize) || blob.size || 0;
-          if (byteSize <= 0) continue;
+          if (byteSize <= 0) {
+            fallbacks.set(assetId, normalizeFallbackImageUrl(safeUrl));
+            continue;
+          }
 
           const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
           if (existing?.id) {
@@ -894,8 +861,8 @@ export async function importBackupZipV2Merge(
   }
 
   // 2) Upsert messages by (localConversationId, messageKey).
-  // Asset targets are rewritten on the incoming candidate before merge. If the existing row wins the merge,
-  // refresh only when both Markdown bodies are otherwise the same restore payload; local edits must remain authoritative.
+  // Asset targets are rewritten on the incoming candidate before merge. If an existing row is newer than the backup,
+  // its Markdown remains authoritative; equal/older restore rows may refresh a stale local asset id after asset recovery.
   {
     progress.stage = 'Messages';
     report();
@@ -937,15 +904,17 @@ export async function importBackupZipV2Merge(
             };
             const merged = mergeMessageRecord(existing, base);
             const existingMarkdown = String(existing?.contentMarkdown || '');
+            const existingUpdatedAt = Number(existing?.updatedAt);
+            const incomingUpdatedAt = Number(incoming?.updatedAt);
+            const existingIsNewer =
+              Number.isFinite(existingUpdatedAt) &&
+              existingUpdatedAt > 0 &&
+              (!Number.isFinite(incomingUpdatedAt) || incomingUpdatedAt <= 0 || existingUpdatedAt > incomingUpdatedAt);
             if (
               existing?.id &&
+              !existingIsNewer &&
               rewrittenIncomingMarkdown !== incomingMarkdown &&
-              String(merged.contentMarkdown || '') === existingMarkdown &&
-              canRefreshRestoredAssetMarkdown({
-                existingMarkdown,
-                incomingMarkdown,
-                fallbackUrlByOldId: fallbacks,
-              })
+              String(merged.contentMarkdown || '') === existingMarkdown
             ) {
               merged.contentMarkdown = rewrittenIncomingMarkdown;
             }
