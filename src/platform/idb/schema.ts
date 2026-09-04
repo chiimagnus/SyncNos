@@ -187,13 +187,12 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
       return;
     }
 
-    const threads = Array.from(groups.entries());
-    let threadIndex = 0;
+    const threads = groups.entries();
 
     const processNextThread = () => {
-      if (threadIndex >= threads.length) return onDone();
-      const [threadId, groupedConversations] = threads[threadIndex];
-      threadIndex += 1;
+      const nextThread = threads.next();
+      if (nextThread.done) return onDone();
+      const [threadId, groupedConversations] = nextThread.value;
 
       const stableKey = `notionai_t_${threadId}`;
       const canonicalUrl = `https://app.notion.com/chat?t=${threadId}&wfv=chat`;
@@ -407,13 +406,12 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
       return;
     }
 
-    const entries = Array.from(groups.entries());
-    let groupIndex = 0;
+    const entries = groups.entries();
 
     const processNextGroup = () => {
-      if (groupIndex >= entries.length) return onDone();
-      const [canonicalKey, groupedConversations] = entries[groupIndex];
-      groupIndex += 1;
+      const nextGroup = entries.next();
+      if (nextGroup.done) return onDone();
+      const [canonicalKey, groupedConversations] = nextGroup.value;
       const canonicalUrl = safeString(groupedConversations[0]?.__canonicalUrl);
 
       const exactReq = convoKeyIdx.get(['web', canonicalKey]);
