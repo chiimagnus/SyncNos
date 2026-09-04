@@ -149,7 +149,10 @@ describe('background-router item mention', () => {
     });
 
     expect(response.ok).toBe(true);
-    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenCalledWith({ maxScan: 2, maxDurationMs: 300 });
+    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenCalledWith({
+      maxScan: 2,
+      maxDurationMs: 300,
+    });
     expect(storageMocks.readConversationMentionCandidatePool).not.toHaveBeenCalled();
     expect(revisionMocks.readDataRevision).not.toHaveBeenCalled();
   });

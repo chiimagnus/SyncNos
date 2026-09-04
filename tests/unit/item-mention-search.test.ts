@@ -57,5 +57,4 @@ describe('item-mention-search', () => {
     expect(res.candidates).toHaveLength(20);
     expect(res.candidates[0]?.conversationId).toBe(56);
   });
-
 });

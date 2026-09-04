@@ -201,7 +201,8 @@ async function findExistingArticleConversationByUrl(
         canonicalizeArticleUrl(row?.url) === normalizedUrl
       ) {
         const rowCanonical =
-          safeString(row?.source) === WEB_ARTICLE_SOURCE && canonicalConversationKey === safeString(row?.conversationKey);
+          safeString(row?.source) === WEB_ARTICLE_SOURCE &&
+          canonicalConversationKey === safeString(row?.conversationKey);
         const bestCanonical =
           !!best &&
           safeString(best?.source) === WEB_ARTICLE_SOURCE &&

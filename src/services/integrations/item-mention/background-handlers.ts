@@ -40,7 +40,9 @@ export function registerItemMentionHandlers(router: AnyRouter) {
     router.ok(searchMentionCandidates({ query, candidates: pool.candidates, limit }));
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
-    const normalizedQuery = String(msg?.query ?? '').trim().toLowerCase();
+    const normalizedQuery = String(msg?.query ?? '')
+      .trim()
+      .toLowerCase();
     const rawLimit = msg?.limit;
     const parsedLimit = Number(rawLimit);
     const limit =

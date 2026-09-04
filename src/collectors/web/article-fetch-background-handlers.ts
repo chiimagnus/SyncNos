@@ -34,7 +34,10 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
       const data = await fetchActiveTabArticle({ tabId: msg?.tabId });
 
       fireAndForget(
-        deps.onConversationChanged(data.conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
+        deps.onConversationChanged(
+          data.conversationId,
+          AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+        ),
       );
 
       return router.ok(data);
@@ -49,7 +52,10 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
 
       if (data.isNew) {
         fireAndForget(
-          deps.onConversationChanged(data.conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
+          deps.onConversationChanged(
+            data.conversationId,
+            AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+          ),
         );
       }
 

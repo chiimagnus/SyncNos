@@ -9,5 +9,3 @@ export type MentionCandidate = {
 export type MentionSearchResult = {
   candidates: MentionCandidate[];
 };
-
-

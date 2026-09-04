@@ -431,7 +431,8 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
           const canonical =
             safeString(conversation?.source) === 'web' && safeString(conversation?.conversationKey) === canonicalKey;
           const bestCanonical =
-            safeString(keepConversation?.source) === 'web' && safeString(keepConversation?.conversationKey) === canonicalKey;
+            safeString(keepConversation?.source) === 'web' &&
+            safeString(keepConversation?.conversationKey) === canonicalKey;
           const mapped = !!safeString(conversation?.notionPageId);
           const bestMapped = !!safeString(keepConversation?.notionPageId);
           const capturedAt = Number(conversation?.lastCapturedAt) || 0;
