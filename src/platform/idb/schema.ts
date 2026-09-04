@@ -67,10 +67,6 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
-function articleStableConversationKey(url: string): string {
-  return url ? `article:${url}` : '';
-}
-
 function mergeStringArray(base: unknown, incoming: unknown): string[] {
   const values = new Set<string>();
   const pushAll = (value: unknown) => {
@@ -127,14 +123,6 @@ function extractNotionAiThreadIdFromUrl(url: unknown): string {
   } catch (_e) {
     return '';
   }
-}
-
-function notionAiStableConversationKey(threadId: string): string {
-  return threadId ? `notionai_t_${threadId}` : '';
-}
-
-function notionAiCanonicalChatUrl(threadId: string): string {
-  return threadId ? `https://app.notion.com/chat?t=${threadId}&wfv=chat` : '';
 }
 
 function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: () => void): void {
@@ -207,8 +195,8 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
       const [threadId, groupedConversations] = threads[threadIndex];
       threadIndex += 1;
 
-      const stableKey = notionAiStableConversationKey(threadId);
-      const canonicalUrl = notionAiCanonicalChatUrl(threadId);
+      const stableKey = `notionai_t_${threadId}`;
+      const canonicalUrl = `https://app.notion.com/chat?t=${threadId}&wfv=chat`;
 
       const proceedWithStableExisting = (stableExisting: Record<string, unknown> | null) => {
         const seenIds = new Set(
@@ -422,7 +410,7 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
       const row = cursor.value as Record<string, unknown> | undefined;
       if (safeString(row?.sourceType).toLowerCase() === 'article') {
         const canonicalUrl = normalizeHttpUrl(row?.url);
-        const canonicalKey = articleStableConversationKey(canonicalUrl);
+        const canonicalKey = canonicalUrl ? `article:${canonicalUrl}` : '';
         if (canonicalUrl && canonicalKey) {
           const list = groups.get(canonicalKey) || [];
           list.push({ ...(row || {}), __canonicalUrl: canonicalUrl, __canonicalKey: canonicalKey });
