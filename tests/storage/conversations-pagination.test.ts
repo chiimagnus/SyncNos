@@ -344,6 +344,33 @@ describe('conversations pagination storage-idb', () => {
     expect(bootstrap.summary).toEqual({ totalCount: 4, todayCount: 2 });
   });
 
+  it('fails closed instead of dropping list filters when IDBKeyRange is unavailable', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'keyrange-chatgpt',
+      title: 'chatgpt row',
+      url: 'https://chatgpt.com/c/keyrange-chatgpt',
+      lastCapturedAt: Date.now(),
+    });
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'gemini',
+      conversationKey: 'keyrange-gemini',
+      title: 'gemini row',
+      url: 'https://gemini.google.com/app/keyrange-gemini',
+      lastCapturedAt: Date.now() - 1,
+    });
+
+    const keyRange = globalThis.IDBKeyRange;
+    (globalThis as any).IDBKeyRange = undefined;
+    try {
+      await expect(getConversationListBootstrap({ sourceKey: 'chatgpt', siteKey: 'all', limit: 20 })).rejects.toThrow();
+    } finally {
+      globalThis.IDBKeyRange = keyRange;
+    }
+  });
+
   it('does not persist derived-key repairs while reading a fresh bootstrap', async () => {
     await upsertConversation({
       sourceType: 'chat',

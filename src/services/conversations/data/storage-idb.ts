@@ -1132,12 +1132,6 @@ function buildListPageRange(
   const MAX_KEY = Number.MAX_SAFE_INTEGER;
 
   const keyRangeApi = globalThis.IDBKeyRange;
-  if (!keyRangeApi) {
-    return {
-      indexName: 'by_lastCapturedAt_id',
-      range: null,
-    };
-  }
 
   if (hasSourceFilter && hasSiteFilter) {
     if (!cursor) {
@@ -1210,9 +1204,8 @@ function buildListTimestampRange(
   indexName: ReturnType<typeof buildListPageRange>['indexName'],
   startInclusive: number,
   endExclusive: number,
-): IDBKeyRange | null {
+): IDBKeyRange {
   const keyRangeApi = globalThis.IDBKeyRange;
-  if (!keyRangeApi) return null;
 
   const sourceKey = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
   const siteKey = normalizeConversationListSiteFilterKey(query.siteKey);
@@ -1265,7 +1258,7 @@ async function hydrateConversationListArticleCommentThreadCounts(
     const conversationId = Number((item as any).id);
     const canonicalUrl = canonicalizeArticleUrl((item as any).url);
     const linkedRows =
-      keyRangeApi && Number.isSafeInteger(conversationId) && conversationId > 0
+      Number.isSafeInteger(conversationId) && conversationId > 0
         ? reqToPromise<any[]>(
             byConversation.getAll(
               keyRangeApi.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any),
@@ -1274,7 +1267,7 @@ async function hydrateConversationListArticleCommentThreadCounts(
         : Promise.resolve([]);
 
     let orphanRows = Promise.resolve<any[]>([]);
-    if (keyRangeApi && canonicalUrl) {
+    if (canonicalUrl) {
       orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || Promise.resolve([]);
       if (!orphanRowsByCanonicalUrl.has(canonicalUrl)) {
         orphanRows = reqToPromise<any[]>(
@@ -1374,9 +1367,7 @@ async function readConversationListSummaryAndFacets(input: {
     todayStart.getTime(),
     tomorrowStart.getTime(),
   );
-  const todayCountPromise = todayRange
-    ? reqToPromise<number>(summaryIndex.count(todayRange as any))
-    : Promise.resolve(0);
+  const todayCountPromise = reqToPromise<number>(summaryIndex.count(todayRange as any));
 
   const sourceFacetRequest = store.index('by_listSourceKey_lastCapturedAt_id').openKeyCursor();
   const sourceFacetsPromise = new Promise<void>((resolve, reject) => {
@@ -1396,13 +1387,11 @@ async function readConversationListSummaryAndFacets(input: {
   });
 
   const siteFacetIndex = store.index('by_listSourceKey_listSiteKey_lastCapturedAt_id');
-  const siteFacetRange = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound(
-        [siteFacetSourceScope, '', 0, 0] as any,
-        [siteFacetSourceScope, '\uffff', Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] as any,
-      )
-    : null;
-  const siteFacetRequest = siteFacetIndex.openKeyCursor((siteFacetRange || null) as any);
+  const siteFacetRange = globalThis.IDBKeyRange.bound(
+    [siteFacetSourceScope, '', 0, 0] as any,
+    [siteFacetSourceScope, '\uffff', Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] as any,
+  );
+  const siteFacetRequest = siteFacetIndex.openKeyCursor(siteFacetRange as any);
   const siteFacetsPromise = new Promise<void>((resolve, reject) => {
     siteFacetRequest.onerror = () => reject(siteFacetRequest.error || new Error('site facet cursor failed'));
     siteFacetRequest.onsuccess = () => {
