@@ -138,9 +138,9 @@ async function writeAuthConfig(config: FeishuOAuthConfig): Promise<void> {
   });
 }
 
-async function saveAuthConfigInsideOwner(config: FeishuOAuthConfig): Promise<boolean> {
-  const current = await readAuthConfig();
-  if (configEquals(current, config)) return false;
+async function saveAuthConfigInsideOwner(config: FeishuOAuthConfig, current?: FeishuOAuthConfig): Promise<boolean> {
+  const existing = current ?? (await readAuthConfig());
+  if (configEquals(existing, config)) return false;
 
   // Invalidate the old attempt before changing the credentials it captured. If the
   // subsequent config write fails, failing closed is safer than reviving that attempt.
@@ -177,7 +177,7 @@ export async function saveFeishuOAuthConfig(input: FeishuOAuthConfigInput): Prom
       clientSecret: has('clientSecret') ? input.clientSecret : current.clientSecret,
       tokenExchangeProxyUrl: has('tokenExchangeProxyUrl') ? input.tokenExchangeProxyUrl : current.tokenExchangeProxyUrl,
     });
-    await saveAuthConfigInsideOwner(next);
+    await saveAuthConfigInsideOwner(next, current);
     return toSafeConfigSummary(next);
   });
 }
@@ -216,7 +216,7 @@ export async function ensureDefaultFeishuOAuthClientId(): Promise<void> {
     await enqueueAuthMutation(async () => {
       const current = await readAuthConfig();
       if (current.clientId) return;
-      await saveAuthConfigInsideOwner({ ...current, clientId: safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID) });
+      await saveAuthConfigInsideOwner({ ...current, clientId: safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID) }, current);
     });
   } catch (_error) {
     // Startup defaulting is best-effort and must not block the background worker.
@@ -230,7 +230,7 @@ export async function ensureDefaultFeishuOAuthProxyUrl(): Promise<void> {
     await enqueueAuthMutation(async () => {
       const current = await readAuthConfig();
       if (current.clientSecret || current.tokenExchangeProxyUrl) return;
-      await saveAuthConfigInsideOwner({ ...current, tokenExchangeProxyUrl: defaultProxy });
+      await saveAuthConfigInsideOwner({ ...current, tokenExchangeProxyUrl: defaultProxy }, current);
     });
   } catch (_error) {
     // Startup defaulting is best-effort and must not block the background worker.

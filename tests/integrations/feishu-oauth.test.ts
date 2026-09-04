@@ -282,6 +282,15 @@ describe('Feishu OAuth owner', () => {
     expect(chromeMock.__store[TOKEN_KEY]).toBeUndefined();
   });
 
+  it('reads current auth config once per config save owner mutation', async () => {
+    Object.assign(chromeMock.__store, authConfig());
+    const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
+
+    await saveFeishuOAuthConfig(authConfig({ clientId: 'new-app' }));
+
+    expect(getSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the callback precheck config snapshot and rejects its result after config changes', async () => {
     const { state } = await startFeishuOAuthAttempt(authConfig());
     const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
