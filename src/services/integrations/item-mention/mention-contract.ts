@@ -1,8 +1,3 @@
-export type MentionQuery = {
-  normalized: string;
-  empty: boolean;
-};
-
 export type MentionCandidate = {
   conversationId: number;
   title: string;

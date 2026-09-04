@@ -1,32 +1,23 @@
-import type {
-  MentionCandidate,
-  MentionQuery,
-  MentionSearchResult,
-} from '@services/integrations/item-mention/mention-contract';
+import type { MentionCandidate, MentionSearchResult } from '@services/integrations/item-mention/mention-contract';
 
 type MatchInfo = {
   matched: boolean;
   score: number;
 };
 
-function scoreField(fieldValue: string, query: MentionQuery, weight: number): MatchInfo {
+function scoreField(fieldValue: string, query: string, weight: number): MatchInfo {
   const value = fieldValue.toLowerCase();
   if (!value) return { matched: false, score: 0 };
-  const q = query.normalized;
-  if (!q) return { matched: true, score: 0 };
+  if (value === query) return { matched: true, score: weight + 80 };
+  if (value.startsWith(query)) return { matched: true, score: weight + 50 };
 
-  if (value === q) return { matched: true, score: weight + 80 };
-  if (value.startsWith(q)) return { matched: true, score: weight + 50 };
-
-  const idx = value.indexOf(q);
+  const idx = value.indexOf(query);
   if (idx < 0) return { matched: false, score: 0 };
   // Earlier match is better.
   return { matched: true, score: weight + 20 - Math.min(idx, 40) };
 }
 
-function scoreCandidate(candidate: MentionCandidate, query: MentionQuery): MatchInfo {
-  if (query.empty) return { matched: true, score: 0 };
-
+function scoreCandidate(candidate: MentionCandidate, query: string): MatchInfo {
   const titleScore = scoreField(candidate.title, query, 300);
   const domainScore = scoreField(candidate.domain, query, 200);
   const sourceScore = scoreField(candidate.source, query, 120);
@@ -37,12 +28,12 @@ function scoreCandidate(candidate: MentionCandidate, query: MentionQuery): Match
 }
 
 export function searchMentionCandidates(input: {
-  query: MentionQuery;
+  query: string;
   candidates: MentionCandidate[];
   limit: number;
 }): MentionSearchResult {
   const { query, candidates, limit } = input;
-  if (query.empty) return { candidates: candidates.slice(0, limit) };
+  if (!query) return { candidates: candidates.slice(0, limit) };
 
   const matched: Array<{ c: MentionCandidate; score: number }> = [];
   for (const c of candidates) {

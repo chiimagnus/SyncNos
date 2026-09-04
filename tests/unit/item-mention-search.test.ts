@@ -5,7 +5,7 @@ import { searchMentionCandidates } from '../../src/services/integrations/item-me
 describe('item-mention-search', () => {
   it('preserves recent pool order for empty query', () => {
     const res = searchMentionCandidates({
-      query: { normalized: '', empty: true },
+      query: '',
       candidates: [
         { conversationId: 2, title: 'B', source: 'chatgpt', domain: 'b.com', lastCapturedAt: 3000 },
         { conversationId: 3, title: 'C', source: 'web', domain: 'c.com', lastCapturedAt: 2000 },
@@ -19,7 +19,7 @@ describe('item-mention-search', () => {
 
   it('filters by title/source/domain and sorts by match score then recency', () => {
     const res = searchMentionCandidates({
-      query: { normalized: 'openai', empty: false },
+      query: 'openai',
       candidates: [
         {
           conversationId: 1,
@@ -66,7 +66,7 @@ describe('item-mention-search', () => {
       lastCapturedAt: 10_000 - index,
     }));
 
-    const res = searchMentionCandidates({ query: { normalized: 'openai', empty: false }, candidates, limit: 20 });
+    const res = searchMentionCandidates({ query: 'openai', candidates, limit: 20 });
 
     expect(res.candidates).toHaveLength(20);
     expect(res.candidates[0]?.conversationId).toBe(56);
@@ -81,7 +81,7 @@ describe('item-mention-search', () => {
       lastCapturedAt: i + 1,
     }));
 
-    const res = searchMentionCandidates({ query: { normalized: '', empty: true }, candidates, limit: 50 });
+    const res = searchMentionCandidates({ query: '', candidates, limit: 50 });
     expect(res.candidates).toHaveLength(50);
   });
 });
