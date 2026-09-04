@@ -2,7 +2,6 @@ import type { AddArticleCommentInput, ArticleComment } from '@services/comments/
 import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
-import { serializeArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export class ArticleCommentInvariantError extends Error {
@@ -79,7 +78,7 @@ function toComment(row: any): ArticleComment {
     createdAt: Number(row?.createdAt) || 0,
     updatedAt: Number(row?.updatedAt) || 0,
   };
-  return serializeArticleCommentDto(comment);
+  return comment;
 }
 
 export async function addArticleComment(input: AddArticleCommentInput): Promise<ArticleComment> {
@@ -137,26 +136,22 @@ export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string): P
   const { t, stores } = tx(db, ['article_comments'], 'readonly');
 
   const idx = stores.article_comments.index('by_canonicalUrl_createdAt');
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any)
-    : null;
-  const rows = range ? await reqToPromise<any[]>(idx.getAll(range) as any) : [];
+  const range = globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any);
+  const rows = await reqToPromise<any[]>(idx.getAll(range) as any);
   await txDone(t);
   return (Array.isArray(rows) ? rows : []).map(toComment);
 }
 
 export async function listArticleCommentsByConversationId(conversationId: number): Promise<ArticleComment[]> {
-  const id = Number(conversationId);
-  if (!Number.isFinite(id) || id <= 0) return [];
+  const id = normalizeConversationId(conversationId);
+  if (id == null) return [];
 
   const db = await openDb();
   const { t, stores } = tx(db, ['article_comments'], 'readonly');
 
   const idx = stores.article_comments.index('by_conversationId_createdAt');
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any)
-    : null;
-  const rows = range ? await reqToPromise<any[]>(idx.getAll(range) as any) : [];
+  const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+  const rows = await reqToPromise<any[]>(idx.getAll(range) as any);
   await txDone(t);
   return (Array.isArray(rows) ? rows : []).map(toComment);
 }
@@ -168,7 +163,7 @@ type ArticleCommentDeleteResult = {
 
 export async function deleteArticleCommentById(id: number): Promise<ArticleCommentDeleteResult> {
   const commentId = Number(id);
-  if (!Number.isFinite(commentId) || commentId <= 0) return { deleted: false, conversationId: null };
+  if (!Number.isSafeInteger(commentId) || commentId <= 0) return { deleted: false, conversationId: null };
 
   const db = await openDb();
   return runTrackedTransaction(
@@ -226,27 +221,6 @@ export async function deleteArticleCommentById(id: number): Promise<ArticleComme
   );
 }
 
-export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string): Promise<boolean> {
-  const normalized = normalizeCanonicalUrl(canonicalUrl);
-  if (!normalized) return false;
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readonly');
-  const idx = stores.article_comments.index('by_canonicalUrl_createdAt');
-
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any)
-    : null;
-  if (!range) {
-    await txDone(t);
-    return false;
-  }
-
-  const count = await reqToPromise<number>(idx.count(range) as any);
-  await txDone(t);
-  return Number(count) > 0;
-}
-
 export async function attachOrphanCommentsToConversation(
   canonicalUrl: string,
   conversationId: number,
@@ -261,11 +235,7 @@ export async function attachOrphanCommentsToConversation(
     async ({ stores, markChanged }) => {
       const store = stores.article_comments;
       const idx = store.index('by_canonicalUrl_createdAt');
-      const range = globalThis.IDBKeyRange?.bound
-        ? globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any)
-        : null;
-      if (!range) return { updated: 0 };
-
+      const range = globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any);
       const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
       let updated = 0;
       const now = Date.now();
@@ -303,11 +273,7 @@ export async function migrateArticleCommentsCanonicalUrl(input: {
     async ({ stores, markChanged }) => {
       const store = stores.article_comments;
       const idx = store.index('by_canonicalUrl_createdAt');
-      const range = globalThis.IDBKeyRange?.bound
-        ? globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any)
-        : null;
-      if (!range) return { updated: 0 };
-
+      const range = globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any);
       const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
       const now = Date.now();
       let updated = 0;
