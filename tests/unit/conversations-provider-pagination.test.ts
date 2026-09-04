@@ -295,6 +295,48 @@ describe('ConversationsProvider pagination state', () => {
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([201]);
   });
 
+  it('merges a successful continuation page and commits its pagination bundle', async () => {
+    const firstPage = {
+      ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 3 }],
+      }),
+      cursor: { lastCapturedAt: 100, id: 1 },
+      hasMore: true,
+      summary: { totalCount: 3, todayCount: 1 },
+    };
+    const secondPage = {
+      ...makePage([makeConversation(2, 'gemini', 'conv-2')], {
+        sources: [
+          { key: 'chatgpt', label: 'chatgpt', count: 2 },
+          { key: 'gemini', label: 'gemini', count: 1 },
+        ],
+        sites: [{ key: 'domain:example.com', label: 'example.com', count: 3 }],
+      }),
+      cursor: { lastCapturedAt: 50, id: 2 },
+      hasMore: true,
+      summary: { totalCount: 3, todayCount: 2 },
+    };
+    getConversationListBootstrap.mockResolvedValue(firstPage);
+    getConversationListPage.mockResolvedValue(secondPage);
+
+    await renderProvider();
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1, 2]);
+    expect(latestState.listCursor).toEqual({ lastCapturedAt: 50, id: 2 });
+    expect(latestState.listHasMore).toBe(true);
+    expect(latestState.listSummary).toEqual({ totalCount: 3, todayCount: 2 });
+    expect(latestState.listFacets).toEqual(secondPage.facets);
+    expect(getConversationListPage).toHaveBeenCalledWith(
+      expect.any(Object),
+      { lastCapturedAt: 100, id: 1 },
+      expect.any(Number),
+    );
+  });
+
   it('keeps the committed page bundle when loading more fails', async () => {
     const firstPage = {
       ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
