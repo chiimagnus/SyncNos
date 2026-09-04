@@ -50,9 +50,8 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
     try {
       const data = await resolveOrCaptureActiveTabArticle({ tabId: msg?.tabId });
 
-      const conversationId = Number((data as any)?.conversationId);
-      const isNew = (data as any)?.isNew === true;
-      if (isNew && Number.isFinite(conversationId) && conversationId > 0) {
+      const { conversationId, isNew } = data;
+      if (isNew && conversationId > 0) {
         fireAndForget(
           deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
         );
