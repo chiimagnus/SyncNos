@@ -10,7 +10,6 @@ export const DB_NAME = 'webclipper';
 export const DB_VERSION = 11;
 
 type MigrationContext = {
-  db: IDBDatabase;
   tx: IDBTransaction;
 };
 
@@ -88,8 +87,7 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   return Array.from(values);
 }
 
-function normalizeConversationRecordsForV11({ db, tx }: MigrationContext): void {
-  if (!db.objectStoreNames.contains('conversations')) return;
+function normalizeConversationRecordsForV11({ tx }: MigrationContext): void {
   const conversationsStore = tx.objectStore('conversations');
   const req = conversationsStore.openCursor();
   req.onsuccess = () => {
@@ -771,14 +769,14 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
 
   if (!tx || oldVersion === 0 || oldVersion >= 11) return;
 
-  const finish = () => normalizeConversationRecordsForV11({ db, tx });
+  const finish = () => normalizeConversationRecordsForV11({ tx });
   const migrateArticles = () => {
     if (oldVersion >= 4) return finish();
-    migrateLegacyArticleConversations({ db, tx }, finish);
+    migrateLegacyArticleConversations({ tx }, finish);
   };
 
   if (oldVersion >= 2) return migrateArticles();
-  migrateNotionAiThreadConversations({ db, tx }, migrateArticles);
+  migrateNotionAiThreadConversations({ tx }, migrateArticles);
 }
 
 let cachedDb: IDBDatabase | null = null;
