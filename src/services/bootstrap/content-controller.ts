@@ -911,15 +911,11 @@ export function createContentController(deps: Deps) {
         else stopMention();
       }
 
-      function ensureControllerStarted() {
+      function applyAutoSaveEnabled(enabled: boolean) {
+        controller.setAutoSaveEnabled(enabled === true);
         if (stopped || controllerStarted) return;
         controllerStarted = true;
         controller.start();
-      }
-
-      function applyAutoSaveEnabled(enabled: boolean) {
-        controller.setAutoSaveEnabled(enabled === true);
-        ensureControllerStarted();
       }
 
       unsubscribeStorage = storageOnChanged((changes: Record<string, any> | null, areaName: string) => {
