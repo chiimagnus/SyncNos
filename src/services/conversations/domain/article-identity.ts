@@ -3,7 +3,7 @@ import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 export const WEB_ARTICLE_SOURCE = 'web' as const;
 const WEB_ARTICLE_CONVERSATION_KEY_PREFIX = 'article:';
 
-export type CanonicalWebArticleIdentity = {
+type CanonicalWebArticleIdentity = {
   source: typeof WEB_ARTICLE_SOURCE;
   conversationKey: string;
   url: string;
