@@ -16,6 +16,42 @@ type MigrationContext = {
 
 type MigrationDone = (result: { ok: boolean }) => void;
 
+function migrateDuplicateConversationMessages(input: {
+  messagesBySequenceIndex: IDBIndex;
+  messagesByKeyIndex: IDBIndex;
+  dupId: number;
+  keepId: number;
+  onDone: MigrationDone;
+}): void {
+  const { messagesBySequenceIndex, messagesByKeyIndex, dupId, keepId, onDone } = input;
+  const range = globalThis.IDBKeyRange.bound([dupId, -Infinity], [dupId, Infinity]);
+  const cursorReq = messagesBySequenceIndex.openCursor(range);
+  cursorReq.onsuccess = () => {
+    const cursor = cursorReq.result;
+    if (!cursor) return onDone({ ok: true });
+
+    const message = cursor.value as Record<string, unknown> | undefined;
+    const messageKey = safeString(message?.messageKey);
+    if (!messageKey || !message) {
+      cursor.delete();
+      cursor.continue();
+      return;
+    }
+
+    const existsReq = messagesByKeyIndex.get([keepId, messageKey]);
+    existsReq.onsuccess = () => {
+      if (existsReq.result) cursor.delete();
+      else {
+        message.conversationId = keepId;
+        cursor.update(message);
+      }
+      cursor.continue();
+    };
+    existsReq.onerror = () => onDone({ ok: false });
+  };
+  cursorReq.onerror = () => onDone({ ok: false });
+}
+
 function safeString(value: unknown): string {
   return String(value || '').trim();
 }
@@ -150,57 +186,6 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
     mapReq.onerror = () => onDone({ ok: false });
   }
 
-  function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
-    const { dupId, keepId, onDone } = input;
-    let ok = true;
-
-    function done() {
-      onDone({ ok });
-    }
-
-    const keyRangeApi = globalThis.IDBKeyRange;
-    const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
-    if (!range) {
-      onDone({ ok: false });
-      return;
-    }
-
-    try {
-      const msgCursorReq = messagesBySequenceIndex.openCursor(range);
-      msgCursorReq.onsuccess = () => {
-        const cursor = msgCursorReq.result;
-        if (!cursor) return done();
-
-        const msg = cursor.value as Record<string, unknown> | undefined;
-        const messageKey = msg?.messageKey ? String(msg.messageKey) : '';
-        if (!messageKey || !msg) {
-          cursor.delete();
-          cursor.continue();
-          return;
-        }
-
-        const existsReq = messagesByKeyIndex.get([keepId, messageKey]);
-        existsReq.onsuccess = () => {
-          const existing = existsReq.result;
-          if (existing) {
-            cursor.delete();
-          } else {
-            msg.conversationId = keepId;
-            cursor.update(msg);
-          }
-          cursor.continue();
-        };
-        existsReq.onerror = () => {
-          ok = false;
-          done();
-        };
-      };
-      msgCursorReq.onerror = () => onDone({ ok: false });
-    } catch (_e) {
-      onDone({ ok: false });
-    }
-  }
-
   const notionConversations: Array<Record<string, unknown> & { __threadId?: string }> = [];
   const cursorReq = conversationsStore.openCursor();
   cursorReq.onsuccess = () => {
@@ -315,7 +300,9 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
                   }
 
                   const legacyKey = String(duplicate.conversationKey || '');
-                  migrateMessagesFromDupToKeep({
+                  migrateDuplicateConversationMessages({
+                    messagesBySequenceIndex,
+                    messagesByKeyIndex,
                     dupId: duplicateId,
                     keepId,
                     onDone: ({ ok }) => {
@@ -394,59 +381,6 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
     next.warningFlags = mergeStringArray(next.warningFlags, incoming.warningFlags);
     next.lastCapturedAt = pickMaxFiniteNumber(next.lastCapturedAt, incoming.lastCapturedAt) || Date.now();
     return next;
-  }
-
-  function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
-    const { dupId, keepId, onDone } = input;
-    let ok = true;
-
-    function done() {
-      onDone({ ok });
-    }
-
-    const keyRangeApi = globalThis.IDBKeyRange;
-    const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
-    if (!range) {
-      onDone({ ok: false });
-      return;
-    }
-
-    try {
-      const cursorReq = messagesBySequenceIndex.openCursor(range);
-      cursorReq.onsuccess = () => {
-        const cursor = cursorReq.result;
-        if (!cursor) return done();
-
-        const msg = cursor.value as Record<string, unknown> | undefined;
-        const messageKey = safeString(msg?.messageKey);
-        if (!messageKey || !msg) {
-          cursor.delete();
-          cursor.continue();
-          return;
-        }
-
-        const existsReq = messagesByKeyIndex.get([keepId, messageKey]);
-        existsReq.onsuccess = () => {
-          const existing = existsReq.result;
-          if (existing) cursor.delete();
-          else {
-            msg.conversationId = keepId;
-            cursor.update(msg);
-          }
-          cursor.continue();
-        };
-        existsReq.onerror = () => {
-          ok = false;
-          done();
-        };
-      };
-      cursorReq.onerror = () => {
-        ok = false;
-        done();
-      };
-    } catch (_e) {
-      onDone({ ok: false });
-    }
   }
 
   function migrateMappingToCanonical(input: {
@@ -634,7 +568,9 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
                   return;
                 }
 
-                migrateMessagesFromDupToKeep({
+                migrateDuplicateConversationMessages({
+                  messagesBySequenceIndex,
+                  messagesByKeyIndex,
                   dupId: duplicateId,
                   keepId,
                   onDone: () => {
