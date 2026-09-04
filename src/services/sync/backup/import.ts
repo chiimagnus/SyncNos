@@ -92,6 +92,44 @@ function getOrCreateScopedMap<V>(outer: Map<string, Map<number, V>>, uniqueKey: 
   return created;
 }
 
+function buildRestoreMarkdownComparisonKey(
+  markdown: unknown,
+  fallbackUrlByOldId: ReadonlyMap<number, string>,
+): string {
+  const source = String(markdown || '');
+  const references = collectMarkdownImageReferences(source);
+  if (!references.length) return JSON.stringify([source]);
+
+  const materializedTargets = new Set<string>([
+    SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
+    ...Array.from(fallbackUrlByOldId.values()),
+  ]);
+  const parts: unknown[] = [];
+  let cursor = 0;
+  for (const reference of references) {
+    parts.push(source.slice(cursor, reference.targetStart));
+    parts.push(
+      isSyncnosAssetUrl(reference.target) || materializedTargets.has(reference.target)
+        ? { syncnosAsset: true }
+        : { target: reference.target },
+    );
+    cursor = reference.targetEnd;
+  }
+  parts.push(source.slice(cursor));
+  return JSON.stringify(parts);
+}
+
+function canRefreshRestoredAssetMarkdown(input: {
+  existingMarkdown: unknown;
+  incomingMarkdown: unknown;
+  fallbackUrlByOldId: ReadonlyMap<number, string>;
+}): boolean {
+  return (
+    buildRestoreMarkdownComparisonKey(input.existingMarkdown, input.fallbackUrlByOldId) ===
+    buildRestoreMarkdownComparisonKey(input.incomingMarkdown, input.fallbackUrlByOldId)
+  );
+}
+
 export type ImportProgress = { done: number; total: number; stage: string };
 
 function reportImportProgressBestEffort(
@@ -775,7 +813,6 @@ export async function importBackupZipV2Merge(
   // is scoped by the bundle uniqueKey and may only be consumed by that same conversation during message rewrite.
   const assetIdRemapByUniqueKey = new Map<string, Map<number, number>>();
   const fallbackUrlByOldIdByUniqueKey = new Map<string, Map<number, string>>();
-  const rewrittenAssetMarkdownByMessage = new Map<string, string>();
 
   if (imageCacheAssets.length) {
     progress.stage = 'Assets';
@@ -803,16 +840,11 @@ export async function importBackupZipV2Merge(
           const bytes = blobPath ? entries.get(blobPath) : null;
           const remap = getOrCreateScopedMap(assetIdRemapByUniqueKey, uniqueKey);
           const fallbacks = getOrCreateScopedMap(fallbackUrlByOldIdByUniqueKey, uniqueKey);
-          if (!bytes) {
-            fallbacks.set(assetId, normalizeFallbackImageUrl(safeUrl));
-            continue;
-          }
+          fallbacks.set(assetId, normalizeFallbackImageUrl(safeUrl));
+          if (!bytes) continue;
           const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
           const byteSize = Number(asset.byteSize) || blob.size || 0;
-          if (byteSize <= 0) {
-            fallbacks.set(assetId, normalizeFallbackImageUrl(safeUrl));
-            continue;
-          }
+          if (byteSize <= 0) continue;
 
           const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
           if (existing?.id) {
@@ -861,31 +893,9 @@ export async function importBackupZipV2Merge(
     reportCommittedStage(imageCacheAssets.length, 'Assets');
   }
 
-  // Rewrite each conversation exactly once after asset restore. Only real Markdown image targets participate:
-  // prose/code literals remain source-preserving, while missing/malformed/cross-conversation internal images degrade safely.
-  for (const [uk, list] of messagesByUniqueKey.entries()) {
-    const remap = assetIdRemapByUniqueKey.get(uk) || new Map<number, number>();
-    const fallbacks = fallbackUrlByOldIdByUniqueKey.get(uk) || new Map<number, string>();
-    const msgs = Array.isArray(list) ? list : [];
-    for (const msg of msgs) {
-      if (!msg || typeof msg !== 'object') continue;
-      const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
-      if (!markdown) continue;
-      const next = rewriteSyncnosAssetUrlsInMarkdown(markdown, {
-        remap,
-        fallbackUrlByOldId: fallbacks,
-        defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
-      });
-      if (next !== markdown) {
-        msg.contentMarkdown = next;
-        const messageKey = safeString(msg.messageKey);
-        if (messageKey) rewrittenAssetMarkdownByMessage.set(`${uk}\u0000${messageKey}`, next);
-      }
-    }
-    messagesByUniqueKey.set(uk, msgs);
-  }
-
   // 2) Upsert messages by (localConversationId, messageKey).
+  // Asset targets are rewritten on the incoming candidate before merge. If the existing row wins the merge,
+  // refresh only when both Markdown bodies are otherwise the same restore payload; local edits must remain authoritative.
   {
     progress.stage = 'Messages';
     report();
@@ -901,6 +911,8 @@ export async function importBackupZipV2Merge(
             stats.messagesSkipped += Array.isArray(list) ? list.length : 0;
             continue;
           }
+          const remap = assetIdRemapByUniqueKey.get(uk) || new Map<number, number>();
+          const fallbacks = fallbackUrlByOldIdByUniqueKey.get(uk) || new Map<number, string>();
 
           for (const incoming of Array.isArray(list) ? list : []) {
             const messageKey = incoming?.messageKey ? String(incoming.messageKey) : '';
@@ -910,15 +922,33 @@ export async function importBackupZipV2Merge(
             }
 
             const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
+            const incomingMarkdown = String(incoming?.contentMarkdown || '');
+            const rewrittenIncomingMarkdown = rewriteSyncnosAssetUrlsInMarkdown(incomingMarkdown, {
+              remap,
+              fallbackUrlByOldId: fallbacks,
+              defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
+            });
             const base = {
               ...(incoming || {}),
+              contentMarkdown: rewrittenIncomingMarkdown,
               conversationId: localConversationId,
               messageKey,
               ...(existing?.id ? { id: existing.id } : {}),
             };
             const merged = mergeMessageRecord(existing, base);
-            const rewrittenAssetMarkdown = rewrittenAssetMarkdownByMessage.get(`${uk}\u0000${messageKey}`);
-            if (rewrittenAssetMarkdown != null) merged.contentMarkdown = rewrittenAssetMarkdown;
+            const existingMarkdown = String(existing?.contentMarkdown || '');
+            if (
+              existing?.id &&
+              rewrittenIncomingMarkdown !== incomingMarkdown &&
+              String(merged.contentMarkdown || '') === existingMarkdown &&
+              canRefreshRestoredAssetMarkdown({
+                existingMarkdown,
+                incomingMarkdown,
+                fallbackUrlByOldId: fallbacks,
+              })
+            ) {
+              merged.contentMarkdown = rewrittenIncomingMarkdown;
+            }
             merged.conversationId = localConversationId;
             merged.messageKey = messageKey;
 

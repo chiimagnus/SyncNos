@@ -788,6 +788,17 @@ describe('backup service', () => {
         updatedAt: 1,
       }) as any,
     );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: convId,
+        messageKey: 'm-newer-local',
+        role: 'assistant',
+        contentText: 'backup body',
+        contentMarkdown: `backup body\n\n![x](syncnos-asset://${oldImgId})`,
+        sequence: 2,
+        updatedAt: 1,
+      }) as any,
+    );
     await new Promise<void>((resolve, reject) => {
       t.oncomplete = () => resolve();
       t.onerror = () => reject(t.error);
@@ -813,9 +824,10 @@ describe('backup service', () => {
       t2.onabort = () => reject(t2.error);
     });
 
-    expect(msgs.length).toBe(1);
+    expect(msgs.length).toBe(2);
     expect(assets.length).toBe(1);
-    const md = String(msgs[0].contentMarkdown || '');
+    const primaryMessage = msgs.find((message) => message.messageKey === 'm1');
+    const md = String(primaryMessage?.contentMarkdown || '');
     const match = /syncnos-asset:\/\/(\d+)/.exec(md);
     expect(match).not.toBeNull();
     const referencedId = Number(match?.[1]);
@@ -828,6 +840,40 @@ describe('backup service', () => {
     expect(md).not.toContain('![malformed](syncnos-asset://nope)');
     expect(md).not.toContain('![zero](syncnos-asset://0)');
     expect(md).not.toContain('![unsafe](syncnos-asset://9007199254740992)');
+
+    const newerLocal = msgs.find((message) => message.messageKey === 'm-newer-local');
+    const localMarkdown = `local newer body\n\n![x](syncnos-asset://${referencedId})`;
+    const localEditTx = db2.transaction(['messages'], 'readwrite');
+    await reqToPromise(
+      localEditTx.objectStore('messages').put({
+        ...newerLocal,
+        contentText: 'local newer body',
+        contentMarkdown: localMarkdown,
+        updatedAt: 999,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      localEditTx.oncomplete = () => resolve();
+      localEditTx.onerror = () => reject(localEditTx.error);
+      localEditTx.onabort = () => reject(localEditTx.error);
+    });
+
+    const olderBackupStats = await importBackupZipV2Merge(entries);
+    expect(olderBackupStats.messagesUpdated).toBe(0);
+    const preservedLocalTx = db2.transaction(['messages'], 'readonly');
+    const preservedLocal = await reqToPromise<any>(
+      preservedLocalTx.objectStore('messages').index('by_conversationId_messageKey').get([convId, 'm-newer-local']) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      preservedLocalTx.oncomplete = () => resolve();
+      preservedLocalTx.onerror = () => reject(preservedLocalTx.error);
+      preservedLocalTx.onabort = () => reject(preservedLocalTx.error);
+    });
+    expect(preservedLocal).toMatchObject({
+      contentText: 'local newer body',
+      contentMarkdown: localMarkdown,
+      updatedAt: 999,
+    });
 
     const deleteAssetTx = db2.transaction(['image_cache'], 'readwrite');
     deleteAssetTx.objectStore('image_cache').delete(referencedId);
@@ -851,7 +897,8 @@ describe('backup service', () => {
 
     expect(restoredAgainAssets).toHaveLength(1);
     expect(Number(restoredAgainAssets[0]?.id)).not.toBe(referencedId);
-    const restoredAgainMarkdown = String(restoredAgainMessages[0]?.contentMarkdown || '');
+    const restoredAgainPrimary = restoredAgainMessages.find((message) => message.messageKey === 'm1');
+    const restoredAgainMarkdown = String(restoredAgainPrimary?.contentMarkdown || '');
     const remapped = /syncnos-asset:\/\/(\d+)/.exec(restoredAgainMarkdown);
     expect(Number(remapped?.[1])).toBe(Number(restoredAgainAssets[0]?.id));
     expect(restoredAgainMarkdown).toContain(`literal syncnos-asset://${oldImgId}`);
