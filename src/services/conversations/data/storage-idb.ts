@@ -1693,12 +1693,6 @@ export async function getConversationById(conversationId: number): Promise<Conve
   return row ? (normalizeConversationListRecord(row) as Conversation) : null;
 }
 
-function stripDomainPrefix(listSiteKey: string): string {
-  const text = safeString(listSiteKey).toLowerCase();
-  if (!text.startsWith('domain:')) return '';
-  return text.slice('domain:'.length);
-}
-
 export async function readConversationMentionCandidatePool(input: {
   maxScan: number;
   maxDurationMs: number;
@@ -1743,11 +1737,12 @@ export async function readConversationMentionCandidatePool(input: {
       const record = cursor.value as any;
       const conversationId = Number(record?.id);
       if (Number.isFinite(conversationId) && conversationId > 0) {
+        const listSiteKey = safeString(record?.listSiteKey).toLowerCase();
         candidates.push({
           conversationId,
           title: safeString(record?.title),
           source: safeString(record?.source),
-          domain: stripDomainPrefix(safeString(record?.listSiteKey)),
+          domain: listSiteKey.startsWith('domain:') ? listSiteKey.slice('domain:'.length) : '',
           lastCapturedAt: Number(record?.lastCapturedAt) || 0,
         });
       }
