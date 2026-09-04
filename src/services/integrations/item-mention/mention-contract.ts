@@ -28,11 +28,9 @@ export function normalizeMentionQuery(raw: unknown): MentionQuery {
   return { raw: text, normalized, empty: !normalized };
 }
 
-export function normalizeMentionSearchLimit(raw: unknown, defaults?: { defaultLimit?: number; maxLimit?: number }) {
-  const defaultLimit = Math.max(1, Math.floor(Number(defaults?.defaultLimit ?? 20)));
-  const maxLimit = Math.max(defaultLimit, Math.floor(Number(defaults?.maxLimit ?? 50)));
-  if (raw == null || raw === '') return defaultLimit;
+export function normalizeMentionSearchLimit(raw: unknown) {
+  if (raw == null || raw === '') return 20;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return defaultLimit;
-  return Math.min(Math.floor(n), maxLimit);
+  if (!Number.isFinite(n) || n <= 0) return 20;
+  return Math.min(Math.floor(n), 50);
 }

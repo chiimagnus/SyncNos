@@ -44,7 +44,7 @@ export function registerItemMentionHandlers(router: AnyRouter) {
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
     const mentionQuery = normalizeMentionQuery(msg?.query ?? '');
-    const limit = normalizeMentionSearchLimit(msg?.limit, { defaultLimit: 20, maxLimit: 50 });
+    const limit = normalizeMentionSearchLimit(msg?.limit);
 
     if (mentionQuery.empty) {
       const recentPool = await readConversationMentionCandidatePool({ maxScan: limit, maxDurationMs: 300 });
