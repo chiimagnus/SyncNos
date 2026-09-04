@@ -227,6 +227,45 @@ describe('feishu docx image bind flow', () => {
     expect(String(res.results?.[0]?.warnings?.join('\n') || '')).toContain('local image unavailable');
   });
 
+  it('uses preprocessed markdown for text fallback when Convert fails', async () => {
+    setupChromeStorage();
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
+    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+      conversation: { id: 1, title: 't' },
+      mapping: { feishuDocId: '' },
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+    markdownMocks.formatConversationMarkdownForFeishuDocxSync.mockResolvedValueOnce(
+      ['![local](syncnos-asset://7)', '`![code](syncnos-asset://8)`'].join('\n\n'),
+    );
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+
+    const fallbackBodies: string[] = [];
+    fetchFeishuJsonMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/docx/v1/documents') return { document: { document_id: 'doc1' } };
+      if (path === '/docx/v1/documents/blocks/convert') throw new Error('convert unavailable');
+      if (path.endsWith('/children')) {
+        fallbackBodies.push(String((init as any)?.body || ''));
+        return { ok: true };
+      }
+      if (path.includes('/children?page_size=')) return { items: [] };
+      return {};
+    });
+
+    const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
+    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(res.okCount).toBe(1);
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7], conversationId: 1 });
+    const fallbackBody = fallbackBodies.join('\n');
+    expect(fallbackBody).toContain('https://syncnos.invalid/asset/');
+    expect(fallbackBody).not.toContain('![local](syncnos-asset://7)');
+    expect(fallbackBody).toContain('`![code](syncnos-asset://8)`');
+    expect(downloadImageSmartMock).not.toHaveBeenCalled();
+    expect(imageBindMocks.uploadImageToFeishu).not.toHaveBeenCalled();
+    expect(imageBindMocks.bindImageBlockWithFileToken).not.toHaveBeenCalled();
+  });
+
   it('records warnings when image blocks are fewer than markdown images', async () => {
     setupChromeStorage();
     authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
