@@ -213,6 +213,7 @@ describe('image cache bulk reader', () => {
       conversationId: 42,
       byteSize: 3,
     });
+    await expect(getImageCacheAssetById({ id: '10' as any, conversationId: 42 })).resolves.toMatchObject({ id: 10 });
     await expect(getImageCacheAssetById({ id: 10, conversationId: 99 })).resolves.toBeNull();
     await expect(getImageCacheAssetById({ id: 404, conversationId: 42 })).resolves.toBeNull();
     await expect(getImageCacheAssetById({ id: 0, conversationId: 42 })).resolves.toBeNull();
