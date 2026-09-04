@@ -324,20 +324,19 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const key = articleIdentity.conversationKey;
   try {
     const existing = await getConversationBySourceConversationKey(WEB_ARTICLE_SOURCE, key);
-    const existingId = Number((existing as any)?.id);
-    if (existing && Number.isFinite(existingId) && existingId > 0) {
-      const warningFlags = Array.isArray((existing as any)?.warningFlags)
-        ? (existing as any).warningFlags.map((x: any) => String(x || '').trim()).filter(Boolean)
+    if (existing) {
+      const warningFlags = Array.isArray(existing.warningFlags)
+        ? existing.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
         : [];
       return {
         isNew: false,
-        conversationId: existingId,
+        conversationId: existing.id,
         url: canonicalUrl,
-        title: normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
-        author: normalizeText((existing as any)?.author || ''),
-        publishedAt: normalizeText((existing as any)?.publishedAt || ''),
+        title: normalizeText(existing.title || '') || fallbackTitle(canonicalUrl, tab.title || ''),
+        author: normalizeText(existing.author || ''),
+        publishedAt: normalizeText(existing.publishedAt || ''),
         warningFlags,
-        lastCapturedAt: Number((existing as any)?.lastCapturedAt) || null,
+        lastCapturedAt: Number(existing.lastCapturedAt) || null,
       };
     }
   } catch (_e) {
