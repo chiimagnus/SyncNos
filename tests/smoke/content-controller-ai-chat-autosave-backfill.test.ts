@@ -126,7 +126,7 @@ function createHarness(options: {
         };
       },
     },
-    itemMention: null,
+    itemMention: { start: () => null },
   });
   let resident = controller.start();
 

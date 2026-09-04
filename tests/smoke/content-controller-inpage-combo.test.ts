@@ -97,7 +97,7 @@ function createHarness(options?: {
         };
       },
     },
-    itemMention: null,
+    itemMention: { start: () => null },
   });
   controller.start();
 

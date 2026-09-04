@@ -117,7 +117,7 @@ function createHarness(options?: {
         commit: () => true,
       }),
     },
-    itemMention: options?.mentionStart ? { start: options.mentionStart } : null,
+    itemMention: { start: options?.mentionStart || (() => null) },
   });
 
   return {

@@ -56,7 +56,7 @@ type Deps = {
   inpageTip: InpageTipApi | null;
   createRuntimeObserver: RuntimeObserverFactory;
   incrementalEngine: { prepare: (snapshot: unknown) => any };
-  itemMention: { start?: () => { stop?: () => void } | null } | null;
+  itemMention: { start: () => { stop: () => void } | null };
 };
 
 const EASTER_EGG_LINES = Object.freeze({
@@ -860,7 +860,7 @@ export function createContentController(deps: Deps) {
       const ownerToken = ++residentOwnerSequence;
       const controller = createAutoCaptureController(ownerToken);
       currentResidentAutoSaveHandle = controller;
-      let mentionController: { stop?: () => void } | null = null;
+      let mentionController: { stop: () => void } | null = null;
       let stopped = false;
       let controllerStarted = false;
       let aiChatDollarMentionEnabled: boolean | null = null;
@@ -872,7 +872,7 @@ export function createContentController(deps: Deps) {
         const previous = mentionController;
         mentionController = null;
         try {
-          previous?.stop?.();
+          previous?.stop();
         } catch (_e) {
           // ignore
         }
@@ -880,7 +880,7 @@ export function createContentController(deps: Deps) {
 
       function startMention() {
         if (stopped || aiChatDollarMentionEnabled !== true) return;
-        if (!itemMention || typeof itemMention.start !== 'function' || mentionController) return;
+        if (mentionController) return;
         mentionController = itemMention.start() || null;
       }
 

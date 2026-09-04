@@ -87,7 +87,7 @@ function createHarness(options: {
   send?: (type: string, payload?: any) => any;
   incremental?: (snapshot: any) => any;
   collectorId?: string;
-  itemMentionStart?: () => { stop?: () => void } | null;
+  itemMentionStart?: () => { stop: () => void } | null;
 }) {
   let tick: (() => void | Promise<void>) | null = null;
   const observerStart = vi.fn();
@@ -147,7 +147,7 @@ function createHarness(options: {
         };
       },
     },
-    itemMention: options.itemMentionStart ? { start: options.itemMentionStart } : null,
+    itemMention: { start: options.itemMentionStart || (() => null) },
   });
   const resident = controller.start();
   return {
