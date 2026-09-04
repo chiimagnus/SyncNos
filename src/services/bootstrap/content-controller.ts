@@ -9,7 +9,10 @@ import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
-import { fingerprintHash } from '@services/conversations/content/autosave-identity-utils';
+import {
+  fingerprintHash,
+  makeAutoSaveConversationStateKey,
+} from '@services/conversations/content/autosave-identity-utils';
 import {
   readInpageButtonGlobalPosition,
   writeInpageButtonGlobalPosition,
@@ -394,13 +397,6 @@ export function createContentController(deps: Deps) {
       scheduleNotionAiProactiveCaptureBurst();
     }
 
-    function makeConversationStateKey(snapshot: any): string {
-      const source = normalizeConversationMeta(snapshot?.conversation?.source);
-      const conversationKey = normalizeConversationMeta(snapshot?.conversation?.conversationKey);
-      if (!source || !conversationKey) return '';
-      return `${source}::${conversationKey}`;
-    }
-
     function getBackfillState(stateKey: string, now: number) {
       let state = backfillStateByConversation.get(stateKey);
       if (state) return state;
@@ -456,7 +452,7 @@ export function createContentController(deps: Deps) {
       pageSignature: string | null;
       stateKey: string | null;
     }> {
-      const stateKey = makeConversationStateKey(snapshot);
+      const stateKey = makeAutoSaveConversationStateKey(snapshot);
       if (!stateKey)
         return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
       const stateKeyHash = fingerprintHash(stateKey);

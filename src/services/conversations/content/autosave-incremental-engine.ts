@@ -5,6 +5,7 @@ import {
   computeSuffixPrefixOverlap,
   fingerprintHash,
   getMessageIdentityBase,
+  makeAutoSaveConversationStateKey,
 } from '@services/conversations/content/autosave-identity-utils.ts';
 
 type Diff = { added: string[]; updated: string[]; removed: string[] };
@@ -46,13 +47,6 @@ type AutoSaveIncrementalPreparation = {
 
 function normalizeMeta(value: unknown): string {
   return String(value || '').trim();
-}
-
-function makeConversationStateKey(snapshot: any): string {
-  const source = normalizeMeta(snapshot?.conversation?.source);
-  const conversationKey = normalizeMeta(snapshot?.conversation?.conversationKey);
-  if (!source || !conversationKey) return '';
-  return `${source}::${conversationKey}`;
 }
 
 function buildTailEntries(args: {
@@ -195,7 +189,7 @@ export function createAutoSaveIncrementalEngine() {
     prepare(inputSnapshot: any): AutoSaveIncrementalPreparation {
       if (!inputSnapshot || !inputSnapshot.conversation) return noOpPreparation();
 
-      const stateKey = makeConversationStateKey(inputSnapshot);
+      const stateKey = makeAutoSaveConversationStateKey(inputSnapshot);
       if (!stateKey) return noOpPreparation();
 
       const baseState = byConversation.get(stateKey) || null;
