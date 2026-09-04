@@ -1699,9 +1699,9 @@ function stripDomainPrefix(listSiteKey: string): string {
   return text.slice('domain:'.length);
 }
 
-export async function readConversationMentionCandidatePool(input?: {
-  maxScan?: number;
-  maxDurationMs?: number;
+export async function readConversationMentionCandidatePool(input: {
+  maxScan: number;
+  maxDurationMs: number;
 }): Promise<{
   candidates: Array<{
     conversationId: number;
@@ -1715,12 +1715,7 @@ export async function readConversationMentionCandidatePool(input?: {
   revision: number;
 }> {
   // ponytail: Item Mention intentionally searches only a bounded recent pool; FTS/global indexing stays out of scope.
-  const maxScan =
-    Number.isFinite(input?.maxScan) && (input?.maxScan as number) > 0 ? Math.floor(input!.maxScan!) : 2000;
-  const maxDurationMs =
-    Number.isFinite(input?.maxDurationMs) && (input?.maxDurationMs as number) > 0
-      ? Math.floor(input!.maxDurationMs!)
-      : 300;
+  const { maxScan, maxDurationMs } = input;
 
   const db = await openDb();
   const revisionStoreName = DATA_REVISION_STORE_BY_SCOPE.conversations;

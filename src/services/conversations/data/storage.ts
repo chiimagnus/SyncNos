@@ -46,7 +46,7 @@ export async function getConversationDetail(conversationId: number) {
   return { conversationId, messages };
 }
 
-export async function readConversationMentionCandidatePool(input?: { maxScan?: number; maxDurationMs?: number }) {
+export async function readConversationMentionCandidatePool(input: { maxScan: number; maxDurationMs: number }) {
   return await idb.readConversationMentionCandidatePool(input);
 }
 
