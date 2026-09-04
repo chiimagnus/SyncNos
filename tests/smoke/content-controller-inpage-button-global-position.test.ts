@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 import { INPAGE_BUTTON_GLOBAL_POSITION_STORAGE_KEY } from '@platform/storage/inpage-button-position.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 
 type TickFn = (() => void | Promise<void>) | null;
 
@@ -106,7 +107,7 @@ function createHarness(options?: {
       tickRef = onTick || null;
       return { start: () => {}, stop: () => {} };
     },
-    incrementalEngine: null,
+    incrementalEngine: createAutoSaveIncrementalEngine(),
   });
   const resident = controller.start();
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 
 type TickFn = (() => void | Promise<void>) | null;
 
@@ -59,7 +60,7 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       tickRef = onTick || null;
       return { start: () => {}, stop: () => {} };
     },
-    incrementalEngine: null,
+    incrementalEngine: createAutoSaveIncrementalEngine(),
   });
   controller.start();
 

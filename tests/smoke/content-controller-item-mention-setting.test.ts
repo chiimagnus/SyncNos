@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createContentController } from '@services/bootstrap/content-controller.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 
 type StorageChangeListener = (changes: Record<string, any>, areaName?: string) => void;
 
@@ -69,7 +70,7 @@ describe('content-controller item mention setting', () => {
       inpageButton: null,
       inpageTip: null,
       createRuntimeObserver: () => ({ start: () => {}, stop: () => {} }),
-      incrementalEngine: null,
+      incrementalEngine: createAutoSaveIncrementalEngine(),
       itemMention: { start },
     } as any);
 
@@ -94,7 +95,7 @@ describe('content-controller item mention setting', () => {
       inpageButton: null,
       inpageTip: null,
       createRuntimeObserver: () => ({ start: () => {}, stop: () => {} }),
-      incrementalEngine: null,
+      incrementalEngine: createAutoSaveIncrementalEngine(),
       itemMention: { start },
     } as any);
 
