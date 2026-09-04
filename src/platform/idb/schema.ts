@@ -199,11 +199,10 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
       const canonicalUrl = `https://app.notion.com/chat?t=${threadId}&wfv=chat`;
 
       const proceedWithStableExisting = (stableExisting: Record<string, unknown> | null) => {
-        const seenIds = new Set(
-          groupedConversations.map((item) => Number(item?.id)).filter((id) => Number.isFinite(id) && id > 0),
-        );
         const mergedConversations =
-          stableExisting && stableExisting.id && !seenIds.has(Number(stableExisting.id))
+          stableExisting &&
+          stableExisting.id &&
+          !groupedConversations.some((item) => Number(item?.id) === Number(stableExisting.id))
             ? groupedConversations.concat([stableExisting])
             : groupedConversations;
 
@@ -420,11 +419,8 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
       const exactReq = convoKeyIdx.get(['web', canonicalKey]);
       exactReq.onsuccess = () => {
         const exact = (exactReq.result as Record<string, unknown> | undefined) || null;
-        const seenIds = new Set(
-          groupedConversations.map((item) => Number(item?.id)).filter((id) => Number.isFinite(id) && id > 0),
-        );
         const mergedConversations =
-          exact && exact.id && !seenIds.has(Number(exact.id))
+          exact && exact.id && !groupedConversations.some((item) => Number(item?.id) === Number(exact.id))
             ? groupedConversations.concat([{ ...exact, __canonicalUrl: canonicalUrl, __canonicalKey: canonicalKey }])
             : groupedConversations;
 
