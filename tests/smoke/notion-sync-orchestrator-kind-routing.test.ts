@@ -198,6 +198,82 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(updateCalls.length).toBe(0);
   });
 
+  it('fails closed before appending blocks when image upgrade throws unexpectedly', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+    const appendChildren = vi.fn(async () => ({ ok: true, results: [{ id: 'unexpected' }] }));
+    const setSyncCursor = vi.fn(async () => true);
+    const setConversationNotionPageId = vi.fn(async () => true);
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+      storage: {
+        getSyncMappingByConversation: async () => ({
+          conversation: {
+            id: 3,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            title: 'Internal image failure',
+            url: 'https://example.com/3',
+            lastCapturedAt: 3,
+          },
+          mapping: null,
+        }),
+        getMessagesByConversationId: async () => [
+          { messageKey: 'm1', role: 'assistant', contentText: 'image', sequence: 1, updatedAt: 1 },
+        ],
+        setConversationNotionPageId,
+        setSyncCursor,
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase: async () => ({ databaseId: 'db_chats' }) },
+      syncService: {
+        getPage: async () => {
+          throw new Error('unused');
+        },
+        createPageInDatabase: async () => ({ id: 'p3' }),
+        updatePageProperties: async () => ({ ok: true }),
+        appendChildren,
+        messagesToBlocks: () => [
+          {
+            object: 'block',
+            type: 'image',
+            image: { type: 'external', external: { url: 'syncnos-asset://42' } },
+          },
+        ],
+        isPageUsableForDatabase: () => true,
+        hasExternalImageBlocks: () => true,
+        upgradeImageBlocksToFileUploads: async () => {
+          throw new Error('forced image upgrader failure');
+        },
+      },
+      jobStore,
+    });
+
+    const result = await orchestrator.syncConversations({ conversationIds: [3], instanceId: 'i' });
+
+    expect(result.failCount).toBe(1);
+    expect(result.okCount).toBe(0);
+    expect(result.results[0]).toMatchObject({
+      conversationId: 3,
+      ok: false,
+      mode: 'failed',
+      error: 'forced image upgrader failure',
+    });
+    expect(setConversationNotionPageId).toHaveBeenCalledWith(3, 'p3', {});
+    expect(appendChildren).not.toHaveBeenCalled();
+    expect(setSyncCursor).not.toHaveBeenCalled();
+  });
+
   it('rebuilds article section when digest changes', async () => {
     const calls: any[] = [];
 

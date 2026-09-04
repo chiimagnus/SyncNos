@@ -279,16 +279,7 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   }
 
   const externalBefore = countExternalImageBlocks(nextBlocks);
-  try {
-    nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks, conversationId);
-  } catch (e) {
-    warnings.push({
-      code: 'notion_image_upload_failed',
-      message: 'Image upload upgrade failed; keeping external images.',
-      extra: { error: e && (e as any).message ? String((e as any).message) : String(e) },
-    });
-    return nextBlocks;
-  }
+  nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks, conversationId);
 
   const externalAfter = countExternalImageBlocks(nextBlocks);
   if (externalBefore > 0 && externalAfter > 0) {
