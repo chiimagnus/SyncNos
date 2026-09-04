@@ -774,19 +774,11 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   const finish = () => normalizeConversationRecordsForV11({ db, tx });
   const migrateArticles = () => {
     if (oldVersion >= 4) return finish();
-    try {
-      migrateLegacyArticleConversations({ db, tx }, finish);
-    } catch (_e) {
-      finish();
-    }
+    migrateLegacyArticleConversations({ db, tx }, finish);
   };
 
   if (oldVersion >= 2) return migrateArticles();
-  try {
-    migrateNotionAiThreadConversations({ db, tx }, migrateArticles);
-  } catch (_e) {
-    migrateArticles();
-  }
+  migrateNotionAiThreadConversations({ db, tx }, migrateArticles);
 }
 
 let cachedDb: IDBDatabase | null = null;
