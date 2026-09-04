@@ -235,10 +235,7 @@ export async function attachOrphanCommentsToConversation(
     async ({ stores, markChanged }) => {
       const store = stores.article_comments;
       const idx = store.index('by_canonicalUrl_createdAt');
-      const range = globalThis.IDBKeyRange.bound(
-        [normalizedUrl, -Infinity] as any,
-        [normalizedUrl, Infinity] as any,
-      );
+      const range = globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any);
       const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
       let updated = 0;
       const now = Date.now();
