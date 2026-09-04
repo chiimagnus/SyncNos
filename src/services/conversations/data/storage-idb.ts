@@ -172,10 +172,6 @@ function sortFacetItems(items: Array<{ key: string; label: string; count: number
   });
 }
 
-function isArticlePayload(payload: any): boolean {
-  return safeString(payload?.sourceType).toLowerCase() === 'article';
-}
-
 async function findExistingArticleConversationByUrl(
   conversationsStore: IDBObjectStore,
   rawUrl: unknown,
@@ -251,10 +247,11 @@ async function findExistingConversationForPayload(
   }
 
   const source = safeString(payload?.source);
+  const isArticle = safeString(payload?.sourceType).toLowerCase() === 'article';
   let conversationKey = safeString(payload?.conversationKey);
   if (!source) return null;
 
-  if (isArticlePayload(payload) && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
+  if (isArticle && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
     const identity = buildCanonicalWebArticleIdentity(payload?.url);
     if (identity) conversationKey = identity.conversationKey;
     conversationKey = normalizeWebArticleConversationKey(conversationKey);
@@ -263,9 +260,7 @@ async function findExistingConversationForPayload(
   if (!conversationKey) return null;
   const idx = conversationsStore.index('by_source_conversationKey');
   let existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
-  if (!existing && isArticlePayload(payload)) {
-    existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
-  }
+  if (!existing && isArticle) existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
   return existing || null;
 }
 
