@@ -62,6 +62,31 @@ describe('image-inline', () => {
     expect(hasReusableImageCachePayload({ byteSize: 10 })).toBe(false);
   });
 
+  it('ignores HTTP/data image examples in escaped and code contexts without side effects', async () => {
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    const fetchMock = vi.fn();
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+    const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([1, 2, 3])).toString('base64')}`;
+    const source = [
+      '\\![escaped](https://example.com/escaped.png)',
+      '`![inline](https://example.com/inline.png)`',
+      '```md',
+      '![fenced](https://example.com/fenced.png)',
+      `![fenced-data](${dataImageUrl})`,
+      '```',
+      '    ![indented](https://example.com/indented.png)',
+    ].join('\n');
+    const messages = [{ messageKey: 'm1', contentMarkdown: source, role: 'assistant', sequence: 1 }];
+
+    const result = await inlineChatImagesInMessages({ conversationId: 1, messages });
+
+    expect(result).toMatchObject({ inlinedCount: 0, fromCacheCount: 0, downloadedCount: 0, inlinedBytes: 0 });
+    expect(messages[0].contentMarkdown).toBe(source);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(transactionSpy).not.toHaveBeenCalled();
+  });
+
   it('ignores existing internal asset refs without opening image-cache transactions', async () => {
     const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
     const messages = [
