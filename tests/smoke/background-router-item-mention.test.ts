@@ -98,7 +98,7 @@ describe('background-router item mention', () => {
     const router = createRouter();
 
     const empty = await search(router, '', 3);
-    const whitespace = await search(router, ' \n\t ', 4);
+    await search(router, ' \n\t ', 4);
     const nonEmpty = await search(router, 'openai', 20);
     const cached = await search(router, 'open', 20);
 
