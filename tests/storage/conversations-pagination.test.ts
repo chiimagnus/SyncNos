@@ -102,6 +102,72 @@ describe('conversations pagination storage-idb', () => {
     }
   });
 
+  it('queues continuation article comment reads while the conversation cursor success event is active', async () => {
+    const now = Date.now();
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'active-window-chat',
+      title: 'newer chat',
+      url: 'https://chatgpt.com/c/active-window-chat',
+      lastCapturedAt: now,
+    });
+    const article = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/active-window',
+      title: 'older article',
+      url: 'https://example.com/active-window',
+      lastCapturedAt: now - 1,
+    });
+    await addArticleComment({
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/active-window',
+      commentText: 'root',
+      createdAt: 1,
+    });
+
+    const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 1 });
+    expect(first.items.map((item) => item.conversationKey)).toEqual(['active-window-chat']);
+    expect(first.cursor).toBeTruthy();
+
+    const originalOpenCursor = IDBIndex.prototype.openCursor;
+    const originalGetAll = IDBIndex.prototype.getAll;
+    let conversationCursorEventActive = false;
+    const openCursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor').mockImplementation(function (...args: any[]) {
+      const request = originalOpenCursor.apply(this, args as any);
+      if (String((this as any)?.name || '').startsWith('by_')) {
+        request.addEventListener('success', () => {
+          conversationCursorEventActive = true;
+          queueMicrotask(() => {
+            conversationCursorEventActive = false;
+          });
+        });
+      }
+      return request;
+    });
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll').mockImplementation(function (...args: any[]) {
+      const name = String((this as any)?.name || '');
+      if (name === 'by_conversationId_createdAt' || name === 'by_canonicalUrl_createdAt') {
+        if (!conversationCursorEventActive)
+          throw new Error('comment read queued outside active conversation cursor event');
+      }
+      return originalGetAll.apply(this, args as any);
+    });
+
+    try {
+      const second = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 1 }, first.cursor!);
+      expect(second.items).toHaveLength(1);
+      expect(second.items[0]).toMatchObject({
+        conversationKey: 'article:https://example.com/active-window',
+        commentThreadCount: 1,
+      });
+    } finally {
+      getAllSpy.mockRestore();
+      openCursorSpy.mockRestore();
+    }
+  });
+
   it('does not duplicate or skip rows across pages', async () => {
     const now = Date.now();
     const inserted: Array<{ id: number; conversationKey: string; lastCapturedAt: number }> = [];

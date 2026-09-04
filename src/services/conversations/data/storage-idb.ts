@@ -1311,21 +1311,29 @@ async function readConversationListPageItems(input: {
   const idx = store.index(rangeInput.indexName);
   const request = idx.openCursor((rangeInput.range || null) as any, 'prev');
 
-  const rows = await new Promise<any[]>((resolve, reject) => {
-    const out: any[] = [];
-    request.onerror = () => reject(request.error || new Error('cursor failed'));
-    request.onsuccess = () => {
-      const c = request.result;
-      if (!c) return resolve(out);
-      out.push(normalizeConversationListRecord(c.value || {}));
-      if (out.length >= safeLimit + 1) return resolve(out);
-      c.continue();
-    };
-  });
+  const page = await new Promise<{ pageItems: Conversation[]; hasMore: boolean; hydration: Promise<void> }>(
+    (resolve, reject) => {
+      const out: any[] = [];
+      const finishPage = () => {
+        const hasMore = out.length > safeLimit;
+        const pageItems = (hasMore ? out.slice(0, safeLimit) : out) as Conversation[];
+        const hydration = hydrateConversationListArticleCommentThreadCounts(pageItems, articleCommentsStore);
+        resolve({ pageItems, hasMore, hydration });
+      };
 
-  const hasMore = rows.length > safeLimit;
-  const pageItems = hasMore ? rows.slice(0, safeLimit) : rows;
-  await hydrateConversationListArticleCommentThreadCounts(pageItems as Conversation[], articleCommentsStore);
+      request.onerror = () => reject(request.error || new Error('cursor failed'));
+      request.onsuccess = () => {
+        const c = request.result;
+        if (!c) return finishPage();
+        out.push(normalizeConversationListRecord(c.value || {}));
+        if (out.length >= safeLimit + 1) return finishPage();
+        c.continue();
+      };
+    },
+  );
+
+  await page.hydration;
+  const { pageItems, hasMore } = page;
 
   const tail = pageItems.length ? pageItems[pageItems.length - 1] : null;
   const nextCursor =
