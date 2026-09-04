@@ -222,19 +222,6 @@ export async function deleteArticleCommentById(id: number): Promise<ArticleComme
   );
 }
 
-export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string): Promise<boolean> {
-  const normalized = normalizeCanonicalUrl(canonicalUrl);
-  if (!normalized) return false;
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readonly');
-  const idx = stores.article_comments.index('by_canonicalUrl_createdAt');
-  const range = globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any);
-  const count = await reqToPromise<number>(idx.count(range) as any);
-  await txDone(t);
-  return Number(count) > 0;
-}
-
 export async function attachOrphanCommentsToConversation(
   canonicalUrl: string,
   conversationId: number,

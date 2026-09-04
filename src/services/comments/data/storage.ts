@@ -17,10 +17,6 @@ export async function deleteArticleCommentById(id: number) {
   return await idb.deleteArticleCommentById(id);
 }
 
-export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string) {
-  return await idb.hasAnyArticleCommentsForCanonicalUrl(canonicalUrl);
-}
-
 export async function attachOrphanCommentsToConversation(canonicalUrl: string, conversationId: number) {
   return await idb.attachOrphanCommentsToConversation(canonicalUrl, conversationId);
 }
