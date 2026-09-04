@@ -12,11 +12,8 @@ const storageMocks = vi.hoisted(() => ({
   getConversationDetail: vi.fn(),
   getConversationTailWindowBySourceAndKey: vi.fn(),
   mergeConversationsByIds: vi.fn(),
-}));
-
-const writeMocks = vi.hoisted(() => ({
-  writeConversationMessagesSnapshot: vi.fn(),
-  writeConversationSnapshot: vi.fn(),
+  syncConversationMessages: vi.fn(),
+  upsertConversation: vi.fn(),
 }));
 
 vi.mock('@services/conversations/data/storage', () => ({
@@ -28,11 +25,8 @@ vi.mock('@services/conversations/data/storage', () => ({
   getConversationDetail: storageMocks.getConversationDetail,
   getConversationTailWindowBySourceAndKey: storageMocks.getConversationTailWindowBySourceAndKey,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
-}));
-
-vi.mock('@services/conversations/data/write', () => ({
-  writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
-  writeConversationSnapshot: writeMocks.writeConversationSnapshot,
+  syncConversationMessages: storageMocks.syncConversationMessages,
+  upsertConversation: storageMocks.upsertConversation,
 }));
 
 function createRouter() {
@@ -60,8 +54,8 @@ afterEach(() => {
   storageMocks.getConversationDetail.mockReset();
   storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
-  writeMocks.writeConversationMessagesSnapshot.mockReset();
-  writeMocks.writeConversationSnapshot.mockReset();
+  storageMocks.syncConversationMessages.mockReset();
+  storageMocks.upsertConversation.mockReset();
 });
 
 describe('conversations pagination handlers', () => {

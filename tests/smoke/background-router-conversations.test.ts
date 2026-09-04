@@ -2,11 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 
-const writeMocks = vi.hoisted(() => ({
-  writeConversationMessagesSnapshot: vi.fn(),
-  writeConversationSnapshot: vi.fn(),
-}));
-
 const storageMocks = vi.hoisted(() => ({
   deleteConversationsByIds: vi.fn(),
   getConversationListBootstrap: vi.fn(),
@@ -15,6 +10,8 @@ const storageMocks = vi.hoisted(() => ({
   findConversationById: vi.fn(),
   getConversationDetail: vi.fn(),
   mergeConversationsByIds: vi.fn(),
+  syncConversationMessages: vi.fn(),
+  upsertConversation: vi.fn(),
 }));
 
 const localStorageMocks = vi.hoisted(() => ({
@@ -29,11 +26,6 @@ const backfillJobMocks = vi.hoisted(() => ({
   backfillConversationImages: vi.fn(),
 }));
 
-vi.mock('@services/conversations/data/write', () => ({
-  writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
-  writeConversationSnapshot: writeMocks.writeConversationSnapshot,
-}));
-
 vi.mock('@services/conversations/data/storage', () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
   getConversationListBootstrap: storageMocks.getConversationListBootstrap,
@@ -42,6 +34,8 @@ vi.mock('@services/conversations/data/storage', () => ({
   findConversationById: storageMocks.findConversationById,
   getConversationDetail: storageMocks.getConversationDetail,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
+  syncConversationMessages: storageMocks.syncConversationMessages,
+  upsertConversation: storageMocks.upsertConversation,
 }));
 
 vi.mock('@platform/storage/local', () => ({
@@ -104,8 +98,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  writeMocks.writeConversationMessagesSnapshot.mockReset();
-  writeMocks.writeConversationSnapshot.mockReset();
+  storageMocks.syncConversationMessages.mockReset();
+  storageMocks.upsertConversation.mockReset();
   storageMocks.deleteConversationsByIds.mockReset();
   storageMocks.getConversationListBootstrap.mockReset();
   storageMocks.getConversationListPage.mockReset();
@@ -124,7 +118,7 @@ describe('background-router conversations', () => {
     [false, 'upsertConversation'],
   ])('uses mutation __isNew=%s for the UPSERT response and auto-sync reason', async (__isNew, expectedReason) => {
     const onConversationChanged = vi.fn(async () => {});
-    writeMocks.writeConversationSnapshot.mockResolvedValue({
+    storageMocks.upsertConversation.mockResolvedValue({
       id: 321,
       source: 'chatgpt',
       conversationKey: 'k-321',
@@ -139,8 +133,8 @@ describe('background-router conversations', () => {
 
     expect(res.ok).toBe(true);
     expect(res.data).toMatchObject({ id: 321, __isNew });
-    expect(writeMocks.writeConversationSnapshot).toHaveBeenCalledTimes(1);
-    expect(writeMocks.writeConversationSnapshot).toHaveBeenCalledWith({
+    expect(storageMocks.upsertConversation).toHaveBeenCalledTimes(1);
+    expect(storageMocks.upsertConversation).toHaveBeenCalledWith({
       source: 'chatgpt',
       conversationKey: 'k-321',
       title: 'Title',
@@ -151,7 +145,7 @@ describe('background-router conversations', () => {
 
   it('persists syncConversationMessages and emits the durable auto-sync change signal', async () => {
     const onConversationChanged = vi.fn(async () => {});
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
 
     const router = createRouter({ onConversationChanged });
 
@@ -162,7 +156,7 @@ describe('background-router conversations', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalledWith(123, [], {
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(123, [], {
       mode: 'snapshot',
       diff: null,
     });
@@ -182,11 +176,11 @@ describe('background-router conversations', () => {
 
     expect(res).toMatchObject({ ok: false, error: { message: 'invalid mode' } });
     expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
-    expect(writeMocks.writeConversationMessagesSnapshot).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
   });
 
   it('uses ai_chat_cache_images_enabled for chat source auto-save', async () => {
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
       if (Array.isArray(keys) && keys.includes('ai_chat_cache_images_enabled')) {
         return {
@@ -220,7 +214,7 @@ describe('background-router conversations', () => {
   });
 
   it('keeps transient protective policies through author normalization and image inlining', async () => {
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
       makeInlineResult(
         input.messages.map((message: any) => ({
@@ -251,7 +245,7 @@ describe('background-router conversations', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalledWith(
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(
       2003,
       [
         expect.objectContaining({
@@ -267,7 +261,7 @@ describe('background-router conversations', () => {
   });
 
   it('uses web_article_cache_images_enabled for article source auto-save', async () => {
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
       if (Array.isArray(keys) && keys.includes('ai_chat_cache_images_enabled')) {
         return {

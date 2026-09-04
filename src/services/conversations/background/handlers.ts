@@ -9,8 +9,9 @@ import {
   getConversationDetail,
   getConversationTailWindowBySourceAndKey,
   mergeConversationsByIds,
+  syncConversationMessages,
+  upsertConversation,
 } from '@services/conversations/data/storage';
-import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 import {
@@ -175,7 +176,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const payload = msg.payload || {};
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
-    const convo = await writeConversationSnapshot(payload);
+    const convo = await upsertConversation(payload);
     const conversationId = Number((convo as any)?.id);
     if (Number.isFinite(conversationId) && conversationId > 0) {
       fireAndForget(
@@ -298,7 +299,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       });
     }
 
-    const res = await writeConversationMessagesSnapshot(conversationId, messages, { mode, diff });
+    const res = await syncConversationMessages(conversationId, messages, { mode, diff });
     fireAndForget(
       deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
     );
