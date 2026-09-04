@@ -8,9 +8,7 @@ export type MentionCandidate = {
   conversationId: number;
   title: string;
   source: string;
-  url: string;
   domain: string;
-  sourceType: string;
   lastCapturedAt: number;
 };
 

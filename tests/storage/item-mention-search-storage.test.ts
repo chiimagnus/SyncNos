@@ -104,7 +104,6 @@ describe('item mention candidate pool storage', () => {
     expect(res.candidates).toEqual([
       expect.objectContaining({
         conversationId,
-        url: 'https://url-derived.example/path',
         domain: 'persisted-contract.example',
       }),
     ]);

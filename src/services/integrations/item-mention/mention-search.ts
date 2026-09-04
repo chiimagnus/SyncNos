@@ -25,9 +25,7 @@ export function normalizeMentionCandidate(
     conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : 0,
     title: safeText((input as any).title),
     source: safeText((input as any).source),
-    url: safeText((input as any).url),
     domain: safeText((input as any).domain),
-    sourceType: safeText((input as any).sourceType) || 'chat',
     lastCapturedAt: Number.isFinite(lastCapturedAt) && lastCapturedAt > 0 ? lastCapturedAt : 0,
   };
 }

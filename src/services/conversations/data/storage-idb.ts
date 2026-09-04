@@ -1707,9 +1707,7 @@ export async function readConversationMentionCandidatePool(input: {
     conversationId: number;
     title: string;
     source: string;
-    url: string;
     domain: string;
-    sourceType: string;
     lastCapturedAt: number;
   }>;
   revision: number;
@@ -1728,9 +1726,7 @@ export async function readConversationMentionCandidatePool(input: {
     conversationId: number;
     title: string;
     source: string;
-    url: string;
     domain: string;
-    sourceType: string;
     lastCapturedAt: number;
   }> = [];
   let scannedCount = 0;
@@ -1751,9 +1747,7 @@ export async function readConversationMentionCandidatePool(input: {
           conversationId,
           title: safeString(record?.title),
           source: safeString(record?.source),
-          url: safeString(record?.url),
           domain: stripDomainPrefix(safeString(record?.listSiteKey)),
-          sourceType: safeString(record?.sourceType) || 'chat',
           lastCapturedAt: Number(record?.lastCapturedAt) || 0,
         });
       }
