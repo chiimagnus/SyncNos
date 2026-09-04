@@ -132,7 +132,6 @@ export default defineBackground(() => {
   }
   try {
     onInstalled((details) => {
-      cleanupLegacyNotionOAuthConfig().catch(() => {});
       ensureDefaultFeishuOAuthClientId().catch(() => {});
       ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
       // Do not auto-open tabs after extension updates.
