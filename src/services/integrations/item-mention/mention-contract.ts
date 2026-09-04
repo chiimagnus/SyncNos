@@ -10,8 +10,4 @@ export type MentionSearchResult = {
   candidates: MentionCandidate[];
 };
 
-export type MentionInsertPayload = {
-  conversationId: number;
-};
-
 
