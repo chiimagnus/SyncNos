@@ -9,7 +9,6 @@ import {
   type ImportStats,
 } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
-import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { disconnectFeishu } from '@services/sync/feishu/auth/settings-client';
 import {
   FEISHU_DEFAULTS,
@@ -1062,7 +1061,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (!status) return;
 
       if (status.connected === true) {
-        await disconnectNotion();
+        unwrap(await send<ApiResponse<{ disconnected: boolean }>>(NOTION_MESSAGE_TYPES.DISCONNECT, {}));
         notionAuthObservationRevisionRef.current += 1;
         notionStartGenerationRef.current += 1;
         applyNotionAuthStatus({ connected: false, workspaceName: '' });

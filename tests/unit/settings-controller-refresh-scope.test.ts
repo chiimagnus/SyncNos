@@ -23,7 +23,6 @@ const antiHotlinkMocks = vi.hoisted(() => ({
 const feishuSettingsMocks = vi.hoisted(() => ({
   getPathConfig: vi.fn(),
 }));
-const notionClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 const feishuClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
@@ -33,7 +32,6 @@ vi.mock('@services/shared/storage', () => ({
   storageRemove: storageMocks.remove,
   storageOnChanged: storageMocks.onChanged,
 }));
-vi.mock('@services/sync/notion/auth/settings-client', () => ({ disconnectNotion: notionClientMocks.disconnect }));
 vi.mock('@services/sync/feishu/auth/settings-client', () => ({ disconnectFeishu: feishuClientMocks.disconnect }));
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: vi.fn(),
@@ -181,7 +179,6 @@ beforeEach(() => {
     articleFolder: 'Articles',
     videoFolder: 'Videos',
   });
-  notionClientMocks.disconnect.mockResolvedValue(undefined);
   feishuClientMocks.disconnect.mockResolvedValue(undefined);
 
   storageMocks.get.mockImplementation(async (keys: string[]) => {
@@ -208,6 +205,10 @@ beforeEach(() => {
     }
     if (type === NOTION_MESSAGE_TYPES.START_AUTH) {
       return await takeQueued(notionStartQueue, ok({ state: 'notion-state' }));
+    }
+    if (type === NOTION_MESSAGE_TYPES.DISCONNECT) {
+      notionStatus = { connected: false, workspaceName: '' };
+      return ok({ disconnected: true });
     }
     if (type === NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES) return ok({ pages: [], resolvedSaved: null });
     if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) {

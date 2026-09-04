@@ -8,7 +8,7 @@ import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
-import { cleanupLegacyNotionOAuthConfig, setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
+import { setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
 import {
   ensureDefaultFeishuOAuthClientId,
   ensureDefaultFeishuOAuthProxyUrl,
@@ -161,7 +161,6 @@ export default defineBackground(() => {
     // optional listener registration must not block sibling listeners
   }
 
-  void cleanupLegacyNotionOAuthConfig().catch(() => {});
   void ensureDefaultFeishuOAuthClientId().catch(() => {});
   void ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
 

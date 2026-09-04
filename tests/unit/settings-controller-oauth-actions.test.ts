@@ -13,7 +13,6 @@ const storageMocks = vi.hoisted(() => ({
   remove: vi.fn(),
   onChanged: vi.fn(),
 }));
-const notionClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 const feishuClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 const uiUtilsMocks = vi.hoisted(() => ({ openHttpUrl: vi.fn() }));
 
@@ -24,7 +23,6 @@ vi.mock('@services/shared/storage', () => ({
   storageRemove: storageMocks.remove,
   storageOnChanged: storageMocks.onChanged,
 }));
-vi.mock('@services/sync/notion/auth/settings-client', () => ({ disconnectNotion: notionClientMocks.disconnect }));
 vi.mock('@services/sync/feishu/auth/settings-client', () => ({ disconnectFeishu: feishuClientMocks.disconnect }));
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: vi.fn(),
@@ -124,7 +122,6 @@ beforeEach(() => {
   notionConnected = false;
   feishuConnected = false;
   storageState = {};
-  notionClientMocks.disconnect.mockResolvedValue(undefined);
   feishuClientMocks.disconnect.mockResolvedValue(undefined);
   uiUtilsMocks.openHttpUrl.mockReturnValue(true);
 
@@ -146,6 +143,7 @@ beforeEach(() => {
       return ok({ connected: notionConnected, workspaceName: notionConnected ? 'Workspace' : '' });
     }
     if (type === NOTION_MESSAGE_TYPES.START_AUTH) return ok({ state: 'background-state' });
+    if (type === NOTION_MESSAGE_TYPES.DISCONNECT) return ok({ disconnected: true });
     if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) return ok({ connected: feishuConnected });
     if (type === FEISHU_MESSAGE_TYPES.START_AUTH) return ok({ state: 'feishu-background-state' });
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
@@ -234,7 +232,7 @@ describe('Settings OAuth actions', () => {
 
     await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
 
-    expect(notionClientMocks.disconnect).toHaveBeenCalledTimes(1);
+    expect(callsOf(NOTION_MESSAGE_TYPES.DISCONNECT)).toHaveLength(1);
     expect(callsOf(NOTION_MESSAGE_TYPES.START_AUTH)).toHaveLength(0);
     expect(callsOf(FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS)).toHaveLength(feishuReadsBefore);
     expect(callsOf('obsidianGetSettings')).toHaveLength(obsidianReadsBefore);

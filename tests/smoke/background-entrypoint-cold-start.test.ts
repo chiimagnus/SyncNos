@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   registerGithubSettingsHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
-  cleanupLegacyNotionOAuthConfig: vi.fn(),
   ensureDefaultFeishuOAuthClientId: vi.fn(),
   ensureDefaultFeishuOAuthProxyUrl: vi.fn(),
   registerClipperContextMenu: vi.fn(),
@@ -66,7 +65,6 @@ vi.mock('@services/sync/github/settings-background-handlers', () => ({
   registerGithubSettingsHandlers: mocks.registerGithubSettingsHandlers,
 }));
 vi.mock('@services/sync/notion/auth/oauth', () => ({
-  cleanupLegacyNotionOAuthConfig: mocks.cleanupLegacyNotionOAuthConfig,
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
 }));
 vi.mock('@services/sync/feishu/auth/oauth', () => ({
@@ -153,7 +151,6 @@ async function loadBackground() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  mocks.cleanupLegacyNotionOAuthConfig.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthClientId.mockResolvedValue(undefined);
   mocks.ensureDefaultFeishuOAuthProxyUrl.mockResolvedValue(undefined);
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);
@@ -182,13 +179,11 @@ describe('background entrypoint cold start', () => {
     const callback = await loadBackground();
     expect(callback()).toBeUndefined();
     await flushMicrotasks();
-    expect(mocks.cleanupLegacyNotionOAuthConfig).toHaveBeenCalledTimes(1);
     expect(mocks.ensureDefaultFeishuOAuthClientId).toHaveBeenCalledTimes(1);
     expect(mocks.ensureDefaultFeishuOAuthProxyUrl).toHaveBeenCalledTimes(1);
 
     installedListener?.({ reason: 'update' });
     await flushMicrotasks();
-    expect(mocks.cleanupLegacyNotionOAuthConfig).toHaveBeenCalledTimes(1);
     expect(mocks.ensureDefaultFeishuOAuthClientId).toHaveBeenCalledTimes(1);
     expect(mocks.ensureDefaultFeishuOAuthProxyUrl).toHaveBeenCalledTimes(1);
   });

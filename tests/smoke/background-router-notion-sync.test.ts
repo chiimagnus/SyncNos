@@ -6,7 +6,6 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
-import { cleanupLegacyNotionOAuthConfig } from '@services/sync/notion/auth/oauth';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = {
@@ -292,22 +291,6 @@ describe('background-router notion sync', () => {
     expect(chromeMock.__createdTabs).toHaveLength(1);
   });
 
-  it('legacy Notion OAuth config cleanup removes only obsolete mirror keys', async () => {
-    const chromeMock = mockChromeStorage();
-    chromeMock.__store.notion_oauth_client_id = 'legacy-id';
-    chromeMock.__store.notion_oauth_client_secret = 'legacy-secret';
-    chromeMock.__store.notion_oauth_pending_state = 'current-pending';
-    chromeMock.__store.notion_oauth_last_error = 'current-error';
-    globalThis.chrome = chromeMock as any;
-
-    await cleanupLegacyNotionOAuthConfig();
-
-    expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
-    expect(chromeMock.__store.notion_oauth_client_secret).toBeUndefined();
-    expect(chromeMock.__store.notion_oauth_pending_state).toBe('current-pending');
-    expect(chromeMock.__store.notion_oauth_last_error).toBe('current-error');
-  });
-
   it('disconnect clears notion token and cached notion routing keys', async () => {
     const chromeMock = mockChromeStorage();
     chromeMock.storage.local.set(
@@ -344,7 +327,6 @@ describe('background-router notion sync', () => {
     expect(removedFlatten).toContain('notion_oauth_pending_state');
     expect(removedFlatten).toContain('notion_oauth_last_error');
     expect(removedFlatten).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
-    expect(res.data?.clearedKeys).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
   });
 
   it('rejects disconnect while a live notion run owns the provider before deleting credentials or config', async () => {
@@ -420,7 +402,6 @@ describe('background-router notion sync', () => {
     expect(jobStore.__getJob()).toBeNull();
     expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
     expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
-    expect(disconnected.data?.clearedKeys).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
     expect(chromeMock.__removed.flat()).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
   });
 

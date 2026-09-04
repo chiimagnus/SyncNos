@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  cleanupLegacyNotionOAuthConfig,
   getNotionOAuthDefaults,
   handleNotionOAuthCallbackNavigation,
   setupNotionOAuthNavigationListener,
@@ -134,24 +133,6 @@ describe('notion oauth (ts)', () => {
 
     setupNotionOAuthNavigationListener();
     expect(typeof chromeMock.__webNavCb).toBe('function');
-  });
-
-  it('cleanupLegacyNotionOAuthConfig removes obsolete id/secret but preserves active auth state', async () => {
-    const chromeMock = installChrome({
-      notion_oauth_client_id: 'legacy-client-id',
-      notion_oauth_client_secret: 'legacy-secret',
-      notion_oauth_pending_state: 'pending-current',
-      notion_oauth_last_error: 'current-error',
-      notion_oauth_token_v1: { accessToken: 'token' },
-    });
-
-    await cleanupLegacyNotionOAuthConfig();
-
-    expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
-    expect(chromeMock.__store.notion_oauth_client_secret).toBeUndefined();
-    expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending-current');
-    expect(chromeMock.__store.notion_oauth_last_error).toBe('current-error');
-    expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'token' });
   });
 
   it('startNotionOAuthAttempt uses secure state and the canonical fixed client id', async () => {
