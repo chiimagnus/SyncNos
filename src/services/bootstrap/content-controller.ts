@@ -43,10 +43,9 @@ type InpageTipApi = {
 };
 
 type RuntimeObserverFactory = (input: {
-  debounceMs?: number;
-  getRoot?: () => Node | null;
-  onTick?: () => void | Promise<void>;
-  leading?: boolean;
+  debounceMs: number;
+  getRoot: () => Node | null;
+  onTick: () => void | Promise<void>;
 }) => { start?: () => void; stop?: () => void } | null;
 
 type Deps = {

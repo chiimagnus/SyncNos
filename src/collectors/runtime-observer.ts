@@ -1,8 +1,7 @@
 type ObserverInput = {
-  debounceMs?: number;
-  onTick?: () => void;
-  getRoot?: () => Node | null;
-  leading?: boolean;
+  debounceMs: number;
+  onTick: () => void | Promise<void>;
+  getRoot: () => Node | null;
 };
 
 type ObserverController = {
@@ -29,23 +28,15 @@ function debounce(callback: () => void, wait: number): { trigger: () => void; ca
 }
 
 export function createObserver(input: ObserverInput): ObserverController {
-  const onTick = typeof input?.onTick === 'function' ? input.onTick : null;
-  const debounceMs = typeof input?.debounceMs === 'number' ? input.debounceMs : 500;
-  const debouncedTick = debounce(() => onTick?.(), debounceMs);
-  const getRoot = typeof input?.getRoot === 'function' ? input.getRoot : null;
-  const leading = input?.leading !== false;
+  const { debounceMs, getRoot, onTick } = input;
+  const debouncedTick = debounce(() => void onTick(), debounceMs);
 
   let observer: MutationObserver | null = null;
   let observedRoot: Node | null = null;
   let rootRefreshTimer: ReturnType<typeof setInterval> | null = null;
   let started = false;
 
-  function getDefaultRoot(): Node | null {
-    return document.documentElement || document.body || null;
-  }
-
   function readRequestedRoot(): Node | null {
-    if (!getRoot) return getDefaultRoot();
     try {
       return getRoot();
     } catch (_error) {
@@ -74,16 +65,15 @@ export function createObserver(input: ObserverInput): ObserverController {
       started = true;
 
       ensureObservedRoot(readRequestedRoot());
-      if (leading) onTick?.();
-      else debouncedTick.trigger();
+      void onTick();
 
-      if (getRoot && !rootRefreshTimer) {
+      if (!rootRefreshTimer) {
         rootRefreshTimer = setInterval(() => {
           if (!started) return;
           const nextRoot = readRequestedRoot();
           if (nextRoot && nextRoot !== observedRoot) {
             ensureObservedRoot(nextRoot);
-            onTick?.();
+            void onTick();
           }
         }, 800);
       }

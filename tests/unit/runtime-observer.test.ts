@@ -24,8 +24,6 @@ beforeEach(() => {
   }
   // @ts-expect-error test global
   globalThis.MutationObserver = FakeMutationObserver;
-  // @ts-expect-error minimal fake document
-  globalThis.document = { documentElement: null, body: null };
 });
 
 afterEach(() => {
@@ -38,22 +36,6 @@ afterEach(() => {
 });
 
 describe('runtime observer lifecycle', () => {
-  it('uses the document root only when no custom root resolver is provided', () => {
-    const documentRoot = {} as Node;
-    // @ts-expect-error minimal fake document
-    globalThis.document = { documentElement: documentRoot, body: documentRoot };
-    const observer = createObserver({ onTick: vi.fn() });
-
-    observer.start();
-
-    expect(observerRecords).toHaveLength(1);
-    expect(observerRecords[0]!.observe).toHaveBeenCalledWith(
-      documentRoot,
-      expect.objectContaining({ subtree: true, childList: true }),
-    );
-    observer.stop();
-  });
-
   it('cancels a mutation debounce when stopped', async () => {
     const root = {} as Node;
     const onTick = vi.fn();
@@ -67,17 +49,6 @@ describe('runtime observer lifecycle', () => {
     expect(observerRecords[0]!.disconnect).toHaveBeenCalledTimes(1);
   });
 
-  it('cancels a leading:false pending tick when stopped', async () => {
-    const root = {} as Node;
-    const onTick = vi.fn();
-    const observer = createObserver({ getRoot: () => root, onTick, debounceMs: 50, leading: false });
-    observer.start();
-    expect(onTick).not.toHaveBeenCalled();
-    observer.stop();
-    await vi.advanceTimersByTimeAsync(100);
-    expect(onTick).not.toHaveBeenCalled();
-  });
-
   it('continues polling after an initially missing custom root without observing the document fallback', async () => {
     const documentRoot = {} as Node;
     // A real browser always has documentElement/body. A custom provider root returning null
@@ -87,7 +58,7 @@ describe('runtime observer lifecycle', () => {
     let root: Node | null = null;
     const onTick = vi.fn();
     const getRoot = vi.fn(() => root);
-    const observer = createObserver({ getRoot, onTick });
+    const observer = createObserver({ getRoot, onTick, debounceMs: 50 });
     observer.start();
     expect(observerRecords).toHaveLength(0);
     expect(onTick).toHaveBeenCalledTimes(1);
@@ -106,7 +77,7 @@ describe('runtime observer lifecycle', () => {
   it('does not duplicate leading work or polling when start is called twice without a root', async () => {
     const onTick = vi.fn();
     const getRoot = vi.fn(() => null);
-    const observer = createObserver({ getRoot, onTick });
+    const observer = createObserver({ getRoot, onTick, debounceMs: 50 });
     observer.start();
     observer.start();
     expect(onTick).toHaveBeenCalledTimes(1);
@@ -118,7 +89,7 @@ describe('runtime observer lifecycle', () => {
 
   it('clears the root poll even if a MutationObserver was never created', async () => {
     const getRoot = vi.fn(() => null);
-    const observer = createObserver({ getRoot, onTick: vi.fn() });
+    const observer = createObserver({ getRoot, onTick: vi.fn(), debounceMs: 50 });
     observer.start();
     observer.stop();
     const callsAfterStop = getRoot.mock.calls.length;
