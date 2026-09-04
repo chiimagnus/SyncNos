@@ -39,14 +39,8 @@ export function registerItemMentionHandlers(router: AnyRouter) {
     return load;
   };
 
-  const respondWithPool = (pool: MentionCandidatePool, query: string, limit: number) => {
-    const res = searchMentionCandidates({ query, candidates: pool.candidates, limit });
-    return router.ok({
-      ...res,
-      scannedCount: pool.scannedCount,
-      truncatedByScanLimit: pool.truncatedByScanLimit,
-    });
-  };
+  const respondWithPool = (pool: MentionCandidatePool, query: string, limit: number) =>
+    router.ok(searchMentionCandidates({ query, candidates: pool.candidates, limit }));
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
     const mentionQuery = normalizeMentionQuery(msg?.query ?? '');

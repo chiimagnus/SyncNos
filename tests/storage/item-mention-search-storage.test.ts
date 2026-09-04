@@ -74,7 +74,6 @@ describe('item mention candidate pool storage', () => {
         expect.objectContaining({ conversationId: Number(b.id), domain: 'openai.com' }),
       ]),
     );
-    expect(res.scannedCount).toBe(2);
     expect(res.revision).toBe(2);
   });
 
@@ -129,10 +128,8 @@ describe('item mention candidate pool storage', () => {
 
     const res = await readConversationMentionCandidatePool({ maxScan: 51, maxDurationMs: 10_000 });
 
-    expect(res.scannedCount).toBe(51);
     expect(res.candidates).toHaveLength(51);
     expect(res.candidates[50]).toMatchObject({ title: 'OpenAI', source: 'chatgpt' });
-    expect(res.truncatedByScanLimit).toBe(true);
   });
 
   it('reads conversation rows and their revision in one readonly transaction', async () => {
@@ -169,14 +166,11 @@ describe('item mention candidate pool storage', () => {
     }
 
     const scanLimited = await readConversationMentionCandidatePool({ maxScan: 1, maxDurationMs: 10_000 });
-    expect(scanLimited.scannedCount).toBe(1);
     expect(scanLimited.candidates).toHaveLength(1);
-    expect(scanLimited.truncatedByScanLimit).toBe(true);
 
     let nowCalls = 0;
     vi.spyOn(Date, 'now').mockImplementation(() => (nowCalls++ === 0 ? 0 : 1_000));
     const durationLimited = await readConversationMentionCandidatePool({ maxScan: 100, maxDurationMs: 10 });
-    expect(durationLimited.scannedCount).toBe(1);
-    expect(durationLimited.truncatedByScanLimit).toBe(true);
+    expect(durationLimited.candidates).toHaveLength(1);
   });
 });

@@ -45,12 +45,7 @@ function candidate(conversationId: number, title: string, lastCapturedAt = conve
 }
 
 function pool(revision: number, candidates = [candidate(1, 'OpenAI')]) {
-  return {
-    revision,
-    candidates,
-    scannedCount: candidates.length,
-    truncatedByScanLimit: false,
-  };
+  return { revision, candidates };
 }
 
 function deferred<T>() {

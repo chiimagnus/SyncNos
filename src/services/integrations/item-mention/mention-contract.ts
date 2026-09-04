@@ -18,8 +18,6 @@ export type MentionSearchResult = {
   query: MentionQuery;
   candidates: MentionCandidate[];
   limit: number;
-  scannedCount?: number;
-  truncatedByScanLimit?: boolean;
 };
 
 export type MentionInsertPayload = {

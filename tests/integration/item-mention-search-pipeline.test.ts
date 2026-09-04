@@ -69,7 +69,6 @@ describe('item mention search pipeline', () => {
     });
 
     expect(response.ok).toBe(true);
-    expect(response.data?.scannedCount).toBe(60);
     expect(response.data?.candidates).toHaveLength(20);
     expect(response.data?.candidates?.[0]?.conversationId).toBe(exactId);
   });

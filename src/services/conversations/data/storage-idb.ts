@@ -1712,8 +1712,6 @@ export async function readConversationMentionCandidatePool(input?: {
     sourceType: string;
     lastCapturedAt: number;
   }>;
-  scannedCount: number;
-  truncatedByScanLimit: boolean;
   revision: number;
 }> {
   // ponytail: Item Mention intentionally searches only a bounded recent pool; FTS/global indexing stays out of scope.
@@ -1741,7 +1739,6 @@ export async function readConversationMentionCandidatePool(input?: {
     lastCapturedAt: number;
   }> = [];
   let scannedCount = 0;
-  let truncatedByScanLimit = false;
   const startedAt = Date.now();
 
   const cursorReq = idx.openCursor(null, 'prev');
@@ -1767,10 +1764,7 @@ export async function readConversationMentionCandidatePool(input?: {
       }
 
       const elapsed = Date.now() - startedAt;
-      if (scannedCount >= maxScan || elapsed >= maxDurationMs) {
-        truncatedByScanLimit = true;
-        return resolve();
-      }
+      if (scannedCount >= maxScan || elapsed >= maxDurationMs) return resolve();
 
       cursor.continue();
     };
@@ -1780,7 +1774,7 @@ export async function readConversationMentionCandidatePool(input?: {
     await cursorDone;
     const revision = normalizeDataRevisionRecord(await revisionPromise).revision;
     await done;
-    return { candidates, scannedCount, truncatedByScanLimit, revision };
+    return { candidates, revision };
   } catch (error) {
     await done.catch(() => undefined);
     throw error;
