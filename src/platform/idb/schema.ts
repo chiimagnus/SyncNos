@@ -180,7 +180,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
     };
   }
 
-  const notionConversations: Array<Record<string, unknown> & { __threadId?: string }> = [];
+  const groups = new Map<string, Array<Record<string, unknown>>>();
   const cursorReq = conversationsStore.openCursor();
   cursorReq.onsuccess = () => {
     const cursor = cursorReq.result;
@@ -189,19 +189,14 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
       const source = row?.source ? String(row.source) : '';
       if (source === 'notionai') {
         const threadId = extractNotionAiThreadIdFromUrl(row?.url);
-        if (threadId) notionConversations.push({ ...(row || {}), __threadId: threadId });
+        if (threadId && row) {
+          const list = groups.get(threadId) || [];
+          list.push(row);
+          groups.set(threadId, list);
+        }
       }
       cursor.continue();
       return;
-    }
-
-    const groups = new Map<string, Array<Record<string, unknown> & { __threadId?: string }>>();
-    for (const conversation of notionConversations) {
-      const threadId = String(conversation.__threadId || '');
-      if (!threadId) continue;
-      const list = groups.get(threadId) || [];
-      list.push(conversation);
-      groups.set(threadId, list);
     }
 
     const threads = Array.from(groups.entries());
@@ -221,7 +216,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
         );
         const mergedConversations =
           stableExisting && stableExisting.id && !seenIds.has(Number(stableExisting.id))
-            ? groupedConversations.concat([{ ...stableExisting, __threadId: threadId }])
+            ? groupedConversations.concat([stableExisting])
             : groupedConversations;
 
         let keepConversation: Record<string, unknown> | null = null;
