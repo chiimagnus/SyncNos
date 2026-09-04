@@ -19,8 +19,4 @@ export type MentionInsertPayload = {
   conversationId: number;
 };
 
-export function normalizeMentionQuery(raw: unknown): MentionQuery {
-  const normalized = String(raw || '').trim().toLowerCase();
-  return { normalized, empty: !normalized };
-}
 
