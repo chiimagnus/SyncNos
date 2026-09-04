@@ -90,10 +90,10 @@ function createTurndownService() {
     return normalizeText(value).replace(/\s+/g, ' ');
   }
 
-  turndown.addRule('syncnos-table-section', {
+  turndown.addRule('syncnos-table-block-wrapper', {
     filter(node) {
       const name = String((node as any)?.nodeName || '').toLowerCase();
-      if (name !== 'section') return false;
+      if (name !== 'p' && name !== 'section' && name !== 'div') return false;
       return isInsideTable(node);
     },
     replacement(content) {
@@ -110,6 +110,18 @@ function createTurndownService() {
     },
     replacement() {
       return ' ';
+    },
+  });
+
+  turndown.addRule('syncnos-redundant-strong', {
+    filter(node) {
+      const name = String((node as any)?.nodeName || '').toLowerCase();
+      if (name !== 'b' && name !== 'strong') return false;
+      const parent = (node as Element)?.parentElement;
+      return Boolean(parent?.closest?.('b,strong'));
+    },
+    replacement(content) {
+      return content;
     },
   });
 

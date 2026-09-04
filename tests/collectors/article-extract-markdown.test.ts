@@ -259,6 +259,36 @@ describe('article-extract markdown', () => {
     expect(md).not.toContain('<table');
   });
 
+  it('keeps block-wrapped table cells on one markdown row', () => {
+    const html = `
+      <article>
+        <table>
+          <tbody>
+            <tr>
+              <th><p><span>词语</span></p></th>
+              <th><p><span>在本项目中的含义</span></p></th>
+            </tr>
+            <tr>
+              <td><p><b><strong>MJCF</strong></b></p></td>
+              <td><p><span>描述机器人刚体、关节、质量、惯量、网格和碰撞关系的 XML 模型</span></p></td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://example.com/article' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://example.com/article');
+    const lines = md.split('\n');
+    expect(lines.find((line) => line.includes('词语'))).toMatch(/^\|[ \t]+词语[ \t]+\|[ \t]+在本项目中的含义[ \t]+\|$/);
+    expect(lines.find((line) => line.includes('MJCF'))).toMatch(
+      /^\|[ \t]+\*\*MJCF\*\*[ \t]+\|[ \t]+描述机器人刚体、关节、质量、惯量、网格和碰撞关系的 XML 模型[ \t]+\|$/,
+    );
+    expect(md).not.toContain('****MJCF****');
+  });
+
   it('converts wechat rich_media tables with nested <section>/<span> into markdown tables', () => {
     const html = `
       <article>
