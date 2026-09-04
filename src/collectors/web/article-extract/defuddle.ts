@@ -35,6 +35,21 @@ function pickTextFromHtml(content: string) {
   return normalizeText((wrapper as any).innerText || wrapper.textContent || '');
 }
 
+function normalizeTitleText(value: unknown) {
+  return normalizeText(value).replace(/\s+/g, ' ');
+}
+
+function pickSemanticTitleFromContent(content: string) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = content;
+  const heading = wrapper.querySelector?.('h1,h2');
+  const candidate = normalizeTitleText(heading?.textContent || '');
+  if (!candidate || typeof document.querySelectorAll !== 'function') return '';
+
+  const pageH1s = Array.from(document.querySelectorAll('h1'));
+  return pageH1s.some((node) => normalizeTitleText(node.textContent || '') === candidate) ? candidate : '';
+}
+
 export function extractByDefuddle(baseHref: string): DefuddleArticlePayload | null {
   try {
     const cloned = document.cloneNode(true) as Document;
@@ -53,7 +68,7 @@ export function extractByDefuddle(baseHref: string): DefuddleArticlePayload | nu
     if (!content && !text) return null;
 
     return {
-      title: normalizeText(parsed.title || document.title || ''),
+      title: pickSemanticTitleFromContent(content) || normalizeText(parsed.title || document.title || ''),
       author: normalizeText(parsed.author || ''),
       publishedAt: normalizeText(parsed.published || ''),
       excerpt: normalizeText(parsed.description || ''),
