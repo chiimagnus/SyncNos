@@ -90,6 +90,31 @@ describe('notion-image-upload-upgrader', () => {
     expect(paragraphText(out[0])).toContain('local image upload failed');
   });
 
+  it('degrades malformed internal targets without external upload or byte-download fallback', async () => {
+    const bulkRead = vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds');
+    const externalUpload = vi.spyOn(notionFilesApi, 'createExternalURLUpload').mockResolvedValue({ id: 'unexpected' } as any);
+    const fileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'unexpected' } as any);
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn();
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: fetchMock });
+    try {
+      const out = await upgradeImageBlocksToFileUploads('token', [
+        externalImageBlock('syncnos-asset://nope'),
+        externalImageBlock('syncnos-asset://0'),
+        externalImageBlock('syncnos-asset://9007199254740992'),
+      ] as any);
+
+      expect(bulkRead).not.toHaveBeenCalled();
+      expect(externalUpload).not.toHaveBeenCalled();
+      expect(fileUpload).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(out.every((block: any) => block?.type === 'paragraph')).toBe(true);
+      expect(JSON.stringify(out)).not.toContain('syncnos-asset://');
+    } finally {
+      Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: originalFetch });
+    }
+  });
+
   it('degrades a bulk-reader rejection to omission paragraphs without leaking internal URLs', async () => {
     vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds').mockRejectedValue(new Error('idb unavailable'));
     const createFileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'unused' } as any);

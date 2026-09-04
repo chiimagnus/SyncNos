@@ -1,6 +1,6 @@
 import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read.ts';
-import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
@@ -240,6 +240,7 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
     }
 
     const assetId = parseSyncnosAssetId(url);
+    const isInternalAsset = isSyncnosAssetUrl(url);
     let uploadId = cache.get(url) || '';
     if (!uploadId) {
       if (isDataImageUrl(url)) {
@@ -255,18 +256,20 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
           }
           uploadId = '';
         }
-      } else if (assetId != null) {
-        try {
-          uploadId = await uploadFromSyncnosAsset(files, accessToken, assetId, localAssets.get(assetId) || null);
-          if (uploadId) cache.set(url, uploadId);
-        } catch (e) {
-          const msg = e && (e as any).message ? String((e as any).message) : String(e);
+      } else if (isInternalAsset) {
+        if (assetId != null) {
           try {
-            console.warn('[NotionImageUpload] syncnos_asset upload failed:', url, msg);
-          } catch (_e2) {
-            // ignore
+            uploadId = await uploadFromSyncnosAsset(files, accessToken, assetId, localAssets.get(assetId) || null);
+            if (uploadId) cache.set(url, uploadId);
+          } catch (e) {
+            const msg = e && (e as any).message ? String((e as any).message) : String(e);
+            try {
+              console.warn('[NotionImageUpload] syncnos_asset upload failed:', assetId, msg);
+            } catch (_e2) {
+              // ignore
+            }
+            uploadId = '';
           }
-          uploadId = '';
         }
       } else {
         try {
@@ -297,7 +300,7 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
     }
 
     if (!uploadId) {
-      if (isDataImageUrl(url) || assetId != null) {
+      if (isDataImageUrl(url) || isInternalAsset) {
         out.push(paragraphBlock('[Image omitted: local image upload failed]'));
       } else out.push(b);
       continue;

@@ -2,22 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   collectOrderedSyncnosAssetIds,
-  parseSyncnosAssetId,
   replaceSyncnosAssetImageReferences,
   replaceSyncnosAssetImageTargets,
-} from '@services/sync/shared/markdown-asset-refs';
+} from '@services/shared/markdown-asset-refs';
 
 describe('markdown asset refs', () => {
-  it('parses plain and angle-bracket SyncNos asset targets only', () => {
-    expect(parseSyncnosAssetId('syncnos-asset://12')).toBe(12);
-    expect(parseSyncnosAssetId('<syncnos-asset://12>')).toBe(12);
-    expect(parseSyncnosAssetId('SYNCNOS-ASSET://12')).toBe(12);
-    expect(parseSyncnosAssetId('syncnos-asset://0')).toBeNull();
-    expect(parseSyncnosAssetId('syncnos-asset://-1')).toBeNull();
-    expect(parseSyncnosAssetId('syncnos-asset://12/path')).toBeNull();
-    expect(parseSyncnosAssetId('https://example.com/image.png')).toBeNull();
-  });
-
   it('collects ordered unique ids from Markdown image syntax and ignores other links', () => {
     const markdown = [
       '![one](syncnos-asset://2)',
@@ -26,6 +15,11 @@ describe('markdown asset refs', () => {
       '![duplicate](syncnos-asset://2 "again")',
       '![http](https://example.com/a.png)',
       '![invalid](syncnos-asset://0)',
+      '`![inline-code](syncnos-asset://10)`',
+      '```md',
+      '![fenced](syncnos-asset://11)',
+      '```',
+      '    ![indented](syncnos-asset://12)',
     ].join('\n');
 
     expect(collectOrderedSyncnosAssetIds(markdown)).toEqual([2, 1]);

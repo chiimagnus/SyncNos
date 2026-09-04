@@ -59,6 +59,17 @@ describe('createMarkdownRenderer', () => {
     expect(html).not.toContain('src="https://');
   });
 
+  it('renders malformed internal image targets as safe placeholders without local asset markers', () => {
+    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    for (const target of ['syncnos-asset://nope', 'syncnos-asset://0', 'syncnos-asset://9007199254740992']) {
+      const html = md.render(`![bad](${target})`);
+      expect(html).toContain('src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="');
+      expect(html).not.toContain(target);
+      expect(html).not.toContain('data-syncnos-asset-id');
+      expect(html).not.toContain('syncnos-md-image-link');
+    }
+  });
+
   it('renders inline math with KaTeX', () => {
     const md = createMarkdownRenderer();
     const html = md.render('x = $E=mc^2$');

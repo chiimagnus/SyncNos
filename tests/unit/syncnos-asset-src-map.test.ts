@@ -181,6 +181,20 @@ describe('useSyncnosAssetSrcMap', () => {
     expect(latestMap.get(2)).toBe('blob:asset-1');
   });
 
+  it('does not read image cache for escaped or code-context asset examples', async () => {
+    mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    await renderProbe(11, [
+      '\\![escaped](syncnos-asset://1)',
+      '`![inline](syncnos-asset://2)`',
+      '```md\n![fenced](syncnos-asset://3)\n```',
+      '    ![indented](syncnos-asset://4)',
+    ]);
+
+    expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
+    expect(createObjectUrl).not.toHaveBeenCalled();
+    expect(latestMap.size).toBe(0);
+  });
+
   it('resolves multiple local assets through one bulk read per generation', async () => {
     mocks.whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
     mocks.getImageCacheAssetsByIds.mockResolvedValue(makeAssetMap(makeAsset(3, 11), makeAsset(4, 11)));

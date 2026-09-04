@@ -7,7 +7,7 @@ import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageReferences,
-} from '@services/sync/shared/markdown-asset-refs';
+} from '@services/shared/markdown-asset-refs';
 import { buildSyncnosObject } from '@services/sync/shared/remote-markdown-metadata';
 import { buildFullNoteMarkdown } from '@services/sync/shared/remote-markdown-writer';
 

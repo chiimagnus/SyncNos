@@ -83,6 +83,19 @@ describe('feishu docx image preprocess', () => {
     expect(result.markdownForConvert).not.toContain('syncnos-asset://');
   });
 
+  it('classifies malformed internal targets as unavailable local images instead of external URLs', async () => {
+    const result = await preprocessFeishuDocxMarkdownImages(
+      '![bad](syncnos-asset://nope)\n\n![zero](syncnos-asset://0)\n\n![unsafe](syncnos-asset://9007199254740992)',
+    );
+
+    expect(imageCacheMocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
+    expect(result.imageSourcesInOrder).toHaveLength(3);
+    expect(result.imageSourcesInOrder.every((source) => source.kind === 'syncnos_asset')).toBe(true);
+    expect(result.imageSourcesInOrder.every((source) => source.blob == null)).toBe(true);
+    expect(result.markdownForConvert).not.toContain('syncnos-asset://');
+    expect(result.markdownForConvert.match(/https:\/\/syncnos\.invalid\/asset\//g)?.length).toBe(3);
+  });
+
   it('keeps HTTP/data-image preprocessing unchanged and skips the local bulk reader when no local ids exist', async () => {
     const dataUrl = `data:image/png;base64,${Buffer.from(Uint8Array.of(4, 5, 6)).toString('base64')}`;
     const result = await preprocessFeishuDocxMarkdownImages(

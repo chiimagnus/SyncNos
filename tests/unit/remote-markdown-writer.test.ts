@@ -115,6 +115,21 @@ describe('remote-markdown-writer', () => {
     expect(utcMd).toContain('- You | 2026-01-02 03:04');
   });
 
+  it('preserves image-looking caption text inside code while normalizing real image captions', async () => {
+    const w = await loadWriter();
+    const source = ['```md', '![code](https://example.com/code.png)Code caption', '```', '', '    ![indent](https://example.com/i.png)Indented caption', '', '![real](https://example.com/real.png)Real caption'].join('\n');
+    const md = w.buildFullNoteMarkdown({
+      conversation: { title: 'T', source: 's', sourceType: 'article', conversationKey: 'k' },
+      messages: [{ messageKey: 'article_body', sequence: 1, role: 'assistant', contentMarkdown: source }],
+      comments: [],
+      syncnosObject: { source: 's', conversationKey: 'k', schemaVersion: 1, lastSyncedSequence: 1 },
+    });
+
+    expect(md).toContain('![code](https://example.com/code.png)Code caption');
+    expect(md).toContain('    ![indent](https://example.com/i.png)Indented caption');
+    expect(md).toContain('![real](https://example.com/real.png)\n\nReal caption');
+  });
+
   it('normalizes standalone image lines that append caption text', async () => {
     const w = await loadWriter();
     const md = w.buildFullNoteMarkdown({

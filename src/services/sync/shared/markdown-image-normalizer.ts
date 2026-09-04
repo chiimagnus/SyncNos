@@ -1,5 +1,4 @@
-const STANDALONE_IMAGE_WITH_TRAILING_TEXT_RE =
-  /^(\s*!\[[^\]]*\]\(\s*(?:<[^>]+>|[^)\s]+)(?:\s+"[^"]*")?\s*\))\s*(.+)$/gm;
+import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
 
 /**
  * Discourse 风格图片行经常是：
@@ -12,15 +11,26 @@ const STANDALONE_IMAGE_WITH_TRAILING_TEXT_RE =
  *   Caption text...
  */
 export function normalizeStandaloneImageCaptionLines(markdown: unknown): string {
-  const src = String(markdown || '');
-  if (!src) return '';
+  const source = String(markdown || '');
+  if (!source) return '';
 
-  return src.replace(STANDALONE_IMAGE_WITH_TRAILING_TEXT_RE, (_full, imageRaw, trailingTextRaw) => {
-    const image = String(imageRaw || '');
-    const trailingText = String(trailingTextRaw || '').trim();
-    if (!trailingText) return image;
-    return `${image}\n\n${trailingText}`;
-  });
+  const edits: Array<{ start: number; end: number; text: string }> = [];
+  for (const reference of collectMarkdownImageReferences(source)) {
+    const lineStart = source.lastIndexOf('\n', Math.max(0, reference.start - 1)) + 1;
+    if (source.slice(lineStart, reference.start).trim()) continue;
+    const nextNewline = source.indexOf('\n', reference.end);
+    const lineEnd = nextNewline >= 0 ? nextNewline : source.length;
+    const caption = source.slice(reference.end, lineEnd).trim();
+    if (!caption) continue;
+    edits.push({ start: reference.end, end: lineEnd, text: `\n\n${caption}` });
+  }
+
+  let output = source;
+  for (let index = edits.length - 1; index >= 0; index -= 1) {
+    const edit = edits[index]!;
+    output = `${output.slice(0, edit.start)}${edit.text}${output.slice(edit.end)}`;
+  }
+  return output;
 }
 
 export default {

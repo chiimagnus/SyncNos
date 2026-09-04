@@ -6,7 +6,7 @@ import {
   subscribeDataRevisionChanges,
   whenDataRevisionObserverReady,
 } from '@services/data-revisions/observer';
-import { collectOrderedSyncnosAssetIds } from '@services/sync/shared/markdown-asset-refs';
+import { collectOrderedSyncnosAssetIds } from '@services/shared/markdown-asset-refs';
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -94,16 +94,18 @@ export function useSyncnosAssetSrcMap(input: {
       }
     };
 
-    let assets: Map<number, ImageCacheAsset>;
-    try {
-      assets = await getImageCacheAssetsByIds({ ids: currentAssetIds, conversationId: currentConversationId });
-    } catch (_error) {
-      if (!mountedRef.current || generation !== generationRef.current) {
-        discardCreatedUrls();
-        return;
+    let assets = new Map<number, ImageCacheAsset>();
+    if (currentAssetIds.length) {
+      try {
+        assets = await getImageCacheAssetsByIds({ ids: currentAssetIds, conversationId: currentConversationId });
+      } catch (_error) {
+        if (!mountedRef.current || generation !== generationRef.current) {
+          discardCreatedUrls();
+          return;
+        }
+        readFailed = true;
+        assets = new Map();
       }
-      readFailed = true;
-      assets = new Map();
     }
 
     if (!mountedRef.current || generation !== generationRef.current) {

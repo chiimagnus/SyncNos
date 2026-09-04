@@ -19,7 +19,7 @@ import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cac
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageTargets,
-} from '@services/sync/shared/markdown-asset-refs';
+} from '@services/shared/markdown-asset-refs';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';

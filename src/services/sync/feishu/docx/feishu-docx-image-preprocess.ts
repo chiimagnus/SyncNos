@@ -1,6 +1,6 @@
 import { sha256Hex } from '@services/sync/shared/content-hash';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
-import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -135,16 +135,16 @@ export async function preprocessFeishuDocxMarkdownImages(markdown: string): Prom
           }
 
           const assetId = parseSyncnosAssetId(sourceUrl);
-          if (assetId != null) {
-            const asset = localAssets.get(assetId) || null;
+          if (isSyncnosAssetUrl(sourceUrl)) {
+            const asset = assetId != null ? localAssets.get(assetId) || null : null;
             const contentType = safeString(asset?.contentType);
             const ext = extFromContentType(contentType || 'image/png');
             const blob = asset?.blob instanceof Blob ? asset.blob : undefined;
-
+            const stableKey = assetId != null ? `asset:${assetId}` : `asset-invalid:${sourceUrl}`;
             const urlForConvert =
               asset && isHttpUrl(safeString(asset.url))
                 ? safeString(asset.url)
-                : await toPlaceholderUrl('asset', `asset:${assetId}`, ext);
+                : await toPlaceholderUrl('asset', stableKey, ext);
 
             return {
               kind: 'syncnos_asset' as const,
