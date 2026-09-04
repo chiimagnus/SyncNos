@@ -89,14 +89,20 @@ function normalizeConversationRecordsForV11({ tx }: MigrationContext): void {
     if (!cursor) return;
     const value = (cursor.value || {}) as Record<string, unknown>;
     const normalized = normalizeConversationListRecord(value);
-    const next = { ...normalized } as Record<string, unknown>;
-    let changed = normalized !== value;
-    for (const key of ['description', '__canonicalUrl', '__canonicalKey']) {
-      if (!Object.prototype.hasOwnProperty.call(next, key)) continue;
-      delete next[key];
-      changed = true;
+    const hasRetiredFields =
+      Object.prototype.hasOwnProperty.call(normalized, 'description') ||
+      Object.prototype.hasOwnProperty.call(normalized, '__canonicalUrl') ||
+      Object.prototype.hasOwnProperty.call(normalized, '__canonicalKey');
+    if (normalized === value && !hasRetiredFields) {
+      cursor.continue();
+      return;
     }
-    if (changed) cursor.update(next as any);
+
+    const next = { ...normalized } as Record<string, unknown>;
+    delete next.description;
+    delete next.__canonicalUrl;
+    delete next.__canonicalKey;
+    cursor.update(next as any);
     cursor.continue();
   };
 }
