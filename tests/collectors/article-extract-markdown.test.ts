@@ -96,6 +96,56 @@ describe('article-extract markdown', () => {
     expect(blocks[0]?.image?.external?.url).toBe('https://cdn3.ldstatic.com/original/4X/5/1/2/example.png');
   });
 
+  it('flattens Discourse image-only quote callouts into standalone images', () => {
+    const imageUrls = [
+      'https://cdn3.ldstatic.com/original/4X/f/5/0/f5006243373a4e44558b0a2d17f1131045b40d59.png',
+      'https://cdn3.ldstatic.com/original/4X/8/f/d/8fd3573cf337cd54f784f96f196238daa7d43363.png',
+      'https://cdn3.ldstatic.com/original/4X/6/c/8/6c8e4dabb541f8b0989e586da694f265a4948e12.png',
+    ];
+    const lightbox = (url: string, size: string) => `
+      <p><div class="lightbox-wrapper"><a class="lightbox" href="${url}" title="image">
+        <img src="${url}" alt="image" width="378" height="240" />
+        <div class="meta"><span class="filename">image</span><span class="informations">${size}</span></div>
+      </a></div></p>
+    `;
+    for (const label of ['[!quote]+', 'Quote']) {
+      const html = `
+        <article>
+          <blockquote>
+            <p>${label}</p>
+            ${lightbox(imageUrls[0], '378×240 22 KB')}
+            ${lightbox(imageUrls[1], '378×240 36.3 KB')}
+            ${lightbox(imageUrls[2], '377×240 23.3 KB')}
+          </blockquote>
+          <blockquote><p>ordinary quoted text</p></blockquote>
+        </article>
+      `;
+
+      const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://linux.do/t/topic/2843323' });
+      setupDom(dom);
+
+      const md = htmlToMarkdownTurndown(html, 'https://linux.do/t/topic/2843323');
+      expect(md).not.toContain('[![image]');
+      expect(md).not.toMatch(/image\d+×\d+/);
+      expect(md).not.toContain('[!quote]');
+      expect(md).not.toContain('> Quote');
+      for (const url of imageUrls) expect(md).toContain(`![image](${url})`);
+      expect(md).toContain('> ordinary quoted text');
+
+      const blocks = markdownToNotionBlocks(md);
+      expect(
+        blocks.filter((block: any) => block?.type === 'image').map((block: any) => block.image?.external?.url),
+      ).toEqual(imageUrls);
+      expect(
+        blocks.some(
+          (block: any) =>
+            block?.type === 'quote' &&
+            block.quote?.rich_text?.some((item: any) => item?.text?.content === 'ordinary quoted text'),
+        ),
+      ).toBe(true);
+    }
+  });
+
   it('removes Discourse emoji images and their empty links', () => {
     const html = `
       <article>

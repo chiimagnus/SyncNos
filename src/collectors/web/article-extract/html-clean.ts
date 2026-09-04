@@ -49,7 +49,9 @@ function isDiscourseOriginalImageLink(src: string, href: string) {
 
     const thumbnailParts = thumbnail.pathname.split('/').filter(Boolean);
     const originalParts = original.pathname.split('/').filter(Boolean);
-    if (thumbnailParts[0] !== 'optimized' || originalParts[0] !== 'original') return false;
+    if (originalParts[0] !== 'original') return false;
+    if (thumbnailParts[0] === 'original') return thumbnail.pathname === original.pathname;
+    if (thumbnailParts[0] !== 'optimized') return false;
     if (thumbnailParts.slice(1, -1).join('/') !== originalParts.slice(1, -1).join('/')) return false;
 
     const thumbnailName = thumbnailParts.at(-1) || '';
@@ -69,6 +71,47 @@ function promoteDiscourseOriginalImages(root: Element) {
     if (!link || !isDiscourseOriginalImageLink(src, href)) continue;
     image.setAttribute('src', href);
     link.replaceWith(image);
+  }
+}
+
+const DISCOURSE_QUOTE_CALLOUT_RE = /^(?:\[!quote\][+-]?|quote)$/i;
+
+function readDiscourseLightboxImage(wrapper: Element) {
+  const link = wrapper.querySelector('a.lightbox[href]') as HTMLAnchorElement | null;
+  const image = link?.querySelector('img[src]') as HTMLImageElement | null;
+  if (!link || !image) return null;
+
+  const src = normalizeText(image.getAttribute('src') || '');
+  const href = normalizeText(link.getAttribute('href') || '');
+  if (!isDiscourseOriginalImageLink(src, href)) return null;
+  return { image, href };
+}
+
+function flattenDiscourseImageOnlyQuoteCallouts(root: Element) {
+  for (const node of listElementsIncludingRoot(root, 'blockquote')) {
+    const quote = node as HTMLElement;
+    const wrappers = Array.from(quote.querySelectorAll('.lightbox-wrapper'));
+    if (!wrappers.length) continue;
+    if (quote.querySelectorAll('img[src]').length !== wrappers.length) continue;
+    if (quote.querySelectorAll('a[href]').length !== wrappers.length) continue;
+
+    const images = wrappers.map(readDiscourseLightboxImage);
+    if (images.some((item) => !item)) continue;
+
+    const residue = quote.cloneNode(true) as Element;
+    residue.querySelectorAll('.lightbox-wrapper').forEach((wrapper) => wrapper.remove());
+    if (!DISCOURSE_QUOTE_CALLOUT_RE.test(normalizeText(residue.textContent || ''))) continue;
+
+    const doc = quote.ownerDocument || document;
+    const fragment = doc.createDocumentFragment();
+    for (const item of images) {
+      if (!item) continue;
+      item.image.setAttribute('src', item.href);
+      const paragraph = doc.createElement('p');
+      paragraph.appendChild(item.image);
+      fragment.appendChild(paragraph);
+    }
+    quote.replaceWith(fragment);
   }
 }
 
@@ -193,6 +236,7 @@ export function cleanHtmlFragment(root: Element, baseHref: string) {
   normalizeLazyLoadedImages(root, baseHref);
   listElementsIncludingRoot(root, '[href]').forEach((node) => absolutizeAttr(node, 'href', baseHref));
   listElementsIncludingRoot(root, '[src]').forEach((node) => absolutizeAttr(node, 'src', baseHref));
+  flattenDiscourseImageOnlyQuoteCallouts(root);
   promoteDiscourseOriginalImages(root);
   removeEmojiImages(root);
   removeOneboxPreviewImages(root);
