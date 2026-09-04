@@ -79,7 +79,12 @@ export function createCommentAnchorController(input: {
       });
       if (run.signal.aborted || run.generation !== generation || disposed) return;
       if (result.ok) {
-        input.registry.replace(item.commentId, result.range, item.commentId === activeCommentId ? 'active' : 'passive');
+        input.registry.replace(
+          item.commentId,
+          result.range,
+          result.root,
+          item.commentId === activeCommentId ? 'active' : 'passive',
+        );
         trackedCommentIds.add(item.commentId);
       } else {
         input.registry.remove(item.commentId);
@@ -123,7 +128,7 @@ export function createCommentAnchorController(input: {
       trackedCommentIds.delete(item.commentId);
       return result;
     }
-    input.registry.replace(item.commentId, result.range, 'active');
+    input.registry.replace(item.commentId, result.range, result.root, 'active');
     trackedCommentIds.add(item.commentId);
     input.registry.setActive(item.commentId);
     return result;

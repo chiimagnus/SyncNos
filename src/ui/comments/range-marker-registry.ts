@@ -1,6 +1,6 @@
 export type CommentMarkerTone = 'passive' | 'active';
 
-type MarkerEntry = { range: Range; tone: CommentMarkerTone; elements: HTMLElement[] };
+type MarkerEntry = { range: Range; root: Element; tone: CommentMarkerTone; elements: HTMLElement[] };
 
 type NativeHighlightRegistry = {
   set(name: string, highlight: Highlight): unknown;
@@ -13,7 +13,7 @@ type NativeHighlightWindow = Window & {
 };
 
 export type CommentRangeMarkerRegistry = {
-  replace(commentId: number, range: Range, tone?: CommentMarkerTone): void;
+  replace(commentId: number, range: Range, root: Element, tone?: CommentMarkerTone): void;
   remove(commentId: number): void;
   setActive(commentId: number | null): void;
   refresh(): void;
@@ -54,12 +54,45 @@ function readNativeHighlightApi(window: Window | undefined) {
   return { registry, HighlightCtor };
 }
 
+function selectedTextRangeRects(document: Document, range: Range): DOMRect[] {
+  const textNodes: Text[] = [];
+  const ancestor = range.commonAncestorContainer;
+  if (ancestor.nodeType === 3) {
+    textNodes.push(ancestor as Text);
+  } else {
+    const walker = document.createTreeWalker(ancestor, 4);
+    let node = walker.nextNode();
+    while (node) {
+      textNodes.push(node as Text);
+      node = walker.nextNode();
+    }
+  }
+
+  const rects: DOMRect[] = [];
+  for (const textNode of textNodes) {
+    if (!textNode.data) continue;
+    try {
+      if (!range.intersectsNode(textNode)) continue;
+      const textRange = document.createRange();
+      textRange.selectNodeContents(textNode);
+      if (range.startContainer === textNode) textRange.setStart(textNode, range.startOffset);
+      if (range.endContainer === textNode) textRange.setEnd(textNode, range.endOffset);
+      if (textRange.collapsed) continue;
+      for (const rect of Array.from(textRange.getClientRects()) as DOMRect[]) {
+        if (rect.width > 0 && rect.height > 0) rects.push(rect);
+      }
+    } catch (_error) {
+      continue;
+    }
+  }
+  return rects;
+}
+
 export function createCommentRangeMarkerRegistry(input: {
   document: Document;
   window?: Window;
   host?: HTMLElement;
   styleSource?: Element;
-  getGeometryRoots?: () => readonly Element[];
   renderMode?: 'overlay' | 'native';
 }): CommentRangeMarkerRegistry {
   const doc = input.document;
@@ -140,14 +173,7 @@ export function createCommentRangeMarkerRegistry(input: {
   const renderOverlayEntry = (commentId: number, entry: MarkerEntry) => {
     if (!layer) return;
     clearElements(entry);
-    let rects: DOMRect[] = [];
-    try {
-      rects = Array.from(entry.range.getClientRects?.() || []) as DOMRect[];
-    } catch (_error) {
-      rects = [];
-    }
-    for (const rect of rects) {
-      if (rect.width <= 0 || rect.height <= 0) continue;
+    for (const rect of selectedTextRangeRects(doc, entry.range)) {
       const element = doc.createElement('div');
       element.className = `webclipper-comment-range-marker is-${entry.tone}`;
       element.dataset.commentId = String(commentId);
@@ -188,15 +214,10 @@ export function createCommentRangeMarkerRegistry(input: {
     if (!layer) return;
     const ResizeObserverCtor = (win as (Window & { ResizeObserver?: typeof ResizeObserver }) | undefined)
       ?.ResizeObserver;
-    if (!ResizeObserverCtor || !input.getGeometryRoots) return;
-    let nextRoots: Element[] = [];
-    try {
-      nextRoots = Array.from(input.getGeometryRoots() || []).filter(
-        (root, index, roots): root is Element => Boolean(root) && roots.indexOf(root) === index,
-      );
-    } catch (_error) {
-      nextRoots = [];
-    }
+    if (!ResizeObserverCtor) return;
+    const nextRoots = entries.size
+      ? Array.from(new Set<Element>([doc.documentElement, ...Array.from(entries.values(), (entry) => entry.root)]))
+      : [];
     const unchanged =
       nextRoots.length === observedGeometryRoots.size && nextRoots.every((root) => observedGeometryRoots.has(root));
     if (unchanged) return;
@@ -231,11 +252,11 @@ export function createCommentRangeMarkerRegistry(input: {
   }
 
   return {
-    replace(commentId, range, tone = commentId === activeId ? 'active' : 'passive') {
+    replace(commentId, range, root, tone = commentId === activeId ? 'active' : 'passive') {
       if (disposed) return;
       const previous = entries.get(commentId);
       if (previous) clearElements(previous);
-      entries.set(commentId, { range: range.cloneRange(), tone, elements: [] });
+      entries.set(commentId, { range: range.cloneRange(), root, tone, elements: [] });
       refresh();
     },
     remove(commentId) {

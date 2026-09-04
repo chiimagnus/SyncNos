@@ -11,10 +11,15 @@ const locator = {
 
 function registry() {
   const calls: string[] = [];
+  const replacements: Array<{ id: number; root: Element; tone: string | undefined }> = [];
   return {
     calls,
+    replacements,
     value: {
-      replace: (id: number, _range: Range, tone?: string) => calls.push(`replace:${id}:${tone}`),
+      replace: (id: number, _range: Range, root: Element, tone?: string) => {
+        calls.push(`replace:${id}:${tone}`);
+        replacements.push({ id, root, tone });
+      },
       remove: (id: number) => calls.push(`remove:${id}`),
       setActive: (id: number | null) => calls.push(`active:${id}`),
       refresh: () => {},
@@ -28,12 +33,16 @@ describe('comment anchor controller', () => {
   test('prioritizes active roots and syncs exact markers', async () => {
     const markers = registry();
     const order: number[] = [];
+    const roots = new Map<number, Element>([
+      [0, {} as Element],
+      [2, {} as Element],
+    ]);
     const controller = createCommentAnchorController({
       getRoots: () => [{} as Element],
       registry: markers.value,
       resolve: async ({ locator: current }) => {
         order.push(current.position.start);
-        return { ok: true as const, range: {} as Range, root: {} as Element, rootIndex: 0 };
+        return { ok: true as const, range: {} as Range, root: roots.get(current.position.start)!, rootIndex: 0 };
       },
     });
     await controller.sync(
@@ -46,12 +55,16 @@ describe('comment anchor controller', () => {
     expect(order).toEqual([2, 0]);
     expect(markers.calls).toContain('replace:2:active');
     expect(markers.calls).toContain('replace:1:passive');
+    expect(markers.replacements).toContainEqual({ id: 2, root: roots.get(2)!, tone: 'active' });
+    expect(markers.replacements).toContainEqual({ id: 1, root: roots.get(0)!, tone: 'passive' });
   });
 
   test('keeps passive marker sync running while an explicit locate gets priority', async () => {
     const markers = registry();
     let releasePassive: (() => void) | null = null;
     let passiveSignal: AbortSignal | null = null;
+    const passiveRoot = {} as Element;
+    const activeRoot = {} as Element;
     const controller = createCommentAnchorController({
       getRoots: () => [{} as Element],
       registry: markers.value,
@@ -59,10 +72,10 @@ describe('comment anchor controller', () => {
         if (current.position.start === 0 && !releasePassive) {
           passiveSignal = signal;
           return new Promise((resolve) => {
-            releasePassive = () => resolve({ ok: true, range: {} as Range, root: {} as Element, rootIndex: 0 });
+            releasePassive = () => resolve({ ok: true, range: {} as Range, root: passiveRoot, rootIndex: 0 });
           });
         }
-        return { ok: true as const, range: {} as Range, root: {} as Element, rootIndex: 0 };
+        return { ok: true as const, range: {} as Range, root: activeRoot, rootIndex: 0 };
       },
     });
     const second = { ...locator, position: { ...locator.position, start: 2, end: 3 } };
@@ -74,6 +87,7 @@ describe('comment anchor controller', () => {
     const located = await controller.locate({ commentId: 2, locator: second });
     expect(located.ok).toBe(true);
     expect(passiveSignal?.aborted).toBe(false);
+    expect(markers.replacements).toContainEqual({ id: 2, root: activeRoot, tone: 'active' });
     releasePassive?.();
     await syncing;
 
