@@ -177,17 +177,14 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
     const convo = await upsertConversation(payload);
-    const conversationId = Number((convo as any)?.id);
-    if (Number.isFinite(conversationId) && conversationId > 0) {
-      fireAndForget(
-        deps.onConversationChanged(
-          conversationId,
-          convo.__isNew
-            ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
-            : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
-        ),
-      );
-    }
+    fireAndForget(
+      deps.onConversationChanged(
+        convo.id,
+        convo.__isNew
+          ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
+          : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+      ),
+    );
     return router.ok(convo);
   });
 

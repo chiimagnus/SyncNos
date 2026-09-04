@@ -244,7 +244,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
 
   const body = textContent;
   const markdown = markdownContent || body;
-  const conversationId = Number((conversation as any).id);
+  const conversationId = conversation.id;
   let messagesToSave = [
     {
       messageKey: 'article_body',
