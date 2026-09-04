@@ -180,11 +180,12 @@ async function findExistingArticleConversationByUrl(
   conversationsStore: IDBObjectStore,
   rawUrl: unknown,
 ): Promise<any | null> {
-  const normalizedUrl = canonicalizeArticleUrl(rawUrl);
-  if (!normalizedUrl) return null;
+  const identity = buildCanonicalWebArticleIdentity(rawUrl);
+  if (!identity) return null;
+  const normalizedUrl = identity.url;
   const siteKey = deriveConversationListStoredSiteKeyFromUrl(normalizedUrl);
-  if (!siteKey || siteKey === 'unknown') return null;
-  const canonicalConversationKey = buildCanonicalWebArticleIdentity(normalizedUrl)?.conversationKey || '';
+  if (siteKey === 'unknown') return null;
+  const canonicalConversationKey = identity.conversationKey;
 
   const index = conversationsStore.index('by_listSiteKey_lastCapturedAt_id');
   const range = globalThis.IDBKeyRange.bound(
