@@ -329,8 +329,10 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
   const messagesByKeyIndex = messagesStore.index('by_conversationId_messageKey');
   const mappingsBySourceConversationKeyIndex = mappingsStore.index('by_source_conversationKey');
   const convoKeyIdx = conversationsStore.index('by_source_conversationKey');
-  const articleConversations: Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }> =
-    [];
+  const groups = new Map<
+    string,
+    Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }>
+  >();
 
   function mergeConversationRecord(base: Record<string, unknown>, incoming: Record<string, unknown>) {
     const next = { ...base };
@@ -418,27 +420,13 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
         const canonicalUrl = normalizeHttpUrl(row?.url);
         const canonicalKey = articleStableConversationKey(canonicalUrl);
         if (canonicalUrl && canonicalKey) {
-          articleConversations.push({
-            ...(row || {}),
-            __canonicalUrl: canonicalUrl,
-            __canonicalKey: canonicalKey,
-          });
+          const list = groups.get(canonicalKey) || [];
+          list.push({ ...(row || {}), __canonicalUrl: canonicalUrl, __canonicalKey: canonicalKey });
+          groups.set(canonicalKey, list);
         }
       }
       cursor.continue();
       return;
-    }
-
-    const groups = new Map<
-      string,
-      Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }>
-    >();
-    for (const conversation of articleConversations) {
-      const key = safeString(conversation.__canonicalKey);
-      if (!key) continue;
-      const list = groups.get(key) || [];
-      list.push(conversation);
-      groups.set(key, list);
     }
 
     const entries = Array.from(groups.entries());
