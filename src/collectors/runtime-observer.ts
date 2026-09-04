@@ -67,16 +67,14 @@ export function createObserver(input: ObserverInput): ObserverController {
       ensureObservedRoot(readRequestedRoot());
       void onTick();
 
-      if (!rootRefreshTimer) {
-        rootRefreshTimer = setInterval(() => {
-          if (!started) return;
-          const nextRoot = readRequestedRoot();
-          if (nextRoot && nextRoot !== observedRoot) {
-            ensureObservedRoot(nextRoot);
-            void onTick();
-          }
-        }, 800);
-      }
+      rootRefreshTimer = setInterval(() => {
+        if (!started) return;
+        const nextRoot = readRequestedRoot();
+        if (nextRoot && nextRoot !== observedRoot) {
+          ensureObservedRoot(nextRoot);
+          void onTick();
+        }
+      }, 800);
     },
     stop() {
       started = false;
