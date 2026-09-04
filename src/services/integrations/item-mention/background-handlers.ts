@@ -75,12 +75,11 @@ export function registerItemMentionHandlers(router: AnyRouter) {
     if (!conversation) return router.err('conversation not found', { code: 'NOT_FOUND' });
 
     const detail = await getConversationDetail(conversationId);
-    const messages = Array.isArray((detail as any)?.messages) ? (detail as any).messages : [];
-    if (!messages.length) {
+    if (!detail.messages.length) {
       return router.err('conversation detail empty', { code: 'EMPTY_DETAIL' });
     }
 
-    const markdown = await formatConversationMarkdownForExternalOutput(conversation as any, detail as any);
+    const markdown = await formatConversationMarkdownForExternalOutput(conversation, detail);
     return router.ok({ conversationId, markdown });
   });
 }
