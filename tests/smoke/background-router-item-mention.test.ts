@@ -121,6 +121,23 @@ describe('background-router item mention', () => {
     expect(revisionMocks.readDataRevision).toHaveBeenCalledTimes(2);
   });
 
+  it('clamps fractional and oversized limits to the 1..50 contract', async () => {
+    storageMocks.readRecentConversationMentionCandidates.mockResolvedValue([]);
+    const router = createRouter();
+
+    await search(router, '', 0.5);
+    await search(router, '', 999);
+
+    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenNthCalledWith(1, {
+      maxScan: 1,
+      maxDurationMs: 300,
+    });
+    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenNthCalledWith(2, {
+      maxScan: 50,
+      maxDurationMs: 300,
+    });
+  });
+
   it('ignores the retired text query alias and uses the canonical query field only', async () => {
     storageMocks.readRecentConversationMentionCandidates.mockResolvedValue([candidate(1, 'Recent')]);
     const router = createRouter();

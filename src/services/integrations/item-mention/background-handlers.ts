@@ -46,7 +46,7 @@ export function registerItemMentionHandlers(router: AnyRouter) {
     const limit =
       rawLimit == null || rawLimit === '' || !Number.isFinite(parsedLimit) || parsedLimit <= 0
         ? 20
-        : Math.min(Math.floor(parsedLimit), 50);
+        : Math.max(1, Math.min(Math.floor(parsedLimit), 50));
 
     if (!normalizedQuery) {
       const candidates = await readRecentConversationMentionCandidates({ maxScan: limit, maxDurationMs: 300 });
