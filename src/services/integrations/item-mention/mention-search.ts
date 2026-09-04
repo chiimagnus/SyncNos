@@ -33,8 +33,6 @@ export function searchMentionCandidates(input: {
   limit: number;
 }): MentionSearchResult {
   const { query, candidates, limit } = input;
-  if (!query) return { candidates: candidates.slice(0, limit) };
-
   const matched: Array<{ c: MentionCandidate; score: number }> = [];
   for (const c of candidates) {
     const info = scoreCandidate(c, query);

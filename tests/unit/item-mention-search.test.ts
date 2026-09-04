@@ -3,20 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { searchMentionCandidates } from '../../src/services/integrations/item-mention/mention-search';
 
 describe('item-mention-search', () => {
-  it('preserves recent pool order for empty query', () => {
-    const res = searchMentionCandidates({
-      query: '',
-      candidates: [
-        { conversationId: 2, title: 'B', source: 'chatgpt', domain: 'b.com', lastCapturedAt: 3000 },
-        { conversationId: 3, title: 'C', source: 'web', domain: 'c.com', lastCapturedAt: 2000 },
-        { conversationId: 1, title: 'A', source: 'chatgpt', domain: 'a.com', lastCapturedAt: 1000 },
-      ],
-      limit: 10,
-    });
-
-    expect(res.candidates.map((c) => c.conversationId)).toEqual([2, 3, 1]);
-  });
-
   it('filters by title/source/domain and sorts by match score then recency', () => {
     const res = searchMentionCandidates({
       query: 'openai',
@@ -72,16 +58,4 @@ describe('item-mention-search', () => {
     expect(res.candidates[0]?.conversationId).toBe(56);
   });
 
-  it('applies the already-normalized final limit', () => {
-    const candidates = Array.from({ length: 200 }, (_, i) => ({
-      conversationId: i + 1,
-      title: `T${i + 1}`,
-      source: 'chatgpt',
-      domain: 'x.com',
-      lastCapturedAt: i + 1,
-    }));
-
-    const res = searchMentionCandidates({ query: '', candidates, limit: 50 });
-    expect(res.candidates).toHaveLength(50);
-  });
 });

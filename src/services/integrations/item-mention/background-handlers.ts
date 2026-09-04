@@ -50,7 +50,7 @@ export function registerItemMentionHandlers(router: AnyRouter) {
 
     if (!normalizedQuery) {
       const candidates = await readRecentConversationMentionCandidates({ maxScan: limit, maxDurationMs: 300 });
-      return router.ok(searchMentionCandidates({ query: normalizedQuery, candidates, limit }));
+      return router.ok({ candidates });
     }
 
     const observedRevision = await readDataRevision('conversations');
