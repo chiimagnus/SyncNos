@@ -992,44 +992,22 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   useEffect(() => {
     if (!pollingNotion) return;
+    if (notionConnected || notionLastError || !notionPendingState) {
+      setNotionPollingState(false);
+      return;
+    }
     const timer = setTimeout(() => setNotionPollingState(false), 60_000);
     return () => clearTimeout(timer);
-  }, [pollingNotion, setNotionPollingState]);
-
-  useEffect(() => {
-    if (!pollingNotion) return;
-    if (notionConnected) {
-      setNotionPollingState(false);
-      return;
-    }
-    if (notionLastError) {
-      setNotionPollingState(false);
-      return;
-    }
-    if (!notionPendingState) {
-      setNotionPollingState(false);
-    }
   }, [notionConnected, notionLastError, notionPendingState, pollingNotion, setNotionPollingState]);
 
   useEffect(() => {
     if (!pollingFeishu) return;
+    if (feishuConnected || feishuLastError || !feishuPendingState) {
+      setFeishuPollingState(false);
+      return;
+    }
     const timer = setTimeout(() => setFeishuPollingState(false), 60_000);
     return () => clearTimeout(timer);
-  }, [pollingFeishu, setFeishuPollingState]);
-
-  useEffect(() => {
-    if (!pollingFeishu) return;
-    if (feishuConnected) {
-      setFeishuPollingState(false);
-      return;
-    }
-    if (feishuLastError) {
-      setFeishuPollingState(false);
-      return;
-    }
-    if (!feishuPendingState) {
-      setFeishuPollingState(false);
-    }
   }, [feishuConnected, feishuLastError, feishuPendingState, pollingFeishu, setFeishuPollingState]);
 
   const notionPageOptions = useMemo(() => {
