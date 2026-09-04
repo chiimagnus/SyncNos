@@ -105,32 +105,14 @@ function notionAiCanonicalChatUrl(threadId: string): string {
   return threadId ? `https://app.notion.com/chat?t=${threadId}&wfv=chat` : '';
 }
 
-function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone: () => void): void {
-  if (!db.objectStoreNames.contains('conversations')) return onDone();
-  if (!db.objectStoreNames.contains('messages')) return onDone();
-  if (!db.objectStoreNames.contains('sync_mappings')) return onDone();
-
+function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: () => void): void {
   const conversationsStore = tx.objectStore('conversations');
   const messagesStore = tx.objectStore('messages');
   const mappingsStore = tx.objectStore('sync_mappings');
-
-  let msgSeqIdx: IDBIndex | null = null;
-  let msgKeyIdx: IDBIndex | null = null;
-  let mappingIdx: IDBIndex | null = null;
-  let convoKeyIdx: IDBIndex | null = null;
-
-  try {
-    msgSeqIdx = messagesStore.index('by_conversationId_sequence');
-    msgKeyIdx = messagesStore.index('by_conversationId_messageKey');
-    mappingIdx = mappingsStore.index('by_source_conversationKey');
-    convoKeyIdx = conversationsStore.index('by_source_conversationKey');
-  } catch (_e) {
-    return onDone();
-  }
-  if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return onDone();
-  const messagesBySequenceIndex = msgSeqIdx;
-  const messagesByKeyIndex = msgKeyIdx;
-  const mappingsBySourceConversationKeyIndex = mappingIdx;
+  const messagesBySequenceIndex = messagesStore.index('by_conversationId_sequence');
+  const messagesByKeyIndex = messagesStore.index('by_conversationId_messageKey');
+  const mappingsBySourceConversationKeyIndex = mappingsStore.index('by_source_conversationKey');
+  const convoKeyIdx = conversationsStore.index('by_source_conversationKey');
 
   function migrateMappingKey(input: { legacyKey: string; stableKey: string; onDone: MigrationDone }): void {
     const { legacyKey, stableKey, onDone } = input;
@@ -388,33 +370,14 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext, onDone
   cursorReq.onerror = () => onDone();
 }
 
-function migrateLegacyArticleConversations({ db, tx }: MigrationContext, onDone: () => void): void {
-  if (!db.objectStoreNames.contains('conversations')) return onDone();
-  if (!db.objectStoreNames.contains('messages')) return onDone();
-  if (!db.objectStoreNames.contains('sync_mappings')) return onDone();
-
+function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () => void): void {
   const conversationsStore = tx.objectStore('conversations');
   const messagesStore = tx.objectStore('messages');
   const mappingsStore = tx.objectStore('sync_mappings');
-
-  let msgSeqIdx: IDBIndex | null = null;
-  let msgKeyIdx: IDBIndex | null = null;
-  let mappingIdx: IDBIndex | null = null;
-  let convoKeyIdx: IDBIndex | null = null;
-
-  try {
-    msgSeqIdx = messagesStore.index('by_conversationId_sequence');
-    msgKeyIdx = messagesStore.index('by_conversationId_messageKey');
-    mappingIdx = mappingsStore.index('by_source_conversationKey');
-    convoKeyIdx = conversationsStore.index('by_source_conversationKey');
-  } catch (_e) {
-    return onDone();
-  }
-  if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return onDone();
-
-  const messagesBySequenceIndex = msgSeqIdx;
-  const messagesByKeyIndex = msgKeyIdx;
-  const mappingsBySourceConversationKeyIndex = mappingIdx;
+  const messagesBySequenceIndex = messagesStore.index('by_conversationId_sequence');
+  const messagesByKeyIndex = messagesStore.index('by_conversationId_messageKey');
+  const mappingsBySourceConversationKeyIndex = mappingsStore.index('by_source_conversationKey');
+  const convoKeyIdx = conversationsStore.index('by_source_conversationKey');
   const articleConversations: Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }> =
     [];
 
