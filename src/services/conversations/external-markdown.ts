@@ -1,6 +1,9 @@
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
-import { collectMarkdownImageReferences, replaceMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
 import { isSyncnosAssetUrl } from '@services/shared/syncnos-asset-uri';
 
 function isDataImageUrl(url: unknown): boolean {

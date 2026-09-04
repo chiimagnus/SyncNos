@@ -105,9 +105,7 @@ describe('local markdown export', () => {
             messageKey: 'article_body',
             role: 'assistant',
             contentMarkdown:
-              id === 1
-                ? '![own](syncnos-asset://11)\n\n![cross](syncnos-asset://22)'
-                : '![own](syncnos-asset://22)',
+              id === 1 ? '![own](syncnos-asset://11)\n\n![cross](syncnos-asset://22)' : '![own](syncnos-asset://22)',
           },
         ],
       }));
@@ -121,7 +119,9 @@ describe('local markdown export', () => {
 
     await buildConversationsMarkdownZipExport({ conversations, mergeSingle: false });
     const firstFiles = capturedFiles();
-    const firstAttachmentNames = firstFiles.filter((file) => file.name.startsWith('attachments/')).map((file) => file.name);
+    const firstAttachmentNames = firstFiles
+      .filter((file) => file.name.startsWith('attachments/'))
+      .map((file) => file.name);
     expect(mocks.getImageCacheAssetsByIds.mock.calls).toEqual([
       [{ ids: [11, 22], conversationId: 1 }],
       [{ ids: [22], conversationId: 2 }],
@@ -141,9 +141,11 @@ describe('local markdown export', () => {
     mocks.createZipBlob.mockResolvedValue(new Blob(['zip'], { type: 'application/zip' }));
     setup();
     await buildConversationsMarkdownZipExport({ conversations, mergeSingle: false });
-    expect(capturedFiles().filter((file) => file.name.startsWith('attachments/')).map((file) => file.name)).toEqual(
-      firstAttachmentNames,
-    );
+    expect(
+      capturedFiles()
+        .filter((file) => file.name.startsWith('attachments/'))
+        .map((file) => file.name),
+    ).toEqual(firstAttachmentNames);
   });
 
   it('materializes each conversation before merged export instead of dropping conversation scope', async () => {

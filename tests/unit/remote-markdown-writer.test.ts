@@ -117,7 +117,15 @@ describe('remote-markdown-writer', () => {
 
   it('preserves image-looking caption text inside code while normalizing real image captions', async () => {
     const w = await loadWriter();
-    const source = ['```md', '![code](https://example.com/code.png)Code caption', '```', '', '    ![indent](https://example.com/i.png)Indented caption', '', '![real](https://example.com/real.png)Real caption'].join('\n');
+    const source = [
+      '```md',
+      '![code](https://example.com/code.png)Code caption',
+      '```',
+      '',
+      '    ![indent](https://example.com/i.png)Indented caption',
+      '',
+      '![real](https://example.com/real.png)Real caption',
+    ].join('\n');
     const md = w.buildFullNoteMarkdown({
       conversation: { title: 'T', source: 's', sourceType: 'article', conversationKey: 'k' },
       messages: [{ messageKey: 'article_body', sequence: 1, role: 'assistant', contentMarkdown: source }],

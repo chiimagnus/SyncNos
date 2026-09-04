@@ -19,7 +19,10 @@ import { openDb } from '@platform/idb/schema';
 import { reqToPromise } from '@services/sync/backup/idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import { INPAGE_DISPLAY_MODE_STORAGE_KEY } from '@services/shared/inpage-display-mode';
-import { collectMarkdownImageReferences, replaceMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
 import { formatSyncnosAssetUrl, isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import {
   buildArticleCommentArchiveBaseKey,

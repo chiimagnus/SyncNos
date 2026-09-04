@@ -64,7 +64,13 @@ describe('feishu docx markdown formatter', () => {
   });
 
   it('does not normalize image-looking caption lines inside fenced or indented code', async () => {
-    const markdown = ['```md', '![code](https://example.com/code.png)Code caption', '```', '', '    ![indent](https://example.com/i.png)Indented caption'].join('\n');
+    const markdown = [
+      '```md',
+      '![code](https://example.com/code.png)Code caption',
+      '```',
+      '',
+      '    ![indent](https://example.com/i.png)Indented caption',
+    ].join('\n');
     const out = await formatConversationMarkdownForFeishuDocxSync(
       { id: 1, source: 'x', conversationKey: 'k', title: 't' } as any,
       {

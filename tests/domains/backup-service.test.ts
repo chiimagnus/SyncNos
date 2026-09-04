@@ -950,9 +950,7 @@ describe('backup service', () => {
     expect(assets.length).toBe(0);
     const restoredMarkdown = String(msgs[0].contentMarkdown || '');
     expect(restoredMarkdown).not.toContain(`![x](syncnos-asset://${oldImgId})`);
-    expect(restoredMarkdown).toContain(
-      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
-    );
+    expect(restoredMarkdown).toContain('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
     expect(restoredMarkdown).toContain(`literal syncnos-asset://${oldImgId}`);
     expect(restoredMarkdown).toContain(`\`![inline](syncnos-asset://${oldImgId})\``);
     expect(restoredMarkdown).toContain(`![fenced](syncnos-asset://${oldImgId})`);
@@ -1168,10 +1166,12 @@ describe('backup service', () => {
 
     expect(restoredAssetAId).toBeGreaterThan(0);
     expect(assets).toHaveLength(1);
-    expect(assets[0]).toMatchObject({ id: restoredAssetAId, conversationId: restoredA.id, url: 'https://img.example/a.png' });
-    expect(markdownA).toContain(
-      '![cross-b](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==)',
-    );
+    expect(assets[0]).toMatchObject({
+      id: restoredAssetAId,
+      conversationId: restoredA.id,
+      url: 'https://img.example/a.png',
+    });
+    expect(markdownA).toContain('![cross-b](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==)');
     expect(markdownA).not.toContain('https://img.example/b.png');
     expect(markdownA).toContain(`literal syncnos-asset://${assetB}`);
     expect(markdownB).toContain('![own-b](https://img.example/b.png)');

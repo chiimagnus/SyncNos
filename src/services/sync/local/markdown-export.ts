@@ -3,13 +3,18 @@ import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conver
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
 import type { Conversation } from '@services/conversations/domain/models';
-import { collectMarkdownImageReferences, replaceMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 
 function normalizeImageExt(raw: unknown): string {
-  const value = String(raw || '').trim().toLowerCase();
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase();
   if (!value) return 'png';
   if (value === 'jpeg') return 'jpg';
   if (value === 'svg+xml') return 'svg';
@@ -18,7 +23,9 @@ function normalizeImageExt(raw: unknown): string {
 }
 
 function inferImageExt(asset: ImageCacheAsset): string {
-  const contentType = String(asset.contentType || asset.blob?.type || '').trim().toLowerCase();
+  const contentType = String(asset.contentType || asset.blob?.type || '')
+    .trim()
+    .toLowerCase();
   if (contentType.startsWith('image/')) return normalizeImageExt(contentType.slice('image/'.length));
 
   try {
@@ -101,7 +108,8 @@ export async function buildConversationsMarkdownZipExport({
   for (const conversation of list) {
     const conversationId = Number(conversation.id);
     const detail = await getConversationDetail(conversationId);
-    if (Number(detail?.conversationId) !== conversationId) throw new Error('conversation detail returned a mismatched id');
+    if (Number(detail?.conversationId) !== conversationId)
+      throw new Error('conversation detail returned a mismatched id');
     const basename = buildConversationBasename(conversation);
     const result = await materializeConversationMarkdown({
       conversationId,
@@ -114,7 +122,10 @@ export async function buildConversationsMarkdownZipExport({
   }
 
   if (mergeSingle) {
-    files.unshift({ name: `SyncNos-md-${stamp}.md`, data: materialized.map((item) => item.markdown).join('\n---\n\n') });
+    files.unshift({
+      name: `SyncNos-md-${stamp}.md`,
+      data: materialized.map((item) => item.markdown).join('\n---\n\n'),
+    });
   } else {
     for (let index = materialized.length - 1; index >= 0; index -= 1) {
       const item = materialized[index]!;
