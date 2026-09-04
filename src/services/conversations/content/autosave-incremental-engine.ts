@@ -1,4 +1,3 @@
-import normalizeApi from '@services/shared/normalize.ts';
 import {
   IDENTITY_PREFIX_LEN,
   classifyPrefixOrFillingUpdate,
@@ -47,12 +46,6 @@ type AutoSaveIncrementalPreparation = {
 
 function normalizeMeta(value: unknown): string {
   return String(value || '').trim();
-}
-
-function computeStateKeyHash(stateKey: string): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(stateKey));
-  return stateKey.replace(/[^a-zA-Z0-9]+/g, '_');
 }
 
 function makeConversationStateKey(snapshot: any): string {
@@ -206,7 +199,7 @@ export function createAutoSaveIncrementalEngine() {
       if (!stateKey) return noOpPreparation();
 
       const baseState = byConversation.get(stateKey) || null;
-      const stateKeyHash = baseState?.stateKeyHash || computeStateKeyHash(stateKey);
+      const stateKeyHash = baseState?.stateKeyHash || fingerprintHash(stateKey);
       const effectiveConversation = { ...(inputSnapshot.conversation || {}) };
       if (baseState) {
         if (!normalizeMeta(effectiveConversation.title) && baseState.lastTitle)

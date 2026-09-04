@@ -1,14 +1,10 @@
-import normalizeApi from '@services/shared/normalize.ts';
+import { fnv1a32, normalizeText } from '@services/shared/normalize.ts';
 
 export const IDENTITY_PREFIX_LEN = 96;
 export const MIN_OVERLAP_FOR_LONG_WINDOWS = 8;
 
 export function normalizeContent(value: unknown): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.normalizeText === 'function') {
-    return normalize.normalizeText(value);
-  }
-  return String(value || '');
+  return normalizeText(value);
 }
 
 export function getMessageIdentityBase(
@@ -27,9 +23,7 @@ export function getMessageIdentityBase(
 }
 
 export function fingerprintHash(base: string): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(base));
-  return base;
+  return fnv1a32(base);
 }
 
 export function classifyPrefixOrFillingUpdate(

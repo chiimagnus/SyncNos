@@ -6,10 +6,10 @@ import {
   type CollectorRegistryLike,
 } from '@collectors/registry';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
-import normalizeApi from '@services/shared/normalize.ts';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
+import { fingerprintHash } from '@services/conversations/content/autosave-identity-utils';
 import {
   readInpageButtonGlobalPosition,
   writeInpageButtonGlobalPosition,
@@ -74,12 +74,6 @@ function pickLineByLevel(level: number): string {
 
 function normalizeConversationMeta(value: unknown): string {
   return String(value || '').trim();
-}
-
-function computeStateKeyHash(stateKey: string): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(stateKey));
-  return stateKey.replace(/[^a-zA-Z0-9]+/g, '_');
 }
 
 export function createContentController(deps: Deps) {
@@ -465,9 +459,7 @@ export function createContentController(deps: Deps) {
       const stateKey = makeConversationStateKey(snapshot);
       if (!stateKey)
         return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
-      const stateKeyHash = computeStateKeyHash(stateKey);
-      if (!stateKeyHash)
-        return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
+      const stateKeyHash = fingerprintHash(stateKey);
 
       const pageMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
       const pageWindowMessages = pageMessages.slice(Math.max(0, pageMessages.length - BACKFILL_WINDOW_LIMIT));
