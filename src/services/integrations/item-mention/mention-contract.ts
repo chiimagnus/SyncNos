@@ -1,5 +1,4 @@
 export type MentionQuery = {
-  raw: string;
   normalized: string;
   empty: boolean;
 };
@@ -21,9 +20,8 @@ export type MentionInsertPayload = {
 };
 
 export function normalizeMentionQuery(raw: unknown): MentionQuery {
-  const text = String(raw || '');
-  const normalized = text.trim().toLowerCase();
-  return { raw: text, normalized, empty: !normalized };
+  const normalized = String(raw || '').trim().toLowerCase();
+  return { normalized, empty: !normalized };
 }
 
 export function normalizeMentionSearchLimit(raw: unknown) {
