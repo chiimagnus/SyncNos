@@ -176,37 +176,6 @@ function isArticlePayload(payload: any): boolean {
   return safeString(payload?.sourceType).toLowerCase() === 'article';
 }
 
-function pickPreferredArticleConversation(candidates: any[]): any | null {
-  const list = Array.isArray(candidates) ? candidates.slice() : [];
-  if (!list.length) return null;
-  list.sort((a, b) => {
-    const aIdentity = buildCanonicalWebArticleIdentity(a?.url);
-    const bIdentity = buildCanonicalWebArticleIdentity(b?.url);
-    const aCanonical =
-      safeString(a?.source) === WEB_ARTICLE_SOURCE && aIdentity?.conversationKey === safeString(a?.conversationKey)
-        ? 1
-        : 0;
-    const bCanonical =
-      safeString(b?.source) === WEB_ARTICLE_SOURCE && bIdentity?.conversationKey === safeString(b?.conversationKey)
-        ? 1
-        : 0;
-    if (bCanonical !== aCanonical) return bCanonical - aCanonical;
-
-    const aMapped = safeString(a?.notionPageId) ? 1 : 0;
-    const bMapped = safeString(b?.notionPageId) ? 1 : 0;
-    if (bMapped !== aMapped) return bMapped - aMapped;
-
-    const at = Number(a?.lastCapturedAt) || 0;
-    const bt = Number(b?.lastCapturedAt) || 0;
-    if (bt !== at) return bt - at;
-
-    const aid = Number(a?.id) || 0;
-    const bid = Number(b?.id) || 0;
-    return bid - aid;
-  });
-  return list[0] || null;
-}
-
 async function findExistingArticleConversationByUrl(
   conversationsStore: IDBObjectStore,
   rawUrl: unknown,
@@ -221,7 +190,7 @@ async function findExistingArticleConversationByUrl(
     [siteKey, -Infinity, -Infinity] as any,
     [siteKey, Infinity, Infinity] as any,
   );
-  const matched: any[] = [];
+  let best: any | null = null;
   const cursorReq = index.openCursor(range);
   await new Promise<void>((resolve, reject) => {
     cursorReq.onerror = () => reject(cursorReq.error || new Error('article identity cursor failed'));
@@ -233,14 +202,40 @@ async function findExistingArticleConversationByUrl(
         safeString(row?.sourceType).toLowerCase() === 'article' &&
         canonicalizeArticleUrl(row?.url) === normalizedUrl
       ) {
-        matched.push(row);
+        const rowIdentity = buildCanonicalWebArticleIdentity(row?.url);
+        const bestIdentity = best ? buildCanonicalWebArticleIdentity(best?.url) : null;
+        const rowCanonical =
+          safeString(row?.source) === WEB_ARTICLE_SOURCE && rowIdentity?.conversationKey === safeString(row?.conversationKey);
+        const bestCanonical =
+          !!best &&
+          safeString(best?.source) === WEB_ARTICLE_SOURCE &&
+          bestIdentity?.conversationKey === safeString(best?.conversationKey);
+        const rowMapped = !!safeString(row?.notionPageId);
+        const bestMapped = !!safeString(best?.notionPageId);
+        const rowCapturedAt = Number(row?.lastCapturedAt) || 0;
+        const bestCapturedAt = Number(best?.lastCapturedAt) || 0;
+        const rowId = Number(row?.id) || 0;
+        const bestId = Number(best?.id) || 0;
+
+        if (
+          !best ||
+          (rowCanonical && !bestCanonical) ||
+          (rowCanonical === bestCanonical && rowMapped && !bestMapped) ||
+          (rowCanonical === bestCanonical && rowMapped === bestMapped && rowCapturedAt > bestCapturedAt) ||
+          (rowCanonical === bestCanonical &&
+            rowMapped === bestMapped &&
+            rowCapturedAt === bestCapturedAt &&
+            rowId > bestId)
+        ) {
+          best = row;
+        }
       }
       cursor.continue();
     };
   });
 
   // ponytail: 同站点 fallback 仍是 O(site rows)；只有实测成为热点时才值得新增 canonical URL identity index。
-  return pickPreferredArticleConversation(matched);
+  return best;
 }
 
 async function findExistingConversationForPayload(
