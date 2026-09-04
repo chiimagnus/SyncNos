@@ -15,12 +15,12 @@ function ensureOk(res: any, fallback: string) {
 
 export async function searchMentionCandidates(
   runtime: RuntimeClient | null,
-  input: { query: string; limit?: number | null },
+  input: { query: string; limit: number },
 ): Promise<MentionSearchResult> {
   if (!runtime || typeof runtime.send !== 'function') throw new Error('runtime client unavailable');
   const res = await runtime.send(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, {
     query: input.query,
-    limit: input.limit ?? null,
+    limit: input.limit,
   });
   return ensureOk(res, 'searchMentionCandidates failed') as MentionSearchResult;
 }
