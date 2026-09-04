@@ -875,7 +875,10 @@ describe('backup service', () => {
     expect(olderBackupStats.messagesUpdated).toBe(0);
     const preservedLocalTx = db2.transaction(['messages'], 'readonly');
     const preservedLocal = await reqToPromise<any>(
-      preservedLocalTx.objectStore('messages').index('by_conversationId_messageKey').get([convId, 'm-newer-local']) as any,
+      preservedLocalTx
+        .objectStore('messages')
+        .index('by_conversationId_messageKey')
+        .get([convId, 'm-newer-local']) as any,
     );
     await new Promise<void>((resolve, reject) => {
       preservedLocalTx.oncomplete = () => resolve();
