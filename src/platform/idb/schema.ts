@@ -238,7 +238,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
           keepConversation.conversationKey = stableKey;
           changed = true;
         }
-        if (canonicalUrl && String(keepConversation.url || '') !== canonicalUrl) {
+        if (String(keepConversation.url || '') !== canonicalUrl) {
           keepConversation.url = canonicalUrl;
           changed = true;
         }
@@ -335,13 +335,8 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
   }): void {
     const legacySource = safeString(input.legacySource);
     const legacyKey = safeString(input.legacyKey);
-    const canonicalKey = safeString(input.canonicalKey);
+    const canonicalKey = input.canonicalKey;
     const fallbackNotionPageId = safeString(input.fallbackNotionPageId);
-
-    if (!canonicalKey) {
-      input.onDone();
-      return;
-    }
 
     const targetReq = mappingsBySourceConversationKeyIndex.get(['web', canonicalKey]);
     targetReq.onsuccess = () => {
@@ -395,8 +390,8 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
       const row = cursor.value as Record<string, unknown> | undefined;
       if (safeString(row?.sourceType).toLowerCase() === 'article') {
         const canonicalUrl = normalizeHttpUrl(row?.url);
-        const canonicalKey = canonicalUrl ? `article:${canonicalUrl}` : '';
-        if (canonicalUrl && canonicalKey) {
+        if (canonicalUrl) {
+          const canonicalKey = `article:${canonicalUrl}`;
           const list = groups.get(canonicalKey) || [];
           list.push({ ...(row || {}), __canonicalUrl: canonicalUrl, __canonicalKey: canonicalKey });
           groups.set(canonicalKey, list);
