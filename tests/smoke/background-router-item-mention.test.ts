@@ -37,9 +37,7 @@ function candidate(conversationId: number, title: string, lastCapturedAt = conve
     conversationId,
     title,
     source: 'chatgpt',
-    url: `https://example.com/${conversationId}`,
     domain: 'example.com',
-    sourceType: 'chat',
     lastCapturedAt,
   };
 }

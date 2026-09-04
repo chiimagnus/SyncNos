@@ -3,31 +3,9 @@ import type {
   MentionQuery,
   MentionSearchResult,
 } from '@services/integrations/item-mention/mention-contract';
-import {
-  normalizeMentionQuery,
-  normalizeMentionSearchLimit,
-} from '@services/integrations/item-mention/mention-contract';
 
-function safeText(value: unknown): string {
-  return String(value || '').trim();
-}
-
-function normalizeField(value: unknown): string {
-  return safeText(value).toLowerCase();
-}
-
-export function normalizeMentionCandidate(
-  input: Partial<MentionCandidate> & Record<string, unknown>,
-): MentionCandidate {
-  const conversationId = Number((input as any).conversationId);
-  const lastCapturedAt = Number((input as any).lastCapturedAt);
-  return {
-    conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : 0,
-    title: safeText((input as any).title),
-    source: safeText((input as any).source),
-    domain: safeText((input as any).domain),
-    lastCapturedAt: Number.isFinite(lastCapturedAt) && lastCapturedAt > 0 ? lastCapturedAt : 0,
-  };
+function normalizeField(value: string): string {
+  return value.toLowerCase();
 }
 
 type MatchInfo = {
@@ -63,30 +41,15 @@ function scoreCandidate(candidate: MentionCandidate, query: MentionQuery): Match
 }
 
 export function searchMentionCandidates(input: {
-  query: unknown;
-  candidates: Array<Partial<MentionCandidate> & Record<string, unknown>>;
-  limit?: unknown;
+  query: MentionQuery;
+  candidates: MentionCandidate[];
+  limit: number;
 }): MentionSearchResult {
-  const query = normalizeMentionQuery(input.query);
-  const limit = normalizeMentionSearchLimit(input.limit, { defaultLimit: 20, maxLimit: 50 });
-  const normalized = (Array.isArray(input.candidates) ? input.candidates : []).map((c) => normalizeMentionCandidate(c));
-
-  if (query.empty) {
-    const sorted = normalized
-      .filter((c) => c.conversationId > 0)
-      .sort((a, b) => {
-        const at = a.lastCapturedAt || 0;
-        const bt = b.lastCapturedAt || 0;
-        if (bt !== at) return bt - at;
-        return (b.conversationId || 0) - (a.conversationId || 0);
-      })
-      .slice(0, limit);
-    return { query, candidates: sorted, limit };
-  }
+  const { query, candidates, limit } = input;
+  if (query.empty) return { query, candidates: candidates.slice(0, limit), limit };
 
   const matched: Array<{ c: MentionCandidate; score: number }> = [];
-  for (const c of normalized) {
-    if (!c || c.conversationId <= 0) continue;
+  for (const c of candidates) {
     const info = scoreCandidate(c, query);
     if (!info.matched) continue;
     matched.push({ c, score: info.score });

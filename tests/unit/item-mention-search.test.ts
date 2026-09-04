@@ -1,39 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { searchMentionCandidates } from '../../src/services/integrations/item-mention/mention-search';
+import { normalizeMentionQuery } from '../../src/services/integrations/item-mention/mention-contract';
 
 describe('item-mention-search', () => {
-  it('returns most recent items for empty query', () => {
+  it('preserves recent pool order for empty query', () => {
     const res = searchMentionCandidates({
-      query: '',
+      query: normalizeMentionQuery(''),
       candidates: [
-        {
-          conversationId: 1,
-          title: 'A',
-          source: 'chatgpt',
-          url: 'https://a.com',
-          domain: 'a.com',
-          lastCapturedAt: 1000,
-          sourceType: 'chat',
-        },
-        {
-          conversationId: 2,
-          title: 'B',
-          source: 'chatgpt',
-          url: 'https://b.com',
-          domain: 'b.com',
-          lastCapturedAt: 3000,
-          sourceType: 'chat',
-        },
-        {
-          conversationId: 3,
-          title: 'C',
-          source: 'web',
-          url: 'https://c.com',
-          domain: 'c.com',
-          lastCapturedAt: 2000,
-          sourceType: 'article',
-        },
+        { conversationId: 2, title: 'B', source: 'chatgpt', domain: 'b.com', lastCapturedAt: 3000 },
+        { conversationId: 3, title: 'C', source: 'web', domain: 'c.com', lastCapturedAt: 2000 },
+        { conversationId: 1, title: 'A', source: 'chatgpt', domain: 'a.com', lastCapturedAt: 1000 },
       ],
       limit: 10,
     });
@@ -43,43 +20,35 @@ describe('item-mention-search', () => {
 
   it('filters by title/source/domain and sorts by match score then recency', () => {
     const res = searchMentionCandidates({
-      query: 'openai',
+      query: normalizeMentionQuery('openai'),
       candidates: [
         {
           conversationId: 1,
           title: 'Hello world',
           source: 'chatgpt',
-          url: 'https://openai.com/blog',
           domain: 'openai.com',
           lastCapturedAt: 1000,
-          sourceType: 'article',
         },
         {
           conversationId: 2,
           title: 'OpenAI paper',
           source: 'chatgpt',
-          url: 'https://example.com',
           domain: 'example.com',
           lastCapturedAt: 900,
-          sourceType: 'chat',
         },
         {
           conversationId: 3,
           title: 'Something else',
           source: 'openai',
-          url: 'https://foo.com',
           domain: 'foo.com',
           lastCapturedAt: 5000,
-          sourceType: 'chat',
         },
         {
           conversationId: 4,
           title: 'Nothing',
           source: 'chatgpt',
-          url: 'https://bar.com',
           domain: 'bar.com',
           lastCapturedAt: 9999,
-          sourceType: 'chat',
         },
       ],
       limit: 10,
@@ -94,30 +63,26 @@ describe('item-mention-search', () => {
       conversationId: index + 1,
       title: index === 55 ? 'OpenAI' : `Weak ${index + 1}`,
       source: index < 55 ? 'openai-weak' : 'chatgpt',
-      url: `https://example.com/${index + 1}`,
       domain: 'example.com',
       lastCapturedAt: 10_000 - index,
-      sourceType: 'chat',
     }));
 
-    const res = searchMentionCandidates({ query: 'openai', candidates, limit: 20 });
+    const res = searchMentionCandidates({ query: normalizeMentionQuery('openai'), candidates, limit: 20 });
 
     expect(res.candidates).toHaveLength(20);
     expect(res.candidates[0]?.conversationId).toBe(56);
   });
 
-  it('enforces max limit', () => {
+  it('applies the already-normalized final limit', () => {
     const candidates = Array.from({ length: 200 }, (_, i) => ({
       conversationId: i + 1,
       title: `T${i + 1}`,
       source: 'chatgpt',
-      url: 'https://x.com',
       domain: 'x.com',
       lastCapturedAt: i + 1,
-      sourceType: 'chat',
     }));
 
-    const res = searchMentionCandidates({ query: '', candidates, limit: 999 });
-    expect(res.candidates.length).toBeLessThanOrEqual(50);
+    const res = searchMentionCandidates({ query: normalizeMentionQuery(''), candidates, limit: 50 });
+    expect(res.candidates).toHaveLength(50);
   });
 });
