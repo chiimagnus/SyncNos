@@ -137,10 +137,8 @@ export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string): P
   const { t, stores } = tx(db, ['article_comments'], 'readonly');
 
   const idx = stores.article_comments.index('by_canonicalUrl_createdAt');
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any)
-    : null;
-  const rows = range ? await reqToPromise<any[]>(idx.getAll(range) as any) : [];
+  const range = globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any);
+  const rows = await reqToPromise<any[]>(idx.getAll(range) as any);
   await txDone(t);
   return (Array.isArray(rows) ? rows : []).map(toComment);
 }
@@ -153,10 +151,8 @@ export async function listArticleCommentsByConversationId(conversationId: number
   const { t, stores } = tx(db, ['article_comments'], 'readonly');
 
   const idx = stores.article_comments.index('by_conversationId_createdAt');
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any)
-    : null;
-  const rows = range ? await reqToPromise<any[]>(idx.getAll(range) as any) : [];
+  const range = globalThis.IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
+  const rows = await reqToPromise<any[]>(idx.getAll(range) as any);
   await txDone(t);
   return (Array.isArray(rows) ? rows : []).map(toComment);
 }
@@ -233,15 +229,7 @@ export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string)
   const db = await openDb();
   const { t, stores } = tx(db, ['article_comments'], 'readonly');
   const idx = stores.article_comments.index('by_canonicalUrl_createdAt');
-
-  const range = globalThis.IDBKeyRange?.bound
-    ? globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any)
-    : null;
-  if (!range) {
-    await txDone(t);
-    return false;
-  }
-
+  const range = globalThis.IDBKeyRange.bound([normalized, -Infinity] as any, [normalized, Infinity] as any);
   const count = await reqToPromise<number>(idx.count(range) as any);
   await txDone(t);
   return Number(count) > 0;
@@ -261,11 +249,10 @@ export async function attachOrphanCommentsToConversation(
     async ({ stores, markChanged }) => {
       const store = stores.article_comments;
       const idx = store.index('by_canonicalUrl_createdAt');
-      const range = globalThis.IDBKeyRange?.bound
-        ? globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any)
-        : null;
-      if (!range) return { updated: 0 };
-
+      const range = globalThis.IDBKeyRange.bound(
+        [normalizedUrl, -Infinity] as any,
+        [normalizedUrl, Infinity] as any,
+      );
       const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
       let updated = 0;
       const now = Date.now();
@@ -303,11 +290,7 @@ export async function migrateArticleCommentsCanonicalUrl(input: {
     async ({ stores, markChanged }) => {
       const store = stores.article_comments;
       const idx = store.index('by_canonicalUrl_createdAt');
-      const range = globalThis.IDBKeyRange?.bound
-        ? globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any)
-        : null;
-      if (!range) return { updated: 0 };
-
+      const range = globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any);
       const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
       const now = Date.now();
       let updated = 0;

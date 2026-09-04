@@ -433,6 +433,28 @@ describe('article comments storage-idb', () => {
     expect(await hasAnyArticleCommentsForCanonicalUrl(url)).toBe(true);
   });
 
+  it('fails instead of fabricating empty comment results when IDBKeyRange is unavailable', async () => {
+    const url = 'https://example.com/required-key-range';
+    await addArticleComment({ conversationId: null, canonicalUrl: url, commentText: 'x' });
+    const previousKeyRange = globalThis.IDBKeyRange;
+    // @ts-expect-error simulate a broken IndexedDB runtime invariant
+    globalThis.IDBKeyRange = undefined;
+    try {
+      await expect(listArticleCommentsByCanonicalUrl(url)).rejects.toThrow();
+      await expect(hasAnyArticleCommentsForCanonicalUrl(url)).rejects.toThrow();
+      await expect(attachOrphanCommentsToConversation(url, 42)).rejects.toThrow();
+      await expect(
+        migrateArticleCommentsCanonicalUrl({
+          fromCanonicalUrl: url,
+          toCanonicalUrl: 'https://example.com/required-key-range-next',
+          conversationId: 42,
+        }),
+      ).rejects.toThrow();
+    } finally {
+      globalThis.IDBKeyRange = previousKeyRange;
+    }
+  });
+
   it('attaches orphan comments to conversation', async () => {
     const url = 'https://example.com/a';
     const orphan1 = await addArticleComment({
