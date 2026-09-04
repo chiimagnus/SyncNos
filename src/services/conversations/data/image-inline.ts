@@ -59,12 +59,6 @@ function isDataImageUrl(url: unknown): boolean {
   return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
 }
 
-function isSyncnosAssetUrl(url: unknown): boolean {
-  const text = String(url || '').trim();
-  if (!text) return false;
-  return /^syncnos-asset:\/\/\d+$/i.test(text);
-}
-
 function stripAngleBrackets(url: string): string {
   const text = String(url || '').trim();
   if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
@@ -87,7 +81,6 @@ function extractInlineCandidateUrlsFromMarkdown(markdown: string): string[] {
   while ((match = MARKDOWN_IMAGE_RE.exec(raw)) != null) {
     const urlPart = match[2] ? String(match[2]) : '';
     const url = stripAngleBrackets(urlPart);
-    if (isSyncnosAssetUrl(url)) continue;
     if (!isDataImageUrl(url) && !isHttpUrl(url)) continue;
     if (seen.has(url)) continue;
     seen.add(url);
