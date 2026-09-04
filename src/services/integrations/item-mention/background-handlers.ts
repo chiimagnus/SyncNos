@@ -33,7 +33,7 @@ export function registerItemMentionHandlers(router: AnyRouter) {
         return pool;
       })
       .finally(() => {
-        if (mentionCandidatePoolLoadInFlight === load) mentionCandidatePoolLoadInFlight = null;
+        mentionCandidatePoolLoadInFlight = null;
       });
     mentionCandidatePoolLoadInFlight = load;
     return load;
