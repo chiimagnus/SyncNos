@@ -46,7 +46,7 @@ type RuntimeObserverFactory = (input: {
   debounceMs: number;
   getRoot: () => Node | null;
   onTick: () => void | Promise<void>;
-}) => { start?: () => void; stop?: () => void } | null;
+}) => { start: () => void; stop: () => void };
 
 type Deps = {
   runtime: RuntimeClient | null;
@@ -54,7 +54,7 @@ type Deps = {
   currentPageCapture: CurrentPageCaptureService;
   inpageButton: InpageButtonApi | null;
   inpageTip: InpageTipApi | null;
-  createRuntimeObserver: RuntimeObserverFactory | null;
+  createRuntimeObserver: RuntimeObserverFactory;
   incrementalEngine: { prepare?: (snapshot: unknown) => any } | null;
   itemMention: { start?: () => { stop?: () => void } | null } | null;
 };
@@ -263,7 +263,7 @@ export function createContentController(deps: Deps) {
 
   function createAutoCaptureController(ownerToken: number) {
     let stopped = false;
-    let observer: { start?: () => void; stop?: () => void } | null = null;
+    let observer: { start: () => void; stop: () => void };
     const BACKFILL_WINDOW_LIMIT = 200;
     const BACKFILL_RETRY_THROTTLE_MS = 10_000;
     const BACKFILL_RETRY_MAX_ATTEMPTS = 6;
@@ -342,7 +342,7 @@ export function createContentController(deps: Deps) {
       inpageButton?.setSaving?.(false);
       inpageButton?.cleanupButtons?.('');
       backfillStateByConversation.clear();
-      observer?.stop?.();
+      observer.stop();
       clearProactiveTimers();
       doc?.removeEventListener('click', onDocumentClickCapture, true);
       doc?.removeEventListener('keydown', onDocumentKeydownCapture, true);
@@ -822,21 +822,20 @@ export function createContentController(deps: Deps) {
     doc?.addEventListener('click', onDocumentClickCapture, true);
     doc?.addEventListener('keydown', onDocumentKeydownCapture, true);
 
-    observer =
-      createRuntimeObserver?.({
-        debounceMs: 600,
-        getRoot: () => {
-          if (stopped) return null;
-          const collector = resolveActiveCollector(collectorsRegistry);
-          return collector && typeof collector.getRoot === 'function' ? collector.getRoot() : null;
-        },
-        onTick: handleObserverTick,
-      }) || null;
+    observer = createRuntimeObserver({
+      debounceMs: 600,
+      getRoot: () => {
+        if (stopped) return null;
+        const collector = resolveActiveCollector(collectorsRegistry);
+        return collector && typeof collector.getRoot === 'function' ? collector.getRoot() : null;
+      },
+      onTick: handleObserverTick,
+    });
 
     return {
       ownerToken,
       start() {
-        if (!stopped) observer?.start?.();
+        if (!stopped) observer.start();
       },
       isAutoSaveEnabled: () => !stopped && aiChatAutoSaveEnabled === true,
       runAutoSaveTick,
