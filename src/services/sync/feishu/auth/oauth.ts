@@ -130,22 +130,18 @@ async function readPendingState(): Promise<string> {
   return safeString(values?.[KEY_PENDING_STATE]);
 }
 
-async function writeAuthConfig(config: FeishuOAuthConfig): Promise<void> {
-  await storageSet({
+function authConfigStoragePatch(config: FeishuOAuthConfig) {
+  return {
     [KEY_CLIENT_ID]: config.clientId,
     [KEY_CLIENT_SECRET]: config.clientSecret,
     [KEY_TOKEN_EXCHANGE_PROXY_URL]: config.tokenExchangeProxyUrl,
-  });
+  };
 }
 
 async function saveAuthConfigInsideOwner(config: FeishuOAuthConfig, current?: FeishuOAuthConfig): Promise<boolean> {
   const existing = current ?? (await readAuthConfig());
   if (configEquals(existing, config)) return false;
-
-  // Invalidate the old attempt before changing the credentials it captured. If the
-  // subsequent config write fails, failing closed is safer than reviving that attempt.
-  await storageRemove([KEY_PENDING_STATE]);
-  await writeAuthConfig(config);
+  await storageSet({ ...authConfigStoragePatch(config), [KEY_PENDING_STATE]: '' });
   return true;
 }
 
@@ -187,50 +183,39 @@ export async function startFeishuOAuthAttempt(input: FeishuOAuthConfigInput): Pr
   validateStartConfig(config);
 
   return enqueueAuthMutation(async () => {
-    await saveAuthConfigInsideOwner(config);
     const state = createSecureOAuthState();
     const authorizationUrl = buildAuthorizationUrl(config, state);
 
-    await storageSet({ [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
+    await storageSet({ ...authConfigStoragePatch(config), [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
     try {
       await tabsCreate({ url: authorizationUrl, active: true });
     } catch (error) {
-      if ((await readPendingState()) === state) await storageRemove([KEY_PENDING_STATE]);
+      await storageRemove([KEY_PENDING_STATE]);
       throw error;
     }
     return { state };
   });
 }
 
-export async function clearFeishuOAuthAttemptAndToken(): Promise<string[]> {
-  return enqueueAuthMutation(async () => {
-    const keys = [FEISHU_OAUTH_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR];
-    await storageRemove(keys);
-    return keys;
-  });
+export async function clearFeishuOAuthAttemptAndToken(): Promise<void> {
+  return enqueueAuthMutation(() => storageRemove([FEISHU_OAUTH_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR]));
 }
 
-export async function ensureDefaultFeishuOAuthClientId(): Promise<void> {
-  if (!safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID)) return;
-  try {
-    await enqueueAuthMutation(async () => {
-      const current = await readAuthConfig();
-      if (current.clientId) return;
-      await saveAuthConfigInsideOwner({ ...current, clientId: safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID) }, current);
-    });
-  } catch (_error) {
-    // Startup defaulting is best-effort and must not block the background worker.
-  }
-}
-
-export async function ensureDefaultFeishuOAuthProxyUrl(): Promise<void> {
+export async function ensureDefaultFeishuOAuthConfig(): Promise<void> {
+  const defaultClientId = safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID);
   const defaultProxy = normalizeHttpsUrlOrEmpty(DEFAULT_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL);
-  if (!defaultProxy) return;
+  if (!defaultClientId && !defaultProxy) return;
+
   try {
     await enqueueAuthMutation(async () => {
       const current = await readAuthConfig();
-      if (current.clientSecret || current.tokenExchangeProxyUrl) return;
-      await saveAuthConfigInsideOwner({ ...current, tokenExchangeProxyUrl: defaultProxy }, current);
+      const next = {
+        ...current,
+        clientId: current.clientId || defaultClientId,
+        tokenExchangeProxyUrl:
+          current.clientSecret || current.tokenExchangeProxyUrl ? current.tokenExchangeProxyUrl : defaultProxy,
+      };
+      await saveAuthConfigInsideOwner(next, current);
     });
   } catch (_error) {
     // Startup defaulting is best-effort and must not block the background worker.
@@ -341,19 +326,6 @@ async function exchangeFeishuCodeForToken(
   );
 }
 
-function parseQueryFromUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    return {
-      code: parsed.searchParams.get('code') || '',
-      state: parsed.searchParams.get('state') || '',
-      error: parsed.searchParams.get('error') || '',
-    };
-  } catch (_error) {
-    return { code: '', state: '', error: '' };
-  }
-}
-
 async function removeTab(tabId: number) {
   if (!Number.isFinite(tabId) || tabId < 0) return;
   try {
@@ -376,7 +348,10 @@ export async function handleFeishuOAuthCallbackNavigation(
   const url = String(details?.url || '');
   if (!isExactOAuthRedirect(url, defaults.redirectUri)) return false;
 
-  const { code, state, error } = parseQueryFromUrl(url);
+  const parsed = new URL(url);
+  const code = parsed.searchParams.get('code') || '';
+  const state = parsed.searchParams.get('state') || '';
+  const error = parsed.searchParams.get('error') || '';
   if (!state) return false;
 
   if (error) {

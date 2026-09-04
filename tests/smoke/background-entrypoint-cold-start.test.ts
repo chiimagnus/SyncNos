@@ -16,8 +16,7 @@ const mocks = vi.hoisted(() => ({
   registerGithubSettingsHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
-  ensureDefaultFeishuOAuthClientId: vi.fn(),
-  ensureDefaultFeishuOAuthProxyUrl: vi.fn(),
+  ensureDefaultFeishuOAuthConfig: vi.fn(),
   registerClipperContextMenu: vi.fn(),
   onInstalled: vi.fn(),
   onAlarm: vi.fn(),
@@ -68,8 +67,7 @@ vi.mock('@services/sync/notion/auth/oauth', () => ({
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
 }));
 vi.mock('@services/sync/feishu/auth/oauth', () => ({
-  ensureDefaultFeishuOAuthClientId: mocks.ensureDefaultFeishuOAuthClientId,
-  ensureDefaultFeishuOAuthProxyUrl: mocks.ensureDefaultFeishuOAuthProxyUrl,
+  ensureDefaultFeishuOAuthConfig: mocks.ensureDefaultFeishuOAuthConfig,
   setupFeishuOAuthNavigationListener: mocks.setupFeishuOAuthNavigationListener,
 }));
 vi.mock('@platform/runtime/runtime', () => ({ onInstalled: mocks.onInstalled }));
@@ -151,8 +149,7 @@ async function loadBackground() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  mocks.ensureDefaultFeishuOAuthClientId.mockResolvedValue(undefined);
-  mocks.ensureDefaultFeishuOAuthProxyUrl.mockResolvedValue(undefined);
+  mocks.ensureDefaultFeishuOAuthConfig.mockResolvedValue(undefined);
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);
   mocks.ensureDisplayMode.mockResolvedValue('all');
   mocks.readDisplayMode.mockResolvedValue('all');
@@ -179,13 +176,11 @@ describe('background entrypoint cold start', () => {
     const callback = await loadBackground();
     expect(callback()).toBeUndefined();
     await flushMicrotasks();
-    expect(mocks.ensureDefaultFeishuOAuthClientId).toHaveBeenCalledTimes(1);
-    expect(mocks.ensureDefaultFeishuOAuthProxyUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureDefaultFeishuOAuthConfig).toHaveBeenCalledTimes(1);
 
     installedListener?.({ reason: 'update' });
     await flushMicrotasks();
-    expect(mocks.ensureDefaultFeishuOAuthClientId).toHaveBeenCalledTimes(1);
-    expect(mocks.ensureDefaultFeishuOAuthProxyUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureDefaultFeishuOAuthConfig).toHaveBeenCalledTimes(1);
   });
 
   it('registers runtime and browser listeners before locale readiness settles', async () => {

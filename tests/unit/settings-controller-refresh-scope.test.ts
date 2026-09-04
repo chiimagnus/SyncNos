@@ -23,7 +23,6 @@ const antiHotlinkMocks = vi.hoisted(() => ({
 const feishuSettingsMocks = vi.hoisted(() => ({
   getPathConfig: vi.fn(),
 }));
-const feishuClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
 vi.mock('@services/shared/storage', () => ({
@@ -32,7 +31,6 @@ vi.mock('@services/shared/storage', () => ({
   storageRemove: storageMocks.remove,
   storageOnChanged: storageMocks.onChanged,
 }));
-vi.mock('@services/sync/feishu/auth/settings-client', () => ({ disconnectFeishu: feishuClientMocks.disconnect }));
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: vi.fn(),
   syncProviderEnabledStorageKey: (id: string) => `webclipper_sync_provider_${id}_enabled`,
@@ -179,7 +177,6 @@ beforeEach(() => {
     articleFolder: 'Articles',
     videoFolder: 'Videos',
   });
-  feishuClientMocks.disconnect.mockResolvedValue(undefined);
 
   storageMocks.get.mockImplementation(async (keys: string[]) => {
     const out: Record<string, unknown> = {};
@@ -216,6 +213,10 @@ beforeEach(() => {
     }
     if (type === FEISHU_MESSAGE_TYPES.START_AUTH) {
       return await takeQueued(feishuStartQueue, ok({ state: 'feishu-state' }));
+    }
+    if (type === FEISHU_MESSAGE_TYPES.DISCONNECT) {
+      feishuStatus = { connected: false };
+      return ok({ disconnected: true });
     }
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
       return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });

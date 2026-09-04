@@ -9,7 +9,6 @@ import {
   type ImportStats,
 } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
-import { disconnectFeishu } from '@services/sync/feishu/auth/settings-client';
 import {
   FEISHU_DEFAULTS,
   FEISHU_STORAGE_KEYS,
@@ -1401,37 +1400,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     return !target?.contentWriteCapable;
   }, [githubAuth.state, githubRepositories, githubRepository, githubRepositoryStatus]);
 
-  const normalizeHttpsUrlOrEmpty = (raw: string) => {
-    const value = String(raw || '').trim();
-    if (!value) return '';
-    try {
-      const url = new URL(value);
-      if (url.protocol !== 'https:') return '';
-      return url.toString();
-    } catch (_e) {
-      return '';
-    }
-  };
-
   const onSaveFeishuAdvancedSettings = useCallback(async () => {
     await runTask(
       async () => {
-        const clientId = String(feishuClientId || '').trim();
-        const clientSecret = String(feishuClientSecret || '').trim();
-        const proxyUrlRaw = String(feishuTokenExchangeProxyUrl || '').trim();
-        const proxyUrl = proxyUrlRaw ? normalizeHttpsUrlOrEmpty(proxyUrlRaw) : '';
-        if (proxyUrlRaw && !proxyUrl) throw new Error('Feishu token exchange proxy url must be https');
-
         const saved = unwrap(
           await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, {
-            clientId,
-            clientSecret,
-            tokenExchangeProxyUrl: proxyUrl,
+            clientId: feishuClientId,
+            clientSecret: feishuClientSecret,
+            tokenExchangeProxyUrl: feishuTokenExchangeProxyUrl,
           }),
         );
-        setFeishuTokenExchangeProxyUrl(String(saved?.tokenExchangeProxyUrl || proxyUrl));
-        setFeishuClientId(String(saved?.clientId || clientId));
-        setFeishuClientSecret(clientSecret);
+        setFeishuTokenExchangeProxyUrl(String(saved?.tokenExchangeProxyUrl || ''));
+        setFeishuClientId(String(saved?.clientId || ''));
+        setFeishuClientSecret(String(feishuClientSecret || '').trim());
       },
       { fallbackMessage: 'save feishu settings failed' },
     );
@@ -1446,7 +1427,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (!status) return;
 
       if (status.connected === true) {
-        await disconnectFeishu();
+        unwrap(await send<ApiResponse<{ disconnected: boolean }>>(FEISHU_MESSAGE_TYPES.DISCONNECT, {}));
         feishuAuthObservationRevisionRef.current += 1;
         feishuStartGenerationRef.current += 1;
         applyFeishuAuthStatus({ connected: false });
@@ -1459,26 +1440,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       }
       if (feishuPollingRef.current) return;
 
-      const clientId = String(feishuClientId || '').trim();
-      if (!clientId) {
-        throw new Error('Feishu OAuth client id not configured');
-      }
-      const clientSecret = String(feishuClientSecret || '').trim();
-      const proxyUrlRaw = String(feishuTokenExchangeProxyUrl || '').trim();
-      const proxyUrl = proxyUrlRaw ? normalizeHttpsUrlOrEmpty(proxyUrlRaw) : '';
-      if (proxyUrlRaw && !proxyUrl) throw new Error('Feishu token exchange proxy url must be https');
-      if (!clientSecret && !proxyUrl) {
-        throw new Error('Feishu OAuth requires client secret (direct) or token exchange proxy url (worker)');
-      }
-
       const requestGeneration = feishuStartGenerationRef.current + 1;
       feishuStartGenerationRef.current = requestGeneration;
       const pendingObservationRevisionAtStart = feishuPendingObservationRevisionRef.current;
       const started = unwrap(
         await send<ApiResponse<{ state: string }>>(FEISHU_MESSAGE_TYPES.START_AUTH, {
-          clientId,
-          clientSecret,
-          tokenExchangeProxyUrl: proxyUrl,
+          clientId: feishuClientId,
+          clientSecret: feishuClientSecret,
+          tokenExchangeProxyUrl: feishuTokenExchangeProxyUrl,
         }),
       );
       const state = String(started?.state || '').trim();

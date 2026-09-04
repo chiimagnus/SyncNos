@@ -148,11 +148,7 @@ beforeEach(() => {
     clientSecretPresent: true,
     tokenExchangeProxyUrl: '',
   });
-  mocks.clearFeishuOAuthAttemptAndToken.mockResolvedValue([
-    'feishu_oauth_token_v1',
-    'feishu_oauth_pending_state',
-    'feishu_oauth_last_error',
-  ]);
+  mocks.clearFeishuOAuthAttemptAndToken.mockResolvedValue(undefined);
   mocks.storageGet.mockResolvedValue({ notion_parent_page_id: 'parent-page' });
   mocks.storageRemove.mockResolvedValue(undefined);
 });
@@ -395,12 +391,6 @@ describe('Feishu destructive settings ownership', () => {
     expect(harness.getJob()).toBeNull();
     expect(mocks.clearFeishuOAuthAttemptAndToken).toHaveBeenCalledTimes(1);
     expect(mocks.storageRemove).not.toHaveBeenCalled();
-    expect(response.data?.clearedKeys).toEqual([
-      'feishu_oauth_token_v1',
-      'feishu_oauth_pending_state',
-      'feishu_oauth_last_error',
-    ]);
-    expect(response.data?.clearedKeys).not.toContain('feishu_sync_job_v2');
   });
 
   it('reports final Feishu job-clear failure after credential cleanup instead of fake disconnect success', async () => {

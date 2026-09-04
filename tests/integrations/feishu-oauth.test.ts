@@ -145,8 +145,10 @@ beforeEach(() => {
 
 describe('Feishu OAuth owner', () => {
   it('starts with secure state after persisting immutable config and pending state', async () => {
+    const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
     const started = await startFeishuOAuthAttempt(authConfig());
 
+    expect(getSpy).not.toHaveBeenCalled();
     expect(started.state).toMatch(/^[0-9a-f]{32}$/);
     expect(chromeMock.__store).toMatchObject({
       [CLIENT_ID_KEY]: 'app-id',
@@ -270,7 +272,7 @@ describe('Feishu OAuth owner', () => {
 
     const saved = await saveFeishuOAuthConfig(authConfig({ clientId: 'new-app' }));
     expect(saved).toMatchObject({ clientId: 'new-app', clientSecretPresent: true });
-    expect(chromeMock.__store[PENDING_KEY]).toBeUndefined();
+    expect(chromeMock.__store[PENDING_KEY]).toBe('');
 
     const fetchImpl = vi.fn(async () => jsonResponse({ access_token: 'must-not-write' }));
     const handled = await handleFeishuOAuthCallbackNavigation(
@@ -282,13 +284,17 @@ describe('Feishu OAuth owner', () => {
     expect(chromeMock.__store[TOKEN_KEY]).toBeUndefined();
   });
 
-  it('reads current auth config once per config save owner mutation', async () => {
+  it('uses one read and one snapshot write per changed config save', async () => {
     Object.assign(chromeMock.__store, authConfig());
     const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
+    const setSpy = vi.spyOn(chromeMock.storage.local, 'set');
+    const removeSpy = vi.spyOn(chromeMock.storage.local, 'remove');
 
     await saveFeishuOAuthConfig(authConfig({ clientId: 'new-app' }));
 
     expect(getSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(removeSpy).not.toHaveBeenCalled();
   });
 
   it('uses the callback precheck config snapshot and rejects its result after config changes', async () => {
@@ -338,8 +344,8 @@ describe('Feishu OAuth owner', () => {
     expect(chromeMock.__store[ERROR_KEY]).toBe('');
   });
 
-  it('startup defaults mutate through the owner and invalidate an older pending attempt', async () => {
-    chromeMock.__store[PENDING_KEY] = 'old-client-id-attempt';
+  it('applies startup auth defaults with one owner read and invalidates an older pending attempt', async () => {
+    chromeMock.__store[PENDING_KEY] = 'old-attempt';
     (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__ = 'default-app-id';
     (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__ =
       'https://default-worker.example.com/exchange';
@@ -347,14 +353,14 @@ describe('Feishu OAuth owner', () => {
     try {
       vi.resetModules();
       const reloaded = await import('@services/sync/feishu/auth/oauth');
-      await reloaded.ensureDefaultFeishuOAuthClientId();
-      expect(chromeMock.__store[CLIENT_ID_KEY]).toBe('default-app-id');
-      expect(chromeMock.__store[PENDING_KEY]).toBeUndefined();
+      const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
 
-      chromeMock.__store[PENDING_KEY] = 'old-proxy-attempt';
-      await reloaded.ensureDefaultFeishuOAuthProxyUrl();
+      await reloaded.ensureDefaultFeishuOAuthConfig();
+
+      expect(getSpy).toHaveBeenCalledTimes(1);
+      expect(chromeMock.__store[CLIENT_ID_KEY]).toBe('default-app-id');
       expect(chromeMock.__store[PROXY_KEY]).toBe('https://default-worker.example.com/exchange');
-      expect(chromeMock.__store[PENDING_KEY]).toBeUndefined();
+      expect(chromeMock.__store[PENDING_KEY]).toBe('');
     } finally {
       delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__;
       delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__;
@@ -374,9 +380,7 @@ describe('Feishu OAuth owner', () => {
       feishu_video_folder: 'Videos',
     });
 
-    const cleared = await clearFeishuOAuthAttemptAndToken();
-
-    expect(cleared).toEqual([TOKEN_KEY, PENDING_KEY, ERROR_KEY]);
+    await clearFeishuOAuthAttemptAndToken();
     expect(chromeMock.__store[TOKEN_KEY]).toBeUndefined();
     expect(chromeMock.__store[PENDING_KEY]).toBeUndefined();
     expect(chromeMock.__store[ERROR_KEY]).toBeUndefined();
@@ -390,7 +394,7 @@ describe('Feishu OAuth owner', () => {
     });
   });
 
-  it('rolls back only its own pending state when tab creation fails and the queue remains usable', async () => {
+  it('rolls back pending state when tab creation fails and the queue remains usable', async () => {
     chromeMock.failNextTabCreate();
     await expect(startFeishuOAuthAttempt(authConfig())).rejects.toThrow('tabs create failed');
     expect(chromeMock.__store[PENDING_KEY]).toBeUndefined();

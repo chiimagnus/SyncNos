@@ -13,7 +13,6 @@ const storageMocks = vi.hoisted(() => ({
   remove: vi.fn(),
   onChanged: vi.fn(),
 }));
-const feishuClientMocks = vi.hoisted(() => ({ disconnect: vi.fn() }));
 const uiUtilsMocks = vi.hoisted(() => ({ openHttpUrl: vi.fn() }));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
@@ -23,7 +22,6 @@ vi.mock('@services/shared/storage', () => ({
   storageRemove: storageMocks.remove,
   storageOnChanged: storageMocks.onChanged,
 }));
-vi.mock('@services/sync/feishu/auth/settings-client', () => ({ disconnectFeishu: feishuClientMocks.disconnect }));
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: vi.fn(),
   syncProviderEnabledStorageKey: (id: string) => `webclipper_sync_provider_${id}_enabled`,
@@ -122,7 +120,6 @@ beforeEach(() => {
   notionConnected = false;
   feishuConnected = false;
   storageState = {};
-  feishuClientMocks.disconnect.mockResolvedValue(undefined);
   uiUtilsMocks.openHttpUrl.mockReturnValue(true);
 
   storageMocks.get.mockImplementation(async (keys: string[]) => {
@@ -146,6 +143,7 @@ beforeEach(() => {
     if (type === NOTION_MESSAGE_TYPES.DISCONNECT) return ok({ disconnected: true });
     if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) return ok({ connected: feishuConnected });
     if (type === FEISHU_MESSAGE_TYPES.START_AUTH) return ok({ state: 'feishu-background-state' });
+    if (type === FEISHU_MESSAGE_TYPES.DISCONNECT) return ok({ disconnected: true });
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
       return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
     }
@@ -329,7 +327,7 @@ describe('Settings OAuth actions', () => {
 
     await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
 
-    expect(feishuClientMocks.disconnect).toHaveBeenCalledTimes(1);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.DISCONNECT)).toHaveLength(1);
     expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(0);
     expect(callsOf(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS)).toHaveLength(notionReadsBefore);
     expect(callsOf('obsidianGetSettings')).toHaveLength(obsidianReadsBefore);

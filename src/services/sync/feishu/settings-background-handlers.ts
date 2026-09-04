@@ -64,8 +64,8 @@ export function registerFeishuSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(FEISHU_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
-      const clearedKeys = await deps.runExclusiveMaintenance(() => clearFeishuOAuthAttemptAndToken());
-      return router.ok({ disconnected: true, clearedKeys });
+      await deps.runExclusiveMaintenance(() => clearFeishuOAuthAttemptAndToken());
+      return router.ok({ disconnected: true });
     } catch (error) {
       return errorResponse(router, error, 'feishu disconnect failed');
     }
