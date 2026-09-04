@@ -13,7 +13,7 @@ type MigrationContext = {
   tx: IDBTransaction;
 };
 
-type MigrationDone = (result: { ok: boolean }) => void;
+type MigrationDone = () => void;
 
 function migrateDuplicateConversationMessages(input: {
   messagesBySequenceIndex: IDBIndex;
@@ -27,7 +27,7 @@ function migrateDuplicateConversationMessages(input: {
   const cursorReq = messagesBySequenceIndex.openCursor(range);
   cursorReq.onsuccess = () => {
     const cursor = cursorReq.result;
-    if (!cursor) return onDone({ ok: true });
+    if (!cursor) return onDone();
 
     const message = cursor.value as Record<string, unknown> | undefined;
     const messageKey = safeString(message?.messageKey);
@@ -46,9 +46,7 @@ function migrateDuplicateConversationMessages(input: {
       }
       cursor.continue();
     };
-    existsReq.onerror = () => onDone({ ok: false });
   };
-  cursorReq.onerror = () => onDone({ ok: false });
 }
 
 function safeString(value: unknown): string {
@@ -151,7 +149,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
   function migrateMappingKey(input: { legacyKey: string; stableKey: string; onDone: MigrationDone }): void {
     const { legacyKey, stableKey, onDone } = input;
     if (!legacyKey || legacyKey === stableKey) {
-      onDone({ ok: true });
+      onDone();
       return;
     }
 
@@ -159,7 +157,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
     mapReq.onsuccess = () => {
       const mapping = mapReq.result as Record<string, unknown> | undefined;
       if (!mapping) {
-        onDone({ ok: true });
+        onDone();
         return;
       }
 
@@ -177,11 +175,9 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
             mappingsStore.delete(mappingId);
           }
         }
-        onDone({ ok: true });
+        onDone();
       };
-      targetReq.onerror = () => onDone({ ok: false });
     };
-    mapReq.onerror = () => onDone({ ok: false });
   }
 
   const notionConversations: Array<Record<string, unknown> & { __threadId?: string }> = [];
@@ -257,8 +253,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
           return;
         }
 
-        try {
-          const keepReq = conversationsStore.get(keepId);
+        const keepReq = conversationsStore.get(keepId);
           keepReq.onsuccess = () => {
             const current = keepReq.result as Record<string, unknown> | undefined;
             const legacyKeepKey = current ? String(current.conversationKey || '') : '';
@@ -303,25 +298,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
                     messagesByKeyIndex,
                     dupId: duplicateId,
                     keepId,
-                    onDone: ({ ok }) => {
-                      if (!ok) {
-                        try {
-                          const dupReq = conversationsStore.get(duplicateId);
-                          dupReq.onsuccess = () => {
-                            const dupRec = dupReq.result as Record<string, unknown> | undefined;
-                            if (dupRec && canonicalUrl && String(dupRec.url || '') !== canonicalUrl) {
-                              dupRec.url = canonicalUrl;
-                              conversationsStore.put(dupRec);
-                            }
-                            processNextDup();
-                          };
-                          dupReq.onerror = () => processNextDup();
-                        } catch (_e) {
-                          processNextDup();
-                        }
-                        return;
-                      }
-
+                    onDone: () => {
                       migrateMappingKey({
                         legacyKey,
                         stableKey,
@@ -337,22 +314,16 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
                 processNextDup();
               },
             });
-          };
-          keepReq.onerror = () => processNextThread();
-        } catch (_e) {
-          processNextThread();
-        }
+        };
       };
 
       const stableReq = convoKeyIdx.get(['notionai', stableKey]);
       stableReq.onsuccess = () =>
         proceedWithStableExisting((stableReq.result as Record<string, unknown> | undefined) || null);
-      stableReq.onerror = () => proceedWithStableExisting(null);
     };
 
     processNextThread();
   };
-  cursorReq.onerror = () => onDone();
 }
 
 function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () => void): void {
@@ -394,7 +365,7 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
     const fallbackNotionPageId = safeString(input.fallbackNotionPageId);
 
     if (!canonicalKey) {
-      input.onDone({ ok: true });
+      input.onDone();
       return;
     }
 
@@ -405,12 +376,12 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
       const identity = { source: 'web', conversationKey: canonicalKey, fallbackNotionPageId };
       if (!legacySource || !legacyKey || (legacySource === 'web' && legacyKey === canonicalKey)) {
         if (!target) {
-          input.onDone({ ok: true });
+          input.onDone();
           return;
         }
         const merged = mergeSyncMappingForIdentityMove(target, null, identity);
         if (JSON.stringify(merged) !== JSON.stringify(target)) mappingsStore.put(merged);
-        input.onDone({ ok: true });
+        input.onDone();
         return;
       }
 
@@ -422,13 +393,13 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
             const merged = mergeSyncMappingForIdentityMove(target, null, identity);
             if (JSON.stringify(merged) !== JSON.stringify(target)) mappingsStore.put(merged);
           }
-          input.onDone({ ok: true });
+          input.onDone();
           return;
         }
 
         if (!target) {
           mappingsStore.put(mergeSyncMappingForIdentityMove(null, legacy, identity));
-          input.onDone({ ok: true });
+          input.onDone();
           return;
         }
 
@@ -438,11 +409,9 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
         if (Number.isFinite(legacyId) && legacyId > 0 && legacyId !== Number((target as { id?: unknown }).id)) {
           mappingsStore.delete(legacyId);
         }
-        input.onDone({ ok: true });
+        input.onDone();
       };
-      legacyReq.onerror = () => input.onDone({ ok: false });
     };
-    targetReq.onerror = () => input.onDone({ ok: false });
   }
 
   const cursorReq = conversationsStore.openCursor();
@@ -590,14 +559,11 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
             },
           });
         };
-        keepReq.onerror = () => processNextGroup();
       };
-      exactReq.onerror = () => processNextGroup();
     };
 
     processNextGroup();
   };
-  cursorReq.onerror = () => onDone();
 }
 
 function ensureConversationsStore(db: IDBDatabase, tx: IDBTransaction | null): void {
