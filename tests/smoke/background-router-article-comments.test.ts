@@ -66,6 +66,43 @@ describe('article comments background handler mutation side effects', () => {
     expect(onConversationChanged).not.toHaveBeenCalled();
   });
 
+  it('rejects fractional conversation ids before comment list/attach/migrate storage calls', async () => {
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const listResponse = await handlers.get(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS)?.({ conversationId: 1.5 });
+    const attachResponse = await handlers.get(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS)?.({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 1.5,
+    });
+    const migrateResponse = await handlers.get(COMMENTS_MESSAGE_TYPES.MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL)?.({
+      fromCanonicalUrl: 'https://example.com/old',
+      toCanonicalUrl: 'https://example.com/new',
+      conversationId: 1.5,
+    });
+
+    expect(listResponse).toEqual({
+      ok: false,
+      data: null,
+      error: { message: 'invalid conversationId', extra: null },
+    });
+    expect(attachResponse).toEqual({
+      ok: false,
+      data: null,
+      error: { message: 'invalid conversationId', extra: null },
+    });
+    expect(migrateResponse).toEqual({
+      ok: false,
+      data: null,
+      error: { message: 'invalid conversationId', extra: null },
+    });
+    expect(storageMocks.listArticleCommentsByConversationId).not.toHaveBeenCalled();
+    expect(storageMocks.attachOrphanCommentsToConversation).not.toHaveBeenCalled();
+    expect(storageMocks.migrateArticleCommentsCanonicalUrl).not.toHaveBeenCalled();
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
   it('returns ok=false for a missing delete without scheduling auto-sync', async () => {
     storageMocks.deleteArticleCommentById.mockResolvedValue({ deleted: false, conversationId: null });
     const onConversationChanged = vi.fn();

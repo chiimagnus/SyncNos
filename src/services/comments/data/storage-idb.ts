@@ -144,8 +144,8 @@ export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string): P
 }
 
 export async function listArticleCommentsByConversationId(conversationId: number): Promise<ArticleComment[]> {
-  const id = Number(conversationId);
-  if (!Number.isFinite(id) || id <= 0) return [];
+  const id = normalizeConversationId(conversationId);
+  if (id == null) return [];
 
   const db = await openDb();
   const { t, stores } = tx(db, ['article_comments'], 'readonly');
@@ -164,7 +164,7 @@ type ArticleCommentDeleteResult = {
 
 export async function deleteArticleCommentById(id: number): Promise<ArticleCommentDeleteResult> {
   const commentId = Number(id);
-  if (!Number.isFinite(commentId) || commentId <= 0) return { deleted: false, conversationId: null };
+  if (!Number.isSafeInteger(commentId) || commentId <= 0) return { deleted: false, conversationId: null };
 
   const db = await openDb();
   return runTrackedTransaction(

@@ -40,14 +40,15 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     const canonicalUrl = canonicalizeArticleUrl(msg?.canonicalUrl);
     const conversationId = Number(msg?.conversationId);
 
-    // Canonical URL is preferred. When unavailable, fall back to conversationId
-    // so legacy contexts can still load comments.
     if (canonicalUrl) {
       const items = await listArticleCommentsByCanonicalUrl(canonicalUrl);
       return router.ok(items.map(serializeArticleCommentDto));
     }
 
-    if (Number.isFinite(conversationId) && conversationId > 0) {
+    if (msg?.conversationId != null && (!Number.isSafeInteger(conversationId) || conversationId <= 0)) {
+      return router.err('invalid conversationId');
+    }
+    if (Number.isSafeInteger(conversationId) && conversationId > 0) {
       const items = await listArticleCommentsByConversationId(conversationId);
       return router.ok(items.map(serializeArticleCommentDto));
     }
@@ -109,7 +110,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     const canonicalUrl = canonicalizeArticleUrl(msg?.canonicalUrl);
     const conversationId = Number(msg?.conversationId);
     if (!canonicalUrl) return router.err('missing canonicalUrl');
-    if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const res = await attachOrphanCommentsToConversation(canonicalUrl, conversationId);
     if (Number(res.updated) > 0) {
       fireAndForget(
@@ -126,7 +127,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     if (!fromCanonicalUrl) return router.err('missing fromCanonicalUrl');
     if (!toCanonicalUrl) return router.err('missing toCanonicalUrl');
 
-    if (conversationId == null || !Number.isFinite(conversationId) || conversationId <= 0) {
+    if (conversationId == null || !Number.isSafeInteger(conversationId) || conversationId <= 0) {
       return router.err('invalid conversationId');
     }
     const res = await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl, toCanonicalUrl, conversationId });
