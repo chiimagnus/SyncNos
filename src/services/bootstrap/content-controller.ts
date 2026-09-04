@@ -180,11 +180,7 @@ export function createContentController(deps: Deps) {
       return;
     }
     const handle = currentResidentAutoSaveHandle;
-    if (
-      !handle ||
-      !isCurrentResidentOwner(ownerToken) ||
-      !handle.isAutoSaveEnabled()
-    ) {
+    if (!handle || !isCurrentResidentOwner(ownerToken) || !handle.isAutoSaveEnabled()) {
       return;
     }
 
@@ -203,11 +199,7 @@ export function createContentController(deps: Deps) {
 
   function requestAutoSave(ownerToken: number) {
     const handle = currentResidentAutoSaveHandle;
-    if (
-      !handle ||
-      !isCurrentResidentOwner(ownerToken) ||
-      !handle.isAutoSaveEnabled()
-    ) {
+    if (!handle || !isCurrentResidentOwner(ownerToken) || !handle.isAutoSaveEnabled()) {
       return;
     }
     if (autoSaveRunInFlight || manualPersistence) {
