@@ -12,10 +12,6 @@ export function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | 
   return null;
 }
 
-function hasOwn(record: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record, key);
-}
-
 export function canonicalizeInpageDisplayModeStorageRecord(record: unknown): Record<string, unknown> {
   const input = record && typeof record === 'object' ? (record as Record<string, unknown>) : {};
   const out: Record<string, unknown> = { ...input };
@@ -55,7 +51,7 @@ export function ensureCanonicalInpageDisplayMode(): Promise<InpageDisplayMode> {
     const local = await storageGet([INPAGE_DISPLAY_MODE_STORAGE_KEY]);
     const canonical = normalizeInpageDisplayMode(local[INPAGE_DISPLAY_MODE_STORAGE_KEY]);
     if (canonical) return canonical;
-    if (hasOwn(local, INPAGE_DISPLAY_MODE_STORAGE_KEY)) {
+    if (Object.prototype.hasOwnProperty.call(local, INPAGE_DISPLAY_MODE_STORAGE_KEY)) {
       try {
         await storageRemove([INPAGE_DISPLAY_MODE_STORAGE_KEY]);
       } catch (_error) {
