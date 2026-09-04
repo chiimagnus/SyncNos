@@ -3,6 +3,7 @@ import {
   getConversationById,
   getConversationDetail,
   readConversationMentionCandidatePool,
+  readRecentConversationMentionCandidates,
 } from '@services/conversations/data/storage';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
@@ -48,8 +49,8 @@ export function registerItemMentionHandlers(router: AnyRouter) {
         : Math.min(Math.floor(parsedLimit), 50);
 
     if (!normalizedQuery) {
-      const recentPool = await readConversationMentionCandidatePool({ maxScan: limit, maxDurationMs: 300 });
-      return respondWithPool(recentPool, normalizedQuery, limit);
+      const candidates = await readRecentConversationMentionCandidates({ maxScan: limit, maxDurationMs: 300 });
+      return router.ok(searchMentionCandidates({ query: normalizedQuery, candidates, limit }));
     }
 
     const observedRevision = await readDataRevision('conversations');

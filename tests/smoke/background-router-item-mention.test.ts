@@ -6,6 +6,7 @@ import { registerItemMentionHandlers } from '@services/integrations/item-mention
 
 const storageMocks = vi.hoisted(() => ({
   readConversationMentionCandidatePool: vi.fn(),
+  readRecentConversationMentionCandidates: vi.fn(),
   getConversationById: vi.fn(),
   getConversationDetail: vi.fn(),
 }));
@@ -20,6 +21,7 @@ const externalMarkdownMocks = vi.hoisted(() => ({
 
 vi.mock('@services/conversations/data/storage', () => ({
   readConversationMentionCandidatePool: storageMocks.readConversationMentionCandidatePool,
+  readRecentConversationMentionCandidates: storageMocks.readRecentConversationMentionCandidates,
   getConversationById: storageMocks.getConversationById,
   getConversationDetail: storageMocks.getConversationDetail,
 }));
@@ -79,6 +81,7 @@ async function search(router: ReturnType<typeof createRouter>, query: string, li
 afterEach(() => {
   vi.restoreAllMocks();
   storageMocks.readConversationMentionCandidatePool.mockReset();
+  storageMocks.readRecentConversationMentionCandidates.mockReset();
   storageMocks.getConversationById.mockReset();
   storageMocks.getConversationDetail.mockReset();
   revisionMocks.readDataRevision.mockReset();
@@ -87,12 +90,10 @@ afterEach(() => {
 
 describe('background-router item mention', () => {
   it('keeps empty and whitespace-only queries on the small recent-read path without filling the full cache', async () => {
-    storageMocks.readConversationMentionCandidatePool
-      .mockResolvedValueOnce(pool(1, [candidate(1, 'Recent')]))
-      .mockResolvedValueOnce(pool(1, [candidate(2, 'Whitespace')]))
-      .mockResolvedValueOnce(pool(1, [candidate(3, 'OpenAI')]))
-      .mockResolvedValueOnce(pool(1, [candidate(4, 'OpenAI cached')]))
-      .mockResolvedValueOnce(pool(1, [candidate(5, 'OpenAI cached again')]));
+    storageMocks.readRecentConversationMentionCandidates
+      .mockResolvedValueOnce([candidate(1, 'Recent')])
+      .mockResolvedValueOnce([candidate(2, 'Whitespace')]);
+    storageMocks.readConversationMentionCandidatePool.mockResolvedValue(pool(1, [candidate(3, 'OpenAI')]));
     revisionMocks.readDataRevision.mockResolvedValue(1);
     const router = createRouter();
 
@@ -104,24 +105,24 @@ describe('background-router item mention', () => {
     expect(empty.ok).toBe(true);
     expect(nonEmpty.ok).toBe(true);
     expect(cached.ok).toBe(true);
-    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenNthCalledWith(1, {
+    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenNthCalledWith(1, {
       maxScan: 3,
       maxDurationMs: 300,
     });
-    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenNthCalledWith(2, {
+    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenNthCalledWith(2, {
       maxScan: 4,
       maxDurationMs: 300,
     });
-    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenNthCalledWith(3, {
+    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenCalledWith({
       maxScan: 2000,
       maxDurationMs: 300,
     });
-    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenCalledTimes(3);
+    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenCalledTimes(1);
     expect(revisionMocks.readDataRevision).toHaveBeenCalledTimes(2);
   });
 
   it('ignores the retired text query alias and uses the canonical query field only', async () => {
-    storageMocks.readConversationMentionCandidatePool.mockResolvedValue(pool(1, [candidate(1, 'Recent')]));
+    storageMocks.readRecentConversationMentionCandidates.mockResolvedValue([candidate(1, 'Recent')]);
     const router = createRouter();
 
     const response = await router.__handleMessageForTests({
@@ -131,7 +132,8 @@ describe('background-router item mention', () => {
     });
 
     expect(response.ok).toBe(true);
-    expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenCalledWith({ maxScan: 2, maxDurationMs: 300 });
+    expect(storageMocks.readRecentConversationMentionCandidates).toHaveBeenCalledWith({ maxScan: 2, maxDurationMs: 300 });
+    expect(storageMocks.readConversationMentionCandidatePool).not.toHaveBeenCalled();
     expect(revisionMocks.readDataRevision).not.toHaveBeenCalled();
   });
 
