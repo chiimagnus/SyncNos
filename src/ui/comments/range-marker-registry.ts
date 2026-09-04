@@ -71,18 +71,14 @@ function selectedTextRangeRects(document: Document, range: Range): DOMRect[] {
   const rects: DOMRect[] = [];
   for (const textNode of textNodes) {
     if (!textNode.data) continue;
-    try {
-      if (!range.intersectsNode(textNode)) continue;
-      const textRange = document.createRange();
-      textRange.selectNodeContents(textNode);
-      if (range.startContainer === textNode) textRange.setStart(textNode, range.startOffset);
-      if (range.endContainer === textNode) textRange.setEnd(textNode, range.endOffset);
-      if (textRange.collapsed) continue;
-      for (const rect of Array.from(textRange.getClientRects()) as DOMRect[]) {
-        if (rect.width > 0 && rect.height > 0) rects.push(rect);
-      }
-    } catch (_error) {
-      continue;
+    if (!range.intersectsNode(textNode)) continue;
+    const textRange = document.createRange();
+    textRange.selectNodeContents(textNode);
+    if (range.startContainer === textNode) textRange.setStart(textNode, range.startOffset);
+    if (range.endContainer === textNode) textRange.setEnd(textNode, range.endOffset);
+    if (textRange.collapsed) continue;
+    for (const rect of Array.from(textRange.getClientRects()) as DOMRect[]) {
+      if (rect.width > 0 && rect.height > 0) rects.push(rect);
     }
   }
   return rects;
