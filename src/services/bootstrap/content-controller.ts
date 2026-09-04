@@ -150,26 +150,19 @@ export function createContentController(deps: Deps) {
 
   type ResidentAutoSaveHandle = {
     ownerToken: number;
-    isActive: () => boolean;
     isAutoSaveEnabled: () => boolean;
     runAutoSaveTick: () => Promise<void>;
   };
   type ManualPersistenceSlot = { ownerToken: number | null; state: 'pending' | 'inflight' };
 
   let residentOwnerSequence = 0;
-  let activeResidentOwnerToken = 0;
   let currentResidentAutoSaveHandle: ResidentAutoSaveHandle | null = null;
   let autoSaveRunInFlight: Promise<void> | null = null;
   let latestTrailingAutoSaveOwnerToken: number | null = null;
   let manualPersistence: ManualPersistenceSlot | null = null;
 
   function isCurrentResidentOwner(ownerToken: number): boolean {
-    return (
-      ownerToken > 0 &&
-      activeResidentOwnerToken === ownerToken &&
-      currentResidentAutoSaveHandle?.ownerToken === ownerToken &&
-      currentResidentAutoSaveHandle.isActive()
-    );
+    return currentResidentAutoSaveHandle?.ownerToken === ownerToken;
   }
 
   function cancelAutoSaveTrailingForOwner(ownerToken: number) {
@@ -192,7 +185,6 @@ export function createContentController(deps: Deps) {
     const handle = currentResidentAutoSaveHandle;
     if (
       !handle ||
-      handle.ownerToken !== ownerToken ||
       !isCurrentResidentOwner(ownerToken) ||
       !handle.isAutoSaveEnabled()
     ) {
@@ -216,7 +208,6 @@ export function createContentController(deps: Deps) {
     const handle = currentResidentAutoSaveHandle;
     if (
       !handle ||
-      handle.ownerToken !== ownerToken ||
       !isCurrentResidentOwner(ownerToken) ||
       !handle.isAutoSaveEnabled()
     ) {
@@ -238,8 +229,7 @@ export function createContentController(deps: Deps) {
   function releaseResidentOwner(ownerToken: number) {
     cancelAutoSaveTrailingForOwner(ownerToken);
     cancelPendingManualPersistenceForOwner(ownerToken);
-    if (activeResidentOwnerToken !== ownerToken || currentResidentAutoSaveHandle?.ownerToken !== ownerToken) return;
-    activeResidentOwnerToken = 0;
+    if (!isCurrentResidentOwner(ownerToken)) return;
     currentResidentAutoSaveHandle = null;
   }
 
@@ -856,7 +846,6 @@ export function createContentController(deps: Deps) {
       start() {
         if (!stopped) observer?.start?.();
       },
-      isActive: () => !stopped,
       isAutoSaveEnabled: () => !stopped && aiChatAutoSaveEnabled === true,
       runAutoSaveTick,
       setAutoSaveEnabled,
@@ -879,7 +868,6 @@ export function createContentController(deps: Deps) {
     start() {
       const ownerToken = ++residentOwnerSequence;
       const controller = createAutoCaptureController(ownerToken);
-      activeResidentOwnerToken = ownerToken;
       currentResidentAutoSaveHandle = controller;
       let mentionController: { stop?: () => void } | null = null;
       let stopped = false;
