@@ -172,7 +172,7 @@ beforeEach(() => {
 });
 
 describe('background entrypoint cold start', () => {
-  it('runs Notion legacy cleanup once when onInstalled fires after bootstrap', async () => {
+  it('runs auth bootstrap cleanup/defaults only once when onInstalled fires', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     let installedListener: ((details?: { reason?: string }) => void) | null = null;
     mocks.onInstalled.mockImplementationOnce((listener: any) => {
@@ -183,10 +183,14 @@ describe('background entrypoint cold start', () => {
     expect(callback()).toBeUndefined();
     await flushMicrotasks();
     expect(mocks.cleanupLegacyNotionOAuthConfig).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureDefaultFeishuOAuthClientId).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureDefaultFeishuOAuthProxyUrl).toHaveBeenCalledTimes(1);
 
     installedListener?.({ reason: 'update' });
     await flushMicrotasks();
     expect(mocks.cleanupLegacyNotionOAuthConfig).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureDefaultFeishuOAuthClientId).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureDefaultFeishuOAuthProxyUrl).toHaveBeenCalledTimes(1);
   });
 
   it('registers runtime and browser listeners before locale readiness settles', async () => {

@@ -132,8 +132,6 @@ export default defineBackground(() => {
   }
   try {
     onInstalled((details) => {
-      ensureDefaultFeishuOAuthClientId().catch(() => {});
-      ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
       // Do not auto-open tabs after extension updates.
       if (details?.reason !== 'install') return;
       openAboutSectionAfterInstall().catch(() => {});
