@@ -248,19 +248,18 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
           legacyKey: legacyKeepKey,
           stableKey,
           onDone: () => {
-            const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
             let duplicateIndex = 0;
 
             const processNextDup = () => {
-              if (duplicateIndex >= duplicates.length) {
+              if (duplicateIndex >= mergedConversations.length) {
                 processNextThread();
                 return;
               }
-              const duplicate = duplicates[duplicateIndex];
+              const duplicate = mergedConversations[duplicateIndex];
               duplicateIndex += 1;
 
               const duplicateId = duplicate?.id ? Number(duplicate.id) : 0;
-              if (!Number.isFinite(duplicateId) || duplicateId <= 0) {
+              if (!Number.isFinite(duplicateId) || duplicateId <= 0 || duplicateId === keepId) {
                 processNextDup();
                 return;
               }
@@ -475,19 +474,18 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
           canonicalKey,
           fallbackNotionPageId: safeString(mergedKeep.notionPageId),
           onDone: () => {
-            const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
             let duplicateIndex = 0;
 
             const processNextDuplicate = () => {
-              if (duplicateIndex >= duplicates.length) {
+              if (duplicateIndex >= mergedConversations.length) {
                 processNextGroup();
                 return;
               }
-              const duplicate = duplicates[duplicateIndex];
+              const duplicate = mergedConversations[duplicateIndex];
               duplicateIndex += 1;
 
               const duplicateId = Number(duplicate?.id);
-              if (!Number.isFinite(duplicateId) || duplicateId <= 0) {
+              if (!Number.isFinite(duplicateId) || duplicateId <= 0 || duplicateId === keepId) {
                 processNextDuplicate();
                 return;
               }
