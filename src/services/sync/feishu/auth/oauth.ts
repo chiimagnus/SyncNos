@@ -156,20 +156,16 @@ function validateStartConfig(config: FeishuOAuthConfig): void {
   }
 }
 
-function buildAuthorizationUrl(config: FeishuOAuthConfig): string {
+function buildAuthorizationUrl(config: FeishuOAuthConfig, state: string): string {
   const defaults = getFeishuOAuthDefaults();
   const url = new URL(defaults.authorizationUrl);
   url.searchParams.set('client_id', config.clientId);
   url.searchParams.set('app_id', config.clientId);
   url.searchParams.set('redirect_uri', defaults.redirectUri);
-  url.searchParams.set('state', createSecureOAuthState());
+  url.searchParams.set('state', state);
   url.searchParams.set('response_type', defaults.responseType);
   url.searchParams.set('scope', defaults.scope);
   return url.toString();
-}
-
-function authorizationState(url: string): string {
-  return new URL(url).searchParams.get('state') || '';
 }
 
 export async function saveFeishuOAuthConfig(input: FeishuOAuthConfigInput): Promise<FeishuOAuthConfigSummary> {
@@ -192,9 +188,8 @@ export async function startFeishuOAuthAttempt(input: FeishuOAuthConfigInput): Pr
 
   return enqueueAuthMutation(async () => {
     await saveAuthConfigInsideOwner(config);
-    const authorizationUrl = buildAuthorizationUrl(config);
-    const state = authorizationState(authorizationUrl);
-    if (!state) throw new Error('feishu oauth state generation failed');
+    const state = createSecureOAuthState();
+    const authorizationUrl = buildAuthorizationUrl(config, state);
 
     await storageSet({ [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
     try {
