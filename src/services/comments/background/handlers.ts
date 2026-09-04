@@ -92,7 +92,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
 
   router.register(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, async (msg) => {
     const id = Number(msg?.id);
-    if (!Number.isFinite(id) || id <= 0) return router.err('invalid id');
+    if (!Number.isSafeInteger(id) || id <= 0) return router.err('invalid id');
     const result = await deleteArticleCommentById(id);
     if (result.deleted) {
       const conversationId = Number(result.conversationId);

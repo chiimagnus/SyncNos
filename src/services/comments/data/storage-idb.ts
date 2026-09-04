@@ -48,14 +48,12 @@ function normalizeCanonicalUrl(raw: unknown): string {
 
 function normalizeConversationId(value: unknown): number | null {
   const id = Number(value);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 function normalizeParentId(value: unknown): number | null {
   const id = Number(value);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 function normalizeTimestamp(value: unknown, fallback: number): number {

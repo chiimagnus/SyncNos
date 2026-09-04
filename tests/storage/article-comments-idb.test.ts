@@ -269,6 +269,48 @@ describe('article comments storage-idb', () => {
     expect((await listArticleCommentsByCanonicalUrl(url)).map((item) => item.id)).toEqual([rootId, middleId]);
   });
 
+  it('skips malformed fractional owners while resolving the nearest valid ancestor owner', async () => {
+    const url = 'https://example.com/malformed-owner';
+    const rootId = await insertRawArticleComment({
+      id: 5201,
+      parentId: null,
+      conversationId: 71,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'valid root owner',
+      locator: null,
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const middleId = await insertRawArticleComment({
+      id: 5202,
+      parentId: rootId,
+      conversationId: 1.5,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'malformed middle owner',
+      locator: null,
+      createdAt: 2,
+      updatedAt: 2,
+    });
+    const targetId = await insertRawArticleComment({
+      id: 5203,
+      parentId: middleId,
+      conversationId: null,
+      canonicalUrl: url,
+      authorName: '',
+      quoteText: '',
+      commentText: 'target',
+      locator: null,
+      createdAt: 3,
+      updatedAt: 3,
+    });
+
+    expect(await deleteArticleCommentById(targetId)).toEqual({ deleted: true, conversationId: 71 });
+  });
+
   it('supports replies and cascades delete on root', async () => {
     const url = 'https://example.com/thread';
     const root = await addArticleComment({

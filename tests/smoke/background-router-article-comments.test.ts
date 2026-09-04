@@ -54,6 +54,18 @@ describe('article comments background handler mutation side effects', () => {
     );
   });
 
+  it('rejects a fractional delete id before touching storage', async () => {
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT)?.({ id: 7.5 });
+
+    expect(response).toEqual({ ok: false, data: null, error: { message: 'invalid id', extra: null } });
+    expect(storageMocks.deleteArticleCommentById).not.toHaveBeenCalled();
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
   it('returns ok=false for a missing delete without scheduling auto-sync', async () => {
     storageMocks.deleteArticleCommentById.mockResolvedValue({ deleted: false, conversationId: null });
     const onConversationChanged = vi.fn();
