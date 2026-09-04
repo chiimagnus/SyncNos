@@ -46,6 +46,7 @@ describe('notion-sync-orchestrator kind routing', () => {
     const ensureCalls: any[] = [];
     const createCalls: any[] = [];
     const updateCalls: any[] = [];
+    const upgradeConversationIds: number[] = [];
 
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
@@ -151,7 +152,18 @@ describe('notion-sync-orchestrator kind routing', () => {
           : [];
         return { ok: true, results };
       },
-      messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
+      messagesToBlocks: (_messages: any[]) => [
+        {
+          object: 'block',
+          type: 'image',
+          image: { type: 'external', external: { url: 'syncnos-asset://42' } },
+        },
+      ],
+      hasExternalImageBlocks: () => true,
+      upgradeImageBlocksToFileUploads: async (_token: string, blocks: any[], conversationId: number) => {
+        upgradeConversationIds.push(conversationId);
+        return blocks;
+      },
     };
 
     const orchestrator = createNotionSyncOrchestrator({
@@ -179,6 +191,8 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(articleCreate.properties.Author).toBeTruthy();
     expect(articleCreate.properties['Comment Threads']).toEqual({ number: 1 });
     expect(chatCreate.properties.AI).toBeTruthy();
+
+    expect(upgradeConversationIds.sort((a, b) => a - b)).toEqual([1, 2]);
 
     // Update properties only happen on subsequent syncs; keep coverage minimal here.
     expect(updateCalls.length).toBe(0);

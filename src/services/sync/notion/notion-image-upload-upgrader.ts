@@ -208,7 +208,7 @@ async function uploadFromSyncnosAsset(files: any, accessToken: string, assetId: 
   return ready && ready.id ? String(ready.id).trim() : fileId;
 }
 
-async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any) {
+async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any, conversationId: number) {
   const list = Array.isArray(blocks) ? blocks : [];
   if (!list.length) return [];
   const files = notionFilesApi;
@@ -223,7 +223,9 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
     localAssetIds.push(assetId);
   }
   const localAssets: Map<number, ImageCacheAsset> = localAssetIds.length
-    ? await getImageCacheAssetsByIds({ ids: localAssetIds }).catch(() => new Map<number, ImageCacheAsset>())
+    ? await getImageCacheAssetsByIds({ ids: localAssetIds, conversationId }).catch(
+        () => new Map<number, ImageCacheAsset>(),
+      )
     : new Map<number, ImageCacheAsset>();
   const cache = new Map<string, string>();
   const out: any[] = [];

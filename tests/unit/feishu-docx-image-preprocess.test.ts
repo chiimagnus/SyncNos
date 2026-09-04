@@ -37,10 +37,10 @@ describe('feishu docx image preprocess', () => {
       `![data](${dataUrl})`,
     ].join('\n\n');
 
-    const result = await preprocessFeishuDocxMarkdownImages(markdown);
+    const result = await preprocessFeishuDocxMarkdownImages(markdown, 1);
 
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
-    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8] });
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8], conversationId: 1 });
     expect(result.imageSourcesInOrder.map((source) => source.kind)).toEqual([
       'http',
       'syncnos_asset',
@@ -70,10 +70,13 @@ describe('feishu docx image preprocess', () => {
 
   it('degrades a bulk local-asset read rejection to the existing placeholder semantics', async () => {
     imageCacheMocks.getImageCacheAssetsByIds.mockRejectedValue(new Error('idb unavailable'));
-    const result = await preprocessFeishuDocxMarkdownImages('![one](syncnos-asset://7)\n\n![two](syncnos-asset://8)');
+    const result = await preprocessFeishuDocxMarkdownImages(
+      '![one](syncnos-asset://7)\n\n![two](syncnos-asset://8)',
+      1,
+    );
 
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
-    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8] });
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8], conversationId: 1 });
     expect(result.imageSourcesInOrder).toHaveLength(2);
     for (const source of result.imageSourcesInOrder) {
       expect(source.kind).toBe('syncnos_asset');
@@ -86,6 +89,7 @@ describe('feishu docx image preprocess', () => {
   it('classifies malformed internal targets as unavailable local images instead of external URLs', async () => {
     const result = await preprocessFeishuDocxMarkdownImages(
       '![bad](syncnos-asset://nope)\n\n![zero](syncnos-asset://0)\n\n![unsafe](syncnos-asset://9007199254740992)',
+      1,
     );
 
     expect(imageCacheMocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
@@ -96,10 +100,34 @@ describe('feishu docx image preprocess', () => {
     expect(result.markdownForConvert.match(/https:\/\/syncnos\.invalid\/asset\//g)?.length).toBe(3);
   });
 
+  it('ignores image examples in inline, fenced, and indented code', async () => {
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(new Map([[7, makeAsset(7)]]));
+    const markdown = [
+      '`![inline](syncnos-asset://8)`',
+      '```md',
+      '![fenced](syncnos-asset://9)',
+      '```',
+      '    ![indented](syncnos-asset://10)',
+      '![real](syncnos-asset://7)',
+    ].join('\n\n');
+
+    const result = await preprocessFeishuDocxMarkdownImages(markdown, 1);
+
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7], conversationId: 1 });
+    expect(result.imageSourcesInOrder).toHaveLength(1);
+    expect(result.imageSourcesInOrder[0]).toMatchObject({ kind: 'syncnos_asset', sourceUrl: 'syncnos-asset://7' });
+    expect(result.markdownForConvert).toContain('`![inline](syncnos-asset://8)`');
+    expect(result.markdownForConvert).toContain('![fenced](syncnos-asset://9)');
+    expect(result.markdownForConvert).toContain('    ![indented](syncnos-asset://10)');
+    expect(result.markdownForConvert).not.toContain('![real](syncnos-asset://7)');
+  });
+
   it('keeps HTTP/data-image preprocessing unchanged and skips the local bulk reader when no local ids exist', async () => {
     const dataUrl = `data:image/png;base64,${Buffer.from(Uint8Array.of(4, 5, 6)).toString('base64')}`;
     const result = await preprocessFeishuDocxMarkdownImages(
       `![remote](https://example.com/a.png)\n\n![data](${dataUrl})`,
+      1,
     );
 
     expect(imageCacheMocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();

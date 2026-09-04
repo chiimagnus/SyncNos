@@ -438,14 +438,16 @@ async function appendConvertedBlocks({
 
 async function appendMarkdownWithConvertFallback({
   accessToken,
+  conversationId,
   docId,
   markdown,
 }: {
   accessToken: string;
+  conversationId: number;
   docId: string;
   markdown: string;
 }): Promise<{ appended: number; warnings: string[] }> {
-  const preprocessed = await preprocessFeishuDocxMarkdownImages(markdown).catch(() => ({
+  const preprocessed = await preprocessFeishuDocxMarkdownImages(markdown, conversationId).catch(() => ({
     markdownForConvert: markdown,
     imageSourcesInOrder: [],
   }));
@@ -665,14 +667,14 @@ async function runSyncConversations({
         let appended = 0;
         let appendWarnings: string[] = [];
         try {
-          const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
+          const res = await appendMarkdownWithConvertFallback({ accessToken, conversationId, docId, markdown });
           appended = res.appended;
           appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
         } catch (e) {
           if (existingDocId) {
             mode = 'create';
             docId = await createDoc({ accessToken, title: documentTitle });
-            const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
+            const res = await appendMarkdownWithConvertFallback({ accessToken, conversationId, docId, markdown });
             appended = res.appended;
             appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
           } else {

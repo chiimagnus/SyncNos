@@ -267,8 +267,18 @@ describe('obsidian-sync-orchestrator', () => {
       {
         messageKey: 'm1',
         sequence: 1,
-        contentMarkdown:
-          'before\n\n![diagram](<syncnos-asset://7> "caption")\n\n![again](syncnos-asset://7)\n\n![photo](syncnos-asset://8)\n\nafter',
+        contentMarkdown: [
+          'before',
+          '`![inline](syncnos-asset://9)`',
+          '```md',
+          '![fenced](syncnos-asset://10)',
+          '```',
+          '    ![indented](syncnos-asset://11)',
+          '![diagram](<syncnos-asset://7> "caption")',
+          '![again](syncnos-asset://7)',
+          '![photo](syncnos-asset://8)',
+          'after',
+        ].join('\n\n'),
         updatedAt: 1,
       },
     ]);
@@ -323,7 +333,7 @@ describe('obsidian-sync-orchestrator', () => {
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(syncRes.results[0].ok).toBe(true);
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
-    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8] });
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8], conversationId: 1 });
 
     const encodedAttachmentNames = [
       encodeURIComponent(`${noteBasename}-1.png`),
@@ -338,7 +348,11 @@ describe('obsidian-sync-orchestrator', () => {
     expect(String(markdownPut?.body || '')).toContain(`![diagram](<${noteBasename}-1.png> "caption")`);
     expect(String(markdownPut?.body || '')).toContain(`![again](${noteBasename}-1.png)`);
     expect(String(markdownPut?.body || '')).toContain(`![photo](${noteBasename}-2.webp)`);
-    expect(String(markdownPut?.body || '')).not.toContain('syncnos-asset://');
+    expect(String(markdownPut?.body || '')).toContain('`![inline](syncnos-asset://9)`');
+    expect(String(markdownPut?.body || '')).toContain('![fenced](syncnos-asset://10)');
+    expect(String(markdownPut?.body || '')).toContain('    ![indented](syncnos-asset://11)');
+    expect(String(markdownPut?.body || '')).not.toContain('![diagram](<syncnos-asset://7>');
+    expect(String(markdownPut?.body || '')).not.toContain('![photo](syncnos-asset://8)');
   });
 
   it.each([
@@ -385,9 +399,75 @@ describe('obsidian-sync-orchestrator', () => {
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
 
-    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7] });
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7], conversationId: 1 });
     expect(syncRes.results[0]).toMatchObject({ ok: false, mode: 'failed' });
     expect(putCount).toBe(0);
+  });
+
+  it.each([
+    ['cross-conversation asset', '![valid](syncnos-asset://7)\n\n![cross](syncnos-asset://8)', 'cross'],
+    ['malformed asset', '![valid](syncnos-asset://7)\n\n![bad](syncnos-asset://nope)', 'malformed'],
+  ] as const)('preflights every internal image before any Obsidian PUT: %s', async (_label, markdown, mode) => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: `asset-preflight-${mode}`,
+      title: 'Asset preflight',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'm1', sequence: 1, contentMarkdown: markdown, updatedAt: 1 },
+    ]);
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
+      new Map([
+        [
+          7,
+          {
+            id: 7,
+            conversationId: 1,
+            url: 'https://example.com/valid.png',
+            blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+            byteSize: 3,
+            contentType: 'image/png',
+          },
+        ],
+      ]),
+    );
+
+    let binaryPutCount = 0;
+    let notePutCount = 0;
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT' && typeof init?.body !== 'string') binaryPutCount += 1;
+      else if (method === 'PUT') notePutCount += 1;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(syncRes.results[0]).toMatchObject({ ok: false, mode: 'failed' });
+    if (mode === 'cross') {
+      expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8], conversationId: 1 });
+    } else {
+      expect(imageCacheMocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
+    }
+    expect(binaryPutCount).toBe(0);
+    expect(notePutCount).toBe(0);
   });
 
   it('does not record generation when only attachments succeed and the main note PUT fails', async () => {

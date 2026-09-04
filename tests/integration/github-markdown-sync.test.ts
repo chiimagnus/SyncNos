@@ -630,7 +630,16 @@ describe('GitHub Markdown production-chain integration', () => {
         messageKey: 'chat-1',
         role: 'assistant',
         contentText: 'Chat body with cached image',
-        contentMarkdown: 'Chat body with cached image\n\n![cached](syncnos-asset://1)',
+        contentMarkdown: [
+          'Chat body with cached image',
+          'mounted chat 中的 `syncnos-asset://` 已自动变成 `blob:chrome-extension://...`。',
+          '`![inline](syncnos-asset://2)`',
+          '```md',
+          '![fenced](syncnos-asset://3)',
+          '```',
+          '    ![indented](syncnos-asset://4)',
+          '![cached](syncnos-asset://1)',
+        ].join('\n\n'),
         sequence: 1,
         updatedAt: 10,
       },
@@ -682,7 +691,11 @@ describe('GitHub Markdown production-chain integration', () => {
     expect(fakeGithub.hasPath(articlePath)).toBe(true);
     expect(fakeGithub.hasPath(firstAssetPaths[0]!)).toBe(true);
     expect(fakeGithub.readText(articlePath)).toContain('E2E owned comment');
-    expect(fakeGithub.readText(chatPath)).not.toContain('syncnos-asset://');
+    expect(fakeGithub.readText(chatPath)).toContain('mounted chat 中的 `syncnos-asset://` 已自动变成');
+    expect(fakeGithub.readText(chatPath)).toContain('`![inline](syncnos-asset://2)`');
+    expect(fakeGithub.readText(chatPath)).toContain('![fenced](syncnos-asset://3)');
+    expect(fakeGithub.readText(chatPath)).toContain('    ![indented](syncnos-asset://4)');
+    expect(fakeGithub.readText(chatPath)).not.toContain('![cached](syncnos-asset://1)');
 
     chromeMock.__store[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     chromeMock.__store[syncProviderEnabledStorageKey('github')] = true;

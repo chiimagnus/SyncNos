@@ -46,7 +46,7 @@ export type NotionSyncService = {
   messagesToBlocks: (messages: any[], input?: any) => any[];
   isPageUsableForDatabase: (page: any, databaseId?: string) => boolean;
   hasExternalImageBlocks?: (blocks: any[]) => boolean;
-  upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[]) => Promise<any[]>;
+  upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[], conversationId: number) => Promise<any[]>;
 };
 
 export type NotionServices = {
