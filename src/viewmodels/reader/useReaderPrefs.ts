@@ -45,7 +45,6 @@ export function useReaderPrefs(): UseReaderPrefsResult {
   const [prefs, setPrefs] = useState<ReaderPrefs>(initial);
   const durablePrefsRef = useRef<ReaderPrefs>(initial);
   const dirtyPatchRef = useRef<ReaderPrefsPatch>({});
-  const displayPrefsRef = useRef<ReaderPrefs>(initial);
   const previewGenerationRef = useRef(0);
   const durableObservationGenerationRef = useRef(0);
   const disposedRef = useRef(false);
@@ -61,7 +60,6 @@ export function useReaderPrefs(): UseReaderPrefsResult {
   }
 
   const publishDisplay = useCallback((next: ReaderPrefs) => {
-    displayPrefsRef.current = next;
     if (!disposedRef.current) setPrefs(next);
   }, []);
 
