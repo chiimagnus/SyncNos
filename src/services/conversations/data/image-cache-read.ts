@@ -211,8 +211,6 @@ export async function getImageCacheAssetById(input: {
   id: number;
   conversationId?: number | null;
 }): Promise<ImageCacheAsset | null> {
-  const id = Number(input.id);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  const assets = await getImageCacheAssetsByIds({ ids: [id], conversationId: input.conversationId });
-  return assets.get(id) ?? null;
+  const assets = await getImageCacheAssetsByIds({ ids: [input.id], conversationId: input.conversationId });
+  return assets.values().next().value ?? null;
 }

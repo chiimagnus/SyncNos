@@ -62,6 +62,19 @@ describe('image-inline', () => {
     expect(hasReusableImageCachePayload({ byteSize: 10 })).toBe(false);
   });
 
+  it('ignores existing internal asset refs without opening image-cache transactions', async () => {
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    const messages = [
+      { messageKey: 'm1', contentMarkdown: '![](syncnos-asset://123)', role: 'assistant', sequence: 1 },
+    ];
+
+    const result = await inlineChatImagesInMessages({ conversationId: 1, messages });
+
+    expect(result).toMatchObject({ inlinedCount: 0, fromCacheCount: 0, downloadedCount: 0, inlinedBytes: 0 });
+    expect(messages[0].contentMarkdown).toBe('![](syncnos-asset://123)');
+    expect(transactionSpy).not.toHaveBeenCalled();
+  });
+
   it('replaces http(s)/data images with internal asset refs and reuses cache', async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(Uint8Array.from([1, 2, 3, 4]), {

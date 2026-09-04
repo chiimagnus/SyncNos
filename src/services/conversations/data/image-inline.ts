@@ -59,12 +59,6 @@ function isDataImageUrl(url: unknown): boolean {
   return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
 }
 
-function isSyncnosAssetUrl(url: unknown): boolean {
-  const text = String(url || '').trim();
-  if (!text) return false;
-  return /^syncnos-asset:\/\/\d+$/i.test(text);
-}
-
 function stripAngleBrackets(url: string): string {
   const text = String(url || '').trim();
   if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
@@ -87,7 +81,6 @@ function extractInlineCandidateUrlsFromMarkdown(markdown: string): string[] {
   while ((match = MARKDOWN_IMAGE_RE.exec(raw)) != null) {
     const urlPart = match[2] ? String(match[2]) : '';
     const url = stripAngleBrackets(urlPart);
-    if (isSyncnosAssetUrl(url)) continue;
     if (!isDataImageUrl(url) && !isHttpUrl(url)) continue;
     if (seen.has(url)) continue;
     seen.add(url);
@@ -231,21 +224,13 @@ async function getCachedImagesByUrls(
   conversationId: number,
   urls: readonly string[],
 ): Promise<Map<string, ImageCacheRow>> {
-  const lookupUrls: string[] = [];
-  const seen = new Set<string>();
-  for (const rawUrl of urls) {
-    const url = String(rawUrl || '').trim();
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    lookupUrls.push(url);
-  }
-  if (!lookupUrls.length) return new Map();
+  if (!urls.length) return new Map();
 
   const db = await openDb();
   const { t, stores } = tx(db, ['image_cache'], 'readonly');
   const done = txDone(t);
   const idx = stores.image_cache.index('by_conversationId_url');
-  const requests = lookupUrls.map((url) =>
+  const requests = urls.map((url) =>
     reqToPromise(idx.get([conversationId, url]) as IDBRequest<ImageCacheRow | undefined>).then(
       (row) => [url, row] as const,
     ),
