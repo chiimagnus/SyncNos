@@ -172,7 +172,7 @@ describe('feishu skip unchanged', () => {
       perConversation: [expect.objectContaining({ conversationId: 1, ok: true })],
     });
     expect(orch.isRunActive()).toBe(false);
-    expect(await orch.getSyncStatus({ instanceId: 'first' })).toMatchObject({ provider: 'feishu', job: null });
+    expect(await orch.getSyncStatus()).toMatchObject({ provider: 'feishu', job: null });
   });
 
   it('skips syncing when content hash unchanged and docId exists', async () => {

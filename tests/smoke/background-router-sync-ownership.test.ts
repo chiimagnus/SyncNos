@@ -291,17 +291,15 @@ describe('Feishu destructive settings ownership', () => {
       }),
     });
     registerFeishuSettingsHandlers(router as any, {
-      runExclusiveMaintenance: <T>(mutation: () => Promise<T>, options: { clearStatusAfter?: boolean } = {}) =>
+      runExclusiveMaintenance: <T>(mutation: () => Promise<T>) =>
         ownership.runExclusiveMutation(async () => {
           const result = await mutation();
-          if (options.clearStatusAfter === true) {
-            if (!clearSucceeds) {
-              throw Object.assign(new Error('feishu sync job persistence failed'), {
-                code: 'feishu_sync_job_persist_failed',
-              });
-            }
-            job = null;
+          if (!clearSucceeds) {
+            throw Object.assign(new Error('feishu sync job persistence failed'), {
+              code: 'feishu_sync_job_persist_failed',
+            });
           }
+          job = null;
           return result;
         }),
     });

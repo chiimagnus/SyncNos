@@ -78,12 +78,12 @@ describe('background-router obsidian sync routes', () => {
           }
           return { ok: true, instanceId };
         },
-        async getSyncStatus({ instanceId }: any) {
+        async getSyncStatus() {
           calls.getSyncStatus += 1;
-          return { job: null, instanceId };
+          return { provider: 'obsidian', job: null };
         },
-        async clearSyncStatus({ instanceId }: any) {
-          return { job: null, instanceId };
+        async clearSyncStatus() {
+          return { provider: 'obsidian', job: null };
         },
         isRunActive: () => false,
         async syncConversations(payload: any) {
@@ -143,7 +143,6 @@ describe('background-router obsidian sync routes', () => {
     const statusRes = await router.__handleMessageForTests({ type: 'obsidianGetSyncStatus' });
     expect(statusRes.ok).toBe(true);
     expect(calls.getSyncStatus).toBe(1);
-    expect(typeof statusRes.data?.instanceId).toBe('string');
     expect(statusRes.data?.active).toBe(false);
 
     const syncRes = await router.__handleMessageForTests({

@@ -569,11 +569,11 @@ describe('notion-sync-orchestrator kind routing', () => {
       jobStore,
     });
 
-    const status = await orchestrator.getSyncJobStatus({ instanceId: 'background-new' });
+    const status = await orchestrator.getSyncJobStatus();
     expect(status.job?.status).toBe('running');
 
     await orchestrator.reconcileStartupSyncJob();
-    const reconciled = await orchestrator.getSyncJobStatus({ instanceId: 'background-new' });
+    const reconciled = await orchestrator.getSyncJobStatus();
     expect(reconciled.job?.status).toBe('aborted');
     expect(reconciled.job?.abortedReason).toBe('extension reloaded');
   });

@@ -14,7 +14,7 @@ type AnyRouter = {
 };
 
 type Deps = {
-  runExclusiveMaintenance: <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
+  runExclusiveMaintenance: <T>(mutation: () => Promise<T>) => Promise<T>;
 };
 
 function errorResponse(router: AnyRouter, error: unknown, fallback: string) {
@@ -64,9 +64,7 @@ export function registerFeishuSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(FEISHU_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
-      const clearedKeys = await deps.runExclusiveMaintenance(() => clearFeishuOAuthAttemptAndToken(), {
-        clearStatusAfter: true,
-      });
+      const clearedKeys = await deps.runExclusiveMaintenance(() => clearFeishuOAuthAttemptAndToken());
       return router.ok({ disconnected: true, clearedKeys });
     } catch (error) {
       return errorResponse(router, error, 'feishu disconnect failed');

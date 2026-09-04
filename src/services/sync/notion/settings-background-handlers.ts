@@ -12,7 +12,7 @@ type AnyRouter = {
 
 type Deps = {
   conversationKinds: { getNotionStorageKeys?: () => unknown[] } | null;
-  runExclusiveMaintenance: <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
+  runExclusiveMaintenance: <T>(mutation: () => Promise<T>) => Promise<T>;
 };
 
 function getNotionDisconnectStorageKeys(deps: Deps): string[] {
@@ -79,15 +79,12 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
-      const clearedKeys = await deps.runExclusiveMaintenance(
-        async () => {
-          const authKeys = await clearNotionOAuthAttemptAndToken();
-          const configKeys = getNotionDisconnectStorageKeys(deps);
-          await storageRemove(configKeys);
-          return [...authKeys, ...configKeys];
-        },
-        { clearStatusAfter: true },
-      );
+      const clearedKeys = await deps.runExclusiveMaintenance(async () => {
+        const authKeys = await clearNotionOAuthAttemptAndToken();
+        const configKeys = getNotionDisconnectStorageKeys(deps);
+        await storageRemove(configKeys);
+        return [...authKeys, ...configKeys];
+      });
       return router.ok({ disconnected: true, clearedKeys });
     } catch (error) {
       const message = String((error as any)?.message ?? error ?? 'notion disconnect failed');

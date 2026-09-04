@@ -129,12 +129,11 @@ describe('background-router github sync routes', () => {
   it('delegates status and clear through the production sync contract', async () => {
     installStorage({});
     const githubSyncOrchestrator = {
-      getSyncStatus: vi.fn(async ({ instanceId }: any) => ({
+      getSyncStatus: vi.fn(async () => ({
         provider: 'github',
         job: { status: 'done' },
-        instanceId,
       })),
-      clearSyncStatus: vi.fn(async ({ instanceId }: any) => ({ provider: 'github', job: null, instanceId })),
+      clearSyncStatus: vi.fn(async () => ({ provider: 'github', job: null })),
       sync: vi.fn(async () => ({})),
       isRunActive: vi.fn(() => false),
     };
@@ -143,14 +142,14 @@ describe('background-router github sync routes', () => {
     const status = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
     expect(status).toMatchObject({
       ok: true,
-      data: { provider: 'github', active: false, job: { status: 'done' }, instanceId: 'instance-status' },
+      data: { provider: 'github', active: false, job: { status: 'done' } },
     });
 
     const cleared = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
     expect(cleared).toMatchObject({
       ok: true,
-      data: { provider: 'github', active: false, job: null, instanceId: 'instance-status' },
+      data: { provider: 'github', active: false, job: null },
     });
-    expect(githubSyncOrchestrator.clearSyncStatus).toHaveBeenCalledWith({ instanceId: 'instance-status' });
+    expect(githubSyncOrchestrator.clearSyncStatus).toHaveBeenCalledWith();
   });
 });

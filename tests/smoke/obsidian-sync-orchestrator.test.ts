@@ -215,7 +215,7 @@ describe('obsidian-sync-orchestrator', () => {
       conversationIds: [],
       perConversation: [],
     });
-    expect((await orch.getSyncStatus({ instanceId: 'first' })).job).toBeNull();
+    expect((await orch.getSyncStatus()).job).toBeNull();
 
     let conflict: unknown = null;
     try {
@@ -251,7 +251,7 @@ describe('obsidian-sync-orchestrator', () => {
       perConversation: [expect.objectContaining({ conversationId: 1, ok: true })],
     });
     expect(orch.isRunActive()).toBe(false);
-    expect((await orch.getSyncStatus({ instanceId: 'first' })).job).toBeNull();
+    expect((await orch.getSyncStatus()).job).toBeNull();
   });
 
   it('materializes SyncNos image refs through the shared Markdown helper without changing Obsidian naming', async () => {
@@ -527,7 +527,7 @@ describe('obsidian-sync-orchestrator', () => {
     expect(putBody).toContain('# Conversations');
     expect(putBody).toContain('## 1 assistant');
 
-    const status = await orch.getSyncStatus({ instanceId: 'x' });
+    const status = await orch.getSyncStatus();
     expect(status.job?.status).toBe('done');
   });
 
@@ -552,7 +552,7 @@ describe('obsidian-sync-orchestrator', () => {
     });
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    const status = await orch.getSyncStatus({ instanceId: 'background-new' });
+    const status = await orch.getSyncStatus();
     expect(status.job?.status).toBe('running');
     expect((await jobStore.getJob())?.status).toBe('running');
 
@@ -918,7 +918,7 @@ describe('obsidian-sync-orchestrator', () => {
       ok: true,
       mode: 'full_rebuild',
     });
-    const status = await orch.getSyncStatus({ instanceId: 'x' });
+    const status = await orch.getSyncStatus();
     expect(status.job?.perConversation?.[0]).toMatchObject({
       conversationId: 1,
       conversationTitle: 'Isolation 1',

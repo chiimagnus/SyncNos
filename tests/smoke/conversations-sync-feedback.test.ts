@@ -201,40 +201,34 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: null,
-      instanceId: 'notion-test',
     });
     clearObsidianSyncStatus.mockResolvedValue({
       provider: 'obsidian',
       active: false,
       job: null,
-      instanceId: 'obsidian-test',
     });
     clearFeishuSyncStatus.mockResolvedValue({
       provider: 'feishu',
       active: false,
       job: null,
-      instanceId: 'feishu-test',
     });
     clearGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: false,
       job: null,
-      instanceId: 'github-test',
     });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
       job: null,
-      instanceId: 'notion-test',
     });
     getObsidianSyncStatus.mockResolvedValue({
       provider: 'obsidian',
       active: false,
       job: null,
-      instanceId: 'obsidian-test',
     });
-    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: false, job: null, instanceId: 'feishu-test' });
-    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: false, job: null, instanceId: 'github-test' });
+    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: false, job: null });
+    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: false, job: null });
   });
 
   afterEach(() => {
@@ -332,7 +326,9 @@ describe('Conversations sync feedback', () => {
 
   function notionRunningJob(overrides: Record<string, unknown> = {}) {
     return {
+      id: 'notion-job',
       provider: 'notion',
+      instanceId: 'notion-background',
       status: 'running',
       startedAt: Date.now(),
       updatedAt: Date.now(),
@@ -377,7 +373,9 @@ describe('Conversations sync feedback', () => {
 
   function githubJob(overrides: Record<string, unknown> = {}) {
     return {
+      id: 'github-job',
       provider: 'github',
+      instanceId: 'github-background',
       status: 'running',
       startedAt: Date.now() - 500,
       updatedAt: Date.now(),
@@ -411,7 +409,7 @@ describe('Conversations sync feedback', () => {
     'converges a successful %s start with only the target provider status read',
     async (provider, starter, getter) => {
       starter.mockResolvedValue({ provider, started: true });
-      getter.mockResolvedValue({ provider, active: true, job: null, instanceId: `${provider}-test` });
+      getter.mockResolvedValue({ provider, active: true, job: null });
       await renderFeedbackProbe();
       clearStatusGetterCalls();
 
@@ -433,7 +431,6 @@ describe('Conversations sync feedback', () => {
       provider: 'obsidian',
       active: true,
       job: null,
-      instanceId: 'obsidian-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -547,7 +544,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob({ currentConversationTitle: 'Preferred Notion' }),
     });
     await renderFeedbackProbe();
@@ -572,16 +568,14 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: null,
-      instanceId: 'notion-test',
     });
     getObsidianSyncStatus.mockResolvedValue({
       provider: 'obsidian',
       active: true,
       job: null,
-      instanceId: 'obsidian-test',
     });
-    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: true, job: null, instanceId: 'feishu-test' });
-    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: true, job: null, instanceId: 'github-test' });
+    getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: true, job: null });
+    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: true, job: null });
 
     await renderFeedbackProbe();
 
@@ -596,7 +590,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: terminal,
-      instanceId: 'notion-test',
     });
 
     await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
@@ -610,7 +603,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -639,7 +631,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -659,8 +650,8 @@ describe('Conversations sync feedback', () => {
     });
     clearStatusGetterCalls();
     getNotionSyncJobStatus
-      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' })
-      .mockResolvedValueOnce({ provider: 'notion', active: false, job: null, instanceId: 'notion-test' });
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal })
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: null });
 
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -681,7 +672,7 @@ describe('Conversations sync feedback', () => {
     });
     clearStatusGetterCalls();
     getNotionSyncJobStatus
-      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' })
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal })
       .mockRejectedValueOnce(new Error('handoff read failed'));
 
     await act(async () => {
@@ -701,7 +692,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ currentConversationTitle: 'Notion still owns' }),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -709,13 +699,11 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: terminal,
-      instanceId: 'notion-test',
     });
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: true,
       job: githubJob({ currentConversationTitle: 'Hidden GitHub' }),
-      instanceId: 'github-test',
     });
 
     await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
@@ -731,7 +719,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -753,7 +740,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ currentConversationTitle: 'Notion preferred' }),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -762,7 +748,6 @@ describe('Conversations sync feedback', () => {
       provider: 'github',
       active: true,
       job: githubJob({ currentConversationTitle: 'GitHub must wait' }),
-      instanceId: 'github-test',
     });
 
     await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: terminal } });
@@ -777,7 +762,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -794,7 +778,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success' });
@@ -808,7 +791,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: null,
-      instanceId: 'notion-test',
     });
     await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: null } });
     expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
@@ -823,7 +805,6 @@ describe('Conversations sync feedback', () => {
         provider: 'notion',
         active: true,
         job: notionRunningJob({ currentConversationTitle: 'Current Notion' }),
-        instanceId: 'notion-test',
       });
       await renderFeedbackProbe();
       clearStatusGetterCalls();
@@ -831,13 +812,11 @@ describe('Conversations sync feedback', () => {
         provider: 'notion',
         active: false,
         job: terminal,
-        instanceId: 'notion-test',
       });
       getGithubSyncStatus.mockResolvedValue({
         provider: 'github',
         active: true,
         job: githubJob({ currentConversationTitle: 'Surviving GitHub' }),
-        instanceId: 'github-test',
       });
       const terminalChange = [SYNC_JOB_STORAGE_KEYS.notion, { newValue: terminal }] as const;
       const runningChange = [SYNC_JOB_STORAGE_KEYS.github, { newValue: githubJob() }] as const;
@@ -858,7 +837,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob(),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -877,7 +855,7 @@ describe('Conversations sync feedback', () => {
     });
     expectStatusGetterCalls({ notion: 1 });
 
-    poll.resolve({ provider: 'notion', active: true, job: notionRunningJob(), instanceId: 'notion-test' });
+    poll.resolve({ provider: 'notion', active: true, job: notionRunningJob() });
     await act(async () => {
       await flushMicrotasks();
       await flushMicrotasks();
@@ -889,7 +867,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ currentConversationTitle: 'Initial' }),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -913,7 +890,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ currentConversationTitle: 'Old poll response', okCount: 0, totalCount: 3 }),
-      instanceId: 'notion-test',
     });
     await act(async () => {
       await flushMicrotasks();
@@ -929,7 +905,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob(),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -945,7 +920,7 @@ describe('Conversations sync feedback', () => {
     });
     expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(1);
 
-    handoffRead.resolve({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' });
+    handoffRead.resolve({ provider: 'notion', active: false, job: terminal });
     await act(async () => {
       await flushMicrotasks();
       await flushMicrotasks();
@@ -960,7 +935,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob(),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -974,7 +948,7 @@ describe('Conversations sync feedback', () => {
     await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: secondTerminal } });
     expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(2);
 
-    firstRead.resolve({ provider: 'notion', active: false, job: firstTerminal, instanceId: 'notion-test' });
+    firstRead.resolve({ provider: 'notion', active: false, job: firstTerminal });
     await act(async () => {
       await flushMicrotasks();
       vi.advanceTimersByTime(500);
@@ -982,7 +956,7 @@ describe('Conversations sync feedback', () => {
     });
     expect(getNotionSyncJobStatus).toHaveBeenCalledTimes(2);
 
-    secondRead.resolve({ provider: 'notion', active: false, job: secondTerminal, instanceId: 'notion-test' });
+    secondRead.resolve({ provider: 'notion', active: false, job: secondTerminal });
     await act(async () => {
       await flushMicrotasks();
       await flushMicrotasks();
@@ -999,7 +973,6 @@ describe('Conversations sync feedback', () => {
       provider: 'obsidian',
       active: true,
       job: null,
-      instanceId: 'obsidian-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -1018,7 +991,6 @@ describe('Conversations sync feedback', () => {
       provider: 'obsidian',
       active: false,
       job: null,
-      instanceId: 'obsidian-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -1068,7 +1040,6 @@ describe('Conversations sync feedback', () => {
       provider: 'github',
       active: false,
       job: githubJob({ currentConversationTitle: 'Residue GitHub' }),
-      instanceId: 'github-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -1107,7 +1078,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ totalCount: 3, okCount: 0, currentConversationTitle: 'Older known read' }),
-      instanceId: 'notion-test',
     });
     await act(async () => {
       await startPromise;
@@ -1123,14 +1093,13 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ currentConversationTitle: 'Before terminal' }),
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
     const oldPoll = deferred<any>();
     getNotionSyncJobStatus
       .mockImplementationOnce(() => oldPoll.promise)
-      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal, instanceId: 'notion-test' });
+      .mockResolvedValueOnce({ provider: 'notion', active: false, job: terminal });
 
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -1145,7 +1114,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ currentConversationTitle: 'Stale running poll' }),
-      instanceId: 'notion-test',
     });
     await act(async () => {
       await flushMicrotasks();
@@ -1169,7 +1137,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: notionTerminal,
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -1187,7 +1154,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -1210,7 +1176,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await renderFeedbackProbe();
     const listener = storageEventMocks.listener;
@@ -1219,13 +1184,11 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: null,
-      instanceId: 'notion-test',
     });
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: true,
       job: githubJob({ currentConversationTitle: 'Surviving after clear' }),
-      instanceId: 'github-test',
     });
 
     await emitStorageChanges({ [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: null } });
@@ -1251,7 +1214,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: terminal,
-      instanceId: 'notion-test',
     });
 
     await act(async () => {
@@ -1266,7 +1228,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: false,
       job: terminal,
-      instanceId: 'notion-test',
     });
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -1289,7 +1250,7 @@ describe('Conversations sync feedback', () => {
       conflict.code = 'sync_already_running';
       conflict.extra = { code: 'sync_already_running' };
       starter.mockRejectedValue(conflict);
-      getter.mockResolvedValue({ provider, active: true, job: null, instanceId: `${provider}-test` });
+      getter.mockResolvedValue({ provider, active: true, job: null });
       await renderFeedbackProbe();
       clearStatusGetterCalls();
 
@@ -1325,7 +1286,6 @@ describe('Conversations sync feedback', () => {
       provider: 'notion',
       active: true,
       job: notionRunningJob({ totalCount: 3, okCount: 0, currentConversationTitle: 'Stale mount' }),
-      instanceId: 'old-mount',
     });
     await act(async () => {
       await flushMicrotasks();
@@ -1341,7 +1301,6 @@ describe('Conversations sync feedback', () => {
       provider: 'github',
       active: false,
       job: githubJob({ currentConversationTitle: 'Ownerless residue' }),
-      instanceId: 'github-test',
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -1366,7 +1325,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: null,
     });
     selectFirstConversation();
@@ -1382,7 +1340,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob(),
     });
 
@@ -1404,9 +1361,10 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: {
+        id: 'notion-success-job',
         provider: 'notion',
+        instanceId: 'notion-background',
         status: 'done',
         startedAt: Date.now() - 500,
         updatedAt: Date.now(),
@@ -1452,7 +1410,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob(),
     });
     await renderPane();
@@ -1476,7 +1433,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob({
         totalCount: 5,
         conversationIds: [],
@@ -1503,7 +1459,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: notionRunningJob({ updatedAt: Date.now() - 10 * 60_000 }),
     });
 
@@ -1517,7 +1472,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: null,
     });
 
@@ -1537,7 +1491,9 @@ describe('Conversations sync feedback', () => {
 
   it('keeps a terminal snapshot non-dismissible while ownership is active and exposes it only after settle', async () => {
     const terminalJob = {
+      id: 'notion-terminal-job',
       provider: 'notion',
+      instanceId: 'notion-background',
       status: 'done',
       startedAt: Date.now() - 500,
       updatedAt: Date.now(),
@@ -1561,7 +1517,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: terminalJob,
     });
 
@@ -1572,7 +1527,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: terminalJob,
     });
     await act(async () => {
@@ -1593,7 +1547,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob(),
     });
     await renderFeedbackProbe();
@@ -1610,7 +1563,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: null,
     });
     await act(async () => {
@@ -1637,7 +1589,6 @@ describe('Conversations sync feedback', () => {
     staleMount.resolve({
       provider: 'notion',
       active: true,
-      instanceId: 'stale-mount',
       job: notionRunningJob({ id: 'stale-running' }),
     });
     await act(async () => {
@@ -1653,9 +1604,10 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: {
+        id: 'notion-aborted-job',
         provider: 'notion',
+        instanceId: 'notion-background',
         status: 'aborted',
         startedAt: Date.now() - 2_000,
         updatedAt: Date.now(),
@@ -1693,7 +1645,6 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob(),
     });
 
@@ -1720,9 +1671,10 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: {
+        id: 'notion-failed-job',
         provider: 'notion',
+        instanceId: 'notion-background',
         status: 'done',
         startedAt: Date.now() - 800,
         updatedAt: Date.now(),
@@ -1776,13 +1728,15 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      instanceId: 'notion-test',
       job: {
+        id: 'notion-warning-job',
         provider: 'notion',
+        instanceId: 'notion-background',
         status: 'done',
         startedAt: Date.now() - 800,
         updatedAt: Date.now(),
         finishedAt: Date.now(),
+        totalCount: 1,
         conversationIds: [11],
         okCount: 1,
         failCount: 0,
@@ -1866,7 +1820,6 @@ describe('Conversations sync feedback', () => {
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: true,
-      instanceId: 'github-test',
       job: githubJob(),
     });
 
@@ -1884,7 +1837,6 @@ describe('Conversations sync feedback', () => {
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: false,
-      instanceId: 'github-test',
       job: githubJob({
         status: 'done',
         finishedAt: Date.now(),
@@ -1906,7 +1858,6 @@ describe('Conversations sync feedback', () => {
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: false,
-      instanceId: 'github-test',
       job: githubJob({
         status: 'done',
         finishedAt: Date.now(),
@@ -1973,13 +1924,11 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      instanceId: 'notion-test',
       job: notionRunningJob({ updatedAt: Date.now() + 10_000 }),
     });
     getGithubSyncStatus.mockResolvedValue({
       provider: 'github',
       active: true,
-      instanceId: 'github-test',
       job: githubJob({ updatedAt: Date.now() }),
     });
 

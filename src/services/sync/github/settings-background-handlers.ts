@@ -40,7 +40,7 @@ type GithubSettingsServiceDeps = {
 };
 
 export type GithubSettingsHandlersDeps = Partial<GithubSettingsServiceDeps> & {
-  runExclusiveMaintenance: <T>(mutation: () => Promise<T>, options?: { clearStatusAfter?: boolean }) => Promise<T>;
+  runExclusiveMaintenance: <T>(mutation: () => Promise<T>) => Promise<T>;
 };
 
 const DEFAULT_DEPS: GithubSettingsServiceDeps = {

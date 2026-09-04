@@ -86,7 +86,7 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   if (!isRecord(job) || job.provider !== provider) return null;
   const status = job.status;
   if (status !== 'running' && status !== 'done' && status !== 'aborted') return null;
-  if (!isOptionalString(job.id) || !isOptionalString(job.instanceId)) return null;
+  if (typeof job.id !== 'string' || typeof job.instanceId !== 'string') return null;
   if (!isNonNegativeFiniteNumber(job.startedAt) || !isNonNegativeFiniteNumber(job.updatedAt)) return null;
   let finishedAt: number | null;
   if (status === 'running') {

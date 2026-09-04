@@ -108,6 +108,8 @@ describe('normalizeSyncJobSnapshot', () => {
 
   it.each([
     ['provider mismatch', { provider: 'github' }],
+    ['missing job id', { id: undefined }],
+    ['missing background instance id', { instanceId: undefined }],
     ['missing totalCount', { totalCount: undefined }],
     ['fractional totalCount', { totalCount: 1.5 }],
     ['coerced timestamp', { startedAt: '1' }],
@@ -164,7 +166,7 @@ describe('normalizeSyncJobSnapshot', () => {
     await expect(createSyncJobStore('notion').getJob()).resolves.toBeNull();
   });
 
-  it('materializes a current orphan running job as aborted without instance or age heuristics', async () => {
+  it('materializes a current orphan running job as aborted without instance ownership or age heuristics', async () => {
     const { createSyncJobStore, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
     storageState[SYNC_JOB_STORAGE_KEYS.notion] = runningJob({ currentConversationId: undefined });
 

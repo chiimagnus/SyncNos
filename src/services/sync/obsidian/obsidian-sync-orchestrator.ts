@@ -415,14 +415,14 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
   return { ok: true, data, message: okMessage, instanceId: safeString(instanceId) };
 }
 
-async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  return { provider: SYNC_PROVIDER, job: await obsidianSyncJobStore.getJob(), instanceId: safeString(instanceId) };
+async function getSyncStatus() {
+  return { provider: SYNC_PROVIDER, job: await obsidianSyncJobStore.getJob() };
 }
 
-function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+function clearSyncStatus() {
   return obsidianSyncOwnership.runExclusiveMutation(async () => {
     if (!(await obsidianSyncJobStore.setJob(null))) throw buildJobPersistenceError();
-    return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
+    return { provider: SYNC_PROVIDER, job: null };
   });
 }
 
