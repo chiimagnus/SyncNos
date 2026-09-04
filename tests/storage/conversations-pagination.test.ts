@@ -397,6 +397,57 @@ describe('conversations pagination storage-idb', () => {
     expect(persisted.listSiteKey).toBe('stale.example');
   });
 
+  it('does not normalize malformed persisted facet keys at read time', async () => {
+    const now = Date.now();
+    await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/raw-source',
+      title: 'raw source',
+      url: 'https://example.com/raw-source',
+      lastCapturedAt: now,
+    });
+    await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/raw-site',
+      title: 'raw site',
+      url: 'https://example.com/raw-site',
+      lastCapturedAt: now - 1,
+    });
+
+    const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('webclipper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rawTx = rawDb.transaction(['conversations'], 'readwrite');
+    const rawStore = rawTx.objectStore('conversations');
+    const sourceRow = await reqToPromise<any>(
+      rawStore.index('by_source_conversationKey').get(['web', 'article:https://example.com/raw-source']),
+    );
+    sourceRow.listSourceKey = 'WEB';
+    await reqToPromise(rawStore.put(sourceRow));
+    const siteRow = await reqToPromise<any>(
+      rawStore.index('by_source_conversationKey').get(['web', 'article:https://example.com/raw-site']),
+    );
+    siteRow.listSiteKey = 'Legacy.Example';
+    await reqToPromise(rawStore.put(siteRow));
+    await new Promise<void>((resolve, reject) => {
+      rawTx.oncomplete = () => resolve();
+      rawTx.onerror = () => reject(rawTx.error);
+      rawTx.onabort = () => reject(rawTx.error);
+    });
+    rawDb.close();
+
+    const bootstrap = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
+    expect(bootstrap.facets.sources).toEqual([
+      { key: 'web', label: 'web', count: 1 },
+      { key: 'WEB', label: 'WEB', count: 1 },
+    ]);
+    expect(bootstrap.facets.sites).toEqual([{ key: 'Legacy.Example', label: 'Legacy.Example', count: 1 }]);
+  });
+
   it('shows a tracked upsert in the next fresh bootstrap without stale summary state', async () => {
     const initial = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
     expect(initial.summary.totalCount).toBe(0);

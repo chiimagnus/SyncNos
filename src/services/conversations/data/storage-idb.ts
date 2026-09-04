@@ -1385,10 +1385,12 @@ async function readConversationListSummaryAndFacets(input: {
       const cursor = sourceFacetRequest.result;
       if (!cursor) return resolve();
       const key = Array.isArray(cursor.key) ? cursor.key : [];
-      const rowSourceKey = normalizeListKey(key[0], 'unknown');
-      const facet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
-      facet.count += 1;
-      sourceFacetMap.set(rowSourceKey, facet);
+      const rowSourceKey = typeof key[0] === 'string' ? key[0] : '';
+      if (rowSourceKey) {
+        const facet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
+        facet.count += 1;
+        sourceFacetMap.set(rowSourceKey, facet);
+      }
       cursor.continue();
     };
   });
@@ -1407,9 +1409,9 @@ async function readConversationListSummaryAndFacets(input: {
       const cursor = siteFacetRequest.result;
       if (!cursor) return resolve();
       const key = Array.isArray(cursor.key) ? cursor.key : [];
-      const rowSourceKey = normalizeListKey(key[0], 'unknown');
-      if (rowSourceKey === siteFacetSourceScope) {
-        const rowSiteKey = normalizeConversationListSiteFilterKey(key[1]);
+      const rowSourceKey = typeof key[0] === 'string' ? key[0] : '';
+      const rowSiteKey = typeof key[1] === 'string' ? key[1] : '';
+      if (rowSourceKey === siteFacetSourceScope && rowSiteKey) {
         const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
         const facet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteLabel, count: 0 };
         facet.count += 1;
