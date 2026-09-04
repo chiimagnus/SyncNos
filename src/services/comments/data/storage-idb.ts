@@ -2,7 +2,6 @@ import type { AddArticleCommentInput, ArticleComment } from '@services/comments/
 import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
-import { serializeArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export class ArticleCommentInvariantError extends Error {
@@ -79,7 +78,7 @@ function toComment(row: any): ArticleComment {
     createdAt: Number(row?.createdAt) || 0,
     updatedAt: Number(row?.updatedAt) || 0,
   };
-  return serializeArticleCommentDto(comment);
+  return comment;
 }
 
 export async function addArticleComment(input: AddArticleCommentInput): Promise<ArticleComment> {
