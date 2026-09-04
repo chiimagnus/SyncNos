@@ -5,10 +5,7 @@ import {
   readConversationMentionCandidatePool,
 } from '@services/conversations/data/storage';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
-import {
-  normalizeMentionQuery,
-  normalizeMentionSearchLimit,
-} from '@services/integrations/item-mention/mention-contract';
+import { normalizeMentionQuery } from '@services/integrations/item-mention/mention-contract';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 
@@ -44,7 +41,12 @@ export function registerItemMentionHandlers(router: AnyRouter) {
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
     const mentionQuery = normalizeMentionQuery(msg?.query ?? '');
-    const limit = normalizeMentionSearchLimit(msg?.limit);
+    const rawLimit = msg?.limit;
+    const parsedLimit = Number(rawLimit);
+    const limit =
+      rawLimit == null || rawLimit === '' || !Number.isFinite(parsedLimit) || parsedLimit <= 0
+        ? 20
+        : Math.min(Math.floor(parsedLimit), 50);
 
     if (mentionQuery.empty) {
       const recentPool = await readConversationMentionCandidatePool({ maxScan: limit, maxDurationMs: 300 });

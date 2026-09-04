@@ -24,9 +24,3 @@ export function normalizeMentionQuery(raw: unknown): MentionQuery {
   return { normalized, empty: !normalized };
 }
 
-export function normalizeMentionSearchLimit(raw: unknown) {
-  if (raw == null || raw === '') return 20;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return 20;
-  return Math.min(Math.floor(n), 50);
-}
