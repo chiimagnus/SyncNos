@@ -184,6 +184,7 @@ async function findExistingArticleConversationByUrl(
   if (!normalizedUrl) return null;
   const siteKey = deriveConversationListStoredSiteKeyFromUrl(normalizedUrl);
   if (!siteKey || siteKey === 'unknown') return null;
+  const canonicalConversationKey = buildCanonicalWebArticleIdentity(normalizedUrl)?.conversationKey || '';
 
   const index = conversationsStore.index('by_listSiteKey_lastCapturedAt_id');
   const range = globalThis.IDBKeyRange.bound(
@@ -202,14 +203,12 @@ async function findExistingArticleConversationByUrl(
         safeString(row?.sourceType).toLowerCase() === 'article' &&
         canonicalizeArticleUrl(row?.url) === normalizedUrl
       ) {
-        const rowIdentity = buildCanonicalWebArticleIdentity(row?.url);
-        const bestIdentity = best ? buildCanonicalWebArticleIdentity(best?.url) : null;
         const rowCanonical =
-          safeString(row?.source) === WEB_ARTICLE_SOURCE && rowIdentity?.conversationKey === safeString(row?.conversationKey);
+          safeString(row?.source) === WEB_ARTICLE_SOURCE && canonicalConversationKey === safeString(row?.conversationKey);
         const bestCanonical =
           !!best &&
           safeString(best?.source) === WEB_ARTICLE_SOURCE &&
-          bestIdentity?.conversationKey === safeString(best?.conversationKey);
+          canonicalConversationKey === safeString(best?.conversationKey);
         const rowMapped = !!safeString(row?.notionPageId);
         const bestMapped = !!safeString(best?.notionPageId);
         const rowCapturedAt = Number(row?.lastCapturedAt) || 0;
