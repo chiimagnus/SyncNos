@@ -36,9 +36,9 @@ export type SyncRunSummary = {
 };
 
 export type SyncJobSnapshot = {
-  id?: string;
+  id: string;
   provider: SyncProvider;
-  instanceId?: string;
+  instanceId: string;
   status: SyncJobPhase;
   startedAt: number;
   updatedAt: number;
