@@ -217,15 +217,12 @@ export function createContentController(deps: Deps) {
     startAutoSaveRequest(ownerToken);
   }
 
-  function cancelPendingManualPersistenceForOwner(ownerToken: number) {
-    if (manualPersistence?.ownerToken !== ownerToken || manualPersistence.state !== 'pending') return;
-    manualPersistence = null;
-    drainLatestAutoSaveRequest();
-  }
-
   function releaseResidentOwner(ownerToken: number) {
     cancelAutoSaveTrailingForOwner(ownerToken);
-    cancelPendingManualPersistenceForOwner(ownerToken);
+    if (manualPersistence?.ownerToken === ownerToken && manualPersistence.state === 'pending') {
+      manualPersistence = null;
+      drainLatestAutoSaveRequest();
+    }
     if (!isCurrentResidentOwner(ownerToken)) return;
     currentResidentAutoSaveHandle = null;
   }
