@@ -33,10 +33,12 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
     try {
       const data = await fetchActiveTabArticle({ tabId: msg?.tabId });
 
-      const { conversationId } = data;
-      if (conversationId > 0) {
-        fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages));
-      }
+      fireAndForget(
+        deps.onConversationChanged(
+          data.conversationId,
+          AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+        ),
+      );
 
       return router.ok(data);
     } catch (e) {
@@ -48,9 +50,13 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
     try {
       const data = await resolveOrCaptureActiveTabArticle({ tabId: msg?.tabId });
 
-      const { conversationId, isNew } = data;
-      if (isNew && conversationId > 0) {
-        fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages));
+      if (data.isNew) {
+        fireAndForget(
+          deps.onConversationChanged(
+            data.conversationId,
+            AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+          ),
+        );
       }
 
       return router.ok(data);

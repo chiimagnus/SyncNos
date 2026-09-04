@@ -6,7 +6,7 @@ import {
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
-import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery, tabsSendMessage, tabsUpdate } from '@platform/webext/tabs';
 import { storageGet } from '@platform/storage/local';
@@ -182,7 +182,8 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const discourseTopic = parseDiscourseTopicUrl(normalizedUrl);
-  const canonicalUrl = canonicalizeArticleUrl(normalizedUrl) || normalizedUrl;
+  const articleIdentity = buildCanonicalWebArticleIdentity(normalizedUrl)!;
+  const canonicalUrl = articleIdentity.url;
   const includeXiaohongshuComments = await shouldCaptureXiaohongshuComments();
 
   let readabilityInjected = false;
@@ -233,7 +234,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: WEB_ARTICLE_SOURCE,
-    conversationKey: buildCanonicalWebArticleIdentity(canonicalUrl)?.conversationKey || '',
+    conversationKey: articleIdentity.conversationKey,
     title,
     url: canonicalUrl,
     author,
@@ -244,7 +245,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
 
   const body = textContent;
   const markdown = markdownContent || body;
-  const conversationId = Number((conversation as any).id);
+  const conversationId = conversation.id;
   let messagesToSave = [
     {
       messageKey: 'article_body',
@@ -318,25 +319,24 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const tab = await resolveTargetTab(tabId);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
-  const canonicalUrl = canonicalizeArticleUrl(normalizedUrl) || normalizedUrl;
-
-  const key = buildCanonicalWebArticleIdentity(canonicalUrl)?.conversationKey || '';
+  const articleIdentity = buildCanonicalWebArticleIdentity(normalizedUrl)!;
+  const canonicalUrl = articleIdentity.url;
+  const key = articleIdentity.conversationKey;
   try {
     const existing = await getConversationBySourceConversationKey(WEB_ARTICLE_SOURCE, key);
-    const existingId = Number((existing as any)?.id);
-    if (existing && Number.isFinite(existingId) && existingId > 0) {
-      const warningFlags = Array.isArray((existing as any)?.warningFlags)
-        ? (existing as any).warningFlags.map((x: any) => String(x || '').trim()).filter(Boolean)
+    if (existing) {
+      const warningFlags = Array.isArray(existing.warningFlags)
+        ? existing.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
         : [];
       return {
         isNew: false,
-        conversationId: existingId,
+        conversationId: existing.id,
         url: canonicalUrl,
-        title: normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
-        author: normalizeText((existing as any)?.author || ''),
-        publishedAt: normalizeText((existing as any)?.publishedAt || ''),
+        title: normalizeText(existing.title || '') || fallbackTitle(canonicalUrl, tab.title || ''),
+        author: normalizeText(existing.author || ''),
+        publishedAt: normalizeText(existing.publishedAt || ''),
         warningFlags,
-        lastCapturedAt: Number((existing as any)?.lastCapturedAt) || null,
+        lastCapturedAt: Number(existing.lastCapturedAt) || null,
       };
     }
   } catch (_e) {

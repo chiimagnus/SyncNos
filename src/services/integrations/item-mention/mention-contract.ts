@@ -1,8 +1,3 @@
-export type MentionQuery = {
-  normalized: string;
-  empty: boolean;
-};
-
 export type MentionCandidate = {
   conversationId: number;
   title: string;
@@ -14,9 +9,3 @@ export type MentionCandidate = {
 export type MentionSearchResult = {
   candidates: MentionCandidate[];
 };
-
-export type MentionInsertPayload = {
-  conversationId: number;
-};
-
-

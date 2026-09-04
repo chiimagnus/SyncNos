@@ -172,19 +172,16 @@ function sortFacetItems(items: Array<{ key: string; label: string; count: number
   });
 }
 
-function isArticlePayload(payload: any): boolean {
-  return safeString(payload?.sourceType).toLowerCase() === 'article';
-}
-
 async function findExistingArticleConversationByUrl(
   conversationsStore: IDBObjectStore,
   rawUrl: unknown,
 ): Promise<any | null> {
-  const normalizedUrl = canonicalizeArticleUrl(rawUrl);
-  if (!normalizedUrl) return null;
+  const identity = buildCanonicalWebArticleIdentity(rawUrl);
+  if (!identity) return null;
+  const normalizedUrl = identity.url;
   const siteKey = deriveConversationListStoredSiteKeyFromUrl(normalizedUrl);
-  if (!siteKey || siteKey === 'unknown') return null;
-  const canonicalConversationKey = buildCanonicalWebArticleIdentity(normalizedUrl)?.conversationKey || '';
+  if (siteKey === 'unknown') return null;
+  const canonicalConversationKey = identity.conversationKey;
 
   const index = conversationsStore.index('by_listSiteKey_lastCapturedAt_id');
   const range = globalThis.IDBKeyRange.bound(
@@ -204,7 +201,8 @@ async function findExistingArticleConversationByUrl(
         canonicalizeArticleUrl(row?.url) === normalizedUrl
       ) {
         const rowCanonical =
-          safeString(row?.source) === WEB_ARTICLE_SOURCE && canonicalConversationKey === safeString(row?.conversationKey);
+          safeString(row?.source) === WEB_ARTICLE_SOURCE &&
+          canonicalConversationKey === safeString(row?.conversationKey);
         const bestCanonical =
           !!best &&
           safeString(best?.source) === WEB_ARTICLE_SOURCE &&
@@ -250,10 +248,11 @@ async function findExistingConversationForPayload(
   }
 
   const source = safeString(payload?.source);
+  const isArticle = safeString(payload?.sourceType).toLowerCase() === 'article';
   let conversationKey = safeString(payload?.conversationKey);
   if (!source) return null;
 
-  if (isArticlePayload(payload) && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
+  if (isArticle && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
     const identity = buildCanonicalWebArticleIdentity(payload?.url);
     if (identity) conversationKey = identity.conversationKey;
     conversationKey = normalizeWebArticleConversationKey(conversationKey);
@@ -262,9 +261,7 @@ async function findExistingConversationForPayload(
   if (!conversationKey) return null;
   const idx = conversationsStore.index('by_source_conversationKey');
   let existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
-  if (!existing && isArticlePayload(payload)) {
-    existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
-  }
+  if (!existing && isArticle) existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
   return existing || null;
 }
 
@@ -1692,45 +1689,29 @@ export async function getConversationById(conversationId: number): Promise<Conve
   return row ? (normalizeConversationListRecord(row) as Conversation) : null;
 }
 
-export async function readConversationMentionCandidatePool(input: {
-  maxScan: number;
-  maxDurationMs: number;
-}): Promise<{
-  candidates: Array<{
-    conversationId: number;
-    title: string;
-    source: string;
-    domain: string;
-    lastCapturedAt: number;
-  }>;
-  revision: number;
-}> {
-  // ponytail: Item Mention intentionally searches only a bounded recent pool; FTS/global indexing stays out of scope.
+type ConversationMentionCandidate = {
+  conversationId: number;
+  title: string;
+  source: string;
+  domain: string;
+  lastCapturedAt: number;
+};
+
+function readConversationMentionCandidatesFromStore(
+  conversationsStore: IDBObjectStore,
+  input: { maxScan: number; maxDurationMs: number },
+): Promise<ConversationMentionCandidate[]> {
   const { maxScan, maxDurationMs } = input;
-
-  const db = await openDb();
-  const revisionStoreName = DATA_REVISION_STORE_BY_SCOPE.conversations;
-  const { t, stores } = tx(db, ['conversations', revisionStoreName], 'readonly');
-  const done = txDone(t);
-  const revisionPromise = reqToPromise(stores[revisionStoreName].get(DATA_REVISION_RECORD_KEY));
-  const idx = stores.conversations.index('by_lastCapturedAt_id');
-
-  const candidates: Array<{
-    conversationId: number;
-    title: string;
-    source: string;
-    domain: string;
-    lastCapturedAt: number;
-  }> = [];
+  const candidates: ConversationMentionCandidate[] = [];
   let scannedCount = 0;
   const startedAt = Date.now();
+  const cursorReq = conversationsStore.index('by_lastCapturedAt_id').openCursor(null, 'prev');
 
-  const cursorReq = idx.openCursor(null, 'prev');
-  const cursorDone = new Promise<void>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
     cursorReq.onsuccess = () => {
       const cursor = cursorReq.result as IDBCursorWithValue | null;
-      if (!cursor) return resolve();
+      if (!cursor) return resolve(candidates);
 
       scannedCount += 1;
       const record = cursor.value as any;
@@ -1746,15 +1727,41 @@ export async function readConversationMentionCandidatePool(input: {
         });
       }
 
-      const elapsed = Date.now() - startedAt;
-      if (scannedCount >= maxScan || elapsed >= maxDurationMs) return resolve();
-
+      if (scannedCount >= maxScan || Date.now() - startedAt >= maxDurationMs) return resolve(candidates);
       cursor.continue();
     };
   });
+}
 
+export async function readRecentConversationMentionCandidates(input: {
+  maxScan: number;
+  maxDurationMs: number;
+}): Promise<ConversationMentionCandidate[]> {
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  const done = txDone(t);
   try {
-    await cursorDone;
+    const candidates = await readConversationMentionCandidatesFromStore(stores.conversations, input);
+    await done;
+    return candidates;
+  } catch (error) {
+    await done.catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function readConversationMentionCandidatePool(input: {
+  maxScan: number;
+  maxDurationMs: number;
+}): Promise<{ candidates: ConversationMentionCandidate[]; revision: number }> {
+  // ponytail: Item Mention intentionally searches only a bounded recent pool; FTS/global indexing stays out of scope.
+  const db = await openDb();
+  const revisionStoreName = DATA_REVISION_STORE_BY_SCOPE.conversations;
+  const { t, stores } = tx(db, ['conversations', revisionStoreName], 'readonly');
+  const done = txDone(t);
+  const revisionPromise = reqToPromise(stores[revisionStoreName].get(DATA_REVISION_RECORD_KEY));
+  try {
+    const candidates = await readConversationMentionCandidatesFromStore(stores.conversations, input);
     const revision = normalizeDataRevisionRecord(await revisionPromise).revision;
     await done;
     return { candidates, revision };

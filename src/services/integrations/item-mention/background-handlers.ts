@@ -3,9 +3,9 @@ import {
   getConversationById,
   getConversationDetail,
   readConversationMentionCandidatePool,
+  readRecentConversationMentionCandidates,
 } from '@services/conversations/data/storage';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
-import type { MentionQuery } from '@services/integrations/item-mention/mention-contract';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 
@@ -36,27 +36,28 @@ export function registerItemMentionHandlers(router: AnyRouter) {
     return load;
   };
 
-  const respondWithPool = (pool: MentionCandidatePool, query: MentionQuery, limit: number) =>
+  const respondWithPool = (pool: MentionCandidatePool, query: string, limit: number) =>
     router.ok(searchMentionCandidates({ query, candidates: pool.candidates, limit }));
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, async (msg) => {
-    const normalizedQuery = String(msg?.query ?? '').trim().toLowerCase();
-    const mentionQuery = { normalized: normalizedQuery, empty: !normalizedQuery };
+    const normalizedQuery = String(msg?.query ?? '')
+      .trim()
+      .toLowerCase();
     const rawLimit = msg?.limit;
     const parsedLimit = Number(rawLimit);
     const limit =
       rawLimit == null || rawLimit === '' || !Number.isFinite(parsedLimit) || parsedLimit <= 0
         ? 20
-        : Math.min(Math.floor(parsedLimit), 50);
+        : Math.max(1, Math.min(Math.floor(parsedLimit), 50));
 
-    if (mentionQuery.empty) {
-      const recentPool = await readConversationMentionCandidatePool({ maxScan: limit, maxDurationMs: 300 });
-      return respondWithPool(recentPool, mentionQuery, limit);
+    if (!normalizedQuery) {
+      const candidates = await readRecentConversationMentionCandidates({ maxScan: limit, maxDurationMs: 300 });
+      return router.ok({ candidates });
     }
 
     const observedRevision = await readDataRevision('conversations');
     if (mentionCandidatePoolCache?.revision === observedRevision) {
-      return respondWithPool(mentionCandidatePoolCache, mentionQuery, limit);
+      return respondWithPool(mentionCandidatePoolCache, normalizedQuery, limit);
     }
 
     let pool = await loadMentionCandidatePoolSingleFlight();
@@ -65,7 +66,7 @@ export function registerItemMentionHandlers(router: AnyRouter) {
       if (pool.revision !== currentRevision) pool = await loadMentionCandidatePoolSingleFlight();
     }
 
-    return respondWithPool(pool, mentionQuery, limit);
+    return respondWithPool(pool, normalizedQuery, limit);
   });
 
   router.register(ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, async (msg) => {

@@ -6,6 +6,7 @@ import { closeDbForTests, openDb } from '@platform/idb/schema';
 import {
   __resetConversationStorageStateForTests,
   readConversationMentionCandidatePool,
+  readRecentConversationMentionCandidates,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
 
@@ -129,6 +130,26 @@ describe('item mention candidate pool storage', () => {
 
     expect(res.candidates).toHaveLength(51);
     expect(res.candidates[50]).toMatchObject({ title: 'OpenAI', source: 'chatgpt' });
+  });
+
+  it('reads empty-query recent candidates without opening the revision store', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'recent-only',
+      title: 'Recent only',
+      url: 'https://chatgpt.com/c/recent-only',
+      lastCapturedAt: 1,
+    });
+
+    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
+    const candidates = await readRecentConversationMentionCandidates({ maxScan: 20, maxDurationMs: 10_000 });
+
+    expect(candidates).toHaveLength(1);
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+    const [storeNames, mode] = transactionSpy.mock.calls[0] || [];
+    expect(storeNames).toEqual(['conversations']);
+    expect(mode).toBe('readonly');
   });
 
   it('reads conversation rows and their revision in one readonly transaction', async () => {
