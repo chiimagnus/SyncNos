@@ -61,6 +61,7 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       return { start: () => {}, stop: () => {} };
     },
     incrementalEngine: createAutoSaveIncrementalEngine(),
+    itemMention: { start: () => null },
   });
   controller.start();
 

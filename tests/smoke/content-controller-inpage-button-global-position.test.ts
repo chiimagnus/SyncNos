@@ -108,6 +108,7 @@ function createHarness(options?: {
       return { start: () => {}, stop: () => {} };
     },
     incrementalEngine: createAutoSaveIncrementalEngine(),
+    itemMention: { start: () => null },
   });
   const resident = controller.start();
 
