@@ -13,9 +13,7 @@ export type MentionCandidate = {
 };
 
 export type MentionSearchResult = {
-  query: MentionQuery;
   candidates: MentionCandidate[];
-  limit: number;
 };
 
 export type MentionInsertPayload = {

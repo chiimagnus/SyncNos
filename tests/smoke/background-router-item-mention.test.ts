@@ -102,7 +102,6 @@ describe('background-router item mention', () => {
     const cached = await search(router, 'open', 20);
 
     expect(empty.ok).toBe(true);
-    expect(whitespace.data?.query).toEqual({ raw: ' \n\t ', normalized: '', empty: true });
     expect(nonEmpty.ok).toBe(true);
     expect(cached.ok).toBe(true);
     expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenNthCalledWith(1, {
@@ -132,7 +131,6 @@ describe('background-router item mention', () => {
     });
 
     expect(response.ok).toBe(true);
-    expect(response.data?.query).toEqual({ raw: '', normalized: '', empty: true });
     expect(storageMocks.readConversationMentionCandidatePool).toHaveBeenCalledWith({ maxScan: 2, maxDurationMs: 300 });
     expect(revisionMocks.readDataRevision).not.toHaveBeenCalled();
   });

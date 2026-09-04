@@ -46,7 +46,7 @@ export function searchMentionCandidates(input: {
   limit: number;
 }): MentionSearchResult {
   const { query, candidates, limit } = input;
-  if (query.empty) return { query, candidates: candidates.slice(0, limit), limit };
+  if (query.empty) return { candidates: candidates.slice(0, limit) };
 
   const matched: Array<{ c: MentionCandidate; score: number }> = [];
   for (const c of candidates) {
@@ -63,9 +63,5 @@ export function searchMentionCandidates(input: {
     return (b.c.conversationId || 0) - (a.c.conversationId || 0);
   });
 
-  return {
-    query,
-    candidates: matched.slice(0, limit).map((x) => x.c),
-    limit,
-  };
+  return { candidates: matched.slice(0, limit).map((x) => x.c) };
 }
