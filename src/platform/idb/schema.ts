@@ -207,17 +207,7 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
             ? groupedConversations.concat([stableExisting])
             : groupedConversations;
 
-        let keepConversation: Record<string, unknown> | null = null;
-        if (stableExisting?.id) {
-          keepConversation = stableExisting;
-        } else {
-          for (const conversation of mergedConversations) {
-            if (String(conversation.conversationKey || '') === stableKey) {
-              keepConversation = conversation;
-              break;
-            }
-          }
-        }
+        let keepConversation: Record<string, unknown> | null = stableExisting?.id ? stableExisting : null;
         if (!keepConversation) {
           for (const conversation of mergedConversations) {
             if (!keepConversation) {
