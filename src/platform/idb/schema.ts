@@ -224,74 +224,71 @@ function migrateNotionAiThreadConversations({ tx }: MigrationContext, onDone: ()
           }
         }
 
-        const keepId = keepConversation?.id ? Number(keepConversation.id) : 0;
+        if (!keepConversation) {
+          processNextThread();
+          return;
+        }
+        const keepId = Number(keepConversation.id);
         if (!Number.isFinite(keepId) || keepId <= 0) {
           processNextThread();
           return;
         }
 
-        const keepReq = conversationsStore.get(keepId);
-          keepReq.onsuccess = () => {
-            const current = keepReq.result as Record<string, unknown> | undefined;
-            const legacyKeepKey = current ? String(current.conversationKey || '') : '';
+        const legacyKeepKey = String(keepConversation.conversationKey || '');
+        let changed = false;
+        if (legacyKeepKey !== stableKey) {
+          keepConversation.conversationKey = stableKey;
+          changed = true;
+        }
+        if (canonicalUrl && String(keepConversation.url || '') !== canonicalUrl) {
+          keepConversation.url = canonicalUrl;
+          changed = true;
+        }
+        if (changed) conversationsStore.put(keepConversation);
 
-            if (current) {
-              let changed = false;
-              if (String(current.conversationKey || '') !== stableKey) {
-                current.conversationKey = stableKey;
-                changed = true;
+        migrateMappingKey({
+          legacyKey: legacyKeepKey,
+          stableKey,
+          onDone: () => {
+            const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
+            let duplicateIndex = 0;
+
+            const processNextDup = () => {
+              if (duplicateIndex >= duplicates.length) {
+                processNextThread();
+                return;
               }
-              if (canonicalUrl && String(current.url || '') !== canonicalUrl) {
-                current.url = canonicalUrl;
-                changed = true;
+              const duplicate = duplicates[duplicateIndex];
+              duplicateIndex += 1;
+
+              const duplicateId = duplicate?.id ? Number(duplicate.id) : 0;
+              if (!Number.isFinite(duplicateId) || duplicateId <= 0) {
+                processNextDup();
+                return;
               }
-              if (changed) conversationsStore.put(current);
-            }
 
-            migrateMappingKey({
-              legacyKey: legacyKeepKey,
-              stableKey,
-              onDone: () => {
-                const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
-                let duplicateIndex = 0;
-
-                const processNextDup = () => {
-                  if (duplicateIndex >= duplicates.length) {
-                    processNextThread();
-                    return;
-                  }
-                  const duplicate = duplicates[duplicateIndex];
-                  duplicateIndex += 1;
-
-                  const duplicateId = duplicate?.id ? Number(duplicate.id) : 0;
-                  if (!Number.isFinite(duplicateId) || duplicateId <= 0) {
-                    processNextDup();
-                    return;
-                  }
-
-                  const legacyKey = String(duplicate.conversationKey || '');
-                  migrateDuplicateConversationMessages({
-                    messagesBySequenceIndex,
-                    messagesByKeyIndex,
-                    dupId: duplicateId,
-                    keepId,
+              const legacyKey = String(duplicate.conversationKey || '');
+              migrateDuplicateConversationMessages({
+                messagesBySequenceIndex,
+                messagesByKeyIndex,
+                dupId: duplicateId,
+                keepId,
+                onDone: () => {
+                  migrateMappingKey({
+                    legacyKey,
+                    stableKey,
                     onDone: () => {
-                      migrateMappingKey({
-                        legacyKey,
-                        stableKey,
-                        onDone: () => {
-                          conversationsStore.delete(duplicateId);
-                          processNextDup();
-                        },
-                      });
+                      conversationsStore.delete(duplicateId);
+                      processNextDup();
                     },
                   });
-                };
+                },
+              });
+            };
 
-                processNextDup();
-              },
-            });
-        };
+            processNextDup();
+          },
+        });
       };
 
       const stableReq = convoKeyIdx.get(['notionai', stableKey]);
@@ -458,78 +455,77 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
           }
         }
 
-        const keepId = Number(keepConversation?.id);
+        if (!keepConversation) {
+          processNextGroup();
+          return;
+        }
+        const keepId = Number(keepConversation.id);
         if (!Number.isFinite(keepId) || keepId <= 0) {
           processNextGroup();
           return;
         }
 
-        const keepReq = conversationsStore.get(keepId);
-        keepReq.onsuccess = () => {
-          const currentKeep = (keepReq.result as Record<string, unknown> | undefined) || {};
-          const legacyKeepSource = safeString(currentKeep.source);
-          const legacyKeepKey = safeString(currentKeep.conversationKey);
+        const legacyKeepSource = safeString(keepConversation.source);
+        const legacyKeepKey = safeString(keepConversation.conversationKey);
+        let mergedKeep = {
+          ...keepConversation,
+          __canonicalUrl: canonicalUrl,
+          __canonicalKey: canonicalKey,
+        } as Record<string, unknown>;
+        for (const conversation of mergedConversations) {
+          mergedKeep = mergeConversationRecord(mergedKeep, conversation);
+        }
+        delete mergedKeep.__canonicalUrl;
+        delete mergedKeep.__canonicalKey;
+        mergedKeep = normalizeConversationListRecord(mergedKeep) as Record<string, unknown>;
+        conversationsStore.put(mergedKeep);
 
-          let mergedKeep = {
-            ...currentKeep,
-            __canonicalUrl: canonicalUrl,
-            __canonicalKey: canonicalKey,
-          } as Record<string, unknown>;
-          for (const conversation of mergedConversations) {
-            mergedKeep = mergeConversationRecord(mergedKeep, conversation);
-          }
-          delete mergedKeep.__canonicalUrl;
-          delete mergedKeep.__canonicalKey;
-          mergedKeep = normalizeConversationListRecord(mergedKeep) as Record<string, unknown>;
-          conversationsStore.put(mergedKeep);
+        migrateMappingToCanonical({
+          legacySource: legacyKeepSource,
+          legacyKey: legacyKeepKey,
+          canonicalKey,
+          fallbackNotionPageId: safeString(mergedKeep.notionPageId),
+          onDone: () => {
+            const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
+            let duplicateIndex = 0;
 
-          migrateMappingToCanonical({
-            legacySource: legacyKeepSource,
-            legacyKey: legacyKeepKey,
-            canonicalKey,
-            fallbackNotionPageId: safeString(mergedKeep.notionPageId),
-            onDone: () => {
-              const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
-              let duplicateIndex = 0;
+            const processNextDuplicate = () => {
+              if (duplicateIndex >= duplicates.length) {
+                processNextGroup();
+                return;
+              }
+              const duplicate = duplicates[duplicateIndex];
+              duplicateIndex += 1;
 
-              const processNextDuplicate = () => {
-                if (duplicateIndex >= duplicates.length) {
-                  processNextGroup();
-                  return;
-                }
-                const duplicate = duplicates[duplicateIndex];
-                duplicateIndex += 1;
+              const duplicateId = Number(duplicate?.id);
+              if (!Number.isFinite(duplicateId) || duplicateId <= 0) {
+                processNextDuplicate();
+                return;
+              }
 
-                const duplicateId = Number(duplicate?.id);
-                if (!Number.isFinite(duplicateId) || duplicateId <= 0) {
-                  processNextDuplicate();
-                  return;
-                }
+              migrateDuplicateConversationMessages({
+                messagesBySequenceIndex,
+                messagesByKeyIndex,
+                dupId: duplicateId,
+                keepId,
+                onDone: () => {
+                  migrateMappingToCanonical({
+                    legacySource: safeString(duplicate?.source),
+                    legacyKey: safeString(duplicate?.conversationKey),
+                    canonicalKey,
+                    fallbackNotionPageId: safeString(mergedKeep.notionPageId),
+                    onDone: () => {
+                      conversationsStore.delete(duplicateId);
+                      processNextDuplicate();
+                    },
+                  });
+                },
+              });
+            };
 
-                migrateDuplicateConversationMessages({
-                  messagesBySequenceIndex,
-                  messagesByKeyIndex,
-                  dupId: duplicateId,
-                  keepId,
-                  onDone: () => {
-                    migrateMappingToCanonical({
-                      legacySource: safeString(duplicate?.source),
-                      legacyKey: safeString(duplicate?.conversationKey),
-                      canonicalKey,
-                      fallbackNotionPageId: safeString(mergedKeep.notionPageId),
-                      onDone: () => {
-                        conversationsStore.delete(duplicateId);
-                        processNextDuplicate();
-                      },
-                    });
-                  },
-                });
-              };
-
-              processNextDuplicate();
-            },
-          });
-        };
+            processNextDuplicate();
+          },
+        });
       };
     };
 
