@@ -47,7 +47,9 @@ export function createTestBackgroundRouter(
     onConversationChanged: async () => {},
     onRemoteCleanupPending: async () => {},
   });
-  registerWebArticleHandlers(router, { onConversationChanged: options.onArticleConversationChanged });
+  registerWebArticleHandlers(router, {
+    onConversationChanged: options.onArticleConversationChanged ?? (async () => {}),
+  });
   registerNotionSettingsHandlers(router, {
     conversationKinds,
     runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,

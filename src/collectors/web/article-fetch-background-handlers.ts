@@ -13,7 +13,7 @@ type AnyRouter = {
 };
 
 type WebArticleHandlersDeps = {
-  onConversationChanged?: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
 };
 
 function normalizeArticleFetchError(error: unknown, fallback: string): string {
@@ -28,16 +28,14 @@ function fireAndForget(task: void | Promise<void>) {
   Promise.resolve(task).catch(() => {});
 }
 
-export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHandlersDeps = {}) {
+export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHandlersDeps) {
   router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg) => {
     try {
       const data = await fetchActiveTabArticle({ tabId: msg?.tabId });
 
-      const conversationId = Number((data as any)?.conversationId);
-      if (Number.isFinite(conversationId) && conversationId > 0) {
-        fireAndForget(
-          deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
-        );
+      const { conversationId } = data;
+      if (conversationId > 0) {
+        fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages));
       }
 
       return router.ok(data);
@@ -52,9 +50,7 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
 
       const { conversationId, isNew } = data;
       if (isNew && conversationId > 0) {
-        fireAndForget(
-          deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
-        );
+        fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages));
       }
 
       return router.ok(data);
