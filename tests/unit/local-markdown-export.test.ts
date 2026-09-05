@@ -64,6 +64,14 @@ beforeEach(() => {
 });
 
 describe('local markdown export', () => {
+  it('fails malformed conversation ids instead of silently dropping selected items', async () => {
+    await expect(
+      buildConversationsMarkdownZipExport({ conversations: [{ ...conversation(1, 'One'), id: '1' } as any] }),
+    ).rejects.toThrow('Invalid conversation id');
+    expect(mocks.getConversationDetail).not.toHaveBeenCalled();
+    expect(mocks.createZipBlob).not.toHaveBeenCalled();
+  });
+
   it('uses one scoped batch read and safely degrades unavailable internal images', async () => {
     const c = conversation(1, 'One');
     const source = [

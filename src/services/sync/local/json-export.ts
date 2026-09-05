@@ -99,20 +99,16 @@ function normalizeCapturedAt(value: unknown): string | null {
 }
 
 function normalizeContent(message: ConversationMessage | null | undefined): JsonContent {
-  const markdown = contentString((message as any)?.contentMarkdown, 'contentMarkdown');
-  const text = contentString((message as any)?.contentText, 'contentText');
+  const markdown = contentString(message?.contentMarkdown, 'contentMarkdown');
+  const text = contentString(message?.contentText, 'contentText');
   if (markdown != null) return { format: 'markdown', value: markdown };
   if (text != null) return { format: 'text', value: text };
   return null;
 }
 
 function findSemanticMessage(messages: ConversationMessage[], messageKey: string): ConversationMessage | null {
-  const semantic = messages.find((message) => (message as any)?.messageKey === messageKey);
+  const semantic = messages.find((message) => message.messageKey === messageKey);
   return semantic || messages[0] || null;
-}
-
-function toPublicAttachments(attachments: MaterializedExportAttachment[]): JsonAttachment[] {
-  return attachments.map(({ path, mediaType, byteSize }) => ({ path, mediaType, byteSize }));
 }
 
 async function materializeContentMarkdown(input: {
@@ -125,13 +121,7 @@ async function materializeContentMarkdown(input: {
   attachments: JsonAttachment[];
   zipAttachments: MaterializedExportAttachment[];
 }> {
-  const slotIndexes: number[] = [];
-  const markdown: string[] = [];
-  input.contents.forEach((content, index) => {
-    if (content?.format !== 'markdown') return;
-    slotIndexes.push(index);
-    markdown.push(content.value);
-  });
+  const markdown = input.contents.flatMap((content) => (content?.format === 'markdown' ? [content.value] : []));
 
   const materialized = await materializeConversationMarkdownAssets({
     conversationId: input.conversationId,
@@ -139,16 +129,15 @@ async function materializeContentMarkdown(input: {
     markdown,
     nextAttachmentIndex: input.nextAttachmentIndex,
   });
-  const contents = input.contents.map((content) => (content ? { ...content } : null));
-  slotIndexes.forEach((contentIndex, slotIndex) => {
-    const content = contents[contentIndex];
-    if (!content || content.format !== 'markdown') return;
-    content.value = materialized.markdown[slotIndex] ?? content.value;
+  let markdownIndex = 0;
+  const contents = input.contents.map((content) => {
+    if (content?.format !== 'markdown') return content;
+    return { ...content, value: materialized.markdown[markdownIndex++] };
   });
 
   return {
     contents,
-    attachments: toPublicAttachments(materialized.attachments),
+    attachments: materialized.attachments.map(({ path, mediaType, byteSize }) => ({ path, mediaType, byteSize })),
     zipAttachments: materialized.attachments,
   };
 }
@@ -160,34 +149,33 @@ function commonFields<T extends JsonCommon['type']>(
   return {
     schemaVersion: 1,
     type,
-    source: requireNonEmptyString((conversation as any)?.source, 'source'),
-    key: requireNonEmptyString((conversation as any)?.conversationKey, 'conversationKey'),
-    title: nullableMetadataString((conversation as any)?.title),
-    url: nullableMetadataString((conversation as any)?.url),
-    capturedAt: normalizeCapturedAt((conversation as any)?.lastCapturedAt),
-    warnings: normalizeWarnings((conversation as any)?.warningFlags),
+    source: requireNonEmptyString(conversation.source, 'source'),
+    key: requireNonEmptyString(conversation.conversationKey, 'conversationKey'),
+    title: nullableMetadataString(conversation.title),
+    url: nullableMetadataString(conversation.url),
+    capturedAt: normalizeCapturedAt(conversation.lastCapturedAt),
+    warnings: normalizeWarnings(conversation.warningFlags),
   };
 }
 
 async function buildJsonItem(input: {
   conversation: Conversation;
-  conversationId: number;
   messages: ConversationMessage[];
   basename: string;
   nextAttachmentIndex: () => number;
 }): Promise<{ item: JsonExportItem; zipAttachments: MaterializedExportAttachment[] }> {
-  const definition = conversationKinds.pick(input.conversation as any);
+  const definition = conversationKinds.pick(input.conversation);
   const kindId = definition?.id;
 
   if (kindId === CHAT_KIND_ID) {
     const rawMessages = input.messages.map((message) => ({
-      key: requireNonEmptyString((message as any)?.messageKey, 'messageKey'),
-      role: nullableMetadataString((message as any)?.role) || 'assistant',
-      author: nullableMetadataString((message as any)?.authorName),
+      key: requireNonEmptyString(message.messageKey, 'messageKey'),
+      role: nullableMetadataString(message.role) || 'assistant',
+      author: nullableMetadataString(message.authorName),
       content: normalizeContent(message),
     }));
     const materialized = await materializeContentMarkdown({
-      conversationId: input.conversationId,
+      conversationId: input.conversation.id,
       basename: input.basename,
       contents: rawMessages.map((message) => message.content),
       nextAttachmentIndex: input.nextAttachmentIndex,
@@ -205,7 +193,7 @@ async function buildJsonItem(input: {
   if (kindId === ARTICLE_KIND_ID) {
     const sourceMessage = findSemanticMessage(input.messages, 'article_body');
     const materialized = await materializeContentMarkdown({
-      conversationId: input.conversationId,
+      conversationId: input.conversation.id,
       basename: input.basename,
       contents: [normalizeContent(sourceMessage)],
       nextAttachmentIndex: input.nextAttachmentIndex,
@@ -214,8 +202,8 @@ async function buildJsonItem(input: {
       item: {
         ...commonFields(input.conversation, 'article'),
         attachments: materialized.attachments,
-        author: nullableMetadataString((input.conversation as any)?.author),
-        publishedAt: nullableMetadataString((input.conversation as any)?.publishedAt),
+        author: nullableMetadataString(input.conversation.author),
+        publishedAt: nullableMetadataString(input.conversation.publishedAt),
         content: materialized.contents[0]!,
       },
       zipAttachments: materialized.zipAttachments,
@@ -225,7 +213,7 @@ async function buildJsonItem(input: {
   if (kindId === VIDEO_KIND_ID) {
     const sourceMessage = findSemanticMessage(input.messages, 'video_transcript');
     const materialized = await materializeContentMarkdown({
-      conversationId: input.conversationId,
+      conversationId: input.conversation.id,
       basename: input.basename,
       contents: [normalizeContent(sourceMessage)],
       nextAttachmentIndex: input.nextAttachmentIndex,
@@ -234,7 +222,7 @@ async function buildJsonItem(input: {
       item: {
         ...commonFields(input.conversation, 'video'),
         attachments: materialized.attachments,
-        author: nullableMetadataString((input.conversation as any)?.author),
+        author: nullableMetadataString(input.conversation.author),
         transcript: materialized.contents[0]!,
       },
       zipAttachments: materialized.zipAttachments,
@@ -249,37 +237,24 @@ export async function buildConversationsJsonZipExport({
 }: {
   conversations: Conversation[];
 }): Promise<{ zipBlob: Blob; filename: string }> {
-  const list = Array.isArray(conversations) ? conversations : [];
-  if (!list.length) throw new Error('No conversations selected');
-
-  for (const conversation of list) {
-    const id = (conversation as any)?.id;
-    if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) throw new Error('Invalid conversation id');
-    requireNonEmptyString((conversation as any)?.source, 'source');
-    requireNonEmptyString((conversation as any)?.conversationKey, 'conversationKey');
-  }
+  if (!conversations.length) throw new Error('No conversations selected');
 
   const files: Array<{ name: string; data: string | Blob }> = [];
-  const jsonFiles: Array<{ name: string; data: string }> = [];
   const usedBasenames = new Set<string>();
   let attachmentIndex = 0;
-  const nextAttachmentIndex = () => {
-    attachmentIndex += 1;
-    return attachmentIndex;
-  };
+  const nextAttachmentIndex = () => ++attachmentIndex;
 
-  for (const conversation of list) {
+  for (const conversation of conversations) {
     const conversationId = conversation.id;
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('Invalid conversation id');
     const detail = await getConversationDetail(conversationId);
-    if (detail?.conversationId !== conversationId) throw new Error('conversation detail returned a mismatched id');
-    const messages = Array.isArray(detail.messages) ? detail.messages : [];
+    if (detail.conversationId !== conversationId) throw new Error('conversation detail returned a mismatched id');
     const basename = claimUniqueConversationExportBasename(conversation, usedBasenames);
-    const built = await buildJsonItem({ conversation, conversationId, messages, basename, nextAttachmentIndex });
-    jsonFiles.push({ name: `${basename}.json`, data: JSON.stringify(built.item, null, 2) });
+    const built = await buildJsonItem({ conversation, messages: detail.messages, basename, nextAttachmentIndex });
+    files.push({ name: `${basename}.json`, data: JSON.stringify(built.item, null, 2) });
     files.push(...built.zipAttachments.map(({ path, blob }) => ({ name: path, data: blob })));
   }
 
-  files.unshift(...jsonFiles);
   return {
     zipBlob: await createZipBlob(files),
     filename: `SyncNos-json-${buildLocalTimestampForFilename()}.zip`,

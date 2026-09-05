@@ -29,7 +29,7 @@ import type { ConversationKindDbSpec } from '@services/protocols/conversation-ki
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
-import { openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
 import {
@@ -1988,17 +1988,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
             if (label) setExportStatus(`${t('backupExporting')} (${label})`);
           },
         });
-        const url = URL.createObjectURL(result.blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = result.filename;
-        anchor.click();
+        downloadBlobFile(result.blob, result.filename);
 
         setExportStatus(
           `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages}, ${t('statsComments')} ${result.counts.article_comments})`,
         );
         setLastBackupExportAt(Date.parse(result.exportedAt) || Date.now());
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
       },
       {
         fallbackMessage: 'export failed',

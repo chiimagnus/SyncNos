@@ -390,8 +390,6 @@ describe('ConversationListPane row actions', () => {
     const jsonItem = document.getElementById('menuExportJson') as HTMLButtonElement | null;
     expect(markdownItem?.textContent).toBe('markdownExport');
     expect(jsonItem?.textContent).toBe('jsonExport');
-    expect(document.getElementById('menuExportSingleMarkdown')).toBeNull();
-    expect(document.getElementById('menuExportMultiMarkdown')).toBeNull();
 
     await act(async () => {
       markdownItem!.click();
