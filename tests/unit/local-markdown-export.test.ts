@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getConversationDetail: vi.fn(),
   getImageCacheAssetsByIds: vi.fn(),
   createZipBlob: vi.fn(),
+  realCreateZipBlob: null as null | ((entries: any[]) => Promise<Blob>),
 }));
 
 vi.mock('@services/conversations/client/repo', () => ({
@@ -14,15 +15,21 @@ vi.mock('@services/conversations/data/image-cache-read', () => ({
   getImageCacheAssetsByIds: (...args: any[]) => mocks.getImageCacheAssetsByIds(...args),
 }));
 
-vi.mock('@services/sync/backup/zip-utils', () => ({
-  createZipBlob: (...args: any[]) => mocks.createZipBlob(...args),
-}));
+vi.mock('@services/sync/backup/zip-utils', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  mocks.realCreateZipBlob = actual.createZipBlob;
+  return {
+    ...actual,
+    createZipBlob: (...args: any[]) => mocks.createZipBlob(...args),
+  };
+});
 
 vi.mock('@services/shared/file-timestamp', () => ({
   buildLocalTimestampForFilename: () => '20260905-010203',
 }));
 
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
+import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 
 function conversation(id: number, title: string) {
@@ -205,7 +212,8 @@ describe('local markdown export', () => {
       conversationId === 2 ? new Map([[22, asset(22, 2)]]) : new Map(),
     );
 
-    await buildConversationsMarkdownZipExport({ conversations: items });
+    mocks.createZipBlob.mockImplementation((entries: any[]) => mocks.realCreateZipBlob!(entries));
+    const result = await buildConversationsMarkdownZipExport({ conversations: items });
     const files = capturedFiles();
     const markdownNames = files.filter((file) => file.name.endsWith('.md')).map((file) => file.name);
     const attachment = files.find((file) => file.name.startsWith('attachments/'))!;
@@ -215,5 +223,10 @@ describe('local markdown export', () => {
     expect(new Set(markdownNames).size).toBe(3);
     expect(attachment.name).toMatch(new RegExp(`^attachments/${base}-2-0001\\.png$`));
     expect(String(secondMarkdown.data)).toContain(attachment.name);
+
+    const zipEntries = await extractZipEntries(result.zipBlob);
+    expect(Array.from(zipEntries.keys()).sort()).toEqual(
+      [`${base}.md`, `${base}-2.md`, `${base}-3.md`, attachment.name].sort(),
+    );
   });
 });
