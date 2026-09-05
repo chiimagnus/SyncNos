@@ -19,6 +19,7 @@ The commit above is the code baseline at the start of this documentation reconci
 - `PRIVACY.md`: privacy boundaries and external-service disclosure.
 - `docs/CONTRIBUTING.md`: development workflow and validation requirements.
 - `docs/storage.md`: local-source-of-truth, IndexedDB consistency/reload-free recovery, backup, secret-exclusion, and recovery contracts.
+- `docs/export-json-v1.md`: canonical selected JSON v1 archive/schema, content-fidelity, attachment, exclusion, and compatibility contract.
 - `docs/troubleshooting.md`: durable troubleshooting guidance.
 - `docs/guide/feishu/DocxSync.en.md` and `docs/guide/feishu/DocxSync.zh.md`: Feishu setup.
 - `docs/guide/obsidian/LocalRestAPI.en.md` and `docs/guide/obsidian/LocalRestAPI.zh.md`: Obsidian Local REST API setup.
@@ -31,9 +32,10 @@ The commit above is the code baseline at the start of this documentation reconci
 - Runtime structure, symbols, callers, and module relationships belong to CodeGraph and source code rather than duplicated module-index Markdown.
 - `PRIVACY.md` owns external GitHub network/auth disclosure and the distinction between local Disconnect, GitHub authorization revoke, and GitHub App installation controls.
 - `docs/storage.md` owns durable local-data consistency/retry semantics, backup recovery, GitHub local-secret/backup-exclusion, sync-mapping, and cleanup-outbox recovery boundaries; implementation topology stays in source/CodeGraph and provider setup remains in the provider guides.
+- `docs/export-json-v1.md` owns the public selected JSON export schema and archive compatibility rules. It must not absorb Backup ZIP restore semantics, internal IndexedDB schema, or provider setup.
 - `docs/overview.md` is intentionally retired. README is the top-level navigation surface; do not recreate `docs/overview.md` or a duplicate `docs/configuration.md`.
 - `.github/features/**` and `.github/archived_features/**` are execution/history material, not canonical long-term architecture documentation.
 
 ## Coverage Policy
 
-No additional long-term page is required by the current code baseline. Add a page only when a durable product contract, operational procedure, privacy boundary, or recovery rule cannot be inferred from source code and does not already have a canonical owner above.
+No additional long-term page beyond the set above is required by the current code baseline. Add another page only when a durable product contract, operational procedure, privacy boundary, or recovery rule cannot be inferred from source code and does not already have a canonical owner above.
