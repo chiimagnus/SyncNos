@@ -7,7 +7,9 @@ import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageReferences,
-} from '@services/sync/shared/markdown-asset-refs';
+} from '@services/shared/markdown-asset-refs';
+import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import { isSyncnosAssetUrl } from '@services/shared/syncnos-asset-uri';
 import { buildSyncnosObject } from '@services/sync/shared/remote-markdown-metadata';
 import { buildFullNoteMarkdown } from '@services/sync/shared/remote-markdown-writer';
 
@@ -189,14 +191,13 @@ export async function buildGithubMarkdownProjection(input: {
   const assetsById = assetIds.length ? await imageBatchLoader({ ids: assetIds, conversationId }) : new Map();
   const remoteKey = String(input.remoteKey || '');
   const namespace = attachmentNamespace(markdownPath);
-  const replacementByAssetId = new Map<number, { target?: string; placeholder?: true }>();
+  const replacementByAssetId = new Map<number, string>();
   const attachmentByPath = new Map<string, GithubProjectionAttachment>();
   const warnings: GithubProjectionWarning[] = [];
 
   for (const assetId of assetIds) {
     const asset = assetsById.get(assetId) || null;
     if (!asset || !(asset.blob instanceof Blob)) {
-      replacementByAssetId.set(assetId, { placeholder: true });
       warnings.push({ code: 'image_missing', assetId });
       continue;
     }
@@ -208,7 +209,7 @@ export async function buildGithubMarkdownProjection(input: {
     const path = `${namespace.fullPrefix}/${contentHash}.${ext}`;
     const duplicate = attachmentByPath.get(path);
     if (duplicate) {
-      replacementByAssetId.set(assetId, { target: duplicate.relativeTarget });
+      replacementByAssetId.set(assetId, duplicate.relativeTarget);
       continue;
     }
 
@@ -218,8 +219,7 @@ export async function buildGithubMarkdownProjection(input: {
         sha = requireBlobSha((await blobUploader!({ content })).sha);
       } catch (_error) {
         const fallback = publicFallbackUrl(asset.url);
-        if (fallback) replacementByAssetId.set(assetId, { target: fallback });
-        else replacementByAssetId.set(assetId, { placeholder: true });
+        if (fallback) replacementByAssetId.set(assetId, fallback);
         warnings.push({ code: 'image_upload_failed', assetId });
         continue;
       }
@@ -227,16 +227,17 @@ export async function buildGithubMarkdownProjection(input: {
 
     const attachment = { path, relativeTarget, contentHash, sha };
     attachmentByPath.set(path, attachment);
-    replacementByAssetId.set(assetId, { target: relativeTarget });
+    replacementByAssetId.set(assetId, relativeTarget);
   }
 
   const markdownText = replaceSyncnosAssetImageReferences(rawMarkdown, ({ assetId }) => {
-    const replacement = replacementByAssetId.get(assetId);
-    if (!replacement) return null;
-    if (replacement.placeholder) return { replacement: '[Image unavailable]' };
-    return replacement.target ? { target: replacement.target } : null;
+    const target = replacementByAssetId.get(assetId);
+    return target ? { target } : null;
   });
-  if (/syncnos-asset:\/\//i.test(markdownText)) throw new Error('github_internal_asset_ref_unresolved');
+  const hasUnresolvedInternalImage = collectMarkdownImageReferences(markdownText).some((reference) =>
+    isSyncnosAssetUrl(reference.target),
+  );
+  if (hasUnresolvedInternalImage) throw new Error('github_internal_asset_ref_unresolved');
 
   const attachments = Array.from(attachmentByPath.values()).sort((a, b) =>
     a.path < b.path ? -1 : a.path > b.path ? 1 : 0,

@@ -373,54 +373,57 @@ describe('github markdown projection', () => {
       expect(reorderedPaths.get(item.contentHash)).toBe(firstPaths.get(item.contentHash));
   });
 
-  it('treats missing and cross-conversation assets as placeholders without uploading', async () => {
+  it('fails closed when a valid internal image is missing from the current conversation scope', async () => {
     const loader = vi.fn(async ({ ids, conversationId }: { ids: readonly number[]; conversationId: number }) => {
       if (conversationId !== 999) return new Map();
       return new Map(ids.map((id) => [id, imageAsset(id, [id])]));
     });
     const uploader = vi.fn(async () => ({ sha: 'a'.repeat(40) }));
-    const projection = await buildGithubMarkdownProjection({
-      conversation: conversation({ id: 7 }),
-      messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: 'before ![secret](syncnos-asset://4) after' }],
-      imageBatchLoader: loader,
-      blobUploader: uploader,
-    });
+
+    await expect(
+      buildGithubMarkdownProjection({
+        conversation: conversation({ id: 7 }),
+        messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: 'before ![secret](syncnos-asset://4) after' }],
+        imageBatchLoader: loader,
+        blobUploader: uploader,
+      }),
+    ).rejects.toThrow('github_internal_asset_ref_unresolved');
 
     expect(loader).toHaveBeenCalledWith({ ids: [4], conversationId: 7 });
     expect(uploader).not.toHaveBeenCalled();
-    expect(projection.markdownText).toContain('before [Image unavailable] after');
-    expect(projection.markdownText).not.toContain('syncnos-asset://');
-    expect(projection.warnings).toEqual([{ code: 'image_missing', assetId: 4 }]);
   });
 
-  it('falls back only to public URL shapes when blob upload fails and never leaks signed/credential URLs', async () => {
-    const assets = new Map([
-      [1, imageAsset(1, [1], 'https://cdn.example.com/safe.png')],
-      [2, imageAsset(2, [2], 'https://cdn.example.com/signed.png?token=SECRET#frag')],
-      [3, imageAsset(3, [3], 'https://user:pass@cdn.example.com/credential.png')],
-    ]);
-    const loader = batchLoaderFromAssets(assets);
+  it('falls back to a public HTTP URL when blob upload fails', async () => {
     const uploader = vi.fn(async () => {
       throw new Error('upload failed with remote details');
     });
     const projection = await buildGithubMarkdownProjection({
       conversation: conversation(),
-      messages: [
-        {
-          messageKey: 'm1',
-          sequence: 1,
-          contentMarkdown: '![safe](syncnos-asset://1)\n![signed](syncnos-asset://2)\n![credential](syncnos-asset://3)',
-        },
-      ],
-      imageBatchLoader: loader,
+      messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![safe](syncnos-asset://1)' }],
+      imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, [1], 'https://cdn.example.com/safe.png')]])),
       blobUploader: uploader,
     });
 
     expect(projection.markdownText).toContain('![safe](https://cdn.example.com/safe.png)');
-    expect(projection.markdownText.match(/\[Image unavailable\]/g)).toHaveLength(2);
-    expect(projection.markdownText).not.toMatch(/SECRET|user:pass|syncnos-asset:\/\//i);
+    expect(projection.markdownText).not.toContain('syncnos-asset://');
     expect(projection.attachments).toEqual([]);
-    expect(projection.warnings).toHaveLength(3);
+    expect(projection.warnings).toEqual([{ code: 'image_upload_failed', assetId: 1 }]);
+  });
+
+  it.each([
+    ['signed URL', 'https://cdn.example.com/signed.png?token=SECRET#frag'],
+    ['credential URL', 'https://user:pass@cdn.example.com/credential.png'],
+  ])('fails closed when blob upload fails and the only fallback is an unsafe %s', async (_label, url) => {
+    await expect(
+      buildGithubMarkdownProjection({
+        conversation: conversation(),
+        messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: '![private](syncnos-asset://1)' }],
+        imageBatchLoader: batchLoaderFromAssets(new Map([[1, imageAsset(1, [1], url)]])),
+        blobUploader: async () => {
+          throw new Error('upload failed');
+        },
+      }),
+    ).rejects.toThrow('github_internal_asset_ref_unresolved');
   });
 
   it('treats outcome-unknown blob uploads as degraded images without guessing success', async () => {
@@ -438,12 +441,49 @@ describe('github markdown projection', () => {
     expect(projection.warnings).toEqual([{ code: 'image_upload_failed', assetId: 1 }]);
   });
 
-  it('fails closed when an internal asset URI remains outside supported Markdown image syntax', async () => {
-    await expect(
-      buildGithubMarkdownProjection({
-        conversation: conversation(),
-        messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: 'raw syncnos-asset://99' }],
-      }),
-    ).rejects.toThrow('github_internal_asset_ref_unresolved');
+  it('preserves prose and code literals while materializing a real internal image', async () => {
+    const loader = vi.fn(batchLoaderFromAssets(new Map([[1, imageAsset(1, [1, 2, 3])]])));
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [
+        {
+          messageKey: 'm1',
+          sequence: 1,
+          contentMarkdown: [
+            'mounted chat 中的 `syncnos-asset://` 已自动变成 blob URL。',
+            'raw syncnos-asset://99',
+            '`![inline](syncnos-asset://2)`',
+            '```md',
+            '![fenced](syncnos-asset://3)',
+            '```',
+            '    ![indented](syncnos-asset://4)',
+            '![real](syncnos-asset://1)',
+          ].join('\n\n'),
+        },
+      ],
+      imageBatchLoader: loader,
+      blobUploader: async () => ({ sha: 'a'.repeat(40) }),
+    });
+
+    expect(loader).toHaveBeenCalledWith({ ids: [1], conversationId: 7 });
+    expect(projection.attachments).toHaveLength(1);
+    expect(projection.markdownText).toContain('mounted chat 中的 `syncnos-asset://` 已自动变成 blob URL。');
+    expect(projection.markdownText).toContain('raw syncnos-asset://99');
+    expect(projection.markdownText).toContain('`![inline](syncnos-asset://2)`');
+    expect(projection.markdownText).toContain('![fenced](syncnos-asset://3)');
+    expect(projection.markdownText).toContain('    ![indented](syncnos-asset://4)');
+    expect(projection.markdownText).not.toContain('![real](syncnos-asset://1)');
   });
+
+  it.each(['syncnos-asset://nope', 'syncnos-asset://0', 'syncnos-asset://9007199254740992'])(
+    'fails closed for malformed internal image target %s',
+    async (target) => {
+      await expect(
+        buildGithubMarkdownProjection({
+          conversation: conversation(),
+          messages: [{ messageKey: 'm1', sequence: 1, contentMarkdown: `![bad](${target})` }],
+        }),
+      ).rejects.toThrow('github_internal_asset_ref_unresolved');
+    },
+  );
 });

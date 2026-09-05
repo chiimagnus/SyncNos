@@ -1,4 +1,4 @@
-import { fetchFeishuJson, type FeishuApiError } from '@services/sync/feishu/feishu-api';
+import { fetchFeishuJson } from '@services/sync/feishu/feishu-api';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -63,12 +63,6 @@ export function normalizeConvertedBlocksPreorder(input: FeishuDocxConvertResult)
   }
 
   return { blocks: ordered, firstLevelBlockIds: roots };
-}
-
-export function isFeishuConvertPermissionDenied(error: unknown): boolean {
-  const e = error as FeishuApiError & { extra?: any };
-  const status = Number((e as any)?.extra?.status || 0) || 0;
-  return status === 401 || status === 403;
 }
 
 export async function convertContentToBlocks({

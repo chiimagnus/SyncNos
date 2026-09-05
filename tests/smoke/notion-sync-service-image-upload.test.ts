@@ -62,7 +62,7 @@ describe('notion-sync-service image uploads', () => {
       },
     ];
 
-    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks, 1);
     expect(out[0]?.image?.type).toBe('file_upload');
     expect(out[0]?.image?.file_upload?.id).toBe('u1');
     expect(calls.map((c) => c.op)).toEqual(['createExternalURLUpload', 'waitUntilUploaded']);
@@ -111,7 +111,7 @@ describe('notion-sync-service image uploads', () => {
       },
     ];
 
-    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks, 1);
     expect(out[0]?.image?.type).toBe('file_upload');
     expect(out[0]?.image?.file_upload?.id).toBe('u2');
     expect(calls.map((c) => c.op)).toEqual([
@@ -160,7 +160,7 @@ describe('notion-sync-service image uploads', () => {
       },
     ];
 
-    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks, 1);
     expect(out[0]?.image?.type).toBe('external');
     expect(out[0]?.image?.external?.url).toContain('/image/attachment%3A');
     expect(calls.map((c) => c.op)).toEqual(['createExternalURLUpload']);
@@ -195,7 +195,7 @@ describe('notion-sync-service image uploads', () => {
       },
     ];
 
-    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks, 1);
     expect(out[0]?.image?.type).toBe('file_upload');
     expect(out[0]?.image?.file_upload?.id).toBe('u_data_1');
     expect(calls.map((c) => c.op)).toEqual(['createFileUpload', 'sendFileUpload', 'waitUntilUploaded']);
@@ -230,7 +230,7 @@ describe('notion-sync-service image uploads', () => {
       },
     ];
 
-    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks, 1);
     expect(out[0]?.type).toBe('paragraph');
     expect(String(out[0]?.paragraph?.rich_text?.[0]?.text?.content || '')).toContain('Image omitted');
     expect(calls.map((c) => c.op)).toEqual(['createFileUpload']);

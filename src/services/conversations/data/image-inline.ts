@@ -1,9 +1,14 @@
 import { openDb } from '@platform/idb/schema';
 import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+  type MarkdownImageReference,
+} from '@services/shared/markdown-image-references';
+import { formatSyncnosAssetUrl } from '@services/shared/syncnos-asset-uri';
 
 const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
-const SYNCNOS_ASSET_PREFIX = 'syncnos-asset://';
 
 type ImageCacheRow = {
   id?: number;
@@ -59,49 +64,17 @@ function isDataImageUrl(url: unknown): boolean {
   return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
 }
 
-function stripAngleBrackets(url: string): string {
-  const text = String(url || '').trim();
-  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
-  return text;
-}
-
-function toSyncnosAssetUrl(id: number): string {
-  return `${SYNCNOS_ASSET_PREFIX}${id}`;
-}
-
-const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
-
-function extractInlineCandidateUrlsFromMarkdown(markdown: string): string[] {
-  const raw = String(markdown || '');
-  if (!raw) return [];
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
+function collectInlineCandidateUrls(references: readonly MarkdownImageReference[]): string[] {
   const seen = new Set<string>();
   const output: string[] = [];
-  let match: RegExpExecArray | null = null;
-  while ((match = MARKDOWN_IMAGE_RE.exec(raw)) != null) {
-    const urlPart = match[2] ? String(match[2]) : '';
-    const url = stripAngleBrackets(urlPart);
+  for (const reference of references) {
+    const url = reference.target;
     if (!isDataImageUrl(url) && !isHttpUrl(url)) continue;
     if (seen.has(url)) continue;
     seen.add(url);
     output.push(url);
   }
   return output;
-}
-
-function replaceMarkdownImageUrls(markdown: string, replacements: Map<string, string>): string {
-  if (!replacements.size) return markdown;
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  return String(markdown || '').replace(MARKDOWN_IMAGE_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
-    const alt = altRaw ? String(altRaw) : '';
-    const urlPart = urlPartRaw ? String(urlPartRaw) : '';
-    const title = titleRaw ? String(titleRaw) : '';
-    const url = stripAngleBrackets(urlPart);
-    const next = replacements.get(url);
-    if (!next) return _full;
-    const nextPart = urlPart.trim().startsWith('<') && !isDataImageUrl(next) ? `<${next}>` : next;
-    return `![${alt}](${nextPart}${title})`;
-  });
 }
 
 function parseContentType(value: unknown): string {
@@ -416,6 +389,12 @@ export async function inlineChatImagesInMessages(input: {
   const onlyKeys = input.onlyMessageKeys || null;
   const enableHttpImages = input.enableHttpImages !== false;
 
+  const parsedMessages: Array<{
+    message: any;
+    markdown: string;
+    references: MarkdownImageReference[];
+    urls: string[];
+  }> = [];
   const dataDescriptorByUrl = new Map<string, DataImageDescriptor>();
   const cacheLookupUrls: string[] = [];
   const seenCacheLookupUrls = new Set<string>();
@@ -431,7 +410,10 @@ export async function inlineChatImagesInMessages(input: {
     const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
     if (!markdown) continue;
 
-    for (const url of extractInlineCandidateUrlsFromMarkdown(markdown)) {
+    const references = collectMarkdownImageReferences(markdown);
+    const urls = collectInlineCandidateUrls(references);
+    parsedMessages.push({ message: msg, markdown, references, urls });
+    for (const url of urls) {
       const isDataUrl = isDataImageUrl(url);
       const isHttpImage = !isDataUrl && isHttpUrl(url);
       if (!isDataUrl && !isHttpImage) continue;
@@ -458,14 +440,8 @@ export async function inlineChatImagesInMessages(input: {
   let downloadedCount = 0;
   let inlinedBytes = 0;
 
-  for (const msg of messages) {
-    if (!msg || !msg.messageKey) continue;
-    if (onlyKeys && !onlyKeys.has(String(msg.messageKey))) continue;
-
-    const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
-    if (!markdown) continue;
-
-    const urls = extractInlineCandidateUrlsFromMarkdown(markdown);
+  for (const parsedMessage of parsedMessages) {
+    const { message, markdown, references, urls } = parsedMessage;
     if (!urls.length) continue;
 
     for (const url of urls) {
@@ -490,7 +466,7 @@ export async function inlineChatImagesInMessages(input: {
       if (cached) {
         const cachedAsset = await ensureCachedAssetRecord(cached);
         if (cachedAsset) {
-          replacements.set(url, toSyncnosAssetUrl(cachedAsset.id));
+          replacements.set(url, formatSyncnosAssetUrl(cachedAsset.id));
           fromCacheCount += 1;
           inlinedCount += 1;
           inlinedBytes += cachedAsset.byteSize;
@@ -534,15 +510,18 @@ export async function inlineChatImagesInMessages(input: {
         });
       }
 
-      replacements.set(url, toSyncnosAssetUrl(nextAsset.id));
+      replacements.set(url, formatSyncnosAssetUrl(nextAsset.id));
       downloadedCount += 1;
       inlinedCount += 1;
       inlinedBytes += nextAsset.byteSize;
     }
 
     if (!replacements.size) continue;
-    const nextMarkdown = replaceMarkdownImageUrls(markdown, replacements);
-    if (nextMarkdown !== markdown) msg.contentMarkdown = nextMarkdown;
+    const nextMarkdown = replaceMarkdownImageReferences(markdown, references, (reference) => {
+      const next = replacements.get(reference.target);
+      return next ? { target: next } : null;
+    });
+    if (nextMarkdown !== markdown) message.contentMarkdown = nextMarkdown;
   }
 
   return {

@@ -18,9 +18,18 @@ describe('notion-markdown-blocks', () => {
     expect(blocks[0]?.image?.external?.url).toBe('syncnos-asset://43');
   });
 
-  it('does not accept malformed or non-positive SyncNos targets as local image blocks', () => {
-    for (const target of ['syncnos-asset://0', 'syncnos-asset://nope']) {
+  it('keeps malformed internal targets classified as image blocks for safe downstream degradation', () => {
+    for (const target of ['syncnos-asset://0', 'syncnos-asset://nope', 'syncnos-asset://9007199254740992']) {
       const blocks = markdownToNotionBlocks(`![](${target})`);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]?.type).toBe('image');
+      expect(blocks[0]?.image?.external?.url).toBe(target);
+    }
+  });
+
+  it('does not turn indented code that looks like an image into a Notion image block', () => {
+    for (const markdown of ['    ![code](syncnos-asset://42)', '\t![code](syncnos-asset://42)']) {
+      const blocks = markdownToNotionBlocks(markdown);
       expect(blocks.some((block: any) => block?.type === 'image')).toBe(false);
     }
   });

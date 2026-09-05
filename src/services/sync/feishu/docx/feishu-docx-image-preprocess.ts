@@ -1,15 +1,13 @@
 import { sha256Hex } from '@services/sync/shared/content-hash';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
-import { parseSyncnosAssetId } from '@services/sync/shared/markdown-asset-refs';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
-}
-
-function stripAngleBrackets(urlPart: string): string {
-  const t = safeString(urlPart);
-  if (t.startsWith('<') && t.endsWith('>')) return t.slice(1, -1).trim();
-  return t;
 }
 
 function isHttpUrl(url: string): boolean {
@@ -83,110 +81,101 @@ export type FeishuMarkdownPreprocessResult = {
   imageSourcesInOrder: FeishuMarkdownImageSource[];
 };
 
-const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+\"[^\"]*\")?\s*\)/g;
-
 async function toPlaceholderUrl(prefix: string, stableKey: string, ext: string): Promise<string> {
   const hash = await sha256Hex(stableKey).catch(() => '');
   const id = hash ? hash.slice(0, 16) : String(Math.random()).slice(2);
   return `https://syncnos.invalid/${prefix}/${id}.${normalizeImageExt(ext)}`;
 }
 
-export async function preprocessFeishuDocxMarkdownImages(markdown: string): Promise<FeishuMarkdownPreprocessResult> {
+export async function preprocessFeishuDocxMarkdownImages(
+  markdown: string,
+  conversationId: number,
+): Promise<FeishuMarkdownPreprocessResult> {
   const src = String(markdown || '');
   if (!src) return { markdownForConvert: '', imageSourcesInOrder: [] };
 
+  const references = collectMarkdownImageReferences(src);
+  if (!references.length) return { markdownForConvert: src, imageSourcesInOrder: [] };
+
   const localAssetIds: number[] = [];
   const seenLocalAssetIds = new Set<number>();
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  let assetMatch: RegExpExecArray | null = null;
-  while ((assetMatch = MARKDOWN_IMAGE_RE.exec(src)) != null) {
-    const sourceUrl = stripAngleBrackets(assetMatch[2] || '');
-    const assetId = parseSyncnosAssetId(sourceUrl);
+  for (const reference of references) {
+    const assetId = parseSyncnosAssetId(reference.target);
     if (assetId == null || seenLocalAssetIds.has(assetId)) continue;
     seenLocalAssetIds.add(assetId);
     localAssetIds.push(assetId);
   }
 
-  const localAssets: Map<number, ImageCacheAsset> = localAssetIds.length
-    ? await getImageCacheAssetsByIds({ ids: localAssetIds }).catch(() => new Map<number, ImageCacheAsset>())
-    : new Map<number, ImageCacheAsset>();
-  const cache = new Map<string, Promise<FeishuMarkdownImageSource>>();
+  const scopedConversationId = Number(conversationId);
+  const canReadLocalAssets = Number.isSafeInteger(scopedConversationId) && scopedConversationId > 0;
+  const localAssets: Map<number, ImageCacheAsset> =
+    localAssetIds.length && canReadLocalAssets
+      ? await getImageCacheAssetsByIds({ ids: localAssetIds, conversationId: scopedConversationId }).catch(
+          () => new Map<number, ImageCacheAsset>(),
+        )
+      : new Map<number, ImageCacheAsset>();
+
+  const sourceByTarget = new Map<string, Promise<FeishuMarkdownImageSource>>();
+  const resolveSource = (rawTarget: string): Promise<FeishuMarkdownImageSource> => {
+    const sourceUrl = safeString(rawTarget);
+    const cached = sourceByTarget.get(sourceUrl);
+    if (cached) return cached;
+
+    const computed = (async () => {
+      if (isHttpUrl(sourceUrl)) return { kind: 'http' as const, sourceUrl, urlForConvert: sourceUrl };
+
+      const assetId = parseSyncnosAssetId(sourceUrl);
+      if (isSyncnosAssetUrl(sourceUrl)) {
+        const asset = assetId != null ? localAssets.get(assetId) || null : null;
+        const contentType = safeString(asset?.contentType);
+        const ext = extFromContentType(contentType || 'image/png');
+        const blob = asset?.blob instanceof Blob ? asset.blob : undefined;
+        const stableKey = assetId != null ? `asset:${assetId}` : `asset-invalid:${sourceUrl}`;
+        const urlForConvert =
+          asset && isHttpUrl(safeString(asset.url))
+            ? safeString(asset.url)
+            : await toPlaceholderUrl('asset', stableKey, ext);
+        return {
+          kind: 'syncnos_asset' as const,
+          sourceUrl,
+          urlForConvert,
+          blob,
+          contentType: contentType || undefined,
+        };
+      }
+
+      if (isDataImageUrl(sourceUrl)) {
+        const decoded = decodeDataUrlToBlob(sourceUrl);
+        const contentType = safeString(decoded?.contentType);
+        const ext = extFromContentType(contentType || 'image/png');
+        const urlForConvert = await toPlaceholderUrl('data', sourceUrl, ext);
+        return {
+          kind: 'data' as const,
+          sourceUrl,
+          urlForConvert,
+          blob: decoded?.blob,
+          contentType: contentType || undefined,
+        };
+      }
+
+      return { kind: 'http' as const, sourceUrl, urlForConvert: sourceUrl };
+    })();
+    sourceByTarget.set(sourceUrl, computed);
+    return computed;
+  };
+
   const imageSourcesInOrder: FeishuMarkdownImageSource[] = [];
+  const resolvedSourceByTarget = new Map<string, FeishuMarkdownImageSource>();
+  for (const reference of references) {
+    const source = await resolveSource(reference.target);
+    imageSourcesInOrder.push(source);
+    resolvedSourceByTarget.set(reference.target, source);
+  }
 
-  const markdownForConvert = await (async () => {
-    MARKDOWN_IMAGE_RE.lastIndex = 0;
-    const parts: string[] = [];
-    let cursor = 0;
-    let match: RegExpExecArray | null = null;
-
-    while ((match = MARKDOWN_IMAGE_RE.exec(src)) != null) {
-      const start = Number(match.index) || 0;
-      const full = match[0] || '';
-      const urlRaw = stripAngleBrackets(match[2] || '');
-
-      parts.push(src.slice(cursor, start));
-
-      const computed =
-        cache.get(urlRaw) ||
-        (async () => {
-          const sourceUrl = safeString(urlRaw);
-          if (isHttpUrl(sourceUrl)) {
-            return { kind: 'http' as const, sourceUrl, urlForConvert: sourceUrl };
-          }
-
-          const assetId = parseSyncnosAssetId(sourceUrl);
-          if (assetId != null) {
-            const asset = localAssets.get(assetId) || null;
-            const contentType = safeString(asset?.contentType);
-            const ext = extFromContentType(contentType || 'image/png');
-            const blob = asset?.blob instanceof Blob ? asset.blob : undefined;
-
-            const urlForConvert =
-              asset && isHttpUrl(safeString(asset.url))
-                ? safeString(asset.url)
-                : await toPlaceholderUrl('asset', `asset:${assetId}`, ext);
-
-            return {
-              kind: 'syncnos_asset' as const,
-              sourceUrl,
-              urlForConvert,
-              blob,
-              contentType: contentType || undefined,
-            };
-          }
-
-          if (isDataImageUrl(sourceUrl)) {
-            const decoded = decodeDataUrlToBlob(sourceUrl);
-            const contentType = safeString(decoded?.contentType);
-            const ext = extFromContentType(contentType || 'image/png');
-            const urlForConvert = await toPlaceholderUrl('data', sourceUrl, ext);
-            return {
-              kind: 'data' as const,
-              sourceUrl,
-              urlForConvert,
-              blob: decoded?.blob,
-              contentType: contentType || undefined,
-            };
-          }
-
-          // Unknown scheme: keep as-is (Convert may ignore it).
-          return { kind: 'http' as const, sourceUrl, urlForConvert: sourceUrl };
-        })();
-
-      cache.set(urlRaw, computed);
-      const source = await computed;
-      imageSourcesInOrder.push(source);
-
-      const replacedUrl = match[2]?.trim().startsWith('<') ? `<${source.urlForConvert}>` : source.urlForConvert;
-      const next = full.replace(match[2] || '', replacedUrl);
-      parts.push(next);
-      cursor = start + full.length;
-    }
-
-    parts.push(src.slice(cursor));
-    return parts.join('');
-  })();
-
+  const markdownForConvert = replaceMarkdownImageReferences(src, references, (reference) => {
+    const source = resolvedSourceByTarget.get(reference.target);
+    return source ? { target: source.urlForConvert } : null;
+  });
   return { markdownForConvert, imageSourcesInOrder };
 }
 

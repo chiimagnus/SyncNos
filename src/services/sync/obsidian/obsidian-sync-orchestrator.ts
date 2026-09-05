@@ -16,10 +16,9 @@ import {
 } from '@services/sync/shared/remote-markdown-metadata.ts';
 import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cache-read';
-import {
-  collectOrderedSyncnosAssetIds,
-  replaceSyncnosAssetImageTargets,
-} from '@services/sync/shared/markdown-asset-refs';
+import { collectOrderedSyncnosAssetIds, replaceSyncnosAssetImageTargets } from '@services/shared/markdown-asset-refs';
+import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
@@ -78,11 +77,13 @@ function buildAttachmentPath(filePath: unknown, attachmentName: string) {
 
 async function materializeMarkdownAssetsForObsidian({
   client,
+  conversationId,
   filePath,
   markdown,
   indexScopeMarkdown,
 }: {
   client: any;
+  conversationId: number;
   filePath: string;
   markdown: string;
   indexScopeMarkdown?: string;
@@ -93,36 +94,49 @@ async function materializeMarkdownAssetsForObsidian({
     throw new Error('obsidian client does not support binary attachment upload');
   }
 
-  const scopeIds = collectOrderedSyncnosAssetIds(indexScopeMarkdown || targetMarkdown);
-  if (!scopeIds.length) return targetMarkdown;
+  const internalReferences = collectMarkdownImageReferences(targetMarkdown).filter((reference) =>
+    isSyncnosAssetUrl(reference.target),
+  );
+  if (!internalReferences.length) return targetMarkdown;
 
-  const indexByAssetId = new Map<number, number>();
-  for (let i = 0; i < scopeIds.length; i += 1) {
-    indexByAssetId.set(scopeIds[i]!, i + 1);
+  const targetIds: number[] = [];
+  const seenTargetIds = new Set<number>();
+  for (const reference of internalReferences) {
+    const assetId = parseSyncnosAssetId(reference.target);
+    if (assetId == null) throw new Error('missing local asset blob: invalid SyncNos asset target');
+    if (seenTargetIds.has(assetId)) continue;
+    seenTargetIds.add(assetId);
+    targetIds.push(assetId);
   }
 
-  const targetIds = collectOrderedSyncnosAssetIds(targetMarkdown);
-  if (!targetIds.length) return targetMarkdown;
-  const assetsById = await getImageCacheAssetsByIds({ ids: targetIds });
+  const scopeIds = collectOrderedSyncnosAssetIds(indexScopeMarkdown || targetMarkdown);
+  const indexByAssetId = new Map<number, number>();
+  for (let i = 0; i < scopeIds.length; i += 1) indexByAssetId.set(scopeIds[i]!, i + 1);
+  for (const assetId of targetIds) {
+    if (!indexByAssetId.has(assetId)) throw new Error(`missing asset index mapping: ${assetId}`);
+  }
+
+  const safeConversationId = Number(conversationId);
+  if (!Number.isSafeInteger(safeConversationId) || safeConversationId <= 0) {
+    throw new Error('missing local asset blob: invalid conversation id');
+  }
+  const assetsById = await getImageCacheAssetsByIds({ ids: targetIds, conversationId: safeConversationId });
+  for (const assetId of targetIds) {
+    const asset = assetsById.get(assetId);
+    if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
+  }
 
   const noteBase = buildNoteBasenameFromFilePath(filePath);
   const attachmentNameByAssetId = new Map<number, string>();
-
   for (const assetId of targetIds) {
-    const index = indexByAssetId.get(assetId);
-    if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
-
-    const asset = assetsById.get(assetId);
-    if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
-
+    const asset = assetsById.get(assetId)!;
+    const index = indexByAssetId.get(assetId)!;
     const ext = inferImageExtFromAsset(asset);
     const attachmentName = `${noteBase}-${index}.${ext}`;
     attachmentNameByAssetId.set(assetId, attachmentName);
 
     const contentType = safeString(asset.contentType || asset.blob.type) || `image/${ext}`;
-
     const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-
     const putRes = await client.putVaultBinaryFile(buildAttachmentPath(filePath, attachmentName), bytes, {
       contentType,
     });
@@ -523,6 +537,7 @@ async function runSyncConversations({
           });
           const markdown = await materializeMarkdownAssetsForObsidian({
             client,
+            conversationId: decision.conversationId,
             filePath: decision.filePath,
             markdown: rawMarkdown,
             indexScopeMarkdown: rawMarkdown,

@@ -8,13 +8,9 @@ import type {
   ConversationListOpenTarget,
   ConversationListSummary,
 } from '@services/conversations/domain/models';
-import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
-import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
-import { createZipBlob } from '@services/sync/backup/zip-utils';
-import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
+import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import {
   deleteConversations,
@@ -52,65 +48,9 @@ const LIST_SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_k
 const LIST_SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
 const LIST_SITE_FILTER_ALL_KEY = LIST_SITE_KEY_ALL;
 const LIST_BOOTSTRAP_LIMIT = 100;
-const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 const EMPTY_LIST_SUMMARY: ConversationListSummary = { totalCount: 0, todayCount: 0 };
 const EMPTY_LIST_FACETS: ConversationListFacets = { sources: [], sites: [] };
 const LIST_REVISION_SCOPES: readonly DataRevisionScope[] = ['conversations', 'article_comments'];
-
-function stripAngleBrackets(url: string): string {
-  const text = String(url || '').trim();
-  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
-  return text;
-}
-
-function parseSyncnosAssetId(url: unknown): number | null {
-  const text = String(url || '').trim();
-  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
-  if (!matched) return null;
-  const id = Number(matched[1]);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
-}
-
-function normalizeImageExt(raw: unknown): string {
-  const text = String(raw || '')
-    .trim()
-    .toLowerCase();
-  if (!text) return 'png';
-  if (text === 'jpeg') return 'jpg';
-  if (text === 'svg+xml') return 'svg';
-  if (text === 'x-icon' || text === 'vnd.microsoft.icon') return 'ico';
-  return /^[a-z0-9]+$/.test(text) ? text : 'png';
-}
-
-function inferImageExtFromAsset(asset: { contentType?: string; url?: string }): string {
-  const contentType = String(asset.contentType || '')
-    .trim()
-    .toLowerCase();
-  if (contentType.startsWith('image/')) {
-    return normalizeImageExt(contentType.slice('image/'.length));
-  }
-
-  const url = String(asset.url || '').trim();
-  if (/^data:image\//i.test(url)) {
-    const matched = /^data:image\/([a-z0-9.+-]+)/i.exec(url);
-    return normalizeImageExt(matched?.[1] || '');
-  }
-
-  try {
-    const parsed = new URL(url);
-    const pathname = String(parsed.pathname || '');
-    const filename = pathname.split('/').filter(Boolean).pop() || '';
-    const dot = filename.lastIndexOf('.');
-    if (dot >= 0 && dot < filename.length - 1) {
-      return normalizeImageExt(filename.slice(dot + 1));
-    }
-  } catch (_e) {
-    // ignore parse failure, fallback below
-  }
-
-  return 'png';
-}
 
 function canonicalizeHttpUrl(raw: unknown): string {
   return canonicalizeArticleUrl(raw);
@@ -151,66 +91,6 @@ function ensureConversationUiShape(conversation: Conversation): Conversation {
 }
 
 const URL_EDIT_CANCELLED_ERROR = 'SYNCNOS_URL_EDIT_CANCELLED';
-
-async function materializeSyncnosAssetsForExport(input: {
-  markdown: string;
-  markdownBasename: string;
-  conversationId?: number | null;
-}): Promise<{ markdown: string; attachments: Array<{ name: string; data: Blob }> }> {
-  const markdown = String(input.markdown || '');
-  if (!markdown) return { markdown: '', attachments: [] };
-
-  const basename = String(input.markdownBasename || '').trim() || 'conversation';
-  const conversationId = Number(input.conversationId);
-
-  const orderedAssetIds: number[] = [];
-  const seenAssetIds = new Set<number>();
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  let match: RegExpExecArray | null = null;
-  while ((match = MARKDOWN_IMAGE_RE.exec(markdown)) != null) {
-    const urlPart = match[2] ? String(match[2]) : '';
-    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
-    if (!assetId) continue;
-    if (seenAssetIds.has(assetId)) continue;
-    seenAssetIds.add(assetId);
-    orderedAssetIds.push(assetId);
-  }
-  if (!orderedAssetIds.length) return { markdown, attachments: [] };
-
-  const assetNameById = new Map<number, string>();
-  const attachments: Array<{ name: string; data: Blob }> = [];
-  let index = 0;
-
-  for (const assetId of orderedAssetIds) {
-    const asset = await getImageCacheAssetById({
-      id: assetId,
-      conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
-    });
-    if (!asset) continue;
-    index += 1;
-    const ext = inferImageExtFromAsset(asset);
-    const attachmentName = `${basename}-${index}.${ext}`;
-    assetNameById.set(assetId, attachmentName);
-    attachments.push({ name: attachmentName, data: asset.blob });
-  }
-
-  if (!assetNameById.size) return { markdown, attachments: [] };
-
-  MARKDOWN_IMAGE_RE.lastIndex = 0;
-  const rewrittenMarkdown = markdown.replace(MARKDOWN_IMAGE_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
-    const alt = altRaw ? String(altRaw) : '';
-    const urlPart = urlPartRaw ? String(urlPartRaw) : '';
-    const title = titleRaw ? String(titleRaw) : '';
-    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
-    if (!assetId) return _full;
-    const attachmentName = assetNameById.get(assetId);
-    if (!attachmentName) return _full;
-    const nextPart = urlPart.trim().startsWith('<') ? `<${attachmentName}>` : attachmentName;
-    return `![${alt}](${nextPart}${title})`;
-  });
-
-  return { markdown: rewrittenMarkdown, attachments };
-}
 
 function readLocalStorageValue(key: string): string {
   try {
@@ -1346,46 +1226,14 @@ export function ConversationsProvider({
         const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
         if (!selectedConversations.length) return;
 
-        const stamp = buildLocalTimestampForFilename();
-        const files: Array<{ name: string; data: unknown }> = [];
-
-        if (mergeSingle) {
-          const docs: string[] = [];
-          for (const c of selectedConversations) {
-            const d = await getConversationDetail(Number(c.id));
-            docs.push(formatConversationMarkdown(c, d.messages || []));
-          }
-          const mergedBaseName = `SyncNos-md-${stamp}`;
-          const mergedDoc = docs.join('\n---\n\n');
-          const mergedMaterialized = await materializeSyncnosAssetsForExport({
-            markdown: mergedDoc,
-            markdownBasename: mergedBaseName,
-          });
-          files.push({ name: `${mergedBaseName}.md`, data: mergedMaterialized.markdown });
-          for (const attachment of mergedMaterialized.attachments) files.push(attachment);
-        } else {
-          for (const c of selectedConversations) {
-            const d = await getConversationDetail(Number(c.id));
-            const basename = buildConversationBasename(c);
-
-            const materialized = await materializeSyncnosAssetsForExport({
-              markdown: formatConversationMarkdown(c, d.messages || []),
-              markdownBasename: basename,
-              conversationId: Number(c.id),
-            });
-            files.push({
-              name: `${basename}.md`,
-              data: materialized.markdown,
-            });
-            for (const attachment of materialized.attachments) files.push(attachment);
-          }
-        }
-
-        const zipBlob = await createZipBlob(files);
+        const { zipBlob, filename } = await buildConversationsMarkdownZipExport({
+          conversations: selectedConversations,
+          mergeSingle,
+        });
         const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `SyncNos-md-${stamp}.zip`;
+        a.download = filename;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch (e) {

@@ -367,8 +367,8 @@ function hasExternalImageBlocks(blocks: unknown): boolean {
   );
 }
 
-async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: unknown) {
-  return upgradeNotionImageBlocksToFileUploads(accessToken, blocks);
+async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: unknown, conversationId: number) {
+  return upgradeNotionImageBlocksToFileUploads(accessToken, blocks, conversationId);
 }
 
 export {

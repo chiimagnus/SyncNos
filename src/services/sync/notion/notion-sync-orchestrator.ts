@@ -234,17 +234,25 @@ async function buildBlocksForSync({
   accessToken,
   source,
   messagesList,
+  conversationId,
 }: {
   notionSyncService: any;
   accessToken?: string;
   source?: unknown;
   messagesList?: any;
+  conversationId: number;
 }) {
   const warnings: any[] = [];
   let blocks = notionSyncService.messagesToBlocks(messagesList, {
     source,
   });
-  blocks = await maybeUpgradeBlocksWithNotionFileUploads({ notionSyncService, accessToken, blocks, warnings });
+  blocks = await maybeUpgradeBlocksWithNotionFileUploads({
+    notionSyncService,
+    accessToken,
+    blocks,
+    warnings,
+    conversationId,
+  });
   return { blocks, warnings };
 }
 
@@ -253,11 +261,13 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   accessToken,
   blocks,
   warnings,
+  conversationId,
 }: {
   notionSyncService: any;
   accessToken?: string;
   blocks?: any;
   warnings: any[];
+  conversationId: number;
 }) {
   let nextBlocks = Array.isArray(blocks) ? blocks : [];
   if (!nextBlocks.length || typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return nextBlocks;
@@ -269,16 +279,7 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   }
 
   const externalBefore = countExternalImageBlocks(nextBlocks);
-  try {
-    nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks);
-  } catch (e) {
-    warnings.push({
-      code: 'notion_image_upload_failed',
-      message: 'Image upload upgrade failed; keeping external images.',
-      extra: { error: e && (e as any).message ? String((e as any).message) : String(e) },
-    });
-    return nextBlocks;
-  }
+  nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks, conversationId);
 
   const externalAfter = countExternalImageBlocks(nextBlocks);
   if (externalBefore > 0 && externalAfter > 0) {
@@ -678,6 +679,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 accessToken: accessToken,
                 source: convo.source,
                 messagesList: pickArticleBodyMessages(messages),
+                conversationId: id,
               });
               const articleBlocks = stripLeadingArticleRoleHeading(
                 Array.isArray(builtArticle?.blocks) ? builtArticle.blocks : [],
@@ -763,6 +765,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               accessToken: accessToken,
               source: convo.source,
               messagesList: messages,
+              conversationId: id,
             });
             const blocks = Array.isArray(built?.blocks) ? built.blocks : [];
             if (Array.isArray(built?.warnings) && built.warnings.length) warnings.push(...built.warnings);
@@ -920,6 +923,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   accessToken: accessToken,
                   source: convo.source,
                   messagesList: pickArticleBodyMessages(messages),
+                  conversationId: id,
                 });
                 articleBlocks = stripLeadingArticleRoleHeading(
                   Array.isArray(builtArticle?.blocks) ? builtArticle.blocks : [],
@@ -1137,6 +1141,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               accessToken: accessToken,
               source: convo.source,
               messagesList: messages,
+              conversationId: id,
             });
             const blocks = Array.isArray(built.blocks) ? built.blocks : [];
             if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
@@ -1217,6 +1222,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               accessToken: accessToken,
               source: convo.source,
               messagesList: inc.newMessages,
+              conversationId: id,
             });
             const blocks = Array.isArray(built.blocks) ? built.blocks : [];
             if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);

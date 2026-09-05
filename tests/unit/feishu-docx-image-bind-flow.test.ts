@@ -5,6 +5,9 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   getMessagesByConversationId: vi.fn(),
   patchSyncMapping: vi.fn(),
 }));
+const imageCacheMocks = vi.hoisted(() => ({
+  getImageCacheAssetsByIds: vi.fn(),
+}));
 
 vi.mock('@services/conversations/background/storage', () => ({
   backgroundStorage: {
@@ -12,6 +15,9 @@ vi.mock('@services/conversations/background/storage', () => ({
     getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
     patchSyncMapping: backgroundStorageMocks.patchSyncMapping,
   },
+}));
+vi.mock('@services/conversations/data/image-cache-read', () => ({
+  getImageCacheAssetsByIds: (...args: any[]) => imageCacheMocks.getImageCacheAssetsByIds(...args),
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -44,10 +50,13 @@ vi.mock('@services/sync/feishu/settings-store', () => ({
   pickFeishuFolderPathForConversation: vi.fn(() => ''),
 }));
 
-vi.mock('@services/sync/feishu/docx/feishu-docx-markdown', () => ({
+const markdownMocks = vi.hoisted(() => ({
   formatConversationMarkdownForFeishuDocxSync: vi.fn(
     async () => '![a](https://example.com/a.png)\n\n![b](data:image/png;base64,AAAA)',
   ),
+}));
+vi.mock('@services/sync/feishu/docx/feishu-docx-markdown', () => ({
+  formatConversationMarkdownForFeishuDocxSync: markdownMocks.formatConversationMarkdownForFeishuDocxSync,
 }));
 
 const fetchFeishuJsonMock = vi.hoisted(() => vi.fn());
@@ -162,6 +171,99 @@ describe('feishu docx image bind flow', () => {
     );
     expect(imageBindMocks.uploadImageToFeishu).toHaveBeenCalledTimes(2);
     expect(imageBindMocks.bindImageBlockWithFileToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes conversation ownership into preprocess and skips unavailable local images before downloader/upload/bind', async () => {
+    setupChromeStorage();
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
+    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+      conversation: { id: 1, title: 't' },
+      mapping: { feishuDocId: '' },
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+    markdownMocks.formatConversationMarkdownForFeishuDocxSync.mockResolvedValueOnce(
+      [
+        '![cross](syncnos-asset://7)',
+        '![bad](syncnos-asset://nope)',
+        '![zero](syncnos-asset://0)',
+        '![unsafe](syncnos-asset://9007199254740992)',
+      ].join('\n\n'),
+    );
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+
+    fetchFeishuJsonMock.mockImplementation(async (path: string) => {
+      if (path === '/docx/v1/documents') return { document: { document_id: 'doc1' } };
+      if (path === '/docx/v1/documents/blocks/convert') {
+        return {
+          blocks: Array.from({ length: 4 }, (_, index) => ({
+            block_id: `tmp${index + 1}`,
+            block_type: 27,
+            image: {},
+            children: [],
+          })),
+          first_level_block_ids: ['tmp1', 'tmp2', 'tmp3', 'tmp4'],
+        };
+      }
+      if (path.endsWith('/descendant')) return { ok: true };
+      if (path.startsWith('/docx/v1/documents/doc1/blocks?')) {
+        return {
+          items: Array.from({ length: 4 }, (_, index) => ({ block_id: `img${index + 1}`, block_type: 27 })),
+          has_more: false,
+        };
+      }
+      if (path.includes('/children?page_size=')) return { items: [] };
+      return {};
+    });
+
+    const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
+    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(res.okCount).toBe(1);
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7], conversationId: 1 });
+    expect(downloadImageSmartMock).not.toHaveBeenCalled();
+    expect(imageBindMocks.uploadImageToFeishu).not.toHaveBeenCalled();
+    expect(imageBindMocks.bindImageBlockWithFileToken).not.toHaveBeenCalled();
+    expect(String(res.results?.[0]?.warnings?.join('\n') || '')).toContain('local image unavailable');
+  });
+
+  it('uses preprocessed markdown for text fallback when Convert fails', async () => {
+    setupChromeStorage();
+    authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
+    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+      conversation: { id: 1, title: 't' },
+      mapping: { feishuDocId: '' },
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+    markdownMocks.formatConversationMarkdownForFeishuDocxSync.mockResolvedValueOnce(
+      ['![local](syncnos-asset://7)', '`![code](syncnos-asset://8)`'].join('\n\n'),
+    );
+    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+
+    const fallbackBodies: string[] = [];
+    fetchFeishuJsonMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/docx/v1/documents') return { document: { document_id: 'doc1' } };
+      if (path === '/docx/v1/documents/blocks/convert') throw new Error('convert unavailable');
+      if (path.endsWith('/children')) {
+        fallbackBodies.push(String((init as any)?.body || ''));
+        return { ok: true };
+      }
+      if (path.includes('/children?page_size=')) return { items: [] };
+      return {};
+    });
+
+    const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
+    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(res.okCount).toBe(1);
+    expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7], conversationId: 1 });
+    const fallbackBody = fallbackBodies.join('\n');
+    expect(fallbackBody).toContain('https://syncnos.invalid/asset/');
+    expect(fallbackBody).not.toContain('![local](syncnos-asset://7)');
+    expect(fallbackBody).toContain('`![code](syncnos-asset://8)`');
+    expect(downloadImageSmartMock).not.toHaveBeenCalled();
+    expect(imageBindMocks.uploadImageToFeishu).not.toHaveBeenCalled();
+    expect(imageBindMocks.bindImageBlockWithFileToken).not.toHaveBeenCalled();
   });
 
   it('records warnings when image blocks are fewer than markdown images', async () => {

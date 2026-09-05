@@ -320,8 +320,21 @@ describe('reload-free data consistency production chain', () => {
     listConsumer.dispose();
   });
 
-  it('remaps message asset refs when a repeated ZIP import recreates a missing local cache row', async () => {
+  it('remaps only real message asset refs when a repeated ZIP import recreates a missing local cache row', async () => {
     const fixture = buildBackupV2FixtureEntries();
+    const chatPath = 'sources/chatgpt/reload-free-chat.json';
+    const chatBundle = JSON.parse(new TextDecoder().decode(fixture.entries.get(chatPath)!));
+    const backupAssetId = fixture.expected.chat.assetId;
+    chatBundle.messages[1].contentMarkdown = [
+      String(chatBundle.messages[1].contentMarkdown || ''),
+      `literal syncnos-asset://${backupAssetId}`,
+      `\`![inline](syncnos-asset://${backupAssetId})\``,
+      '```md',
+      `![fenced](syncnos-asset://${backupAssetId})`,
+      '```',
+      `    ![indented](syncnos-asset://${backupAssetId})`,
+    ].join('\n');
+    fixture.entries.set(chatPath, new TextEncoder().encode(JSON.stringify(chatBundle, null, 2)));
     await importBackupZipV2Merge(fixture.entries);
 
     const chat = await getConversationBySourceConversationKey(
@@ -330,9 +343,14 @@ describe('reload-free data consistency production chain', () => {
     );
     const chatId = Number(chat?.id);
     const initialDetail = await getConversationDetail(chatId);
-    const initialAssetRef = /syncnos-asset:\/\/(\d+)/.exec(String(initialDetail.messages[1]?.contentMarkdown || ''));
+    const initialMarkdown = String(initialDetail.messages[1]?.contentMarkdown || '');
+    const initialAssetRef = /!\[fixture\]\(syncnos-asset:\/\/(\d+)\)/.exec(initialMarkdown);
     const initialAssetId = Number(initialAssetRef?.[1]);
     expect(initialAssetId).toBeGreaterThan(0);
+    expect(initialMarkdown).toContain(`literal syncnos-asset://${backupAssetId}`);
+    expect(initialMarkdown).toContain(`\`![inline](syncnos-asset://${backupAssetId})\``);
+    expect(initialMarkdown).toContain(`![fenced](syncnos-asset://${backupAssetId})`);
+    expect(initialMarkdown).toContain(`    ![indented](syncnos-asset://${backupAssetId})`);
 
     const db = await openDb();
     const deleteTx = db.transaction(['image_cache'], 'readwrite');
@@ -357,7 +375,8 @@ describe('reload-free data consistency production chain', () => {
     });
 
     const restoredDetail = await getConversationDetail(chatId);
-    const restoredAssetRef = /syncnos-asset:\/\/(\d+)/.exec(String(restoredDetail.messages[1]?.contentMarkdown || ''));
+    const restoredMarkdown = String(restoredDetail.messages[1]?.contentMarkdown || '');
+    const restoredAssetRef = /!\[fixture\]\(syncnos-asset:\/\/(\d+)\)/.exec(restoredMarkdown);
     const restoredAssetId = Number(restoredAssetRef?.[1]);
     expect(restoredAssetId).toBeGreaterThan(0);
     expect(restoredAssetId).not.toBe(initialAssetId);
@@ -366,6 +385,10 @@ describe('reload-free data consistency production chain', () => {
       contentType: 'image/png',
       byteSize: fixture.expected.chat.assetByteSize,
     });
+    expect(restoredMarkdown).toContain(`literal syncnos-asset://${backupAssetId}`);
+    expect(restoredMarkdown).toContain(`\`![inline](syncnos-asset://${backupAssetId})\``);
+    expect(restoredMarkdown).toContain(`![fenced](syncnos-asset://${backupAssetId})`);
+    expect(restoredMarkdown).toContain(`    ![indented](syncnos-asset://${backupAssetId})`);
   });
 
   it('replays a failed mounted List canonical read against an unchanged revision vector and preserves the last-good bundle', async () => {

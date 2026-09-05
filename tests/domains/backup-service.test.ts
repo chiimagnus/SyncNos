@@ -734,7 +734,7 @@ describe('backup service', () => {
     expect(chromeMock.__store.notion_parent_page_id).toBe('parent-a');
   });
 
-  it('importBackupZipV2Merge restores image cache and rewrites syncnos-asset urls', async () => {
+  it('importBackupZipV2Merge restores image cache and rewrites only real Markdown asset images', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -771,8 +771,31 @@ describe('backup service', () => {
         messageKey: 'm1',
         role: 'user',
         contentText: 'hi',
-        contentMarkdown: `![x](syncnos-asset://${oldImgId})`,
+        contentMarkdown: [
+          `![x](syncnos-asset://${oldImgId})`,
+          `literal syncnos-asset://${oldImgId}`,
+          `\`syncnos-asset://${oldImgId}\``,
+          `\`![inline](syncnos-asset://${oldImgId})\``,
+          '```md',
+          `![fenced](syncnos-asset://${oldImgId})`,
+          '```',
+          `    ![indented](syncnos-asset://${oldImgId})`,
+          '![malformed](syncnos-asset://nope)',
+          '![zero](syncnos-asset://0)',
+          '![unsafe](syncnos-asset://9007199254740992)',
+        ].join('\n'),
         sequence: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: convId,
+        messageKey: 'm-newer-local',
+        role: 'assistant',
+        contentText: 'backup body',
+        contentMarkdown: `backup body\n\n![x](syncnos-asset://${oldImgId})`,
+        sequence: 2,
         updatedAt: 1,
       }) as any,
     );
@@ -801,16 +824,76 @@ describe('backup service', () => {
       t2.onabort = () => reject(t2.error);
     });
 
-    expect(msgs.length).toBe(1);
+    expect(msgs.length).toBe(2);
     expect(assets.length).toBe(1);
-    const md = String(msgs[0].contentMarkdown || '');
+    const primaryMessage = msgs.find((message) => message.messageKey === 'm1');
+    const md = String(primaryMessage?.contentMarkdown || '');
     const match = /syncnos-asset:\/\/(\d+)/.exec(md);
     expect(match).not.toBeNull();
     const referencedId = Number(match?.[1]);
     expect(assets.some((a) => Number(a.id) === referencedId)).toBe(true);
+    expect(md).toContain(`literal syncnos-asset://${oldImgId}`);
+    expect(md).toContain(`\`syncnos-asset://${oldImgId}\``);
+    expect(md).toContain(`\`![inline](syncnos-asset://${oldImgId})\``);
+    expect(md).toContain(`![fenced](syncnos-asset://${oldImgId})`);
+    expect(md).toContain(`    ![indented](syncnos-asset://${oldImgId})`);
+    expect(md).not.toContain('![malformed](syncnos-asset://nope)');
+    expect(md).not.toContain('![zero](syncnos-asset://0)');
+    expect(md).not.toContain('![unsafe](syncnos-asset://9007199254740992)');
+
+    const newerLocal = msgs.find((message) => message.messageKey === 'm-newer-local');
+    const localEditTx = db2.transaction(['messages', 'image_cache'], 'readwrite');
+    const manualAssetId = Number(
+      await reqToPromise(
+        localEditTx.objectStore('image_cache').add({
+          conversationId: convId,
+          url: 'https://img.example/user-selected.png',
+          blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }),
+          byteSize: 4,
+          contentType: 'image/png',
+          createdAt: 2,
+          updatedAt: 2,
+        }) as any,
+      ),
+    );
+    const localMarkdown = `backup body\n\n![x](syncnos-asset://${manualAssetId})`;
+    await reqToPromise(
+      localEditTx.objectStore('messages').put({
+        ...newerLocal,
+        contentText: 'backup body',
+        contentMarkdown: localMarkdown,
+        updatedAt: 999,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      localEditTx.oncomplete = () => resolve();
+      localEditTx.onerror = () => reject(localEditTx.error);
+      localEditTx.onabort = () => reject(localEditTx.error);
+    });
+
+    const olderBackupStats = await importBackupZipV2Merge(entries);
+    expect(olderBackupStats.messagesUpdated).toBe(0);
+    const preservedLocalTx = db2.transaction(['messages'], 'readonly');
+    const preservedLocal = await reqToPromise<any>(
+      preservedLocalTx
+        .objectStore('messages')
+        .index('by_conversationId_messageKey')
+        .get([convId, 'm-newer-local']) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      preservedLocalTx.oncomplete = () => resolve();
+      preservedLocalTx.onerror = () => reject(preservedLocalTx.error);
+      preservedLocalTx.onabort = () => reject(preservedLocalTx.error);
+    });
+    expect(preservedLocal).toMatchObject({
+      contentText: 'backup body',
+      contentMarkdown: localMarkdown,
+      updatedAt: 999,
+    });
 
     const deleteAssetTx = db2.transaction(['image_cache'], 'readwrite');
     deleteAssetTx.objectStore('image_cache').delete(referencedId);
+    deleteAssetTx.objectStore('image_cache').delete(manualAssetId);
     await new Promise<void>((resolve, reject) => {
       deleteAssetTx.oncomplete = () => resolve();
       deleteAssetTx.onerror = () => reject(deleteAssetTx.error);
@@ -831,11 +914,18 @@ describe('backup service', () => {
 
     expect(restoredAgainAssets).toHaveLength(1);
     expect(Number(restoredAgainAssets[0]?.id)).not.toBe(referencedId);
-    const remapped = /syncnos-asset:\/\/(\d+)/.exec(String(restoredAgainMessages[0]?.contentMarkdown || ''));
+    const restoredAgainPrimary = restoredAgainMessages.find((message) => message.messageKey === 'm1');
+    const restoredAgainMarkdown = String(restoredAgainPrimary?.contentMarkdown || '');
+    const remapped = /syncnos-asset:\/\/(\d+)/.exec(restoredAgainMarkdown);
     expect(Number(remapped?.[1])).toBe(Number(restoredAgainAssets[0]?.id));
+    expect(restoredAgainMarkdown).toContain(`literal syncnos-asset://${oldImgId}`);
+    expect(restoredAgainMarkdown).toContain(`\`syncnos-asset://${oldImgId}\``);
+    expect(restoredAgainMarkdown).toContain(`\`![inline](syncnos-asset://${oldImgId})\``);
+    expect(restoredAgainMarkdown).toContain(`![fenced](syncnos-asset://${oldImgId})`);
+    expect(restoredAgainMarkdown).toContain(`    ![indented](syncnos-asset://${oldImgId})`);
   });
 
-  it('importBackupZipV2Merge tolerates missing image index and strips syncnos-asset urls', async () => {
+  it('importBackupZipV2Merge tolerates a missing image index while preserving literal/code private URIs', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -891,6 +981,18 @@ describe('backup service', () => {
     const indexDoc = JSON.parse(new TextDecoder().decode(entries.get(indexPath)!));
     const blobPath = String(indexDoc.assets?.[0]?.blobPath || '');
 
+    const bundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
+    const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
+    bundle.messages[0].contentMarkdown = [
+      `![x](syncnos-asset://${oldImgId})`,
+      `literal syncnos-asset://${oldImgId}`,
+      `\`![inline](syncnos-asset://${oldImgId})\``,
+      '```md',
+      `![fenced](syncnos-asset://${oldImgId})`,
+      '```',
+      `    ![indented](syncnos-asset://${oldImgId})`,
+    ].join('\n');
+    entries.set(bundlePath, new TextEncoder().encode(JSON.stringify(bundle)));
     entries.delete(indexPath);
     if (blobPath) entries.delete(blobPath);
 
@@ -910,10 +1012,13 @@ describe('backup service', () => {
     });
 
     expect(assets.length).toBe(0);
-    expect(String(msgs[0].contentMarkdown || '')).not.toContain('syncnos-asset://');
-    expect(String(msgs[0].contentMarkdown || '')).toContain(
-      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
-    );
+    const restoredMarkdown = String(msgs[0].contentMarkdown || '');
+    expect(restoredMarkdown).not.toContain(`![x](syncnos-asset://${oldImgId})`);
+    expect(restoredMarkdown).toContain('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
+    expect(restoredMarkdown).toContain(`literal syncnos-asset://${oldImgId}`);
+    expect(restoredMarkdown).toContain(`\`![inline](syncnos-asset://${oldImgId})\``);
+    expect(restoredMarkdown).toContain(`![fenced](syncnos-asset://${oldImgId})`);
+    expect(restoredMarkdown).toContain(`    ![indented](syncnos-asset://${oldImgId})`);
   });
 
   it('importBackupZipV2Merge tolerates missing image blob and falls back to https url', async () => {
@@ -990,6 +1095,150 @@ describe('backup service', () => {
 
     expect(assets.length).toBe(0);
     expect(String(msgs[0].contentMarkdown || '')).toContain('https://img.example/x.png');
+  });
+
+  it('scopes asset remap and fallback by backup conversation uniqueKey', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const tx = db.transaction(['conversations', 'messages', 'image_cache'], 'readwrite');
+    const conversationA = await reqToPromise<number>(
+      tx.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'asset-scope-a',
+        title: 'A',
+        url: 'https://example.com/a',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      }) as any,
+    );
+    const conversationB = await reqToPromise<number>(
+      tx.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'asset-scope-b',
+        title: 'B',
+        url: 'https://example.com/b',
+        warningFlags: [],
+        lastCapturedAt: 2,
+      }) as any,
+    );
+    const assetA = await reqToPromise<number>(
+      tx.objectStore('image_cache').add({
+        conversationId: conversationA,
+        url: 'https://img.example/a.png',
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    const assetB = await reqToPromise<number>(
+      tx.objectStore('image_cache').add({
+        conversationId: conversationB,
+        url: 'https://img.example/b.png',
+        blob: new Blob([Uint8Array.from([4, 5, 6])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+        createdAt: 2,
+        updatedAt: 2,
+      }) as any,
+    );
+    await reqToPromise(
+      tx.objectStore('messages').add({
+        conversationId: conversationA,
+        messageKey: 'a1',
+        role: 'assistant',
+        contentText: 'A',
+        contentMarkdown: `![own-a](syncnos-asset://${assetA})`,
+        sequence: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      tx.objectStore('messages').add({
+        conversationId: conversationB,
+        messageKey: 'b1',
+        role: 'assistant',
+        contentText: 'B',
+        contentMarkdown: `![own-b](syncnos-asset://${assetB})`,
+        sequence: 1,
+        updatedAt: 2,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const bundlePaths = (manifest.sources || []).flatMap((group: any) => group.files || []);
+    let bundlePathA = '';
+    for (const path of bundlePaths) {
+      const bundle = JSON.parse(new TextDecoder().decode(entries.get(String(path))!));
+      if (bundle?.conversation?.conversationKey === 'asset-scope-a') {
+        bundlePathA = String(path);
+        bundle.messages[0].contentMarkdown = [
+          `![own-a](syncnos-asset://${assetA})`,
+          `![cross-b](syncnos-asset://${assetB})`,
+          `literal syncnos-asset://${assetB}`,
+        ].join('\n');
+        entries.set(bundlePathA, new TextEncoder().encode(JSON.stringify(bundle)));
+      }
+    }
+    expect(bundlePathA).not.toBe('');
+
+    const imageIndexPath = String(manifest.assets?.imageCacheIndexPath || '');
+    const imageIndex = JSON.parse(new TextDecoder().decode(entries.get(imageIndexPath)!));
+    const assetBIndex = imageIndex.assets.find((asset: any) => Number(asset.assetId) === Number(assetB));
+    expect(assetBIndex).toBeTruthy();
+    const assetBBlobPath = String(assetBIndex?.blobPath || '');
+    if (assetBBlobPath) entries.delete(assetBBlobPath);
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+    await importBackupZipV2Merge(entries);
+
+    const restoredDb = await openDb();
+    const readTx = restoredDb.transaction(['conversations', 'messages', 'image_cache'], 'readonly');
+    const conversations = await reqToPromise<any[]>(readTx.objectStore('conversations').getAll() as any);
+    const messages = await reqToPromise<any[]>(readTx.objectStore('messages').getAll() as any);
+    const assets = await reqToPromise<any[]>(readTx.objectStore('image_cache').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      readTx.oncomplete = () => resolve();
+      readTx.onerror = () => reject(readTx.error);
+      readTx.onabort = () => reject(readTx.error);
+    });
+
+    const restoredA = conversations.find((conversation) => conversation.conversationKey === 'asset-scope-a');
+    const restoredB = conversations.find((conversation) => conversation.conversationKey === 'asset-scope-b');
+    const messageA = messages.find((message) => Number(message.conversationId) === Number(restoredA?.id));
+    const messageB = messages.find((message) => Number(message.conversationId) === Number(restoredB?.id));
+    const markdownA = String(messageA?.contentMarkdown || '');
+    const markdownB = String(messageB?.contentMarkdown || '');
+    const ownARef = /!\[own-a\]\(syncnos-asset:\/\/(\d+)\)/.exec(markdownA);
+    const restoredAssetAId = Number(ownARef?.[1]);
+
+    expect(restoredAssetAId).toBeGreaterThan(0);
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toMatchObject({
+      id: restoredAssetAId,
+      conversationId: restoredA.id,
+      url: 'https://img.example/a.png',
+    });
+    expect(markdownA).toContain('![cross-b](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==)');
+    expect(markdownA).not.toContain('https://img.example/b.png');
+    expect(markdownA).toContain(`literal syncnos-asset://${assetB}`);
+    expect(markdownB).toContain('![own-b](https://img.example/b.png)');
   });
 
   it('importBackupZipV2Merge tolerates missing conversation bundle entry', async () => {

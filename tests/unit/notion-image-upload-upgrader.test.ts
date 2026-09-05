@@ -58,14 +58,18 @@ describe('notion-image-upload-upgrader', () => {
       return { id: input.id } as any;
     });
 
-    const out = await upgradeImageBlocksToFileUploads('token', [
-      externalImageBlock('syncnos-asset://42'),
-      externalImageBlock('syncnos-asset://43'),
-      externalImageBlock('syncnos-asset://42'),
-    ] as any);
+    const out = await upgradeImageBlocksToFileUploads(
+      'token',
+      [
+        externalImageBlock('syncnos-asset://42'),
+        externalImageBlock('syncnos-asset://43'),
+        externalImageBlock('syncnos-asset://42'),
+      ] as any,
+      1,
+    );
 
     expect(bulkRead).toHaveBeenCalledTimes(1);
-    expect(bulkRead).toHaveBeenCalledWith({ ids: [42, 43] });
+    expect(bulkRead).toHaveBeenCalledWith({ ids: [42, 43], conversationId: 1 });
     expect(createExternalUrlUpload).not.toHaveBeenCalled();
     expect(createFileUpload).toHaveBeenCalledTimes(2);
     expect(events).toEqual([
@@ -79,25 +83,69 @@ describe('notion-image-upload-upgrader', () => {
     expect(out.map((block: any) => block?.image?.file_upload?.id)).toEqual(['up-42', 'up-43', 'up-42']);
   });
 
-  it('falls back to an omission paragraph when a local asset is missing', async () => {
+  it('treats a cross-conversation local asset as missing without external upload or byte-download fallback', async () => {
+    const bulkRead = vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds').mockResolvedValue(new Map() as any);
+    const externalUpload = vi
+      .spyOn(notionFilesApi, 'createExternalURLUpload')
+      .mockResolvedValue({ id: 'unused' } as any);
     const createFileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'unused' } as any);
-    vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds').mockResolvedValue(new Map() as any);
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn();
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: fetchMock });
+    try {
+      const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('syncnos-asset://999')] as any, 1);
 
-    const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('syncnos-asset://999')] as any);
+      expect(bulkRead).toHaveBeenCalledWith({ ids: [999], conversationId: 1 });
+      expect(externalUpload).not.toHaveBeenCalled();
+      expect(createFileUpload).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(out[0]?.type).toBe('paragraph');
+      expect(paragraphText(out[0])).toContain('local image upload failed');
+    } finally {
+      Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: originalFetch });
+    }
+  });
 
-    expect(createFileUpload).not.toHaveBeenCalled();
-    expect(out[0]?.type).toBe('paragraph');
-    expect(paragraphText(out[0])).toContain('local image upload failed');
+  it('degrades malformed internal targets without external upload or byte-download fallback', async () => {
+    const bulkRead = vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds');
+    const externalUpload = vi
+      .spyOn(notionFilesApi, 'createExternalURLUpload')
+      .mockResolvedValue({ id: 'unexpected' } as any);
+    const fileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'unexpected' } as any);
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn();
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: fetchMock });
+    try {
+      const out = await upgradeImageBlocksToFileUploads(
+        'token',
+        [
+          externalImageBlock('syncnos-asset://nope'),
+          externalImageBlock('syncnos-asset://0'),
+          externalImageBlock('syncnos-asset://9007199254740992'),
+        ] as any,
+        1,
+      );
+
+      expect(bulkRead).not.toHaveBeenCalled();
+      expect(externalUpload).not.toHaveBeenCalled();
+      expect(fileUpload).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(out.every((block: any) => block?.type === 'paragraph')).toBe(true);
+      expect(JSON.stringify(out)).not.toContain('syncnos-asset://');
+    } finally {
+      Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: originalFetch });
+    }
   });
 
   it('degrades a bulk-reader rejection to omission paragraphs without leaking internal URLs', async () => {
     vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds').mockRejectedValue(new Error('idb unavailable'));
     const createFileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'unused' } as any);
 
-    const out = await upgradeImageBlocksToFileUploads('token', [
-      externalImageBlock('syncnos-asset://42'),
-      externalImageBlock('syncnos-asset://43'),
-    ] as any);
+    const out = await upgradeImageBlocksToFileUploads(
+      'token',
+      [externalImageBlock('syncnos-asset://42'), externalImageBlock('syncnos-asset://43')] as any,
+      1,
+    );
 
     expect(createFileUpload).not.toHaveBeenCalled();
     expect(out).toHaveLength(2);
@@ -116,10 +164,11 @@ describe('notion-image-upload-upgrader', () => {
     const sendFileUpload = vi.spyOn(notionFilesApi, 'sendFileUpload').mockResolvedValue({} as any);
     vi.spyOn(notionFilesApi, 'waitUntilUploaded').mockImplementation(async (input: any) => ({ id: input.id }) as any);
 
-    const out = await upgradeImageBlocksToFileUploads('token', [
-      externalImageBlock('https://example.com/remote.png'),
-      externalImageBlock(dataUrl),
-    ] as any);
+    const out = await upgradeImageBlocksToFileUploads(
+      'token',
+      [externalImageBlock('https://example.com/remote.png'), externalImageBlock(dataUrl)] as any,
+      1,
+    );
 
     expect(bulkRead).not.toHaveBeenCalled();
     expect(createExternalUrlUpload).toHaveBeenCalledTimes(1);

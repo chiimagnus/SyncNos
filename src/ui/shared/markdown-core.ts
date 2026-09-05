@@ -1,5 +1,8 @@
 import MarkdownIt from 'markdown-it';
 import linkAttributes from 'markdown-it-link-attributes';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
+
+const SYNCNOS_ASSET_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 export type MarkdownRendererOptions = {
   /**
@@ -40,15 +43,6 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     const text = String(url || '').trim();
     if (!text) return false;
     return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
-  }
-
-  function parseSyncnosAssetId(url: unknown): number | null {
-    const text = String(url || '').trim();
-    const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
-    if (!matched) return null;
-    const id = Number(matched[1]);
-    if (!Number.isFinite(id) || id <= 0) return null;
-    return id;
   }
 
   function sanitizeUrlForDisplay(url: unknown): string {
@@ -107,15 +101,17 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       const envMap = env && typeof env === 'object' ? (env as any).syncnosAssetSrcById : null;
       const resolved = envMap && (typeof envMap.get === 'function' ? envMap.get(assetId) : (envMap as any)[assetId]);
       const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
-      // Use a tiny valid image as fallback to avoid noisy console errors.
-      const placeholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-      const finalSrc = safeResolved || placeholderSrc;
+      const finalSrc = safeResolved || SYNCNOS_ASSET_PLACEHOLDER_SRC;
       const escapedFinal = inst.utils.escapeHtml(finalSrc);
       return `<img src="${escapedFinal}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
     }
 
-    const escapedSrc = inst.utils.escapeHtml(safeSrc);
+    if (isSyncnosAssetUrl(safeSrc)) {
+      const escapedPlaceholder = inst.utils.escapeHtml(SYNCNOS_ASSET_PLACEHOLDER_SRC);
+      return `<img src="${escapedPlaceholder}" alt="${escapedAlt}"${titleAttr}>`;
+    }
 
+    const escapedSrc = inst.utils.escapeHtml(safeSrc);
     const img = `<img src="${escapedSrc}" alt="${escapedAlt}"${titleAttr}>`;
 
     if (!isHttpUrl(safeSrc) || isDataImageUrl(safeSrc)) return img;

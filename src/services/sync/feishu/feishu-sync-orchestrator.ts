@@ -6,11 +6,7 @@ import { resolveFeishuAccessToken } from '@services/sync/feishu/auth/oauth';
 import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getFeishuPathConfig, pickFeishuFolderPathForConversation } from '@services/sync/feishu/settings-store';
 import { resolveFeishuDriveFolderTokenByPath } from '@services/sync/feishu/drive-folder-path';
-import {
-  convertContentToBlocks,
-  isFeishuConvertPermissionDenied,
-  normalizeConvertedBlocksPreorder,
-} from '@services/sync/feishu/docx/convert-api';
+import { convertContentToBlocks, normalizeConvertedBlocksPreorder } from '@services/sync/feishu/docx/convert-api';
 import { preprocessFeishuDocxMarkdownImages } from '@services/sync/feishu/docx/feishu-docx-image-preprocess';
 import { bindFeishuDocxImagesByOrder } from '@services/sync/feishu/docx/image-block-binder';
 import { sha256Hex } from '@services/sync/shared/content-hash';
@@ -438,17 +434,16 @@ async function appendConvertedBlocks({
 
 async function appendMarkdownWithConvertFallback({
   accessToken,
+  conversationId,
   docId,
   markdown,
 }: {
   accessToken: string;
+  conversationId: number;
   docId: string;
   markdown: string;
 }): Promise<{ appended: number; warnings: string[] }> {
-  const preprocessed = await preprocessFeishuDocxMarkdownImages(markdown).catch(() => ({
-    markdownForConvert: markdown,
-    imageSourcesInOrder: [],
-  }));
+  const preprocessed = await preprocessFeishuDocxMarkdownImages(markdown, conversationId);
 
   try {
     const appended = await appendConvertedBlocks({ accessToken, docId, markdown: preprocessed.markdownForConvert });
@@ -463,11 +458,11 @@ async function appendMarkdownWithConvertFallback({
       warnings: [`image bind failed: ${sanitizePotentialUrls(safeString((e as any)?.message || e || ''))}`],
     }));
     return { appended, warnings: bind.warnings || [] };
-  } catch (e) {
-    if (isFeishuConvertPermissionDenied(e)) {
-      return { appended: await appendTextBlocks({ accessToken, docId, markdown }), warnings: [] };
-    }
-    return { appended: await appendTextBlocks({ accessToken, docId, markdown }), warnings: [] };
+  } catch (_error) {
+    return {
+      appended: await appendTextBlocks({ accessToken, docId, markdown: preprocessed.markdownForConvert }),
+      warnings: [],
+    };
   }
 }
 
@@ -665,14 +660,14 @@ async function runSyncConversations({
         let appended = 0;
         let appendWarnings: string[] = [];
         try {
-          const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
+          const res = await appendMarkdownWithConvertFallback({ accessToken, conversationId, docId, markdown });
           appended = res.appended;
           appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
         } catch (e) {
           if (existingDocId) {
             mode = 'create';
             docId = await createDoc({ accessToken, title: documentTitle });
-            const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
+            const res = await appendMarkdownWithConvertFallback({ accessToken, conversationId, docId, markdown });
             appended = res.appended;
             appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
           } else {

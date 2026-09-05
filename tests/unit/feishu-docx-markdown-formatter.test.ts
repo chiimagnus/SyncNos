@@ -63,6 +63,26 @@ describe('feishu docx markdown formatter', () => {
     expect(out).not.toContain('[Image omitted]');
   });
 
+  it('does not normalize image-looking caption lines inside fenced or indented code', async () => {
+    const markdown = [
+      '```md',
+      '![code](https://example.com/code.png)Code caption',
+      '```',
+      '',
+      '    ![indent](https://example.com/i.png)Indented caption',
+    ].join('\n');
+    const out = await formatConversationMarkdownForFeishuDocxSync(
+      { id: 1, source: 'x', conversationKey: 'k', title: 't' } as any,
+      {
+        conversationId: 1,
+        messages: [{ id: 1, conversationId: 1, messageKey: 'm1', role: 'assistant', contentMarkdown: markdown } as any],
+      } as any,
+    );
+
+    expect(out).toContain('![code](https://example.com/code.png)Code caption');
+    expect(out).toContain('    ![indent](https://example.com/i.png)Indented caption');
+  });
+
   it('normalizes standalone image caption lines', async () => {
     const markdown = ['![alt](https://example.com/a.png)Caption'].join('\n');
     const out = await formatConversationMarkdownForFeishuDocxSync(
