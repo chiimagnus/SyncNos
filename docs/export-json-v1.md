@@ -64,8 +64,8 @@ A chat adds `messages`. Array order is the public message order and follows the 
       "role": "assistant",
       "author": null,
       "content": {
-        "markdown": "Saved Markdown",
-        "text": "Saved text"
+        "format": "markdown",
+        "value": "Saved Markdown"
       }
     }
   ]
@@ -77,7 +77,7 @@ Each message contains only:
 - `key: string` — a non-empty persisted `messageKey`;
 - `role: string` — an empty or malformed stored role falls back to `assistant`;
 - `author: string | null`;
-- `content: { markdown: string | null, text: string | null }`.
+- `content: { format: "markdown" | "text", value: string } | null`.
 
 Local message IDs, `conversationId`, `sequence`, and `updatedAt` are not exported.
 
@@ -90,13 +90,13 @@ An article adds:
   "author": "Author name or null",
   "publishedAt": "source value or null",
   "content": {
-    "markdown": "Saved Markdown or null",
-    "text": "Saved text or null"
+    "format": "markdown",
+    "value": "Saved Markdown"
   }
 }
 ```
 
-SyncNos selects the message whose `messageKey` is exactly `article_body`. Only when that semantic key is absent does it fall back to the first canonical detail message. If `article_body` exists with empty content, that empty content remains authoritative and is represented with `null` content fields rather than replaced by another message.
+SyncNos selects the message whose `messageKey` is exactly `article_body`. Only when that semantic key is absent does it fall back to the first canonical detail message. Within that message, non-empty Markdown is exported as `{ "format": "markdown", "value": ... }`; otherwise non-empty plain text is exported as `{ "format": "text", "value": ... }`. If `article_body` exists with neither representation, that empty content remains authoritative and is exported as `null` rather than replaced by another message.
 
 `publishedAt` preserves the captured source string. v1 does not reinterpret it as a new timestamp type.
 
@@ -108,8 +108,8 @@ A video adds:
 {
   "author": "Creator or null",
   "transcript": {
-    "markdown": "Saved transcript Markdown or null",
-    "text": "Saved transcript text or null"
+    "format": "markdown",
+    "value": "Saved transcript Markdown"
   }
 }
 ```
@@ -124,14 +124,14 @@ v1 does **not** publish `platform`, `durationSeconds`, `thumbnailUrl`, `transcri
 - Optional metadata strings such as `title`, `url`, `author`, and `publishedAt` become `null` when missing, non-string, or empty after trimming.
 - `warnings` always exists. Only actual non-empty string codes are retained, in their existing order.
 - `capturedAt` is `null` unless the stored value is an actual finite positive number that can be represented as an ISO timestamp.
-- Saved content is different from metadata: `content.markdown`, `content.text`, and transcript/message content are preserved exactly when they are non-empty strings. SyncNos does not trim them, normalize their line endings, or re-render them for JSON export.
-- A missing or exact empty saved content string becomes `null`. Any other non-string saved-content value is malformed and makes that item fail export rather than being silently erased as `null`.
+- Saved content is projected to one public representation instead of exposing both internal storage fields. SyncNos prefers a non-empty saved Markdown string; only when Markdown is absent or exactly empty does it fall back to a non-empty saved plain-text string. The selected string is preserved exactly: SyncNos does not trim it, normalize its line endings, or re-render it for JSON export.
+- Public content is `{ "format": "markdown" | "text", "value": string } | null`. When both saved representations are missing or exactly empty, public content is `null`. Any other non-string saved-content value is malformed and makes that item fail export rather than being silently erased as `null`.
 
 The only intentional content rewrite is the internal-image handling below.
 
 ## Internal images and attachments
 
-For each item, SyncNos walks its Markdown-bearing fields in their stable public order and parses real Markdown image targets.
+For each item, SyncNos walks public content values whose `format` is `markdown` in their stable public order and parses real Markdown image targets.
 
 - A valid `syncnos-asset://...` image target is read only from that item's own conversation-scoped image cache.
 - A successfully materialized asset is written once and listed once in `attachments`, in first-real-reference order. Repeated references reuse the same archive path.

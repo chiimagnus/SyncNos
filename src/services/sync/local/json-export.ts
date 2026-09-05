@@ -15,9 +15,9 @@ import {
 } from '@services/sync/local/export-shared';
 
 type JsonContent = {
-  markdown: string | null;
-  text: string | null;
-};
+  format: 'markdown' | 'text';
+  value: string;
+} | null;
 
 type JsonAttachment = {
   path: string;
@@ -99,10 +99,11 @@ function normalizeCapturedAt(value: unknown): string | null {
 }
 
 function normalizeContent(message: ConversationMessage | null | undefined): JsonContent {
-  return {
-    markdown: contentString((message as any)?.contentMarkdown, 'contentMarkdown'),
-    text: contentString((message as any)?.contentText, 'contentText'),
-  };
+  const markdown = contentString((message as any)?.contentMarkdown, 'contentMarkdown');
+  const text = contentString((message as any)?.contentText, 'contentText');
+  if (markdown != null) return { format: 'markdown', value: markdown };
+  if (text != null) return { format: 'text', value: text };
+  return null;
 }
 
 function findSemanticMessage(messages: ConversationMessage[], messageKey: string): ConversationMessage | null {
@@ -127,9 +128,9 @@ async function materializeContentMarkdown(input: {
   const slotIndexes: number[] = [];
   const markdown: string[] = [];
   input.contents.forEach((content, index) => {
-    if (content.markdown == null) return;
+    if (content?.format !== 'markdown') return;
     slotIndexes.push(index);
-    markdown.push(content.markdown);
+    markdown.push(content.value);
   });
 
   const materialized = await materializeConversationMarkdownAssets({
@@ -138,9 +139,11 @@ async function materializeContentMarkdown(input: {
     markdown,
     nextAttachmentIndex: input.nextAttachmentIndex,
   });
-  const contents = input.contents.map((content) => ({ ...content }));
+  const contents = input.contents.map((content) => (content ? { ...content } : null));
   slotIndexes.forEach((contentIndex, slotIndex) => {
-    contents[contentIndex]!.markdown = materialized.markdown[slotIndex] ?? contents[contentIndex]!.markdown;
+    const content = contents[contentIndex];
+    if (!content || content.format !== 'markdown') return;
+    content.value = materialized.markdown[slotIndex] ?? content.value;
   });
 
   return {

@@ -120,13 +120,13 @@ describe('local JSON v1 export', () => {
           key: 'm-2',
           role: 'assistant',
           author: 'Assistant',
-          content: { markdown: '  markdown with spaces  ', text: '\ntext\n' },
+          content: { format: 'markdown', value: '  markdown with spaces  ' },
         },
         {
           key: 'm-1',
           role: 'assistant',
           author: null,
-          content: { markdown: null, text: null },
+          content: null,
         },
       ],
     });
@@ -172,14 +172,14 @@ describe('local JSON v1 export', () => {
       type: 'article',
       author: 'Author',
       publishedAt: '2026-09-01',
-      content: { markdown: null, text: 'semantic text' },
+      content: { format: 'text', value: 'semantic text' },
     });
     expect(semanticJson.messages).toBeUndefined();
     expect(fallbackJson).toMatchObject({
       type: 'article',
       author: null,
       publishedAt: null,
-      content: { markdown: 'fallback md', text: 'fallback text' },
+      content: { format: 'markdown', value: 'fallback md' },
     });
   });
 
@@ -212,7 +212,7 @@ describe('local JSON v1 export', () => {
       source: 'video',
       key: 'video:https://example.com/watch/4',
       author: 'Creator',
-      transcript: { markdown: '00:01 hello', text: 'hello' },
+      transcript: { format: 'markdown', value: '00:01 hello' },
       attachments: [],
     });
     expect(entry.value.messages).toBeUndefined();
@@ -239,8 +239,28 @@ describe('local JSON v1 export', () => {
     const [entry] = await readJsonEntries(result.zipBlob);
     expect(entry.value).toMatchObject({
       type: 'video',
-      transcript: { markdown: 'legacy md', text: 'legacy text' },
+      transcript: { format: 'markdown', value: 'legacy md' },
     });
+  });
+
+  it('keeps text fallback opaque and does not parse asset-like text as Markdown', async () => {
+    const c = conversation(41, {
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article:text-only',
+    });
+    const textOnly = 'plain ![example](syncnos-asset://41) text';
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 41,
+      messages: [message('article_body', { contentMarkdown: '', contentText: textOnly })],
+    });
+
+    const result = await buildConversationsJsonZipExport({ conversations: [c] });
+    const [entry] = await readJsonEntries(result.zipBlob);
+
+    expect(entry.value.content).toEqual({ format: 'text', value: textOnly });
+    expect(entry.value.attachments).toEqual([]);
+    expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
   });
 
   it('materializes cached image targets once in first-reference order and preserves non-asset content exactly', async () => {
@@ -283,13 +303,15 @@ describe('local JSON v1 export', () => {
     const [twoPath, onePath] = jsonEntry.value.attachments.map((attachment: any) => attachment.path);
     expect(entries.has(twoPath)).toBe(true);
     expect(entries.has(onePath)).toBe(true);
-    expect(first.content.markdown).toContain(`![two](${twoPath})`);
-    expect(first.content.markdown.match(/\[Image unavailable\]/g)).toHaveLength(2);
-    expect(first.content.markdown).toContain('![remote](https://example.com/remote.png)');
-    expect(first.content.markdown).toContain('![data](data:image/png;base64,AQID)');
-    expect(first.content.markdown).toContain('`![literal](syncnos-asset://8)`');
-    expect(second.content.markdown).toContain(`![one](${onePath})`);
-    expect(second.content.markdown).toContain(`![two-again](${twoPath})`);
+    expect(first.content).toMatchObject({ format: 'markdown' });
+    expect(first.content.value).toContain(`![two](${twoPath})`);
+    expect(first.content.value.match(/\[Image unavailable\]/g)).toHaveLength(2);
+    expect(first.content.value).toContain('![remote](https://example.com/remote.png)');
+    expect(first.content.value).toContain('![data](data:image/png;base64,AQID)');
+    expect(first.content.value).toContain('`![literal](syncnos-asset://8)`');
+    expect(second.content).toMatchObject({ format: 'markdown' });
+    expect(second.content.value).toContain(`![one](${onePath})`);
+    expect(second.content.value).toContain(`![two-again](${twoPath})`);
   });
 
   it('uses actual Blob metadata, falls back from malformed cache MIME to Blob MIME, then to octet-stream', async () => {
