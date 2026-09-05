@@ -20,7 +20,7 @@ import {
 import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getGithubSettings, type GithubSettings } from '@services/sync/github/settings-store';
 
-export type GithubOrchestratorStorage = {
+type GithubOrchestratorStorage = {
   getSyncMappingByConversation: (conversationId: number) => Promise<{ conversation: any; mapping: any | null } | null>;
   getMessagesByConversationId: (conversationId: number) => Promise<any[]>;
   getArticleCommentsByConversationId: (conversationId: number) => Promise<any[]>;
@@ -30,8 +30,7 @@ export type GithubOrchestratorStorage = {
 
 const githubSyncJobStore = createSyncJobStore('github');
 
-export const GITHUB_REPLACEMENT_DEFER_SAFETY_MS = 5_000;
-export const DEFAULT_GITHUB_REPLACEMENT_DEFER_MS = GITHUB_AUTO_SYNC_DEBOUNCE_MS + GITHUB_REPLACEMENT_DEFER_SAFETY_MS;
+const DEFAULT_GITHUB_REPLACEMENT_DEFER_MS = GITHUB_AUTO_SYNC_DEBOUNCE_MS + 5_000;
 
 export type GithubOrchestratorServices = {
   getSettings: () => Promise<GithubSettings>;
@@ -43,7 +42,6 @@ export type GithubOrchestratorServices = {
     repository: string;
     branch: string;
     operations: readonly GithubStagedOperation[];
-    message: string;
   }) => Promise<GithubGitTransactionResult>;
   listDueCleanupRows: typeof listDueGithubCleanupRows;
   getNextCleanupDueAt: typeof getNextGithubCleanupDueAt;
@@ -56,12 +54,11 @@ export type GithubOrchestratorServices = {
 
 export const defaultGithubOrchestratorServices: GithubOrchestratorServices = {
   getSettings: getGithubSettings,
-  preflight: (input) => preflightGithubRepository(input),
+  preflight: preflightGithubRepository,
   storage: backgroundStorage,
   loadImages: getImageCacheAssetsByIds,
   createBlob: createGithubBlob,
-  commit: ({ repository, branch, operations, message }) =>
-    commitGithubStagedOperations({ repository, branch, operations, message }),
+  commit: commitGithubStagedOperations,
   listDueCleanupRows: listDueGithubCleanupRows,
   getNextCleanupDueAt: getNextGithubCleanupDueAt,
   deferCleanupRows: deferGithubCleanupRows,

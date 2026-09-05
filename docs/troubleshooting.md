@@ -10,6 +10,7 @@
 | Vitest 不退出 | 未释放的 timer、listener 或 React root；超时不是 PASS。 |
 | manifest/version 发布失败 | `wxt.config.ts`、tag 和 workflow 的版本校验。 |
 | OAuth Connect 无响应 | client id、redirect URI、pending state、Worker endpoint 和浏览器日志。 |
+| GitHub 手动同步选中了多条，但 commit 的 changed files 更少 | 这是可能的正常结果：手动同步使用 `reconcile`，未变化的受管路径也可能参与声明，但 GitHub 最终 tree diff 只显示真正变化的文件。SyncNos commit message 固定为 `SyncNos GitHub sync`，不再用选中数或 staged 数冒充 changed-file 数。 |
 | article 只有文本没有图片 | 图片设置、anti-hotlink rule、referer 与下载 warning；文本成功仍是成功。 |
 | 视频提示没有字幕 | 先在页面开启并等待字幕请求加载，再 capture。 |
 | `Could not establish connection` / `Receiving end does not exist` | 先按发送方向和生命周期分类：content → background 冷启动、background → content 尚未注入、port 已建立后关闭、旧 context 失效是不同问题。不要用通用 retry 掩盖 background cold-start，也不要把 `message port closed` 或 `Extension context invalidated` 当成 missing receiver。 |

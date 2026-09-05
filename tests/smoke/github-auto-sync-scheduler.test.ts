@@ -46,7 +46,7 @@ beforeEach(() => {
 describe('github-auto-sync-scheduler', () => {
   it('runs queued conversations through incremental GitHub sync', async () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
-    const sync = vi.fn().mockResolvedValue({ transport: { status: 'not_needed' }, items: [] });
+    const sync = vi.fn().mockResolvedValue({ transportStatus: 'not_needed', items: [] });
     const scheduler = createGithubAutoSyncScheduler(
       { getInstanceId: () => 'github-auto-instance', githubSyncOrchestrator: { sync } as any },
       { now: () => 10_000 },
@@ -105,7 +105,7 @@ describe('github-auto-sync-scheduler', () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '8': 9_999 };
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'failed' },
+      transportStatus: 'failed',
       items: [{ conversationId: 8, status: 'failed', error: 'github_network_error' }],
     });
     const scheduler = createGithubAutoSyncScheduler(
@@ -124,7 +124,7 @@ describe('github-auto-sync-scheduler', () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '9': 9_999 };
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'not_needed' },
+      transportStatus: 'not_needed',
       items: [{ conversationId: 9, status: 'failed', error: 'github_network_error' }],
     });
     const scheduler = createGithubAutoSyncScheduler(
@@ -143,7 +143,7 @@ describe('github-auto-sync-scheduler', () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '12': 9_999 };
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'not_needed' },
+      transportStatus: 'not_needed',
       items: [{ conversationId: 12, status: 'failed', error: 'conversation not found' }],
     });
     const scheduler = createGithubAutoSyncScheduler(
@@ -158,11 +158,11 @@ describe('github-auto-sync-scheduler', () => {
     });
   });
 
-  it('retains dirty ids when the orchestrator returns an invalid transport resolution', async () => {
+  it('retains dirty ids when transport resolution cannot be acknowledged', async () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '10': 9_999 };
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'invalid_resolution' },
+      transportStatus: 'committed',
       items: [{ conversationId: 10, status: 'failed', error: 'github_transport_resolution_incomplete' }],
     });
     const scheduler = createGithubAutoSyncScheduler(
@@ -181,7 +181,7 @@ describe('github-auto-sync-scheduler', () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     storageState[GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '11': 9_999 };
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'committed' },
+      transportStatus: 'committed',
       items: [{ conversationId: 11, status: 'mapping_failed', error: 'github_mapping_patch_failed' }],
     });
     const scheduler = createGithubAutoSyncScheduler(
@@ -223,7 +223,7 @@ describe('github-auto-sync-scheduler', () => {
   it('drains cleanup-only work, re-dirties replacements, and schedules a future batch without recursion', async () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'committed' },
+      transportStatus: 'committed',
       deferredReplacementConversationIds: [7, 7, '8', 0],
       cleanupHasMoreDue: true,
       nextCleanupDueAt: null,
@@ -250,7 +250,7 @@ describe('github-auto-sync-scheduler', () => {
   it('uses the orchestrator nextCleanupDueAt exactly when no cleanup batch remains due', async () => {
     storageState[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] = true;
     const sync = vi.fn().mockResolvedValue({
-      transport: { status: 'not_needed' },
+      transportStatus: 'not_needed',
       deferredReplacementConversationIds: [],
       cleanupHasMoreDue: false,
       nextCleanupDueAt: 45_678,
@@ -338,14 +338,14 @@ describe('github-auto-sync-scheduler', () => {
     const sync = vi
       .fn()
       .mockResolvedValueOnce({
-        transport: { status: 'not_needed' },
+        transportStatus: 'not_needed',
         deferredReplacementConversationIds: [7],
         cleanupHasMoreDue: false,
         nextCleanupDueAt: 75_000,
       })
-      .mockResolvedValueOnce({ transport: { status: 'committed' }, items: [{ conversationId: 7, status: 'synced' }] })
+      .mockResolvedValueOnce({ transportStatus: 'committed', items: [{ conversationId: 7, status: 'synced' }] })
       .mockResolvedValueOnce({
-        transport: { status: 'committed' },
+        transportStatus: 'committed',
         deferredReplacementConversationIds: [],
         cleanupHasMoreDue: false,
         nextCleanupDueAt: null,

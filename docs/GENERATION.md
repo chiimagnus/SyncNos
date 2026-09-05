@@ -7,8 +7,8 @@ This file records the source baseline and ownership rules used for the long-term
 | Field | Value |
 | --- | --- |
 | Repository | `SyncNos` WebClipper codebase (origin: `chiimagnus/SyncNos`) |
-| Commit hash | `529c39c486a64662c41499fb9815c0af7f25f7ec` |
-| Generated at | `2026-08-31` |
+| Commit hash | `2e75adfdd9bfc36503c164def288ec1e0fcc638e` |
+| Generated at | `2026-09-05` |
 
 The commit above is the code baseline at the start of this documentation reconciliation. Documentation-only edits do not advance it.
 

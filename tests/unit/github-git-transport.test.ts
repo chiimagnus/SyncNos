@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { GithubApiError } from '@services/sync/github/github-api-client';
 import {
-  GITHUB_BRANCH_RACE_MAX_ATTEMPTS,
-  GithubGitTransportError,
   commitGithubStagedOperations,
   commitGithubStagedOperationsOnce,
   createGithubBlob,
@@ -97,8 +95,8 @@ describe('github git transport staged path/delete resolver', () => {
     );
 
     expect(result.deletes).toEqual([
-      { path: 'folder/nested/one.md', status: 'present', sha: BLOB_1 },
-      { path: 'folder/nested/two.md', status: 'present', sha: BLOB_2 },
+      { path: 'folder/nested/one.md', status: 'present' },
+      { path: 'folder/nested/two.md', status: 'present' },
     ]);
     expect(result.operations).toEqual([
       { type: 'delete', path: 'folder/nested/one.md' },
@@ -277,8 +275,6 @@ describe('github git transport staged path/delete resolver', () => {
 
     expect(result).toEqual({
       status: 'committed',
-      treeSha: NEW_TREE,
-      commitSha: COMMIT,
       files: [
         { path: 'new.md', status: 'written', sha: BLOB_1 },
         { path: 'asset.png', status: 'reused', sha: BLOB_2 },
@@ -296,7 +292,7 @@ describe('github git transport staged path/delete resolver', () => {
     });
     const commit = calls.find((call) => call.path.endsWith('/git/commits'));
     expect(commit?.body).toEqual({
-      message: 'SyncNos: sync 3 files',
+      message: 'SyncNos GitHub sync',
       tree: NEW_TREE,
       parents: ['f'.repeat(40)],
     });
@@ -306,71 +302,6 @@ describe('github git transport staged path/delete resolver', () => {
       path: '/repos/owner/repo/git/refs/heads/feature/foo',
       body: { sha: COMMIT, force: false },
     });
-  });
-
-  it('uses an explicit safe commit message and rejects unsafe messages before mutations', async () => {
-    const NEW_TREE = '1'.repeat(40);
-    const COMMIT = '2'.repeat(40);
-    const calls: Array<{ method: string; path: string; body?: any }> = [];
-    const api = {
-      async get<T>(): Promise<T> {
-        throw new Error('no deletes');
-      },
-      async post<T>(path: string, body?: unknown): Promise<T> {
-        calls.push({ method: 'POST', path, body });
-        if (path.endsWith('/git/trees')) return { sha: NEW_TREE } as T;
-        if (path.endsWith('/git/commits')) return { sha: COMMIT } as T;
-        throw new Error(`unexpected:${path}`);
-      },
-      async patch<T>(path: string, body?: unknown): Promise<T> {
-        calls.push({ method: 'PATCH', path, body });
-        return { object: { sha: COMMIT } } as T;
-      },
-    };
-
-    await commitGithubStagedOperationsOnce(
-      {
-        repository: 'owner/repo',
-        branch: 'main',
-        headSha: 'f'.repeat(40),
-        treeSha: ROOT,
-        operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
-        message: 'SyncNos GitHub sync (2 items)',
-      },
-      api,
-    );
-    expect(calls.find((call) => call.path.endsWith('/git/commits'))?.body).toMatchObject({
-      message: 'SyncNos GitHub sync (2 items)',
-    });
-
-    let mutations = 0;
-    const noMutationApi = {
-      async get<T>(): Promise<T> {
-        throw new Error('must-not-read');
-      },
-      async post<T>(): Promise<T> {
-        mutations += 1;
-        throw new Error('must-not-post');
-      },
-      async patch<T>(): Promise<T> {
-        mutations += 1;
-        throw new Error('must-not-patch');
-      },
-    };
-    await expect(
-      commitGithubStagedOperationsOnce(
-        {
-          repository: 'owner/repo',
-          branch: 'main',
-          headSha: 'f'.repeat(40),
-          treeSha: ROOT,
-          operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
-          message: 'SyncNos\nbody',
-        },
-        noMutationApi,
-      ),
-    ).rejects.toMatchObject({ code: 'github_git_message_invalid' });
-    expect(mutations).toBe(0);
   });
 
   it('returns no_changes for absent deletes without creating tree/commit/ref', async () => {
@@ -401,7 +332,6 @@ describe('github git transport staged path/delete resolver', () => {
     );
     expect(result).toEqual({
       status: 'no_changes',
-      treeSha: ROOT,
       files: [{ path: 'missing.md', status: 'absent' }],
     });
     expect(calls.some((call) => call.startsWith('POST') || call.startsWith('PATCH'))).toBe(false);
@@ -475,7 +405,6 @@ describe('github git transport staged path/delete resolver', () => {
     );
     expect(result).toEqual({
       status: 'no_changes',
-      treeSha: ROOT,
       files: [
         { path: 'same.md', status: 'written', sha: BLOB_1 },
         { path: 'same-asset.png', status: 'reused', sha: BLOB_2 },
@@ -571,17 +500,13 @@ describe('github git transport staged path/delete resolver', () => {
         repository: 'owner/repo',
         branch: 'main',
         operations: [{ type: 'reuse', path: 'asset.png', sha: BLOB_2 }],
-        message: 'SyncNos GitHub sync (1 items)',
       },
       api,
     );
-    expect(result).toMatchObject({ status: 'committed', treeSha: NEW_2, commitSha: COMMIT_2 });
+    expect(result.status).toBe('committed');
     expect(refReads).toBe(2);
     expect(treeBodies.map((body) => body.base_tree)).toEqual([BASE_1, BASE_2]);
-    expect(commitBodies.map((body) => body.message)).toEqual([
-      'SyncNos GitHub sync (1 items)',
-      'SyncNos GitHub sync (1 items)',
-    ]);
+    expect(commitBodies.map((body) => body.message)).toEqual(['SyncNos GitHub sync', 'SyncNos GitHub sync']);
     expect(patchBodies).toEqual([
       { sha: COMMIT_1, force: false },
       { sha: COMMIT_2, force: false },
@@ -679,8 +604,8 @@ describe('github git transport staged path/delete resolver', () => {
         api,
       ),
     ).rejects.toMatchObject({ code: 'github_git_branch_race_exhausted' });
-    expect(refReads).toBe(GITHUB_BRANCH_RACE_MAX_ATTEMPTS);
-    expect(patches).toBe(GITHUB_BRANCH_RACE_MAX_ATTEMPTS);
+    expect(refReads).toBe(3);
+    expect(patches).toBe(3);
   });
 
   it('re-resolves deletes against the fresh tree and treats a concurrently removed path as satisfied', async () => {
@@ -727,7 +652,6 @@ describe('github git transport staged path/delete resolver', () => {
     );
     expect(result).toEqual({
       status: 'no_changes',
-      treeSha: BASE_2,
       files: [{ path: 'old.md', status: 'absent' }],
     });
     expect(treeReads).toEqual([BASE_1, BASE_2]);
@@ -749,7 +673,7 @@ describe('github git transport staged path/delete resolver', () => {
         { repository: 'owner/repo', treeSha: 'bad', operations: [{ type: 'delete', path: 'old.md' }] },
         api,
       ),
-    ).rejects.toBeInstanceOf(GithubGitTransportError);
+    ).rejects.toMatchObject({ code: 'github_git_sha_invalid' });
     expect(calls).toHaveLength(0);
   });
 });

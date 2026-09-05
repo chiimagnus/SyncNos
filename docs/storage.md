@@ -34,8 +34,11 @@ GitHub 的 repository 与 branch 属于非敏感配置，可按现有 storage ba
 
 Inpage 显示设置只使用 `inpage_display_mode`（`supported | all | off`）。运行时、Settings、context menu 与 backup 都只读取和写入这一 canonical key；backup 会丢弃其它退役的 `inpage_*` storage residue。无设置或值非法时使用运行默认 `all`，startup 会清理非法 canonical residue，但不会为了默认值凭空物化 storage key。
 
-## GitHub 恢复状态
+## GitHub 同步与恢复边界
 
+- 手动 GitHub 同步使用 `reconcile`，会重新声明已知受管 projection 以恢复远端删除或漂移；自动同步和 cleanup 使用 `incremental`。两者都进入同一 GitHub orchestrator / SyncJob lifecycle，不能为了减少远端操作或显示数量而拆成第二套同步状态机。
+- SyncNos 创建 GitHub commit 时固定使用 `SyncNos GitHub sync`。选中的 conversations、planner staged operations、Git tree entries 与最终 changed files 不保证一一对应；不要把其中任一候选数量写进 commit message，实际远端变化以 GitHub 最终 tree diff 为准。
+- GitHub sync mapping 只在 transport 为本次 staged operations 返回完整 final-file resolution 后 acknowledgement。远端 commit 失败、resolution 不完整或 mapping patch 失败时，本地采集内容仍是真源，既有 continuity 不得被伪造为成功状态。
 - GitHub auth/pending state 存在 `chrome.storage.local` 的 `github_auth_state_v1`，属于 secret/runtime state，不进入 Zip backup。
 - pending Device Flow 的 remote-state discovery 不得把单个 UI timer 当成 correctness 唯一来源。设置页面在重新可见、重新获得焦点或 pageshow 时，只在持久化 `nextPollAt` 已到期后补做 reconcile；poll interval、`slow_down`、expiry 与跨调用 claim 仍由 Device Flow service 和 durable auth state 最终裁决。timer / lifecycle wake 的并发触发必须合并，且授权收敛不得因无关设置操作而长期阻塞。
 - mount hydration、auth storage wake 与 poll-error recovery 可能并发读取 GitHub safe auth snapshot；较旧响应不得覆盖更新的已应用 auth 状态。较新的读取失败只保留 last-good，不得把失败解释成 disconnected，也不能让乱序响应把 connected 回退为 pending。

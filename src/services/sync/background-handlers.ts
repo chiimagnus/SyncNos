@@ -48,7 +48,7 @@ type Deps = {
   };
   githubSyncOrchestrator: {
     sync: (input: {
-      conversationIds?: readonly unknown[];
+      conversationIds?: readonly number[];
       mode?: 'incremental' | 'reconcile';
       instanceId?: string;
     }) => Promise<unknown>;

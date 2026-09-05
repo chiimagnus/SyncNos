@@ -2,8 +2,10 @@ import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
 import { sha256Hex } from '@services/sync/github/github-content-hash';
-import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
-import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
+import {
+  githubOutputFolderForConversation,
+  isGithubManagedPathOwnedByConversation,
+} from '@services/sync/github/github-managed-path-ownership';
 import {
   collectOrderedSyncnosAssetIds,
   replaceSyncnosAssetImageReferences,
@@ -22,19 +24,19 @@ export type GithubProjectionManagedFile = {
   sha: string;
 };
 
-export type GithubProjectionContinuity = {
+type GithubProjectionContinuity = {
   githubRemoteKey?: string;
   githubManagedFiles?: Record<string, GithubProjectionManagedFile>;
 };
 
-export type GithubProjectionAttachment = {
+type GithubProjectionAttachment = {
   path: string;
   relativeTarget: string;
   contentHash: string;
   sha: string;
 };
 
-export type GithubProjectionWarning = {
+type GithubProjectionWarning = {
   code: 'image_missing' | 'image_upload_failed';
   assetId: number;
 };
@@ -48,18 +50,11 @@ export type GithubMarkdownProjection = {
   warnings: GithubProjectionWarning[];
 };
 
-export type GithubImageBatchLoader = (input: {
+type GithubImageBatchLoader = (input: {
   ids: readonly number[];
   conversationId: number;
 }) => Promise<Map<number, ImageCacheAsset>>;
-export type GithubBlobUploader = (input: { content: Uint8Array }) => Promise<{ sha: string }>;
-
-function folderForConversation(conversation: any): string {
-  const sourceType = String(conversation?.sourceType || '').trim();
-  if (sourceType === 'article') return GITHUB_OUTPUT_FOLDERS.article;
-  if (sourceType === 'video') return GITHUB_OUTPUT_FOLDERS.video;
-  return GITHUB_OUTPUT_FOLDERS.chat;
-}
+type GithubBlobUploader = (input: { content: Uint8Array }) => Promise<{ sha: string }>;
 
 function normalizeImageExt(asset: Pick<ImageCacheAsset, 'contentType' | 'url'>): string {
   const contentType = String(asset.contentType || '')
@@ -168,7 +163,7 @@ export async function buildGithubMarkdownProjection(input: {
   blobUploader?: GithubBlobUploader;
 }): Promise<GithubMarkdownProjection> {
   const conversation = input.conversation || {};
-  const folder = folderForConversation(conversation);
+  const folder = githubOutputFolderForConversation(conversation);
   const markdownPath = `${folder}/${buildConversationBasename(conversation)}.md`;
   const rawMarkdown = buildFullNoteMarkdown({
     conversation,

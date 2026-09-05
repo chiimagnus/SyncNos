@@ -20,7 +20,6 @@ export const GITHUB_AUTO_SYNC_TRANSIENT_RETRY_MS = 2 * 60_000;
 export const GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS = 15 * 60_000;
 export const GITHUB_CLEANUP_BATCH_CONTINUE_DELAY_MS = 1_000;
 export const GITHUB_CLEANUP_BUSY_RETRY_MS = 60_000;
-export const GITHUB_CLEANUP_UNKNOWN_FAILURE_RETRY_MS = 5 * 60_000;
 
 const TRANSIENT_CODES = new Set([
   'github_network_error',
@@ -41,29 +40,12 @@ export function getGithubAutoSyncFailureRetryDelayMs(error: unknown): number {
     : GITHUB_AUTO_SYNC_ACTION_REQUIRED_RETRY_MS;
 }
 
-function resultFailureCode(result: any): string {
-  const items = Array.isArray(result?.items) ? result.items : [];
-  for (const item of items) {
-    if (item?.status !== 'failed' && item?.status !== 'mapping_failed') continue;
-    const code = String(item?.error || '').trim();
-    return code.startsWith('github_') ? code : 'github_sync_item_failed';
+function resultFailureCode(result: Awaited<ReturnType<GithubSyncOrchestrator['sync']>>): string {
+  for (const item of result.items) {
+    if (item.status !== 'failed' && item.status !== 'mapping_failed') continue;
+    return item.error.startsWith('github_') ? item.error : 'github_sync_item_failed';
   }
-
-  const transportStatus = String(result?.transport?.status || '').trim();
-  if (transportStatus === 'invalid_resolution') return 'github_transport_resolution_incomplete';
-  if (transportStatus === 'failed') return 'github_transport_failed';
-  return '';
-}
-
-function normalizePositiveIds(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  return [
-    ...new Set(
-      value
-        .map((candidate) => Number(candidate))
-        .filter((candidate): candidate is number => Number.isSafeInteger(candidate) && candidate > 0),
-    ),
-  ];
+  return result.transportStatus === 'failed' ? 'github_transport_failed' : '';
 }
 
 export type GithubAutoSyncScheduler = AutoSyncScheduler & {
@@ -112,18 +94,15 @@ export function createGithubAutoSyncScheduler(
   const scheduleCleanup = async (when = infra.now()) => {
     if (!(await cleanupEnabled())) return;
     if (!infra.alarms.isAvailable()) return;
-    const candidate = Number(when);
     const now = infra.now();
-    const dueAt = Number.isFinite(candidate) && candidate > now ? Math.floor(candidate) : now;
+    const dueAt = when > now ? Math.floor(when) : now;
     infra.alarms.create(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME, { when: dueAt });
   };
 
   const scheduleCleanupFailure = async (error: unknown) => {
     const code = String((error as any)?.code || '').trim();
     const delay =
-      code === 'sync_already_running'
-        ? GITHUB_CLEANUP_BUSY_RETRY_MS
-        : getGithubAutoSyncFailureRetryDelayMs(error) || GITHUB_CLEANUP_UNKNOWN_FAILURE_RETRY_MS;
+      code === 'sync_already_running' ? GITHUB_CLEANUP_BUSY_RETRY_MS : getGithubAutoSyncFailureRetryDelayMs(error);
     await scheduleCleanup(infra.now() + delay);
   };
 
@@ -131,27 +110,26 @@ export function createGithubAutoSyncScheduler(
   const flushCleanupOnce = async () => {
     if (!(await cleanupEnabled())) return;
     try {
-      const result: any = await deps.githubSyncOrchestrator.sync({
+      const result = await deps.githubSyncOrchestrator.sync({
         conversationIds: [],
         mode: 'incremental',
         instanceId: deps.getInstanceId(),
       });
-      if (result?.transport?.status === 'failed' || result?.transport?.status === 'invalid_resolution') {
+      if (result.transportStatus === 'failed') {
         throw Object.assign(new Error('github_cleanup_transport_failed'), { code: 'github_cleanup_transport_failed' });
       }
 
-      const replacementIds = normalizePositiveIds(result?.deferredReplacementConversationIds);
+      const replacementIds = result.deferredReplacementConversationIds;
       for (const conversationId of replacementIds) {
         await normalScheduler.enqueue(conversationId, 'github_cleanup_replacement');
       }
 
-      if (result?.cleanupHasMoreDue === true) {
+      if (result.cleanupHasMoreDue) {
         await scheduleCleanup(infra.now() + GITHUB_CLEANUP_BATCH_CONTINUE_DELAY_MS);
         return;
       }
-      const nextCleanupDueAt = Number(result?.nextCleanupDueAt);
-      if (Number.isFinite(nextCleanupDueAt) && nextCleanupDueAt > 0) {
-        await scheduleCleanup(nextCleanupDueAt);
+      if (result.nextCleanupDueAt != null) {
+        await scheduleCleanup(result.nextCleanupDueAt);
         return;
       }
       if (infra.alarms.isAvailable()) await infra.alarms.clear(GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME);
