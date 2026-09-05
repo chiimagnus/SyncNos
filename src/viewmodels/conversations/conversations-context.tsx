@@ -279,7 +279,7 @@ type ConversationsAppState = {
   clearSelected: () => void;
 
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
-  exportSelectedMarkdown: (opts: { mergeSingle: boolean }) => Promise<void>;
+  exportSelectedMarkdown: () => Promise<void>;
   syncSelectedNotion: () => Promise<void>;
   syncSelectedObsidian: () => Promise<void>;
   syncSelectedFeishu: () => Promise<void>;
@@ -1236,34 +1236,30 @@ export function ConversationsProvider({
     if (!(await writeTextToClipboard(markdown))) throw new Error(t('copyFailed'));
   }, []);
 
-  const exportSelectedMarkdown = useCallback(
-    async ({ mergeSingle }: { mergeSingle: boolean }) => {
-      const ids = selectedIds.slice();
-      if (!ids.length) return;
+  const exportSelectedMarkdown = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
 
-      setExporting(true);
-      try {
-        const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
-        if (!selectedConversations.length) return;
+    setExporting(true);
+    try {
+      const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
+      if (!selectedConversations.length) return;
 
-        const { zipBlob, filename } = await buildConversationsMarkdownZipExport({
-          conversations: selectedConversations,
-          mergeSingle,
-        });
-        const url = URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      } catch (e) {
-        alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
-      } finally {
-        setExporting(false);
-      }
-    },
-    [items, selectedIds],
-  );
+      const { zipBlob, filename } = await buildConversationsMarkdownZipExport({
+        conversations: selectedConversations,
+      });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
+    } finally {
+      setExporting(false);
+    }
+  }, [items, selectedIds]);
 
   const syncSelectedNotion = useCallback(async () => {
     const ids = selectedIds.slice();

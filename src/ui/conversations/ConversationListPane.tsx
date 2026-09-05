@@ -942,28 +942,16 @@ export function ConversationListPane({
                 )}
               >
                 <button
-                  id="menuExportSingleMarkdown"
+                  id="menuExportMarkdown"
                   className={menuItemButtonClassName}
                   type="button"
                   role="menuitem"
                   onClick={() => {
                     setExportOpen(false);
-                    void exportSelectedMarkdown({ mergeSingle: true });
+                    void exportSelectedMarkdown();
                   }}
                 >
-                  {t('singleMarkdown')}
-                </button>
-                <button
-                  id="menuExportMultiMarkdown"
-                  className={menuItemButtonClassName}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setExportOpen(false);
-                    void exportSelectedMarkdown({ mergeSingle: false });
-                  }}
-                >
-                  {t('multiMarkdown')}
+                  {t('markdownExport')}
                 </button>
               </MenuPopover>
 

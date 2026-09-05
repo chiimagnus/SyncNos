@@ -85,10 +85,8 @@ async function materializeConversationMarkdown(input: {
 
 export async function buildConversationsMarkdownZipExport({
   conversations,
-  mergeSingle,
 }: {
   conversations: Conversation[];
-  mergeSingle: boolean;
 }): Promise<{ zipBlob: Blob; filename: string }> {
   const list = (Array.isArray(conversations) ? conversations : []).filter((conversation) => {
     const id = Number(conversation?.id);
@@ -103,7 +101,7 @@ export async function buildConversationsMarkdownZipExport({
     attachmentIndex += 1;
     return attachmentIndex;
   };
-  const materialized: Array<{ conversation: Conversation; basename: string; markdown: string }> = [];
+  const markdownFiles: Array<{ name: string; data: string }> = [];
 
   for (const conversation of list) {
     const conversationId = Number(conversation.id);
@@ -117,21 +115,11 @@ export async function buildConversationsMarkdownZipExport({
       markdown: formatConversationMarkdown(conversation, detail.messages || []),
       nextAttachmentIndex,
     });
-    materialized.push({ conversation, basename, markdown: result.markdown });
+    markdownFiles.push({ name: `${basename}.md`, data: result.markdown });
     files.push(...result.attachments);
   }
 
-  if (mergeSingle) {
-    files.unshift({
-      name: `SyncNos-md-${stamp}.md`,
-      data: materialized.map((item) => item.markdown).join('\n---\n\n'),
-    });
-  } else {
-    for (let index = materialized.length - 1; index >= 0; index -= 1) {
-      const item = materialized[index]!;
-      files.unshift({ name: `${item.basename}.md`, data: item.markdown });
-    }
-  }
+  files.unshift(...markdownFiles);
 
   return {
     zipBlob: await createZipBlob(files),

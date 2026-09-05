@@ -75,7 +75,7 @@ describe('local markdown export', () => {
     });
     mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map([[11, asset(11, 1, 'image/webp')]]));
 
-    const result = await buildConversationsMarkdownZipExport({ conversations: [c], mergeSingle: false });
+    const result = await buildConversationsMarkdownZipExport({ conversations: [c] });
     const files = capturedFiles();
     const markdownFile = files.find((file) => file.name.endsWith('.md'))!;
     const attachment = files.find((file) => file.name.startsWith('attachments/'))!;
@@ -117,7 +117,7 @@ describe('local markdown export', () => {
     };
     setup();
 
-    await buildConversationsMarkdownZipExport({ conversations, mergeSingle: false });
+    await buildConversationsMarkdownZipExport({ conversations });
     const firstFiles = capturedFiles();
     const firstAttachmentNames = firstFiles
       .filter((file) => file.name.startsWith('attachments/'))
@@ -130,8 +130,10 @@ describe('local markdown export', () => {
     expect(new Set(firstAttachmentNames).size).toBe(2);
     expect(firstAttachmentNames[0]).toMatch(/-0001\.png$/);
     expect(firstAttachmentNames[1]).toMatch(/-0002\.jpg$/);
-    const firstDoc = firstFiles.find((file) => file.name.endsWith('.md') && String(file.data).includes('# One'))!;
-    const secondDoc = firstFiles.find((file) => file.name.endsWith('.md') && String(file.data).includes('# Two'))!;
+    const markdownFiles = firstFiles.filter((file) => file.name.endsWith('.md'));
+    expect(markdownFiles).toHaveLength(2);
+    const firstDoc = markdownFiles.find((file) => String(file.data).includes('# One'))!;
+    const secondDoc = markdownFiles.find((file) => String(file.data).includes('# Two'))!;
     expect(String(firstDoc.data)).toContain(firstAttachmentNames[0]!);
     expect(String(firstDoc.data)).toContain('[Image unavailable]');
     expect(String(firstDoc.data)).not.toContain(firstAttachmentNames[1]!);
@@ -140,7 +142,7 @@ describe('local markdown export', () => {
     vi.clearAllMocks();
     mocks.createZipBlob.mockResolvedValue(new Blob(['zip'], { type: 'application/zip' }));
     setup();
-    await buildConversationsMarkdownZipExport({ conversations, mergeSingle: false });
+    await buildConversationsMarkdownZipExport({ conversations });
     expect(
       capturedFiles()
         .filter((file) => file.name.startsWith('attachments/'))
@@ -148,37 +150,4 @@ describe('local markdown export', () => {
     ).toEqual(firstAttachmentNames);
   });
 
-  it('materializes each conversation before merged export instead of dropping conversation scope', async () => {
-    const conversations = [conversation(1, 'One'), conversation(2, 'Two')];
-    mocks.getConversationDetail.mockImplementation(async (id: number) => ({
-      conversationId: id,
-      messages: [
-        {
-          messageKey: 'article_body',
-          role: 'assistant',
-          contentMarkdown: `![own](syncnos-asset://${id === 1 ? 11 : 22})`,
-        },
-      ],
-    }));
-    mocks.getImageCacheAssetsByIds.mockImplementation(async ({ conversationId }: any) =>
-      conversationId === 1 ? new Map([[11, asset(11, 1)]]) : new Map([[22, asset(22, 2)]]),
-    );
-
-    await buildConversationsMarkdownZipExport({ conversations, mergeSingle: true });
-    const files = capturedFiles();
-    const markdownFiles = files.filter((file) => file.name.endsWith('.md'));
-    const attachments = files.filter((file) => file.name.startsWith('attachments/'));
-
-    expect(markdownFiles).toHaveLength(1);
-    expect(attachments).toHaveLength(2);
-    expect(mocks.getImageCacheAssetsByIds.mock.calls).toEqual([
-      [{ ids: [11], conversationId: 1 }],
-      [{ ids: [22], conversationId: 2 }],
-    ]);
-    const merged = String(markdownFiles[0]!.data);
-    expect(merged).toContain('# One');
-    expect(merged).toContain('# Two');
-    expect(merged).toContain(attachments[0]!.name);
-    expect(merged).toContain(attachments[1]!.name);
-  });
 });
