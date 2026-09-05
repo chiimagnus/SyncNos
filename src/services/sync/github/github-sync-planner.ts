@@ -2,7 +2,7 @@ import type {
   GithubMarkdownProjection,
   GithubProjectionManagedFile,
 } from '@services/sync/github/github-markdown-projection';
-import { validateGithubGitPath, type GithubStagedOperation } from '@services/sync/github/github-git-transport';
+import type { GithubStagedOperation } from '@services/sync/github/github-git-transport';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -10,29 +10,20 @@ const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
 export type GithubSyncPlannerMode = 'incremental' | 'reconcile';
 
-export type GithubSyncPlannerMapping = {
+type GithubSyncPlannerMapping = {
   githubRemoteKey?: string;
   githubProjectionFingerprint?: string;
   githubManagedFiles?: Record<string, GithubProjectionManagedFile>;
 };
 
-export type GithubSyncContinuityDraftFile = {
-  kind: 'markdown' | 'asset';
-  contentHash: string;
-  sha?: string;
-};
+type GithubSyncContinuityDraftFile =
+  | { kind: 'markdown'; contentHash: string; sha?: string }
+  | { kind: 'asset'; contentHash: string; sha: string };
 
 export type GithubSyncContinuityDraft = {
   githubRemoteKey: string;
   githubProjectionFingerprint: string;
   githubManagedFiles: Record<string, GithubSyncContinuityDraftFile>;
-};
-
-export type GithubSyncPlan = {
-  status: 'no_changes' | 'changed';
-  operations: GithubStagedOperation[];
-  nextContinuity: GithubSyncContinuityDraft;
-  warnings: string[];
 };
 
 function safeManagedFiles(value: unknown): Record<string, GithubProjectionManagedFile> {
@@ -47,15 +38,6 @@ function safeManagedFiles(value: unknown): Record<string, GithubProjectionManage
     output[path] = { kind: row.kind, contentHash: row.contentHash, sha: row.sha.toLowerCase() };
   }
   return output;
-}
-
-function isSafeGitPath(path: string): boolean {
-  try {
-    validateGithubGitPath(path);
-    return true;
-  } catch (_error) {
-    return false;
-  }
 }
 
 function currentFiles(projection: GithubMarkdownProjection): Record<string, GithubSyncContinuityDraftFile> {
@@ -87,7 +69,7 @@ export function planGithubConversationSync(input: {
   projection: GithubMarkdownProjection;
   mapping?: GithubSyncPlannerMapping | null;
   mode: GithubSyncPlannerMode;
-}): GithubSyncPlan {
+}) {
   const remoteKey = String(input.remoteKey || '');
   if (!remoteKey) throw new Error('github_remote_key_required');
   const projection = input.projection;
@@ -117,7 +99,6 @@ export function planGithubConversationSync(input: {
 
   const operations: GithubStagedOperation[] = [];
   for (const [path, row] of Object.entries(current)) {
-    if (!isSafeGitPath(path)) throw new Error('github_projection_path_invalid');
     const old = sameTarget ? previous[path] : undefined;
     const sameContent = !!old && old.kind === row.kind && old.contentHash === row.contentHash;
 
@@ -144,7 +125,6 @@ export function planGithubConversationSync(input: {
       continue;
     }
 
-    if (!row.sha || !GIT_SHA_RE.test(row.sha)) throw new Error('github_projection_asset_sha_invalid');
     if (sameContent && input.mode === 'incremental') continue;
     operations.push({ type: 'reuse', path, sha: row.sha });
   }

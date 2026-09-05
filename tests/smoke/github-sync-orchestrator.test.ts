@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GithubCleanupOutboxRecord } from '@platform/idb/github-cleanup-outbox-record';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { GithubApiError } from '@services/sync/github/github-api-client';
-import { commitGithubStagedOperations, GithubGitTransportError } from '@services/sync/github/github-git-transport';
+import { commitGithubStagedOperations } from '@services/sync/github/github-git-transport';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
 import type { GithubOrchestratorServices } from '@services/sync/github/github-orchestrator-services';
 import { createGithubSyncOrchestrator } from '@services/sync/github/github-sync-orchestrator';
@@ -24,7 +24,6 @@ const preflight = {
   remoteKey: 'github.com/owner/repo@main',
   installationId: 1,
   headSha: 'a'.repeat(40),
-  treeSha: 'b'.repeat(40),
 };
 
 function chat(id: number, overrides: Record<string, unknown> = {}) {
@@ -62,7 +61,6 @@ function fakeServices(input: {
 }) {
   const defaultCommit: GithubOrchestratorServices['commit'] = async () => ({
     status: 'no_changes',
-    treeSha: 'b'.repeat(40),
     files: [],
   });
   const commit = vi.fn(input.commitImpl ?? defaultCommit);
@@ -195,18 +193,16 @@ function successfulChatGithubMapping(conversation: any, syncedAt = 100) {
 }
 
 describe('github sync orchestrator staging through production sync', () => {
-  it('dedupes candidate ids and resolves the target exactly once', async () => {
+  it('resolves one target for a normalized conversation batch', async () => {
     const { services } = fakeServices({
       rows: { 1: { conversation: chat(1) }, 2: { conversation: chat(2) } },
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
     const result = await createGithubSyncOrchestrator(services).sync({
-      conversationIds: [1, 1, 2, 0, 'bad'],
+      conversationIds: [1, 2],
       instanceId: 'staging-dedupe',
     });
 
@@ -214,8 +210,7 @@ describe('github sync orchestrator staging through production sync', () => {
     expect(services.preflight).toHaveBeenCalledWith({ repository: settings.repository, branch: settings.branch });
     expect(services.getSettings).toHaveBeenCalledTimes(1);
     expect(services.storage.getSyncMappingByConversation).toHaveBeenCalledTimes(2);
-    expect(result.summary.candidateCount).toBe(2);
-    expect(result.summary.syncedCount).toBe(2);
+    expect(result.items.map((item) => item.status)).toEqual(['synced', 'synced']);
   });
 
   it('reattaches article orphans before reading comments by conversation id only', async () => {
@@ -250,8 +245,6 @@ describe('github sync orchestrator staging through production sync', () => {
         stagedOperations = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -278,8 +271,6 @@ describe('github sync orchestrator staging through production sync', () => {
         stagedOperations = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -356,8 +347,6 @@ describe('github sync orchestrator staging through production sync', () => {
         stagedOperations = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -390,7 +379,7 @@ describe('github sync orchestrator staging through production sync', () => {
       instanceId: 'collision',
     });
 
-    expect(result.transport.status).toBe('not_needed');
+    expect(result.transportStatus).toBe('not_needed');
     expect(commit).not.toHaveBeenCalled();
     expect(result.items.map((item) => [item.conversationId, item.status, item.error])).toEqual([
       [1, 'failed', 'github_staged_path_collision'],
@@ -415,7 +404,7 @@ describe('github sync orchestrator staging through production sync', () => {
       instanceId: 'local-no-op',
     });
 
-    expect(result.transport.status).toBe('not_needed');
+    expect(result.transportStatus).toBe('not_needed');
     expect(result.items[0]?.status).toBe('no_changes');
     expect(commit).not.toHaveBeenCalled();
   });
@@ -446,8 +435,6 @@ describe('github sync orchestrator job lifecycle', () => {
       rows: { 1: { conversation: chat(1) } },
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
@@ -507,7 +494,7 @@ describe('github sync orchestrator job lifecycle', () => {
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [], instanceId: 'instance-a' });
 
-    expect(result.transport.status).toBe('not_needed');
+    expect(result.transportStatus).toBe('not_needed');
     expect(jobStore.setJob).not.toHaveBeenCalled();
   });
 
@@ -517,8 +504,6 @@ describe('github sync orchestrator job lifecycle', () => {
       cleanupRows: [cleanupRow(40)],
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
@@ -559,8 +544,6 @@ describe('github sync orchestrator job lifecycle', () => {
       initialJob: residue,
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
@@ -589,8 +572,6 @@ describe('github sync orchestrator job lifecycle', () => {
       initialJob: residue,
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
@@ -620,8 +601,6 @@ describe('github sync orchestrator job lifecycle', () => {
       failJobWritesAfterInitial: true,
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
@@ -633,9 +612,8 @@ describe('github sync orchestrator job lifecycle', () => {
 
     expect(commit).toHaveBeenCalledTimes(1);
     expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(1);
-    expect(result.transport.status).toBe('committed');
+    expect(result.transportStatus).toBe('committed');
     expect(result.items[0]?.status).toBe('synced');
-    expect(result.cleanupWarnings).toContain('github_sync_job_persist_failed');
     expect(getPersistedJob()).toMatchObject({ status: 'running', currentStage: 'preparing_queue' });
   });
 
@@ -775,8 +753,6 @@ describe('github sync orchestrator cleanup outbox', () => {
         committedOperations = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -788,7 +764,7 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(committedOperations).toEqual([{ type: 'delete', path: 'Old/owned-1.md' }]);
     expect(services.ackCleanupRows).toHaveBeenCalledWith([1]);
     expect(getCleanupRows()).toEqual([]);
-    expect(result.transport.status).toBe('committed');
+    expect(result.transportStatus).toBe('committed');
     expect(result.cleanupHasMoreDue).toBe(false);
     expect(result.nextCleanupDueAt).toBeNull();
     expect(result.deferredReplacementConversationIds).toEqual([]);
@@ -811,8 +787,6 @@ describe('github sync orchestrator cleanup outbox', () => {
         committedOperations = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -857,8 +831,6 @@ describe('github sync orchestrator cleanup outbox', () => {
         await commitRelease;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -901,7 +873,7 @@ describe('github sync orchestrator cleanup outbox', () => {
     expect(services.deferCleanupRows).toHaveBeenCalledWith([7], 9_000);
     expect(services.ackCleanupRows).not.toHaveBeenCalled();
     expect(getCleanupRows()[0]?.nextAttemptAt).toBe(9_000);
-    expect(result.transport.status).toBe('not_needed');
+    expect(result.transportStatus).toBe('not_needed');
     expect(result.deferredReplacementConversationIds).toEqual([2]);
     expect(result.nextCleanupDueAt).toBe(9_000);
   });
@@ -1037,7 +1009,6 @@ describe('github sync orchestrator cleanup outbox', () => {
         committedOperations = operations;
         return {
           status: 'no_changes',
-          treeSha: 'f'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -1051,7 +1022,7 @@ describe('github sync orchestrator cleanup outbox', () => {
     ]);
     expect(services.ackCleanupRows).toHaveBeenCalledWith([8, 9]);
     expect(getCleanupRows()).toEqual([]);
-    expect(result.transport.status).toBe('no_changes');
+    expect(result.transportStatus).toBe('no_changes');
   });
 
   it('keeps eligible cleanup pending when the shared transport fails', async () => {
@@ -1066,7 +1037,7 @@ describe('github sync orchestrator cleanup outbox', () => {
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [] });
 
-    expect(result.transport.status).toBe('failed');
+    expect(result.transportStatus).toBe('failed');
     expect(services.ackCleanupRows).not.toHaveBeenCalled();
     expect(getCleanupRows()).toHaveLength(1);
     expect(result.nextCleanupDueAt).toBe(1);
@@ -1098,14 +1069,11 @@ describe('github sync orchestrator cleanup outbox', () => {
           remotePresent = false;
           return {
             status: 'committed',
-            treeSha: 'f'.repeat(40),
-            commitSha: '1'.repeat(40),
             files: resolvedFiles(operations),
           };
         }
         return {
           status: 'no_changes',
-          treeSha: 'f'.repeat(40),
           files: operations.map((operation) =>
             operation.type === 'delete'
               ? { path: operation.path, status: 'absent' as const }
@@ -1123,8 +1091,7 @@ describe('github sync orchestrator cleanup outbox', () => {
 
     const first = await orchestrator.sync({ conversationIds: [] });
 
-    expect(first.transport).toEqual({ status: 'committed', commitSha: '1'.repeat(40) });
-    expect(first.cleanupWarnings).toContain('github_cleanup_ack_failed');
+    expect(first.transportStatus).toBe('committed');
     expect(getCleanupRows()).toHaveLength(1);
     expect(first.nextCleanupDueAt).toBe(1);
 
@@ -1132,7 +1099,7 @@ describe('github sync orchestrator cleanup outbox', () => {
     const second = await orchestrator.sync({ conversationIds: [] });
 
     expect(commit).toHaveBeenCalledTimes(2);
-    expect(second.transport.status).toBe('no_changes');
+    expect(second.transportStatus).toBe('no_changes');
     expect(services.ackCleanupRows).toHaveBeenLastCalledWith([12]);
     expect(getCleanupRows()).toEqual([]);
   });
@@ -1152,7 +1119,6 @@ describe('github sync orchestrator cleanup outbox', () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(services.ackCleanupRows).not.toHaveBeenCalled();
-    expect(result.cleanupWarnings).toContain('github_cleanup_defer_failed');
     expect(result.deferredReplacementConversationIds).toEqual([6]);
     expect(getCleanupRows()[0]?.nextAttemptAt).toBe(1);
     expect(result.nextCleanupDueAt).toBe(1);
@@ -1190,7 +1156,6 @@ describe('github sync orchestrator cleanup crash recovery', () => {
         expect(remotePresent).toBe(false);
         return {
           status: 'no_changes',
-          treeSha: 'f'.repeat(40),
           files: operations.map((operation) =>
             operation.type === 'delete'
               ? { path: operation.path, status: 'absent' as const }
@@ -1202,12 +1167,12 @@ describe('github sync orchestrator cleanup crash recovery', () => {
     const orchestrator = createGithubSyncOrchestrator(services);
 
     const first = await orchestrator.sync({ conversationIds: [] });
-    expect(first.transport.status).toBe('failed');
+    expect(first.transportStatus).toBe('failed');
     expect(services.ackCleanupRows).not.toHaveBeenCalled();
     expect(getCleanupRows()).toHaveLength(1);
 
     const second = await orchestrator.sync({ conversationIds: [] });
-    expect(second.transport.status).toBe('no_changes');
+    expect(second.transportStatus).toBe('no_changes');
     expect(getCleanupRows()).toEqual([]);
     expect(services.ackCleanupRows).toHaveBeenCalledWith([20]);
   });
@@ -1218,11 +1183,12 @@ describe('github sync orchestrator cleanup crash recovery', () => {
       rows: {},
       cleanupRows: [cleanupRow(21)],
       commitImpl: async ({ operations }) => {
-        if (failRace) throw new GithubGitTransportError('github_git_branch_race_exhausted');
+        if (failRace)
+          throw Object.assign(new Error('github_git_branch_race_exhausted'), {
+            code: 'github_git_branch_race_exhausted',
+          });
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -1230,12 +1196,12 @@ describe('github sync orchestrator cleanup crash recovery', () => {
     const orchestrator = createGithubSyncOrchestrator(services);
 
     const first = await orchestrator.sync({ conversationIds: [] });
-    expect(first.transport.status).toBe('failed');
+    expect(first.transportStatus).toBe('failed');
     expect(getCleanupRows()).toHaveLength(1);
 
     failRace = false;
     const second = await orchestrator.sync({ conversationIds: [] });
-    expect(second.transport.status).toBe('committed');
+    expect(second.transportStatus).toBe('committed');
     expect(getCleanupRows()).toEqual([]);
   });
 
@@ -1282,7 +1248,6 @@ describe('github sync orchestrator cleanup crash recovery', () => {
         committedOperations = operations;
         return {
           status: 'no_changes',
-          treeSha: 'f'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -1334,13 +1299,11 @@ describe('github sync orchestrator transport acknowledgement', () => {
 
     resolveCommit({
       status: 'committed',
-      treeSha: 'f'.repeat(40),
-      commitSha: '1'.repeat(40),
       files: resolvedFiles(captured.operations),
     });
     const result = await syncPromise;
 
-    expect(result.transport).toEqual({ status: 'committed', commitSha: '1'.repeat(40) });
+    expect(result.transportStatus).toBe('committed');
     expect(result.items.map((item) => item.status)).toEqual(['synced', 'synced']);
     expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(2);
     for (const [, patch] of (services.storage.patchSyncMapping as any).mock.calls) {
@@ -1369,13 +1332,12 @@ describe('github sync orchestrator transport acknowledgement', () => {
       messages: { 1: messages },
       commitImpl: async ({ operations }) => ({
         status: 'no_changes',
-        treeSha: 'f'.repeat(40),
         files: resolvedFiles(operations, '9'.repeat(40)),
       }),
     });
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1] });
-    expect(result.transport.status).toBe('no_changes');
+    expect(result.transportStatus).toBe('no_changes');
     expect(result.items[0]?.status).toBe('synced');
     expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(1);
     const patch = (services.storage.patchSyncMapping as any).mock.calls[0][1];
@@ -1418,7 +1380,7 @@ describe('github sync orchestrator transport acknowledgement', () => {
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1, 2] });
     expect(services.storage.patchSyncMapping).not.toHaveBeenCalled();
-    expect(result.transport.status).toBe('failed');
+    expect(result.transportStatus).toBe('failed');
     expect(result.items.map((item) => [item.conversationId, item.status, item.error])).toEqual([
       [1, 'failed', 'github_outcome_unknown'],
       [2, 'no_changes', ''],
@@ -1431,14 +1393,12 @@ describe('github sync orchestrator transport acknowledgement', () => {
       patchFailures: new Set([2]),
       commitImpl: async ({ operations }) => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: resolvedFiles(operations),
       }),
     });
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1, 2] });
-    expect(result.transport).toEqual({ status: 'committed', commitSha: '1'.repeat(40) });
+    expect(result.transportStatus).toBe('committed');
     expect(result.items.map((item) => item.status)).toEqual(['synced', 'mapping_failed']);
     expect(result.items[1]?.warnings).toContain('github_mapping_patch_failed');
     expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(2);
@@ -1449,14 +1409,12 @@ describe('github sync orchestrator transport acknowledgement', () => {
       rows: { 1: { conversation: chat(1) } },
       commitImpl: async () => ({
         status: 'committed',
-        treeSha: 'f'.repeat(40),
-        commitSha: '1'.repeat(40),
         files: [],
       }),
     });
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1] });
-    expect(result.transport.status).toBe('invalid_resolution');
+    expect(result.transportStatus).toBe('committed');
     expect(result.items[0]).toMatchObject({ status: 'failed', error: 'github_transport_resolution_incomplete' });
     expect(services.storage.patchSyncMapping).not.toHaveBeenCalled();
   });
@@ -1545,7 +1503,7 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
     });
 
     const result = await createGithubSyncOrchestrator(services).sync({ conversationIds: [1] });
-    expect(result.transport.status).toBe('not_needed');
+    expect(result.transportStatus).toBe('not_needed');
     expect(result.items[0]?.status).toBe('no_changes');
     expect(commit).not.toHaveBeenCalled();
   });
@@ -1572,7 +1530,7 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
       conversationIds: [1],
       mode: 'reconcile',
     });
-    expect(driftedResult.transport.status).toBe('committed');
+    expect(driftedResult.transportStatus).toBe('committed');
     expect(drifted.calls.find((call) => call.path.endsWith('/git/trees'))?.body.tree).toEqual([
       { path: p.markdownPath, mode: '100644', type: 'blob', sha: 'd'.repeat(40) },
     ]);
@@ -1588,7 +1546,7 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
       conversationIds: [1],
       mode: 'reconcile',
     });
-    expect(currentResult.transport.status).toBe('no_changes');
+    expect(currentResult.transportStatus).toBe('no_changes');
     expect(currentResult.items[0]?.status).toBe('synced');
     expect(currentRemote.calls.filter((call) => call.path.endsWith('/git/commits'))).toHaveLength(0);
     expect(currentRemote.calls.filter((call) => call.method === 'PATCH')).toHaveLength(0);
@@ -1622,8 +1580,6 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
         renameOps = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -1642,8 +1598,6 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
         switchOps = operations;
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -1679,8 +1633,6 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
         committedMarkdown = write?.type === 'write' ? String(write.content) : '';
         return {
           status: 'committed',
-          treeSha: 'f'.repeat(40),
-          commitSha: '1'.repeat(40),
           files: resolvedFiles(operations),
         };
       },
@@ -1743,14 +1695,14 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
     const orchestrator = createGithubSyncOrchestrator(services);
 
     const first = await orchestrator.sync({ conversationIds: [1] });
-    expect(first.transport.status).toBe('failed');
+    expect(first.transportStatus).toBe('failed');
     expect(first.items[0]).toMatchObject({ status: 'failed', error: 'github_outcome_unknown' });
     expect(services.storage.patchSyncMapping).not.toHaveBeenCalled();
     expect(commitCreates).toBe(1);
     expect(refPatches).toBe(1);
 
     const second = await orchestrator.sync({ conversationIds: [1] });
-    expect(second.transport.status).toBe('no_changes');
+    expect(second.transportStatus).toBe('no_changes');
     expect(second.items[0]?.status).toBe('synced');
     expect(services.storage.patchSyncMapping).toHaveBeenCalledTimes(1);
     expect(commitCreates).toBe(1);

@@ -5,7 +5,7 @@ import { GITHUB_OUTPUT_FOLDERS } from '@services/sync/github/settings-store';
 
 const GITHUB_MANAGED_ASSET_FILE_RE = /^[0-9a-f]{64}\.[a-z0-9]{1,10}$/;
 
-function outputFolderForConversation(conversation: any): string {
+export function githubOutputFolderForConversation(conversation: any): string {
   const sourceType = String(conversation?.sourceType || '').trim();
   if (sourceType === 'article') return GITHUB_OUTPUT_FOLDERS.article;
   if (sourceType === 'video') return GITHUB_OUTPUT_FOLDERS.video;
@@ -30,7 +30,7 @@ export function isGithubManagedPathOwnedByConversation(
   conversation: any,
 ): boolean {
   if (!isSafeGithubCleanupPath(path)) return false;
-  const folder = outputFolderForConversation(conversation);
+  const folder = githubOutputFolderForConversation(conversation);
   const segments = path.split('/');
 
   if (kind === 'markdown') {

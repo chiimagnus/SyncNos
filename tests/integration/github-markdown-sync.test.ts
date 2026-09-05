@@ -748,7 +748,7 @@ describe('GitHub Markdown production-chain integration', () => {
       instanceId: 'github-integration-instance',
     });
     expect(unchanged.items.map((item) => item.status)).toEqual(['synced', 'synced']);
-    expect(unchanged.transport.status).toBe('no_changes');
+    expect(unchanged.transportStatus).toBe('no_changes');
     expect(fakeGithub.syncRefUpdates).toBe(commitsBeforeNoOp);
 
     const localMessagesBeforeDrift = await backgroundStorage.getMessagesByConversationId(Number(chat.id));
@@ -903,7 +903,7 @@ describe('GitHub Markdown production-chain integration', () => {
       mode: 'reconcile',
       instanceId: 'github-integration-instance',
     });
-    expect(finalRun.summary.failedCount).toBe(0);
+    expect(finalRun.items.map((item) => item.status)).toEqual(['synced', 'synced']);
     expect(fakeGithub.hasPath('README.md')).toBe(true);
     assertSecretFree(finalRun);
 
@@ -933,7 +933,7 @@ describe('GitHub Markdown production-chain integration', () => {
       conversationIds: [],
       instanceId: 'github-integration-instance',
     });
-    expect(cleanupRecovered.transport.status).toMatch(/^(committed|no_changes)$/);
+    expect(cleanupRecovered.transportStatus).toMatch(/^(committed|no_changes)$/);
     expect((await listDueGithubCleanupRows(REMOTE_KEY, Date.now(), 100)).rows).toEqual([]);
     expect(deletedRemotePaths.every((path) => !fakeGithub.hasPath(path))).toBe(true);
     expect(fakeGithub.hasPath('README.md')).toBe(true);
