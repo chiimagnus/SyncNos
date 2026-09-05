@@ -643,13 +643,27 @@ export function ConversationsProvider({
         if (requestSeq !== listRequestSeqRef.current) return;
 
         const list = Array.isArray(page?.items) ? page.items : [];
+        const nextFacets = normalizeConversationListFacets(page?.facets);
+        const selectedSiteAvailable =
+          sourceKey !== 'web' ||
+          siteKey === LIST_SITE_FILTER_ALL_KEY ||
+          nextFacets.sites.some(
+            (facet) =>
+              facet.key === siteKey ||
+              (siteKey !== 'unknown' && !siteKey.startsWith('domain:') && facet.key === `domain:${siteKey}`),
+          );
+        if (!selectedSiteAvailable) {
+          setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
+          return;
+        }
+
         listSuccessRequestSeqRef.current = requestSeq;
         listCommittedFilterScopeRef.current = scope;
         setItems(list);
         setListCursor(page?.cursor ?? null);
         setListHasMore(Boolean(page?.hasMore));
         setListSummary(normalizeConversationListSummary(page?.summary));
-        setListFacets(normalizeConversationListFacets(page?.facets));
+        setListFacets(nextFacets);
 
         const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
         setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
@@ -702,7 +716,13 @@ export function ConversationsProvider({
         }
       }
     },
-    [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId],
+    [
+      listSiteFilterKey,
+      listSourceFilterKey,
+      setActiveConversationSnapshot,
+      setActiveId,
+      setListSiteFilterKeyPersistent,
+    ],
   );
   refreshListRef.current = refreshList;
 

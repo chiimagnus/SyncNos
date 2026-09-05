@@ -295,6 +295,38 @@ describe('ConversationsProvider pagination state', () => {
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([201]);
   });
 
+  it('validates a persisted web domain only against a successful facet snapshot', async () => {
+    window.localStorage.setItem('webclipper_conversations_source_filter_key', 'web');
+    window.localStorage.setItem('webclipper_conversations_site_filter_key', 'domain:missing.example');
+
+    getConversationListBootstrap.mockImplementation((query: any) => {
+      const siteKey = String(query?.siteKey || 'all')
+        .trim()
+        .toLowerCase();
+      const facets = {
+        sources: [{ key: 'web', label: 'web', count: 1 }],
+        sites: [{ key: 'domain:example.com', label: 'example.com', count: 1 }],
+      };
+      if (siteKey === 'domain:missing.example') return Promise.resolve(makePage([], facets));
+      return Promise.resolve(makePage([makeConversation(301, 'web', 'article-301')], facets));
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(String(latestState.listSourceFilterKey)).toBe('web');
+    expect(String(latestState.listSiteFilterKey)).toBe('all');
+    expect(window.localStorage.getItem('webclipper_conversations_site_filter_key')).toBeNull();
+    expect(getConversationListBootstrap.mock.calls.map(([query]) => query?.siteKey)).toEqual([
+      'domain:missing.example',
+      'all',
+    ]);
+  });
+
   it('merges a successful continuation page and commits its pagination bundle', async () => {
     const firstPage = {
       ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {

@@ -226,6 +226,27 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(loadMoreList).toHaveBeenCalledTimes(1);
   });
 
+  it('does not rewrite a selected web domain from a transient empty facet snapshot', async () => {
+    const setListSiteFilterKeyPersistent = vi.fn();
+    currentState = buildState({
+      listSourceFilterKey: 'web',
+      listSiteFilterKey: 'domain:example.com',
+      listFacets: {
+        sources: [{ key: 'web', label: 'web', count: 2 }],
+        sites: [],
+      },
+      loadingInitialList: true,
+      setListSiteFilterKeyPersistent,
+    });
+
+    await renderPane();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    expect(setListSiteFilterKeyPersistent).not.toHaveBeenCalled();
+  });
+
   it('does not attach selection or batch tooltips when nothing is selected', async () => {
     currentState = buildState({ selectedIds: [] });
     await renderPane();

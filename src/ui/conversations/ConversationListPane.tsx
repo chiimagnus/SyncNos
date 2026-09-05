@@ -207,7 +207,6 @@ export function ConversationListPane({
     return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }, ...options];
   }, [listFacets, listSourceFilterKey]);
 
-  const siteOptionKeys = useMemo(() => new Set(siteOptions.map((opt) => String(opt.key || ''))), [siteOptions]);
   const filteredItems = items;
   const sidebarLocale = getCurrentLocale();
   const todayGroupLabel = t('insightRangeToday');
@@ -445,22 +444,6 @@ export function ConversationListPane({
     }
     void refreshList();
   };
-
-  useEffect(() => {
-    const sourceKey =
-      String(listSourceFilterKey || 'all')
-        .trim()
-        .toLowerCase() || 'all';
-    if (sourceKey !== 'web') return;
-
-    const current =
-      String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
-        .trim()
-        .toLowerCase() || SITE_FILTER_ALL_KEY;
-    if (current === SITE_FILTER_ALL_KEY) return;
-    if (siteOptionKeys.has(current)) return;
-    setListSiteFilterKeyPersistent(SITE_FILTER_ALL_KEY);
-  }, [listSiteFilterKey, listSourceFilterKey, setListSiteFilterKeyPersistent, siteOptionKeys]);
 
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
