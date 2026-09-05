@@ -22,6 +22,7 @@ vi.mock('@services/shared/file-timestamp', () => ({
   buildLocalTimestampForFilename: () => '20260905-010203',
 }));
 
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 
 function conversation(id: number, title: string) {
@@ -63,6 +64,7 @@ describe('local markdown export', () => {
       '![missing](syncnos-asset://12)',
       '![malformed](syncnos-asset://nope)',
       '![remote](https://example.com/remote.png)',
+      '![data](data:image/png;base64,AQID)',
       '`![inline](syncnos-asset://13)`',
       '```md',
       '![fenced](syncnos-asset://14)',
@@ -88,11 +90,42 @@ describe('local markdown export', () => {
     expect(markdown).toContain(`![own](<${attachment.name}> "title")`);
     expect(markdown.match(/\[Image unavailable\]/g)?.length).toBe(2);
     expect(markdown).toContain('![remote](https://example.com/remote.png)');
+    expect(markdown).toContain('![data](data:image/png;base64,AQID)');
     expect(markdown).toContain('`![inline](syncnos-asset://13)`');
     expect(markdown).toContain('![fenced](syncnos-asset://14)');
     expect(markdown).toContain('    ![indented](syncnos-asset://15)');
     expect(markdown).not.toContain('![missing](syncnos-asset://12)');
     expect(markdown).not.toContain('![malformed](syncnos-asset://nope)');
+  });
+
+  it('consumes a scoped asset returned by the data layer without adding a second blob-size gate', async () => {
+    const c = conversation(1, 'One');
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [{ messageKey: 'article_body', role: 'assistant', contentMarkdown: '![empty](syncnos-asset://16)' }],
+    });
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(
+      new Map([
+        [
+          16,
+          {
+            ...asset(16, 1),
+            blob: new Blob([], { type: 'image/png' }),
+            byteSize: 1,
+          },
+        ],
+      ]),
+    );
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const files = capturedFiles();
+    const attachment = files.find((file) => file.name.startsWith('attachments/'))!;
+    const markdown = String(files.find((file) => file.name.endsWith('.md'))?.data || '');
+
+    expect(attachment.data).toBeInstanceOf(Blob);
+    expect((attachment.data as Blob).size).toBe(0);
+    expect(markdown).toContain(attachment.name);
+    expect(markdown).not.toContain('[Image unavailable]');
   });
 
   it('keeps ownership per conversation and uses deterministic unique attachment names', async () => {
@@ -150,4 +183,37 @@ describe('local markdown export', () => {
     ).toEqual(firstAttachmentNames);
   });
 
+  it('claims unique basenames for colliding items and keeps attachment prefixes aligned', async () => {
+    const items = [1, 2, 3].map((id) => ({
+      ...conversation(id, 'Same title'),
+      conversationKey: 'article:https://example.com/same',
+      url: 'https://example.com/same',
+    }));
+    const base = buildConversationBasename(items[0]);
+
+    mocks.getConversationDetail.mockImplementation(async (id: number) => ({
+      conversationId: id,
+      messages: [
+        {
+          messageKey: 'article_body',
+          role: 'assistant',
+          contentMarkdown: id === 2 ? '![own](syncnos-asset://22)' : `body-${id}`,
+        },
+      ],
+    }));
+    mocks.getImageCacheAssetsByIds.mockImplementation(async ({ conversationId }: any) =>
+      conversationId === 2 ? new Map([[22, asset(22, 2)]]) : new Map(),
+    );
+
+    await buildConversationsMarkdownZipExport({ conversations: items });
+    const files = capturedFiles();
+    const markdownNames = files.filter((file) => file.name.endsWith('.md')).map((file) => file.name);
+    const attachment = files.find((file) => file.name.startsWith('attachments/'))!;
+    const secondMarkdown = files.find((file) => file.name === `${base}-2.md`)!;
+
+    expect(markdownNames).toEqual([`${base}.md`, `${base}-2.md`, `${base}-3.md`]);
+    expect(new Set(markdownNames).size).toBe(3);
+    expect(attachment.name).toMatch(new RegExp(`^attachments/${base}-2-0001\\.png$`));
+    expect(String(secondMarkdown.data)).toContain(attachment.name);
+  });
 });
