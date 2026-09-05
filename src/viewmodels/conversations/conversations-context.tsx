@@ -10,6 +10,7 @@ import type {
 } from '@services/conversations/domain/models';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
+import { buildConversationsJsonZipExport } from '@services/sync/local/json-export';
 import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import {
@@ -98,6 +99,15 @@ function readLocalStorageValue(key: string): string {
   } catch (_e) {
     return '';
   }
+}
+
+function downloadExportBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function writeLocalStorageValue(key: string, value: string | null) {
@@ -280,6 +290,7 @@ type ConversationsAppState = {
 
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
   exportSelectedMarkdown: () => Promise<void>;
+  exportSelectedJson: () => Promise<void>;
   syncSelectedNotion: () => Promise<void>;
   syncSelectedObsidian: () => Promise<void>;
   syncSelectedFeishu: () => Promise<void>;
@@ -1248,12 +1259,25 @@ export function ConversationsProvider({
       const { zipBlob, filename } = await buildConversationsMarkdownZipExport({
         conversations: selectedConversations,
       });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      downloadExportBlob(zipBlob, filename);
+    } catch (e) {
+      alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
+    } finally {
+      setExporting(false);
+    }
+  }, [items, selectedIds]);
+
+  const exportSelectedJson = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+
+    setExporting(true);
+    try {
+      const selectedConversations = items.filter((conversation) => ids.includes(Number(conversation.id)));
+      if (!selectedConversations.length) return;
+
+      const { zipBlob, filename } = await buildConversationsJsonZipExport({ conversations: selectedConversations });
+      downloadExportBlob(zipBlob, filename);
     } catch (e) {
       alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
     } finally {
@@ -1350,6 +1374,7 @@ export function ConversationsProvider({
     clearSelected,
     copyConversationMarkdown,
     exportSelectedMarkdown,
+    exportSelectedJson,
     syncSelectedNotion,
     syncSelectedObsidian,
     syncSelectedFeishu,

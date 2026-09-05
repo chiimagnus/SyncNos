@@ -112,6 +112,7 @@ function buildState() {
       loadMoreList: vi.fn(async () => {}),
       copyConversationMarkdown: vi.fn().mockResolvedValue(undefined),
       exportSelectedMarkdown: vi.fn(),
+      exportSelectedJson: vi.fn(),
       syncSelectedNotion: vi.fn().mockResolvedValue(undefined),
       syncSelectedObsidian: vi.fn().mockResolvedValue(undefined),
       syncSelectedFeishu: vi.fn().mockResolvedValue(undefined),
@@ -372,6 +373,43 @@ describe('ConversationListPane row actions', () => {
     expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
     expect(currentState.syncSelectedObsidian).not.toHaveBeenCalled();
     expect(currentState.syncSelectedFeishu).not.toHaveBeenCalled();
+  });
+
+  it('offers only Markdown and JSON export formats and dispatches them independently', async () => {
+    currentState.selectedIds = [11];
+    await renderPane();
+
+    const exportButton = document.getElementById('btnExport') as HTMLButtonElement | null;
+    expect(exportButton).toBeTruthy();
+    await act(async () => {
+      exportButton!.click();
+      await flushMicrotasks();
+    });
+
+    const markdownItem = document.getElementById('menuExportMarkdown') as HTMLButtonElement | null;
+    const jsonItem = document.getElementById('menuExportJson') as HTMLButtonElement | null;
+    expect(markdownItem?.textContent).toBe('markdownExport');
+    expect(jsonItem?.textContent).toBe('jsonExport');
+    expect(document.getElementById('menuExportSingleMarkdown')).toBeNull();
+    expect(document.getElementById('menuExportMultiMarkdown')).toBeNull();
+
+    await act(async () => {
+      markdownItem!.click();
+      await flushMicrotasks();
+    });
+    expect(currentState.exportSelectedMarkdown).toHaveBeenCalledTimes(1);
+    expect(currentState.exportSelectedJson).not.toHaveBeenCalled();
+
+    await act(async () => {
+      exportButton!.click();
+      await flushMicrotasks();
+      (document.getElementById('menuExportJson') as HTMLButtonElement).click();
+      await flushMicrotasks();
+    });
+    expect(currentState.exportSelectedJson).toHaveBeenCalledTimes(1);
+    expect(currentState.exportSelectedMarkdown).toHaveBeenCalledTimes(1);
+    expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
+    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
   });
 
   it('reports clipboard failure without showing a copied state', async () => {

@@ -20,6 +20,16 @@ function normalizeImageExt(raw: unknown): string {
   return /^[a-z0-9]+$/.test(value) ? value : 'png';
 }
 
+function normalizeMediaType(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.split(';')[0]!.trim().toLowerCase();
+  return /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(normalized) ? normalized : null;
+}
+
+function resolveMediaType(asset: ImageCacheAsset): string {
+  return normalizeMediaType(asset.contentType) || normalizeMediaType(asset.blob.type) || 'application/octet-stream';
+}
+
 function inferImageExt(asset: ImageCacheAsset): string {
   const contentType = String(asset.contentType || asset.blob?.type || '')
     .trim()
@@ -52,6 +62,8 @@ export function claimUniqueConversationExportBasename(conversation: Conversation
 export type MaterializedExportAttachment = {
   path: string;
   blob: Blob;
+  mediaType: string;
+  byteSize: number;
 };
 
 export type MaterializedConversationMarkdown = {
@@ -91,7 +103,7 @@ export async function materializeConversationMarkdownAssets(input: {
     const index = input.nextAttachmentIndex();
     const path = `attachments/${input.basename}-${String(index).padStart(4, '0')}.${inferImageExt(asset)}`;
     attachmentPathById.set(assetId, path);
-    attachments.push({ path, blob: asset.blob });
+    attachments.push({ path, blob: asset.blob, mediaType: resolveMediaType(asset), byteSize: asset.blob.size });
   }
 
   const rewritten = markdown.map((source, index) =>
