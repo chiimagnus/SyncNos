@@ -74,8 +74,10 @@ function nullableMetadataString(value: unknown): string | null {
   return value.trim() || null;
 }
 
-function contentString(value: unknown): string | null {
-  return typeof value === 'string' && value !== '' ? value : null;
+function contentString(value: unknown, field: string): string | null {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') throw new Error(`Invalid ${field}`);
+  return value;
 }
 
 function normalizeWarnings(value: unknown): string[] {
@@ -98,8 +100,8 @@ function normalizeCapturedAt(value: unknown): string | null {
 
 function normalizeContent(message: ConversationMessage | null | undefined): JsonContent {
   return {
-    markdown: contentString((message as any)?.contentMarkdown),
-    text: contentString((message as any)?.contentText),
+    markdown: contentString((message as any)?.contentMarkdown, 'contentMarkdown'),
+    text: contentString((message as any)?.contentText, 'contentText'),
   };
 }
 

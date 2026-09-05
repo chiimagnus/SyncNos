@@ -125,7 +125,7 @@ v1 does **not** publish `platform`, `durationSeconds`, `thumbnailUrl`, `transcri
 - `warnings` always exists. Only actual non-empty string codes are retained, in their existing order.
 - `capturedAt` is `null` unless the stored value is an actual finite positive number that can be represented as an ISO timestamp.
 - Saved content is different from metadata: `content.markdown`, `content.text`, and transcript/message content are preserved exactly when they are non-empty strings. SyncNos does not trim them, normalize their line endings, or re-render them for JSON export.
-- A missing or exact empty saved content string becomes `null`.
+- A missing or exact empty saved content string becomes `null`. Any other non-string saved-content value is malformed and makes that item fail export rather than being silently erased as `null`.
 
 The only intentional content rewrite is the internal-image handling below.
 

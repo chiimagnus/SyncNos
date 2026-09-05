@@ -340,6 +340,45 @@ describe('local JSON v1 export', () => {
     }
   });
 
+  it('fails malformed saved content instead of silently serializing it as null', async () => {
+    const cases = [
+      {
+        conversation: conversation(1),
+        detail: { conversationId: 1, messages: [message('m', { contentText: { malformed: true } })] },
+        error: 'Invalid contentText',
+      },
+      {
+        conversation: conversation(2, {
+          source: 'web',
+          sourceType: 'article',
+          conversationKey: 'article:malformed-content',
+        }),
+        detail: {
+          conversationId: 2,
+          messages: [message('article_body', { contentMarkdown: 42, contentText: 'valid text' })],
+        },
+        error: 'Invalid contentMarkdown',
+      },
+      {
+        conversation: conversation(3, {
+          source: 'video',
+          sourceType: 'video',
+          conversationKey: 'video:malformed-content',
+        }),
+        detail: {
+          conversationId: 3,
+          messages: [message('video_transcript', { contentMarkdown: 'valid markdown', contentText: ['bad'] })],
+        },
+        error: 'Invalid contentText',
+      },
+    ];
+
+    for (const item of cases) {
+      mocks.getConversationDetail.mockResolvedValueOnce(item.detail);
+      await expect(buildConversationsJsonZipExport({ conversations: [item.conversation] })).rejects.toThrow(item.error);
+    }
+  });
+
   it('fails malformed identities, ids, message keys, and mismatched details instead of silently dropping items', async () => {
     mocks.getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [message('m')] });
     await expect(buildConversationsJsonZipExport({ conversations: [conversation(1, { source: 7 })] })).rejects.toThrow(
