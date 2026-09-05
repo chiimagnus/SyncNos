@@ -571,7 +571,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
       };
 
       const operations = mergeCleanupDeletes(staged.operations, cleanupDeletePaths);
-      const changed = staged.items.filter((item) => item.status === 'staged');
       if (!operations.length) {
         const items = staged.items.map((item) =>
           item.status === 'no_changes' ? finalItem(item, 'no_changes') : finalItem(item, 'failed', item.error),
@@ -591,7 +590,6 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
           repository: staged.target.repository,
           branch: staged.target.branch,
           operations,
-          message: `SyncNos GitHub sync (${changed.length} items)`,
         });
       } catch (error) {
         const code = transportFailureCode(error);

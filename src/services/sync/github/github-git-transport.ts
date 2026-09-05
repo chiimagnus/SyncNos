@@ -8,6 +8,7 @@ import {
 } from '@services/sync/github/settings-store';
 
 const GIT_SHA_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+const GITHUB_SYNC_COMMIT_MESSAGE = 'SyncNos GitHub sync';
 
 export type GithubStagedWriteOperation = {
   type: 'write';
@@ -44,7 +45,6 @@ export type GithubOwnedDeleteResolution = {
 export type GithubGitTransportErrorCode =
   | 'github_git_path_invalid'
   | 'github_git_branch_invalid'
-  | 'github_git_message_invalid'
   | 'github_git_sha_invalid'
   | 'github_git_delete_resolution_failed'
   | 'github_git_response_invalid'
@@ -89,15 +89,6 @@ function requireResponseGitSha(value: unknown): string {
     throw new GithubGitTransportError('github_git_response_invalid');
   }
   return value.toLowerCase();
-}
-
-function normalizeGithubCommitMessage(value: unknown, fallback: string): string {
-  if (value == null) return fallback;
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 160) {
-    throw new GithubGitTransportError('github_git_message_invalid');
-  }
-  if (hasAsciiControlCharacter(value)) throw new GithubGitTransportError('github_git_message_invalid');
-  return value;
 }
 
 export function validateGithubGitPath(value: unknown): string {
@@ -269,7 +260,6 @@ export async function commitGithubStagedOperationsOnce(
     headSha: string;
     treeSha: string;
     operations: readonly GithubStagedOperation[];
-    message?: string;
   },
   api: GithubGitApi = githubApiClient,
 ): Promise<GithubGitTransactionResult> {
@@ -282,7 +272,6 @@ export async function commitGithubStagedOperationsOnce(
   const headSha = requireGitSha(input.headSha);
   const baseTreeSha = requireGitSha(input.treeSha);
   const operations = validateGithubStagedOperations(input.operations);
-  const customMessage = input.message == null ? null : normalizeGithubCommitMessage(input.message, '');
 
   const deleteResolution = await resolveOwnedGithubDeletes({ repository, treeSha: baseTreeSha, operations }, api);
   if (deleteResolution.deletes.some((item) => item.status === 'failure')) {
@@ -334,7 +323,7 @@ export async function commitGithubStagedOperationsOnce(
   }
 
   const commitResponse = await api.post<any>(`/repos/${encodedRepository}/git/commits`, {
-    message: customMessage ?? `SyncNos: sync ${treeEntries.length} file${treeEntries.length === 1 ? '' : 's'}`,
+    message: GITHUB_SYNC_COMMIT_MESSAGE,
     tree: treeSha,
     parents: [headSha],
   });
@@ -373,7 +362,7 @@ async function resolveGithubBranchState(
 }
 
 export async function commitGithubStagedOperations(
-  input: { repository: string; branch: string; operations: readonly GithubStagedOperation[]; message?: string },
+  input: { repository: string; branch: string; operations: readonly GithubStagedOperation[] },
   api: GithubGitApi = githubApiClient,
 ): Promise<GithubGitTransactionResult> {
   const repository = normalizeGithubRepository(input.repository);
@@ -385,10 +374,7 @@ export async function commitGithubStagedOperations(
   for (let attempt = 1; attempt <= GITHUB_BRANCH_RACE_MAX_ATTEMPTS; attempt += 1) {
     const state = await resolveGithubBranchState(repository, branch, api);
     try {
-      return await commitGithubStagedOperationsOnce(
-        { repository, branch, ...state, operations, message: input.message },
-        api,
-      );
+      return await commitGithubStagedOperationsOnce({ repository, branch, ...state, operations }, api);
     } catch (error) {
       if (!(error instanceof GithubGitTransportError) || error.code !== 'github_git_branch_race') throw error;
       if (attempt >= GITHUB_BRANCH_RACE_MAX_ATTEMPTS) {

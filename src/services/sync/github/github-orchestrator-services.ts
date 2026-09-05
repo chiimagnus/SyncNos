@@ -43,7 +43,6 @@ export type GithubOrchestratorServices = {
     repository: string;
     branch: string;
     operations: readonly GithubStagedOperation[];
-    message: string;
   }) => Promise<GithubGitTransactionResult>;
   listDueCleanupRows: typeof listDueGithubCleanupRows;
   getNextCleanupDueAt: typeof getNextGithubCleanupDueAt;
@@ -60,8 +59,7 @@ export const defaultGithubOrchestratorServices: GithubOrchestratorServices = {
   storage: backgroundStorage,
   loadImages: getImageCacheAssetsByIds,
   createBlob: createGithubBlob,
-  commit: ({ repository, branch, operations, message }) =>
-    commitGithubStagedOperations({ repository, branch, operations, message }),
+  commit: ({ repository, branch, operations }) => commitGithubStagedOperations({ repository, branch, operations }),
   listDueCleanupRows: listDueGithubCleanupRows,
   getNextCleanupDueAt: getNextGithubCleanupDueAt,
   deferCleanupRows: deferGithubCleanupRows,

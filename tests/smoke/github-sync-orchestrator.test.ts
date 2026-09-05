@@ -1330,8 +1330,7 @@ describe('github sync orchestrator transport acknowledgement', () => {
     await started;
     expect(commit).toHaveBeenCalledTimes(1);
     expect(services.storage.patchSyncMapping).not.toHaveBeenCalled();
-    expect(captured.message).toBe('SyncNos GitHub sync (2 items)');
-    expect(captured.message).not.toMatch(/Title|body-/);
+    expect(captured).not.toHaveProperty('message');
 
     resolveCommit({
       status: 'committed',
@@ -1512,9 +1511,7 @@ describe('github sync orchestrator atomic cross-layer contracts', () => {
     expect(result.items.map((item) => item.status)).toEqual(['synced', 'synced']);
     expect(remote.calls.filter((call) => call.path.endsWith('/git/commits'))).toHaveLength(1);
     expect(remote.calls.filter((call) => call.method === 'PATCH')).toHaveLength(1);
-    expect(remote.calls.find((call) => call.path.endsWith('/git/commits'))?.body.message).toBe(
-      'SyncNos GitHub sync (2 items)',
-    );
+    expect(remote.calls.find((call) => call.path.endsWith('/git/commits'))?.body.message).toBe('SyncNos GitHub sync');
   });
 
   it('still commits the safe row when another conversation fails local projection', async () => {
