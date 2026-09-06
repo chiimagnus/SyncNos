@@ -323,11 +323,7 @@ function pickArticleBodyMarkdown(messagesList: unknown): string {
     ) ||
     list[0] ||
     null;
-  const markdown =
-    picked && picked.contentMarkdown && String(picked.contentMarkdown).trim()
-      ? String(picked.contentMarkdown)
-      : String((picked && (picked.contentText || '')) || '');
-  return String(markdown || '').trim();
+  return String((picked && picked.contentMarkdown) || '').trim();
 }
 
 function fnv1a32(input: unknown): string {

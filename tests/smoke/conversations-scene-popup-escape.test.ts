@@ -93,7 +93,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     detailError: null,
     detail: {
       id: 11,
-      messages: [{ id: 1, role: 'user', contentText: 'hello', updatedAt: Date.now() }],
+      messages: [{ id: 1, role: 'user', contentMarkdown: 'hello', updatedAt: Date.now() }],
     },
     selectedConversation: {
       id: 11,

@@ -55,7 +55,7 @@ function installStorage(initial: Record<string, any> = {}) {
 function makeSnapshot() {
   return {
     conversation: { source: 'gemini', conversationKey: 'c1', title: 'Chat' },
-    messages: [{ messageKey: 'm1', role: 'user', contentText: 'hello', sequence: 1 }],
+    messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 1 }],
   };
 }
 

@@ -99,7 +99,7 @@ describe('notion-sync-orchestrator kind routing', () => {
         };
       },
       getMessagesByConversationId: async () => [
-        { messageKey: 'm1', role: 'assistant', contentText: 'hi', sequence: 1, updatedAt: 1 },
+        { messageKey: 'm1', role: 'assistant', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 },
       ],
       getArticleCommentsByConversationId: async (conversationId: number) => {
         if (conversationId !== 1) return [];
@@ -229,7 +229,7 @@ describe('notion-sync-orchestrator kind routing', () => {
           mapping: null,
         }),
         getMessagesByConversationId: async () => [
-          { messageKey: 'm1', role: 'assistant', contentText: 'image', sequence: 1, updatedAt: 1 },
+          { messageKey: 'm1', role: 'assistant', contentMarkdown: 'image', sequence: 1, updatedAt: 1 },
         ],
         setConversationNotionPageId,
         setSyncCursor,
@@ -313,7 +313,6 @@ describe('notion-sync-orchestrator kind routing', () => {
         {
           messageKey: 'article_body',
           role: 'assistant',
-          contentText: 'v2',
           contentMarkdown: 'v2',
           sequence: 1,
           updatedAt: 2000,

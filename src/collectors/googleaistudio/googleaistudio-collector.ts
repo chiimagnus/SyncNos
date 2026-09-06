@@ -112,7 +112,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
     const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
     if (id) return `${id}:${role}`;
-    return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
+    return env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence });
   }
 
   type ManualTurnEntry = {
@@ -203,7 +203,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     withinTurn: number;
     role: 'user' | 'assistant';
     sequence: number;
-    contentText: string;
     baseMarkdown: string;
     imageReferences: PlainImageReferences;
     updatedAt: number;
@@ -365,7 +364,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       withinTurn: manualEntry?.withinTurn || 0,
       role,
       sequence,
-      contentText,
       baseMarkdown: baseMarkdown || contentText,
       imageReferences: { httpUrls, blobUrls },
       updatedAt: Date.now(),
@@ -414,12 +412,11 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
   async function extractMessageFromInput(input: PlainExtractionInput, ctx: InlineImageContext): Promise<any | null> {
     const resolved = await resolveImageReferences(input.imageReferences, ctx);
-    if (!input.contentText && !resolved.urls.length) return null;
+    if (!input.baseMarkdown && !resolved.urls.length) return null;
     return {
       messageKey: input.messageKey,
       role: input.role,
-      contentText: input.contentText,
-      contentMarkdown: appendImageMarkdown(input.baseMarkdown || input.contentText, resolved.urls, {
+      contentMarkdown: appendImageMarkdown(input.baseMarkdown, resolved.urls, {
         allowDataImageUrls: true,
       }),
       sequence: input.sequence,

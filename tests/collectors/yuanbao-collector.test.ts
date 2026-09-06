@@ -122,7 +122,7 @@ describe('yuanbao-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
     expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 
@@ -162,7 +162,7 @@ describe('yuanbao-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('user');
-    expect(snap.messages[0].contentText).toContain('这是什么？');
+    expect(snap.messages[0].contentMarkdown).toContain('这是什么？');
     expect(snap.messages[0].contentMarkdown).toContain(
       '![](https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be)',
     );

@@ -629,7 +629,6 @@ describe('GitHub Markdown production-chain integration', () => {
       {
         messageKey: 'chat-1',
         role: 'assistant',
-        contentText: 'Chat body with cached image',
         contentMarkdown: [
           'Chat body with cached image',
           'mounted chat 中的 `syncnos-asset://` 已自动变成 `blob:chrome-extension://...`。',
@@ -648,7 +647,6 @@ describe('GitHub Markdown production-chain integration', () => {
       {
         messageKey: 'article_body',
         role: 'article',
-        contentText: 'Article body',
         contentMarkdown: '# Article body\n\nLocal article text.',
         sequence: 1,
         updatedAt: 20,
@@ -703,7 +701,6 @@ describe('GitHub Markdown production-chain integration', () => {
       {
         messageKey: 'chat-1',
         role: 'assistant',
-        contentText: 'Chat body updated by auto-sync',
         contentMarkdown: 'Chat body updated by auto-sync\n\n![cached](syncnos-asset://1)',
         sequence: 1,
         updatedAt: 30,
@@ -824,7 +821,6 @@ describe('GitHub Markdown production-chain integration', () => {
       {
         messageKey: 'chat-1',
         role: 'assistant',
-        contentText: 'Chat body after upload fallback',
         contentMarkdown: 'Chat body after upload fallback\n\n![fallback](syncnos-asset://2)',
         sequence: 1,
         updatedAt: 60,
@@ -863,7 +859,6 @@ describe('GitHub Markdown production-chain integration', () => {
       {
         messageKey: 'article_body',
         role: 'article',
-        contentText: 'Article body after refresh',
         contentMarkdown: '# Article body\n\nLocal article text after refresh.',
         sequence: 1,
         updatedAt: 70,

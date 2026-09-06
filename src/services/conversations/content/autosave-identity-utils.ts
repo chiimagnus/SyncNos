@@ -1,3 +1,4 @@
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import { fnv1a32, normalizeText } from '@services/shared/normalize.ts';
 
 export const IDENTITY_PREFIX_LEN = 96;
@@ -10,16 +11,16 @@ function normalizeContent(value: unknown): string {
 export function getMessageIdentityBase(
   message: any,
   identityPrefixLen: number = IDENTITY_PREFIX_LEN,
-): { role: string; base: string; text: string; markdown: string } {
+): { role: string; base: string; markdown: string } {
   const role = String((message && message.role) || 'assistant').trim() || 'assistant';
-  const text = normalizeContent(message && message.contentText);
   const markdownRaw =
     message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
   const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
+  const text = markdown ? normalizeContent(markdownToSemanticText(markdown, { includeImageAlt: true })) : '';
   const full = text || markdown;
   const clipped = full ? full.slice(0, identityPrefixLen) : '';
   const base = `${role}|${clipped}`;
-  return { role, base, text, markdown };
+  return { role, base, markdown };
 }
 
 export function fingerprintHash(base: string): string {
@@ -33,16 +34,19 @@ export function makeAutoSaveConversationStateKey(snapshot: any): string {
 }
 
 export function classifyPrefixOrFillingUpdate(
-  prev: { text: string; markdown: string },
-  next: { text: string; markdown: string },
+  prev: { markdown: string },
+  next: { markdown: string },
 ): { changed: boolean; acceptable: boolean } {
-  const prevText = prev.text || '';
-  const nextText = next.text || '';
   const prevMarkdown = prev.markdown || '';
   const nextMarkdown = next.markdown || '';
+  const changed = prevMarkdown !== nextMarkdown;
+  if (!changed) return { changed: false, acceptable: false };
 
+  const prevText = normalizeContent(markdownToSemanticText(prevMarkdown, { includeImageAlt: true }));
+  const nextText = normalizeContent(markdownToSemanticText(nextMarkdown, { includeImageAlt: true }));
   const textFilled = !prevText && !!nextText;
   const markdownFilled = !prevMarkdown && !!nextMarkdown;
+  const textEquivalent = !!prevText && prevText === nextText;
   const textGrew = !!(prevText && nextText && nextText.startsWith(prevText) && nextText.length > prevText.length);
   const markdownGrew = !!(
     prevMarkdown &&
@@ -52,21 +56,19 @@ export function classifyPrefixOrFillingUpdate(
   );
 
   return {
-    changed: prevText !== nextText || prevMarkdown !== nextMarkdown,
-    acceptable: textFilled || markdownFilled || textGrew || markdownGrew,
+    changed,
+    acceptable: textFilled || markdownFilled || textEquivalent || textGrew || markdownGrew,
   };
 }
 
 export function getMessageIdentityMeta(
   message: any,
   identityPrefixLen: number = IDENTITY_PREFIX_LEN,
-): { role: string; text: string; markdown: string; base: string; identityHash: string } {
-  const { role, text, markdown, base } = getMessageIdentityBase(message, identityPrefixLen);
+): { role: string; markdown: string; identityHash: string } {
+  const { role, markdown, base } = getMessageIdentityBase(message, identityPrefixLen);
   return {
     role,
-    text,
     markdown,
-    base,
     identityHash: fingerprintHash(base),
   };
 }

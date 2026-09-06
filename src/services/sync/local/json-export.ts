@@ -15,7 +15,7 @@ import {
 } from '@services/sync/local/export-shared';
 
 type JsonContent = {
-  format: 'markdown' | 'text';
+  format: 'markdown';
   value: string;
 } | null;
 
@@ -100,10 +100,7 @@ function normalizeCapturedAt(value: unknown): string | null {
 
 function normalizeContent(message: ConversationMessage | null | undefined): JsonContent {
   const markdown = contentString(message?.contentMarkdown, 'contentMarkdown');
-  const text = contentString(message?.contentText, 'contentText');
-  if (markdown != null) return { format: 'markdown', value: markdown };
-  if (text != null) return { format: 'text', value: text };
-  return null;
+  return markdown == null ? null : { format: 'markdown', value: markdown };
 }
 
 function findSemanticMessage(messages: ConversationMessage[], messageKey: string): ConversationMessage | null {

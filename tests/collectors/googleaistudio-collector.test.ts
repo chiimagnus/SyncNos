@@ -65,11 +65,11 @@ describe('googleaistudio-collector', () => {
     expect(snap.messages.length).toBe(2);
     const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentText).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
     expect(assistant.contentMarkdown).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
-    expect(assistant.contentText).not.toContain('MODEL_META_SHOULD_NOT_EXPORT');
+    expect(assistant.contentMarkdown).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
     expect(assistant.contentMarkdown).not.toContain('MODEL_META_SHOULD_NOT_EXPORT');
-    expect(assistant.contentText).not.toContain('10:11');
+    expect(assistant.contentMarkdown).not.toContain('MODEL_META_SHOULD_NOT_EXPORT');
+    expect(assistant.contentMarkdown).not.toContain('10:11');
     expect(assistant.contentMarkdown).not.toContain('10:11');
     expect(assistant.contentMarkdown).toContain('**Bold**');
     expect(assistant.contentMarkdown).toContain('[link](https://example.com)');
@@ -451,8 +451,8 @@ describe('googleaistudio-collector', () => {
     const [a, b] = await Promise.all([first.collector.prepareManualCapture(), second.collector.prepareManualCapture()]);
     const firstSnap = await first.collector.capture({ manual: true, preparedCapture: a });
     const secondSnap = await second.collector.capture({ manual: true, preparedCapture: b });
-    expect(firstSnap.messages.map((message: any) => message.contentText)).toEqual(['A']);
-    expect(secondSnap.messages.map((message: any) => message.contentText)).toEqual(['B']);
+    expect(firstSnap.messages.map((message: any) => message.contentMarkdown)).toEqual(['A']);
+    expect(secondSnap.messages.map((message: any) => message.contentMarkdown)).toEqual(['B']);
   });
 
   it('manual capture keeps full turn list', async () => {
@@ -496,9 +496,9 @@ describe('googleaistudio-collector', () => {
 
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(3);
-    expect(snap.messages[0]?.contentText).toBe('hello-1');
-    expect(snap.messages[1]?.contentText).toBe('hello-2');
-    expect(snap.messages[2]?.contentText).toBe('hello-3');
+    expect(snap.messages[0]?.contentMarkdown).toBe('hello-1');
+    expect(snap.messages[1]?.contentMarkdown).toBe('hello-2');
+    expect(snap.messages[2]?.contentMarkdown).toBe('hello-3');
   });
 
   it('sweeps remounted virtual windows and restores the nested scroll root', async () => {
@@ -559,7 +559,7 @@ describe('googleaistudio-collector', () => {
       sleep: async () => {},
     });
     const snap = await def.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(snap.messages.map((message: any) => message.contentText)).toEqual([
+    expect(snap.messages.map((message: any) => message.contentMarkdown)).toEqual([
       'message-1',
       'message-2',
       'message-3',

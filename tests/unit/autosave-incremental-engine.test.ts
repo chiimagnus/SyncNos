@@ -23,8 +23,8 @@ describe('autosave incremental engine transactional baseline', () => {
   it('retries the same short seed until commit, then becomes a no-op', () => {
     const engine = createAutoSaveIncrementalEngine();
     const input = snapshot('seed', [
-      { role: 'user', contentText: 'a' },
-      { role: 'assistant', contentText: 'b' },
+      { role: 'user', contentMarkdown: 'a' },
+      { role: 'assistant', contentMarkdown: 'b' },
     ]);
 
     const first = engine.prepare(input);
@@ -44,11 +44,11 @@ describe('autosave incremental engine transactional baseline', () => {
 
   it('retries an append delta until commit, then does not repeat it', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const base = snapshot('append', [{ role: 'user', contentText: 'A' }]);
+    const base = snapshot('append', [{ role: 'user', contentMarkdown: 'A' }]);
     prepareCommitted(engine, base);
     const next = snapshot('append', [
-      { role: 'user', contentText: 'A' },
-      { role: 'assistant', contentText: 'B' },
+      { role: 'user', contentMarkdown: 'A' },
+      { role: 'assistant', contentMarkdown: 'B' },
     ]);
 
     const first = engine.prepare(next);
@@ -63,18 +63,18 @@ describe('autosave incremental engine transactional baseline', () => {
   it('advances prefix-growth tail state only after commit', () => {
     const engine = createAutoSaveIncrementalEngine();
     const base = snapshot('prefix', [
-      { role: 'user', contentText: 'A' },
-      { role: 'assistant', contentText: 'B' },
-      { role: 'assistant', contentText: 'C' },
+      { role: 'user', contentMarkdown: 'A' },
+      { role: 'assistant', contentMarkdown: 'B' },
+      { role: 'assistant', contentMarkdown: 'C' },
     ]);
     const seed = engine.prepare(base);
     const keyB = seed.snapshot.messages[1].messageKey;
     seed.commit();
 
     const grown = snapshot('prefix', [
-      { role: 'user', contentText: 'A' },
-      { role: 'assistant', contentText: 'B!!!' },
-      { role: 'assistant', contentText: 'C' },
+      { role: 'user', contentMarkdown: 'A' },
+      { role: 'assistant', contentMarkdown: 'B!!!' },
+      { role: 'assistant', contentMarkdown: 'C' },
     ]);
     const first = engine.prepare(grown);
     expect(first.diff.updated).toEqual([keyB]);
@@ -85,7 +85,7 @@ describe('autosave incremental engine transactional baseline', () => {
 
   it('commits a long-conversation changed=false observation baseline before detecting the next append', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const mk = (i: number) => ({ role: i % 2 === 0 ? 'user' : 'assistant', contentText: `m${i}` });
+    const mk = (i: number) => ({ role: i % 2 === 0 ? 'user' : 'assistant', contentMarkdown: `m${i}` });
     const base = Array.from({ length: 201 }, (_, i) => mk(i));
     const initial = engine.prepare(snapshot('long', base));
     expect(initial.changed).toBe(false);
@@ -96,16 +96,16 @@ describe('autosave incremental engine transactional baseline', () => {
     expect(appended.changed).toBe(true);
     expect(appended.diff.added).toHaveLength(1);
     expect(appended.snapshot.messages).toHaveLength(1);
-    expect(appended.snapshot.messages[0].contentText).toBe('m201');
+    expect(appended.snapshot.messages[0].contentMarkdown).toBe('m201');
   });
 
   it('does not leak an uncommitted incoming-key overlay', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const firstInput = snapshot('overlay', [{ messageKey: 'k1', role: 'assistant', contentText: 'hello' }]);
+    const firstInput = snapshot('overlay', [{ messageKey: 'k1', role: 'assistant', contentMarkdown: 'hello' }]);
     const first = engine.prepare(firstInput);
     expect(first.snapshot.messages[0].messageKey).toBe('k1');
 
-    const incompatible = snapshot('overlay', [{ messageKey: 'k1', role: 'user', contentText: 'different' }]);
+    const incompatible = snapshot('overlay', [{ messageKey: 'k1', role: 'user', contentMarkdown: 'different' }]);
     const second = engine.prepare(incompatible);
     expect(second.changed).toBe(true);
     expect(second.snapshot.messages[0].messageKey).toBe('k1');
@@ -120,24 +120,24 @@ describe('autosave incremental engine transactional baseline', () => {
 
   it('double commit is idempotent', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const preparation = engine.prepare(snapshot('double', [{ role: 'user', contentText: 'A' }]));
+    const preparation = engine.prepare(snapshot('double', [{ role: 'user', contentMarkdown: 'A' }]));
     expect(preparation.commit()).toBe(true);
     expect(preparation.commit()).toBe(false);
   });
 
   it('rejects a stale first commit after another preparation advances the same revision', () => {
     const engine = createAutoSaveIncrementalEngine();
-    prepareCommitted(engine, snapshot('stale', [{ role: 'user', contentText: 'A' }]));
+    prepareCommitted(engine, snapshot('stale', [{ role: 'user', contentMarkdown: 'A' }]));
     const oldPreparation = engine.prepare(
       snapshot('stale', [
-        { role: 'user', contentText: 'A' },
-        { role: 'assistant', contentText: 'B' },
+        { role: 'user', contentMarkdown: 'A' },
+        { role: 'assistant', contentMarkdown: 'B' },
       ]),
     );
     const newerPreparation = engine.prepare(
       snapshot('stale', [
-        { role: 'user', contentText: 'A' },
-        { role: 'assistant', contentText: 'C' },
+        { role: 'user', contentMarkdown: 'A' },
+        { role: 'assistant', contentMarkdown: 'C' },
       ]),
     );
     expect(newerPreparation.commit()).toBe(true);
@@ -146,13 +146,13 @@ describe('autosave incremental engine transactional baseline', () => {
 
   it('keeps metadata-only changes pending until commit', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const base = snapshot('meta', [{ messageKey: 'm1', role: 'user', contentText: 'hi' }], {
+    const base = snapshot('meta', [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }], {
       title: 't1',
       url: 'https://a',
     });
     prepareCommitted(engine, base);
 
-    const changedInput = snapshot('meta', [{ messageKey: 'm1', role: 'user', contentText: 'hi' }], {
+    const changedInput = snapshot('meta', [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }], {
       title: 't2',
       url: 'https://b',
     });
@@ -167,7 +167,7 @@ describe('autosave incremental engine transactional baseline', () => {
 
   it('preserves the 200-message sliding window append behavior', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const mk = (i: number) => ({ role: i % 2 === 0 ? 'user' : 'assistant', contentText: `m${i}` });
+    const mk = (i: number) => ({ role: i % 2 === 0 ? 'user' : 'assistant', contentMarkdown: `m${i}` });
     const base = Array.from({ length: 201 }, (_, i) => mk(i));
     prepareCommitted(engine, snapshot('window', base));
     const next = engine.prepare(snapshot('window', [...base, mk(201)]));
@@ -180,7 +180,7 @@ describe('autosave incremental engine transactional baseline', () => {
     const engine = createAutoSaveIncrementalEngine();
     const mk = (prefix: string, i: number) => ({
       role: i % 2 === 0 ? 'user' : 'assistant',
-      contentText: `${prefix}${i}`,
+      contentMarkdown: `${prefix}${i}`,
     });
     const base = Array.from({ length: 201 }, (_, i) => mk('m', i));
     const foreign = Array.from({ length: 201 }, (_, i) => mk('x', i));
@@ -192,16 +192,16 @@ describe('autosave incremental engine transactional baseline', () => {
     const resumed = engine.prepare(snapshot('no-overlap', [...base, mk('m', 201)]));
     expect(resumed.changed).toBe(true);
     expect(resumed.diff.added).toHaveLength(1);
-    expect(resumed.snapshot.messages[0].contentText).toBe('m201');
+    expect(resumed.snapshot.messages[0].contentMarkdown).toBe('m201');
   });
 
   it('treats a new message as added instead of a false tail update', () => {
     const engine = createAutoSaveIncrementalEngine();
-    prepareCommitted(engine, snapshot('new-message', [{ role: 'assistant', contentText: 'hello' }]));
+    prepareCommitted(engine, snapshot('new-message', [{ role: 'assistant', contentMarkdown: 'hello' }]));
     const result = engine.prepare(
       snapshot('new-message', [
-        { role: 'assistant', contentText: 'hello' },
-        { role: 'assistant', contentText: 'new' },
+        { role: 'assistant', contentMarkdown: 'hello' },
+        { role: 'assistant', contentMarkdown: 'new' },
       ]),
     );
     expect(result.diff.updated).toEqual([]);
@@ -212,9 +212,9 @@ describe('autosave incremental engine transactional baseline', () => {
     const engine = createAutoSaveIncrementalEngine();
     const seed = engine.prepare(
       snapshot('fallback', [
-        { messageKey: 'fallback_a1', role: 'user', contentText: 'A' },
-        { messageKey: 'fallback_a2', role: 'assistant', contentText: 'B' },
-        { messageKey: 'fallback_a3', role: 'user', contentText: 'C' },
+        { messageKey: 'fallback_a1', role: 'user', contentMarkdown: 'A' },
+        { messageKey: 'fallback_a2', role: 'assistant', contentMarkdown: 'B' },
+        { messageKey: 'fallback_a3', role: 'user', contentMarkdown: 'C' },
       ]),
     );
     expect(seed.diff.added.every((key) => key.startsWith('autosave_'))).toBe(true);
@@ -222,14 +222,14 @@ describe('autosave incremental engine transactional baseline', () => {
 
     const next = engine.prepare(
       snapshot('fallback', [
-        { messageKey: 'fallback_b1', role: 'assistant', contentText: 'B' },
-        { messageKey: 'fallback_b2', role: 'user', contentText: 'C' },
-        { messageKey: 'fallback_b3', role: 'assistant', contentText: 'D' },
+        { messageKey: 'fallback_b1', role: 'assistant', contentMarkdown: 'B' },
+        { messageKey: 'fallback_b2', role: 'user', contentMarkdown: 'C' },
+        { messageKey: 'fallback_b3', role: 'assistant', contentMarkdown: 'D' },
       ]),
     );
     expect(next.diff.updated).toEqual([]);
     expect(next.diff.added).toHaveLength(1);
-    expect(next.snapshot.messages[0].contentText).toBe('D');
+    expect(next.snapshot.messages[0].contentMarkdown).toBe('D');
   });
 
   it('ignores unstable reused incoming keys across a shifted window', () => {
@@ -237,16 +237,16 @@ describe('autosave incremental engine transactional baseline', () => {
     prepareCommitted(
       engine,
       snapshot('reuse', [
-        { messageKey: 'k0', role: 'user', contentText: 'A' },
-        { messageKey: 'k1', role: 'assistant', contentText: 'B' },
-        { messageKey: 'k2', role: 'user', contentText: 'C' },
+        { messageKey: 'k0', role: 'user', contentMarkdown: 'A' },
+        { messageKey: 'k1', role: 'assistant', contentMarkdown: 'B' },
+        { messageKey: 'k2', role: 'user', contentMarkdown: 'C' },
       ]),
     );
     const result = engine.prepare(
       snapshot('reuse', [
-        { messageKey: 'k0', role: 'assistant', contentText: 'B' },
-        { messageKey: 'k1', role: 'user', contentText: 'C' },
-        { messageKey: 'k2', role: 'assistant', contentText: 'D' },
+        { messageKey: 'k0', role: 'assistant', contentMarkdown: 'B' },
+        { messageKey: 'k1', role: 'user', contentMarkdown: 'C' },
+        { messageKey: 'k2', role: 'assistant', contentMarkdown: 'D' },
       ]),
     );
     expect(result.changed).toBe(true);
@@ -256,20 +256,20 @@ describe('autosave incremental engine transactional baseline', () => {
 
   it('isolates state by source/conversation identity', () => {
     const engine = createAutoSaveIncrementalEngine();
-    const c1 = engine.prepare(snapshot('c1', [{ role: 'user', contentText: 'A' }]));
-    const c2 = engine.prepare(snapshot('c2', [{ role: 'user', contentText: 'B' }]));
+    const c1 = engine.prepare(snapshot('c1', [{ role: 'user', contentMarkdown: 'A' }]));
+    const c2 = engine.prepare(snapshot('c2', [{ role: 'user', contentMarkdown: 'B' }]));
     expect(c1.snapshot.messages[0].messageKey).not.toBe(c2.snapshot.messages[0].messageKey);
     c1.commit();
     c2.commit();
-    expect(engine.prepare(snapshot('c1', [{ role: 'user', contentText: 'A' }])).changed).toBe(false);
-    expect(engine.prepare(snapshot('c2', [{ role: 'user', contentText: 'B' }])).changed).toBe(false);
+    expect(engine.prepare(snapshot('c1', [{ role: 'user', contentMarkdown: 'A' }])).changed).toBe(false);
+    expect(engine.prepare(snapshot('c2', [{ role: 'user', contentMarkdown: 'B' }])).changed).toBe(false);
   });
 
   it('does not mutate the caller snapshot across an uncommitted retry', () => {
     const engine = createAutoSaveIncrementalEngine();
     const input = snapshot('pure', [
-      { role: 'user', contentText: 'A' },
-      { role: 'assistant', contentText: 'B' },
+      { role: 'user', contentMarkdown: 'A' },
+      { role: 'assistant', contentMarkdown: 'B' },
     ]);
     const original = clone(input);
     const first = engine.prepare(input);
@@ -286,12 +286,12 @@ describe('autosave incremental engine transactional baseline', () => {
     const engine = createAutoSaveIncrementalEngine();
     prepareCommitted(
       engine,
-      snapshot('carry', [{ messageKey: 'm1', role: 'user', contentText: 'hi' }], {
+      snapshot('carry', [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }], {
         title: 't1',
         url: 'https://a',
       }),
     );
-    const input = snapshot('carry', [{ messageKey: 'm1', role: 'user', contentText: 'hi' }]);
+    const input = snapshot('carry', [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }]);
     const original = clone(input);
     const preparation = engine.prepare(input);
     expect(preparation.changed).toBe(false);

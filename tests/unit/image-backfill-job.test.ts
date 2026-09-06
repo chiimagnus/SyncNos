@@ -32,8 +32,8 @@ describe('image-backfill-job', () => {
 
   it('builds one conditional Markdown batch and reports only durably patched rows', async () => {
     storageMocks.getMessagesByConversationId.mockResolvedValue([
-      { messageKey: 'm1', contentText: 'latest text one', contentMarkdown: 'before one', updatedAt: 10 },
-      { messageKey: 'm2', contentText: 'latest text two', contentMarkdown: 'before two', updatedAt: 20 },
+      { messageKey: 'm1', contentMarkdown: 'before one', updatedAt: 10 },
+      { messageKey: 'm2', contentMarkdown: 'before two', updatedAt: 20 },
     ]);
     imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
       inlineResult([

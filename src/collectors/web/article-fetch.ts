@@ -250,7 +250,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     {
       messageKey: 'article_body',
       role: 'article',
-      contentText: body,
       contentMarkdown: markdown,
       sequence: 1,
       updatedAt: capturedAt,

@@ -2,6 +2,7 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
 import chatgptMarkdown, { isChatgptNonContentImageUrl } from '@collectors/chatgpt/chatgpt-markdown.ts';
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -228,9 +229,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function deriveTemporaryChatAutoTitle(messages: any): string {
     const firstUser = Array.isArray(messages)
-      ? messages.find((m: any) => m && m.role === 'user' && m.contentText)
+      ? messages.find((m: any) => m && m.role === 'user' && m.contentMarkdown)
       : null;
-    const raw = firstUser ? String(firstUser.contentText || '') : '';
+    const raw = firstUser ? markdownToSemanticText(firstUser.contentMarkdown, { includeImageAlt: true }) : '';
     const normalized = env.normalize && env.normalize.normalizeText ? env.normalize.normalizeText(raw) : raw;
     const text = String(normalized || '').trim();
     if (!text) return '';
@@ -704,7 +705,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return {
       messageKey: input.key,
       role: input.role,
-      contentText,
       contentMarkdown: appendImageMarkdown(baseMarkdown, input.imageUrls),
       sequence,
       updatedAt: Date.now(),

@@ -79,9 +79,9 @@ describe('deepseek-collector', () => {
     expect(assistant.contentMarkdown).not.toContain('复制');
     expect(assistant.contentMarkdown).not.toContain('下载');
 
-    expect(assistant.contentText).toContain('主标题');
-    expect(assistant.contentText).toContain('def greet(name):');
-    expect(assistant.contentText).not.toContain('复制');
+    expect(assistant.contentMarkdown).toContain('主标题');
+    expect(assistant.contentMarkdown).toContain('def greet(name):');
+    expect(assistant.contentMarkdown).not.toContain('复制');
   });
 
   it('falls back to plain text markdown when markdown helper is unavailable', async () => {
@@ -112,7 +112,7 @@ describe('deepseek-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
     expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 });

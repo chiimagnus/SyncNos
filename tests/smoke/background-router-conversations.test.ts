@@ -171,7 +171,7 @@ describe('background-router conversations', () => {
       type: 'syncConversationMessages',
       conversationId: 123,
       mode: 'snapshop',
-      messages: [{ messageKey: 'm1', contentText: 'unsafe' }],
+      messages: [{ messageKey: 'm1', contentMarkdown: 'unsafe' }],
     });
 
     expect(res).toMatchObject({ ok: false, error: { message: 'invalid mode' } });
@@ -236,7 +236,6 @@ describe('background-router conversations', () => {
         {
           messageKey: 'm1',
           role: 'user',
-          contentText: 'fallback',
           contentMarkdown: 'fallback\n\n![](data:image/png;base64,AQ==)',
           captureSequencePolicy: 'preserve-existing-tail',
           captureMergePolicy: 'preserve-existing-markdown',

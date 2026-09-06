@@ -93,10 +93,9 @@ describe('local JSON v1 export', () => {
           role: ' assistant ',
           authorName: '  Assistant  ',
           contentMarkdown: '  markdown with spaces  ',
-          contentText: '\ntext\n',
           sequence: 2,
         }),
-        message('m-1', { role: 42, authorName: '', contentMarkdown: '', contentText: undefined, sequence: 1 }),
+        message('m-1', { role: 42, authorName: '', contentMarkdown: '', sequence: 1 }),
       ],
     });
 
@@ -153,13 +152,13 @@ describe('local JSON v1 export', () => {
         ? {
             conversationId: 2,
             messages: [
-              message('legacy', { contentMarkdown: 'wrong first', contentText: 'wrong text' }),
-              message('article_body', { contentMarkdown: '', contentText: 'semantic text' }),
+              message('legacy', { contentMarkdown: 'wrong first' }),
+              message('article_body', { contentMarkdown: 'semantic text' }),
             ],
           }
         : {
             conversationId: 3,
-            messages: [message('legacy', { contentMarkdown: 'fallback md', contentText: 'fallback text' })],
+            messages: [message('legacy', { contentMarkdown: 'fallback md' })],
           },
     );
 
@@ -172,7 +171,7 @@ describe('local JSON v1 export', () => {
       type: 'article',
       author: 'Author',
       publishedAt: '2026-09-01',
-      content: { format: 'text', value: 'semantic text' },
+      content: { format: 'markdown', value: 'semantic text' },
     });
     expect(semanticJson.messages).toBeUndefined();
     expect(fallbackJson).toMatchObject({
@@ -199,7 +198,7 @@ describe('local JSON v1 export', () => {
       conversationId: 4,
       messages: [
         message('legacy', { contentMarkdown: 'wrong' }),
-        message('video_transcript', { role: 'transcript', contentMarkdown: '00:01 hello', contentText: 'hello' }),
+        message('video_transcript', { role: 'transcript', contentMarkdown: '00:01 hello' }),
       ],
     });
 
@@ -232,7 +231,7 @@ describe('local JSON v1 export', () => {
     });
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 40,
-      messages: [message('legacy-transcript', { contentMarkdown: 'legacy md', contentText: 'legacy text' })],
+      messages: [message('legacy-transcript', { contentMarkdown: 'legacy md' })],
     });
 
     const result = await buildConversationsJsonZipExport({ conversations: [c] });
@@ -243,22 +242,21 @@ describe('local JSON v1 export', () => {
     });
   });
 
-  it('keeps text fallback opaque and does not parse asset-like text as Markdown', async () => {
+  it('keeps an empty canonical Markdown body authoritative', async () => {
     const c = conversation(41, {
       source: 'web',
       sourceType: 'article',
-      conversationKey: 'article:text-only',
+      conversationKey: 'article:canonical-empty',
     });
-    const textOnly = 'plain ![example](syncnos-asset://41) text';
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 41,
-      messages: [message('article_body', { contentMarkdown: '', contentText: textOnly })],
+      messages: [message('article_body', { contentMarkdown: '' })],
     });
 
     const result = await buildConversationsJsonZipExport({ conversations: [c] });
     const [entry] = await readJsonEntries(result.zipBlob);
 
-    expect(entry.value.content).toEqual({ format: 'text', value: textOnly });
+    expect(entry.value.content).toBeNull();
     expect(entry.value.attachments).toEqual([]);
     expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
   });
@@ -276,10 +274,7 @@ describe('local JSON v1 export', () => {
     const markdownB = '![one](syncnos-asset://1)\n![two-again](syncnos-asset://2)';
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 5,
-      messages: [
-        message('m-a', { contentMarkdown: markdownA, contentText: 'text A' }),
-        message('m-b', { contentMarkdown: markdownB, contentText: 'text B' }),
-      ],
+      messages: [message('m-a', { contentMarkdown: markdownA }), message('m-b', { contentMarkdown: markdownB })],
     });
     mocks.getImageCacheAssetsByIds.mockImplementation(async ({ ids, conversationId }: any) => {
       expect(ids).toEqual([2, 3, 1]);
@@ -366,8 +361,8 @@ describe('local JSON v1 export', () => {
     const cases = [
       {
         conversation: conversation(1),
-        detail: { conversationId: 1, messages: [message('m', { contentText: { malformed: true } })] },
-        error: 'Invalid contentText',
+        detail: { conversationId: 1, messages: [message('m', { contentMarkdown: { malformed: true } })] },
+        error: 'Invalid contentMarkdown',
       },
       {
         conversation: conversation(2, {
@@ -377,7 +372,7 @@ describe('local JSON v1 export', () => {
         }),
         detail: {
           conversationId: 2,
-          messages: [message('article_body', { contentMarkdown: 42, contentText: 'valid text' })],
+          messages: [message('article_body', { contentMarkdown: 42 })],
         },
         error: 'Invalid contentMarkdown',
       },
@@ -389,9 +384,9 @@ describe('local JSON v1 export', () => {
         }),
         detail: {
           conversationId: 3,
-          messages: [message('video_transcript', { contentMarkdown: 'valid markdown', contentText: ['bad'] })],
+          messages: [message('video_transcript', { contentMarkdown: ['bad'] })],
         },
-        error: 'Invalid contentText',
+        error: 'Invalid contentMarkdown',
       },
     ];
 
@@ -437,7 +432,7 @@ describe('local JSON v1 export', () => {
     const base = buildConversationBasename(items[0]);
     mocks.getConversationDetail.mockImplementation(async (id: number) => ({
       conversationId: id,
-      messages: [message('article_body', { contentMarkdown: `body-${id}`, contentText: `text-${id}` })],
+      messages: [message('article_body', { contentMarkdown: `body-${id}` })],
     }));
 
     const result = await buildConversationsJsonZipExport({ conversations: items });

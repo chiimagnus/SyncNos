@@ -219,7 +219,7 @@ describe('notionai-collector', () => {
       'user',
       'assistant',
     ]);
-    expect(snap.messages.map((m: any) => String(m && m.contentText))).toEqual(['U1', 'A1', 'U2', 'A2', 'U3', 'A3']);
+    expect(snap.messages.map((m: any) => String(m && m.contentMarkdown))).toEqual(['U1', 'A1', 'U2', 'A2', 'U3', 'A3']);
   });
 
   it('captures user-like bubbles without data-agent-chat-user-step-id when assistant still renders', () => {
@@ -264,7 +264,7 @@ describe('notionai-collector', () => {
       'user',
       'assistant',
     ]);
-    expect(snap1.messages.map((m: any) => String(m && m.contentText))).toEqual([
+    expect(snap1.messages.map((m: any) => String(m && m.contentMarkdown))).toEqual([
       'U1',
       'A1',
       'U2 missing marker',
@@ -322,7 +322,7 @@ describe('notionai-collector', () => {
       'user',
       'assistant',
     ]);
-    expect(snap.messages.map((m: any) => String(m && m.contentText))).toEqual([
+    expect(snap.messages.map((m: any) => String(m && m.contentMarkdown))).toEqual([
       'U1',
       'A1',
       'U2 missing marker',
@@ -356,7 +356,7 @@ describe('notionai-collector', () => {
     const snap = collector.capture();
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m && m.role)).toEqual(['user']);
-    expect(snap.messages.map((m: any) => String(m && m.contentText))).toEqual(['User message']);
+    expect(snap.messages.map((m: any) => String(m && m.contentMarkdown))).toEqual(['User message']);
   });
 
   it('does not capture composer draft text as a fallback user turn', () => {
@@ -385,7 +385,7 @@ describe('notionai-collector', () => {
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
-    expect(snap.messages.map((m: any) => String(m && m.contentText))).toEqual(['User message', 'Assistant reply']);
+    expect(snap.messages.map((m: any) => String(m && m.contentMarkdown))).toEqual(['User message', 'Assistant reply']);
   });
 
   it('resolves relative notion page mentions to full markdown links', () => {
@@ -402,7 +402,7 @@ describe('notionai-collector', () => {
 
     const user = snap.messages.find((m: any) => m && m.role === 'user');
     expect(user).toBeTruthy();
-    expect(user.contentText).toContain('我们来看看这个');
+    expect(user.contentMarkdown).toContain('我们来看看这个');
     expect(user.contentMarkdown).toContain(
       '[全自主鸿蒙智能探地雷达地质建模与隐患检测预警技术研发与应用示范](https://app.notion.com/chiimagnus/343be9d6386a806b9a55ea7833f2c0b5)',
     );
@@ -468,7 +468,7 @@ describe('notionai-collector', () => {
     const snap = collector.capture();
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m && m.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
-    expect(snap.messages.map((m: any) => String(m && m.contentText))).toEqual([
+    expect(snap.messages.map((m: any) => String(m && m.contentMarkdown))).toEqual([
       'U1',
       'A1',
       'U2',

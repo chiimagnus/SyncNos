@@ -417,8 +417,7 @@ describe('backup service', () => {
         conversationId: convId,
         messageKey: 'm1',
         role: 'user',
-        contentText: 'hi',
-        contentMarkdown: `![x](syncnos-asset://${imgId})`,
+        contentMarkdown: `hi\n\n![x](syncnos-asset://${imgId})`,
         sequence: 1,
         updatedAt: 1,
       }) as any,
@@ -598,7 +597,6 @@ describe('backup service', () => {
         conversationId: conversationIdA,
         messageKey: 'm1',
         role: 'assistant',
-        contentText: 'already synced',
         contentMarkdown: 'already synced',
         sequence: 1,
         updatedAt: 20,
@@ -654,6 +652,8 @@ describe('backup service', () => {
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
 
     expect(bundle.syncMapping.id).toBeUndefined();
+    expect(bundle.messages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'already synced' });
+    expect(bundle.messages[0]).not.toHaveProperty('contentText');
     expect(bundle.syncMapping.futureProviderMetadata).toEqual({ version: 3, nested: { keep: true } });
     expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
 
@@ -725,8 +725,9 @@ describe('backup service', () => {
     expect(messages[0]).toMatchObject({
       conversationId: conversations[0].id,
       messageKey: 'm1',
-      contentText: 'already synced',
+      contentMarkdown: 'already synced',
     });
+    expect(messages[0]).not.toHaveProperty('contentText');
     expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'secret-b' });
     expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
     expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending-b');
@@ -770,8 +771,9 @@ describe('backup service', () => {
         conversationId: convId,
         messageKey: 'm1',
         role: 'user',
-        contentText: 'hi',
         contentMarkdown: [
+          'hi',
+          '',
           `![x](syncnos-asset://${oldImgId})`,
           `literal syncnos-asset://${oldImgId}`,
           `\`syncnos-asset://${oldImgId}\``,
@@ -793,7 +795,6 @@ describe('backup service', () => {
         conversationId: convId,
         messageKey: 'm-newer-local',
         role: 'assistant',
-        contentText: 'backup body',
         contentMarkdown: `backup body\n\n![x](syncnos-asset://${oldImgId})`,
         sequence: 2,
         updatedAt: 1,
@@ -860,7 +861,6 @@ describe('backup service', () => {
     await reqToPromise(
       localEditTx.objectStore('messages').put({
         ...newerLocal,
-        contentText: 'backup body',
         contentMarkdown: localMarkdown,
         updatedAt: 999,
       }) as any,
@@ -886,10 +886,10 @@ describe('backup service', () => {
       preservedLocalTx.onabort = () => reject(preservedLocalTx.error);
     });
     expect(preservedLocal).toMatchObject({
-      contentText: 'backup body',
       contentMarkdown: localMarkdown,
       updatedAt: 999,
     });
+    expect(preservedLocal).not.toHaveProperty('contentText');
 
     const deleteAssetTx = db2.transaction(['image_cache'], 'readwrite');
     deleteAssetTx.objectStore('image_cache').delete(referencedId);
@@ -961,8 +961,7 @@ describe('backup service', () => {
         conversationId: convId,
         messageKey: 'm1',
         role: 'user',
-        contentText: 'hi',
-        contentMarkdown: `![x](syncnos-asset://${oldImgId})`,
+        contentMarkdown: `hi\n\n![x](syncnos-asset://${oldImgId})`,
         sequence: 1,
         updatedAt: 1,
       }) as any,
@@ -1057,8 +1056,7 @@ describe('backup service', () => {
         conversationId: convId,
         messageKey: 'm1',
         role: 'user',
-        contentText: 'hi',
-        contentMarkdown: `![x](syncnos-asset://${oldImgId})`,
+        contentMarkdown: `hi\n\n![x](syncnos-asset://${oldImgId})`,
         sequence: 1,
         updatedAt: 1,
       }) as any,
@@ -1155,8 +1153,7 @@ describe('backup service', () => {
         conversationId: conversationA,
         messageKey: 'a1',
         role: 'assistant',
-        contentText: 'A',
-        contentMarkdown: `![own-a](syncnos-asset://${assetA})`,
+        contentMarkdown: `A\n\n![own-a](syncnos-asset://${assetA})`,
         sequence: 1,
         updatedAt: 1,
       }) as any,
@@ -1166,8 +1163,7 @@ describe('backup service', () => {
         conversationId: conversationB,
         messageKey: 'b1',
         role: 'assistant',
-        contentText: 'B',
-        contentMarkdown: `![own-b](syncnos-asset://${assetB})`,
+        contentMarkdown: `B\n\n![own-b](syncnos-asset://${assetB})`,
         sequence: 1,
         updatedAt: 2,
       }) as any,
@@ -1277,8 +1273,7 @@ describe('backup service', () => {
         conversationId: conv1,
         messageKey: 'm1',
         role: 'user',
-        contentText: 'hi',
-        contentMarkdown: '',
+        contentMarkdown: 'hi',
         sequence: 1,
         updatedAt: 1,
       }) as any,
@@ -1288,8 +1283,7 @@ describe('backup service', () => {
         conversationId: conv2,
         messageKey: 'm2',
         role: 'user',
-        contentText: 'hi',
-        contentMarkdown: '',
+        contentMarkdown: 'hi',
         sequence: 1,
         updatedAt: 2,
       }) as any,
@@ -1696,8 +1690,9 @@ describe('backup service', () => {
     expect(message).toMatchObject({
       conversationId: localConversationId,
       messageKey: 'm-remap',
-      contentText: 'mapped',
+      contentMarkdown: 'mapped',
     });
+    expect(message).not.toHaveProperty('contentText');
   });
 
   it('keeps Legacy message imports idempotent after remapping local identities', async () => {
@@ -1743,7 +1738,8 @@ describe('backup service', () => {
       firstTx.onabort = () => reject(firstTx.error);
     });
     expect(persisted).toHaveLength(1);
-    expect(persisted[0]).toMatchObject({ conversationId: 1, messageKey: 'm-stable', contentText: 'stable' });
+    expect(persisted[0]).toMatchObject({ conversationId: 1, messageKey: 'm-stable', contentMarkdown: 'stable' });
+    expect(persisted[0]).not.toHaveProperty('contentText');
     expect(persisted[0].id).not.toBe(500);
     expect(persisted[0].updatedAt).toBeGreaterThan(0);
 
@@ -1766,6 +1762,17 @@ describe('backup service', () => {
     });
     expect(changed.messagesAdded).toBe(0);
     expect(changed.messagesUpdated).toBe(1);
+
+    const changedTx = db.transaction(['messages'], 'readonly');
+    const changedPersisted = await reqToPromise<any>(changedTx.objectStore('messages').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      changedTx.oncomplete = () => resolve();
+      changedTx.onerror = () => reject(changedTx.error);
+      changedTx.onabort = () => reject(changedTx.error);
+    });
+    expect(changedPersisted).toHaveLength(1);
+    expect(changedPersisted[0]).toMatchObject({ contentMarkdown: 'changed' });
+    expect(changedPersisted[0]).not.toHaveProperty('contentText');
   });
 
   it('skips equivalent Legacy mappings without losing conversation mirrors', async () => {
@@ -1875,6 +1882,75 @@ describe('backup service', () => {
       conversationsAdded: 0,
       conversationsUpdated: 0,
     });
+  });
+
+  it('applies newer text-only message bodies from historical ZIP backups to canonical Markdown rows', async () => {
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/chatgpt/legacy-text-only.json';
+    const buildEntries = (body: string, updatedAt: number) =>
+      new Map<string, Uint8Array>([
+        [
+          'manifest.json',
+          encoder.encode(
+            JSON.stringify({
+              backupSchemaVersion: 2,
+              exportedAt: '2026-08-29T00:00:00.000Z',
+              db: { name: 'webclipper', version: 10 },
+              counts: { conversations: 1, messages: 1, sync_mappings: 0 },
+              config: { storageLocalPath: 'config/storage-local.json' },
+              index: { conversationsCsvPath: 'sources/conversations.csv' },
+              sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+            }),
+          ),
+        ],
+        ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+        ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+        [
+          entryPath,
+          encoder.encode(
+            JSON.stringify({
+              schemaVersion: 1,
+              conversation: {
+                sourceType: 'chat',
+                source: 'chatgpt',
+                conversationKey: 'zip-legacy-text-only',
+                title: 'Legacy text-only ZIP',
+                url: 'https://chatgpt.com/c/zip-legacy-text-only',
+                lastCapturedAt: 10,
+              },
+              messages: [
+                {
+                  messageKey: 'm1',
+                  role: 'user',
+                  contentText: body,
+                  contentMarkdown: '',
+                  sequence: 1,
+                  updatedAt,
+                },
+              ],
+              syncMapping: null,
+            }),
+          ),
+        ],
+      ]);
+
+    const first = await importBackupZipV2Merge(buildEntries('stable', 10));
+    expect(first).toMatchObject({ messagesAdded: 1, messagesUpdated: 0 });
+
+    const changed = await importBackupZipV2Merge(buildEntries('changed', 11));
+    expect(changed).toMatchObject({ messagesAdded: 0, messagesUpdated: 1 });
+
+    const db = await openDb();
+    const tx = db.transaction(['messages'], 'readonly');
+    const messages = await reqToPromise<any[]>(tx.objectStore('messages').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'changed', updatedAt: 11 });
+    expect(messages[0]).not.toHaveProperty('contentText');
   });
 
   it('keeps committed Legacy conversations when progress listeners fail', async () => {

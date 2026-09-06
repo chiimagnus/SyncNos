@@ -3,6 +3,7 @@ import {
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
+import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 import {
   canonicalizeInpageDisplayModeStorageRecord,
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
@@ -143,29 +144,19 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
 }
 
 function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownRecord) {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-  const aUpdated = validTimestamp(a.updatedAt) ?? 0;
-  const bUpdated = validTimestamp(b.updatedAt) ?? 0;
-  if (bUpdated && bUpdated > aUpdated) return true;
-
-  const aMd = a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
-  const bMd = b.contentMarkdown && String(b.contentMarkdown).trim() ? String(b.contentMarkdown) : '';
-  if (!aMd && bMd) return true;
-  return false;
+  const aUpdated = validTimestamp(existing.updatedAt) ?? 0;
+  const bUpdated = validTimestamp(incoming.updatedAt) ?? 0;
+  return bUpdated > aUpdated;
 }
 
 export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
+  const hasExisting = !!existing && typeof existing === 'object';
+  const a = hasExisting ? normalizeLegacyMessageRecord(existing) : {};
+  const b = normalizeLegacyMessageRecord(incoming);
 
-  const preferIncoming = shouldPreferIncomingMessage(a, b);
-  const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
-
-  const next: UnknownRecord = { ...base };
-  next.role = pickStringPreferExisting(base.role, 'assistant') || 'assistant';
-  next.contentText = String(next.contentText || '');
-  next.contentMarkdown = String(next.contentMarkdown || '');
+  const preferIncoming = !hasExisting || shouldPreferIncomingMessage(a, b);
+  const next = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+  next.role = pickStringPreferExisting(next.role, 'assistant') || 'assistant';
 
   const aUpdated = validTimestamp(a.updatedAt);
   const bUpdated = validTimestamp(b.updatedAt);

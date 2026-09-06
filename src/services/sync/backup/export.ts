@@ -47,8 +47,8 @@ function stripLocalConversation(conversation: AnyRecord) {
 
 function stripLocalMessage(message: AnyRecord) {
   const m = message && typeof message === 'object' ? { ...message } : {};
-  delete (m as any).id;
-  delete (m as any).conversationId;
+  delete m.id;
+  delete m.conversationId;
   return m;
 }
 

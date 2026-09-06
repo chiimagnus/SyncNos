@@ -147,6 +147,12 @@ async function openV10Db() {
   return reqToPromise(req);
 }
 
+async function openV11Db() {
+  const db10 = await openV10Db();
+  db10.close();
+  return reqToPromise(indexedDB.open('webclipper', 11));
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -309,7 +315,7 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const fullMessageStoreScans = objectStoreCursorSpy.mock.contexts.filter(
       (context) => (context as IDBObjectStore | undefined)?.name === 'messages',
     );
-    expect(fullMessageStoreScans).toHaveLength(0);
+    expect(fullMessageStoreScans).toHaveLength(1);
     objectStoreCursorSpy.mockRestore();
 
     const t2 = db2.transaction(['conversations', 'messages'], 'readonly');
@@ -639,6 +645,56 @@ describe('storage schema migration (v11 conversation hygiene)', () => {
   });
 });
 
+describe('storage schema migration (v12 canonical message content)', () => {
+  it('keeps one Markdown body per message and removes legacy contentText', async () => {
+    const db11 = await openV11Db();
+    const tx11 = db11.transaction(['messages'], 'readwrite');
+    const messages = tx11.objectStore('messages');
+    await reqToPromise(
+      messages.add({
+        conversationId: 1,
+        messageKey: 'both',
+        role: 'assistant',
+        contentText: 'duplicate plain text',
+        contentMarkdown: '**canonical markdown**',
+        sequence: 1,
+      }),
+    );
+    await reqToPromise(
+      messages.add({
+        conversationId: 1,
+        messageKey: 'text-only',
+        role: 'assistant',
+        contentText: 'legacy text only',
+        contentMarkdown: '',
+        sequence: 2,
+      }),
+    );
+    await reqToPromise(
+      messages.add({
+        conversationId: 1,
+        messageKey: 'markdown-only',
+        role: 'assistant',
+        contentMarkdown: 'already canonical',
+        sequence: 3,
+      }),
+    );
+    await txDone(tx11);
+    db11.close();
+
+    const currentDb = await openDb();
+    expect(currentDb.version).toBe(DB_VERSION);
+    const currentTx = currentDb.transaction(['messages'], 'readonly');
+    const rows = await reqToPromise<any[]>(currentTx.objectStore('messages').getAll());
+    await txDone(currentTx);
+
+    expect(rows.find((row) => row.messageKey === 'both')?.contentMarkdown).toBe('**canonical markdown**');
+    expect(rows.find((row) => row.messageKey === 'text-only')?.contentMarkdown).toBe('legacy text only');
+    expect(rows.find((row) => row.messageKey === 'markdown-only')?.contentMarkdown).toBe('already canonical');
+    expect(rows.every((row) => !Object.prototype.hasOwnProperty.call(row, 'contentText'))).toBe(true);
+  });
+});
+
 describe('storage schema migration (v10 data revisions)', () => {
   it('upgrades v8 to the current schema, repairs persisted list keys, and preserves existing business data', async () => {
     const db8 = await openV8Db();
@@ -696,7 +752,10 @@ describe('storage schema migration (v10 data revisions)', () => {
       listSourceKey: 'chatgpt',
       listSiteKey: 'domain:chatgpt.com',
     });
-    expect(await reqToPromise(tx10.objectStore('messages').count())).toBe(1);
+    const migratedMessages = await reqToPromise<any[]>(tx10.objectStore('messages').getAll());
+    expect(migratedMessages).toHaveLength(1);
+    expect(migratedMessages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'keep' });
+    expect(migratedMessages[0]).not.toHaveProperty('contentText');
     expect(await reqToPromise(tx10.objectStore('sync_mappings').count())).toBe(1);
     expect(tx10.objectStore('sync_mappings').index('by_source_conversationKey').unique).toBe(true);
     expect(await reqToPromise(tx10.objectStore('image_cache').count())).toBe(1);

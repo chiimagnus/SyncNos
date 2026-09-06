@@ -105,7 +105,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
     const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute('id') || '') : '';
     if (id) return id;
-    return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
+    return env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence });
   }
 
   function collectMessages({ allowEditing }: any = {}): any {
@@ -143,7 +143,6 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
-        contentText: contentText || '',
         contentMarkdown: nextMarkdown,
         sequence: seq,
         updatedAt: Date.now(),

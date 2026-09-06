@@ -70,7 +70,7 @@ function formatArticleMarkdown(
   const contentHeadingLevel = clampHeadingLevel(options.articleContentHeadingLevel, 2);
   lines.push(`${headingPrefix(contentHeadingLevel)} Content`);
   lines.push('');
-  lines.push(String((m0 && ((m0 as any).contentMarkdown || (m0 as any).contentText)) || ''));
+  lines.push(String((m0 && (m0 as any).contentMarkdown) || ''));
   lines.push('');
   return lines.join('\n');
 }
@@ -98,7 +98,7 @@ function formatChatMarkdown(
     const authorName = role === 'user' && isNonEmptyString((m as any).authorName) ? String((m as any).authorName) : '';
     lines.push(`${messageHeading} ${role === 'user' ? authorName || 'You' : role}`);
     lines.push('');
-    lines.push(String((m as any).contentMarkdown || (m as any).contentText || ''));
+    lines.push(String((m as any).contentMarkdown || ''));
     lines.push('');
   }
   return lines.join('\n');

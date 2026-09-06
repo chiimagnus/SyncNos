@@ -112,7 +112,7 @@ describe('backup-utils', () => {
     const res2 = backupUtils.validateConversationBundle({
       schemaVersion: 1,
       conversation: { source: 'chatgpt', conversationKey: 'c1' },
-      messages: [{ messageKey: 'm1', role: 'user', contentText: 'hi' }],
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }],
       syncMapping: { source: 'chatgpt', conversationKey: 'c2' },
     });
     expect(res2.ok).toBe(false);
@@ -143,13 +143,12 @@ describe('backup-utils', () => {
     expect(merged.lastCapturedAt).toBe(9);
   });
 
-  it('mergeMessageRecord prefers newer updatedAt and fills missing markdown', () => {
+  it('mergeMessageRecord keeps newer explicit emptiness and lets only newer backups replace it', () => {
     const existing = {
       id: 1,
       conversationId: 9,
       messageKey: 'm1',
       contentMarkdown: '',
-      contentText: 'hi',
       updatedAt: 10,
       sequence: 1,
       role: 'user',
@@ -157,29 +156,45 @@ describe('backup-utils', () => {
     const incoming = {
       conversationId: 9,
       messageKey: 'm1',
-      contentMarkdown: '## md',
-      contentText: 'hi',
+      contentMarkdown: '## hi',
       updatedAt: 9,
       sequence: 1,
       role: 'user',
     };
     const merged1 = backupUtils.mergeMessageRecord(existing, incoming);
-    expect(merged1.contentMarkdown).toBe('## md');
+    expect(merged1.contentMarkdown).toBe('');
     expect(merged1.updatedAt).toBe(10);
 
     const newer = {
       conversationId: 9,
       messageKey: 'm1',
       contentMarkdown: 'new',
-      contentText: 'hi!',
       updatedAt: 12,
       sequence: 2,
       role: 'user',
     };
     const merged2 = backupUtils.mergeMessageRecord(existing, newer);
     expect(merged2.contentMarkdown).toBe('new');
-    expect(merged2.contentText).toBe('hi!');
+    expect(merged2).not.toHaveProperty('contentText');
     expect(merged2.updatedAt).toBe(12);
     expect(merged2.sequence).toBe(2);
+  });
+
+  it('mergeMessageRecord keeps a newer explicit clear authoritative', () => {
+    const merged = backupUtils.mergeMessageRecord(
+      { conversationId: 9, messageKey: 'm1', contentMarkdown: '**old**', updatedAt: 10 },
+      { conversationId: 9, messageKey: 'm1', contentMarkdown: '', updatedAt: 11 },
+    );
+    expect(merged.contentMarkdown).toBe('');
+    expect(merged.updatedAt).toBe(11);
+  });
+
+  it('mergeMessageRecord does not let older rich Markdown replace newer canonical content', () => {
+    const merged = backupUtils.mergeMessageRecord(
+      { conversationId: 9, messageKey: 'm1', contentMarkdown: 'hi', updatedAt: 20 },
+      { conversationId: 9, messageKey: 'm1', contentMarkdown: '## hi', updatedAt: 10 },
+    );
+    expect(merged.contentMarkdown).toBe('hi');
+    expect(merged.updatedAt).toBe(20);
   });
 });

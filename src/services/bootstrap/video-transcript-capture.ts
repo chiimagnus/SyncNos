@@ -75,12 +75,6 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     const cues = Array.isArray(extracted?.cues) ? extracted.cues : [];
     const transcriptMarkdown = formatTranscriptMarkdown(cues, extracted?.hasTimestamps === true);
     const subtitleStatus: 'ok' | 'empty' = transcriptMarkdown ? 'ok' : 'empty';
-    const transcriptText = normalizeText(
-      cues
-        .map((c: any) => normalizeText(c?.text || ''))
-        .filter(Boolean)
-        .join('\n'),
-    );
 
     if (subtitleStatus === 'empty') {
       return {
@@ -120,7 +114,6 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       {
         messageKey: 'video_transcript',
         role: 'transcript',
-        contentText: transcriptText,
         contentMarkdown: transcriptMarkdown,
         sequence: 1,
         updatedAt: capturedAt,

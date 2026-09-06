@@ -5,9 +5,10 @@ import {
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
 import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
+import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 11;
+export const DB_VERSION = 12;
 
 type MigrationContext = {
   tx: IDBTransaction;
@@ -103,6 +104,22 @@ function normalizeConversationRecordsForV11({ tx }: MigrationContext): void {
     delete next.__canonicalUrl;
     delete next.__canonicalKey;
     cursor.update(next as any);
+    cursor.continue();
+  };
+}
+
+function normalizeMessageRecordsForV12({ tx }: MigrationContext): void {
+  const messagesStore = tx.objectStore('messages');
+  const req = messagesStore.openCursor();
+  req.onsuccess = () => {
+    const cursor = req.result;
+    if (!cursor) return;
+    const value = (cursor.value || {}) as Record<string, unknown>;
+    const next = normalizeLegacyMessageRecord(value);
+    const hasLegacyText = Object.prototype.hasOwnProperty.call(value, 'contentText');
+    if (hasLegacyText || String(value.contentMarkdown ?? '') !== String(next.contentMarkdown ?? '')) {
+      cursor.update(next as any);
+    }
     cursor.continue();
   };
 }
@@ -694,9 +711,12 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureGithubCleanupOutboxStore(db, tx);
   ensureDataRevisionStores(db);
 
-  if (!tx || oldVersion === 0 || oldVersion >= 11) return;
+  if (!tx || oldVersion === 0 || oldVersion >= DB_VERSION) return;
 
-  const finish = () => normalizeConversationRecordsForV11({ tx });
+  const finish = () => {
+    if (oldVersion < 11) normalizeConversationRecordsForV11({ tx });
+    normalizeMessageRecordsForV12({ tx });
+  };
   const migrateArticles = () => {
     if (oldVersion >= 4) return finish();
     migrateLegacyArticleConversations({ tx }, finish);

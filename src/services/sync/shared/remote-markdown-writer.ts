@@ -93,7 +93,7 @@ function buildMessageChunk(message: any) {
   const seq = Number.isFinite(Number(m.sequence)) ? Number(m.sequence) : 0;
   const role = normalizeRole(m.role);
   const roleLabel = role === 'user' ? safeString(m.authorName) || DEFAULT_COMMENT_AUTHOR : role;
-  const body = safeString(m.contentMarkdown) || safeString(m.contentText) || '';
+  const body = safeString(m.contentMarkdown);
   const header = `## ${seq} ${roleLabel}`.trim();
   return `${header}\n\n${body}\n\n`;
 }
@@ -109,9 +109,7 @@ function toArticleBodyMessages(messages: unknown[]): any[] {
     if (!message || typeof message !== 'object') return false;
     const key = safeString((message as any).messageKey);
     if (key) return key === 'article_body';
-    const markdown = safeString((message as any).contentMarkdown);
-    const text = safeString((message as any).contentText);
-    return !!markdown || !!text;
+    return !!safeString((message as any).contentMarkdown);
   });
 }
 
@@ -119,7 +117,7 @@ function buildArticleBodyMarkdown(messages: any[]) {
   const list = toArticleBodyMessages(messages);
   const chunks = list
     .map((m) => {
-      const raw = safeString(m?.contentMarkdown) || safeString(m?.contentText);
+      const raw = safeString(m?.contentMarkdown);
       return normalizeStandaloneImageCaptionLines(raw);
     })
     .filter((x) => !!x);

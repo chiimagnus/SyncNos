@@ -7,7 +7,7 @@ export type CaptureMeta = {
   metrics?: Record<string, number | boolean>;
 };
 
-export type CaptureMessageMergePolicy = 'replace' | 'preserve-existing-markdown' | 'preserve-existing-content';
+export type CaptureMessageMergePolicy = 'preserve-existing-markdown' | 'preserve-existing-content';
 
 export type CaptureMessageTransientFields = {
   captureSequencePolicy?: 'preserve-existing-tail' | 'reconcile-existing-order';
@@ -83,8 +83,8 @@ function normalizeMeta(raw: unknown): CaptureMeta | null {
   };
 }
 
-function normalizedMergePolicy(value: unknown): CaptureMessageMergePolicy {
-  return value === 'preserve-existing-markdown' || value === 'preserve-existing-content' ? value : 'replace';
+function normalizedMergePolicy(value: unknown): CaptureMessageMergePolicy | null {
+  return value === 'preserve-existing-markdown' || value === 'preserve-existing-content' ? value : null;
 }
 
 function isStablePartialKey(value: unknown): value is string {
@@ -106,9 +106,6 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
   const isVirtual = VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS.has(normalizedCollectorId);
   const meta = normalizeMeta(snapshot?.captureMeta);
   const rawMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
-  const hasProtectivePolicy = rawMessages.some(
-    (message: any) => normalizedMergePolicy(message?.captureMergePolicy) !== 'replace',
-  );
 
   if (isVirtual) {
     const source = stableIdentityString(snapshot?.conversation?.source).toLowerCase();
@@ -122,7 +119,7 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     }
   }
 
-  if (!meta && !isVirtual && !hasProtectivePolicy) {
+  if (!meta && !isVirtual) {
     return {
       ok: true,
       snapshot,
@@ -131,24 +128,17 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     };
   }
 
-  let effectiveMeta: CaptureMeta = meta || {
-    completeness: 'partial',
-    identityVerified: false,
-    reasons: ['protective_message_merge'],
-  };
+  let effectiveMeta = meta as CaptureMeta;
   const completeKeys: string[] = rawMessages.map((message: any) => stableIdentityString(message?.messageKey));
   const completeKeysAreSafe =
     rawMessages.length > 0 &&
     completeKeys.every((key) => isStablePartialKey(key)) &&
     new Set(completeKeys).size === completeKeys.length;
-  const unsafeComplete =
-    isVirtual &&
-    effectiveMeta.completeness === 'complete' &&
-    (!completeKeysAreSafe || (effectiveMeta.reasons || []).length > 0);
+  const unsafeComplete = isVirtual && effectiveMeta.completeness === 'complete' && !completeKeysAreSafe;
   if (unsafeComplete) {
     effectiveMeta = failureMeta(effectiveMeta, 'capture_integrity_complete_untrusted');
   }
-  const forcePartial = effectiveMeta.completeness === 'partial' || hasProtectivePolicy || unsafeComplete;
+  const forcePartial = effectiveMeta.completeness === 'partial' || unsafeComplete;
 
   if (!forcePartial) {
     return {
@@ -169,11 +159,12 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     const key = stableIdentityString(message?.messageKey);
     if (!isStablePartialKey(key)) continue;
     if (!byKey.has(key)) firstPositions.push(key);
+    const captureMergePolicy = normalizedMergePolicy(message?.captureMergePolicy);
     byKey.set(key, {
       ...message,
       messageKey: key,
       captureSequencePolicy,
-      captureMergePolicy: normalizedMergePolicy(message?.captureMergePolicy),
+      ...(captureMergePolicy ? { captureMergePolicy } : null),
     });
   }
 
@@ -186,14 +177,9 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     };
   }
 
-  const reasons = dedupeStrings([
-    ...(effectiveMeta.reasons || []),
-    ...(hasProtectivePolicy ? ['protective_message_merge'] : []),
-  ]);
   const normalizedMeta: CaptureMeta = {
     ...effectiveMeta,
     completeness: 'partial',
-    ...(reasons.length ? { reasons } : null),
   };
   const keys = messages.map((message: any) => message.messageKey);
   return {

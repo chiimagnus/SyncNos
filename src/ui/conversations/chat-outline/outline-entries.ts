@@ -1,5 +1,5 @@
 import type { ConversationMessage } from '@services/conversations/domain/models';
-import { resolveConversationMessageTextSource } from '@services/conversations/domain/message-text-source';
+import { markdownToSemanticText, stripHttpUrlsFromText } from '@services/shared/markdown-semantic-text';
 
 export type ChatOutlineEntry = {
   index: number;
@@ -15,32 +15,9 @@ function normalizeSingleLine(text: string): string {
     .trim();
 }
 
-function markdownToReadableText(markdown: string): string {
-  const raw = String(markdown || '');
-  if (!raw) return '';
-
-  const withoutFences = raw
-    .replace(/```+/g, ' ')
-    .replace(/~~~+/g, ' ')
-    .replace(/^#{1,6}\s+/gm, ' ')
-    .replace(/^\s*>\s?/gm, ' ')
-    .replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, ' ')
-    .replace(/!\[([^\]]*)\]\((?:[^)]+)\)/g, '$1')
-    .replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, '$1')
-    .replace(/`([^`]*)`/g, '$1')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/(?:^|\s)https?:\/\/\S+/gi, ' ')
-    .replace(/\|/g, ' ')
-    .replace(/[*_~]+/g, ' ');
-
-  return normalizeSingleLine(withoutFences);
-}
-
 export function extractMessagePlainText(message: ConversationMessage): string {
-  const source = resolveConversationMessageTextSource(message);
-  if (source.kind === 'text') return normalizeSingleLine(source.value);
-  if (source.kind === 'markdown') return markdownToReadableText(source.value);
-  return '';
+  const semanticText = markdownToSemanticText(message?.contentMarkdown, { includeImageAlt: true });
+  return normalizeSingleLine(stripHttpUrlsFromText(semanticText));
 }
 
 export function buildChatOutlineEntries(messages: ConversationMessage[]): ChatOutlineEntry[] {

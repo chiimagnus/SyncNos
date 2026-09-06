@@ -69,14 +69,14 @@ describe('gemini-collector', () => {
 
     const user = snap.messages.find((m: { role: string }) => m.role === 'user');
     expect(user).toBeTruthy();
-    expect(user.contentText).toContain('你好');
-    expect(user.contentText).not.toContain('你说');
-    expect(user.contentText).not.toContain('你已让系统停止这条回答');
+    expect(user.contentMarkdown).toContain('你好');
+    expect(user.contentMarkdown).not.toContain('你说');
+    expect(user.contentMarkdown).not.toContain('你已让系统停止这条回答');
 
     const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentText).toContain('世界');
-    expect(assistant.contentText).not.toContain('Gemini 说');
+    expect(assistant.contentMarkdown).toContain('世界');
+    expect(assistant.contentMarkdown).not.toContain('Gemini 说');
   });
 
   it('prefers conversation title from latest DOM marker', async () => {
@@ -211,7 +211,7 @@ describe('gemini-collector', () => {
     expect(snap).toBeTruthy();
     const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentText).toBe('plain answer');
+    expect(assistant.contentMarkdown).toBe('plain answer');
     expect(assistant.contentMarkdown).toBe('plain answer');
   });
 
@@ -302,8 +302,8 @@ describe('gemini-collector', () => {
     expect(snap).toBeTruthy();
     const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentText).toContain('供应链');
-    expect(assistant.contentText).not.toBe(title);
+    expect(assistant.contentMarkdown).toContain('供应链');
+    expect(assistant.contentMarkdown).not.toBe(title);
     expect(assistant.contentMarkdown).toContain(`# ${title}`);
     expect(assistant.contentMarkdown).toContain('## 第一章');
   });
@@ -364,7 +364,7 @@ describe('gemini-collector', () => {
     expect(clicked).toBe(1);
     const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentText).toContain('量产节奏');
+    expect(assistant.contentMarkdown).toContain('量产节奏');
     expect(assistant.contentMarkdown).toContain('manual capture 会主动点击 chip');
   });
 

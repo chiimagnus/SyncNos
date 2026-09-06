@@ -146,7 +146,7 @@ describe('kimi-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
     expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 });

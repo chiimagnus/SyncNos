@@ -2,6 +2,7 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
 import notionAiMarkdown from '@collectors/notionai/notionai-markdown.ts';
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
 export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefinition {
   const window = env.window;
@@ -751,12 +752,11 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
             : userStepId || fallbackUserId || firstBlockId || '';
       const messageKey = stableId
         ? `${role}_${stableId}`
-        : env.normalize.makeFallbackMessageKey({ role, contentText: contentText || '', sequence: i });
+        : env.normalize.makeFallbackMessageKey({ role, text: contentText || '', sequence: i });
       if (role === 'user' && stableId) lastUserStepId = stableId;
       messages.push({
         messageKey,
         role,
-        contentText: contentText || '',
         contentMarkdown: nextMarkdown,
         sequence: i,
         updatedAt: Date.now(),
@@ -768,8 +768,11 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     const threadId = findChatThreadIdFromHref(location.href);
     const pageId = findPageIdFromUrl();
     const firstUser = messages.find((m: any) => m.role === 'user');
-    const firstUserSig = firstUser
-      ? env.normalize.fnv1a32(firstUser.contentText)
+    const firstUserText = firstUser
+      ? env.normalize.normalizeText(markdownToSemanticText(firstUser.contentMarkdown, { includeImageAlt: true }))
+      : '';
+    const firstUserSig = firstUserText
+      ? env.normalize.fnv1a32(firstUserText)
       : env.normalize.fnv1a32(String(Date.now()));
     const firstUserStableSeed = String(firstUser?.messageKey || '').trim();
     const conversationKeySeed =

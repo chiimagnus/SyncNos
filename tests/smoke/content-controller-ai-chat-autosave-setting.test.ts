@@ -78,7 +78,7 @@ function installStorage(
 function makeSnapshot(key = 'c1') {
   return {
     conversation: { source: 'gemini', conversationKey: key, title: 'Chat' },
-    messages: [{ messageKey: 'm1', role: 'user', contentText: 'hello', sequence: 1 }],
+    messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 1 }],
   };
 }
 

@@ -62,10 +62,7 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
 
   const targets = snapshot.messages
     .map((m: any, idx: number) => ({ m, idx }))
-    .filter(
-      ({ m }: { m: any }) =>
-        m && m.role === 'assistant' && isDeepResearchPlaceholder(m.contentText || m.contentMarkdown),
-    );
+    .filter(({ m }: { m: any }) => m && m.role === 'assistant' && isDeepResearchPlaceholder(m.contentMarkdown));
 
   if (!targets.length) return snapshot;
 
@@ -75,7 +72,7 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
 
   const urls = targets
     .map(({ m }: { m: any }) => {
-      const raw = String(m.contentText || m.contentMarkdown || '');
+      const raw = String(m.contentMarkdown || '');
       const prefix = 'Deep Research (iframe):';
       const extracted = raw.startsWith(prefix) ? raw.slice(prefix.length).trim() : '';
       return normalizeUrl(extracted);
@@ -113,8 +110,6 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
     const best = normalized.slice().sort((a: any, b: any) => b.text.length - a.text.length)[0];
     if (!best) return snapshot;
     const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
-    const text = best.text;
-    targets[0].m.contentText = text;
     targets[0].m.contentMarkdown = markdown;
     return snapshot;
   }
@@ -133,8 +128,6 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
     const best = normalized.slice().sort((a: any, b: any) => b.text.length - a.text.length)[0];
     if (!best) return snapshot;
     const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
-    const text = best.text;
-    targets[0].m.contentText = text;
     targets[0].m.contentMarkdown = markdown;
     return snapshot;
   }
@@ -173,8 +166,6 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
   for (let i = 0; i < n; i += 1) {
     const best = dedupedItems[i];
     const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
-    const text = best.text;
-    sortedTargets[i].m.contentText = text;
     sortedTargets[i].m.contentMarkdown = markdown;
   }
 
