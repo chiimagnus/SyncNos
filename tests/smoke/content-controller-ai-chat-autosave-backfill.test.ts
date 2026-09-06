@@ -155,9 +155,9 @@ function createHarness(options: {
 function makeSnapshot(conversationKey: string, contents: string[]) {
   return {
     conversation: { source: 'gemini', conversationKey },
-    messages: contents.map((contentText, index) => ({
+    messages: contents.map((contentMarkdown, index) => ({
       role: index % 2 === 0 ? 'user' : 'assistant',
-      contentText,
+      contentMarkdown,
       sequence: index + 1,
     })),
   };
@@ -190,7 +190,10 @@ describe('content-controller ai chat autosave backfill', () => {
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['A', 'B']);
+    expect(
+      syncCalls[0].payload.messages.every((entry: any) => !Object.prototype.hasOwnProperty.call(entry, 'contentText')),
+    ).toBe(true);
     expect(syncCalls[0].payload.diff.added).toHaveLength(2);
     expect(harness.getIncrementalCallCount()).toBe(1);
   });
@@ -225,7 +228,7 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
     expect(syncCalls[0].payload.messages).toHaveLength(2);
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['A', 'B']);
   });
 
   it('writes append-only gap when overlap exists in tail', async () => {
@@ -236,8 +239,8 @@ describe('content-controller ai chat autosave backfill', () => {
         {
           conversationId: 55,
           messages: [
-            { role: 'user', contentText: 'A', sequence: 1, messageKey: 'm1' },
-            { role: 'assistant', contentText: 'B', sequence: 2, messageKey: 'm2' },
+            { role: 'user', contentMarkdown: 'A', sequence: 1, messageKey: 'm1' },
+            { role: 'assistant', contentMarkdown: 'B', sequence: 2, messageKey: 'm2' },
           ],
         },
       ],
@@ -249,7 +252,7 @@ describe('content-controller ai chat autosave backfill', () => {
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['C']);
     expect(harness.tipCalls.length).toBeGreaterThan(0);
   });
 
@@ -260,8 +263,8 @@ describe('content-controller ai chat autosave backfill', () => {
         {
           conversationId: 81,
           messages: [
-            { role: 'user', contentText: 'A', sequence: 1, messageKey: 'm1' },
-            { role: 'assistant', contentText: 'B', sequence: 2, messageKey: 'm2' },
+            { role: 'user', contentMarkdown: 'A', sequence: 1, messageKey: 'm1' },
+            { role: 'assistant', contentMarkdown: 'B', sequence: 2, messageKey: 'm2' },
           ],
         },
       ],
@@ -269,7 +272,7 @@ describe('content-controller ai chat autosave backfill', () => {
         changed: true,
         snapshot: {
           conversation: { source: 'gemini', conversationKey: 'c-backfill-plus-incremental' },
-          messages: [{ messageKey: 'inc_1', role: 'assistant', contentText: 'delta', sequence: 999 }],
+          messages: [{ messageKey: 'inc_1', role: 'assistant', contentMarkdown: 'delta', sequence: 999 }],
         },
         diff: { added: ['inc_1'], updated: [], removed: [] },
       }),
@@ -279,7 +282,7 @@ describe('content-controller ai chat autosave backfill', () => {
 
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C', 'delta']);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['C', 'delta']);
     expect(syncCalls[0].payload.diff.added).toContain('inc_1');
   });
 
@@ -291,15 +294,15 @@ describe('content-controller ai chat autosave backfill', () => {
         {
           conversationId: 61,
           messages: [
-            { role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' },
-            { role: 'assistant', contentText: 'Y', sequence: 2, messageKey: 'y1' },
+            { role: 'user', contentMarkdown: 'X', sequence: 1, messageKey: 'x1' },
+            { role: 'assistant', contentMarkdown: 'Y', sequence: 2, messageKey: 'y1' },
           ],
         },
         {
           conversationId: 61,
           messages: [
-            { role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' },
-            { role: 'assistant', contentText: 'Y', sequence: 2, messageKey: 'y1' },
+            { role: 'user', contentMarkdown: 'X', sequence: 1, messageKey: 'x1' },
+            { role: 'assistant', contentMarkdown: 'Y', sequence: 2, messageKey: 'y1' },
           ],
         },
       ],
@@ -324,15 +327,15 @@ describe('content-controller ai chat autosave backfill', () => {
         {
           conversationId: 71,
           messages: [
-            { role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' },
-            { role: 'assistant', contentText: 'Y', sequence: 2, messageKey: 'y1' },
+            { role: 'user', contentMarkdown: 'X', sequence: 1, messageKey: 'x1' },
+            { role: 'assistant', contentMarkdown: 'Y', sequence: 2, messageKey: 'y1' },
           ],
         },
         {
           conversationId: 71,
           messages: [
-            { role: 'user', contentText: 'A', sequence: 1, messageKey: 'm1' },
-            { role: 'assistant', contentText: 'B', sequence: 2, messageKey: 'm2' },
+            { role: 'user', contentMarkdown: 'A', sequence: 1, messageKey: 'm1' },
+            { role: 'assistant', contentMarkdown: 'B', sequence: 2, messageKey: 'm2' },
           ],
         },
       ],
@@ -349,7 +352,7 @@ describe('content-controller ai chat autosave backfill', () => {
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['C']);
   });
 
   it('throttles backfill retries until retry interval elapses', async () => {
@@ -363,7 +366,7 @@ describe('content-controller ai chat autosave backfill', () => {
       tailWindows: [
         {
           conversationId: 91,
-          messages: [{ role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' }],
+          messages: [{ role: 'user', contentMarkdown: 'X', sequence: 1, messageKey: 'x1' }],
         },
       ],
       incrementalImpl: () => ({ changed: false }),
@@ -396,7 +399,7 @@ describe('content-controller ai chat autosave backfill', () => {
       tailWindows: [
         {
           conversationId: 101,
-          messages: [{ role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' }],
+          messages: [{ role: 'user', contentMarkdown: 'X', sequence: 1, messageKey: 'x1' }],
         },
       ],
       incrementalImpl: () => ({ changed: false }),
@@ -419,7 +422,7 @@ describe('content-controller ai chat autosave backfill', () => {
       tailWindows: [
         {
           conversationId: 111,
-          messages: [{ role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' }],
+          messages: [{ role: 'user', contentMarkdown: 'X', sequence: 1, messageKey: 'x1' }],
         },
       ],
       incrementalImpl: () => ({ changed: false }),
@@ -458,7 +461,7 @@ describe('content-controller ai chat autosave backfill', () => {
 
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(2);
-    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B', 'C']);
+    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['A', 'B', 'C']);
   });
 
   it('retries backfill for the same page signature after append write failure', async () => {
@@ -486,7 +489,7 @@ describe('content-controller ai chat autosave backfill', () => {
 
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(2);
-    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['A', 'B']);
   });
 
   it('does not commit incremental baseline until durable save succeeds', async () => {
@@ -521,11 +524,11 @@ describe('content-controller ai chat autosave backfill', () => {
     const engine = createAutoSaveIncrementalEngine();
     const base = {
       conversation: { source: 'gemini', conversationKey: 'metadata-only', title: 'Old', url: 'https://a' },
-      messages: [{ messageKey: 'm1', role: 'user', contentText: 'A', sequence: 1 }],
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'A', sequence: 1 }],
     };
     const changed = {
       conversation: { source: 'gemini', conversationKey: 'metadata-only', title: 'New', url: 'https://b' },
-      messages: [{ messageKey: 'm1', role: 'user', contentText: 'A', sequence: 1 }],
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'A', sequence: 1 }],
     };
     const harness = createHarness({
       snapshots: [base, changed],
@@ -549,7 +552,7 @@ describe('content-controller ai chat autosave backfill', () => {
     const engine = createAutoSaveIncrementalEngine();
     const messages = Array.from({ length: 7 }, (_, index) => ({
       role: index % 2 === 0 ? 'user' : 'assistant',
-      contentText: `M${index + 1}`,
+      contentMarkdown: `M${index + 1}`,
       sequence: index + 1,
     }));
     const base = {
@@ -627,7 +630,7 @@ describe('content-controller ai chat autosave backfill', () => {
           snapshot: {
             ...snapshot,
             conversation: { ...snapshot.conversation },
-            messages: [{ messageKey: 'inc-1', role: 'user', contentText: 'A', sequence: 1 }],
+            messages: [{ messageKey: 'inc-1', role: 'user', contentMarkdown: 'A', sequence: 1 }],
           },
           diff: { added: ['inc-1'], updated: [], removed: [] },
           commit: () => {
@@ -808,7 +811,7 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(captureB).toHaveBeenCalledTimes(1);
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.messages.some((m: any) => m.contentText === 'B')).toBe(true);
+    expect(syncCalls[0].payload.messages.some((m: any) => m.contentMarkdown === 'B')).toBe(true);
   });
 
   it('gives a pending manual save priority over an autosave still awaiting capture', async () => {
@@ -839,7 +842,7 @@ describe('content-controller ai chat autosave backfill', () => {
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).not.toBe('append');
-    expect(syncCalls[0].payload.messages.some((m: any) => m.contentText === 'Manual')).toBe(true);
+    expect(syncCalls[0].payload.messages.some((m: any) => m.contentMarkdown === 'Manual')).toBe(true);
   });
 
   it.each([true, false])(

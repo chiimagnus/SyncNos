@@ -4,6 +4,7 @@ import {
 } from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import { normalizeStoredMessageRecord, resolveMessageMarkdown } from '@platform/idb/message-record';
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import {
   canonicalizeInpageDisplayModeStorageRecord,
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
@@ -156,17 +157,43 @@ function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownR
   return false;
 }
 
-export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
+function normalizedSemanticText(markdown: unknown): string {
+  return markdownToSemanticText(markdown).replace(/\s+/g, ' ').trim();
+}
 
-  const preferIncoming = shouldPreferIncomingMessage(a, b);
-  const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
-  const fallbackMarkdown = preferIncoming ? String(a.contentMarkdown || '') : String(b.contentMarkdown || '');
-  if (!String(base.contentMarkdown || '').trim() && fallbackMarkdown.trim()) {
-    base.contentMarkdown = fallbackMarkdown;
+function isPlainMarkdown(markdown: string): boolean {
+  return markdown.replace(/\s+/g, ' ').trim() === normalizedSemanticText(markdown);
+}
+
+function pickMergedMessageMarkdown(preferred: UnknownRecord, fallback: UnknownRecord): string {
+  const preferredMarkdown = resolveMessageMarkdown(preferred);
+  const fallbackMarkdown = resolveMessageMarkdown(fallback);
+  if (!preferredMarkdown.trim() || !fallbackMarkdown.trim() || preferredMarkdown === fallbackMarkdown) {
+    return preferredMarkdown;
   }
 
+  const preferredText = normalizedSemanticText(preferredMarkdown);
+  const fallbackText = normalizedSemanticText(fallbackMarkdown);
+  if (
+    preferredText &&
+    preferredText === fallbackText &&
+    isPlainMarkdown(preferredMarkdown) &&
+    !isPlainMarkdown(fallbackMarkdown)
+  ) {
+    return fallbackMarkdown;
+  }
+  return preferredMarkdown;
+}
+
+export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
+  const a = normalizeStoredMessageRecord(existing);
+  const b = normalizeStoredMessageRecord(incoming);
+
+  const preferIncoming = shouldPreferIncomingMessage(a, b);
+  const preferred = preferIncoming ? b : a;
+  const fallback = preferIncoming ? a : b;
+  const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+  base.contentMarkdown = pickMergedMessageMarkdown(preferred, fallback);
   const next = normalizeStoredMessageRecord(base);
   next.role = pickStringPreferExisting(base.role, 'assistant') || 'assistant';
 

@@ -752,7 +752,10 @@ describe('storage schema migration (v10 data revisions)', () => {
       listSourceKey: 'chatgpt',
       listSiteKey: 'domain:chatgpt.com',
     });
-    expect(await reqToPromise(tx10.objectStore('messages').count())).toBe(1);
+    const migratedMessages = await reqToPromise<any[]>(tx10.objectStore('messages').getAll());
+    expect(migratedMessages).toHaveLength(1);
+    expect(migratedMessages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'keep' });
+    expect(migratedMessages[0]).not.toHaveProperty('contentText');
     expect(await reqToPromise(tx10.objectStore('sync_mappings').count())).toBe(1);
     expect(tx10.objectStore('sync_mappings').index('by_source_conversationKey').unique).toBe(true);
     expect(await reqToPromise(tx10.objectStore('image_cache').count())).toBe(1);

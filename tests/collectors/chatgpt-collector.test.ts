@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createChatgptCollectorDef, turnKeyOf } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
@@ -9,6 +10,10 @@ import chatgptMarkdown from '../../src/collectors/chatgpt/chatgpt-markdown.ts';
 function setupChatgptDom(html: string, url: string) {
   const dom = new JSDOM(`<body><main>${html}</main></body>`, { url });
   return dom;
+}
+
+function semanticText(message: any): string {
+  return markdownToSemanticText(message?.contentMarkdown, { includeImageAlt: true }).trim();
 }
 
 async function capturePrepared(def: any, prepareOptions: any = {}) {
@@ -215,9 +220,9 @@ describe('chatgpt-collector', () => {
     expect(assistant.contentMarkdown).toContain('---');
     expect(assistant.contentMarkdown).not.toContain('复制');
 
-    expect(assistant.contentText).toContain('主标题');
-    expect(assistant.contentText).toContain('console.log(a);');
-    expect(assistant.contentText).not.toContain('复制');
+    expect(assistant.contentMarkdown).toContain('主标题');
+    expect(assistant.contentMarkdown).toContain('console.log(a);');
+    expect(assistant.contentMarkdown).not.toContain('复制');
   });
 
   it('extracts arbitrary rendered roots with the same semantic cleanup as assistant content', () => {
@@ -316,7 +321,7 @@ describe('chatgpt-collector', () => {
     const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'assistant']);
-    expect(snap.messages.map((m: any) => m.contentText)).toEqual(['Q', 'first', 'second']);
+    expect(snap.messages.map((m: any) => m.contentMarkdown)).toEqual(['Q', 'first', 'second']);
   });
 
   it('preserves hidden mermaid code blocks that are rendered as diagrams', async () => {
@@ -348,7 +353,7 @@ describe('chatgpt-collector', () => {
     expect(snap.messages[0].role).toBe('assistant');
     expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
     expect(snap.messages[0].contentMarkdown).toContain('graph TD');
-    expect(snap.messages[0].contentText).toContain('graph TD');
+    expect(snap.messages[0].contentMarkdown).toContain('graph TD');
   });
 
   it('captures multiple deep-research iframes with identical src as distinct reports', async () => {
@@ -419,9 +424,9 @@ describe('chatgpt-collector', () => {
     const assistant = snap.messages.filter((m: any) => m.role === 'assistant');
     expect(assistant.length).toBe(3);
     // When multiple deep-research iframes exist, we prefer stable placeholders and let the hydrator fill the body.
-    expect(String(assistant[0].contentText)).toContain('Deep Research (iframe)');
-    expect(String(assistant[1].contentText)).toContain('Deep Research (iframe)');
-    expect(String(assistant[2].contentText)).toContain('Deep Research (iframe)');
+    expect(String(assistant[0].contentMarkdown)).toContain('Deep Research (iframe)');
+    expect(String(assistant[1].contentMarkdown)).toContain('Deep Research (iframe)');
+    expect(String(assistant[2].contentMarkdown)).toContain('Deep Research (iframe)');
     expect(String(assistant[0].messageKey || '')).not.toBe(String(assistant[1].messageKey || ''));
   });
 
@@ -471,11 +476,11 @@ describe('chatgpt-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
-    expect(String(snap.messages[0].contentText)).toMatch(/^Deep Research \(iframe\):/);
-    expect(String(snap.messages[0].contentText)).toContain(
+    expect(String(snap.messages[0].contentMarkdown)).toMatch(/^Deep Research \(iframe\):/);
+    expect(String(snap.messages[0].contentMarkdown)).toContain(
       'connector_openai_deep_research.web-sandbox.oaiusercontent.com',
     );
-    expect(String(snap.messages[0].contentText)).not.toContain('ChatGPT说');
+    expect(String(snap.messages[0].contentMarkdown)).not.toContain('ChatGPT说');
   });
 
   it('falls back to plain text markdown when markdown helper is unavailable', async () => {
@@ -504,7 +509,7 @@ describe('chatgpt-collector', () => {
       expect(snap).toBeTruthy();
       expect(snap.messages.length).toBe(1);
       expect(snap.messages[0].role).toBe('assistant');
-      expect(snap.messages[0].contentText).toBe('plain answer');
+      expect(snap.messages[0].contentMarkdown).toBe('plain answer');
       expect(snap.messages[0].contentMarkdown).toBe('plain answer');
     } finally {
       chatgptMarkdown.extractAssistantText = extractAssistantText;
@@ -619,19 +624,19 @@ describe('chatgpt expanded COT manual capture', () => {
     expect(snap).toBeTruthy();
 
     const byKey = new Map(snap.messages.map((message: any) => [message.messageKey, message]));
-    expect(byKey.get('m_user_cot')?.contentText).toBe('Question');
-    expect(byKey.get('m_assistant_first')?.contentText).toBe('First assistant answer.');
+    expect(byKey.get('m_user_cot')?.contentMarkdown).toBe('Question');
+    expect(byKey.get('m_assistant_first')?.contentMarkdown).toBe('First assistant answer.');
 
     const owner = byKey.get('m_assistant_second') as any;
     expect(owner).toBeTruthy();
-    expect(owner.contentText).toBe(
+    expect(semanticText(owner)).toBe(
       [
         'Reasoning block one.',
         'Visible tool summary one',
         'Reasoning block two.',
         'Visible tool summary two',
         'Final assistant answer.',
-      ].join('\n\n'),
+      ].join('\n'),
     );
     expect(owner.contentMarkdown).toBe(
       [
@@ -642,10 +647,11 @@ describe('chatgpt expanded COT manual capture', () => {
         'Final assistant answer.',
       ].join('\n\n'),
     );
-    expect(owner.contentText).not.toContain('TOP_TOGGLE_CHROME');
-    expect(owner.contentText).not.toContain('Nested tool chrome should not be saved');
-    expect(owner.contentText).not.toContain('hidden tool detail');
+    expect(owner.contentMarkdown).not.toContain('TOP_TOGGLE_CHROME');
+    expect(owner.contentMarkdown).not.toContain('Nested tool chrome should not be saved');
+    expect(owner.contentMarkdown).not.toContain('hidden tool detail');
     expect(owner.contentMarkdown).not.toContain('const secret');
+    expect(owner).not.toHaveProperty('contentText');
   });
 
   it('uses the same following-assistant ownership rule for the .agent-turn fallback', async () => {
@@ -667,17 +673,16 @@ describe('chatgpt expanded COT manual capture', () => {
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
     const first = snap.messages.find((message: any) => message.messageKey === 'm_agent_first');
     const second = snap.messages.find((message: any) => message.messageKey === 'm_agent_second');
-    expect(first.contentText).toBe('Agent first.');
-    expect(second.contentText).toContain('Agent reasoning.');
-    expect(second.contentText).toContain('Agent tool summary');
-    expect(second.contentText).toMatch(/Agent reasoning\.[\s\S]*Agent second\./);
+    expect(first.contentMarkdown).toBe('Agent first.');
+    expect(second.contentMarkdown).toContain('Agent reasoning.');
+    expect(second.contentMarkdown).toContain('Agent tool summary');
+    expect(second.contentMarkdown).toMatch(/Agent reasoning\.[\s\S]*Agent second\./);
   });
 
   it('keeps collapsed top COT answer-only', async () => {
     const dom = modernCotDom(false);
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
     const owner = snap.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(owner.contentText).toBe('Final assistant answer.');
     expect(owner.contentMarkdown).toBe('Final assistant answer.');
   });
 
@@ -746,10 +751,10 @@ describe('chatgpt expanded COT manual capture', () => {
     );
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
     expect(snap.messages).toHaveLength(1);
-    expect(snap.messages[0].contentText).toBe('Safe final answer.');
-    expect(snap.messages[0].contentText).not.toContain('UNRELATED_ACCORDION_CONTENT');
-    expect(snap.messages[0].contentText).not.toContain('USER_COLLAPSE_CONTENT');
-    expect(snap.messages[0].contentText).not.toContain('INTERNAL_ACCORDION_CONTENT');
+    expect(snap.messages[0].contentMarkdown).toBe('Safe final answer.');
+    expect(snap.messages[0].contentMarkdown).not.toContain('UNRELATED_ACCORDION_CONTENT');
+    expect(snap.messages[0].contentMarkdown).not.toContain('USER_COLLAPSE_CONTENT');
+    expect(snap.messages[0].contentMarkdown).not.toContain('INTERNAL_ACCORDION_CONTENT');
   });
 
   it('fails safe for markerless transition bodies instead of treating generic transition UI as COT', async () => {
@@ -766,9 +771,8 @@ describe('chatgpt expanded COT manual capture', () => {
       'https://chatgpt.com/c/conv_fallback_cot',
     );
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap.messages[0].contentText).toBe('Fallback final answer.');
     expect(snap.messages[0].contentMarkdown).toBe('Fallback final answer.');
-    expect(snap.messages[0].contentText).not.toContain('MARKERLESS_TRANSITION_CONTENT');
+    expect(snap.messages[0].contentMarkdown).not.toContain('MARKERLESS_TRANSITION_CONTENT');
   });
 
   it('updates COT fingerprint and final markdown when only a visible link target changes', async () => {
@@ -783,7 +787,7 @@ describe('chatgpt expanded COT manual capture', () => {
       sleep: async () => {},
     });
     const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(preparedOwner.payload.contentText).toContain('Reasoning same source.');
+    expect(semanticText(preparedOwner.payload)).toContain('Reasoning same source.');
     expect(preparedOwner.payload.contentMarkdown).toContain('[same source](https://example.com/source-a)');
 
     const link = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown a') as HTMLAnchorElement;
@@ -793,7 +797,7 @@ describe('chatgpt expanded COT manual capture', () => {
 
     const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
     const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(owner.contentText).toContain('Reasoning same source.');
+    expect(semanticText(owner)).toContain('Reasoning same source.');
     expect(owner.contentMarkdown).toContain('[same source](https://example.com/source-b)');
     expect(owner.contentMarkdown).not.toContain('https://example.com/source-a');
     expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
@@ -816,7 +820,7 @@ describe('chatgpt expanded COT manual capture', () => {
       'https://chatgpt.com/c/conv_cot_image_only',
     );
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap.messages[0].contentText).toBe('Final image answer.');
+    expect(semanticText(snap.messages[0])).toBe('Final image answer.');
     expect(snap.messages[0].contentMarkdown).toBe(`![](${imageUrl})\n\nFinal image answer.`);
   });
 
@@ -842,7 +846,7 @@ describe('chatgpt expanded COT manual capture', () => {
       'https://chatgpt.com/c/conv_cot_rich_content',
     );
     const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap.messages[0].contentText).toContain('SVG_ONLY_FORMULA');
+    expect(semanticText(snap.messages[0])).toContain('SVG_ONLY_FORMULA');
     expect(snap.messages[0].contentMarkdown).toContain('SVG_ONLY_FORMULA');
     expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
     expect(snap.messages[0].contentMarkdown).toContain('A[Start] --> B[Done]');
@@ -877,7 +881,6 @@ describe('chatgpt expanded COT manual capture', () => {
     expect(descriptorAfter.fingerprint).toBe(descriptorBefore.fingerprint);
 
     const snap = (await capturePrepared(def)) as any;
-    expect(snap.messages[0].contentText).toBe(`Deep Research (iframe): ${reportUrl}`);
     expect(snap.messages[0].contentMarkdown).toBe(`Deep Research (iframe): ${reportUrl}`);
   });
 
@@ -899,7 +902,7 @@ describe('chatgpt expanded COT manual capture', () => {
     };
     expect(containsElement(prepared)).toBe(false);
     const ownerRecord = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(ownerRecord.payload.contentText).toContain('Reasoning block one.');
+    expect(semanticText(ownerRecord.payload)).toContain('Reasoning block one.');
   });
 
   it('updates only the owner record when COT becomes expanded between prepare and final capture', async () => {
@@ -913,7 +916,7 @@ describe('chatgpt expanded COT manual capture', () => {
     });
     expect(prepared.completeness).toBe('complete');
     const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(preparedOwner.payload.contentText).toBe('Final assistant answer.');
+    expect(preparedOwner.payload.contentMarkdown).toBe('Final assistant answer.');
     const extractionCountAfterPrepare = adapter.getExtractionCount();
 
     const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
@@ -925,8 +928,8 @@ describe('chatgpt expanded COT manual capture', () => {
     const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
     expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare + 1);
     const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(owner.contentText).toContain('Reasoning block one.');
-    expect(owner.contentText).toMatch(/Visible tool summary two[\s\S]*Final assistant answer\./);
+    expect(semanticText(owner)).toContain('Reasoning block one.');
+    expect(owner.contentMarkdown).toMatch(/Visible tool summary two[\s\S]*Final assistant answer\./);
     expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
     expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
   });
@@ -942,7 +945,7 @@ describe('chatgpt expanded COT manual capture', () => {
     });
     expect(prepared.completeness).toBe('complete');
     const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(preparedOwner.payload.contentText).toContain('Reasoning block one.');
+    expect(semanticText(preparedOwner.payload)).toContain('Reasoning block one.');
     const extractionCountAfterPrepare = adapter.getExtractionCount();
 
     const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
@@ -954,7 +957,6 @@ describe('chatgpt expanded COT manual capture', () => {
     expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare + 1);
     const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
     expect(owner.messageKey).toBe(preparedOwner.key);
-    expect(owner.contentText).toBe('Final assistant answer.');
     expect(owner.contentMarkdown).toBe('Final assistant answer.');
     expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
     expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
@@ -984,8 +986,8 @@ describe('chatgpt expanded COT manual capture', () => {
     expect(snapshot.captureMeta).toMatchObject({ completeness: 'complete' });
     expect(snapshot.captureMeta.reasons).not.toContain('final_live_changed');
     const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(owner.contentText).toContain('Reasoning block one.');
-    expect(owner.contentText).not.toContain('mutated hidden detail');
+    expect(semanticText(owner)).toContain('Reasoning block one.');
+    expect(owner.contentMarkdown).not.toContain('mutated hidden detail');
   });
 
   it('never clicks or dispatches events on the live COT toggle', async () => {
@@ -1111,7 +1113,7 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
 
     expect(waits).toBe(1);
     expect(prepared.metrics).toMatchObject({ passes: 1, reachedTop: true, reachedBottom: true });
-    expect(prepared.records.map((record: any) => record.payload.contentText)).toEqual(['question', 'answer']);
+    expect(prepared.records.map((record: any) => record.payload.contentMarkdown)).toEqual(['question', 'answer']);
   });
 
   it('treats a top boundary loader as pending when structural turn ordinals are unavailable', () => {
@@ -1180,7 +1182,7 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     answer.textContent = 'final answer';
     const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
     expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(3);
-    expect(snapshot.messages.map((message: any) => message.contentText)).toEqual(['question', 'final answer']);
+    expect(snapshot.messages.map((message: any) => message.contentMarkdown)).toEqual(['question', 'final answer']);
     expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
     expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
   });
@@ -1217,7 +1219,7 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     expect(postMessage).not.toHaveBeenCalled();
     expect(prepared.records).toHaveLength(1);
     expect(prepared.records[0].payload).toMatchObject({
-      contentText:
+      contentMarkdown:
         'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-a',
     });
     expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(1);
@@ -1355,7 +1357,7 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     expect(snap.messages.every((m: any, i: number) => m.sequence === i)).toBe(true);
     expect(snap.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
     const injectedPositions = snap.messages
-      .map((message: any, index: number) => (String(message.contentText || '').startsWith('注入-') ? index : -1))
+      .map((message: any, index: number) => (String(message.contentMarkdown || '').startsWith('注入-') ? index : -1))
       .filter((index: number) => index >= 0);
     expect(injectedPositions).toEqual([3, 4, 5]);
   });
@@ -1554,8 +1556,8 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     expect(firstPrepared).not.toBe(secondPrepared);
     expect(JSON.parse(JSON.stringify(firstPrepared))).toEqual(firstPrepared);
     expect(JSON.parse(JSON.stringify(secondPrepared))).toEqual(secondPrepared);
-    firstPrepared.records[0].payload.contentText = 'mutated-first-only';
-    expect(secondPrepared.records[0].payload.contentText).not.toBe('mutated-first-only');
+    firstPrepared.records[0].payload.contentMarkdown = 'mutated-first-only';
+    expect(secondPrepared.records[0].payload.contentMarkdown).not.toBe('mutated-first-only');
   });
 
   it('rejects a prepared object after same-path temporary-chat replacement', async () => {

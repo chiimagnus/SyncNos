@@ -77,7 +77,9 @@ Each message contains only:
 - `key: string` — a non-empty persisted `messageKey`;
 - `role: string` — an empty or malformed stored role falls back to `assistant`;
 - `author: string | null`;
-- `content: { format: "markdown" | "text", value: string } | null`.
+- `content: { format: "markdown", value: string } | null` for exports produced by current SyncNos versions.
+
+SyncNos now keeps one canonical saved message body and current v1 exports therefore emit only `format: "markdown"`. Historical v1 archives produced before this canonicalization may contain `{ format: "text", value: string }`; consumers that support older archives should continue accepting that legacy representation, but current SyncNos does not produce it.
 
 Local message IDs, `conversationId`, `sequence`, and `updatedAt` are not exported.
 
@@ -96,7 +98,7 @@ An article adds:
 }
 ```
 
-SyncNos selects the message whose `messageKey` is exactly `article_body`. Only when that semantic key is absent does it fall back to the first canonical detail message. Within that message, non-empty Markdown is exported as `{ "format": "markdown", "value": ... }`; otherwise non-empty plain text is exported as `{ "format": "text", "value": ... }`. If `article_body` exists with neither representation, that empty content remains authoritative and is exported as `null` rather than replaced by another message.
+SyncNos selects the message whose `messageKey` is exactly `article_body`. Only when that semantic key is absent does it fall back to the first canonical detail message. Non-empty canonical Markdown is exported as `{ "format": "markdown", "value": ... }`. If the selected message has no canonical Markdown body, that empty content remains authoritative and is exported as `null` rather than replaced by another representation or another message. Historical v1 archives may still contain the legacy `format: "text"` representation described above.
 
 `publishedAt` preserves the captured source string. v1 does not reinterpret it as a new timestamp type.
 

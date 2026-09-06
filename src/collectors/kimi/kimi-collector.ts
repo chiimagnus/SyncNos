@@ -128,7 +128,6 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
       out.push({
         messageKey: env.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
         role,
-        contentText,
         contentMarkdown,
         sequence: seq,
         updatedAt: Date.now(),

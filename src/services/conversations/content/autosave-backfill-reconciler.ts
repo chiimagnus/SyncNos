@@ -36,14 +36,11 @@ function comparableMatches(a: BackfillComparable | undefined, b: BackfillCompara
   if (!a || !b) return false;
   if (a.role === b.role && a.stableKey && b.stableKey && a.stableKey === b.stableKey) {
     if (a.weakIdentityHash && a.weakIdentityHash === b.weakIdentityHash) return true;
-    const decision = classifyPrefixOrFillingUpdate(
-      { text: a.text || '', markdown: a.markdown || '' },
-      { text: b.text || '', markdown: b.markdown || '' },
-    );
+    const decision = classifyPrefixOrFillingUpdate({ markdown: a.markdown || '' }, { markdown: b.markdown || '' });
     if (decision.acceptable) return true;
     const reverseDecision = classifyPrefixOrFillingUpdate(
-      { text: b.text || '', markdown: b.markdown || '' },
-      { text: a.text || '', markdown: a.markdown || '' },
+      { markdown: b.markdown || '' },
+      { markdown: a.markdown || '' },
     );
     if (reverseDecision.acceptable) return true;
     // Same key but incompatible content: treat as unstable key reuse (virtualized/recycled keys).
@@ -53,16 +50,10 @@ function comparableMatches(a: BackfillComparable | undefined, b: BackfillCompara
   if (a.weakIdentityHash && a.weakIdentityHash === b.weakIdentityHash) return true;
   if (a.role !== b.role) return false;
 
-  const decision = classifyPrefixOrFillingUpdate(
-    { text: a.text || '', markdown: a.markdown || '' },
-    { text: b.text || '', markdown: b.markdown || '' },
-  );
+  const decision = classifyPrefixOrFillingUpdate({ markdown: a.markdown || '' }, { markdown: b.markdown || '' });
   if (decision.acceptable) return true;
 
-  const reverseDecision = classifyPrefixOrFillingUpdate(
-    { text: b.text || '', markdown: b.markdown || '' },
-    { text: a.text || '', markdown: a.markdown || '' },
-  );
+  const reverseDecision = classifyPrefixOrFillingUpdate({ markdown: b.markdown || '' }, { markdown: a.markdown || '' });
   return reverseDecision.acceptable;
 }
 

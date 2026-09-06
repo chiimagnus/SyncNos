@@ -349,7 +349,6 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
-        contentText: contentText || '',
         contentMarkdown: nextMarkdown,
         sequence: seq,
         updatedAt: Date.now(),

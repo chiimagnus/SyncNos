@@ -1,5 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
 async function loadNormalize() {
   const normalizeModule = await import('@services/shared/normalize.ts');
@@ -31,6 +32,10 @@ async function loadPoeCollector() {
   const collector = poeModule.createPoeCollectorDef(env).collector as any;
 
   return collector;
+}
+
+function semanticText(message: any): string {
+  return markdownToSemanticText(message?.contentMarkdown, { includeImageAlt: true }).trim();
 }
 
 describe('poe-collector', () => {
@@ -131,9 +136,9 @@ describe('poe-collector', () => {
     expect(snap.messages.length).toBe(1);
 
     const msg = snap.messages[0];
-    expect(msg.contentText).toContain('Bold and italic with link.');
-    expect(msg.contentText).not.toContain('Thinking');
-    expect(msg.contentText).not.toContain('this should be ignored');
+    expect(semanticText(msg)).toContain('Bold and italic with link.');
+    expect(msg.contentMarkdown).not.toContain('Thinking');
+    expect(msg.contentMarkdown).not.toContain('this should be ignored');
 
     const md = msg.contentMarkdown || '';
     expect(md).toContain('**Bold**');
@@ -146,6 +151,7 @@ describe('poe-collector', () => {
     expect(md).toContain('```');
     expect(md).not.toContain('Thinking...');
     expect(md).not.toContain('this should be ignored');
+    expect(msg).not.toHaveProperty('contentText');
   });
 
   it('captures latest poe markdown structure and keeps normal blockquote content', async () => {
@@ -288,15 +294,15 @@ describe('poe-collector', () => {
 
     expect(snap.messages[0].role).toBe('user');
     expect(snap.messages[0].messageKey).toBe('message-1');
-    expect(snap.messages[0].contentText).toContain('你好');
-    expect(snap.messages[0].contentText).not.toContain('更多操作');
-    expect(snap.messages[0].contentText).not.toContain('23:28');
+    expect(snap.messages[0].contentMarkdown).toContain('你好');
+    expect(snap.messages[0].contentMarkdown).not.toContain('更多操作');
+    expect(snap.messages[0].contentMarkdown).not.toContain('23:28');
 
     expect(snap.messages[1].role).toBe('assistant');
     expect(snap.messages[1].messageKey).toBe('message-2');
-    expect(snap.messages[1].contentText).toContain('你好！有什么我可以帮助你的吗？');
-    expect(snap.messages[1].contentText).not.toContain('分享');
-    expect(snap.messages[1].contentText).not.toContain('重试');
+    expect(snap.messages[1].contentMarkdown).toContain('你好！有什么我可以帮助你的吗？');
+    expect(snap.messages[1].contentMarkdown).not.toContain('分享');
+    expect(snap.messages[1].contentMarkdown).not.toContain('重试');
   });
 
   it('captures messages across date tupleGroupContainer buckets', async () => {
@@ -363,7 +369,12 @@ describe('poe-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.messageKey)).toEqual(['message-1', 'message-2', 'message-3', 'message-4']);
     expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
-    expect(snap.messages.map((m: any) => m.contentText)).toEqual(['y-user', 'y-assistant', 't-user', 't-assistant']);
+    expect(snap.messages.map((m: any) => m.contentMarkdown)).toEqual([
+      'y-user',
+      'y-assistant',
+      't-user',
+      't-assistant',
+    ]);
   });
 
   it('auto-loads older poe history on manual prepare before capture', async () => {
@@ -538,7 +549,7 @@ describe('poe-collector', () => {
     const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].contentText).toContain('@GLM-5 这是什么？');
+    expect(semanticText(snap.messages[0])).toContain('@GLM-5 这是什么？');
     expect(snap.messages[0].contentMarkdown || '').toContain(
       '![](https://pfst.cf2.poecdn.net/base/image/example-image.png?w=1280&h=800)',
     );

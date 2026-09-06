@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
 
-function msg(contentText: string, role = 'assistant', extra?: Record<string, unknown>) {
+function msg(contentMarkdown: string, role = 'assistant', extra?: Record<string, unknown>) {
   return {
     role,
-    contentText,
+    contentMarkdown,
     ...(extra || {}),
   };
 }
@@ -21,7 +21,7 @@ describe('autosave backfill reconciler', () => {
 
     expect(result.ok).toBe(true);
     expect(result.pageSignature).toBeTruthy();
-    expect(result.addedMessages.map((entry) => entry.contentText)).toEqual(['C', 'D']);
+    expect(result.addedMessages.map((entry) => entry.contentMarkdown)).toEqual(['C', 'D']);
     expect(result.diff.updated).toEqual([]);
     expect(result.diff.removed).toEqual([]);
     expect(result.diff.added).toEqual(result.addedMessages.map((entry) => String(entry.messageKey || '')));
@@ -39,7 +39,7 @@ describe('autosave backfill reconciler', () => {
 
     expect(result.ok).toBe(true);
     expect(result.pageSignature).toBeTruthy();
-    expect(result.addedMessages.map((entry) => entry.contentText)).toEqual(['A', 'B']);
+    expect(result.addedMessages.map((entry) => entry.contentMarkdown)).toEqual(['A', 'B']);
     expect(result.diff.added).toHaveLength(2);
   });
 
@@ -70,7 +70,7 @@ describe('autosave backfill reconciler', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.addedMessages.map((entry) => entry.contentText)).toEqual(['Latest user']);
+    expect(result.addedMessages.map((entry) => entry.contentMarkdown)).toEqual(['Latest user']);
     expect(result.diff.added).toEqual(['user_step_2']);
   });
 
@@ -90,7 +90,7 @@ describe('autosave backfill reconciler', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.addedMessages.map((entry) => entry.contentText)).toEqual(['Earlier']);
+    expect(result.addedMessages.map((entry) => entry.contentMarkdown)).toEqual(['Earlier']);
     expect(result.diff.added).toHaveLength(1);
   });
 
@@ -103,7 +103,7 @@ describe('autosave backfill reconciler', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.addedMessages.map((entry) => entry.contentText)).toEqual(['A', 'B']);
+    expect(result.addedMessages.map((entry) => entry.contentMarkdown)).toEqual(['A', 'B']);
     expect(result.diff.added).toHaveLength(2);
   });
 

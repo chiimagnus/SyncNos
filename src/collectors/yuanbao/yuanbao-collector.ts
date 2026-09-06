@@ -83,7 +83,6 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
       out.push({
         messageKey: env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i }),
         role,
-        contentText,
         contentMarkdown,
         sequence: i,
         updatedAt: Date.now(),

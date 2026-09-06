@@ -78,7 +78,6 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       out.push({
         messageKey: env.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
         role,
-        contentText,
         contentMarkdown,
         sequence: seq,
         updatedAt: Date.now(),

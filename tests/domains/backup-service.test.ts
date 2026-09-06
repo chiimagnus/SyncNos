@@ -1769,6 +1769,17 @@ describe('backup service', () => {
     });
     expect(changed.messagesAdded).toBe(0);
     expect(changed.messagesUpdated).toBe(1);
+
+    const changedTx = db.transaction(['messages'], 'readonly');
+    const changedPersisted = await reqToPromise<any>(changedTx.objectStore('messages').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      changedTx.oncomplete = () => resolve();
+      changedTx.onerror = () => reject(changedTx.error);
+      changedTx.onabort = () => reject(changedTx.error);
+    });
+    expect(changedPersisted).toHaveLength(1);
+    expect(changedPersisted[0]).toMatchObject({ contentMarkdown: 'changed' });
+    expect(changedPersisted[0]).not.toHaveProperty('contentText');
   });
 
   it('skips equivalent Legacy mappings without losing conversation mirrors', async () => {
@@ -1878,6 +1889,75 @@ describe('backup service', () => {
       conversationsAdded: 0,
       conversationsUpdated: 0,
     });
+  });
+
+  it('applies newer text-only message bodies from historical ZIP backups to canonical Markdown rows', async () => {
+    const encoder = new TextEncoder();
+    const entryPath = 'sources/chatgpt/legacy-text-only.json';
+    const buildEntries = (body: string, updatedAt: number) =>
+      new Map<string, Uint8Array>([
+        [
+          'manifest.json',
+          encoder.encode(
+            JSON.stringify({
+              backupSchemaVersion: 2,
+              exportedAt: '2026-08-29T00:00:00.000Z',
+              db: { name: 'webclipper', version: 10 },
+              counts: { conversations: 1, messages: 1, sync_mappings: 0 },
+              config: { storageLocalPath: 'config/storage-local.json' },
+              index: { conversationsCsvPath: 'sources/conversations.csv' },
+              sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+            }),
+          ),
+        ],
+        ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
+        ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+        [
+          entryPath,
+          encoder.encode(
+            JSON.stringify({
+              schemaVersion: 1,
+              conversation: {
+                sourceType: 'chat',
+                source: 'chatgpt',
+                conversationKey: 'zip-legacy-text-only',
+                title: 'Legacy text-only ZIP',
+                url: 'https://chatgpt.com/c/zip-legacy-text-only',
+                lastCapturedAt: 10,
+              },
+              messages: [
+                {
+                  messageKey: 'm1',
+                  role: 'user',
+                  contentText: body,
+                  contentMarkdown: '',
+                  sequence: 1,
+                  updatedAt,
+                },
+              ],
+              syncMapping: null,
+            }),
+          ),
+        ],
+      ]);
+
+    const first = await importBackupZipV2Merge(buildEntries('stable', 10));
+    expect(first).toMatchObject({ messagesAdded: 1, messagesUpdated: 0 });
+
+    const changed = await importBackupZipV2Merge(buildEntries('changed', 11));
+    expect(changed).toMatchObject({ messagesAdded: 0, messagesUpdated: 1 });
+
+    const db = await openDb();
+    const tx = db.transaction(['messages'], 'readonly');
+    const messages = await reqToPromise<any[]>(tx.objectStore('messages').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'changed', updatedAt: 11 });
+    expect(messages[0]).not.toHaveProperty('contentText');
   });
 
   it('keeps committed Legacy conversations when progress listeners fail', async () => {

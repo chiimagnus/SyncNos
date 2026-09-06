@@ -418,7 +418,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return {
       messageKey: input.messageKey,
       role: input.role,
-      contentText: input.contentText,
       contentMarkdown: appendImageMarkdown(input.baseMarkdown || input.contentText, resolved.urls, {
         allowDataImageUrls: true,
       }),

@@ -10,13 +10,12 @@ import {
 
 type Diff = { added: string[]; updated: string[]; removed: string[] };
 
-type IncomingKeyIdentity = { role: string; text: string; markdown: string };
+type IncomingKeyIdentity = { role: string; markdown: string };
 
 type TailEntry = {
   key: string;
   role: string;
   identityHash: string;
-  text: string;
   markdown: string;
 };
 
@@ -72,15 +71,12 @@ function buildTailEntries(args: {
     const idx1 = tryPick((p) => p.role === cur.role && p.identityHash === cur.identityHash);
     if (idx1 >= 0) return idx1;
 
-    const idx2 = tryPick((p) => p.role === cur.role && p.text === cur.text && p.markdown === cur.markdown);
+    const idx2 = tryPick((p) => p.role === cur.role && p.markdown === cur.markdown);
     if (idx2 >= 0) return idx2;
 
     return tryPick((p) => {
       if (p.role !== cur.role) return false;
-      const decision = classifyPrefixOrFillingUpdate(
-        { text: p.text, markdown: p.markdown },
-        { text: cur.text, markdown: cur.markdown },
-      );
+      const decision = classifyPrefixOrFillingUpdate({ markdown: p.markdown }, { markdown: cur.markdown });
       return !decision.changed || decision.acceptable;
     });
   };
@@ -106,7 +102,6 @@ function buildTailEntries(args: {
       key: key || '',
       role: cur.role,
       identityHash: cur.identityHash,
-      text: cur.text,
       markdown: cur.markdown,
     });
   }
@@ -232,12 +227,12 @@ export function createAutoSaveIncrementalEngine() {
         if (incomingKeyRaw && !fallbackIncomingKey) {
           const existing = readIncomingKeyIdentity(incomingKeyRaw);
           if (!existing) {
-            incomingKeyOverlay.set(incomingKeyRaw, { role, text, markdown });
+            incomingKeyOverlay.set(incomingKeyRaw, { role, markdown });
             stableIncomingKey = incomingKeyRaw;
           } else if (existing.role === role) {
-            const decision = classifyPrefixOrFillingUpdate(existing, { text, markdown });
+            const decision = classifyPrefixOrFillingUpdate(existing, { markdown });
             if (decision.acceptable) {
-              incomingKeyOverlay.set(incomingKeyRaw, { role, text, markdown });
+              incomingKeyOverlay.set(incomingKeyRaw, { role, markdown });
               stableIncomingKey = incomingKeyRaw;
             }
           }
@@ -291,7 +286,6 @@ export function createAutoSaveIncrementalEngine() {
             key: message.stableIncomingKey || '',
             role: message.role,
             identityHash: message.identityHash,
-            text: message.text,
             markdown: message.markdown,
           }));
 
@@ -316,7 +310,6 @@ export function createAutoSaveIncrementalEngine() {
             key: assignedKeyByWindowIndex.get(tailStart + index) || message.stableIncomingKey || '',
             role: message.role,
             identityHash: message.identityHash,
-            text: message.text,
             markdown: message.markdown,
           }));
 
@@ -372,8 +365,8 @@ export function createAutoSaveIncrementalEngine() {
         const curEntry = curTail[index];
         if (!prevEntry || !curEntry || prevEntry.role !== curEntry.role) continue;
         const decision = classifyPrefixOrFillingUpdate(
-          { text: prevEntry.text || '', markdown: prevEntry.markdown || '' },
-          { text: curEntry.text, markdown: curEntry.markdown },
+          { markdown: prevEntry.markdown || '' },
+          { markdown: curEntry.markdown },
         );
         if (!decision.changed || !decision.acceptable) continue;
 

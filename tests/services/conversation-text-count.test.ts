@@ -140,8 +140,16 @@ describe('countConversationMessageTextUnits', () => {
     ).toBe(0);
   });
 
-  it('counts timestamp text when it is part of the saved Markdown', () => {
-    expect(countConversationMessageTextUnits([{ contentMarkdown: '00:01 你好 world' }])).toBe(4);
+  it('derives timestamp-free text for saved video transcripts', () => {
+    expect(
+      countConversationMessageTextUnits([
+        { messageKey: 'video_transcript', contentMarkdown: '00:01 你好 world\n01:02:03 next line' },
+      ]),
+    ).toBe(5);
+  });
+
+  it('keeps timestamp-like text for ordinary messages', () => {
+    expect(countConversationMessageTextUnits([{ messageKey: 'm1', contentMarkdown: '00:01 你好 world' }])).toBe(4);
   });
 
   it('counts source-site comments when the collector includes them in saved Markdown', () => {

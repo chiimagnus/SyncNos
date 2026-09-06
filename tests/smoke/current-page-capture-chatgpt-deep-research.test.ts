@@ -56,10 +56,10 @@ describe('current-page-capture chatgpt deep research hydration', () => {
         if (type === 'upsertConversation') return { ok: true, data: { id: 101, __isNew: true } };
         if (type === 'syncConversationMessages') {
           const messages = payload?.messages || [];
-          expect(messages.some((m: any) => String(m?.contentText || '').includes('Deep Research (iframe):'))).toBe(
+          expect(messages.some((m: any) => String(m?.contentMarkdown || '').includes('Deep Research (iframe):'))).toBe(
             false,
           );
-          expect(messages.some((m: any) => String(m?.contentText || '').includes('Body'))).toBe(true);
+          expect(messages.some((m: any) => String(m?.contentMarkdown || '').includes('Body'))).toBe(true);
           expect(payload?.mode).toBe('snapshot');
           return { ok: true, data: { ok: true } };
         }
@@ -86,8 +86,6 @@ describe('current-page-capture chatgpt deep research hydration', () => {
               {
                 messageKey: 'm1',
                 role: 'assistant',
-                contentText:
-                  'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
                 contentMarkdown:
                   'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
                 sequence: 0,
@@ -149,14 +147,13 @@ describe('current-page-capture chatgpt deep research hydration', () => {
         if (type === 'upsertConversation') return { ok: true, data: { id: 103, __isNew: false } };
         if (type === 'syncConversationMessages') {
           expect(payload?.mode).toBe('snapshot');
-          expect(payload?.messages.map((message: any) => message.contentText)).toEqual([
-            'First report body',
-            'Second report body',
-          ]);
           expect(payload?.messages.map((message: any) => message.contentMarkdown)).toEqual([
             '# First report\n\nFirst report body',
             '# Second report\n\nSecond report body',
           ]);
+          expect(
+            payload?.messages.every((message: any) => !Object.prototype.hasOwnProperty.call(message, 'contentText')),
+          ).toBe(true);
           return { ok: true, data: { upserted: 2 } };
         }
         return { ok: true, data: {} };
@@ -180,14 +177,12 @@ describe('current-page-capture chatgpt deep research hydration', () => {
                 {
                   messageKey: 'report-a',
                   role: 'assistant',
-                  contentText: `Deep Research (iframe): ${firstUrl}`,
                   contentMarkdown: `Deep Research (iframe): ${firstUrl}`,
                   sequence: 0,
                 },
                 {
                   messageKey: 'report-b',
                   role: 'assistant',
-                  contentText: `Deep Research (iframe): ${secondUrl}`,
                   contentMarkdown: `Deep Research (iframe): ${secondUrl}`,
                   sequence: 1,
                 },
@@ -224,7 +219,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
         if (type === 'syncConversationMessages') {
           expect(payload?.mode).toBe('append');
           expect(payload?.messages[0]).toMatchObject({
-            contentText: placeholder,
+            contentMarkdown: placeholder,
             captureMergePolicy: 'preserve-existing-content',
             captureSequencePolicy: 'reconcile-existing-order',
           });
@@ -251,7 +246,6 @@ describe('current-page-capture chatgpt deep research hydration', () => {
                 {
                   messageKey: 'm1',
                   role: 'assistant',
-                  contentText: placeholder,
                   contentMarkdown: placeholder,
                   sequence: 0,
                 },

@@ -942,7 +942,7 @@ describe('ConversationDetailPane header actions', () => {
       root!.render(createElement(ConversationDetailPane));
     });
 
-    expect(await openMoreAndReadTextCount()).toBe('Words 4');
+    expect(await openMoreAndReadTextCount()).toBe('Words 3');
   });
 
   it('uses semantic Markdown for detail messages', async () => {

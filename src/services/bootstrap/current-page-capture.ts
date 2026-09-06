@@ -61,7 +61,7 @@ function normalizeConversationId(value: unknown): number | null {
 
 function isUnresolvedDeepResearchMessage(message: any): boolean {
   if (!message || message.role !== 'assistant') return false;
-  const value = String(message.contentText || message.contentMarkdown || '').trim();
+  const value = String(message.contentMarkdown || '').trim();
   return value.startsWith('Deep Research (iframe):') || value === 'Deep Research (iframe)';
 }
 

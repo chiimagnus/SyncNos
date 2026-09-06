@@ -12,7 +12,7 @@ function chatSnapshot(options?: { completeness?: 'complete' | 'partial'; verifie
       title: 'Conversation',
       url: 'https://chatgpt.com/c/conversation-1',
     },
-    messages: [{ messageKey: 'm1', role: 'user', contentText: 'hello', sequence: 0 }],
+    messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0 }],
     captureMeta: {
       completeness: options?.completeness || 'complete',
       identityVerified: options?.verified !== false,
@@ -54,6 +54,8 @@ describe('current page capture integrity routing', () => {
 
     expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
     expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
+    expect(harness.calls[1].payload.messages[0]).toMatchObject({ contentMarkdown: 'hello' });
+    expect(harness.calls[1].payload.messages[0]).not.toHaveProperty('contentText');
   });
 
   it('persists verified partial capture as append with normalized diff', async () => {
@@ -78,7 +80,6 @@ describe('current page capture integrity routing', () => {
   });
 
   it('preserves COT plus answer through final-live partial append with default replace semantics', async () => {
-    const contentText = 'Visible reasoning summary\n\nFinal assistant answer';
     const contentMarkdown = '**Visible reasoning summary**\n\nFinal assistant answer';
     const snapshot = {
       ...chatSnapshot({ completeness: 'partial' }),
@@ -86,7 +87,6 @@ describe('current page capture integrity routing', () => {
         {
           messageKey: 'assistant-stable-key',
           role: 'assistant',
-          contentText,
           contentMarkdown,
           sequence: 4,
         },
@@ -113,17 +113,17 @@ describe('current page capture integrity routing', () => {
     expect(sync?.payload.messages).toHaveLength(1);
     expect(sync?.payload.messages[0]).toMatchObject({
       messageKey: 'assistant-stable-key',
-      contentText,
       contentMarkdown,
       captureSequencePolicy: 'reconcile-existing-order',
       captureMergePolicy: 'replace',
     });
+    expect(sync?.payload.messages[0]).not.toHaveProperty('contentText');
   });
 
   it.each([
     ['unverified', chatSnapshot({ verified: false })],
     ['missing metadata', { ...chatSnapshot(), captureMeta: undefined }],
-    ['unsafe partial', { ...chatSnapshot({ completeness: 'partial' }), messages: [{ contentText: 'no key' }] }],
+    ['unsafe partial', { ...chatSnapshot({ completeness: 'partial' }), messages: [{ contentMarkdown: 'no key' }] }],
   ])('sends no write for invalid virtual output: %s', async (_label, snapshot) => {
     const harness = createHarness({ collectorId: 'chatgpt', snapshot });
 
@@ -142,7 +142,6 @@ describe('current page capture integrity routing', () => {
           {
             messageKey: 'm1',
             role: 'assistant',
-            contentText: placeholder,
             contentMarkdown: placeholder,
             sequence: 0,
           },
@@ -171,7 +170,6 @@ describe('current page capture integrity routing', () => {
         {
           messageKey: 'm1',
           role: 'assistant',
-          contentText: 'safe body',
           contentMarkdown: 'safe body',
           sequence: 0,
           captureMergePolicy: 'preserve-existing-markdown',

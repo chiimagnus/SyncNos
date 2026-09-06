@@ -922,7 +922,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
           out.push({
             messageKey: env.normalize.makeFallbackMessageKey({ role: 'user', contentText, sequence: seq }),
             role: 'user',
-            contentText,
             contentMarkdown,
             sequence: seq,
             updatedAt: Date.now(),
@@ -966,7 +965,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
               sequence: seq,
             }),
             role: 'assistant',
-            contentText,
             contentMarkdown,
             sequence: seq,
             updatedAt: Date.now(),

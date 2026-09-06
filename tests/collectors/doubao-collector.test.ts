@@ -50,9 +50,9 @@ describe('doubao-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     expect(snap.messages[0].role).toBe('user');
-    expect(snap.messages[0].contentText).toBe('111');
+    expect(snap.messages[0].contentMarkdown).toBe('111');
     expect(snap.messages[1].role).toBe('assistant');
-    expect(snap.messages[1].contentText).toBe('111～👀');
+    expect(snap.messages[1].contentMarkdown).toBe('111～👀');
     expect(snap.messages[1].contentMarkdown).toContain('111～👀');
   });
 
@@ -85,7 +85,7 @@ describe('doubao-collector', () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
     expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 

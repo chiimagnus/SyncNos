@@ -67,6 +67,35 @@ describe('buildChatOutlineEntries', () => {
     expect(entries[0]?.previewText).toBe('Diagram OpenAI');
   });
 
+  it('parses nested-parenthesis Markdown destinations without leaking URL punctuation', () => {
+    const entries = buildChatOutlineEntries([
+      msg({
+        id: 260,
+        messageKey: 'u-260',
+        role: 'user',
+        contentMarkdown: '[Wikipedia](https://en.wikipedia.org/wiki/Function_(mathematics)) next',
+      }),
+      msg({
+        id: 261,
+        messageKey: 'u-261',
+        role: 'user',
+        contentMarkdown: '[nested](https://example.com/a_(b_(c))) tail',
+      }),
+      msg({
+        id: 262,
+        messageKey: 'u-262',
+        role: 'user',
+        contentMarkdown: 'before ![diagram](https://example.com/a_(b).png) after',
+      }),
+    ]);
+
+    expect(entries.map((entry) => entry.previewText)).toEqual([
+      'Wikipedia next',
+      'nested tail',
+      'before diagram after',
+    ]);
+  });
+
   it('normalizes multiline whitespace to a single line', () => {
     const entries = buildChatOutlineEntries([
       msg({

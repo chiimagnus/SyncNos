@@ -157,14 +157,14 @@ describe('backup-utils', () => {
     const incoming = {
       conversationId: 9,
       messageKey: 'm1',
-      contentMarkdown: '## md',
+      contentMarkdown: '## hi',
       contentText: 'hi',
       updatedAt: 9,
       sequence: 1,
       role: 'user',
     };
     const merged1 = backupUtils.mergeMessageRecord(existing, incoming);
-    expect(merged1.contentMarkdown).toBe('## md');
+    expect(merged1.contentMarkdown).toBe('## hi');
     expect(merged1.updatedAt).toBe(10);
 
     const newer = {
@@ -181,5 +181,14 @@ describe('backup-utils', () => {
     expect(merged2).not.toHaveProperty('contentText');
     expect(merged2.updatedAt).toBe(12);
     expect(merged2.sequence).toBe(2);
+  });
+
+  it('mergeMessageRecord keeps a newer explicit clear authoritative', () => {
+    const merged = backupUtils.mergeMessageRecord(
+      { conversationId: 9, messageKey: 'm1', contentMarkdown: '**old**', updatedAt: 10 },
+      { conversationId: 9, messageKey: 'm1', contentMarkdown: '', updatedAt: 11 },
+    );
+    expect(merged.contentMarkdown).toBe('');
+    expect(merged.updatedAt).toBe(11);
   });
 });

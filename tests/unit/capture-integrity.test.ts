@@ -11,7 +11,7 @@ import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS, SUPPORTED_AI_CHAT_SITES } from '@colle
 function snapshot(overrides: Record<string, unknown> = {}) {
   return {
     conversation: { source: 'chatgpt', conversationKey: 'conversation-1' },
-    messages: [{ messageKey: 'm1', role: 'user', contentText: 'hello', sequence: 0 }],
+    messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0 }],
     captureMeta: { completeness: 'complete', identityVerified: true },
     ...overrides,
   };
@@ -52,13 +52,13 @@ describe('resolveCaptureIntegrity', () => {
 
   it.each([
     ['empty messages', []],
-    ['missing key', [{ role: 'assistant', contentText: 'missing' }]],
-    ['fallback key', [{ messageKey: 'fallback_1', contentText: 'fallback' }]],
+    ['missing key', [{ role: 'assistant', contentMarkdown: 'missing' }]],
+    ['fallback key', [{ messageKey: 'fallback_1', contentMarkdown: 'fallback' }]],
     [
       'duplicate key',
       [
-        { messageKey: 'm1', contentText: 'first' },
-        { messageKey: 'm1', contentText: 'second' },
+        { messageKey: 'm1', contentMarkdown: 'first' },
+        { messageKey: 'm1', contentMarkdown: 'second' },
       ],
     ],
   ])('never treats complete virtual capture with %s as destructive snapshot', (_label, messages) => {
@@ -158,8 +158,8 @@ describe('resolveCaptureIntegrity', () => {
       snapshot({
         captureMeta: { completeness: 'partial', identityVerified: true },
         messages: [
-          { messageKey: { id: 'm1' }, contentText: 'object' },
-          { messageKey: 1, contentText: 'number' },
+          { messageKey: { id: 'm1' }, contentMarkdown: 'object' },
+          { messageKey: 1, contentMarkdown: 'number' },
         ],
       }),
     );
@@ -177,17 +177,17 @@ describe('resolveCaptureIntegrity', () => {
       snapshot({
         captureMeta: { completeness: 'partial', identityVerified: true },
         messages: [
-          { messageKey: 'm1', contentText: 'first' },
-          { messageKey: 'm2', contentText: 'second' },
-          { messageKey: 'm1', contentText: 'last' },
-          { messageKey: '', contentText: 'empty' },
-          { messageKey: 'fallback_123', contentText: 'fallback' },
+          { messageKey: 'm1', contentMarkdown: 'first' },
+          { messageKey: 'm2', contentMarkdown: 'second' },
+          { messageKey: 'm1', contentMarkdown: 'last' },
+          { messageKey: '', contentMarkdown: 'empty' },
+          { messageKey: 'fallback_123', contentMarkdown: 'fallback' },
         ],
       }),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.snapshot.messages.map((message: any) => [message.messageKey, message.contentText])).toEqual([
+    expect(result.snapshot.messages.map((message: any) => [message.messageKey, message.contentMarkdown])).toEqual([
       ['m1', 'last'],
       ['m2', 'second'],
     ]);
@@ -200,7 +200,7 @@ describe('resolveCaptureIntegrity', () => {
         messages: [
           {
             messageKey: 'm1',
-            contentText: 'placeholder',
+            contentMarkdown: 'placeholder',
             captureMergePolicy: 'preserve-existing-content',
           },
         ],
@@ -218,7 +218,7 @@ describe('resolveCaptureIntegrity', () => {
       'chatgpt',
       snapshot({
         captureMeta: { completeness: 'partial', identityVerified: true },
-        messages: [{ messageKey: 'fallback_bad', contentText: 'unsafe' }, { contentText: 'missing' }],
+        messages: [{ messageKey: 'fallback_bad', contentMarkdown: 'unsafe' }, { contentMarkdown: 'missing' }],
       }),
     );
     expect(result).toMatchObject({ ok: false, code: 'capture_integrity_no_safe_messages' });

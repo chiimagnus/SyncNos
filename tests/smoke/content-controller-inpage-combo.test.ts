@@ -165,7 +165,7 @@ describe('content-controller inpage combo', () => {
         if (!args || !args.manual) return null;
         return {
           conversation: { source: 'gemini', conversationKey: 'k1' },
-          messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentText: 'hi' }],
+          messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentMarkdown: 'hi' }],
         };
       },
       sendImpl: async (type: string) => {
@@ -198,7 +198,7 @@ describe('content-controller inpage combo', () => {
           conversationKey: `${collectorId}-1`,
           url: collectorId === 'chatgpt' ? 'https://chatgpt.com/c/1' : 'https://aistudio.google.com/app/1',
         },
-        messages: [{ messageKey: 'm1', sequence: 0, role: 'user', contentText: 'hi' }],
+        messages: [{ messageKey: 'm1', sequence: 0, role: 'user', contentMarkdown: 'hi' }],
         captureMeta: { completeness: 'complete', identityVerified: true, reasons: [] },
       }));
       const harness = createHarness({
@@ -244,7 +244,7 @@ describe('content-controller inpage combo', () => {
     setupDom();
     const snapshot = {
       conversation: { source: 'gemini', conversationKey: 'auto-1' },
-      messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentText: 'hello' }],
+      messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentMarkdown: 'hello' }],
     };
 
     const harness = createHarness({
@@ -271,8 +271,6 @@ describe('content-controller inpage combo', () => {
       messages: [
         {
           role: 'assistant',
-          contentText:
-            'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
           contentMarkdown:
             'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
         },
@@ -303,8 +301,6 @@ describe('content-controller inpage combo', () => {
       messages: [
         {
           role: 'assistant',
-          contentText:
-            'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
           contentMarkdown:
             'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
         },
@@ -361,7 +357,7 @@ describe('content-controller inpage combo', () => {
 
     const snapshot = {
       conversation: { source: 'notionai', conversationKey: 'notionai_t_1' },
-      messages: [{ messageKey: 'user_u1', sequence: 1, role: 'user', contentText: 'just sent' }],
+      messages: [{ messageKey: 'user_u1', sequence: 1, role: 'user', contentMarkdown: 'just sent' }],
     };
 
     const harness = createHarness({
@@ -407,7 +403,7 @@ describe('content-controller inpage combo', () => {
       collectorId: 'notionai',
       captureImpl: () => ({
         conversation: { source: 'notionai', conversationKey: 'notionai_t_2' },
-        messages: [{ messageKey: 'user_u2', sequence: 1, role: 'user', contentText: 'draft' }],
+        messages: [{ messageKey: 'user_u2', sequence: 1, role: 'user', contentMarkdown: 'draft' }],
       }),
       incrementalImpl: (snap) => ({
         changed: true,
@@ -442,7 +438,7 @@ describe('content-controller inpage combo', () => {
   it('disables auto-save for googleaistudio to avoid virtualized truncation', async () => {
     const snapshot = {
       conversation: { source: 'googleaistudio', conversationKey: 'auto-ai-studio-1' },
-      messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentText: 'hello' }],
+      messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentMarkdown: 'hello' }],
     };
 
     const harness = createHarness({
@@ -474,7 +470,7 @@ describe('content-controller inpage combo', () => {
         if (!args || !args.manual) return null;
         return {
           conversation: { source: 'gemini', conversationKey: 'lock-1' },
-          messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentText: 'hi' }],
+          messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentMarkdown: 'hi' }],
         };
       },
       sendImpl: async (type: string) => {

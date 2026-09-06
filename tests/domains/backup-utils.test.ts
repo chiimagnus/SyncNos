@@ -197,7 +197,7 @@ describe('backup backup-utils', () => {
       { conversationId: 1, messageKey: 'm1', contentMarkdown: 'incoming', updatedAt: -1 },
     );
 
-    expect(merged.contentMarkdown).toBe('incoming');
+    expect(merged.contentMarkdown).toBe('local');
     expect(merged).not.toHaveProperty('updatedAt');
   });
 
@@ -215,14 +215,14 @@ describe('backup backup-utils', () => {
     const incoming = {
       conversationId: 9,
       messageKey: 'm1',
-      contentMarkdown: '## md',
+      contentMarkdown: '## hi',
       contentText: 'hi',
       updatedAt: 9,
       sequence: 1,
       role: 'user',
     };
     const merged1 = mergeMessageRecord(existing, incoming);
-    expect(merged1.contentMarkdown).toBe('## md');
+    expect(merged1.contentMarkdown).toBe('## hi');
     expect(merged1.updatedAt).toBe(10);
 
     const newer = {
@@ -239,5 +239,50 @@ describe('backup backup-utils', () => {
     expect(merged2).not.toHaveProperty('contentText');
     expect(merged2.updatedAt).toBe(12);
     expect(merged2.sequence).toBe(2);
+  });
+
+  it('mergeMessageRecord preserves explicit clears and never revives older content', () => {
+    const merged = mergeMessageRecord(
+      {
+        conversationId: 1,
+        messageKey: 'm1',
+        role: 'assistant',
+        contentMarkdown: '**old body**',
+        updatedAt: 10,
+      },
+      {
+        conversationId: 1,
+        messageKey: 'm1',
+        role: 'assistant',
+        contentMarkdown: '',
+        updatedAt: 11,
+      },
+    );
+
+    expect(merged.contentMarkdown).toBe('');
+    expect(merged.updatedAt).toBe(11);
+    expect(merged).not.toHaveProperty('contentText');
+  });
+
+  it('mergeMessageRecord does not let older rich Markdown replace different newer semantic content', () => {
+    const merged = mergeMessageRecord(
+      {
+        conversationId: 1,
+        messageKey: 'm1',
+        role: 'assistant',
+        contentMarkdown: 'newer body',
+        updatedAt: 20,
+      },
+      {
+        conversationId: 1,
+        messageKey: 'm1',
+        role: 'assistant',
+        contentMarkdown: '## older different body',
+        updatedAt: 10,
+      },
+    );
+
+    expect(merged.contentMarkdown).toBe('newer body');
+    expect(merged.updatedAt).toBe(20);
   });
 });
