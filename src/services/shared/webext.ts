@@ -1,11 +1,11 @@
-import { openOrFocusExtensionAppTab as platformOpenOrFocusExtensionAppTab } from '@platform/webext/extension-app';
-import { tabsCreate as platformTabsCreate } from '@platform/webext/tabs';
+export { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
+export { tabsCreate } from '@platform/webext/tabs';
 
-export const webext = {
-  openOrFocusExtensionAppTab: platformOpenOrFocusExtensionAppTab,
-  tabs: {
-    create: platformTabsCreate,
-  },
-};
-
-export { platformOpenOrFocusExtensionAppTab as openOrFocusExtensionAppTab, platformTabsCreate as tabsCreate };
+export function downloadBlobFile(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

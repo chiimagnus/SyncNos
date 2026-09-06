@@ -10,8 +10,10 @@ import type {
 } from '@services/conversations/domain/models';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
+import { buildConversationsJsonZipExport } from '@services/sync/local/json-export';
 import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 import { writeTextToClipboard } from '@services/shared/clipboard';
+import { downloadBlobFile } from '@services/shared/webext';
 import {
   deleteConversations,
   findConversationBySourceAndKey,
@@ -99,6 +101,8 @@ function readLocalStorageValue(key: string): string {
     return '';
   }
 }
+
+type SelectedExportBuilder = typeof buildConversationsMarkdownZipExport;
 
 function writeLocalStorageValue(key: string, value: string | null) {
   try {
@@ -279,7 +283,8 @@ type ConversationsAppState = {
   clearSelected: () => void;
 
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
-  exportSelectedMarkdown: (opts: { mergeSingle: boolean }) => Promise<void>;
+  exportSelectedMarkdown: () => Promise<void>;
+  exportSelectedJson: () => Promise<void>;
   syncSelectedNotion: () => Promise<void>;
   syncSelectedObsidian: () => Promise<void>;
   syncSelectedFeishu: () => Promise<void>;
@@ -1236,26 +1241,16 @@ export function ConversationsProvider({
     if (!(await writeTextToClipboard(markdown))) throw new Error(t('copyFailed'));
   }, []);
 
-  const exportSelectedMarkdown = useCallback(
-    async ({ mergeSingle }: { mergeSingle: boolean }) => {
-      const ids = selectedIds.slice();
-      if (!ids.length) return;
+  const exportSelected = useCallback(
+    async (buildExport: SelectedExportBuilder) => {
+      if (!selectedIds.length) return;
 
       setExporting(true);
       try {
-        const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
-        if (!selectedConversations.length) return;
-
-        const { zipBlob, filename } = await buildConversationsMarkdownZipExport({
-          conversations: selectedConversations,
-          mergeSingle,
-        });
-        const url = URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        const selectedIdSet = new Set(selectedIds);
+        const selectedConversations = items.filter((conversation) => selectedIdSet.has(conversation.id));
+        const { zipBlob, filename } = await buildExport({ conversations: selectedConversations });
+        downloadBlobFile(zipBlob, filename);
       } catch (e) {
         alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
       } finally {
@@ -1264,6 +1259,12 @@ export function ConversationsProvider({
     },
     [items, selectedIds],
   );
+
+  const exportSelectedMarkdown = useCallback(
+    () => exportSelected(buildConversationsMarkdownZipExport),
+    [exportSelected],
+  );
+  const exportSelectedJson = useCallback(() => exportSelected(buildConversationsJsonZipExport), [exportSelected]);
 
   const syncSelectedNotion = useCallback(async () => {
     const ids = selectedIds.slice();
@@ -1354,6 +1355,7 @@ export function ConversationsProvider({
     clearSelected,
     copyConversationMarkdown,
     exportSelectedMarkdown,
+    exportSelectedJson,
     syncSelectedNotion,
     syncSelectedObsidian,
     syncSelectedFeishu,

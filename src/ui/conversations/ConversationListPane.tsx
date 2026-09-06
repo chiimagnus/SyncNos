@@ -131,6 +131,7 @@ export function ConversationListPane({
     loadMoreList,
     copyConversationMarkdown,
     exportSelectedMarkdown,
+    exportSelectedJson,
     syncSelectedNotion,
     syncSelectedObsidian,
     syncSelectedFeishu,
@@ -942,28 +943,28 @@ export function ConversationListPane({
                 )}
               >
                 <button
-                  id="menuExportSingleMarkdown"
+                  id="menuExportMarkdown"
                   className={menuItemButtonClassName}
                   type="button"
                   role="menuitem"
                   onClick={() => {
                     setExportOpen(false);
-                    void exportSelectedMarkdown({ mergeSingle: true });
+                    void exportSelectedMarkdown();
                   }}
                 >
-                  {t('singleMarkdown')}
+                  {t('markdownExport')}
                 </button>
                 <button
-                  id="menuExportMultiMarkdown"
+                  id="menuExportJson"
                   className={menuItemButtonClassName}
                   type="button"
                   role="menuitem"
                   onClick={() => {
                     setExportOpen(false);
-                    void exportSelectedMarkdown({ mergeSingle: false });
+                    void exportSelectedJson();
                   }}
                 >
-                  {t('multiMarkdown')}
+                  {t('jsonExport')}
                 </button>
               </MenuPopover>
 
