@@ -752,7 +752,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
             : userStepId || fallbackUserId || firstBlockId || '';
       const messageKey = stableId
         ? `${role}_${stableId}`
-        : env.normalize.makeFallbackMessageKey({ role, contentText: contentText || '', sequence: i });
+        : env.normalize.makeFallbackMessageKey({ role, text: contentText || '', sequence: i });
       if (role === 'user' && stableId) lastUserStepId = stableId;
       messages.push({
         messageKey,

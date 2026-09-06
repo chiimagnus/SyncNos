@@ -465,7 +465,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p_old' },
             mapping: { notionPageId: 'p_old', lastSyncedMessageKey: 'm0' },
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setConversationNotionPageId: async (_id: number, pageId: string) => calls.push({ op: 'setPageId', pageId }),
           setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
         },
@@ -524,8 +526,8 @@ describe('background-router notion sync', () => {
             },
           }),
           getMessagesByConversationId: async () => [
-            { messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 },
-            { messageKey: 'm2', role: 'assistant', contentText: 'yo', sequence: 2 },
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+            { messageKey: 'm2', role: 'assistant', contentMarkdown: 'yo', sequence: 2 },
           ],
           setSyncCursor: async () => calls.push({ op: 'setCursor' }),
         },
@@ -961,7 +963,6 @@ describe('background-router notion sync', () => {
             {
               messageKey: 'article_body',
               role: 'assistant',
-              contentText: 'same body',
               contentMarkdown: 'same body',
               sequence: 1,
               updatedAt: 1000,
@@ -1045,7 +1046,7 @@ describe('background-router notion sync', () => {
             {
               messageKey: 'm1',
               role: 'assistant',
-              contentText: 'same body',
+              contentMarkdown: 'same body',
               sequence: 1,
               updatedAt: 1000,
             },
@@ -1121,8 +1122,8 @@ describe('background-router notion sync', () => {
             },
           }),
           getMessagesByConversationId: async () => [
-            { messageKey: 'new_key', role: 'user', contentText: 'hi', sequence: 1, updatedAt: 1 },
-            { messageKey: 'm2', role: 'assistant', contentText: 'yo', sequence: 2, updatedAt: 2 },
+            { messageKey: 'new_key', role: 'user', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 },
+            { messageKey: 'm2', role: 'assistant', contentMarkdown: 'yo', sequence: 2, updatedAt: 2 },
           ],
           setSyncCursor: async () => calls.push({ op: 'setCursor' }),
         },
@@ -1188,7 +1189,6 @@ describe('background-router notion sync', () => {
             {
               messageKey: 'article_body',
               role: 'assistant',
-              contentText: 'same body',
               contentMarkdown: 'same body',
               sequence: 1,
               updatedAt: 1000,
@@ -1279,8 +1279,8 @@ describe('background-router notion sync', () => {
             },
           }),
           getMessagesByConversationId: async (conversationId: number) => [
-            { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
-            { messageKey: `m1_${conversationId}`, role: 'assistant', contentText: 'new', sequence: 2 },
+            { messageKey: `m0_${conversationId}`, role: 'user', contentMarkdown: 'old', sequence: 1 },
+            { messageKey: `m1_${conversationId}`, role: 'assistant', contentMarkdown: 'new', sequence: 2 },
           ],
           setSyncCursor: async () => true,
         },
@@ -1351,8 +1351,8 @@ describe('background-router notion sync', () => {
             mapping: { notionPageId: `p_${conversationId}`, lastSyncedMessageKey: `m0_${conversationId}` },
           }),
           getMessagesByConversationId: async (conversationId: number) => [
-            { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
-            { messageKey: `m1_${conversationId}`, role: 'assistant', contentText: 'new', sequence: 2 },
+            { messageKey: `m0_${conversationId}`, role: 'user', contentMarkdown: 'old', sequence: 1 },
+            { messageKey: `m1_${conversationId}`, role: 'assistant', contentMarkdown: 'new', sequence: 2 },
           ],
           setSyncCursor: async () => true,
         },
@@ -1433,7 +1433,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: { notionPageId: 'p1' },
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setSyncCursor: async () => calls.push({ op: 'setCursor' }),
         },
         syncService: {
@@ -1474,7 +1476,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1533,7 +1537,6 @@ describe('background-router notion sync', () => {
             {
               messageKey: 'm1',
               role: 'user',
-              contentText: 'hi',
               contentMarkdown: '![](https://example.com/a.png)',
               sequence: 1,
             },
@@ -1600,7 +1603,6 @@ describe('background-router notion sync', () => {
             {
               messageKey: 'm1',
               role: 'user',
-              contentText: 'hi',
               contentMarkdown: '![](https://example.com/a.png)',
               sequence: 1,
             },
@@ -1659,7 +1661,6 @@ describe('background-router notion sync', () => {
             {
               messageKey: 'm1',
               role: 'user',
-              contentText: 'hi',
               contentMarkdown: '![](https://example.com/a.png)',
               sequence: 1,
             },
@@ -1728,7 +1729,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1790,7 +1793,7 @@ describe('background-router notion sync', () => {
             mapping: null,
           }),
           getMessagesByConversationId: async (conversationId: number) => [
-            { messageKey: `m${conversationId}`, role: 'user', contentText: 'hi', sequence: 1 },
+            { messageKey: `m${conversationId}`, role: 'user', contentMarkdown: 'hi', sequence: 1 },
           ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
@@ -1920,7 +1923,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1966,7 +1971,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -2009,7 +2016,9 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+          ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },

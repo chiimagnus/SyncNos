@@ -19,8 +19,8 @@ export function fnv1a32(text: unknown): string {
   return `0000000${hash.toString(16)}`.slice(-8);
 }
 
-export function makeFallbackMessageKey(input: { role?: unknown; contentText?: unknown; sequence?: unknown }): string {
-  const base = `${input?.role || 'assistant'}|${input?.sequence || 0}|${normalizeText(input?.contentText)}`;
+export function makeFallbackMessageKey(input: { role?: unknown; text?: unknown; sequence?: unknown }): string {
+  const base = `${input?.role || 'assistant'}|${input?.sequence || 0}|${normalizeText(input?.text)}`;
   return `fallback_${fnv1a32(base)}`;
 }
 

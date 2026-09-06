@@ -137,7 +137,7 @@ describe('backup backup-utils', () => {
     const res2 = validateConversationBundle({
       schemaVersion: 1,
       conversation: { source: 'chatgpt', conversationKey: 'c1' },
-      messages: [{ messageKey: 'm1', role: 'user', contentText: 'hi' }],
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }],
       syncMapping: { source: 'chatgpt', conversationKey: 'c2' },
     });
     expect(res2.ok).toBe(false);
@@ -201,13 +201,12 @@ describe('backup backup-utils', () => {
     expect(merged).not.toHaveProperty('updatedAt');
   });
 
-  it('mergeMessageRecord prefers newer updatedAt and fills missing markdown', () => {
+  it('mergeMessageRecord keeps newer explicit emptiness and lets only newer backups replace it', () => {
     const existing = {
       id: 1,
       conversationId: 9,
       messageKey: 'm1',
       contentMarkdown: '',
-      contentText: 'hi',
       updatedAt: 10,
       sequence: 1,
       role: 'user',
@@ -216,20 +215,18 @@ describe('backup backup-utils', () => {
       conversationId: 9,
       messageKey: 'm1',
       contentMarkdown: '## hi',
-      contentText: 'hi',
       updatedAt: 9,
       sequence: 1,
       role: 'user',
     };
     const merged1 = mergeMessageRecord(existing, incoming);
-    expect(merged1.contentMarkdown).toBe('## hi');
+    expect(merged1.contentMarkdown).toBe('');
     expect(merged1.updatedAt).toBe(10);
 
     const newer = {
       conversationId: 9,
       messageKey: 'm1',
       contentMarkdown: 'new',
-      contentText: 'hi!',
       updatedAt: 12,
       sequence: 2,
       role: 'user',
@@ -264,25 +261,25 @@ describe('backup backup-utils', () => {
     expect(merged).not.toHaveProperty('contentText');
   });
 
-  it('mergeMessageRecord does not let older rich Markdown replace different newer semantic content', () => {
+  it('mergeMessageRecord does not let older rich Markdown replace newer canonical content', () => {
     const merged = mergeMessageRecord(
       {
         conversationId: 1,
         messageKey: 'm1',
         role: 'assistant',
-        contentMarkdown: 'newer body',
+        contentMarkdown: 'hi',
         updatedAt: 20,
       },
       {
         conversationId: 1,
         messageKey: 'm1',
         role: 'assistant',
-        contentMarkdown: '## older different body',
+        contentMarkdown: '## hi',
         updatedAt: 10,
       },
     );
 
-    expect(merged.contentMarkdown).toBe('newer body');
+    expect(merged.contentMarkdown).toBe('hi');
     expect(merged.updatedAt).toBe(20);
   });
 });

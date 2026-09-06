@@ -93,10 +93,9 @@ describe('local JSON v1 export', () => {
           role: ' assistant ',
           authorName: '  Assistant  ',
           contentMarkdown: '  markdown with spaces  ',
-          contentText: '\ntext\n',
           sequence: 2,
         }),
-        message('m-1', { role: 42, authorName: '', contentMarkdown: '', contentText: undefined, sequence: 1 }),
+        message('m-1', { role: 42, authorName: '', contentMarkdown: '', sequence: 1 }),
       ],
     });
 
@@ -199,7 +198,7 @@ describe('local JSON v1 export', () => {
       conversationId: 4,
       messages: [
         message('legacy', { contentMarkdown: 'wrong' }),
-        message('video_transcript', { role: 'transcript', contentMarkdown: '00:01 hello', contentText: 'hello' }),
+        message('video_transcript', { role: 'transcript', contentMarkdown: '00:01 hello' }),
       ],
     });
 
@@ -232,7 +231,7 @@ describe('local JSON v1 export', () => {
     });
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 40,
-      messages: [message('legacy-transcript', { contentMarkdown: 'legacy md', contentText: 'legacy text' })],
+      messages: [message('legacy-transcript', { contentMarkdown: 'legacy md' })],
     });
 
     const result = await buildConversationsJsonZipExport({ conversations: [c] });
@@ -243,7 +242,7 @@ describe('local JSON v1 export', () => {
     });
   });
 
-  it('does not export retired contentText when the canonical Markdown body is empty', async () => {
+  it('keeps an empty canonical Markdown body authoritative', async () => {
     const c = conversation(41, {
       source: 'web',
       sourceType: 'article',
@@ -251,7 +250,7 @@ describe('local JSON v1 export', () => {
     });
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 41,
-      messages: [message('article_body', { contentMarkdown: '', contentText: 'retired duplicate' })],
+      messages: [message('article_body', { contentMarkdown: '' })],
     });
 
     const result = await buildConversationsJsonZipExport({ conversations: [c] });
@@ -259,7 +258,6 @@ describe('local JSON v1 export', () => {
 
     expect(entry.value.content).toBeNull();
     expect(entry.value.attachments).toEqual([]);
-    expect(JSON.stringify(entry.value)).not.toContain('retired duplicate');
     expect(mocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
   });
 
@@ -276,10 +274,7 @@ describe('local JSON v1 export', () => {
     const markdownB = '![one](syncnos-asset://1)\n![two-again](syncnos-asset://2)';
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 5,
-      messages: [
-        message('m-a', { contentMarkdown: markdownA, contentText: 'text A' }),
-        message('m-b', { contentMarkdown: markdownB, contentText: 'text B' }),
-      ],
+      messages: [message('m-a', { contentMarkdown: markdownA }), message('m-b', { contentMarkdown: markdownB })],
     });
     mocks.getImageCacheAssetsByIds.mockImplementation(async ({ ids, conversationId }: any) => {
       expect(ids).toEqual([2, 3, 1]);
@@ -437,7 +432,7 @@ describe('local JSON v1 export', () => {
     const base = buildConversationBasename(items[0]);
     mocks.getConversationDetail.mockImplementation(async (id: number) => ({
       conversationId: id,
-      messages: [message('article_body', { contentMarkdown: `body-${id}`, contentText: `text-${id}` })],
+      messages: [message('article_body', { contentMarkdown: `body-${id}` })],
     }));
 
     const result = await buildConversationsJsonZipExport({ conversations: items });

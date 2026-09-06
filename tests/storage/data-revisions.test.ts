@@ -362,7 +362,7 @@ describe('data revision storage', () => {
 
   it('advances the messages revision only for actual message row mutations', async () => {
     const { syncConversationMessages } = await import('@services/conversations/data/storage-idb');
-    const message = { messageKey: 'm1', role: 'user', contentText: 'stable', sequence: 1 };
+    const message = { messageKey: 'm1', role: 'user', contentMarkdown: 'stable', sequence: 1 };
 
     await syncConversationMessages(42, [{ ...message, updatedAt: 10 }]);
     expect(await readDataRevision('messages')).toBe(1);
@@ -1043,7 +1043,6 @@ describe('data revision storage', () => {
                 id: 500,
                 messageKey: 'm1',
                 role: 'assistant',
-                contentText: 'Asset',
                 contentMarkdown: '![asset](syncnos-asset://7)',
                 sequence: 1,
                 updatedAt: 10,

@@ -333,8 +333,8 @@ describe('conversations storage-idb', () => {
     const id = Number(convo.id);
 
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'u', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'a', sequence: 2, updatedAt: 2 },
     ]);
 
     const before = await getMessagesByConversationId(id);
@@ -342,7 +342,7 @@ describe('conversations storage-idb', () => {
 
     // Re-sync with only one message; should delete m2.
     const res = await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'u2', sequence: 1, updatedAt: 3 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'u2', sequence: 1, updatedAt: 3 },
     ]);
     expect(res.upserted).toBe(1);
     expect(res.deleted).toBe(1);
@@ -364,7 +364,6 @@ describe('conversations storage-idb', () => {
       messageKey: 'm1',
       role: 'user',
       authorName: 'User',
-      contentText: 'same',
       contentMarkdown: 'same',
       sequence: 1,
     };
@@ -420,7 +419,7 @@ describe('conversations storage-idb', () => {
     });
     const before = Date.now();
     await syncConversationMessages(Number(convo.id), [
-      { messageKey: 'm1', role: 'user', contentText: 'new', sequence: 1, updatedAt: 'invalid' },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'new', sequence: 1, updatedAt: 'invalid' },
     ]);
     const stored = await getMessagesByConversationId(Number(convo.id));
     expect(Number(stored[0]?.updatedAt)).toBeGreaterThanOrEqual(before);
@@ -437,18 +436,18 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0, updatedAt: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1, updatedAt: 2 },
-      { messageKey: 'm3', role: 'user', contentText: 'remove', sequence: 2, updatedAt: 3 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 0, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 1, updatedAt: 2 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'remove', sequence: 2, updatedAt: 3 },
     ]);
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
     const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
     try {
       const result = await syncConversationMessages(id, [
-        { messageKey: 'm1', role: 'user', contentText: 'one updated', sequence: 0, updatedAt: 4 },
-        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1, updatedAt: 2 },
-        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 2, updatedAt: 5 },
+        { messageKey: 'm1', role: 'user', contentMarkdown: 'one updated', sequence: 0, updatedAt: 4 },
+        { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 1, updatedAt: 2 },
+        { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 2, updatedAt: 5 },
       ]);
       expect(result).toEqual({ upserted: 3, deleted: 1 });
 
@@ -485,8 +484,8 @@ describe('conversations storage-idb', () => {
     const id = Number(convo.id);
 
     const result = await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'first', sequence: 0, updatedAt: 1 },
-      { messageKey: 'm1', role: 'assistant', contentText: 'second', sequence: 1, updatedAt: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'first', sequence: 0, updatedAt: 1 },
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: 'second', sequence: 1, updatedAt: 2 },
     ]);
 
     expect(result).toEqual({ upserted: 2, deleted: 0 });
@@ -504,12 +503,12 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 1,
     });
     const id = Number(convo.id);
-    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'old', sequence: 0 }]);
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 0 }]);
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
     const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
     try {
-      await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'new', sequence: 0 }], {
+      await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'new', sequence: 0 }], {
         mode: 'append',
         diff: { added: [], updated: ['m1'], removed: [] },
       });
@@ -538,8 +537,8 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 10 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 20 },
     ]);
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
@@ -551,14 +550,14 @@ describe('conversations storage-idb', () => {
           {
             messageKey: 'm2',
             role: 'assistant',
-            contentText: 'two updated',
+            contentMarkdown: 'two updated',
             sequence: 0,
             captureSequencePolicy: 'preserve-existing-tail',
           },
           {
             messageKey: 'm3',
             role: 'user',
-            contentText: 'three',
+            contentMarkdown: 'three',
             sequence: 0,
             captureSequencePolicy: 'preserve-existing-tail',
           },
@@ -596,7 +595,7 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: ' m1 ', role: 'user', contentText: 'legacy spaced key', sequence: 0 },
+      { messageKey: ' m1 ', role: 'user', contentMarkdown: 'legacy spaced key', sequence: 0 },
     ]);
 
     await syncConversationMessages(
@@ -605,7 +604,7 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm1',
           role: 'assistant',
-          contentText: 'normalized incoming key',
+          contentMarkdown: 'normalized incoming key',
           sequence: 0,
           captureSequencePolicy: 'preserve-existing-tail',
         },
@@ -629,8 +628,8 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
-      { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 0 },
+      { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 1 },
     ]);
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
@@ -642,28 +641,28 @@ describe('conversations storage-idb', () => {
           {
             messageKey: 'm1',
             role: 'user',
-            contentText: 'one',
+            contentMarkdown: 'one',
             sequence: 0,
             captureSequencePolicy: 'reconcile-existing-order',
           },
           {
             messageKey: 'm2',
             role: 'assistant',
-            contentText: 'two',
+            contentMarkdown: 'two',
             sequence: 1,
             captureSequencePolicy: 'reconcile-existing-order',
           },
           {
             messageKey: 'm3',
             role: 'user',
-            contentText: 'three',
+            contentMarkdown: 'three',
             sequence: 2,
             captureSequencePolicy: 'reconcile-existing-order',
           },
           {
             messageKey: 'm4',
             role: 'assistant',
-            contentText: 'four',
+            contentMarkdown: 'four',
             sequence: 3,
             captureSequencePolicy: 'reconcile-existing-order',
           },
@@ -706,7 +705,6 @@ describe('conversations storage-idb', () => {
         messageKey: 'm1',
         role: 'user',
         authorName: 'Alice',
-        contentText: 'text one',
         contentMarkdown: 'before one',
         sequence: 7,
         updatedAt: 101,
@@ -715,7 +713,6 @@ describe('conversations storage-idb', () => {
         messageKey: 'm2',
         role: 'assistant',
         authorName: 'Bot',
-        contentText: 'text two',
         contentMarkdown: 'before two',
         sequence: 8,
         updatedAt: 102,
@@ -742,22 +739,20 @@ describe('conversations storage-idb', () => {
     const afterRows = await getMessagesByConversationId(id);
     expect(afterRows.map((row) => row.contentMarkdown)).toEqual(['after one', 'after two']);
     expect(
-      afterRows.map(({ id: rowId, messageKey, role, authorName, contentText, sequence, updatedAt }) => ({
+      afterRows.map(({ id: rowId, messageKey, role, authorName, sequence, updatedAt }) => ({
         id: rowId,
         messageKey,
         role,
         authorName,
-        contentText,
         sequence,
         updatedAt,
       })),
     ).toEqual(
-      beforeRows.map(({ id: rowId, messageKey, role, authorName, contentText, sequence, updatedAt }) => ({
+      beforeRows.map(({ id: rowId, messageKey, role, authorName, sequence, updatedAt }) => ({
         id: rowId,
         messageKey,
         role,
         authorName,
-        contentText,
         sequence,
         updatedAt,
       })),
@@ -774,8 +769,8 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', contentMarkdown: 'latest one', sequence: 0 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', contentMarkdown: 'before two', sequence: 1 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'latest one', sequence: 0 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'before two', sequence: 1 },
     ]);
     const beforeRevision = await readDataRevision('messages');
 
@@ -802,9 +797,7 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 1,
     });
     const id = Number(convo.id);
-    await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', contentMarkdown: 'stable', sequence: 0 },
-    ]);
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'stable', sequence: 0 }]);
     const beforeRevision = await readDataRevision('messages');
 
     expect(
@@ -859,15 +852,15 @@ describe('conversations storage-idb', () => {
     const id = Number(convo.id);
 
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'u', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'a', sequence: 2, updatedAt: 2 },
     ]);
 
     // Incremental update only provides m1 (e.g. partial render) and does not mark m2 as removed:
     // m2 should remain.
     const res1 = await syncConversationMessages(
       id,
-      [{ messageKey: 'm1', role: 'user', contentText: 'u2', sequence: 1, updatedAt: 3 }],
+      [{ messageKey: 'm1', role: 'user', contentMarkdown: 'u2', sequence: 1, updatedAt: 3 }],
       { mode: 'incremental', diff: { added: [], updated: ['m1'], removed: [] } },
     );
     expect(res1.upserted).toBe(1);
@@ -879,7 +872,7 @@ describe('conversations storage-idb', () => {
     // Incremental delete removes only explicitly removed keys.
     const res2 = await syncConversationMessages(
       id,
-      [{ messageKey: 'm1', role: 'user', contentText: 'u3', sequence: 1, updatedAt: 4 }],
+      [{ messageKey: 'm1', role: 'user', contentMarkdown: 'u3', sequence: 1, updatedAt: 4 }],
       { mode: 'incremental', diff: { added: [], updated: ['m1'], removed: ['m2'] } },
     );
     expect(res2.upserted).toBe(1);
@@ -897,10 +890,10 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 1,
     });
     const id = Number(convo.id);
-    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'old', sequence: 0 }]);
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 0 }]);
 
     await expect(
-      syncConversationMessages(id, [{ messageKey: 'm2', role: 'assistant', contentText: 'new', sequence: 1 }], {
+      syncConversationMessages(id, [{ messageKey: 'm2', role: 'assistant', contentMarkdown: 'new', sequence: 1 }], {
         mode: 'snapshop' as any,
       }),
     ).rejects.toThrow('Unknown message persistence mode');
@@ -918,13 +911,13 @@ describe('conversations storage-idb', () => {
     const id = Number(convo.id);
 
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'u', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'a', sequence: 2, updatedAt: 2 },
     ]);
 
     const res = await syncConversationMessages(
       id,
-      [{ messageKey: 'm1', role: 'user', contentText: 'u2', sequence: 1, updatedAt: 3 }],
+      [{ messageKey: 'm1', role: 'user', contentMarkdown: 'u2', sequence: 1, updatedAt: 3 }],
       { mode: 'append', diff: { added: [], updated: ['m1'], removed: ['m2'] } },
     );
     expect(res.upserted).toBe(1);
@@ -949,13 +942,13 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'old', sequence: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'keep', sequence: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'keep', sequence: 2 },
     ]);
 
     const result = await syncConversationMessages(
       id,
-      [{ messageKey: 'm1', role: 'user', contentText: 'new', sequence: 1 }],
+      [{ messageKey: 'm1', role: 'user', contentMarkdown: 'new', sequence: 1 }],
       { mode: 'append', diff: diff as any },
     );
 
@@ -975,11 +968,11 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'old', sequence: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'keep', sequence: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'keep', sequence: 2 },
     ]);
 
-    const result = await syncConversationMessages(id, [{ role: 'user', contentText: 'ignored', sequence: 1 }], {
+    const result = await syncConversationMessages(id, [{ role: 'user', contentMarkdown: 'ignored', sequence: 1 }], {
       mode: 'append',
       diff: null,
     });
@@ -998,13 +991,13 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'old', sequence: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'keep', sequence: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'keep', sequence: 2 },
     ]);
 
     const result = await syncConversationMessages(
       id,
-      [{ messageKey: 'm1', role: 'user', contentText: 'ignored', sequence: 1 }],
+      [{ messageKey: 'm1', role: 'user', contentMarkdown: 'ignored', sequence: 1 }],
       { mode: 'incremental', diff: null },
     );
 
@@ -1022,9 +1015,9 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
-      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 30 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 10 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 20 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 30 },
     ]);
 
     await syncConversationMessages(
@@ -1033,21 +1026,21 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm3',
           role: 'user',
-          contentText: 'three updated',
+          contentMarkdown: 'three updated',
           sequence: 0,
           captureSequencePolicy: 'preserve-existing-tail',
         },
         {
           messageKey: 'm4',
           role: 'assistant',
-          contentText: 'four',
+          contentMarkdown: 'four',
           sequence: 0,
           captureSequencePolicy: 'preserve-existing-tail',
         },
         {
           messageKey: 'm5',
           role: 'user',
-          contentText: 'five',
+          contentMarkdown: 'five',
           sequence: 0,
           captureSequencePolicy: 'preserve-existing-tail',
         },
@@ -1081,14 +1074,14 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm2',
           role: 'assistant',
-          contentText: 'second',
+          contentMarkdown: 'second',
           sequence: 99,
           captureSequencePolicy: 'preserve-existing-tail',
         },
         {
           messageKey: 'm1',
           role: 'user',
-          contentText: 'first',
+          contentMarkdown: 'first',
           sequence: 99,
           captureSequencePolicy: 'preserve-existing-tail',
         },
@@ -1118,14 +1111,14 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm1',
           role: 'user',
-          contentText: 'one',
+          contentMarkdown: 'one',
           sequence: 999,
           captureSequencePolicy: 'preserve-existing-tail',
         },
         {
           messageKey: 'm2',
           role: 'assistant',
-          contentText: 'two',
+          contentMarkdown: 'two',
           sequence: 999,
           captureSequencePolicy: 'preserve-existing-tail',
         },
@@ -1146,17 +1139,17 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
-      { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 0 },
+      { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 1 },
     ]);
 
     const integrity = resolveCaptureIntegrity('chatgpt', {
       conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_prefix_reconcile' },
       messages: [
-        { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0 },
-        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1 },
-        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 2 },
-        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 3 },
+        { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 0 },
+        { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 2 },
+        { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 3 },
       ],
       captureMeta: {
         completeness: 'partial',
@@ -1187,19 +1180,19 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
-      { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
-      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 2 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 3 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 0 },
+      { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 1 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 2 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 3 },
     ]);
 
     const integrity = resolveCaptureIntegrity('chatgpt', {
       conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_legacy_order_recovery' },
       messages: [
-        { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0 },
-        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1 },
-        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 2 },
-        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 3 },
+        { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 0 },
+        { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 2 },
+        { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 3 },
       ],
       captureMeta: { completeness: 'partial', identityVerified: true, reasons: ['bottom_not_reached'] },
     });
@@ -1226,16 +1219,16 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
-      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 30 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 10 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 30 },
     ]);
 
     const integrity = resolveCaptureIntegrity('chatgpt', {
       conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_middle_reconcile' },
       messages: [
-        { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 0 },
-        { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 1 },
-        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 2 },
+        { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 0 },
+        { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 2 },
       ],
       captureMeta: { completeness: 'partial', identityVerified: true, reasons: ['bottom_not_reached'] },
     });
@@ -1261,15 +1254,15 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 10 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 20 },
     ]);
 
     const integrity = resolveCaptureIntegrity('chatgpt', {
       conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'partial_unanchored_tail' },
       messages: [
-        { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 0 },
-        { messageKey: 'm4', role: 'assistant', contentText: 'four', sequence: 1 },
+        { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 0 },
+        { messageKey: 'm4', role: 'assistant', contentMarkdown: 'four', sequence: 1 },
       ],
       captureMeta: { completeness: 'partial', identityVerified: true, reasons: ['order_unanchored'] },
     });
@@ -1296,11 +1289,11 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
-      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 30 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'two', sequence: 20 },
+      { messageKey: 'm3', role: 'user', contentMarkdown: 'three', sequence: 30 },
     ]);
 
-    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 }], {
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'one', sequence: 10 }], {
       mode: 'append',
       diff: { added: ['m1'], updated: [], removed: [] },
     });
@@ -1322,19 +1315,16 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'assistant', contentText: 'old', contentMarkdown: '**old**', sequence: 0 },
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: '**old**', sequence: 0 },
     ]);
 
-    await syncConversationMessages(
-      id,
-      [{ messageKey: 'm1', role: 'assistant', contentText: 'append plain', contentMarkdown: '', sequence: 0 }],
-      { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
-    );
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'assistant', contentMarkdown: '', sequence: 0 }], {
+      mode: 'append',
+      diff: { added: [], updated: ['m1'], removed: [] },
+    });
     expect((await getMessagesByConversationId(id))[0].contentMarkdown).toBe('');
 
-    await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'assistant', contentText: 'snapshot plain', contentMarkdown: '', sequence: 0 },
-    ]);
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'assistant', contentMarkdown: '', sequence: 0 }]);
     expect((await getMessagesByConversationId(id))[0].contentMarkdown).toBe('');
   });
 
@@ -1351,7 +1341,6 @@ describe('conversations storage-idb', () => {
       {
         messageKey: 'm1',
         role: 'assistant',
-        contentText: 'old text',
         contentMarkdown: '![rich](data:image/png;base64,abc)',
         sequence: 5,
         updatedAt: 10,
@@ -1364,7 +1353,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm1',
           role: 'assistant',
-          contentText: 'new text',
           contentMarkdown: 'plain fallback',
           sequence: 0,
           updatedAt: 20,
@@ -1400,7 +1388,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm1',
           role: 'assistant',
-          contentText: 'fallback',
           contentMarkdown: 'fallback',
           sequence: 0,
           captureMergePolicy: 'preserve-existing-markdown',
@@ -1415,7 +1402,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm1',
           role: 'assistant',
-          contentText: 'complete',
           contentMarkdown: 'complete\n\n![](syncnos-asset://asset-1)',
           sequence: 0,
         },
@@ -1443,7 +1429,6 @@ describe('conversations storage-idb', () => {
       {
         messageKey: 'm1',
         role: 'assistant',
-        contentText: 'hydrated report',
         contentMarkdown: '# Hydrated report',
         sequence: 3,
         updatedAt: 0,
@@ -1456,7 +1441,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm1',
           role: 'assistant',
-          contentText: 'placeholder',
           contentMarkdown: 'placeholder',
           sequence: 0,
           updatedAt: 20,
@@ -1466,7 +1450,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'm2',
           role: 'assistant',
-          contentText: 'first placeholder',
           contentMarkdown: 'first placeholder',
           sequence: 0,
           updatedAt: 30,
@@ -1505,7 +1488,6 @@ describe('conversations storage-idb', () => {
       {
         messageKey: 'research-1',
         role: 'assistant',
-        contentText: 'Complete report',
         contentMarkdown: '# Complete report',
         sequence: 0,
         updatedAt: 10,
@@ -1519,7 +1501,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'research-1',
           role: 'assistant',
-          contentText: placeholder,
           contentMarkdown: placeholder,
           captureSequencePolicy: 'preserve-existing-tail',
           captureMergePolicy: 'preserve-existing-content',
@@ -1527,7 +1508,6 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'research-2',
           role: 'assistant',
-          contentText: placeholder,
           contentMarkdown: placeholder,
           captureSequencePolicy: 'preserve-existing-tail',
           captureMergePolicy: 'preserve-existing-content',
@@ -1558,7 +1538,7 @@ describe('conversations storage-idb', () => {
         return {
           messageKey: `tail_${sequence}`,
           role: sequence % 2 === 0 ? 'assistant' : 'user',
-          contentText: `content_${sequence}`,
+          contentMarkdown: `content_${sequence}`,
           sequence,
           updatedAt: sequence,
         };
@@ -1594,7 +1574,7 @@ describe('conversations storage-idb', () => {
         return {
           messageKey: `window_${sequence}`,
           role: sequence % 2 === 0 ? 'assistant' : 'user',
-          contentText: `content_${sequence}`,
+          contentMarkdown: `content_${sequence}`,
           sequence,
           updatedAt: sequence,
         };
@@ -1988,7 +1968,7 @@ describe('conversations storage-idb', () => {
     const id = Number(convo.id);
 
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'u', sequence: 1, updatedAt: 1 },
     ]);
 
     // Insert a mapping directly.
@@ -2030,7 +2010,7 @@ describe('conversations storage-idb', () => {
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
-      { messageKey: 'm1', role: 'user', contentText: 'delete me', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'delete me', sequence: 1, updatedAt: 1 },
     ]);
     await seedImageCacheRow({
       conversationId: id,
@@ -2914,8 +2894,8 @@ describe('conversations storage-idb', () => {
     const removeKey = String(remove.conversationKey || '');
 
     await syncConversationMessages(removeId, [
-      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'u', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentMarkdown: 'a', sequence: 2, updatedAt: 2 },
     ]);
 
     const ownedLegacyPath = `WebArticles/${buildConversationBasename(remove)}.md`;
@@ -3133,7 +3113,7 @@ describe('conversations storage-idb', () => {
   it('rolls back earlier merge mutations and all revisions when an image write fails', async () => {
     const { keepId, removeId } = await createMergePair('image-abort');
     await syncConversationMessages(removeId, [
-      { messageKey: 'm1', role: 'user', contentText: 'remove-message', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'remove-message', sequence: 1, updatedAt: 1 },
     ]);
     await seedImageCacheRow({
       conversationId: removeId,

@@ -8,7 +8,6 @@ import {
   normalizeWebArticleConversationKey,
   WEB_ARTICLE_SOURCE,
 } from '@services/conversations/domain/article-identity';
-import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
@@ -32,7 +31,6 @@ import {
   normalizeConversationListRecord,
 } from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
-import { resolveIncomingMessageMarkdown, resolveMessageMarkdown } from '@platform/idb/message-record';
 import {
   DATA_REVISION_RECORD_KEY,
   DATA_REVISION_STORE_BY_SCOPE,
@@ -972,15 +970,15 @@ export async function syncConversationMessages(
                 : Number.isFinite(m.sequence)
                   ? m.sequence
                   : 0;
-          const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
-          const mergePolicy: CaptureMessageMergePolicy =
-            rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
-              ? rawMergePolicy
-              : 'replace';
-          const incomingMarkdown = resolveIncomingMessageMarkdown(m);
+          const mergePolicy =
+            m.captureMergePolicy === 'preserve-existing-markdown' ||
+            m.captureMergePolicy === 'preserve-existing-content'
+              ? m.captureMergePolicy
+              : null;
+          const incomingMarkdown = String(m.contentMarkdown ?? '');
           const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
           const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
-          const existingMarkdown = resolveMessageMarkdown(existing);
+          const existingMarkdown = String(existing?.contentMarkdown ?? '');
           const preserveExistingMarkdown =
             !!existing &&
             (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
@@ -1040,7 +1038,7 @@ export async function syncConversationMessages(
         presentKeys.add(String(m.messageKey));
 
         const existing: any = existingByKey.get(m.messageKey);
-        const incomingMarkdown = resolveIncomingMessageMarkdown(m);
+        const incomingMarkdown = String(m.contentMarkdown ?? '');
         const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
         const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
         const baseRecord: Record<string, unknown> = {

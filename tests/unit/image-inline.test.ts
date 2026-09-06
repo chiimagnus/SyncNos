@@ -482,7 +482,6 @@ describe('image-inline', () => {
         messageKey: 'm-policy',
         role: 'assistant',
         sequence: 0,
-        contentText: 'fallback',
         contentMarkdown: `fallback\n\n![](${dataImageUrl})`,
         captureSequencePolicy: 'preserve-existing-tail',
         captureMergePolicy: 'preserve-existing-markdown',

@@ -3,8 +3,7 @@ import {
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
-import { normalizeStoredMessageRecord, resolveMessageMarkdown } from '@platform/idb/message-record';
-import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
+import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 import {
   canonicalizeInpageDisplayModeStorageRecord,
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
@@ -145,57 +144,19 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
 }
 
 function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownRecord) {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-  const aUpdated = validTimestamp(a.updatedAt) ?? 0;
-  const bUpdated = validTimestamp(b.updatedAt) ?? 0;
-  if (bUpdated && bUpdated > aUpdated) return true;
-
-  const aMd = resolveMessageMarkdown(a);
-  const bMd = resolveMessageMarkdown(b);
-  if (!aMd.trim() && bMd.trim()) return true;
-  return false;
-}
-
-function normalizedSemanticText(markdown: unknown): string {
-  return markdownToSemanticText(markdown).replace(/\s+/g, ' ').trim();
-}
-
-function isPlainMarkdown(markdown: string): boolean {
-  return markdown.replace(/\s+/g, ' ').trim() === normalizedSemanticText(markdown);
-}
-
-function pickMergedMessageMarkdown(preferred: UnknownRecord, fallback: UnknownRecord): string {
-  const preferredMarkdown = resolveMessageMarkdown(preferred);
-  const fallbackMarkdown = resolveMessageMarkdown(fallback);
-  if (!preferredMarkdown.trim() || !fallbackMarkdown.trim() || preferredMarkdown === fallbackMarkdown) {
-    return preferredMarkdown;
-  }
-
-  const preferredText = normalizedSemanticText(preferredMarkdown);
-  const fallbackText = normalizedSemanticText(fallbackMarkdown);
-  if (
-    preferredText &&
-    preferredText === fallbackText &&
-    isPlainMarkdown(preferredMarkdown) &&
-    !isPlainMarkdown(fallbackMarkdown)
-  ) {
-    return fallbackMarkdown;
-  }
-  return preferredMarkdown;
+  const aUpdated = validTimestamp(existing.updatedAt) ?? 0;
+  const bUpdated = validTimestamp(incoming.updatedAt) ?? 0;
+  return bUpdated > aUpdated;
 }
 
 export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = normalizeStoredMessageRecord(existing);
-  const b = normalizeStoredMessageRecord(incoming);
+  const hasExisting = !!existing && typeof existing === 'object';
+  const a = hasExisting ? normalizeLegacyMessageRecord(existing) : {};
+  const b = normalizeLegacyMessageRecord(incoming);
 
-  const preferIncoming = shouldPreferIncomingMessage(a, b);
-  const preferred = preferIncoming ? b : a;
-  const fallback = preferIncoming ? a : b;
-  const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
-  base.contentMarkdown = pickMergedMessageMarkdown(preferred, fallback);
-  const next = normalizeStoredMessageRecord(base);
-  next.role = pickStringPreferExisting(base.role, 'assistant') || 'assistant';
+  const preferIncoming = !hasExisting || shouldPreferIncomingMessage(a, b);
+  const next = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+  next.role = pickStringPreferExisting(next.role, 'assistant') || 'assistant';
 
   const aUpdated = validTimestamp(a.updatedAt);
   const bUpdated = validTimestamp(b.updatedAt);

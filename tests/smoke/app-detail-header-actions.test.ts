@@ -209,7 +209,6 @@ describe('ConversationDetailPane header actions', () => {
           id: 1101,
           messageKey: 'chat-11-user-1',
           role: 'user',
-          contentText: 'Outline entry',
           contentMarkdown: 'Outline entry',
         },
       ],

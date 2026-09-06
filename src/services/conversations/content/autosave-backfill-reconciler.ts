@@ -10,7 +10,6 @@ type BackfillComparable = {
   stableKey: string;
   identityHash: string;
   weakIdentityHash: string;
-  text: string;
   markdown: string;
 };
 
@@ -26,7 +25,6 @@ function toComparable(messages: any[]): BackfillComparable[] {
       stableKey,
       identityHash: meta.identityHash,
       weakIdentityHash: weakMeta.identityHash,
-      text: meta.text,
       markdown: meta.markdown,
     };
   });

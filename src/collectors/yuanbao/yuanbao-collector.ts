@@ -81,7 +81,7 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
           : contentText;
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
       out.push({
-        messageKey: env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i }),
+        messageKey: env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence: i }),
         role,
         contentMarkdown,
         sequence: i,

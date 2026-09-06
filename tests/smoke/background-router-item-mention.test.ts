@@ -274,7 +274,7 @@ describe('background-router item mention', () => {
     });
     storageMocks.getConversationDetail.mockResolvedValue({
       conversationId: 123,
-      messages: [{ id: 1, conversationId: 123, messageKey: 'm1', role: 'user', contentText: 'hi' }],
+      messages: [{ id: 1, conversationId: 123, messageKey: 'm1', role: 'user', contentMarkdown: 'hi' }],
     });
     externalMarkdownMocks.formatConversationMarkdownForExternalOutput.mockResolvedValue('MARKDOWN');
 

@@ -126,7 +126,7 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
       const baseMarkdown = !isUser ? item.__kimiContentMarkdown || contentText : contentText;
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
       out.push({
-        messageKey: env.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
+        messageKey: env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence: seq }),
         role,
         contentMarkdown,
         sequence: seq,

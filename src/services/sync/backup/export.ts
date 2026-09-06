@@ -1,4 +1,3 @@
-import { normalizeStoredMessageRecord } from '@platform/idb/message-record';
 import { stripSyncMappingLocalId } from '@platform/idb/sync-mapping-record';
 import { storageGetAll, storageSet } from '@platform/storage/local';
 import {
@@ -47,7 +46,7 @@ function stripLocalConversation(conversation: AnyRecord) {
 }
 
 function stripLocalMessage(message: AnyRecord) {
-  const m = normalizeStoredMessageRecord(message);
+  const m = message && typeof message === 'object' ? { ...message } : {};
   delete m.id;
   delete m.conversationId;
   return m;

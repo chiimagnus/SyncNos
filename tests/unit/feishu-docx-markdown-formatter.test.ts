@@ -9,9 +9,9 @@ describe('feishu docx markdown formatter', () => {
       {
         conversationId: 1,
         messages: [
-          { id: 1, conversationId: 1, messageKey: 'm1', role: 'content', contentText: 'a' } as any,
-          { id: 2, conversationId: 1, messageKey: 'm2', role: 'user', contentText: 'b' } as any,
-          { id: 3, conversationId: 1, messageKey: 'm3', role: 'assistant', contentText: 'c' } as any,
+          { id: 1, conversationId: 1, messageKey: 'm1', role: 'content', contentMarkdown: 'a' } as any,
+          { id: 2, conversationId: 1, messageKey: 'm2', role: 'user', contentMarkdown: 'b' } as any,
+          { id: 3, conversationId: 1, messageKey: 'm3', role: 'assistant', contentMarkdown: 'c' } as any,
         ],
       } as any,
     );
@@ -29,7 +29,7 @@ describe('feishu docx markdown formatter', () => {
       { id: 1, source: 'x', conversationKey: 'k', title: 't', sourceType: 'article' } as any,
       {
         conversationId: 1,
-        messages: [{ id: 1, conversationId: 1, messageKey: 'm1', role: 'content', contentText: 'body' } as any],
+        messages: [{ id: 1, conversationId: 1, messageKey: 'm1', role: 'content', contentMarkdown: 'body' } as any],
       } as any,
     );
 

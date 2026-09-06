@@ -66,14 +66,6 @@ describe('resolveCaptureIntegrity', () => {
     expect(result.ok ? result.persistence.mode : result.code).not.toBe('snapshot');
   });
 
-  it('downgrades complete virtual metadata with failure reasons to append', () => {
-    const result = resolveCaptureIntegrity(
-      'chatgpt',
-      snapshot({ captureMeta: { completeness: 'complete', identityVerified: true, reasons: ['step_timeout'] } }),
-    );
-    expect(result).toMatchObject({ ok: true, meta: { completeness: 'partial' }, persistence: { mode: 'append' } });
-  });
-
   it('rejects a virtual snapshot whose source does not match its collector', () => {
     const result = resolveCaptureIntegrity(
       'chatgpt',
@@ -100,8 +92,8 @@ describe('resolveCaptureIntegrity', () => {
     expect(result.snapshot.messages[0]).toMatchObject({
       messageKey: 'm1',
       captureSequencePolicy: 'reconcile-existing-order',
-      captureMergePolicy: 'replace',
     });
+    expect(result.snapshot.messages[0]).not.toHaveProperty('captureMergePolicy');
     expect(result.meta).toEqual({
       completeness: 'partial',
       identityVerified: true,
@@ -166,7 +158,7 @@ describe('resolveCaptureIntegrity', () => {
     expect(result).toMatchObject({ ok: false, code: 'capture_integrity_no_safe_messages' });
   });
 
-  it('keeps legacy non-virtual collectors on snapshot without metadata', () => {
+  it('keeps non-virtual collectors on snapshot without metadata', () => {
     const result = resolveCaptureIntegrity('gemini', snapshot({ captureMeta: undefined }));
     expect(result).toMatchObject({ ok: true, meta: null, persistence: { mode: 'snapshot', diff: null } });
   });
@@ -193,14 +185,14 @@ describe('resolveCaptureIntegrity', () => {
     ]);
   });
 
-  it('forces protective merge policy to partial persistence', () => {
+  it('does not let a transient merge policy override complete capture metadata', () => {
     const result = resolveCaptureIntegrity(
       'chatgpt',
       snapshot({
         messages: [
           {
             messageKey: 'm1',
-            contentMarkdown: 'placeholder',
+            contentMarkdown: 'complete body',
             captureMergePolicy: 'preserve-existing-content',
           },
         ],
@@ -208,8 +200,8 @@ describe('resolveCaptureIntegrity', () => {
     );
     expect(result).toMatchObject({
       ok: true,
-      meta: { completeness: 'partial', reasons: ['protective_message_merge'] },
-      persistence: { mode: 'append' },
+      meta: { completeness: 'complete' },
+      persistence: { mode: 'snapshot', diff: null },
     });
   });
 

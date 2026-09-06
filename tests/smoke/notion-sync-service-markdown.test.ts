@@ -129,7 +129,7 @@ describe('notion-sync-service markdown', () => {
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
-    const messages = [{ role: 'assistant', contentText: 'plain', contentMarkdown: '- item **b**' }];
+    const messages = [{ role: 'assistant', contentMarkdown: '- item **b**' }];
     const blocks = notionSyncService.messagesToBlocks(messages, { source: 'notionai' });
     expect(blocks.some((b: any) => b && b.type === 'bulleted_list_item')).toBe(true);
   });
@@ -138,7 +138,7 @@ describe('notion-sync-service markdown', () => {
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
-    const messages = [{ role: 'user', authorName: 'Alice', contentText: 'hi' }];
+    const messages = [{ role: 'user', authorName: 'Alice', contentMarkdown: 'hi' }];
     const blocks = notionSyncService.messagesToBlocks(messages, { source: 'chatgpt' });
     const heading = blocks.find((b: any) => b && b.type === 'heading_3');
     expect(heading?.heading_3?.rich_text?.[0]?.text?.content).toBe('Alice');
@@ -148,7 +148,7 @@ describe('notion-sync-service markdown', () => {
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
-    const messages = [{ role: 'assistant', contentText: 'plain', contentMarkdown: '```js\nconsole.log(1)\n```' }];
+    const messages = [{ role: 'assistant', contentMarkdown: '```js\nconsole.log(1)\n```' }];
     const blocks = notionSyncService.messagesToBlocks(messages, { source: 'zai' });
     expect(blocks.some((b: any) => b && b.type === 'code')).toBe(true);
   });

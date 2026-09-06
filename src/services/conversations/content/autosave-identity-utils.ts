@@ -11,7 +11,7 @@ function normalizeContent(value: unknown): string {
 export function getMessageIdentityBase(
   message: any,
   identityPrefixLen: number = IDENTITY_PREFIX_LEN,
-): { role: string; base: string; text: string; markdown: string } {
+): { role: string; base: string; markdown: string } {
   const role = String((message && message.role) || 'assistant').trim() || 'assistant';
   const markdownRaw =
     message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
@@ -20,7 +20,7 @@ export function getMessageIdentityBase(
   const full = text || markdown;
   const clipped = full ? full.slice(0, identityPrefixLen) : '';
   const base = `${role}|${clipped}`;
-  return { role, base, text, markdown };
+  return { role, base, markdown };
 }
 
 export function fingerprintHash(base: string): string {
@@ -64,13 +64,11 @@ export function classifyPrefixOrFillingUpdate(
 export function getMessageIdentityMeta(
   message: any,
   identityPrefixLen: number = IDENTITY_PREFIX_LEN,
-): { role: string; text: string; markdown: string; base: string; identityHash: string } {
-  const { role, text, markdown, base } = getMessageIdentityBase(message, identityPrefixLen);
+): { role: string; markdown: string; identityHash: string } {
+  const { role, markdown, base } = getMessageIdentityBase(message, identityPrefixLen);
   return {
     role,
-    text,
     markdown,
-    base,
     identityHash: fingerprintHash(base),
   };
 }

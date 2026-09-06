@@ -115,8 +115,8 @@ describe('current page capture integrity routing', () => {
       messageKey: 'assistant-stable-key',
       contentMarkdown,
       captureSequencePolicy: 'reconcile-existing-order',
-      captureMergePolicy: 'replace',
     });
+    expect(sync?.payload.messages[0]).not.toHaveProperty('captureMergePolicy');
     expect(sync?.payload.messages[0]).not.toHaveProperty('contentText');
   });
 

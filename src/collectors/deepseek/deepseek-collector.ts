@@ -76,7 +76,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
           : contentText;
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
       out.push({
-        messageKey: env.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
+        messageKey: env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence: seq }),
         role,
         contentMarkdown,
         sequence: seq,

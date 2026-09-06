@@ -5,7 +5,7 @@ import {
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
 import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
-import { normalizeStoredMessageRecord } from '@platform/idb/message-record';
+import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 
 export const DB_NAME = 'webclipper';
 export const DB_VERSION = 12;
@@ -115,7 +115,7 @@ function normalizeMessageRecordsForV12({ tx }: MigrationContext): void {
     const cursor = req.result;
     if (!cursor) return;
     const value = (cursor.value || {}) as Record<string, unknown>;
-    const next = normalizeStoredMessageRecord(value);
+    const next = normalizeLegacyMessageRecord(value);
     const hasLegacyText = Object.prototype.hasOwnProperty.call(value, 'contentText');
     if (hasLegacyText || String(value.contentMarkdown ?? '') !== String(next.contentMarkdown ?? '')) {
       cursor.update(next as any);

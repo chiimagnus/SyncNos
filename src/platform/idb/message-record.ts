@@ -1,29 +1,11 @@
 type UnknownRecord = Record<string, unknown>;
 
-function toContentString(value: unknown): string {
-  return value == null ? '' : String(value);
-}
-
-export function resolveMessageMarkdown(message: unknown): string {
+export function normalizeLegacyMessageRecord(message: unknown): UnknownRecord {
   const record = message && typeof message === 'object' ? (message as UnknownRecord) : {};
-  const markdown = toContentString(record.contentMarkdown);
-  if (markdown.trim()) return markdown;
-  return toContentString(record.contentText);
-}
-
-export function resolveIncomingMessageMarkdown(message: unknown): string {
-  const record = message && typeof message === 'object' ? (message as UnknownRecord) : {};
-  if (Object.prototype.hasOwnProperty.call(record, 'contentMarkdown')) {
-    return toContentString(record.contentMarkdown);
-  }
-  return toContentString(record.contentText);
-}
-
-export function normalizeStoredMessageRecord(message: unknown): UnknownRecord {
-  const record = message && typeof message === 'object' ? (message as UnknownRecord) : {};
+  const markdown = record.contentMarkdown == null ? '' : String(record.contentMarkdown);
   const next: UnknownRecord = {
     ...record,
-    contentMarkdown: resolveMessageMarkdown(record),
+    contentMarkdown: markdown.trim() ? markdown : record.contentText == null ? '' : String(record.contentText),
   };
   delete next.contentText;
   return next;

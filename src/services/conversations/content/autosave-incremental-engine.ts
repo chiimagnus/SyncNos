@@ -50,7 +50,7 @@ function normalizeMeta(value: unknown): string {
 
 function buildTailEntries(args: {
   prevTail: TailEntry[];
-  curTail: Array<{ role: string; identityHash: string; text: string; markdown: string; stableIncomingKey: string }>;
+  curTail: Array<{ role: string; identityHash: string; markdown: string; stableIncomingKey: string }>;
   tailWindowMessages: any[];
   stateKeyHash: string;
 }): TailEntry[] {
@@ -208,7 +208,6 @@ export function createAutoSaveIncrementalEngine() {
       const currentComparable: Array<{
         role: string;
         identityHash: string;
-        text: string;
         markdown: string;
         stableIncomingKey: string;
       }> = [];
@@ -219,7 +218,7 @@ export function createAutoSaveIncrementalEngine() {
 
       for (const message of windowMessages) {
         const incomingKeyRaw = String(message?.messageKey || '').trim();
-        const { role, base, text, markdown } = getMessageIdentityBase(message, IDENTITY_PREFIX_LEN);
+        const { role, base, markdown } = getMessageIdentityBase(message, IDENTITY_PREFIX_LEN);
         const identityHash = fingerprintHash(base);
         const fallbackIncomingKey = incomingKeyRaw.startsWith('fallback_');
 
@@ -239,7 +238,7 @@ export function createAutoSaveIncrementalEngine() {
         }
 
         currentIdentityHashes.push(identityHash);
-        currentComparable.push({ role, identityHash, text, markdown, stableIncomingKey });
+        currentComparable.push({ role, identityHash, markdown, stableIncomingKey });
       }
 
       const baseLastWindowIdentityHashes = baseState?.lastWindowIdentityHashes || [];

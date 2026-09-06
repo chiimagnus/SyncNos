@@ -59,7 +59,7 @@ async function seedConversation(input: {
       Array.from({ length: messageCount }, (_, index) => ({
         messageKey: `${input.conversationKey}-m${index + 1}`,
         role: index % 2 === 0 ? 'user' : 'assistant',
-        contentText: `message ${index + 1}`,
+        contentMarkdown: `message ${index + 1}`,
         sequence: index + 1,
         updatedAt: index + 1,
       })),
@@ -162,7 +162,6 @@ describe('insight stats', () => {
       {
         messageKey: 'chat-key-only-m1',
         role: 'user',
-        contentText: 'small text',
         contentMarkdown: largeMarkdown,
         sequence: 1,
         updatedAt: 1,
@@ -220,7 +219,6 @@ describe('insight stats', () => {
       {
         messageKey: 'chat-key-only-m1',
         role: 'user',
-        contentText: 'small text',
         contentMarkdown: largeMarkdown,
         sequence: 1,
         updatedAt: 1,
@@ -235,7 +233,7 @@ describe('insight stats', () => {
       {
         messageKey: 'chat-key-only-m3',
         role: 'assistant',
-        contentText: 'new message',
+        contentMarkdown: 'new message',
         sequence: 3,
         updatedAt: 3,
       },

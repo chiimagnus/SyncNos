@@ -639,7 +639,7 @@ describe('ConversationsProvider data revisions', () => {
       warningFlags: ['fresh-warning'],
       url: 'https://example.com/fresh',
     };
-    const freshDetail = { conversationId: 1, messages: [{ messageKey: 'm1', contentText: 'fresh body' }] };
+    const freshDetail = { conversationId: 1, messages: [{ messageKey: 'm1', contentMarkdown: 'fresh body' }] };
     whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
     getConversationListBootstrap.mockResolvedValue(makePage([stale]));
     getConversationById.mockResolvedValue(fresh);

@@ -754,7 +754,7 @@ describe('detail-header-actions', () => {
       title: 'Conversation',
       url: 'https://example.com/chat/20',
     };
-    const detail = { conversationId: 20, messages: [{ role: 'user', contentText: 'hello' }] } as any;
+    const detail = { conversationId: 20, messages: [{ role: 'user', contentMarkdown: 'hello' }] } as any;
     const actions = await resolveDetailHeaderActions({ conversation, detail, port: createPort() });
     const action = byId(actions, 'copy-full-markdown');
 
@@ -775,7 +775,7 @@ describe('detail-header-actions', () => {
     const missingActions = await resolveDetailHeaderActions({ conversation, detail: null, port: createPort() });
     const staleActions = await resolveDetailHeaderActions({
       conversation,
-      detail: { conversationId: 999, messages: [{ role: 'user', contentText: 'stale' }] } as any,
+      detail: { conversationId: 999, messages: [{ role: 'user', contentMarkdown: 'stale' }] } as any,
       port: createPort(),
     });
 

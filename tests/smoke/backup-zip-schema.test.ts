@@ -166,7 +166,7 @@ describe('backup zip v2 schema', () => {
     const ok = backupUtils.validateConversationBundle({
       schemaVersion: 1,
       conversation: { source: 'chatgpt', conversationKey: 'c1', title: 'T' },
-      messages: [{ messageKey: 'm1', role: 'user', contentText: 'hi', updatedAt: 1, sequence: 1 }],
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hi', updatedAt: 1, sequence: 1 }],
       syncMapping: null,
     });
     expect(ok.ok).toBe(true);

@@ -7,6 +7,7 @@ import {
   inEditMode as inEditModeUtil,
 } from '@collectors/collector-utils.ts';
 import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
 export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition {
   const DEEP_RESEARCH_MIN_TEXT_LENGTH = 120;
@@ -429,7 +430,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
   function extractDeepResearchPanelContent(
     panel: Element | null,
-  ): { title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode } | null {
+  ): { title: string; contentMarkdown: string; contentRoot: ParentNode } | null {
     if (!panel) return null;
     const title = extractDeepResearchPanelTitle(panel);
     const contentText = extractAssistantText(panel);
@@ -437,7 +438,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     const contentMarkdown = extractAssistantMarkdown(panel, contentText) || contentText;
     return {
       title,
-      contentText,
       contentMarkdown,
       contentRoot: panel,
     };
@@ -593,7 +593,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       {
         ok: boolean;
         title: string;
-        contentText: string;
         contentMarkdown: string;
         contentRoot: ParentNode;
         error?: string;
@@ -605,7 +604,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       {
         ok: boolean;
         title: string;
-        contentText: string;
         contentMarkdown: string;
         contentRoot: ParentNode;
         error?: string;
@@ -631,7 +629,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
         out.set(job.jobKey, {
           ok: false,
           title: job.title || '',
-          contentText: '',
           contentMarkdown: '',
           contentRoot: env.document.body,
           error: 'trigger_not_found',
@@ -652,7 +649,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
         out.set(job.jobKey, {
           ok: false,
           title: job.title || '',
-          contentText: '',
           contentMarkdown: '',
           contentRoot: env.document.body,
           error: 'panel_extract_failed',
@@ -673,27 +669,23 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       {
         ok: boolean;
         title: string;
-        contentText: string;
         contentMarkdown: string;
         contentRoot: ParentNode;
         error?: string;
       }
     >;
-  }): { contentText: string; contentMarkdown: string } {
+  }): { contentMarkdown: string } {
     const baseText = env.normalize.normalizeText(input.baseText || '');
     const baseMarkdown = String(input.baseMarkdown || '').trim() ? String(input.baseMarkdown) : baseText;
 
     const sections: string[] = [];
-    const textParts: string[] = [];
     for (const job of input.jobs) {
       const res = input.results.get(job.jobKey);
       if (res && res.ok) {
         const title = env.normalize.normalizeText(res.title || job.title || '');
-        const md = String(res.contentMarkdown || '').trim() || env.normalize.normalizeText(res.contentText || '');
+        const md = String(res.contentMarkdown || '').trim();
         const mdBlock = title ? `\n\n## Deep Research: ${title}\n\n${md}` : `\n\n## Deep Research\n\n${md}`;
         sections.push(mdBlock);
-        const textBlock = env.normalize.normalizeText(res.contentText || '');
-        if (textBlock) textParts.push(title ? `${title}\n${textBlock}` : textBlock);
         continue;
       }
 
@@ -704,18 +696,16 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
           ? `\n\n## Deep Research: ${title}\n\n(未抓到全文: ${err})`
           : `\n\n## Deep Research\n\n(未抓到全文: ${err})`,
       );
-      textParts.push(title ? `${title}\n(未抓到全文: ${err})` : `(未抓到全文: ${err})`);
     }
 
     const mergedMarkdown = baseMarkdown + (sections.length ? `\n\n---\n${sections.join('\n\n---\n')}` : '');
-    const mergedText = baseText + (textParts.length ? `\n\n${textParts.join('\n\n')}` : '');
-    return { contentText: mergedText.trim(), contentMarkdown: mergedMarkdown.trim() };
+    return { contentMarkdown: mergedMarkdown.trim() };
   }
 
   async function resolveDeepResearchContent(
     node: ParentNode | null,
     options: { manual?: boolean } = {},
-  ): Promise<{ title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode } | null> {
+  ): Promise<{ title: string; contentMarkdown: string; contentRoot: ParentNode } | null> {
     const chipTitle = findDeepResearchChipTitle(node);
     if (!chipTitle) return null;
 
@@ -920,7 +910,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
           const contentText = text || '';
           const contentMarkdown = appendImageMarkdown(contentText, imageUrls, { allowDataImageUrls: true });
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: 'user', contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: 'user', text: contentText, sequence: seq }),
             role: 'user',
             contentMarkdown,
             sequence: seq,
@@ -950,18 +940,16 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
           ? null
           : await resolveDeepResearchContent(model, { manual: options.manual === true });
 
-        const text = merged?.contentText || deepResearch?.contentText || baseText;
         const imageScope = (deepResearch?.contentRoot || model) as ParentNode | null;
         const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
-        if (text || imageUrls.length) {
-          const contentText = text || '';
-          const baseMd = merged?.contentMarkdown || deepResearch?.contentMarkdown || baseMarkdown || contentText;
-          const contentMarkdown = appendImageMarkdown(baseMd || contentText, imageUrls, { allowDataImageUrls: true });
+        const baseMd = merged?.contentMarkdown || deepResearch?.contentMarkdown || baseMarkdown || baseText;
+        if (baseMd || imageUrls.length) {
+          const contentMarkdown = appendImageMarkdown(baseMd, imageUrls, { allowDataImageUrls: true });
           out.push({
             // Keep messageKey stable across re-saves by using the base assistant text (without appended reports).
             messageKey: env.normalize.makeFallbackMessageKey({
               role: 'assistant',
-              contentText: baseText || contentText,
+              text: baseText || env.normalize.normalizeText(markdownToSemanticText(baseMd, { includeImageAlt: true })),
               sequence: seq,
             }),
             role: 'assistant',
