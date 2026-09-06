@@ -4,7 +4,7 @@
     "description": "Chrome ウェブストアおよび拡張機能管理画面に表示される拡張機能名"
   },
   "extDescription": {
-    "message": "SyncNos はオープンソースの Web クリッパーで、AI チャット、Web 記事、動画字幕を Notion、Obsidian、または Feishu に保存します。",
+    "message": "ローカル優先のWebクリッパー。AIチャット、記事、動画字幕を保存し、Notion、Obsidian、Feishu、GitHubへ同期。",
     "description": "Chrome ウェブストアおよび拡張機能管理画面に表示される短い説明（推奨 132 文字以内）"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos はオープンソースの Web クリッパーで、AI チャット、Web 記事、動画字幕を Notion、Obsidian、または Feishu に保存します。",
+    "message": "ローカル優先のWebクリッパー。AIチャット、記事、動画字幕を保存し、Notion、Obsidian、Feishu、GitHubへ同期。",
     "description": "App description for Safari"
   }
 }

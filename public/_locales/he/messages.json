@@ -4,7 +4,7 @@
     "description": "שם התוסף המוצג בחנות Chrome ובמנהל התוספים"
   },
   "extDescription": {
-    "message": "SyncNos הוא Web Clipper בקוד פתוח ששומר שיחות AI, מאמרים וכתוביות וידאו ב-Notion, Obsidian או Feishu.",
+    "message": "Web Clipper מקומי-תחילה לצ'אטי AI, מאמרים ותמלולי וידאו. סנכרון ל-Notion, Obsidian, Feishu או GitHub.",
     "description": "תיאור קצר המוצג בחנות Chrome ובמנהל התוספים (מומלץ עד 132 תווים)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos הוא Web Clipper בקוד פתוח ששומר שיחות AI, מאמרים וכתוביות וידאו ב-Notion, Obsidian או Feishu.",
+    "message": "Web Clipper מקומי-תחילה לצ'אטי AI, מאמרים ותמלולי וידאו. סנכרון ל-Notion, Obsidian, Feishu או GitHub.",
     "description": "App description for Safari"
   }
 }

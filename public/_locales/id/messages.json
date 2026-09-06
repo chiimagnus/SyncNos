@@ -4,7 +4,7 @@
     "description": "Nama ekstensi yang ditampilkan di Chrome Web Store dan pengelola ekstensi"
   },
   "extDescription": {
-    "message": "SyncNos adalah web clipper open-source untuk menyimpan chat AI, artikel, dan subtitle video ke Notion, Obsidian, atau Feishu.",
+    "message": "Clipper local-first untuk chat AI, artikel, dan transkrip video. Sync ke Notion, Obsidian, Feishu, atau GitHub.",
     "description": "Deskripsi singkat yang ditampilkan di Chrome Web Store dan pengelola ekstensi (disarankan <= 132 karakter)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos adalah web clipper open-source untuk menyimpan chat AI, artikel, dan subtitle video ke Notion, Obsidian,",
+    "message": "Clipper local-first untuk chat AI, artikel, dan transkrip video. Sync ke Notion, Obsidian, Feishu, atau GitHub.",
     "description": "App description for Safari"
   }
 }

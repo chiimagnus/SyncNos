@@ -4,7 +4,7 @@
     "description": "ชื่อส่วนขยายที่แสดงใน Chrome Web Store และหน้าจัดการส่วนขยาย"
   },
   "extDescription": {
-    "message": "SyncNos เป็นเว็บคลิปเปอร์โอเพนซอร์สที่บันทึกแชท AI บทความ และคำบรรยายวิดีโอไปยัง Notion, Obsidian หรือ Feishu",
+    "message": "เว็บคลิปเปอร์แบบ local-first สำหรับแชท AI บทความ และคำบรรยายวิดีโอ ซิงก์ไป Notion, Obsidian, Feishu หรือ GitHub",
     "description": "คำอธิบายสั้นที่แสดงใน Chrome Web Store และหน้าจัดการส่วนขยาย (แนะนำไม่เกิน 132 อักขระ)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos เป็นเว็บคลิปเปอร์โอเพนซอร์สที่บันทึกแชท AI บทความ และคำบรรยายวิดีโอไปยัง Notion, Obsidian หรือ Feishu",
+    "message": "เว็บคลิปเปอร์แบบ local-first สำหรับแชท AI บทความ และคำบรรยายวิดีโอ ซิงก์ไป Notion, Obsidian, Feishu หรือ GitHub",
     "description": "App description for Safari"
   }
 }

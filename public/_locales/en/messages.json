@@ -4,7 +4,7 @@
     "description": "Extension name shown in Chrome Web Store and extension manager"
   },
   "extDescription": {
-    "message": "SyncNos is an open-source web clipper that saves AI chats, web articles, and video subtitles to Notion, Obsidian, or Feishu.",
+    "message": "Local-first clipper for AI chats, articles, and video transcripts. Sync to Notion, Obsidian, Feishu, or GitHub.",
     "description": "Short description shown in Chrome Web Store and extension manager (<=132 chars recommended)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos is an open-source web clipper that saves AI chats, web articles, and video subtitles to Notion, Obsidian",
+    "message": "Local-first clipper for AI chats, articles, and video transcripts. Sync to Notion, Obsidian, Feishu, or GitHub.",
     "description": "App description for Safari"
   }
 }

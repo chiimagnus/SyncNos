@@ -4,7 +4,7 @@
     "description": "Erweiterungsname, der im Chrome Web Store und im Erweiterungsmanager angezeigt wird"
   },
   "extDescription": {
-    "message": "SyncNos ist ein Open-Source-Web-Clipper, der KI-Chats, Webartikel und Video-Untertitel in Notion, Obsidian oder Feishu speichert.",
+    "message": "Local-first Clipper für KI-Chats, Artikel und Video-Transkripte. Sync mit Notion, Obsidian, Feishu oder GitHub.",
     "description": "Kurze Beschreibung im Chrome Web Store und im Erweiterungsmanager (empfohlen <= 132 Zeichen)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos ist ein Open-Source-Web-Clipper, der KI-Chats, Webartikel und Video-Untertitel in Notion, Obsidian oder ",
+    "message": "Local-first Clipper für KI-Chats, Artikel und Video-Transkripte. Sync mit Notion, Obsidian, Feishu oder GitHub.",
     "description": "App description for Safari"
   }
 }

@@ -4,7 +4,7 @@
     "description": "Laajennuksen nimi, joka näkyy Chrome Web Storessa ja laajennusten hallinnassa"
   },
   "extDescription": {
-    "message": "SyncNos on avoimen lähdekoodin web-leikepöytä: AI-chatit, artikkelit ja videotekstitykset Notioniin, Obsidiin tai Feishuun.",
+    "message": "Local-first: tallenna AI-keskustelut, artikkelit ja videotekstit. Synkkaa Notion, Obsidian, Feishu tai GitHub.",
     "description": "Lyhyt kuvaus, joka näkyy Chrome Web Storessa ja laajennusten hallinnassa (suositus <= 132 merkkiä)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos on avoimen lähdekoodin web-leikepöytä: AI-chatit, artikkelit ja videotekstitykset Notioniin, Obsidiin ta",
+    "message": "Local-first: tallenna AI-keskustelut, artikkelit ja videotekstit. Synkkaa Notion, Obsidian, Feishu tai GitHub.",
     "description": "App description for Safari"
   }
 }

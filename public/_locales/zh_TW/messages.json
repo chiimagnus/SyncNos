@@ -4,7 +4,7 @@
     "description": "Chrome 商店與擴充功能管理頁顯示的擴充功能名稱"
   },
   "extDescription": {
-    "message": "SyncNos 是一個開源剪藏外掛，把 AI 對話、網頁文章、影片字幕一鍵存進 Notion、Obsidian 或飛書。",
+    "message": "本地優先的開源網頁剪藏器：保存 AI 對話、文章和影片字幕，可同步到 Notion、Obsidian、飛書或 GitHub。",
     "description": "Chrome 商店與擴充功能管理頁顯示的簡短描述（建議不超過 132 字元）"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos 是一個開源剪藏外掛，把 AI 對話、網頁文章、影片字幕一鍵存進 Notion、Obsidian 或飛書。",
+    "message": "本地優先的開源網頁剪藏器：保存 AI 對話、文章和影片字幕，可同步到 Notion、Obsidian、飛書或 GitHub。",
     "description": "App description for Safari"
   }
 }

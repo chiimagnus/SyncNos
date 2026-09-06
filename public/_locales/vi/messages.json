@@ -4,7 +4,7 @@
     "description": "Tên tiện ích hiển thị trên Chrome Web Store và trang quản lý tiện ích"
   },
   "extDescription": {
-    "message": "SyncNos là web clipper mã nguồn mở giúp lưu chat AI, bài viết và phụ đề video vào Notion, Obsidian hoặc Feishu.",
+    "message": "Clipper local-first cho chat AI, bài viết và bản chép lời video. Đồng bộ Notion, Obsidian, Feishu hoặc GitHub.",
     "description": "Mô tả ngắn hiển thị trên Chrome Web Store và trang quản lý tiện ích (khuyến nghị <= 132 ký tự)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos là web clipper mã nguồn mở giúp lưu chat AI, bài viết và phụ đề video vào Notion, Obsidian hoặc Feishu.",
+    "message": "Clipper local-first cho chat AI, bài viết và bản chép lời video. Đồng bộ Notion, Obsidian, Feishu hoặc GitHub.",
     "description": "App description for Safari"
   }
 }

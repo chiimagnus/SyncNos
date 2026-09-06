@@ -4,7 +4,7 @@
     "description": "Extensienaam die wordt weergegeven in de Chrome Web Store en de extensiebeheerder"
   },
   "extDescription": {
-    "message": "SyncNos is een open-source web clipper die AI-chats, webartikelen en video-ondertitels opslaat in Notion, Obsidian of Feishu.",
+    "message": "Local-first clipper voor AI-chats, artikelen en videotranscripten. Sync met Notion, Obsidian, Feishu of GitHub.",
     "description": "Korte beschrijving die wordt weergegeven in de Chrome Web Store en de extensiebeheerder (aanbevolen <= 132 tekens)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos is een open-source web clipper die AI-chats, webartikelen en video-ondertitels opslaat in Notion, Obsidi",
+    "message": "Local-first clipper voor AI-chats, artikelen en videotranscripten. Sync met Notion, Obsidian, Feishu of GitHub.",
     "description": "App description for Safari"
   }
 }

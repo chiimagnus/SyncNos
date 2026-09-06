@@ -4,7 +4,7 @@
     "description": "اسم الإضافة المعروض في متجر Chrome وصفحة إدارة الإضافات"
   },
   "extDescription": {
-    "message": "SyncNos إضافة ويب مفتوحة المصدر تحفظ محادثات الذكاء الاصطناعي والمقالات وترجمات الفيديو في Notion أو Obsidian أو Feishu.",
+    "message": "أداة قص محلية أولاً لمحادثات AI والمقالات ونصوص الفيديو. مزامنة مع Notion وObsidian وFeishu وGitHub.",
     "description": "وصف قصير يظهر في متجر Chrome وصفحة إدارة الإضافات (يوصى بألا يتجاوز 132 حرفًا)"
   },
   "name": {
@@ -12,7 +12,7 @@
     "description": "App name for Safari"
   },
   "description": {
-    "message": "SyncNos إضافة ويب مفتوحة المصدر تحفظ محادثات الذكاء الاصطناعي والمقالات وترجمات الفيديو في Notion أو Obsidian أو",
+    "message": "أداة قص محلية أولاً لمحادثات AI والمقالات ونصوص الفيديو. مزامنة مع Notion وObsidian وFeishu وGitHub.",
     "description": "App description for Safari"
   }
 }
