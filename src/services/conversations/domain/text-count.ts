@@ -1,7 +1,5 @@
 import MarkdownIt from 'markdown-it';
 
-import { resolveConversationMessageTextSource } from '@services/conversations/domain/message-text-source';
-
 const LETTER_OR_NUMBER_RE = /[\p{L}\p{N}]/u;
 const MARK_RE = /\p{M}/u;
 const EAST_ASIAN_SCRIPT_RE =
@@ -57,7 +55,6 @@ const markdownParser = new MarkdownIt({
 markdownParser.enable(['table']);
 
 type CountableMessage = {
-  contentText?: string | null;
   contentMarkdown?: string | null;
 };
 
@@ -240,12 +237,8 @@ export function countTextUnits(text: string): number {
 export function countConversationMessageTextUnits(messages: CountableMessage[]): number {
   let total = 0;
   for (const message of messages || []) {
-    const source = resolveConversationMessageTextSource(message);
-    if (source.kind === 'text') {
-      total += countTextUnits(source.value);
-      continue;
-    }
-    if (source.kind === 'markdown') total += countTextUnits(markdownToSemanticText(source.value));
+    const markdown = String(message?.contentMarkdown ?? '');
+    if (markdown.trim()) total += countTextUnits(markdownToSemanticText(markdown));
   }
   return total;
 }

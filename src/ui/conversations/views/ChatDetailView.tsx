@@ -29,7 +29,7 @@ export function ChatDetailView({
   const assetSrcById = useSyncnosAssetSrcMap({
     conversationId: Number.isFinite(detailConversationId) && detailConversationId > 0 ? detailConversationId : null,
     markdowns: Array.isArray(detail?.messages)
-      ? detail.messages.map((message: any) => String(message?.contentMarkdown || message?.contentText || ''))
+      ? detail.messages.map((message: any) => String(message?.contentMarkdown || ''))
       : [],
   });
 
@@ -53,7 +53,7 @@ export function ChatDetailView({
               const rawMessageId = Number((m as any).id);
               const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
               const outlineIndex = messageId == null ? null : outlineIndexByMessageId.get(messageId) || null;
-              const text = String((m as any).contentMarkdown || (m as any).contentText || '');
+              const text = String((m as any).contentMarkdown || '');
 
               if (role === 'user' && messageId != null) {
                 return (

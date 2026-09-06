@@ -844,7 +844,6 @@ describe('ConversationDetailPane header actions', () => {
           conversationId: 21,
           messageKey: 'chat-21-user',
           role: 'user',
-          contentText: '这是一个测试。 Hello world',
           contentMarkdown: '这是一个测试。 Hello world',
         },
       ],
@@ -872,7 +871,6 @@ describe('ConversationDetailPane header actions', () => {
             conversationId: 22,
             messageKey: 'chat-22-user',
             role: 'user',
-            contentText: 'ChatGPT-5.6 works',
             contentMarkdown: 'ChatGPT-5.6 works',
           },
         ],
@@ -904,7 +902,6 @@ describe('ConversationDetailPane header actions', () => {
           conversationId: 31,
           messageKey: 'article_body',
           role: 'article',
-          contentText: 'https://example.com/image.png',
           contentMarkdown: '![图片说明](https://example.com/image.png)',
         },
       ],
@@ -917,7 +914,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(await openMoreAndReadTextCount()).toBe('Words 0');
   });
 
-  it('counts Video transcript semantic text without Markdown timestamps', async () => {
+  it('counts the saved Video transcript Markdown on demand', async () => {
     currentState.detailHeaderActions = [];
     currentState.selectedConversation = {
       id: 41,
@@ -936,7 +933,6 @@ describe('ConversationDetailPane header actions', () => {
           conversationId: 41,
           messageKey: 'video_transcript',
           role: 'transcript',
-          contentText: '你好 world',
           contentMarkdown: '00:01 你好 world',
         },
       ],
@@ -946,10 +942,10 @@ describe('ConversationDetailPane header actions', () => {
       root!.render(createElement(ConversationDetailPane));
     });
 
-    expect(await openMoreAndReadTextCount()).toBe('Words 3');
+    expect(await openMoreAndReadTextCount()).toBe('Words 4');
   });
 
-  it('uses semantic Markdown fallback for legacy detail messages', async () => {
+  it('uses semantic Markdown for detail messages', async () => {
     currentState.detailHeaderActions = [];
     currentState.selectedConversation = {
       id: 51,
@@ -968,7 +964,6 @@ describe('ConversationDetailPane header actions', () => {
           conversationId: 51,
           messageKey: 'legacy-body',
           role: 'article',
-          contentText: '',
           contentMarkdown: '**测试** [OpenAI](https://openai.com) ![图片说明](https://example.com/a.png)',
         },
       ],
@@ -1099,7 +1094,7 @@ describe('ConversationDetailPane header actions', () => {
     } as any;
     currentState.detail = {
       conversationId: 13,
-      messages: [{ id: 'm-1', role: 'assistant', contentText: 'Alpha beta gamma' }],
+      messages: [{ id: 'm-1', role: 'assistant', contentMarkdown: 'Alpha beta gamma' }],
     } as any;
     currentState.detailHeaderActions = [];
 

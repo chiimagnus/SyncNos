@@ -55,38 +55,38 @@ describe('countTextUnits', () => {
 });
 
 describe('countConversationMessageTextUnits', () => {
-  it('prefers semantic contentText over timestamped or richer Markdown', () => {
+  it('derives counts from the canonical Markdown body', () => {
     expect(
       countConversationMessageTextUnits([
         {
-          contentText: '你好世界',
           contentMarkdown: '00:01 **你好世界** ![](https://example.com/image.png)',
         },
       ]),
-    ).toBe(4);
+    ).toBe(5);
   });
 
-  it('falls back to Markdown only when contentText is blank', () => {
-    expect(countConversationMessageTextUnits([{ contentText: '  ', contentMarkdown: '**测试**' }])).toBe(2);
+  it('counts formatted Markdown text semantically', () => {
+    expect(countConversationMessageTextUnits([{ contentMarkdown: '**测试**' }])).toBe(2);
   });
 
-  it('supports markdown-only legacy messages and empty messages', () => {
+  it('supports Markdown messages and empty messages', () => {
     expect(countConversationMessageTextUnits([{ contentMarkdown: '**legacy**' }, {}])).toBe(1);
   });
 
   it('sums each message independently', () => {
-    expect(countConversationMessageTextUnits([{ contentText: '中文' }, { contentText: 'Hello world' }])).toBe(4);
+    expect(countConversationMessageTextUnits([{ contentMarkdown: '中文' }, { contentMarkdown: 'Hello world' }])).toBe(
+      4,
+    );
   });
 
-  it('does not let preserved or image-rewritten Markdown change a non-empty contentText count', () => {
+  it('ignores image targets while counting visible Markdown text', () => {
     expect(
       countConversationMessageTextUnits([
         {
-          contentText: 'body',
           contentMarkdown: '**old content with many words** ![](syncnos-asset://123)',
         },
       ]),
-    ).toBe(1);
+    ).toBe(5);
   });
 
   it('projects visible Markdown text without counting link targets or images', () => {
@@ -123,7 +123,7 @@ describe('countConversationMessageTextUnits', () => {
 
   it('preserves indented-code and nested-list structure through the source resolver', () => {
     const markdown = '    indented code\n\n- outer\n  - nested';
-    expect(countConversationMessageTextUnits([{ contentText: '', contentMarkdown: markdown }])).toBe(4);
+    expect(countConversationMessageTextUnits([{ contentMarkdown: markdown }])).toBe(4);
   });
 
   it('returns zero for image-only Markdown', () => {
@@ -134,25 +134,17 @@ describe('countConversationMessageTextUnits', () => {
     expect(
       countConversationMessageTextUnits([
         {
-          contentText: 'https://example.com/image-1.png\nhttps://example.com/image-2.png',
           contentMarkdown: '![第一张](https://example.com/image-1.png)\n![第二张](https://example.com/image-2.png)',
         },
       ]),
     ).toBe(0);
   });
 
-  it('uses timestamp-free video transcript text when Markdown contains timestamps', () => {
-    expect(
-      countConversationMessageTextUnits([
-        {
-          contentText: '你好 world',
-          contentMarkdown: '00:01 你好 world',
-        },
-      ]),
-    ).toBe(3);
+  it('counts timestamp text when it is part of the saved Markdown', () => {
+    expect(countConversationMessageTextUnits([{ contentMarkdown: '00:01 你好 world' }])).toBe(4);
   });
 
-  it('counts source-site comments when the collector intentionally persisted them inside message text', () => {
-    expect(countConversationMessageTextUnits([{ contentText: '正文\n评论区\nnice comment' }])).toBe(7);
+  it('counts source-site comments when the collector includes them in saved Markdown', () => {
+    expect(countConversationMessageTextUnits([{ contentMarkdown: '正文\n评论区\nnice comment' }])).toBe(7);
   });
 });

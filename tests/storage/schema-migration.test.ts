@@ -147,6 +147,12 @@ async function openV10Db() {
   return reqToPromise(req);
 }
 
+async function openV11Db() {
+  const db10 = await openV10Db();
+  db10.close();
+  return reqToPromise(indexedDB.open('webclipper', 11));
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -309,7 +315,7 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     const fullMessageStoreScans = objectStoreCursorSpy.mock.contexts.filter(
       (context) => (context as IDBObjectStore | undefined)?.name === 'messages',
     );
-    expect(fullMessageStoreScans).toHaveLength(0);
+    expect(fullMessageStoreScans).toHaveLength(1);
     objectStoreCursorSpy.mockRestore();
 
     const t2 = db2.transaction(['conversations', 'messages'], 'readonly');
@@ -636,6 +642,56 @@ describe('storage schema migration (v11 conversation hygiene)', () => {
       listSiteKey: 'domain:chatgpt.com',
       futureMetadata: { keep: true },
     });
+  });
+});
+
+describe('storage schema migration (v12 canonical message content)', () => {
+  it('keeps one Markdown body per message and removes legacy contentText', async () => {
+    const db11 = await openV11Db();
+    const tx11 = db11.transaction(['messages'], 'readwrite');
+    const messages = tx11.objectStore('messages');
+    await reqToPromise(
+      messages.add({
+        conversationId: 1,
+        messageKey: 'both',
+        role: 'assistant',
+        contentText: 'duplicate plain text',
+        contentMarkdown: '**canonical markdown**',
+        sequence: 1,
+      }),
+    );
+    await reqToPromise(
+      messages.add({
+        conversationId: 1,
+        messageKey: 'text-only',
+        role: 'assistant',
+        contentText: 'legacy text only',
+        contentMarkdown: '',
+        sequence: 2,
+      }),
+    );
+    await reqToPromise(
+      messages.add({
+        conversationId: 1,
+        messageKey: 'markdown-only',
+        role: 'assistant',
+        contentMarkdown: 'already canonical',
+        sequence: 3,
+      }),
+    );
+    await txDone(tx11);
+    db11.close();
+
+    const currentDb = await openDb();
+    expect(currentDb.version).toBe(DB_VERSION);
+    const currentTx = currentDb.transaction(['messages'], 'readonly');
+    const rows = await reqToPromise<any[]>(currentTx.objectStore('messages').getAll());
+    await txDone(currentTx);
+
+    expect(rows.find((row) => row.messageKey === 'both')?.contentMarkdown).toBe('**canonical markdown**');
+    expect(rows.find((row) => row.messageKey === 'text-only')?.contentMarkdown).toBe('legacy text only');
+    expect(rows.find((row) => row.messageKey === 'markdown-only')?.contentMarkdown).toBe('already canonical');
+    expect(rows.every((row) => !Object.prototype.hasOwnProperty.call(row, 'contentText'))).toBe(true);
   });
 });
 

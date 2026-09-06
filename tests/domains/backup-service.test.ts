@@ -598,7 +598,6 @@ describe('backup service', () => {
         conversationId: conversationIdA,
         messageKey: 'm1',
         role: 'assistant',
-        contentText: 'already synced',
         contentMarkdown: 'already synced',
         sequence: 1,
         updatedAt: 20,
@@ -654,6 +653,8 @@ describe('backup service', () => {
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
 
     expect(bundle.syncMapping.id).toBeUndefined();
+    expect(bundle.messages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'already synced' });
+    expect(bundle.messages[0]).not.toHaveProperty('contentText');
     expect(bundle.syncMapping.futureProviderMetadata).toEqual({ version: 3, nested: { keep: true } });
     expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
 
@@ -725,8 +726,9 @@ describe('backup service', () => {
     expect(messages[0]).toMatchObject({
       conversationId: conversations[0].id,
       messageKey: 'm1',
-      contentText: 'already synced',
+      contentMarkdown: 'already synced',
     });
+    expect(messages[0]).not.toHaveProperty('contentText');
     expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'secret-b' });
     expect(chromeMock.__store.notion_oauth_client_id).toBeUndefined();
     expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending-b');
@@ -860,7 +862,6 @@ describe('backup service', () => {
     await reqToPromise(
       localEditTx.objectStore('messages').put({
         ...newerLocal,
-        contentText: 'backup body',
         contentMarkdown: localMarkdown,
         updatedAt: 999,
       }) as any,
@@ -886,10 +887,10 @@ describe('backup service', () => {
       preservedLocalTx.onabort = () => reject(preservedLocalTx.error);
     });
     expect(preservedLocal).toMatchObject({
-      contentText: 'backup body',
       contentMarkdown: localMarkdown,
       updatedAt: 999,
     });
+    expect(preservedLocal).not.toHaveProperty('contentText');
 
     const deleteAssetTx = db2.transaction(['image_cache'], 'readwrite');
     deleteAssetTx.objectStore('image_cache').delete(referencedId);
@@ -1696,8 +1697,9 @@ describe('backup service', () => {
     expect(message).toMatchObject({
       conversationId: localConversationId,
       messageKey: 'm-remap',
-      contentText: 'mapped',
+      contentMarkdown: 'mapped',
     });
+    expect(message).not.toHaveProperty('contentText');
   });
 
   it('keeps Legacy message imports idempotent after remapping local identities', async () => {
@@ -1743,7 +1745,8 @@ describe('backup service', () => {
       firstTx.onabort = () => reject(firstTx.error);
     });
     expect(persisted).toHaveLength(1);
-    expect(persisted[0]).toMatchObject({ conversationId: 1, messageKey: 'm-stable', contentText: 'stable' });
+    expect(persisted[0]).toMatchObject({ conversationId: 1, messageKey: 'm-stable', contentMarkdown: 'stable' });
+    expect(persisted[0]).not.toHaveProperty('contentText');
     expect(persisted[0].id).not.toBe(500);
     expect(persisted[0].updatedAt).toBeGreaterThan(0);
 

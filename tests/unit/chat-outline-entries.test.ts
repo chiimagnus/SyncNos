@@ -9,7 +9,6 @@ function msg(input: Partial<ConversationMessage>): ConversationMessage {
     conversationId: 1,
     messageKey: 'message-1',
     role: 'assistant',
-    contentText: '',
     contentMarkdown: '',
     ...input,
   };
@@ -18,9 +17,9 @@ function msg(input: Partial<ConversationMessage>): ConversationMessage {
 describe('buildChatOutlineEntries', () => {
   it('keeps only user messages in original order and uses 1-based index', () => {
     const entries = buildChatOutlineEntries([
-      msg({ id: 100, messageKey: 'assistant', role: 'assistant', contentText: 'skip me' }),
-      msg({ id: 101, messageKey: 'u-1', role: 'user', contentText: 'first' }),
-      msg({ id: 102, messageKey: 'u-2', role: 'user', contentText: 'second' }),
+      msg({ id: 100, messageKey: 'assistant', role: 'assistant', contentMarkdown: 'skip me' }),
+      msg({ id: 101, messageKey: 'u-1', role: 'user', contentMarkdown: 'first' }),
+      msg({ id: 102, messageKey: 'u-2', role: 'user', contentMarkdown: 'second' }),
     ]);
 
     expect(entries).toEqual([
@@ -29,27 +28,25 @@ describe('buildChatOutlineEntries', () => {
     ]);
   });
 
-  it('prefers contentText over contentMarkdown', () => {
+  it('derives preview text from the canonical Markdown body', () => {
     const entries = buildChatOutlineEntries([
       msg({
         id: 201,
         messageKey: 'u-201',
         role: 'user',
-        contentText: 'from contentText',
         contentMarkdown: '# from contentMarkdown',
       }),
     ]);
 
-    expect(entries[0]?.previewText).toBe('from contentText');
+    expect(entries[0]?.previewText).toBe('from contentMarkdown');
   });
 
-  it('falls back to Markdown preview when contentText is whitespace-only', () => {
+  it('normalizes Markdown preview formatting', () => {
     const entries = buildChatOutlineEntries([
       msg({
         id: 251,
         messageKey: 'u-251',
         role: 'user',
-        contentText: '  \n\t ',
         contentMarkdown: '# Markdown fallback',
       }),
     ]);
@@ -63,7 +60,6 @@ describe('buildChatOutlineEntries', () => {
         id: 252,
         messageKey: 'u-252',
         role: 'user',
-        contentText: '',
         contentMarkdown: '![Diagram](https://example.com/image.png) [OpenAI](https://openai.com) https://example.com',
       }),
     ]);
@@ -77,7 +73,7 @@ describe('buildChatOutlineEntries', () => {
         id: 301,
         messageKey: 'u-301',
         role: 'user',
-        contentText: 'line 1\n\nline 2\tline 3',
+        contentMarkdown: 'line 1\n\nline 2\tline 3',
       }),
     ]);
 
@@ -90,13 +86,13 @@ describe('buildChatOutlineEntries', () => {
         id: 401,
         messageKey: 'u-401',
         role: 'user',
-        contentText: '123456789012345678901234567890',
+        contentMarkdown: '123456789012345678901234567890',
       }),
       msg({
         id: 402,
         messageKey: 'u-402',
         role: 'user',
-        contentText: '12345678901234567890123456789012345',
+        contentMarkdown: '12345678901234567890123456789012345',
       }),
     ]);
 
@@ -110,7 +106,6 @@ describe('buildChatOutlineEntries', () => {
         id: 501,
         messageKey: 'u-501',
         role: 'user',
-        contentText: '',
         contentMarkdown: '',
       }),
       {

@@ -3,6 +3,7 @@ import {
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
+import { normalizeStoredMessageRecord, resolveMessageMarkdown } from '@platform/idb/message-record';
 import {
   canonicalizeInpageDisplayModeStorageRecord,
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
@@ -149,9 +150,9 @@ function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownR
   const bUpdated = validTimestamp(b.updatedAt) ?? 0;
   if (bUpdated && bUpdated > aUpdated) return true;
 
-  const aMd = a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
-  const bMd = b.contentMarkdown && String(b.contentMarkdown).trim() ? String(b.contentMarkdown) : '';
-  if (!aMd && bMd) return true;
+  const aMd = resolveMessageMarkdown(a);
+  const bMd = resolveMessageMarkdown(b);
+  if (!aMd.trim() && bMd.trim()) return true;
   return false;
 }
 
@@ -161,11 +162,13 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
 
   const preferIncoming = shouldPreferIncomingMessage(a, b);
   const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+  const fallbackMarkdown = preferIncoming ? String(a.contentMarkdown || '') : String(b.contentMarkdown || '');
+  if (!String(base.contentMarkdown || '').trim() && fallbackMarkdown.trim()) {
+    base.contentMarkdown = fallbackMarkdown;
+  }
 
-  const next: UnknownRecord = { ...base };
+  const next = normalizeStoredMessageRecord(base);
   next.role = pickStringPreferExisting(base.role, 'assistant') || 'assistant';
-  next.contentText = String(next.contentText || '');
-  next.contentMarkdown = String(next.contentMarkdown || '');
 
   const aUpdated = validTimestamp(a.updatedAt);
   const bUpdated = validTimestamp(b.updatedAt);

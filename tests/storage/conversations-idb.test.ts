@@ -465,13 +465,13 @@ describe('conversations storage-idb', () => {
       getSpy.mockRestore();
     }
 
-    expect((await getMessagesByConversationId(id)).map((message) => [message.messageKey, message.contentText])).toEqual(
-      [
-        ['m1', 'one updated'],
-        ['m2', 'two'],
-        ['m4', 'four'],
-      ],
-    );
+    expect(
+      (await getMessagesByConversationId(id)).map((message) => [message.messageKey, message.contentMarkdown]),
+    ).toEqual([
+      ['m1', 'one updated'],
+      ['m2', 'two'],
+      ['m4', 'four'],
+    ]);
   });
 
   it('keeps duplicate snapshot message keys on one row with the last incoming value', async () => {
@@ -491,7 +491,7 @@ describe('conversations storage-idb', () => {
 
     expect(result).toEqual({ upserted: 2, deleted: 0 });
     expect(await getMessagesByConversationId(id)).toMatchObject([
-      { messageKey: 'm1', role: 'assistant', contentText: 'second', sequence: 1, updatedAt: 2 },
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: 'second', sequence: 1, updatedAt: 2 },
     ]);
   });
 
@@ -874,7 +874,7 @@ describe('conversations storage-idb', () => {
     expect(res1.deleted).toBe(0);
     const after1 = await getMessagesByConversationId(id);
     expect(after1.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
-    expect(after1.find((m) => m.messageKey === 'm1')?.contentText).toBe('u2');
+    expect(after1.find((m) => m.messageKey === 'm1')?.contentMarkdown).toBe('u2');
 
     // Incremental delete removes only explicitly removed keys.
     const res2 = await syncConversationMessages(
@@ -932,7 +932,7 @@ describe('conversations storage-idb', () => {
 
     const after = await getMessagesByConversationId(id);
     expect(after.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
-    expect(after.find((m) => m.messageKey === 'm1')?.contentText).toBe('u2');
+    expect(after.find((m) => m.messageKey === 'm1')?.contentMarkdown).toBe('u2');
   });
 
   it.each([
@@ -962,7 +962,7 @@ describe('conversations storage-idb', () => {
     expect(result).toEqual({ upserted: 0, deleted: 0 });
     const stored = await getMessagesByConversationId(id);
     expect(stored.map((message) => message.messageKey)).toEqual(['m1', 'm2']);
-    expect(stored.find((message) => message.messageKey === 'm1')?.contentText).toBe('old');
+    expect(stored.find((message) => message.messageKey === 'm1')?.contentMarkdown).toBe('old');
   });
 
   it('treats unkeyed append input as a no-delete no-op', async () => {
@@ -1009,7 +1009,7 @@ describe('conversations storage-idb', () => {
     );
 
     expect(result).toEqual({ upserted: 0, deleted: 0 });
-    expect((await getMessagesByConversationId(id)).map((message) => message.contentText)).toEqual(['old', 'keep']);
+    expect((await getMessagesByConversationId(id)).map((message) => message.contentMarkdown)).toEqual(['old', 'keep']);
   });
 
   it('preserves existing order and tail-assigns new virtual partial rows', async () => {
@@ -1377,7 +1377,6 @@ describe('conversations storage-idb', () => {
 
     const [stored] = await getMessagesByConversationId(id);
     expect(stored).toMatchObject({
-      contentText: 'new text',
       contentMarkdown: '![rich](data:image/png;base64,abc)',
       sequence: 5,
       updatedAt: 20,
@@ -1426,7 +1425,6 @@ describe('conversations storage-idb', () => {
 
     const [stored] = await getMessagesByConversationId(id);
     expect(stored).toMatchObject({
-      contentText: 'complete',
       contentMarkdown: 'complete\n\n![](syncnos-asset://asset-1)',
     });
     expect(stored).not.toHaveProperty('captureMergePolicy');
@@ -1482,14 +1480,12 @@ describe('conversations storage-idb', () => {
     const stored = await getMessagesByConversationId(id);
     expect(stored[0]).toMatchObject({
       messageKey: 'm1',
-      contentText: 'hydrated report',
       contentMarkdown: '# Hydrated report',
       sequence: 3,
       updatedAt: 0,
     });
     expect(stored[1]).toMatchObject({
       messageKey: 'm2',
-      contentText: 'first placeholder',
       contentMarkdown: 'first placeholder',
       sequence: 4,
       updatedAt: 30,
@@ -1541,8 +1537,8 @@ describe('conversations storage-idb', () => {
     );
 
     const stored = await getMessagesByConversationId(id);
-    expect(stored[0]).toMatchObject({ contentText: 'Complete report', contentMarkdown: '# Complete report' });
-    expect(stored[1]).toMatchObject({ contentText: placeholder, contentMarkdown: placeholder });
+    expect(stored[0]).toMatchObject({ contentMarkdown: '# Complete report' });
+    expect(stored[1]).toMatchObject({ contentMarkdown: placeholder });
   });
 
   it('reads message tails by conversation id with ascending sequence order', async () => {

@@ -152,7 +152,6 @@ describe('article-fetch-service', () => {
       messageKey: 'article_body',
       role: 'article',
       sequence: 1,
-      contentText: 'Hello world article text.',
       contentMarkdown: '## Heading\n\n![img](syncnos-asset://conversation/11/a.png)\n\nHello world article text.',
     });
   });
@@ -249,7 +248,6 @@ describe('article-fetch-service', () => {
 
     const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
     expect(messages[0]).toMatchObject({
-      contentText: 'OP body',
       contentMarkdown: 'OP body',
     });
     expect(currentUrl).toBe('https://linux.do/t/topic/1870532/1?u=abc#reply-1');
@@ -306,7 +304,6 @@ describe('article-fetch-service', () => {
     expect(data.url).toBe('https://linux.do/t/topic/1870532');
     const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
     expect(messages[0]).toMatchObject({
-      contentText: 'OP body',
       contentMarkdown: 'OP body',
     });
   });

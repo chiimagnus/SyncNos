@@ -106,15 +106,11 @@ function messagesToBlocks(messages: any, _options?: unknown) {
     const label = role === 'user' ? authorName : role === 'assistant' ? 'Assistant' : role;
     out.push(headingBlock(label, role === 'user' ? 'green' : 'blue_background'));
     const markdown = m && m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
-    if (markdown) {
-      const blocks = markdownToNotionBlocks(markdown);
-      if (blocks.length) out.push(...blocks);
-      else {
-        const parts = splitText(m.contentText || '');
-        for (const p of parts) out.push(textBlock(p));
-      }
-    } else {
-      const parts = splitText(m.contentText || '');
+    if (!markdown) continue;
+    const blocks = markdownToNotionBlocks(markdown);
+    if (blocks.length) out.push(...blocks);
+    else {
+      const parts = splitText(markdown);
       for (const p of parts) out.push(textBlock(p));
     }
   }

@@ -178,7 +178,7 @@ describe('backup-utils', () => {
     };
     const merged2 = backupUtils.mergeMessageRecord(existing, newer);
     expect(merged2.contentMarkdown).toBe('new');
-    expect(merged2.contentText).toBe('hi!');
+    expect(merged2).not.toHaveProperty('contentText');
     expect(merged2.updatedAt).toBe(12);
     expect(merged2.sequence).toBe(2);
   });

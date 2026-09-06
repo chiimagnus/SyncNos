@@ -32,6 +32,7 @@ import {
   normalizeConversationListRecord,
 } from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
+import { resolveIncomingMessageMarkdown, resolveMessageMarkdown } from '@platform/idb/message-record';
 import {
   DATA_REVISION_RECORD_KEY,
   DATA_REVISION_STORE_BY_SCOPE,
@@ -976,22 +977,21 @@ export async function syncConversationMessages(
             rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
               ? rawMergePolicy
               : 'replace';
-          const incomingMarkdown =
-            m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+          const incomingMarkdown = resolveIncomingMessageMarkdown(m);
           const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
           const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
+          const existingMarkdown = resolveMessageMarkdown(existing);
           const preserveExistingMarkdown =
             !!existing &&
             (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
-            !!String(existing.contentMarkdown || '').trim();
+            !!existingMarkdown.trim();
           const timestamp = resolveMessageTimestamp(existing, m.updatedAt, preserveExistingContent);
           const baseRecord: Record<string, unknown> = {
             conversationId,
             messageKey: key,
             role: m.role || 'assistant',
             authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-            contentText: preserveExistingContent ? existing.contentText || '' : m.contentText || '',
-            contentMarkdown: preserveExistingMarkdown ? existing.contentMarkdown || '' : incomingMarkdown,
+            contentMarkdown: preserveExistingMarkdown ? existingMarkdown : incomingMarkdown,
             sequence,
             ...(timestamp.present ? { updatedAt: timestamp.value } : null),
           };
@@ -1040,7 +1040,7 @@ export async function syncConversationMessages(
         presentKeys.add(String(m.messageKey));
 
         const existing: any = existingByKey.get(m.messageKey);
-        const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+        const incomingMarkdown = resolveIncomingMessageMarkdown(m);
         const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
         const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
         const baseRecord: Record<string, unknown> = {
@@ -1048,7 +1048,6 @@ export async function syncConversationMessages(
           messageKey: m.messageKey,
           role: m.role || 'assistant',
           authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-          contentText: m.contentText || '',
           contentMarkdown: incomingMarkdown,
           sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
           ...(timestamp.present ? { updatedAt: timestamp.value } : null),
