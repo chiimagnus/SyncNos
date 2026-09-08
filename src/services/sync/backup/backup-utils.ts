@@ -334,7 +334,6 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
     }
   }
 
-
   return { ok: true, error: '' };
 }
 

@@ -433,11 +433,19 @@ describe('data revision storage', () => {
 
     const nextUrl = 'https://example.com/revision-comments-next';
     expect(
-      await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl: url, toCanonicalUrl: nextUrl, conversationId: ownerId }),
+      await migrateArticleCommentsCanonicalUrl({
+        fromCanonicalUrl: url,
+        toCanonicalUrl: nextUrl,
+        conversationId: ownerId,
+      }),
     ).toEqual({ updated: 1 });
     expect(await readDataRevision('article_comments')).toBe(6);
     expect(
-      await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl: url, toCanonicalUrl: nextUrl, conversationId: ownerId }),
+      await migrateArticleCommentsCanonicalUrl({
+        fromCanonicalUrl: url,
+        toCanonicalUrl: nextUrl,
+        conversationId: ownerId,
+      }),
     ).toEqual({ updated: 0 });
     expect(await readDataRevision('article_comments')).toBe(6);
   });

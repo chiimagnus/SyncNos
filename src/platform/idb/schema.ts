@@ -121,10 +121,7 @@ function migrateConversationRecordsForV13({ tx }: MigrationContext, onDone: Migr
       return;
     }
 
-    const range = globalThis.IDBKeyRange.bound(
-      [conversationId, -Infinity] as any,
-      [conversationId, Infinity] as any,
-    );
+    const range = globalThis.IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
     const commentReq = commentsIndex.openCursor(range, 'prev');
     commentReq.onsuccess = () => {
       const latest = commentReq.result?.value as Record<string, unknown> | undefined;

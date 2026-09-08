@@ -5,7 +5,9 @@ import { normalizeArticleCommentLocator } from '@services/comments/domain/commen
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export class ArticleCommentInvariantError extends Error {
-  constructor(public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch' | 'conversation_not_found') {
+  constructor(
+    public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch' | 'conversation_not_found',
+  ) {
     super(code);
     this.name = 'ArticleCommentInvariantError';
   }
@@ -283,9 +285,7 @@ export async function attachOrphanCommentsToConversation(
         markChanged('article_comments');
         const currentActivityAt = normalizeActivityTimestamp(conversation.lastActivityAt);
         if (latestHistoricalActivityAt > currentActivityAt) {
-          await reqToPromise(
-            stores.conversations.put({ ...conversation, lastActivityAt: latestHistoricalActivityAt }),
-          );
+          await reqToPromise(stores.conversations.put({ ...conversation, lastActivityAt: latestHistoricalActivityAt }));
           markChanged('conversations');
         }
       }

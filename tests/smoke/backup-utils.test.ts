@@ -82,8 +82,12 @@ describe('backup-utils', () => {
     };
     const validate = backupUtils.validateBackupManifest;
     expect(validate(base).ok).toBe(true);
-    expect(validate({ ...base, counts: { conversations: 0, messages: 0, sync_mappings: 0, article_comments: 0 } }).ok).toBe(false);
-    expect(validate({ ...base, assets: { articleCommentsIndexPath: 'assets/article-comments/index.json' } }).ok).toBe(false);
+    expect(
+      validate({ ...base, counts: { conversations: 0, messages: 0, sync_mappings: 0, article_comments: 0 } }).ok,
+    ).toBe(false);
+    expect(validate({ ...base, assets: { articleCommentsIndexPath: 'assets/article-comments/index.json' } }).ok).toBe(
+      false,
+    );
   });
 
   it('validateBackupManifest rejects unsafe paths', () => {

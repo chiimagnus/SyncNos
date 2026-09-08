@@ -353,7 +353,6 @@ export async function importBackupZipMerge(
     if ((bundle as any).syncMapping) incomingMappings.push((bundle as any).syncMapping);
   }
 
-
   if (isCurrentBackup) {
     const expectedCounts = (manifest as any).counts || {};
     const actualCounts: Record<string, number> = {

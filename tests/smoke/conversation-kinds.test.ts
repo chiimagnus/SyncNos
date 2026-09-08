@@ -49,7 +49,9 @@ describe('conversation-kinds', () => {
   it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
     'projects invalid Activity %s as an explicit null Notion Last Activity without inventing now',
     (lastActivityAt) => {
-      const chat = loadConversationKinds().list().find((item) => item.id === 'chat')!;
+      const chat = loadConversationKinds()
+        .list()
+        .find((item) => item.id === 'chat')!;
       const properties = chat.notion.pageSpec.buildUpdateProperties({
         sourceType: 'chat',
         source: 'chatgpt',

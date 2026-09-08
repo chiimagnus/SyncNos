@@ -71,32 +71,32 @@ describe('notion-sync-orchestrator kind routing', () => {
     };
 
     const getSyncMappingByConversation = vi.fn(async (id: number) => {
-        if (id === 1) {
-          return {
-            conversation: {
-              id: 1,
-              sourceType: 'article',
-              title: 'Article 1',
-              url: 'https://a',
-              author: 'Alice',
-              publishedAt: '2026-02-26',
-              lastActivityAt: 1000,
-            },
-            mapping: null,
-          };
-        }
+      if (id === 1) {
         return {
           conversation: {
-            id: 2,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            title: 'Chat 2',
-            url: 'https://c',
-            lastActivityAt: 2000,
+            id: 1,
+            sourceType: 'article',
+            title: 'Article 1',
+            url: 'https://a',
+            author: 'Alice',
+            publishedAt: '2026-02-26',
+            lastActivityAt: 1000,
           },
           mapping: null,
         };
-      });
+      }
+      return {
+        conversation: {
+          id: 2,
+          sourceType: 'chat',
+          source: 'chatgpt',
+          title: 'Chat 2',
+          url: 'https://c',
+          lastActivityAt: 2000,
+        },
+        mapping: null,
+      };
+    });
     const attachOrphanArticleCommentsToConversation = vi.fn(async () => ({ updated: 0 }));
     const storage = {
       getSyncMappingByConversation,
