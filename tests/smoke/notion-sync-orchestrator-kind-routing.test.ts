@@ -275,6 +275,80 @@ describe('notion-sync-orchestrator kind routing', () => {
     );
   });
 
+  it.each([
+    ['reread throws', 'throw'],
+    ['conversation disappears', 'missing'],
+  ] as const)(
+    'fails closed when orphan attach updates Activity but canonical reread fails: %s',
+    async (_label, mode) => {
+      // @ts-expect-error test global
+      globalThis.chrome = mockChromeStorage();
+
+      let currentJob: any = null;
+      const jobStore = {
+        getJob: async () => currentJob,
+        setJob: async (job: any) => {
+          currentJob = job;
+          return true;
+        },
+      };
+      let readCount = 0;
+      const getSyncMappingByConversation = vi.fn(async () => {
+        readCount += 1;
+        if (readCount === 1) {
+          return {
+            conversation: {
+              id: 1,
+              sourceType: 'article',
+              source: 'web',
+              title: 'Article refresh failure',
+              url: 'https://example.com/article-refresh-failure',
+              lastActivityAt: 1_000,
+            },
+            mapping: null,
+          };
+        }
+        if (mode === 'throw') throw new Error('canonical reread failed');
+        return null;
+      });
+      const createPageInDatabase = vi.fn(async () => ({ id: 'must_not_create' }));
+
+      const orchestrator = createNotionSyncOrchestrator({
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        storage: {
+          getSyncMappingByConversation,
+          attachOrphanArticleCommentsToConversation: async () => ({ updated: 1 }),
+          getArticleCommentsByConversationId: async () => [],
+          getMessagesByConversationId: async () => [
+            { messageKey: 'article_body', role: 'assistant', contentMarkdown: 'body', sequence: 1, updatedAt: 1 },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        conversationKinds,
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
+        syncService: {
+          getPage: async () => {
+            throw new Error('unused');
+          },
+          createPageInDatabase,
+          updatePageProperties: async () => ({ ok: true }),
+          appendChildren: async () => ({ results: [] }),
+          messagesToBlocks: () => [],
+          isPageUsableForDatabase: () => true,
+        },
+        jobStore,
+      });
+
+      const result = await orchestrator.syncConversations({ conversationIds: [1], instanceId: 'i' });
+
+      expect(result.failCount).toBe(1);
+      expect(result.okCount).toBe(0);
+      expect(getSyncMappingByConversation).toHaveBeenCalledTimes(2);
+      expect(createPageInDatabase).not.toHaveBeenCalled();
+    },
+  );
+
   it('fails closed before appending blocks when image upgrade throws unexpectedly', async () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();

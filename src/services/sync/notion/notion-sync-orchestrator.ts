@@ -537,18 +537,23 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             }
             if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
               articleCommentsSourceAvailable = true;
+              let canonicalRereadPending = false;
               try {
                 const url = String(convo?.url || '').trim();
                 if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
                   const attached = await storage.attachOrphanArticleCommentsToConversation(url, id);
                   if (Number(attached?.updated) > 0) {
+                    canonicalRereadPending = true;
                     const refreshed = await storage.getSyncMappingByConversation(id);
-                    if (refreshed?.conversation) convo = refreshed.conversation;
+                    if (!refreshed?.conversation) throw new Error('conversation not found after comment attach');
+                    convo = refreshed.conversation;
+                    canonicalRereadPending = false;
                   }
                 }
                 const loaded = await storage.getArticleCommentsByConversationId(id);
                 cachedArticleComments = parseArticleCommentDtos(loaded);
               } catch (e) {
+                if (canonicalRereadPending) throw e;
                 articleCommentsLoadFailed = true;
                 warnings.push({
                   code: 'notion_article_comments_fetch_failed',
