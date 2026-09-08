@@ -277,6 +277,11 @@ export async function importBackupZipMerge(
   if (!manifestValidation.ok) throw new Error(manifestValidation.error || 'Invalid manifest.json');
   const backupSchemaVersion = Number((manifest as any).backupSchemaVersion);
   const isCurrentBackup = backupSchemaVersion === 3;
+  const conversationsCsvPath =
+    manifest && (manifest as any).index ? String((manifest as any).index.conversationsCsvPath || '').trim() : '';
+  if (isCurrentBackup && !entries.has(conversationsCsvPath)) {
+    throw new Error(`Missing entry: ${conversationsCsvPath}`);
+  }
 
   const configPath = manifest && manifest.config ? String(manifest.config.storageLocalPath || '') : '';
   const configDoc = configPath ? readJsonEntry(entries, configPath) : null;

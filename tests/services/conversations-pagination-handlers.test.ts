@@ -82,18 +82,24 @@ describe('conversations pagination handlers', () => {
     );
   });
 
-  it('rejects page requests with invalid cursor shape', async () => {
+  it.each([
+    [{ lastActivityAt: 'bad', id: 1 }, 'non-finite Activity'],
+    [{ lastActivityAt: -1, id: 1 }, 'negative Activity'],
+    [{ lastActivityAt: 0, id: 1.5 }, 'fractional id'],
+    [{ lastActivityAt: 0, id: 0 }, 'non-positive id'],
+  ])('rejects page requests with invalid cursor shape: %s', async (cursor) => {
     const router = createRouter();
     const res = await router.__handleMessageForTests({
       type: 'getConversationListPage',
       query: { sourceKey: 'all', siteKey: 'all', limit: 20 },
-      cursor: { lastActivityAt: 'bad', id: 1 },
+      cursor,
     });
 
     expect(res.ok).toBe(false);
     expect(res.error?.message).toBe('invalid cursor');
     expect((res.error?.extra as any)?.code).toBe('INVALID_ARGUMENT');
     expect((res.error?.extra as any)?.field).toBe('cursor');
+    expect(storageMocks.getConversationListPage).not.toHaveBeenCalled();
   });
 
   it('rejects by-loc lookup when source/conversationKey is invalid', async () => {

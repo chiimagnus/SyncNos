@@ -8,6 +8,7 @@ import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { upsertConversation } from '@services/conversations/data/storage-idb';
+import { buildBackupV2FixtureEntries } from '../helpers/backup-v2-fixture';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -274,6 +275,21 @@ describe('backup service', () => {
     await assertLegacyArticleImportConvergesToCanonicalIdentity();
   });
 
+  it('does not require the conversations CSV entry for bounded ZIP v2 compatibility', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const { entries, expected } = buildBackupV2FixtureEntries();
+    entries.delete('sources/conversations.csv');
+
+    const stats = await importBackupZipMerge(entries);
+
+    expect(stats.conversationsAdded).toBe(expected.counts.conversations);
+    expect(stats.messagesAdded).toBe(expected.counts.messages);
+  });
 
   it('restores canonical ZIP display settings as one logical setting', async () => {
     const chromeMock = mockChromeStorage();
@@ -978,6 +994,41 @@ describe('backup service', () => {
     expect(restoredAgainMarkdown).toContain(`\`![inline](syncnos-asset://${oldImgId})\``);
     expect(restoredAgainMarkdown).toContain(`![fenced](syncnos-asset://${oldImgId})`);
     expect(restoredAgainMarkdown).toContain(`    ![indented](syncnos-asset://${oldImgId})`);
+  });
+
+  it('importBackupZipMerge rejects a missing current manifest-declared conversations index', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'missing-conversations-index',
+        title: 'Missing conversations index',
+        url: 'https://example.com/missing-conversations-index',
+        warningFlags: [],
+        lastActivityAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const indexPath = String(manifest.index?.conversationsCsvPath || '');
+    entries.delete(indexPath);
+
+    await expect(importBackupZipMerge(entries)).rejects.toThrow(`Missing entry: ${indexPath}`);
   });
 
   it('importBackupZipMerge rejects a missing manifest-declared image index', async () => {

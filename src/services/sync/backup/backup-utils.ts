@@ -54,10 +54,6 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
-function isFinitePositiveInt(v: unknown) {
-  return Number.isFinite(v) && Number(v) > 0 && Math.floor(Number(v)) === Number(v);
-}
-
 function validTimestamp(value: unknown): number | null {
   const timestamp = Number(value);
   return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;

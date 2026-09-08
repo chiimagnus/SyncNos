@@ -98,7 +98,7 @@ function parseListCursorPayload(value: unknown): ListCursorPayload | null {
   if (!value || typeof value !== 'object') return null;
   const lastActivityAt = Number((value as any).lastActivityAt);
   const id = Number((value as any).id);
-  if (!Number.isFinite(lastActivityAt) || !Number.isFinite(id) || id <= 0) return null;
+  if (!Number.isFinite(lastActivityAt) || lastActivityAt < 0 || !Number.isSafeInteger(id) || id <= 0) return null;
   return { lastActivityAt, id };
 }
 
