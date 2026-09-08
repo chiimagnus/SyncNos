@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-09-06**
+**Last Updated: 2026-09-08**
 
 This Privacy Policy applies to SyncNos WebClipper (the “Extension”), including its supported Chromium, Firefox-family, and Safari builds.
 
@@ -57,7 +57,7 @@ The repository's Feishu Worker also performs best-effort request rate limiting u
 
 ### Obsidian
 
-Obsidian sync uses the Local REST API plugin on your computer. The current client uses a local HTTP endpoint (by default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. SyncNos does not require an external SyncNos server for this path.
+Obsidian sync uses the Local REST API plugin on your computer. The current client supports only a local HTTP endpoint for this integration (by default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. SyncNos does not require an external SyncNos server for this path.
 
 ### GitHub
 

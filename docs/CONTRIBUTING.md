@@ -36,7 +36,7 @@ npm run dev:safari
 npm run setup:safari:xcode
 ```
 
-当前命令和依赖的事实真源是 [`package.json`](../package.json)。
+当前命令和依赖的事实真源是 [`package.json`](../package.json)。开发环境、消息生命周期、Zen 或发布相关故障见 [`docs/troubleshooting.md`](troubleshooting.md)。
 
 ## 事实真源
 
@@ -97,7 +97,7 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 | --- | --- |
 | 常规代码改动 | 开发期间运行 `npm run compile` 和 `npm run test` |
 | 代码 PR 准备接受审查 | `npm run gate:ci` |
-| 仅文档 / GitHub 模板变更 | 如果没有修改运行时、构建或依赖文件，`gate:ci` 可以填写 `N/A`；需在 PR 中说明原因 |
+| 仅文档 / GitHub 模板变更 | 运行 `npm run format:check` 并检查本次修改的本地链接；若未修改运行时、构建或依赖文件，`gate:ci` 可填写 `N/A` 并说明原因 |
 | 生产构建、manifest、权限、打包或发布变更 | `npm run gate` |
 | 浏览器/站点专项行为 | 手动验证受影响的浏览器/站点路径；适用时运行对应的 `dev:*` / build 命令 |
 | 视觉行为 | 记录受影响状态的修改前/后效果，或提供等价截图 |
@@ -105,6 +105,10 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 对于触及 WebClipper 代码路径的非 Draft PR，GitHub Actions 当前会运行 `npm ci` 和 `npm run gate:ci`。该 CI 结果**不能**替代要求的本地 production build 或手动浏览器验证。
 
 当改动涉及 [`AGENTS.md`](../AGENTS.md) 中的产品不变量时，请在 PR 中提供相应的架构专项扫描或定向测试证据。涉及 provider 同步生命周期时，定向验证至少应覆盖 manual / auto-sync 走同一任务入口、已知 conversation identity 在晚期失败后不降级，以及 provider 原有事务或并发语义没有被共享 progress lifecycle 改写。
+
+## 文档维护
+
+长期文档的职责与更新触发条件见 [`docs/GENERATION.md`](GENERATION.md)。优先更新已有 canonical owner；`.github/features/**` 只保留实施计划与审计证据，不作为长期产品文档。没有现有 owner 能承载新的长期契约时，才新增页面并接入真实导航。
 
 ## 数据与隐私变更
 

@@ -18,7 +18,7 @@ Capture supported AI conversations, web articles, and YouTube/Bilibili transcrip
 
 ## What it does
 
-SyncNos is local-first: captured content is saved locally before any optional sync or export. Notion, Obsidian, Feishu, GitHub, selected Markdown/JSON exports, and Backup ZIP files are derived outputs rather than the source of truth.
+SyncNos is local-first: captured content is saved locally before any optional sync or export. Notion, Obsidian, Feishu, GitHub, selected Markdown/JSON exports, and Backup ZIP files are derived outputs rather than the source of truth. See [Privacy](PRIVACY.md) for permissions, credentials, and external data flows.
 
 ## Download & Install
 
