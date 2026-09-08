@@ -34,6 +34,16 @@ function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
 }
 
+function formatActivityIso(value: unknown): string {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+  try {
+    return new Date(timestamp).toISOString();
+  } catch (_error) {
+    return '';
+  }
+}
+
 function normalizeNewlines(input: unknown) {
   return String(input || '')
     .replace(/\r\n/g, '\n')
@@ -203,9 +213,11 @@ function buildFullNoteMarkdown({
   const c = conversation || {};
   const url = safeString(c.url);
   const sourceType = safeString(c.sourceType);
+  const lastActivityAt = formatActivityIso(c.lastActivityAt);
 
   const frontmatter: Record<string, unknown> = {
     ...(url ? { url } : null),
+    ...(lastActivityAt ? { last_activity_at: lastActivityAt } : null),
     syncnos: syncnosObject || null,
   };
 

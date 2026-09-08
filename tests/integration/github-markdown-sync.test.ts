@@ -661,6 +661,16 @@ describe('GitHub Markdown production-chain integration', () => {
       createdAt: 30,
       updatedAt: 30,
     });
+    await addArticleComment({
+      canonicalUrl: String(article.url),
+      conversationId: null,
+      authorName: 'Bob',
+      quoteText: '',
+      commentText: 'E2E orphan comment',
+      createdAt: 35,
+      updatedAt: 35,
+    });
+    expect((await backgroundStorage.getConversationById(Number(article.id)))?.lastActivityAt).toBe(30);
 
     const refUpdatesBeforeFirstSync = fakeGithub.syncRefUpdates;
     const manualStart = await router.__handleMessageForTests({
@@ -689,6 +699,11 @@ describe('GitHub Markdown production-chain integration', () => {
     expect(fakeGithub.hasPath(articlePath)).toBe(true);
     expect(fakeGithub.hasPath(firstAssetPaths[0]!)).toBe(true);
     expect(fakeGithub.readText(articlePath)).toContain('E2E owned comment');
+    expect(fakeGithub.readText(articlePath)).toContain('E2E orphan comment');
+    expect(fakeGithub.readText(articlePath)).toContain('last_activity_at: "1970-01-01T00:00:00.035Z"');
+    expect((await backgroundStorage.getConversationById(Number(article.id)))?.lastActivityAt).toBe(35);
+    expect(articleAfterFirst?.mapping).not.toHaveProperty('lastActivityAt');
+    expect(articleAfterFirst?.mapping).not.toHaveProperty('githubLastActivityAt');
     expect(fakeGithub.readText(chatPath)).toContain('mounted chat 中的 `syncnos-asset://` 已自动变成');
     expect(fakeGithub.readText(chatPath)).toContain('`![inline](syncnos-asset://2)`');
     expect(fakeGithub.readText(chatPath)).toContain('![fenced](syncnos-asset://3)');

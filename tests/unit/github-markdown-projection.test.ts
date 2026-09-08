@@ -84,6 +84,24 @@ describe('github markdown projection', () => {
     expect(projection.projectionFingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('changes rendered Markdown and hashes when only canonical Activity changes', async () => {
+    const messages = [{ messageKey: 'm1', sequence: 1, role: 'assistant', contentMarkdown: 'same body' }];
+    const first = await buildGithubMarkdownProjection({
+      conversation: conversation({ lastActivityAt: 1_000 }),
+      messages,
+    });
+    const second = await buildGithubMarkdownProjection({
+      conversation: conversation({ lastActivityAt: 2_000 }),
+      messages,
+    });
+
+    expect(first.markdownText).toContain('last_activity_at: "1970-01-01T00:00:01.000Z"');
+    expect(second.markdownText).toContain('last_activity_at: "1970-01-01T00:00:02.000Z"');
+    expect(second.markdownText).not.toBe(first.markdownText);
+    expect(second.markdownContentHash).not.toBe(first.markdownContentHash);
+    expect(second.projectionFingerprint).not.toBe(first.projectionFingerprint);
+  });
+
   it('renders article comments in UTC and remains byte-stable across local timezone changes', async () => {
     const current = conversation({
       id: 9,

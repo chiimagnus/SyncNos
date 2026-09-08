@@ -59,13 +59,15 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
 
     // Local data
     let messages: any[] = [{ messageKey: 'm1', sequence: 1, role: 'assistant', contentMarkdown: 'a', updatedAt: 1 }];
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    let lastActivityAt = 1_000;
+    backgroundStorageMocks.getConversationById.mockImplementation(async () => ({
       id: 1,
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'k1',
       title: 't',
-    });
+      lastActivityAt,
+    }));
     backgroundStorageMocks.getMessagesByConversationId.mockImplementation(async () => messages.slice());
 
     await settingsStore.saveObsidianSettings({ enabled: true, apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
@@ -119,20 +121,28 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
     const r1 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(r1.okCount).toBe(1);
     expect(r1.results[0].mode).toBe('full_rebuild');
+    expect(remoteContent).toContain('last_activity_at: "1970-01-01T00:00:01.000Z"');
 
-    // 2) Add one new message locally -> rebuild again
+    // 2) Activity-only change -> rebuild again with new top-level metadata.
+    lastActivityAt = 2_000;
+    const activityOnly = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    expect(activityOnly.okCount).toBe(1);
+    expect(activityOnly.results[0].mode).toBe('full_rebuild');
+    expect(remoteContent).toContain('last_activity_at: "1970-01-01T00:00:02.000Z"');
+
+    // 3) Add one new message locally -> rebuild again
     messages = [...messages, { messageKey: 'm2', sequence: 2, role: 'assistant', contentMarkdown: 'b', updatedAt: 2 }];
     const r2 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(r2.okCount).toBe(1);
     expect(r2.results[0].mode).toBe('full_rebuild');
     expect(r2.results[0].appended).toBe(2);
 
-    // 3) Remote deleted -> rebuild again
+    // 4) Remote deleted -> rebuild again
     remoteExists = false;
     const r3 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(r3.okCount).toBe(1);
     expect(r3.results[0].mode).toBe('full_rebuild');
-    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(3);
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(4);
     expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenNthCalledWith(1, {
       source: 'chatgpt',
       conversationKey: 'k1',
@@ -145,13 +155,17 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
       source: 'chatgpt',
       conversationKey: 'k1',
     });
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenNthCalledWith(4, {
+      source: 'chatgpt',
+      conversationKey: 'k1',
+    });
 
-    // 4) Auth fails -> failure result
+    // 5) Auth fails -> failure result
     authFail = true;
     const r4 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
     expect(r4.failCount).toBe(1);
     expect(r4.results[0].mode).toBe('failed');
-    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(3);
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledTimes(4);
   });
 });
 

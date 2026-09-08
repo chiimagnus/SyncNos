@@ -662,7 +662,7 @@ describe('obsidian-sync-orchestrator', () => {
     backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
       { messageKey: 'article_body', sequence: 1, contentMarkdown: 'Body', updatedAt: 1 },
     ]);
-    backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockResolvedValue({ ok: true });
+    backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockResolvedValue({ updated: 0 });
     backgroundStorageMocks.getArticleCommentsByConversationId.mockResolvedValue([
       {
         id: 1,
@@ -718,6 +718,58 @@ describe('obsidian-sync-orchestrator', () => {
     expect(putCount).toBe(1);
     expect(putBody).toContain('## Article');
     expect(putBody).toContain('## Comments');
+    expect(backgroundStorageMocks.getConversationById).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses refreshed article Activity in the same run when orphan attach changes canonical state', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    const stale = {
+      id: 1,
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/activity-refresh',
+      title: 'Activity refresh',
+      url: 'https://example.com/activity-refresh',
+      lastActivityAt: 1_000,
+    };
+    const refreshed = { ...stale, lastActivityAt: 5_000 };
+    backgroundStorageMocks.getConversationById.mockResolvedValueOnce(stale).mockResolvedValueOnce(refreshed);
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'article_body', sequence: 1, contentMarkdown: 'Body', updatedAt: 1 },
+    ]);
+    backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockResolvedValue({ updated: 1 });
+    backgroundStorageMocks.getArticleCommentsByConversationId.mockResolvedValue([]);
+
+    let putBody = '';
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        putBody = String(init?.body || '');
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'activity-refresh' });
+
+    expect(syncRes.results[0]).toMatchObject({ ok: true, mode: 'full_rebuild' });
+    expect(backgroundStorageMocks.getConversationById).toHaveBeenCalledTimes(2);
+    expect(putBody).toContain('last_activity_at: "1970-01-01T00:00:05.000Z"');
+    expect(putBody).not.toContain('last_activity_at: "1970-01-01T00:00:01.000Z"');
   });
 
   it('rebuilds chat note even when remote cursor mismatches', async () => {
