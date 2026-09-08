@@ -30,7 +30,7 @@ describe('remote-markdown-writer', () => {
     expect(md).toContain('url:');
     expect(md).toContain('last_activity_at: "2026-09-08T02:00:00.000Z"');
     expect(md).toContain('syncnos:');
-    expect(md).toContain(`# ${w.MESSAGES_HEADING}`);
+    expect(md).toContain('# Conversations');
     expect(md).toContain('## 1 assistant');
     expect(md).toContain('hi');
   });
@@ -77,9 +77,9 @@ describe('remote-markdown-writer', () => {
         lastSyncedMessageKey: 'article_body',
       },
     });
-    expect(md).toContain(`## ${w.ARTICLE_HEADING}`);
-    expect(md).toContain(`## ${w.COMMENTS_HEADING}`);
-    expect(md).not.toContain(`## ${w.MESSAGES_HEADING}`);
+    expect(md).toContain('## Article');
+    expect(md).toContain('## Comments');
+    expect(md).not.toContain('## Conversations');
     expect(md).toContain('last_activity_at: "2026-09-08T03:00:00.000Z"');
     expect(md).toContain('comments_root_count: 1');
     expect(md).toContain('> Quoted');

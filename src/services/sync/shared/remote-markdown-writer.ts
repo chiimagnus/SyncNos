@@ -236,4 +236,4 @@ function buildFullNoteMarkdown({
   return buildFrontmatterBlock(frontmatter) + `# ${MESSAGES_HEADING}\n\n` + messagesMd;
 }
 
-export { MESSAGES_HEADING, ARTICLE_HEADING, COMMENTS_HEADING, buildFullNoteMarkdown };
+export { buildFullNoteMarkdown };
