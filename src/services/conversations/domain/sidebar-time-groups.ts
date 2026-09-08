@@ -1,13 +1,13 @@
 import type { Conversation } from '@services/conversations/domain/models';
 import { differenceInLocalCalendarDays, startOfLocalCalendarDay } from '@services/shared/local-calendar-day';
 
-export type ConversationSidebarGroupLabels = {
+type ConversationSidebarGroupLabels = {
   today: string;
   yesterday: string;
   earlier: string;
 };
 
-export type ConversationSidebarRenderItem =
+type ConversationSidebarRenderItem =
   | {
       type: 'section';
       key: string;

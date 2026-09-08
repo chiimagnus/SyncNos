@@ -15,12 +15,12 @@ type CurrentPageCaptureDeps = {
   collectorsRegistry: CollectorRegistryLike | null;
 };
 
-export type CurrentPageCaptureProgress = {
+type CurrentPageCaptureProgress = {
   kind?: 'default' | 'error';
   message: string;
 };
 
-export type CurrentPageCaptureState = {
+type CurrentPageCaptureState = {
   available: boolean;
   kind: 'chat' | 'article' | 'unsupported';
   label: string;

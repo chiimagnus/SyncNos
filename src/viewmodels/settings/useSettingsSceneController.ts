@@ -148,7 +148,7 @@ type RunTaskOptions = {
   onError?: (message: string) => void;
 };
 
-export type UseSettingsSceneControllerArgs = {
+type UseSettingsSceneControllerArgs = {
   activeSection: SettingsSectionKey;
   focusKey?: string;
 };

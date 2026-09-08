@@ -76,7 +76,7 @@ const SYNC_MENU_ITEM_IDS: Record<SyncProvider, string> = {
   github: 'menuSyncToGithub',
 };
 
-export type ConversationListPaneProps = {
+type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
