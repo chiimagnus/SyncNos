@@ -70,7 +70,7 @@ YouTube 和 Bilibili 页面可采集页面已经加载的字幕 / 转录内容�
 | **Obsidian** | 通过本机 Local REST API 把 Markdown 和本地图片附件写入 vault。参见[配置指南](docs/guide/obsidian/LocalRestAPI.zh.md)。 |
 | **飞书** | OAuth 后同步本地内容到飞书 DocX；始终可手动同步，也可显式开启自动同步。参见[配置指南](docs/guide/feishu/DocxSync.zh.md)。 |
 | **GitHub** | 通过 SyncNos GitHub App 把本地 projection 写入已授权的 repository/branch；始终可手动同步，也可显式开启自动同步。SyncNos 生成的 commit 固定使用 `SyncNos GitHub sync`，实际改变了哪些文件以 GitHub 最终 diff 为准。 |
-| **Markdown / JSON** | 把已选内容打包为一个 ZIP；每条 item 对应一个独立 `.md` 或 `.json` 内容文件，并附带实际引用的本地缓存附件。JSON 遵循版本化的 [Selected JSON Export v2 契约](docs/export-json-v2.md)。 |
+| **Markdown / JSON** | 把已选内容打包为一个 ZIP；每条 item 对应一个独立 `.md` 或 `.json` 内容文件，并附带实际引用的本地缓存附件。 |
 | **Backup ZIP** | 创建独立的本地恢复包；恢复边界见[本地数据、备份与恢复](docs/storage.md)。 |
 
 ## 界面预览
