@@ -87,7 +87,7 @@ describe('conversations pagination handlers', () => {
     const res = await router.__handleMessageForTests({
       type: 'getConversationListPage',
       query: { sourceKey: 'all', siteKey: 'all', limit: 20 },
-      cursor: { lastCapturedAt: 'bad', id: 1 },
+      cursor: { lastActivityAt: 'bad', id: 1 },
     });
 
     expect(res.ok).toBe(false);
@@ -122,7 +122,7 @@ describe('conversations pagination handlers', () => {
       id: 99,
       source: 'chatgpt',
       conversationKey: 'k-99',
-      lastCapturedAt: 123,
+      lastActivityAt: 123,
       author: 'Author',
       publishedAt: '2026-08-29',
       warningFlags: ['partial'],

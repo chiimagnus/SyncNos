@@ -333,7 +333,7 @@ describe('github cleanup outbox store', () => {
       source: 'chatgpt',
       conversationKey: 'github-outbox-connection-ownership',
       title: 'Connection ownership regression',
-      lastCapturedAt: 20,
+      lastActivityAt: 20,
     });
     await expect(getConversationById(Number(conversation.id))).resolves.toMatchObject({
       conversationKey: 'github-outbox-connection-ownership',

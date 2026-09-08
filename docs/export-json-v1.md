@@ -1,6 +1,6 @@
 # Selected JSON Export v1
 
-This page is the canonical public contract for SyncNos **selected JSON export** with `schemaVersion: 1`. It describes a read-only interchange format for selected captured items. It is not the SyncNos Backup ZIP format and is not an import/restore schema.
+This page is the frozen historical public contract for SyncNos **selected JSON export** with `schemaVersion: 1`. It describes the read-only interchange format produced by v1 exporters. It is not the current selected-export schema, the SyncNos Backup ZIP format, or an import/restore schema.
 
 ## Archive contract
 
@@ -77,9 +77,9 @@ Each message contains only:
 - `key: string` — a non-empty persisted `messageKey`;
 - `role: string` — an empty or malformed stored role falls back to `assistant`;
 - `author: string | null`;
-- `content: { format: "markdown", value: string } | null` for exports produced by current SyncNos versions.
+- `content: { format: "markdown", value: string } | null` for later v1 exports produced after canonical message-body storage was introduced.
 
-SyncNos now keeps one canonical saved message body and current v1 exports therefore emit only `format: "markdown"`. Historical v1 archives produced before this canonicalization may contain `{ format: "text", value: string }`; consumers that support older archives should continue accepting that legacy representation, but current SyncNos does not produce it.
+Later v1 exporters emitted only `format: "markdown"`. Earlier v1 archives may contain `{ format: "text", value: string }`; consumers that support v1 should continue accepting that historical representation.
 
 Local message IDs, `conversationId`, `sequence`, and `updatedAt` are not exported.
 

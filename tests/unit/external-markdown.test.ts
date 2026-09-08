@@ -12,6 +12,7 @@ describe('formatConversationMarkdownForExternalOutput', () => {
         conversationKey: 'article:https://example.com/a',
         title: 'Article',
         url: 'https://example.com/a',
+        lastActivityAt: Date.parse('2026-09-08T01:02:03.000Z'),
       },
       {
         conversationId: 1,
@@ -41,6 +42,7 @@ describe('formatConversationMarkdownForExternalOutput', () => {
       },
     );
 
+    expect(markdown).toContain('- Last Activity: 2026-09-08T01:02:03.000Z');
     expect(markdown).toContain('[Image: Diagram]');
     expect(markdown).toContain('[Image: Cached]');
     expect(markdown).toContain('[Image: Malformed]');

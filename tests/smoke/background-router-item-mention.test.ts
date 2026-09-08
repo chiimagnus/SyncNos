@@ -34,13 +34,13 @@ vi.mock('@services/conversations/external-markdown', () => ({
   formatConversationMarkdownForExternalOutput: externalMarkdownMocks.formatConversationMarkdownForExternalOutput,
 }));
 
-function candidate(conversationId: number, title: string, lastCapturedAt = conversationId) {
+function candidate(conversationId: number, title: string, lastActivityAt = conversationId) {
   return {
     conversationId,
     title,
     source: 'chatgpt',
     domain: 'example.com',
-    lastCapturedAt,
+    lastActivityAt,
   };
 }
 
@@ -270,7 +270,7 @@ describe('background-router item mention', () => {
       title: 't',
       url: 'https://chatgpt.com/c/1',
       sourceType: 'chat',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
     storageMocks.getConversationDetail.mockResolvedValue({
       conversationId: 123,
@@ -319,7 +319,7 @@ describe('background-router item mention', () => {
       title: 't',
       url: 'https://chatgpt.com/c/1',
       sourceType: 'chat',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
     storageMocks.getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
 

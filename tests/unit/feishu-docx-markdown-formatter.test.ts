@@ -5,7 +5,13 @@ import { formatConversationMarkdownForFeishuDocxSync } from '@services/sync/feis
 describe('feishu docx markdown formatter', () => {
   it('uses H1 for role labels (content/user/assistant) to improve Feishu render prominence', async () => {
     const out = await formatConversationMarkdownForFeishuDocxSync(
-      { id: 1, source: 'x', conversationKey: 'k', title: 't' } as any,
+      {
+        id: 1,
+        source: 'x',
+        conversationKey: 'k',
+        title: 't',
+        lastActivityAt: Date.parse('2026-09-08T01:02:03.000Z'),
+      } as any,
       {
         conversationId: 1,
         messages: [
@@ -16,6 +22,7 @@ describe('feishu docx markdown formatter', () => {
       } as any,
     );
 
+    expect(out).toContain('- Last Activity: 2026-09-08T01:02:03.000Z');
     expect(out).toContain('\n# content\n');
     expect(out).toContain('\n# You\n');
     expect(out).toContain('\n# assistant\n');
@@ -26,16 +33,37 @@ describe('feishu docx markdown formatter', () => {
 
   it('uses H1 for article Content section in Feishu sync output', async () => {
     const out = await formatConversationMarkdownForFeishuDocxSync(
-      { id: 1, source: 'x', conversationKey: 'k', title: 't', sourceType: 'article' } as any,
+      {
+        id: 1,
+        source: 'x',
+        conversationKey: 'k',
+        title: 't',
+        sourceType: 'article',
+        lastActivityAt: Date.parse('2026-09-08T04:05:06.000Z'),
+      } as any,
       {
         conversationId: 1,
         messages: [{ id: 1, conversationId: 1, messageKey: 'm1', role: 'content', contentMarkdown: 'body' } as any],
       } as any,
     );
 
+    expect(out).toContain('- Last Activity: 2026-09-08T04:05:06.000Z');
+    expect(out.indexOf('- Last Activity:')).toBeLessThan(out.indexOf('\n# Content\n'));
     expect(out).toContain('\n# Content\n');
     expect(out).not.toContain('\n## Content\n');
   });
+
+  it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
+    'omits invalid Last Activity metadata for %s',
+    async (lastActivityAt) => {
+      const out = await formatConversationMarkdownForFeishuDocxSync(
+        { id: 1, source: 'x', conversationKey: 'k', title: 't', lastActivityAt } as any,
+        { conversationId: 1, messages: [] } as any,
+      );
+      expect(out).not.toContain('Last Activity:');
+      expect(out).not.toContain('Infinity');
+    },
+  );
 
   it('keeps internal image references (data url / syncnos-asset)', async () => {
     const markdown = ['# Title', '', '![d](data:image/png;base64,AAAA)', '', '![a](syncnos-asset://123)', ''].join(

@@ -70,7 +70,7 @@ YouTube and Bilibili pages can capture transcripts/subtitles that the page has a
 | **Obsidian** | Writes Markdown and local image attachments to your vault through the localhost Local REST API. See [setup](docs/guide/obsidian/LocalRestAPI.en.md). |
 | **Feishu** | Syncs local content to Feishu DocX after OAuth. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/feishu/DocxSync.en.md). |
 | **GitHub** | Writes the local projection to an authorized repository/branch through the SyncNos GitHub App. Manual sync is always available; optional auto-sync can be enabled. |
-| **Markdown / JSON** | Exports selected content as a ZIP container with one `.md` or `.json` content file per selected item plus referenced cached attachments. JSON follows the versioned [Selected JSON Export v1 contract](docs/export-json-v1.md). |
+| **Markdown / JSON** | Exports selected content as a ZIP container with one `.md` or `.json` content file per selected item plus referenced cached attachments. JSON follows the versioned [Selected JSON Export v2 contract](docs/export-json-v2.md). |
 | **Backup ZIP** | Creates the separate local recovery package described in [storage and recovery](docs/storage.md). |
 
 ## Screenshots

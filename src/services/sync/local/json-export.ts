@@ -26,13 +26,13 @@ type JsonAttachment = {
 };
 
 type JsonCommon = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   type: 'chat' | 'article' | 'video';
   source: string;
   key: string;
   title: string | null;
   url: string | null;
-  capturedAt: string | null;
+  lastActivityAt: string | null;
   warnings: string[];
   attachments: JsonAttachment[];
 };
@@ -89,7 +89,7 @@ function normalizeWarnings(value: unknown): string[] {
   });
 }
 
-function normalizeCapturedAt(value: unknown): string | null {
+function normalizeLastActivityAt(value: unknown): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
   try {
     return new Date(value).toISOString();
@@ -144,13 +144,13 @@ function commonFields<T extends JsonCommon['type']>(
   type: T,
 ): Omit<JsonCommon, 'attachments' | 'type'> & { type: T } {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     type,
     source: requireNonEmptyString(conversation.source, 'source'),
     key: requireNonEmptyString(conversation.conversationKey, 'conversationKey'),
     title: nullableMetadataString(conversation.title),
     url: nullableMetadataString(conversation.url),
-    capturedAt: normalizeCapturedAt(conversation.lastCapturedAt),
+    lastActivityAt: normalizeLastActivityAt(conversation.lastActivityAt),
     warnings: normalizeWarnings(conversation.warningFlags),
   };
 }

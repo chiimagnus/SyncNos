@@ -12,28 +12,28 @@ describe('item-mention-search', () => {
           title: 'Hello world',
           source: 'chatgpt',
           domain: 'openai.com',
-          lastCapturedAt: 1000,
+          lastActivityAt: 1000,
         },
         {
           conversationId: 2,
           title: 'OpenAI paper',
           source: 'chatgpt',
           domain: 'example.com',
-          lastCapturedAt: 900,
+          lastActivityAt: 900,
         },
         {
           conversationId: 3,
           title: 'Something else',
           source: 'openai',
           domain: 'foo.com',
-          lastCapturedAt: 5000,
+          lastActivityAt: 5000,
         },
         {
           conversationId: 4,
           title: 'Nothing',
           source: 'chatgpt',
           domain: 'bar.com',
-          lastCapturedAt: 9999,
+          lastActivityAt: 9999,
         },
       ],
       limit: 10,
@@ -49,7 +49,7 @@ describe('item-mention-search', () => {
       title: index === 55 ? 'OpenAI' : `Weak ${index + 1}`,
       source: index < 55 ? 'openai-weak' : 'chatgpt',
       domain: 'example.com',
-      lastCapturedAt: 10_000 - index,
+      lastActivityAt: 10_000 - index,
     }));
 
     const res = searchMentionCandidates({ query: 'openai', candidates, limit: 20 });

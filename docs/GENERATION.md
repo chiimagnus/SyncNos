@@ -19,7 +19,8 @@ The commit above is the code baseline at the start of this documentation reconci
 - `PRIVACY.md`: privacy boundaries and external-service disclosure.
 - `docs/CONTRIBUTING.md`: development workflow and validation requirements.
 - `docs/storage.md`: local-source-of-truth, IndexedDB consistency/reload-free recovery, backup, secret-exclusion, and recovery contracts.
-- `docs/export-json-v1.md`: canonical selected JSON v1 archive/schema, content-fidelity, attachment, exclusion, and compatibility contract.
+- `docs/export-json-v2.md`: canonical current selected JSON archive/schema, content-fidelity, attachment, exclusion, and compatibility contract.
+- `docs/export-json-v1.md`: frozen historical selected JSON v1 contract retained for consumers of older exports.
 - `docs/troubleshooting.md`: durable troubleshooting guidance.
 - `docs/guide/feishu/DocxSync.en.md` and `docs/guide/feishu/DocxSync.zh.md`: Feishu setup.
 - `docs/guide/obsidian/LocalRestAPI.en.md` and `docs/guide/obsidian/LocalRestAPI.zh.md`: Obsidian Local REST API setup.
@@ -32,7 +33,7 @@ The commit above is the code baseline at the start of this documentation reconci
 - Runtime structure, symbols, callers, and module relationships belong to CodeGraph and source code rather than duplicated module-index Markdown.
 - `PRIVACY.md` owns external GitHub network/auth disclosure and the distinction between local Disconnect, GitHub authorization revoke, and GitHub App installation controls.
 - `docs/storage.md` owns durable local-data consistency/retry semantics, backup recovery, GitHub local-secret/backup-exclusion, sync-mapping, and cleanup-outbox recovery boundaries; implementation topology stays in source/CodeGraph and provider setup remains in the provider guides.
-- `docs/export-json-v1.md` owns the public selected JSON export schema and archive compatibility rules. It must not absorb Backup ZIP restore semantics, internal IndexedDB schema, or provider setup.
+- `docs/export-json-v2.md` owns the current public selected JSON export schema and archive compatibility rules. `docs/export-json-v1.md` is a frozen historical contract. Neither page should absorb Backup ZIP restore semantics, internal IndexedDB schema, or provider setup.
 - `docs/overview.md` is intentionally retired. README is the top-level navigation surface; do not recreate `docs/overview.md` or a duplicate `docs/configuration.md`.
 - `.github/features/**` and `.github/archived_features/**` are execution/history material, not canonical long-term architecture documentation.
 

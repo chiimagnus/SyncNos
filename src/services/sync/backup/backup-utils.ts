@@ -10,8 +10,7 @@ import {
 } from '@services/shared/inpage-display-mode';
 type UnknownRecord = Record<string, any>;
 
-export const BACKUP_SCHEMA_VERSION = 1;
-export const BACKUP_ZIP_SCHEMA_VERSION = 2;
+export const BACKUP_ZIP_SCHEMA_VERSION = 3;
 export const LAST_BACKUP_EXPORT_AT_STORAGE_KEY = 'last_backup_export_at';
 export const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
 export const ARTICLE_COMMENTS_INDEX_SCHEMA_VERSION = ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA;
@@ -111,7 +110,11 @@ function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
   return Array.from(set);
 }
 
-export function mergeConversationRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
+export function mergeConversationRecord(
+  existing: UnknownRecord,
+  incoming: UnknownRecord,
+  options: { allowLegacyLastCapturedAt?: boolean } = {},
+): UnknownRecord {
   const a = existing && typeof existing === 'object' ? existing : {};
   const b = incoming && typeof incoming === 'object' ? incoming : {};
 
@@ -136,9 +139,12 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
   if (notionPageId || hasExplicitEmptyNotionPageId) next.notionPageId = notionPageId;
   else delete next.notionPageId;
 
-  const aCaptured = Number(a.lastCapturedAt) || 0;
-  const bCaptured = Number(b.lastCapturedAt) || 0;
-  next.lastCapturedAt = Math.max(aCaptured, bCaptured, 0);
+  next.lastActivityAt = Math.max(
+    validTimestamp(a.lastActivityAt) ?? 0,
+    validTimestamp(b.lastActivityAt) ?? 0,
+    options.allowLegacyLastCapturedAt ? (validTimestamp(b.lastCapturedAt) ?? 0) : 0,
+  );
+  delete next.lastCapturedAt;
 
   return next;
 }
@@ -181,42 +187,6 @@ export function filterStorageForBackup(storageLocal: unknown): Record<string, un
     out[key] = value;
   }
   return canonicalizeInpageDisplayModeStorageRecord(out);
-}
-
-export function validateBackupDocument(doc: unknown): { ok: boolean; error: string } {
-  const d: any = doc;
-  if (!d || typeof d !== 'object') return { ok: false, error: 'Backup is not an object' };
-  if (Number(d.schemaVersion) !== BACKUP_SCHEMA_VERSION) {
-    return { ok: false, error: 'Unsupported backup schemaVersion' };
-  }
-  if (!d.stores || typeof d.stores !== 'object') return { ok: false, error: 'Missing stores' };
-  const stores = d.stores;
-  for (const name of ['conversations', 'messages', 'sync_mappings']) {
-    if (!Array.isArray(stores[name])) return { ok: false, error: `Invalid store: ${name}` };
-  }
-  const storageLocal = d.storageLocal;
-  if (storageLocal != null && typeof storageLocal !== 'object') {
-    return { ok: false, error: 'Invalid storageLocal' };
-  }
-
-  const seen = new Set<string>();
-  for (const c of stores.conversations) {
-    const uk = uniqueConversationKey(c);
-    if (!uk) continue;
-    if (seen.has(uk)) return { ok: false, error: 'Duplicate conversation key in backup' };
-    seen.add(uk);
-  }
-
-  for (const m of stores.messages) {
-    if (!m || !isNonEmptyString(m.messageKey)) {
-      return { ok: false, error: 'Backup contains messages without messageKey' };
-    }
-    if (!isFinitePositiveInt(Number(m.conversationId))) {
-      return { ok: false, error: 'Backup contains messages without valid conversationId' };
-    }
-  }
-
-  return { ok: true, error: '' };
 }
 
 function isSafeZipPath(pathValue: unknown) {
@@ -279,31 +249,28 @@ export function validateArticleCommentsIndexDocument(doc: unknown): { ok: boolea
 export function validateBackupManifest(doc: unknown): { ok: boolean; error: string } {
   const d: any = doc;
   if (!d || typeof d !== 'object') return { ok: false, error: 'Manifest is not an object' };
-  if (Number(d.backupSchemaVersion) !== BACKUP_ZIP_SCHEMA_VERSION) {
+  const backupSchemaVersion = Number(d.backupSchemaVersion);
+  if (backupSchemaVersion !== 2 && backupSchemaVersion !== BACKUP_ZIP_SCHEMA_VERSION) {
     return { ok: false, error: 'Unsupported backupSchemaVersion' };
   }
+  const isCurrent = backupSchemaVersion === BACKUP_ZIP_SCHEMA_VERSION;
   if (!isNonEmptyString(d.exportedAt)) return { ok: false, error: 'Missing exportedAt' };
   if (!d.db || typeof d.db !== 'object') return { ok: false, error: 'Missing db' };
   if (!isNonEmptyString(d.db.name)) return { ok: false, error: 'Missing db.name' };
   if (!Number.isFinite(Number(d.db.version))) return { ok: false, error: 'Missing db.version' };
 
   if (!d.counts || typeof d.counts !== 'object') return { ok: false, error: 'Missing counts' };
-  for (const k of ['conversations', 'messages', 'sync_mappings']) {
+  const requiredCounts = isCurrent
+    ? ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments']
+    : ['conversations', 'messages', 'sync_mappings'];
+  for (const k of requiredCounts) {
     if (!Number.isFinite(Number(d.counts[k])) || Number(d.counts[k]) < 0) {
       return { ok: false, error: `Invalid counts.${k}` };
     }
   }
-  if ((d.counts as any).image_cache != null) {
-    if (!Number.isFinite(Number((d.counts as any).image_cache)) || Number((d.counts as any).image_cache) < 0) {
-      return { ok: false, error: 'Invalid counts.image_cache' };
-    }
-  }
-  if ((d.counts as any).article_comments != null) {
-    if (
-      !Number.isFinite(Number((d.counts as any).article_comments)) ||
-      Number((d.counts as any).article_comments) < 0
-    ) {
-      return { ok: false, error: 'Invalid counts.article_comments' };
+  for (const k of ['image_cache', 'article_comments']) {
+    if (!isCurrent && d.counts[k] != null && (!Number.isFinite(Number(d.counts[k])) || Number(d.counts[k]) < 0)) {
+      return { ok: false, error: `Invalid counts.${k}` };
     }
   }
 
@@ -349,27 +316,28 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
     }
   }
 
+  if (isCurrent && (!d.assets || typeof d.assets !== 'object')) {
+    return { ok: false, error: 'Missing assets' };
+  }
   if (d.assets != null) {
     if (!d.assets || typeof d.assets !== 'object') return { ok: false, error: 'Invalid assets' };
-    const imageCacheIndexPath = (d.assets as any).imageCacheIndexPath;
-    if (imageCacheIndexPath != null) {
-      if (!isNonEmptyString(imageCacheIndexPath) || !isSafeZipPath(imageCacheIndexPath)) {
-        return { ok: false, error: 'Invalid assets.imageCacheIndexPath' };
-      }
-      if (!String(imageCacheIndexPath).endsWith('.json')) {
-        return { ok: false, error: 'Invalid assets.imageCacheIndexPath extension' };
-      }
-    }
-    const articleCommentsIndexPath = (d.assets as any).articleCommentsIndexPath;
-    if (articleCommentsIndexPath != null) {
-      if (!isNonEmptyString(articleCommentsIndexPath) || !isSafeZipPath(articleCommentsIndexPath)) {
-        return { ok: false, error: 'Invalid assets.articleCommentsIndexPath' };
-      }
-      if (!String(articleCommentsIndexPath).endsWith('.json')) {
-        return { ok: false, error: 'Invalid assets.articleCommentsIndexPath extension' };
+    for (const [key, label] of [
+      ['imageCacheIndexPath', 'assets.imageCacheIndexPath'],
+      ['articleCommentsIndexPath', 'assets.articleCommentsIndexPath'],
+    ] as const) {
+      const pathValue = (d.assets as any)[key];
+      if (isCurrent && pathValue == null) return { ok: false, error: `Missing ${label}` };
+      if (pathValue != null) {
+        if (!isNonEmptyString(pathValue) || !isSafeZipPath(pathValue)) {
+          return { ok: false, error: `Invalid ${label}` };
+        }
+        if (!String(pathValue).endsWith('.json')) {
+          return { ok: false, error: `Invalid ${label} extension` };
+        }
       }
     }
   }
+
 
   return { ok: true, error: '' };
 }

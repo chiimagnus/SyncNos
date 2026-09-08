@@ -35,26 +35,6 @@ export function formatProgress(p: { total: number; done: number; stage?: string 
   return { pct, text: `${t('importingDots')} ${pct}% (${safeDone}/${safeTotal})${labelStage}`.trim() };
 }
 
-export async function isZipFile(file: File) {
-  if (!file) return false;
-  const name = file.name ? String(file.name).toLowerCase() : '';
-  const type = file.type ? String(file.type).toLowerCase() : '';
-  if (name.endsWith('.zip') || type.includes('zip')) return true;
-  try {
-    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-    if (head.length < 4) return false;
-    return (
-      head[0] === 0x50 &&
-      head[1] === 0x4b &&
-      ((head[2] === 0x03 && head[3] === 0x04) ||
-        (head[2] === 0x05 && head[3] === 0x06) ||
-        (head[2] === 0x07 && head[3] === 0x08))
-    );
-  } catch (_e) {
-    return false;
-  }
-}
-
 export type NotionPageOption = { id: string; title: string };
 
 export function openHttpUrl(url: string) {

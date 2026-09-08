@@ -86,7 +86,7 @@ export function BackupSection(props: {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".zip,application/zip,application/json,.json"
+          accept=".zip,application/zip"
           className="tw-hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];

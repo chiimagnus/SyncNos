@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '@services/sync/backup/export';
+import { exportBackupZip } from '@services/sync/backup/export';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
-import {
-  importBackupLegacyJsonMerge,
-  importBackupZipV2Merge,
-  type ImportProgress,
-  type ImportStats,
-} from '@services/sync/backup/import';
+import { importBackupZipMerge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import {
   FEISHU_DEFAULTS,
@@ -62,7 +57,6 @@ import {
 
 import {
   formatProgress,
-  isZipFile,
   openHttpUrl,
   unwrap,
   type ApiResponse,
@@ -1982,7 +1976,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         // Ensure status paint happens before the potentially long synchronous zip step.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-        const result = await exportBackupZipV2({
+        const result = await exportBackupZip({
           onProgress: ({ stage }) => {
             const label = stageLabel(stage);
             if (label) setExportStatus(`${t('backupExporting')} (${label})`);
@@ -2013,23 +2007,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       await runTask(
         async () => {
-          const asZip = await isZipFile(file);
-          let stats: ImportStats;
-
-          if (asZip) {
-            const entries = await extractZipEntries(file);
-            stats = await importBackupZipV2Merge(entries, (progress: ImportProgress) => {
-              const view = formatProgress(progress);
-              setImportStatus(view.text);
-            });
-          } else {
-            const text = await file.text();
-            const doc = JSON.parse(text);
-            stats = await importBackupLegacyJsonMerge(doc, (progress: ImportProgress) => {
-              const view = formatProgress(progress);
-              setImportStatus(view.text);
-            });
-          }
+          const entries = await extractZipEntries(file);
+          const stats: ImportStats = await importBackupZipMerge(entries, (progress: ImportProgress) => {
+            const view = formatProgress(progress);
+            setImportStatus(view.text);
+          });
 
           setImportStats(stats);
           setImportStatus(t('backupImported'));

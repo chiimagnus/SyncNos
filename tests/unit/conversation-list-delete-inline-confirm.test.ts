@@ -22,7 +22,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
         source: 'gemini',
         conversationKey: 'conv-11',
         commentThreadCount: 3,
-        lastCapturedAt: Date.now(),
+        lastActivityAt: Date.now(),
         url: 'https://example.com/chat/11',
       },
     ],

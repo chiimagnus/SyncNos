@@ -1,7 +1,7 @@
 import type { Conversation } from '@services/conversations/domain/models';
 
 export type ConversationListCursor = {
-  lastCapturedAt: number;
+  lastActivityAt: number;
   id: number;
 };
 
@@ -28,7 +28,7 @@ export type ConversationListOpenTarget = {
   title?: string;
   url?: string;
   sourceType?: string;
-  lastCapturedAt: number;
+  lastActivityAt: number;
 };
 
 export type ConversationListPage<TItem = Conversation> = {

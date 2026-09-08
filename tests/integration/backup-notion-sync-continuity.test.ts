@@ -11,8 +11,8 @@ import { computeNotionCommentsDigest } from '@services/comments/sync/notion-comm
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
-import { exportBackupZipV2 } from '@services/sync/backup/export';
-import { importBackupZipV2Merge } from '@services/sync/backup/import';
+import { exportBackupZip } from '@services/sync/backup/export';
+import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
@@ -88,11 +88,11 @@ function articleDigest(markdown: string): string {
 }
 
 async function transferCurrentDbToEmptyDb(): Promise<void> {
-  const exported = await exportBackupZipV2();
+  const exported = await exportBackupZip();
   const entries = await extractZipEntries(exported.blob);
   await closeDbCaches();
   await deleteDb();
-  await importBackupZipV2Merge(entries);
+  await importBackupZipMerge(entries);
 }
 
 async function getOnlyConversationId(): Promise<number> {
@@ -153,7 +153,7 @@ describe('backup -> Notion sync continuity', () => {
         notionPageUrl: 'https://www.notion.so/workspace/page-chat',
         notionWorkspaceSlug: 'workspace',
         warningFlags: [],
-        lastCapturedAt: 100,
+        lastActivityAt: 100,
       }) as any,
     );
     await reqToPromise(
@@ -345,7 +345,7 @@ describe('backup -> Notion sync continuity', () => {
         notionPageUrl: 'https://www.notion.so/workspace/page-article',
         notionWorkspaceSlug: 'workspace',
         warningFlags: [],
-        lastCapturedAt: 200,
+        lastActivityAt: 200,
       }) as any,
     );
     await reqToPromise(

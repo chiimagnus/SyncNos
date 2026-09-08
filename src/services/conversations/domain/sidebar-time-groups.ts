@@ -102,7 +102,7 @@ export function buildConversationSidebarRenderItems(input: {
 
   for (const conversation of conversations) {
     const id = Number((conversation as any)?.id);
-    const ts = Number((conversation as any)?.lastCapturedAt) || 0;
+    const ts = Number((conversation as any)?.lastActivityAt) || 0;
     const section = resolveSection({ ts, nowTs, locale, labels });
     if (section.key !== activeSectionKey) {
       activeSectionKey = section.key;

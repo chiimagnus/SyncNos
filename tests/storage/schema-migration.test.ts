@@ -153,6 +153,12 @@ async function openV11Db() {
   return reqToPromise(indexedDB.open('webclipper', 11));
 }
 
+async function openV12Db() {
+  const db11 = await openV11Db();
+  db11.close();
+  return reqToPromise(indexedDB.open('webclipper', 12));
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -532,10 +538,12 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
     const rows = await reqToPromise<any[]>(store.getAll());
     await txDone(tx8);
 
-    expect(store.indexNames.contains('by_lastCapturedAt_id')).toBe(true);
-    expect(store.indexNames.contains('by_listSourceKey_lastCapturedAt_id')).toBe(true);
-    expect(store.indexNames.contains('by_listSourceKey_listSiteKey_lastCapturedAt_id')).toBe(true);
-    expect(store.indexNames.contains('by_listSiteKey_lastCapturedAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_lastActivityAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_listSourceKey_lastActivityAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_listSourceKey_listSiteKey_lastActivityAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_listSiteKey_lastActivityAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_lastCapturedAt')).toBe(false);
+    expect(store.indexNames.contains('by_lastCapturedAt_id')).toBe(false);
 
     const chat = rows.find((row) => row.conversationKey === 'chat-1');
     expect(chat).toBeTruthy();
@@ -556,7 +564,7 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
 });
 
 describe('storage schema migration (v11 conversation hygiene)', () => {
-  it('repairs final persisted list keys and removes retired migration residue without changing schema shape', async () => {
+  it('repairs final persisted list keys, removes retired residue, and upgrades to the current activity schema', async () => {
     const db10 = await openV10Db();
     const schemaTx = db10.transaction(['conversations'], 'readonly');
     const conversationsStore = schemaTx.objectStore('conversations');
@@ -614,7 +622,15 @@ describe('storage schema migration (v11 conversation hygiene)', () => {
     expect(Array.from(currentDb.objectStoreNames)).toEqual(storeNamesBefore);
     const currentSchemaTx = currentDb.transaction(['conversations'], 'readonly');
     const currentStore = currentSchemaTx.objectStore('conversations');
-    expect(Array.from(currentStore.indexNames)).toEqual(conversationIndexNamesBefore);
+    const currentIndexes = Array.from(currentStore.indexNames);
+    expect(currentIndexes).toEqual([
+      'by_lastActivityAt_id',
+      'by_listSiteKey_lastActivityAt_id',
+      'by_listSourceKey_lastActivityAt_id',
+      'by_listSourceKey_listSiteKey_lastActivityAt_id',
+      'by_source_conversationKey',
+    ]);
+    expect(currentIndexes).not.toEqual(conversationIndexNamesBefore);
     const rows = await reqToPromise<any[]>(currentStore.getAll());
     await txDone(currentSchemaTx);
 
@@ -642,6 +658,121 @@ describe('storage schema migration (v11 conversation hygiene)', () => {
       listSiteKey: 'domain:chatgpt.com',
       futureMetadata: { keep: true },
     });
+    for (const row of rows) {
+      expect(Number(row.lastActivityAt)).toBeGreaterThan(0);
+      expect(Object.prototype.hasOwnProperty.call(row, 'lastCapturedAt')).toBe(false);
+    }
+  });
+});
+
+describe('storage schema migration (v13 canonical activity time)', () => {
+  it('keeps unknown activity at zero when upgrading pre-v4 data instead of inventing migration time', async () => {
+    const db1 = await openV1Db();
+    const tx1 = db1.transaction(['conversations'], 'readwrite');
+    const conversationId = await reqToPromise<number>(
+      tx1.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'debug',
+        conversationKey: 'unknown-pre-v4-activity',
+        title: 'Unknown pre-v4 activity',
+        url: 'https://example.com/unknown-pre-v4-activity',
+        warningFlags: [],
+      }) as IDBRequest<number>,
+    );
+    await txDone(tx1);
+    db1.close();
+
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(9_999_999);
+    try {
+      const currentDb = await openDb();
+      const verifyTx = currentDb.transaction(['conversations'], 'readonly');
+      const migrated = await reqToPromise<any>(verifyTx.objectStore('conversations').get(conversationId));
+      await txDone(verifyTx);
+
+      expect(migrated).toMatchObject({ id: conversationId, lastActivityAt: 0 });
+      expect(Object.prototype.hasOwnProperty.call(migrated, 'lastCapturedAt')).toBe(false);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('migrates v12 capture time plus historical comments without rescanning messages', async () => {
+    const db12 = await openV12Db();
+    const tx12 = db12.transaction(['conversations', 'messages', 'article_comments'], 'readwrite');
+    const conversations = tx12.objectStore('conversations');
+    const firstId = await reqToPromise<number>(
+      conversations.add({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/activity-migration',
+        title: 'Activity migration',
+        url: 'https://example.com/activity-migration',
+        listSourceKey: 'web',
+        listSiteKey: 'domain:example.com',
+        lastCapturedAt: 10,
+      }) as IDBRequest<number>,
+    );
+    const unknownId = await reqToPromise<number>(
+      conversations.add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'unknown-activity',
+        title: 'Unknown',
+        url: 'https://chatgpt.com/c/unknown-activity',
+        listSourceKey: 'chatgpt',
+        listSiteKey: 'domain:chatgpt.com',
+      }) as IDBRequest<number>,
+    );
+    await reqToPromise(
+      tx12.objectStore('article_comments').add({
+        conversationId: firstId,
+        canonicalUrl: 'https://example.com/activity-migration',
+        commentText: 'later historical activity',
+        createdAt: 20,
+        updatedAt: 99,
+      }),
+    );
+    await reqToPromise(
+      tx12.objectStore('messages').add({
+        conversationId: firstId,
+        messageKey: 'm1',
+        role: 'article',
+        contentMarkdown: 'already canonical',
+        sequence: 1,
+      }),
+    );
+    await txDone(tx12);
+    db12.close();
+
+    const cursorSpy = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
+    const currentDb = await openDb();
+    const messageStoreScans = cursorSpy.mock.contexts.filter(
+      (context) => (context as IDBObjectStore | undefined)?.name === 'messages',
+    );
+    cursorSpy.mockRestore();
+    expect(messageStoreScans).toHaveLength(0);
+
+    const verifyTx = currentDb.transaction(['conversations', 'messages'], 'readonly');
+    const rows = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll());
+    const messages = await reqToPromise<any[]>(verifyTx.objectStore('messages').getAll());
+    const store = verifyTx.objectStore('conversations');
+    const indexes = Array.from(store.indexNames);
+    await txDone(verifyTx);
+
+    const migrated = rows.find((row) => Number(row.id) === firstId);
+    expect(migrated).toMatchObject({ lastActivityAt: 20 });
+    expect(Object.prototype.hasOwnProperty.call(migrated, 'lastCapturedAt')).toBe(false);
+    const unknown = rows.find((row) => Number(row.id) === unknownId);
+    expect(unknown).toMatchObject({ lastActivityAt: 0 });
+    expect(messages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'already canonical' });
+    expect(indexes).toEqual([
+      'by_lastActivityAt_id',
+      'by_listSiteKey_lastActivityAt_id',
+      'by_listSourceKey_lastActivityAt_id',
+      'by_listSourceKey_listSiteKey_lastActivityAt_id',
+      'by_source_conversationKey',
+    ]);
+    expect(indexes.some((name) => name.includes('lastCapturedAt'))).toBe(false);
   });
 });
 

@@ -1175,6 +1175,7 @@ describe('background-router notion sync', () => {
               title: 'Same article title',
               url: 'https://x/article',
               notionPageId: 'p1',
+              lastActivityAt: 1000,
             },
             mapping: {
               notionPageId: 'p1',
@@ -1206,6 +1207,7 @@ describe('background-router notion sync', () => {
             properties: {
               Name: { title: [{ plain_text: 'Same article title' }] },
               URL: { url: 'https://x/article' },
+              Date: { date: { start: new Date(1000).toISOString() } },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
               'Comment Threads': { number: 0 },

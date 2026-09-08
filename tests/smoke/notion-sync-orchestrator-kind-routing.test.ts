@@ -81,7 +81,7 @@ describe('notion-sync-orchestrator kind routing', () => {
               url: 'https://a',
               author: 'Alice',
               publishedAt: '2026-02-26',
-              lastCapturedAt: 1000,
+              lastActivityAt: 1000,
             },
             mapping: null,
           };
@@ -93,7 +93,7 @@ describe('notion-sync-orchestrator kind routing', () => {
             source: 'chatgpt',
             title: 'Chat 2',
             url: 'https://c',
-            lastCapturedAt: 2000,
+            lastActivityAt: 2000,
           },
           mapping: null,
         };
@@ -224,7 +224,7 @@ describe('notion-sync-orchestrator kind routing', () => {
             source: 'chatgpt',
             title: 'Internal image failure',
             url: 'https://example.com/3',
-            lastCapturedAt: 3,
+            lastActivityAt: 3,
           },
           mapping: null,
         }),
@@ -300,7 +300,7 @@ describe('notion-sync-orchestrator kind routing', () => {
           sourceType: 'article',
           title: 'A',
           url: 'https://a',
-          lastCapturedAt: 1000,
+          lastActivityAt: 1000,
           notionPageId: 'p1',
         },
         mapping: {

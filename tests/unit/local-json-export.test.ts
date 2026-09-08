@@ -28,7 +28,7 @@ function conversation(id: number, overrides: Record<string, unknown> = {}) {
     conversationKey: `chat-${id}`,
     title: `Chat ${id}`,
     url: `https://example.com/chat/${id}`,
-    lastCapturedAt: 1_700_000_000_000 + id,
+    lastActivityAt: 1_700_000_000_000 + id,
     warningFlags: [],
     ...overrides,
   } as any;
@@ -69,14 +69,14 @@ beforeEach(() => {
   mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
 });
 
-describe('local JSON v1 export', () => {
-  it('exports a chat with the public v1 allowlist and canonical message order', async () => {
+describe('local JSON v2 export', () => {
+  it('exports a chat with the public v2 allowlist and canonical message order', async () => {
     const c = conversation(1, {
       source: ' chatgpt ',
       conversationKey: ' opaque-key ',
       title: '  Title  ',
       url: '  https://example.com/one  ',
-      lastCapturedAt: 1_700_000_000_000,
+      lastActivityAt: 1_700_000_000_000,
       warningFlags: [' warning-a ', '', 7, 'warning-b'],
       listSourceKey: 'internal-list-source',
       listSiteKey: 'internal-site',
@@ -105,13 +105,13 @@ describe('local JSON v1 export', () => {
     expect(result.filename).toBe('SyncNos-json-20260906-010203.zip');
     expect(entry.name).toBe(`${buildConversationBasename(c)}.json`);
     expect(entry.value).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       type: 'chat',
       source: 'chatgpt',
       key: 'opaque-key',
       title: 'Title',
       url: 'https://example.com/one',
-      capturedAt: '2023-11-14T22:13:20.000Z',
+      lastActivityAt: '2023-11-14T22:13:20.000Z',
       warnings: ['warning-a', 'warning-b'],
       attachments: [],
       messages: [
@@ -206,7 +206,7 @@ describe('local JSON v1 export', () => {
     const [entry] = await readJsonEntries(result.zipBlob);
 
     expect(entry.value).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       type: 'video',
       source: 'video',
       key: 'video:https://example.com/watch/4',
@@ -337,7 +337,7 @@ describe('local JSON v1 export', () => {
     const invalidValues = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 9e99, '1700000000000'] as const;
     for (const [index, value] of invalidValues.entries()) {
       const c = conversation(100 + index, {
-        lastCapturedAt: value,
+        lastActivityAt: value,
         title: index === 0 ? 42 : 'Title',
         url: index === 0 ? {} : 'https://example.com',
         warningFlags: index === 0 ? [1, {}, ' ok '] : [],
@@ -348,7 +348,7 @@ describe('local JSON v1 export', () => {
       });
       const result = await buildConversationsJsonZipExport({ conversations: [c] });
       const [entry] = await readJsonEntries(result.zipBlob);
-      expect(entry.value.capturedAt).toBeNull();
+      expect(entry.value.lastActivityAt).toBeNull();
       if (index === 0) {
         expect(entry.value.title).toBeNull();
         expect(entry.value.url).toBeNull();

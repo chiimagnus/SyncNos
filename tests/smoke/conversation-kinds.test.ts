@@ -25,6 +25,42 @@ describe('conversation-kinds', () => {
     expect(chat.notion.dbSpec.storageKey).toBe('notion_db_id_syncnos_ai_chats');
   });
 
+  it('projects lastActivityAt into Notion Date on create and update for every built-in kind', () => {
+    const kinds = loadConversationKinds();
+    const at = Date.parse('2026-09-08T01:02:03.000Z');
+    for (const id of ['chat', 'article', 'video']) {
+      const kind = kinds.list().find((item) => item.id === id)!;
+      const conversation = {
+        sourceType: id === 'chat' ? 'chat' : id,
+        source: id === 'chat' ? 'chatgpt' : id === 'article' ? 'web' : 'video',
+        title: id,
+        url: `https://example.com/${id}`,
+        lastActivityAt: at,
+      };
+      expect(kind.notion.pageSpec.buildCreateProperties(conversation).Date).toEqual({
+        date: { start: '2026-09-08T01:02:03.000Z' },
+      });
+      expect(kind.notion.pageSpec.buildUpdateProperties(conversation).Date).toEqual({
+        date: { start: '2026-09-08T01:02:03.000Z' },
+      });
+    }
+  });
+
+  it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
+    'projects invalid Activity %s as an explicit null Notion Date without inventing now',
+    (lastActivityAt) => {
+      const chat = loadConversationKinds().list().find((item) => item.id === 'chat')!;
+      const properties = chat.notion.pageSpec.buildUpdateProperties({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        title: 'T',
+        url: 'https://example.com',
+        lastActivityAt,
+      });
+      expect(properties.Date).toEqual({ date: null });
+    },
+  );
+
   it('does not expose pageSpec.shouldRebuild (rebuild strategy is handled by orchestrator)', () => {
     const kinds = loadConversationKinds();
     const kind = kinds.pick({ sourceType: 'article' });

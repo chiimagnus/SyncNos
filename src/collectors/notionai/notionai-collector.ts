@@ -791,7 +791,6 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
         title: title || document.title || 'NotionAI',
         url: canonicalUrl || location.href,
         warningFlags,
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

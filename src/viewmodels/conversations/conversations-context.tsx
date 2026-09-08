@@ -193,7 +193,7 @@ function toConversationFromOpenTarget(target: ConversationListOpenTarget): Conve
     title: String(target.title || '').trim() || undefined,
     url,
     sourceType,
-    lastCapturedAt: Number.isFinite(Number(target.lastCapturedAt)) ? Number(target.lastCapturedAt) : undefined,
+    lastActivityAt: Number.isFinite(Number(target.lastActivityAt)) ? Number(target.lastActivityAt) : 0,
   };
 }
 
@@ -842,6 +842,7 @@ export function ConversationsProvider({
         conversationKey: (convo as any)?.conversationKey,
         sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
         url: nextCanonical,
+        lastActivityAt: Date.now(),
       });
       if (Number(activeIdRef.current) === Number(updated?.id)) setActiveConversationSnapshot(updated);
       await refreshList();

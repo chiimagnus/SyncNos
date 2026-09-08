@@ -94,14 +94,14 @@ function ok(data: any) {
   return { ok: true, data, error: null };
 }
 
-function chat(id: number, capturedAt = Date.now()) {
+function chat(id: number, activityAt = Date.now()) {
   return {
     id,
     sourceType: 'chat',
     source: 'chatgpt',
     conversationKey: `chat-${id}`,
     title: `Chat ${id}`,
-    lastCapturedAt: capturedAt,
+    lastActivityAt: activityAt,
   };
 }
 

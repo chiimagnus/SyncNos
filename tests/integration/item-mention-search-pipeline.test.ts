@@ -47,7 +47,7 @@ describe('item mention search pipeline', () => {
           conversationKey: `mention-pipeline-${index}`,
           title: exact ? 'OpenAI' : `Recent weak ${index}`,
           url: `https://example.com/${index}`,
-          lastCapturedAt: base - index,
+          lastActivityAt: base - index,
         });
       }),
     );

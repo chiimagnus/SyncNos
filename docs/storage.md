@@ -5,6 +5,7 @@
 ## 本地真源
 
 - AI 对话、文章、视频字幕及其消息内容先保存到浏览器本地；外部同步目标和导出文件都是派生结果。
+- conversation 的 canonical 业务时间是 `lastActivityAt`：成功抓取/重抓取，以及评论新增、回复、删除等真实用户活动可以推进它；纯阅读、provider sync、技术 identity rewrite、schema/backup migration 不得用当前时间伪造 Activity。
 - 同步 mapping、cursor 或远端状态不能反向覆盖本地内容事实。
 - 虚拟列表来源只有在完整性得到确认后才能做完整快照；不完整采集只能追加已验证内容，不能因为当前 DOM 缺失而删除历史消息。
 - 文章评论属于本地文章身份下的独立注释层；回复必须保持在线程所属的同一文章身份中。
@@ -20,7 +21,7 @@
 
 ## 备份
 
-当前 Zip 备份用于恢复本地数据，而不是复制浏览器内部数据库文件。它可包含：
+当前 Backup ZIP 用于恢复本地数据，而不是复制浏览器内部数据库文件。当前导出只写 canonical `lastActivityAt`；旧 ZIP v2 中的 capture-time 字段只在明确的历史恢复边界转换为 Activity，不作为运行时双时间字段保留。legacy raw JSON backup 不再是受支持的恢复入口。它可包含：
 
 - 本地采集内容及其消息；
 - 同步映射；
@@ -48,8 +49,9 @@ Inpage 显示设置只使用 `inpage_display_mode`（`supported | all | off`）�
 ## 导入与失败语义
 
 - 导入执行合并恢复，不把备份当成无条件覆盖当前本地数据库的镜像；相同备份重复导入应保持幂等，不因为时间戳或其他机械字段制造业务变化与 revision。
-- Zip 导入按已提交 stage 推进，而不是把整个 archive 伪装成单个跨阶段事务。后续 stage 失败时，之前已经 commit 的 stage 保持有效；进度只能报告已经 commit 的阶段。Legacy / Zip 的 progress listener 都是 best-effort side effect：同步 throw 或异步 reject 不得把已经提交的导入 stage 反向解释成失败。
-- 备份 manifest、schema 和 Zip 内部路径必须先验证；危险路径或无效结构应拒绝导入。
+- ZIP 导入按已提交 stage 推进，而不是把整个 archive 伪装成单个跨阶段事务。后续 stage 失败时，之前已经 commit 的 stage 保持有效；进度只能报告已经 commit 的阶段。progress listener 是 best-effort side effect：同步 throw 或异步 reject 不得把已经提交的导入 stage 反向解释成失败。
+- Backup restore 与 schema migration 都不能用导入/升级发生的当前时间制造 `lastActivityAt`。旧 ZIP v2 的历史 capture time 只做 bounded migration；恢复出的已绑定评论可以按其真实 `createdAt` 提升 owning conversation Activity，合法的零时间保持 unknown，不改写成 now。
+- 备份 manifest、schema 和 ZIP 内部路径必须先验证；危险路径、无效结构、manifest 声明但实际缺失的 canonical entry 应拒绝导入，不从未声明路径猜测恢复数据。
 - `image_cache` row 的本地 ID 只在其 owning `conversationId` 内有意义，也不具备跨数据库可移植性。任何读取、导出或外部物化都不能仅凭全局自增 ID 跨 conversation 取图。
 - Zip backup 的 image-cache index 中，old asset ID 同样只在该 index item 的 `uniqueKey` 所属 conversation 内有意义。导入恢复时 old-ID -> local-ID remap 与 fallback 必须按 `uniqueKey` 隔离；一个 conversation 的消息不能消费另一个 conversation 的 remap、blob 或 fallback URL。
 - 导入只重写**真实 Markdown image target** 中的 `syncnos-asset://...`。普通 prose、inline code、fenced code、indented code 或 escaped Markdown 中相同 URI / 图片示例都不是 asset reference，必须保持原文，不得参与 remap/fallback。

@@ -613,7 +613,7 @@ describe('GitHub Markdown production-chain integration', () => {
       title: 'E2E Chat',
       url: 'https://chatgpt.com/c/github-e2e-chat',
       warningFlags: [],
-      lastCapturedAt: 10,
+      lastActivityAt: 10,
     });
     const article = await backgroundStorage.upsertConversation({
       sourceType: 'article',
@@ -622,7 +622,7 @@ describe('GitHub Markdown production-chain integration', () => {
       title: 'E2E Article',
       url: 'https://example.com/github-e2e-article',
       warningFlags: [],
-      lastCapturedAt: 20,
+      lastActivityAt: 20,
     });
     await seedImageAsset(1, Number(chat.id), 'https://images.example.test/one.png', 1);
     await backgroundStorage.syncConversationMessages(Number(chat.id), [
@@ -768,7 +768,7 @@ describe('GitHub Markdown production-chain integration', () => {
       title: 'E2E Chat Renamed',
       url: 'https://chatgpt.com/c/github-e2e-chat',
       warningFlags: [],
-      lastCapturedAt: 40,
+      lastActivityAt: 40,
     });
     const renameCommitsBefore = fakeGithub.syncRefUpdates;
     const renamedChat = await orchestrator.sync({
@@ -801,7 +801,7 @@ describe('GitHub Markdown production-chain integration', () => {
       title: 'E2E Article Renamed',
       url: String(article.url),
       warningFlags: [],
-      lastCapturedAt: 50,
+      lastActivityAt: 50,
     });
     const absentDelete = await orchestrator.sync({
       conversationIds: [article.id],

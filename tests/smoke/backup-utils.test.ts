@@ -53,27 +53,6 @@ describe('backup-utils', () => {
     expect(backupUtils.filterStorageForBackup({ inpage_retired_setting: true, keep: 1 })).toEqual({ keep: 1 });
   });
 
-  it('validateBackupDocument rejects unsupported version', () => {
-    const res = backupUtils.validateBackupDocument({ schemaVersion: 999, stores: {} });
-    expect(res.ok).toBe(false);
-  });
-
-  it('validateBackupDocument rejects duplicate conversation keys', () => {
-    const doc = {
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          { id: 1, source: 'chatgpt', conversationKey: 'c1' },
-          { id: 2, source: 'chatgpt', conversationKey: 'c1' },
-        ],
-        messages: [{ id: 1, conversationId: 1, messageKey: 'm1' }],
-        sync_mappings: [],
-      },
-    };
-    const res = backupUtils.validateBackupDocument(doc);
-    expect(res.ok).toBe(false);
-  });
-
   it('validateBackupManifest accepts a minimal zip v2 manifest', () => {
     const res = backupUtils.validateBackupManifest({
       backupSchemaVersion: 2,
@@ -85,6 +64,26 @@ describe('backup-utils', () => {
       sources: [{ source: 'chatgpt', conversationCount: 1, files: ['sources/chatgpt/c1.json'] }],
     });
     expect(res.ok).toBe(true);
+  });
+
+  it('validateBackupManifest requires current v3 asset counts and index paths', () => {
+    const base = {
+      backupSchemaVersion: 3,
+      exportedAt: new Date().toISOString(),
+      db: { name: 'webclipper', version: 13 },
+      counts: { conversations: 0, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
+      config: { storageLocalPath: 'config/storage-local.json' },
+      index: { conversationsCsvPath: 'sources/conversations.csv' },
+      sources: [],
+      assets: {
+        imageCacheIndexPath: 'assets/image-cache/index.json',
+        articleCommentsIndexPath: 'assets/article-comments/index.json',
+      },
+    };
+    const validate = backupUtils.validateBackupManifest;
+    expect(validate(base).ok).toBe(true);
+    expect(validate({ ...base, counts: { conversations: 0, messages: 0, sync_mappings: 0, article_comments: 0 } }).ok).toBe(false);
+    expect(validate({ ...base, assets: { articleCommentsIndexPath: 'assets/article-comments/index.json' } }).ok).toBe(false);
   });
 
   it('validateBackupManifest rejects unsafe paths', () => {
@@ -126,7 +125,7 @@ describe('backup-utils', () => {
       conversationKey: 'c1',
       title: 'Local',
       url: 'https://a',
-      lastCapturedAt: 5,
+      lastActivityAt: 5,
     };
     const incoming = {
       id: 1,
@@ -135,12 +134,12 @@ describe('backup-utils', () => {
       conversationKey: 'c1',
       title: 'Backup',
       url: 'https://b',
-      lastCapturedAt: 9,
+      lastActivityAt: 9,
     };
     const merged = backupUtils.mergeConversationRecord(existing, incoming);
     expect(merged.title).toBe('Local');
     expect(merged.url).toBe('https://a');
-    expect(merged.lastCapturedAt).toBe(9);
+    expect(merged.lastActivityAt).toBe(9);
   });
 
   it('mergeMessageRecord keeps newer explicit emptiness and lets only newer backups replace it', () => {

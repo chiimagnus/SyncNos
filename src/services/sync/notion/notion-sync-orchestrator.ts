@@ -613,7 +613,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,
                 properties: createProperties,
-                capturedAt: convo.lastCapturedAt,
               });
             } catch (createErr) {
               const shouldRecoverDb = isMissingDatabaseError(createErr);
@@ -631,7 +630,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,
                 properties: createProperties,
-                capturedAt: convo.lastCapturedAt,
               });
             }
             pageId = created && created.id ? created.id : '';

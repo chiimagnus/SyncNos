@@ -246,12 +246,12 @@ export function buildInsightStats(
   let videoUnknownDateCount = 0;
 
   for (const conversation of data.conversations) {
-    if (hasRange && !isWithinRange(conversation.lastCapturedAt, since, until)) {
+    if (hasRange && !isWithinRange(conversation.lastActivityAt, since, until)) {
       continue;
     }
 
     const sourceType = normalizeSourceType(conversation.sourceType);
-    const dayStart = getStartOfLocalDay(Number(conversation.lastCapturedAt) || 0);
+    const dayStart = getStartOfLocalDay(Number(conversation.lastActivityAt) || 0);
 
     if (sourceType === 'chat') {
       stats.chatCount += 1;

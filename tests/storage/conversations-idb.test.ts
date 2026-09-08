@@ -147,14 +147,14 @@ async function createMergePair(suffix: string) {
     source: 'debug',
     conversationKey: `merge-keep-${suffix}`,
     title: 'keep',
-    lastCapturedAt: 1,
+    lastActivityAt: 1,
   });
   const remove = await upsertConversation({
     sourceType: 'chat',
     source: 'debug',
     conversationKey: `merge-remove-${suffix}`,
     title: 'remove',
-    lastCapturedAt: 2,
+    lastActivityAt: 2,
   });
   return { keepId: Number(keep.id), removeId: Number(remove.id) };
 }
@@ -168,7 +168,7 @@ describe('conversations storage-idb', () => {
       title: 'Stable',
       url: 'https://example.com/stable',
       warningFlags: ['keep'],
-      lastCapturedAt: 10,
+      lastActivityAt: 10,
     };
 
     const created = await upsertConversation(payload);
@@ -199,7 +199,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/exact',
       title: 'Exact',
       url: 'https://example.com/exact',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     expect(created.__isNew).toBe(true);
 
@@ -211,12 +211,12 @@ describe('conversations storage-idb', () => {
         conversationKey: 'article:https://example.com/exact',
         title: 'Exact updated',
         url: 'https://example.com/exact#fragment',
-        lastCapturedAt: 2,
+        lastActivityAt: 2,
       });
       expect(Number(repeated.id)).toBe(Number(created.id));
       expect(repeated.__isNew).toBe(false);
       const siteFallbackCursors = openCursorSpy.mock.contexts.filter(
-        (context) => String((context as IDBIndex)?.name || '') === 'by_listSiteKey_lastCapturedAt_id',
+        (context) => String((context as IDBIndex)?.name || '') === 'by_listSiteKey_lastActivityAt_id',
       );
       expect(siteFallbackCursors).toHaveLength(0);
     } finally {
@@ -232,7 +232,7 @@ describe('conversations storage-idb', () => {
       title: 'Preserve',
       notionPageId: 'page-1',
       feishuDocId: 'doc-1',
-      lastCapturedAt: 20,
+      lastActivityAt: 20,
     };
     const created = await upsertConversation(payload);
     const id = Number(created.id);
@@ -272,7 +272,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'mapping-only',
       title: 'Mapping only',
       notionPageId: 'page-mirror',
-      lastCapturedAt: 30,
+      lastActivityAt: 30,
     };
     const created = await upsertConversation(payload);
     expect(await readDataRevision('conversations')).toBe(1);
@@ -298,20 +298,20 @@ describe('conversations storage-idb', () => {
     });
   });
 
-  it('upserts conversation and lists conversations sorted by lastCapturedAt desc', async () => {
+  it('upserts conversation and lists conversations sorted by lastActivityAt desc', async () => {
     await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
       conversationKey: 'k1',
       title: 'A',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
       conversationKey: 'k2',
       title: 'B',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
 
     const items = await listAllConversationsForTests();
@@ -328,7 +328,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'k1',
       title: 'A',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -351,13 +351,111 @@ describe('conversations storage-idb', () => {
     expect(after.map((m) => m.messageKey)).toEqual(['m1']);
   });
 
+  it('commits capture activity with messages while keeping Activity-only recaptures message-revision stable', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'activity-with-messages',
+      title: 'Activity with messages',
+      lastActivityAt: 10,
+    });
+    const id = Number(convo.id);
+    const message = { messageKey: 'm1', role: 'user', contentMarkdown: 'same', sequence: 1, updatedAt: 100 };
+    await syncConversationMessages(id, [message]);
+    const beforeConversations = await readDataRevision('conversations');
+    const beforeMessages = await readDataRevision('messages');
+
+    await syncConversationMessages(id, [message], { activityAt: 20 });
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
+    expect(await readDataRevision('messages')).toBe(beforeMessages);
+
+    await syncConversationMessages(id, [message], { activityAt: 15 });
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
+    expect(await readDataRevision('messages')).toBe(beforeMessages);
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid explicit activityAt=%s before writing messages or conversation activity',
+    async (activityAt) => {
+      const convo = await upsertConversation({
+        sourceType: 'chat',
+        source: 'debug',
+        conversationKey: `invalid-activity-${String(activityAt)}`,
+        title: 'Invalid Activity',
+        lastActivityAt: 10,
+      });
+      const id = Number(convo.id);
+      const beforeMessagesRevision = await readDataRevision('messages');
+      const beforeConversationsRevision = await readDataRevision('conversations');
+
+      await expect(
+        syncConversationMessages(
+          id,
+          [{ messageKey: 'm1', role: 'user', contentMarkdown: 'must not persist', sequence: 1, updatedAt: 100 }],
+          { activityAt },
+        ),
+      ).rejects.toThrow('invalid activityAt');
+
+      expect(await getMessagesByConversationId(id)).toEqual([]);
+      expect((await getConversationById(id))?.lastActivityAt).toBe(10);
+      expect(await readDataRevision('messages')).toBe(beforeMessagesRevision);
+      expect(await readDataRevision('conversations')).toBe(beforeConversationsRevision);
+    },
+  );
+
+  it('rolls back capture activity when message persistence fails', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'activity-message-rollback',
+      title: 'Activity rollback',
+      lastActivityAt: 10,
+    });
+    const id = Number(convo.id);
+    const db = await openDb();
+    const probeTx = db.transaction(['messages'], 'readonly');
+    const prototype = Object.getPrototypeOf(probeTx.objectStore('messages')) as any;
+    const originalAdd = prototype.add;
+    await txDone(probeTx);
+    prototype.add = function add(value: unknown, key?: IDBValidKey) {
+      if (this.name === 'messages') throw new DOMException('forced message failure', 'DataError');
+      return originalAdd.call(this, value, key);
+    };
+    try {
+      await expect(
+        syncConversationMessages(
+          id,
+          [{ messageKey: 'm1', role: 'user', contentMarkdown: 'new', sequence: 1, updatedAt: 100 }],
+          { activityAt: 20 },
+        ),
+      ).rejects.toThrow();
+    } finally {
+      prototype.add = originalAdd;
+    }
+
+    expect((await getConversationById(id))?.lastActivityAt).toBe(10);
+    expect(await getMessagesByConversationId(id)).toEqual([]);
+  });
+
+  it('fails closed when explicit capture activity targets a missing conversation', async () => {
+    await expect(
+      syncConversationMessages(
+        999_999,
+        [{ messageKey: 'm1', role: 'user', contentMarkdown: 'orphan', sequence: 1, updatedAt: 1 }],
+        { activityAt: 20 },
+      ),
+    ).rejects.toThrow('conversation not found');
+  });
+
   it('keeps equivalent message rows revision-stable when incoming timestamps are missing or invalid', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
       conversationKey: 'message_timestamp_noop',
       title: 'Timestamp no-op',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     const stableMessage = {
@@ -415,7 +513,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'message_timestamp_new',
       title: 'Timestamp new',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const before = Date.now();
     await syncConversationMessages(Number(convo.id), [
@@ -432,7 +530,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'snapshot-working-set',
       title: 'Working set',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -479,7 +577,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'snapshot-duplicate-key',
       title: 'Duplicate',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -500,7 +598,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append-delta-read-shape',
       title: 'Delta',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 0 }]);
@@ -533,7 +631,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append-tail-read-shape',
       title: 'Tail',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -591,7 +689,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append-exact-key',
       title: 'Exact key',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -624,7 +722,7 @@ describe('conversations storage-idb', () => {
       source: 'chatgpt',
       conversationKey: 'append-reconcile-read-shape',
       title: 'Reconcile',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -697,7 +795,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'markdown-patch-batch',
       title: 'Patch batch',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -765,7 +863,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'markdown-patch-conflict',
       title: 'Patch conflict',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -794,7 +892,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'markdown-patch-noop',
       title: 'Patch no-op',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'stable', sequence: 0 }]);
@@ -847,7 +945,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'k1',
       title: 'A',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -887,7 +985,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'unknown_mode',
       title: 'Mode',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'old', sequence: 0 }]);
@@ -906,7 +1004,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'k1',
       title: 'A',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -938,7 +1036,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: `append_${_label}`,
       title: 'Append',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -964,7 +1062,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_unkeyed',
       title: 'Append',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -987,7 +1085,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'incremental_no_diff',
       title: 'Incremental',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1011,7 +1109,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_sequence_tail',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1064,7 +1162,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_sequence_incoming_order',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -1101,7 +1199,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_sequence_empty',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -1135,7 +1233,7 @@ describe('conversations storage-idb', () => {
       source: 'chatgpt',
       conversationKey: 'partial_prefix_reconcile',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1176,7 +1274,7 @@ describe('conversations storage-idb', () => {
       source: 'chatgpt',
       conversationKey: 'partial_legacy_order_recovery',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1215,7 +1313,7 @@ describe('conversations storage-idb', () => {
       source: 'chatgpt',
       conversationKey: 'partial_middle_reconcile',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1250,7 +1348,7 @@ describe('conversations storage-idb', () => {
       source: 'chatgpt',
       conversationKey: 'partial_unanchored_tail',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1285,7 +1383,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_sequence_unmarked',
       title: 'Order',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1311,7 +1409,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'clear_markdown',
       title: 'Clear',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1334,7 +1432,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_preserve_markdown',
       title: 'Merge',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1379,7 +1477,7 @@ describe('conversations storage-idb', () => {
       source: 'googleaistudio',
       conversationKey: 'image_fallback_recovery',
       title: 'Images',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(
@@ -1422,7 +1520,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'append_preserve_content',
       title: 'Merge',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1481,7 +1579,7 @@ describe('conversations storage-idb', () => {
       source: 'chatgpt',
       conversationKey: 'deep_research_merge',
       title: 'Research',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -1527,7 +1625,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'tail_k1',
       title: 'Tail',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -1563,7 +1661,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'tail_window_k1',
       title: 'Window',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -1595,7 +1693,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'mapping-patch',
       title: 'Mapping patch',
       notionPageId: 'page-1',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
 
@@ -1692,7 +1790,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'mapping-business-noop',
       title: 'Mapping business no-op',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
     const db = await openDb();
@@ -1733,7 +1831,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'mapping-mirror-only',
       title: 'Mapping mirror only',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
     const db = await openDb();
@@ -1766,7 +1864,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'cursor-baseline-monotonic',
       title: 'Cursor baseline',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
     const previousBaseline = 9_000_000_000_000;
@@ -1814,7 +1912,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'page-switch',
       title: 'Page switch',
       notionPageId: 'page-old',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
 
@@ -1887,7 +1985,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'page-switch-missing-mapping-page',
       title: 'Page switch legacy state',
       notionPageId: 'page-old',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
 
@@ -1926,7 +2024,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'feishu-doc-switch',
       title: 'Feishu doc switch',
       feishuDocId: 'doc-old',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(convo.id);
 
@@ -1963,7 +2061,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'k1',
       title: 'A',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
 
@@ -2006,7 +2104,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${canonicalUrl}`,
       title: 'Delete revisions',
       url: canonicalUrl,
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await syncConversationMessages(id, [
@@ -2075,7 +2173,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'github-delete',
       title: 'GitHub delete',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     const basename = buildConversationBasename(convo);
@@ -2121,7 +2219,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${canonicalUrl}`,
       title: 'Article',
       url: canonicalUrl,
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     const db = await openDb();
@@ -2174,7 +2272,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${canonicalUrl}`,
       title: 'Article restored',
       url: canonicalUrl,
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
     const replacementId = Number(replacement.id);
     await expect(attachOrphanCommentsToConversation(canonicalUrl, replacementId)).resolves.toEqual({ updated: 2 });
@@ -2189,7 +2287,7 @@ describe('conversations storage-idb', () => {
       source: 'debug',
       conversationKey: 'corrupt-github-delete',
       title: 'Corrupt',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     const stableId = stableConversationId10(convo);
@@ -2218,7 +2316,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${canonicalUrl}`,
       title: 'Abort delete',
       url: canonicalUrl,
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const id = Number(convo.id);
     await patchSyncMapping(id, {
@@ -2292,7 +2390,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${oldUrl}`,
       title: 'Old identity',
       url: oldUrl,
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const other = await upsertConversation({
       sourceType: 'article',
@@ -2300,7 +2398,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/other-owner',
       title: 'Other owner',
       url: 'https://example.com/other-owner',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const existingId = Number(existing.id);
     const otherId = Number(other.id);
@@ -2370,7 +2468,7 @@ describe('conversations storage-idb', () => {
       conversationKey: String(existing.conversationKey),
       title: 'New identity',
       url: nextUrl,
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
 
     expect(Number(rewritten.id)).toBe(existingId);
@@ -2424,7 +2522,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${oldUrl}`,
       title: 'Equivalent mapping',
       url: oldUrl,
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const existingId = Number(existing.id);
 
@@ -2475,7 +2573,7 @@ describe('conversations storage-idb', () => {
         conversationKey: `article:${oldUrl}`,
         title: 'Equivalent mapping rewritten',
         url: nextUrl,
-        lastCapturedAt: 2,
+        lastActivityAt: 2,
       });
       expect(rewritten.conversationKey).toBe(`article:${nextUrl}`);
     } finally {
@@ -2505,7 +2603,7 @@ describe('conversations storage-idb', () => {
       conversationKey: `article:${oldUrl}`,
       title: 'Rewrite abort',
       url: oldUrl,
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const existingId = Number(existing.id);
     const oldPath = `WebArticles/${buildConversationBasename(existing)}.md`;
@@ -2547,7 +2645,7 @@ describe('conversations storage-idb', () => {
           conversationKey: String(existing.conversationKey),
           title: 'Rewrite abort new',
           url: nextUrl,
-          lastCapturedAt: 2,
+          lastActivityAt: 2,
         }),
       ).rejects.toThrow();
     } finally {
@@ -2585,7 +2683,7 @@ describe('conversations storage-idb', () => {
           url: 'https://example.com/post#frag',
           notionPageId: 'page_old',
           warningFlags: [],
-          lastCapturedAt: 1,
+          lastActivityAt: 1,
         }),
       ),
     );
@@ -2618,7 +2716,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/post',
       title: 'New title',
       url: 'https://example.com/post',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
 
     expect(Number(conversation.id)).toBe(legacyId);
@@ -2673,7 +2771,7 @@ describe('conversations storage-idb', () => {
           conversationKey: 'legacy-target',
           title: 'Legacy target',
           url: 'https://example.com/post?legacy=1#frag',
-          lastCapturedAt: 10,
+          lastActivityAt: 10,
         }),
       ),
     );
@@ -2685,7 +2783,7 @@ describe('conversations storage-idb', () => {
           conversationKey: 'legacy-wrong-url',
           title: 'Wrong url',
           url: 'https://example.com/other',
-          lastCapturedAt: 11,
+          lastActivityAt: 11,
         }),
       ),
     );
@@ -2698,7 +2796,7 @@ describe('conversations storage-idb', () => {
             conversationKey: `legacy-${sourceType}`,
             title: sourceType,
             url: 'https://example.com/post?legacy=1',
-            lastCapturedAt: 12,
+            lastActivityAt: 12,
           }),
         ),
       );
@@ -2712,7 +2810,7 @@ describe('conversations storage-idb', () => {
             conversationKey: `other-${index}`,
             title: `Other ${index}`,
             url: `https://other-${index}.example.net/post`,
-            lastCapturedAt: 100 + index,
+            lastActivityAt: 100 + index,
           }),
         ),
       );
@@ -2728,7 +2826,7 @@ describe('conversations storage-idb', () => {
         conversationKey: 'article:https://example.com/post?legacy=1',
         title: 'Canonical',
         url: 'https://example.com/post?legacy=1',
-        lastCapturedAt: 200,
+        lastActivityAt: 200,
       });
       expect(Number(conversation.id)).toBe(targetId);
       expect(conversation.__isNew).toBe(false);
@@ -2739,7 +2837,7 @@ describe('conversations storage-idb', () => {
       expect(conversationGetAlls).toHaveLength(0);
       const siteCursorCalls = openCursorSpy.mock.calls.filter(
         (_call, index) =>
-          String((openCursorSpy.mock.contexts[index] as IDBIndex)?.name || '') === 'by_listSiteKey_lastCapturedAt_id',
+          String((openCursorSpy.mock.contexts[index] as IDBIndex)?.name || '') === 'by_listSiteKey_lastActivityAt_id',
       );
       expect(siteCursorCalls).toHaveLength(1);
       const range = siteCursorCalls[0]?.[0] as IDBKeyRange;
@@ -2764,7 +2862,7 @@ describe('conversations storage-idb', () => {
           title: 'Mapped',
           url: 'https://example.com/preferred',
           notionPageId: 'page-mapped',
-          lastCapturedAt: 10,
+          lastActivityAt: 10,
         }),
       ),
     );
@@ -2776,7 +2874,7 @@ describe('conversations storage-idb', () => {
           conversationKey: 'newer',
           title: 'Newer',
           url: 'https://example.com/preferred',
-          lastCapturedAt: 100,
+          lastActivityAt: 100,
         }),
       ),
     );
@@ -2788,7 +2886,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/preferred',
       title: 'Canonical',
       url: 'https://example.com/preferred',
-      lastCapturedAt: 200,
+      lastActivityAt: 200,
     });
     expect(Number(conversation.id)).toBe(mappedId);
   });
@@ -2805,7 +2903,7 @@ describe('conversations storage-idb', () => {
           conversationKey: 'old',
           title: 'Old',
           url: 'https://example.com/tiebreak',
-          lastCapturedAt: 10,
+          lastActivityAt: 10,
         }),
       ),
     );
@@ -2817,7 +2915,7 @@ describe('conversations storage-idb', () => {
           conversationKey: 'new-a',
           title: 'New A',
           url: 'https://example.com/tiebreak',
-          lastCapturedAt: 100,
+          lastActivityAt: 100,
         }),
       ),
     );
@@ -2829,7 +2927,7 @@ describe('conversations storage-idb', () => {
           conversationKey: 'new-b',
           title: 'New B',
           url: 'https://example.com/tiebreak',
-          lastCapturedAt: 100,
+          lastActivityAt: 100,
         }),
       ),
     );
@@ -2841,7 +2939,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/tiebreak',
       title: 'Canonical',
       url: 'https://example.com/tiebreak',
-      lastCapturedAt: 200,
+      lastActivityAt: 200,
     });
     expect(Number(conversation.id)).toBe(expectedId);
   });
@@ -2855,11 +2953,11 @@ describe('conversations storage-idb', () => {
         conversationKey: 'chat-no-article-fallback',
         title: 'Chat',
         url: 'https://example.com/preferred',
-        lastCapturedAt: 1,
+        lastActivityAt: 1,
       });
       expect(conversation.__isNew).toBe(true);
       const siteFallbackCursors = openCursorSpy.mock.contexts.filter(
-        (context) => String((context as IDBIndex)?.name || '') === 'by_listSiteKey_lastCapturedAt_id',
+        (context) => String((context as IDBIndex)?.name || '') === 'by_listSiteKey_lastActivityAt_id',
       );
       expect(siteFallbackCursors).toHaveLength(0);
     } finally {
@@ -2876,7 +2974,7 @@ describe('conversations storage-idb', () => {
       url: 'https://example.com/a',
       notionPageId: '',
       warningFlags: ['w1'],
-      lastCapturedAt: 10,
+      lastActivityAt: 10,
     });
     const remove = await upsertConversation({
       sourceType: 'article',
@@ -2886,7 +2984,7 @@ describe('conversations storage-idb', () => {
       url: 'https://example.com/b',
       notionPageId: 'page_remove',
       warningFlags: ['w2'],
-      lastCapturedAt: 20,
+      lastActivityAt: 20,
     });
     const keepId = Number(keep.id);
     const removeId = Number(remove.id);
@@ -2962,7 +3060,7 @@ describe('conversations storage-idb', () => {
       notionPageId: 'page_remove',
     });
     expect(items[0].warningFlags).toEqual(['w1', 'w2']);
-    expect(Number(items[0].lastCapturedAt)).toBe(20);
+    expect(Number(items[0].lastActivityAt)).toBe(20);
 
     const moved = await getMessagesByConversationId(keepId);
     expect(moved.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
@@ -3167,7 +3265,7 @@ describe('conversations storage-idb', () => {
       url: 'https://example.com/keep',
       notionPageId: '',
       feishuDocId: '',
-      lastCapturedAt: 10,
+      lastActivityAt: 10,
     });
     const remove = await upsertConversation({
       sourceType: 'article',
@@ -3177,7 +3275,7 @@ describe('conversations storage-idb', () => {
       url: 'https://example.com/remove',
       notionPageId: 'page-remove-conversation',
       feishuDocId: 'doc-remove-conversation',
-      lastCapturedAt: 20,
+      lastActivityAt: 20,
     });
     const keepId = Number(keep.id);
     const removeId = Number(remove.id);
@@ -3281,7 +3379,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'merge-abort-keep',
       title: 'keep',
       url: 'https://example.com/merge-abort-keep',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const remove = await upsertConversation({
       sourceType: 'article',
@@ -3289,7 +3387,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'merge-abort-remove',
       title: 'remove',
       url: 'https://example.com/merge-abort-remove',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
     const keepId = Number(keep.id);
     const removeId = Number(remove.id);
@@ -3355,7 +3453,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'key_keep',
       title: 'keep',
       url: '',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const remove = await upsertConversation({
       sourceType: 'article',
@@ -3363,7 +3461,7 @@ describe('conversations storage-idb', () => {
       conversationKey: 'key_remove',
       title: 'remove',
       url: 'https://example.com/post',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
 
     expect(keep.listSourceKey).toBe('web');

@@ -281,7 +281,6 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
         title: env.document.title || 'Doubao',
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

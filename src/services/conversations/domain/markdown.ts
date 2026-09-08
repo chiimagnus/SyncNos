@@ -32,12 +32,12 @@ function headingPrefix(level: MarkdownHeadingLevel) {
 }
 
 function formatIso(ts?: number) {
-  const t = Number(ts) || 0;
-  if (!t) return '';
+  const t = Number(ts);
+  if (!Number.isFinite(t) || t <= 0) return '';
   try {
     return new Date(t).toISOString();
   } catch (_e) {
-    return String(ts || '');
+    return '';
   }
 }
 
@@ -66,6 +66,8 @@ function formatArticleMarkdown(
   if (isNonEmptyString(c.author)) lines.push(`- Author: ${String(c.author)}`);
   if (isNonEmptyString(c.publishedAt)) lines.push(`- Published: ${String(c.publishedAt)}`);
   if (isNonEmptyString(c.url)) lines.push(`- URL: ${String(c.url)}`);
+  const lastActivityAt = formatIso(c.lastActivityAt);
+  if (lastActivityAt) lines.push(`- Last Activity: ${lastActivityAt}`);
   lines.push('');
   const contentHeadingLevel = clampHeadingLevel(options.articleContentHeadingLevel, 2);
   lines.push(`${headingPrefix(contentHeadingLevel)} Content`);
@@ -86,7 +88,8 @@ function formatChatMarkdown(
   lines.push('');
   lines.push(`- Source: ${String((c as any).sourceName || c.source || '')}`);
   if (isNonEmptyString(c.url)) lines.push(`- URL: ${String(c.url)}`);
-  if (c.lastCapturedAt) lines.push(`- CapturedAt: ${formatIso(c.lastCapturedAt)}`);
+  const lastActivityAt = formatIso(c.lastActivityAt);
+  if (lastActivityAt) lines.push(`- Last Activity: ${lastActivityAt}`);
   if (Array.isArray(c.warningFlags) && c.warningFlags.length) {
     lines.push(`- Warnings: ${c.warningFlags.map(String).join(', ')}`);
   }

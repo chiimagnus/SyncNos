@@ -760,9 +760,9 @@ export function ConversationListPane({
                       </span>
                     ) : null}
 
-                    {(conversation as any).lastCapturedAt ? (
+                    {(conversation as any).lastActivityAt ? (
                       <span className="tw-text-[11px] tw-font-semibold">
-                        {formatTime((conversation as any).lastCapturedAt)}
+                        {formatTime((conversation as any).lastActivityAt)}
                       </span>
                     ) : null}
                   </div>

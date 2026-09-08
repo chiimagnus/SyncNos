@@ -145,7 +145,7 @@ function makeConversation(id: number, source: string, conversationKey: string) {
     source,
     conversationKey,
     title: `${source}-${id}`,
-    lastCapturedAt: Date.now() - id * 100,
+    lastActivityAt: Date.now() - id * 100,
     url: `https://example.com/${conversationKey}`,
   };
 }
@@ -332,7 +332,7 @@ describe('ConversationsProvider pagination state', () => {
       ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
         sources: [{ key: 'chatgpt', label: 'chatgpt', count: 3 }],
       }),
-      cursor: { lastCapturedAt: 100, id: 1 },
+      cursor: { lastActivityAt: 100, id: 1 },
       hasMore: true,
       summary: { totalCount: 3, todayCount: 1 },
     };
@@ -344,7 +344,7 @@ describe('ConversationsProvider pagination state', () => {
         ],
         sites: [{ key: 'domain:example.com', label: 'example.com', count: 3 }],
       }),
-      cursor: { lastCapturedAt: 50, id: 2 },
+      cursor: { lastActivityAt: 50, id: 2 },
       hasMore: true,
       summary: { totalCount: 3, todayCount: 2 },
     };
@@ -358,13 +358,13 @@ describe('ConversationsProvider pagination state', () => {
     });
 
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1, 2]);
-    expect(latestState.listCursor).toEqual({ lastCapturedAt: 50, id: 2 });
+    expect(latestState.listCursor).toEqual({ lastActivityAt: 50, id: 2 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 3, todayCount: 2 });
     expect(latestState.listFacets).toEqual(secondPage.facets);
     expect(getConversationListPage).toHaveBeenCalledWith(
       expect.any(Object),
-      { lastCapturedAt: 100, id: 1 },
+      { lastActivityAt: 100, id: 1 },
       expect.any(Number),
     );
   });
@@ -374,7 +374,7 @@ describe('ConversationsProvider pagination state', () => {
       ...makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
         sources: [{ key: 'chatgpt', label: 'chatgpt', count: 2 }],
       }),
-      cursor: { lastCapturedAt: 100, id: 1 },
+      cursor: { lastActivityAt: 100, id: 1 },
       hasMore: true,
       summary: { totalCount: 2, todayCount: 1 },
     };
@@ -389,7 +389,7 @@ describe('ConversationsProvider pagination state', () => {
     });
 
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
-    expect(latestState.listCursor).toEqual({ lastCapturedAt: 100, id: 1 });
+    expect(latestState.listCursor).toEqual({ lastActivityAt: 100, id: 1 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 2, todayCount: 1 });
     expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations', 'article_comments']);
@@ -408,7 +408,7 @@ describe('ConversationsProvider pagination state', () => {
       title: 'Target conversation',
       url: 'https://example.com/chat/999',
       sourceType: 'chat',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
 
     await renderProvider();
@@ -440,7 +440,7 @@ describe('ConversationsProvider pagination state', () => {
       title: 'Target conversation',
       url: 'https://example.com/chat/999',
       sourceType: 'chat',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
 
     await renderProvider();
@@ -494,7 +494,7 @@ describe('ConversationsProvider pagination state', () => {
         title: 'Target conversation',
         url: 'https://example.com/chat/999',
         sourceType: 'chat',
-        lastCapturedAt: Date.now(),
+        lastActivityAt: Date.now(),
       });
       await flushMicrotasks();
       await flushMicrotasks();
@@ -644,6 +644,7 @@ describe('ConversationsProvider pagination state', () => {
         conversationKey: 'article-old',
         sourceType: 'article',
         url: 'https://example.com/target',
+        lastActivityAt: expect.any(Number),
       });
       expect(mergeConversations.mock.invocationCallOrder[0]).toBeLessThan(
         upsertConversation.mock.invocationCallOrder[0]!,

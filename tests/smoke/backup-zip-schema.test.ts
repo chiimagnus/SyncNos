@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 import { DATA_REVISION_STORE_BY_SCOPE } from '@platform/idb/data-revision-record';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
-import { exportBackupZipV2 } from '@services/sync/backup/export';
+import { exportBackupZip } from '@services/sync/backup/export';
 import * as backupUtils from '@services/sync/backup/backup-utils.ts';
 
 describe('backup zip v2 schema', () => {
@@ -90,7 +90,7 @@ describe('backup zip v2 schema', () => {
     }) as any);
 
     try {
-      await exportBackupZipV2();
+      await exportBackupZip();
     } finally {
       spy.mockRestore();
       closeDbForTests();
@@ -155,7 +155,7 @@ describe('backup zip v2 schema', () => {
     };
 
     try {
-      await expect(exportBackupZipV2()).rejects.toThrow('duplicate sync mapping identity: chatgpt||c1');
+      await expect(exportBackupZip()).rejects.toThrow('duplicate sync mapping identity: chatgpt||c1');
     } finally {
       closeDbForTests();
       delete (globalThis as any).chrome;

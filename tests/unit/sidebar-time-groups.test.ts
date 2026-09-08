@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { buildConversationSidebarRenderItems } from '../../src/services/conversations/domain/sidebar-time-groups';
 
-function makeConversation(id: number, lastCapturedAt?: number) {
+function makeConversation(id: number, lastActivityAt?: number) {
   return {
     id,
     source: 'chatgpt',
     conversationKey: `conv-${id}`,
     title: `Conversation ${id}`,
-    lastCapturedAt,
+    lastActivityAt,
   };
 }
 

@@ -141,6 +141,28 @@ describe('article-fetch discourse OP', () => {
     );
   });
 
+  it('resolveOrCapture propagates canonical lookup failure without falling back to capture', async () => {
+    storageMocks.getConversationBySourceConversationKey.mockRejectedValue(new Error('canonical lookup failed'));
+    const executeScript = vi.fn();
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 21, url: 'https://example.com/article?utm_source=test#fragment', title: 'Article tab' }]),
+      },
+      scripting: { executeScript },
+    };
+
+    const mod = await loadArticleFetchModule();
+    await expect(mod.resolveOrCaptureActiveTabArticle()).rejects.toThrow('canonical lookup failed');
+
+    expect(storageMocks.upsertConversation).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
+    expect(executeScript).not.toHaveBeenCalled();
+  });
+
   it('resolveOrCapture reuses existing topic-level conversation key from non-OP floor url', async () => {
     storageMocks.getConversationBySourceConversationKey.mockResolvedValue({
       id: 88,
@@ -148,7 +170,7 @@ describe('article-fetch discourse OP', () => {
       author: 'Author',
       publishedAt: '',
       warningFlags: [],
-      lastCapturedAt: 123,
+      lastActivityAt: 123,
     });
 
     const executeScript = vi.fn();

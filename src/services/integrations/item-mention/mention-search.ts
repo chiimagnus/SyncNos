@@ -42,8 +42,8 @@ export function searchMentionCandidates(input: {
 
   matched.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    const at = a.c.lastCapturedAt || 0;
-    const bt = b.c.lastCapturedAt || 0;
+    const at = a.c.lastActivityAt || 0;
+    const bt = b.c.lastActivityAt || 0;
     if (bt !== at) return bt - at;
     return (b.c.conversationId || 0) - (a.c.conversationId || 0);
   });

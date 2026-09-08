@@ -157,7 +157,7 @@ function extFromImageContentType(contentType: string): string {
   return cleaned || 'bin';
 }
 
-export type BackupZipV2ExportResult = {
+export type BackupZipExportResult = {
   filename: string;
   blob: Blob;
   exportedAt: string;
@@ -171,13 +171,13 @@ export type BackupZipV2ExportResult = {
   warnings: CommentArchiveSerializationWarning[];
 };
 
-export type BackupZipV2ExportProgress = {
+export type BackupZipExportProgress = {
   stage: 'open_db' | 'read_db' | 'read_storage' | 'assemble_files' | 'zip' | 'finalize';
 };
 
-export async function exportBackupZipV2(
-  options: { onProgress?: (p: BackupZipV2ExportProgress) => void } = {},
-): Promise<BackupZipV2ExportResult> {
+export async function exportBackupZip(
+  options: { onProgress?: (p: BackupZipExportProgress) => void } = {},
+): Promise<BackupZipExportResult> {
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   onProgress?.({ stage: 'open_db' });
   const db = await openDb();
@@ -243,7 +243,7 @@ export async function exportBackupZipV2(
     'conversationKey',
     'title',
     'url',
-    'lastCapturedAt',
+    'lastActivityAt',
     'messageCount',
     'notionPageId',
     'hasNotionPageId',
@@ -318,7 +318,7 @@ export async function exportBackupZipV2(
           csvCell(conversationKey),
           csvCell(safeConversation.title || ''),
           csvCell(safeConversation.url || ''),
-          csvCell(safeConversation.lastCapturedAt || ''),
+          csvCell(safeConversation.lastActivityAt || ''),
           csvCell(msgs.length),
           csvCell(notionPageId),
           csvCell(hasNotionPageId),

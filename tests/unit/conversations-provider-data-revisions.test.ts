@@ -148,7 +148,7 @@ function makeConversation(id: number, source = 'chatgpt') {
     conversationKey: `${source}-${id}`,
     title: `${source}-${id}`,
     url: `https://example.com/${source}/${id}`,
-    lastCapturedAt: 1_700_000_000_000 + id,
+    lastActivityAt: 1_700_000_000_000 + id,
   };
 }
 
@@ -358,7 +358,7 @@ describe('ConversationsProvider data revisions', () => {
     getConversationListBootstrap
       .mockResolvedValueOnce(
         makePage([makeConversation(1)], {
-          cursor: { lastCapturedAt: 10, id: 1 },
+          cursor: { lastActivityAt: 10, id: 1 },
           hasMore: true,
           summary: { totalCount: 7, todayCount: 3 },
           facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] },
@@ -378,7 +378,7 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([1]);
-    expect(latestState.listCursor).toEqual({ lastCapturedAt: 10, id: 1 });
+    expect(latestState.listCursor).toEqual({ lastActivityAt: 10, id: 1 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 7, todayCount: 3 });
     expect(latestState.listFacets).toEqual({ sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] });
@@ -399,7 +399,7 @@ describe('ConversationsProvider data revisions', () => {
       if (String(query?.sourceKey || 'all') === 'web') return Promise.reject(new Error('web read failed'));
       return Promise.resolve(
         makePage([makeConversation(1)], {
-          cursor: { lastCapturedAt: 10, id: 1 },
+          cursor: { lastActivityAt: 10, id: 1 },
           hasMore: true,
           summary: { totalCount: 7, todayCount: 3 },
           facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] },

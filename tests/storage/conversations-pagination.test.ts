@@ -39,35 +39,35 @@ afterEach(async () => {
 });
 
 describe('conversations pagination storage-idb', () => {
-  it('keeps stable order when lastCapturedAt ties and paginates by cursor', async () => {
+  it('keeps stable order when lastActivityAt ties and paginates by cursor', async () => {
     const ts = Date.now();
     const a = await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'tie-a',
       title: 'A',
-      lastCapturedAt: ts,
+      lastActivityAt: ts,
     });
     const b = await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'tie-b',
       title: 'B',
-      lastCapturedAt: ts,
+      lastActivityAt: ts,
     });
     await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'tie-c',
       title: 'C',
-      lastCapturedAt: ts - 1,
+      lastActivityAt: ts - 1,
     });
 
     const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 2 });
     expect(first.items.map((item) => item.conversationKey)).toEqual(['tie-b', 'tie-a']);
     expect(first.hasMore).toBe(true);
     expect(first.cursor).toEqual({
-      lastCapturedAt: ts,
+      lastActivityAt: ts,
       id: Number(a.id),
     });
 
@@ -85,7 +85,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'chat-only-comment-read',
       title: 'chat only',
       url: 'https://chatgpt.com/c/chat-only-comment-read',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
@@ -110,7 +110,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'active-window-chat',
       title: 'newer chat',
       url: 'https://chatgpt.com/c/active-window-chat',
-      lastCapturedAt: now,
+      lastActivityAt: now,
     });
     const article = await upsertConversation({
       sourceType: 'article',
@@ -118,7 +118,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'article:https://example.com/active-window',
       title: 'older article',
       url: 'https://example.com/active-window',
-      lastCapturedAt: now - 1,
+      lastActivityAt: now - 1,
     });
     await addArticleComment({
       conversationId: Number(article.id),
@@ -170,7 +170,7 @@ describe('conversations pagination storage-idb', () => {
 
   it('does not duplicate or skip rows across pages', async () => {
     const now = Date.now();
-    const inserted: Array<{ id: number; conversationKey: string; lastCapturedAt: number }> = [];
+    const inserted: Array<{ id: number; conversationKey: string; lastActivityAt: number }> = [];
     const timestamps = [now, now - 1, now - 1, now - 2, now - 3, now - 3, now - 4];
     for (let i = 0; i < timestamps.length; i += 1) {
       const row = await upsertConversation({
@@ -178,12 +178,12 @@ describe('conversations pagination storage-idb', () => {
         source: i % 2 === 0 ? 'chatgpt' : 'gemini',
         conversationKey: `page-${i + 1}`,
         title: `Row ${i + 1}`,
-        lastCapturedAt: timestamps[i],
+        lastActivityAt: timestamps[i],
       });
       inserted.push({
         id: Number(row.id),
         conversationKey: String(row.conversationKey),
-        lastCapturedAt: Number(row.lastCapturedAt) || 0,
+        lastActivityAt: Number(row.lastActivityAt) || 0,
       });
     }
 
@@ -191,7 +191,7 @@ describe('conversations pagination storage-idb', () => {
     const expectedIds = inserted
       .slice()
       .sort((a, b) => {
-        if (b.lastCapturedAt !== a.lastCapturedAt) return b.lastCapturedAt - a.lastCapturedAt;
+        if (b.lastActivityAt !== a.lastActivityAt) return b.lastActivityAt - a.lastActivityAt;
         return b.id - a.id;
       })
       .map((row) => row.id);
@@ -226,7 +226,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'article:https://example.com/today',
         title: 'example today',
         url: 'https://example.com/today',
-        lastCapturedAt: today.getTime(),
+        lastActivityAt: today.getTime(),
       },
       {
         sourceType: 'article',
@@ -234,7 +234,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'article:https://example.com/yesterday',
         title: 'example yesterday',
         url: 'https://example.com/yesterday',
-        lastCapturedAt: yesterday.getTime(),
+        lastActivityAt: yesterday.getTime(),
       },
       {
         sourceType: 'article',
@@ -242,7 +242,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'article:https://other.example/today',
         title: 'other today',
         url: 'https://other.example/today',
-        lastCapturedAt: today.getTime(),
+        lastActivityAt: today.getTime(),
       },
       {
         sourceType: 'article',
@@ -250,7 +250,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'article:no-url',
         title: 'unknown today',
         url: '',
-        lastCapturedAt: today.getTime(),
+        lastActivityAt: today.getTime(),
       },
       {
         sourceType: 'article',
@@ -258,7 +258,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'article:https://future.example/tomorrow',
         title: 'future',
         url: 'https://future.example/tomorrow',
-        lastCapturedAt: tomorrow.getTime(),
+        lastActivityAt: tomorrow.getTime(),
       },
       {
         sourceType: 'chat',
@@ -266,7 +266,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'chat-1',
         title: 'chat',
         url: 'https://chatgpt.com/c/1',
-        lastCapturedAt: today.getTime(),
+        lastActivityAt: today.getTime(),
       },
       {
         sourceType: 'chat',
@@ -274,7 +274,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: 'gemini-1',
         title: 'gemini',
         url: 'https://gemini.google.com/app/1',
-        lastCapturedAt: yesterday.getTime(),
+        lastActivityAt: yesterday.getTime(),
       },
     ];
     for (const row of rows) await upsertConversation(row);
@@ -336,7 +336,7 @@ describe('conversations pagination storage-idb', () => {
         conversationKey: `day-boundary-${index + 1}`,
         title: `day boundary ${index + 1}`,
         url: `https://chatgpt.com/c/day-boundary-${index + 1}`,
-        lastCapturedAt: timestamps[index],
+        lastActivityAt: timestamps[index],
       });
     }
 
@@ -351,7 +351,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'keyrange-chatgpt',
       title: 'chatgpt row',
       url: 'https://chatgpt.com/c/keyrange-chatgpt',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
     await upsertConversation({
       sourceType: 'chat',
@@ -359,7 +359,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'keyrange-gemini',
       title: 'gemini row',
       url: 'https://gemini.google.com/app/keyrange-gemini',
-      lastCapturedAt: Date.now() - 1,
+      lastActivityAt: Date.now() - 1,
     });
 
     const keyRange = globalThis.IDBKeyRange;
@@ -378,7 +378,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'seed-schema',
       title: 'seed',
       url: 'https://chatgpt.com/c/seed',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
 
     const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -432,7 +432,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'article:https://example.com/raw-source',
       title: 'raw source',
       url: 'https://example.com/raw-source',
-      lastCapturedAt: now,
+      lastActivityAt: now,
     });
     await upsertConversation({
       sourceType: 'article',
@@ -440,7 +440,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'article:https://example.com/raw-site',
       title: 'raw site',
       url: 'https://example.com/raw-site',
-      lastCapturedAt: now - 1,
+      lastActivityAt: now - 1,
     });
 
     const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -485,7 +485,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'tracked-bootstrap',
       title: 'Tracked bootstrap',
       url: 'https://chatgpt.com/c/tracked-bootstrap',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
 
     const refreshed = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
@@ -501,7 +501,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'cache-1',
       title: 'cache 1',
       url: 'https://chatgpt.com/c/cache-1',
-      lastCapturedAt: now,
+      lastActivityAt: now,
     });
     await upsertConversation({
       sourceType: 'chat',
@@ -509,7 +509,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'cache-2',
       title: 'cache 2',
       url: 'https://chatgpt.com/c/cache-2',
-      lastCapturedAt: now - 1,
+      lastActivityAt: now - 1,
     });
 
     const first = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 1 });
@@ -529,7 +529,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'cache-external-newer',
       title: 'external newer',
       url: 'https://gemini.google.com/app/cache-external-newer',
-      lastCapturedAt: now + 1,
+      lastActivityAt: now + 1,
       listSourceKey: 'gemini',
       listSiteKey: 'domain:gemini.google.com',
     });
@@ -565,7 +565,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'externally-imported',
       title: 'Externally imported',
       url: 'https://chatgpt.com/c/externally-imported',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
       listSourceKey: 'chatgpt',
       listSiteKey: 'chatgpt',
     });
@@ -588,7 +588,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'loc-key-1',
       title: 'loc title',
       url: 'https://chatgpt.com/c/loc-1',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
 
     const byLoc = await findConversationBySourceAndKey('chatgpt', 'loc-key-1');
@@ -608,7 +608,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'article:https://example.com/thread',
       title: 'article',
       url: 'https://example.com/thread?utm_source=x',
-      lastCapturedAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
     await upsertConversation({
       sourceType: 'chat',
@@ -616,7 +616,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'chat-thread',
       title: 'chat',
       url: 'https://chatgpt.com/c/thread',
-      lastCapturedAt: Date.now() - 1,
+      lastActivityAt: Date.now() - 1,
     });
 
     const beforeComments = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 10 });
@@ -706,7 +706,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'article:https://example.com/shared',
       title: 'canonical',
       url: 'https://example.com/shared',
-      lastCapturedAt: now,
+      lastActivityAt: now,
     });
     await upsertConversation({
       sourceType: 'chat',
@@ -714,7 +714,7 @@ describe('conversations pagination storage-idb', () => {
       conversationKey: 'after-shared',
       title: 'after',
       url: 'https://chatgpt.com/c/after-shared',
-      lastCapturedAt: now - 2,
+      lastActivityAt: now - 2,
     });
 
     const rawDb = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -731,7 +731,7 @@ describe('conversations pagination storage-idb', () => {
           conversationKey: 'article:historical-shared-copy',
           title: 'historical duplicate',
           url: 'https://example.com/shared#historical',
-          lastCapturedAt: now - 1,
+          lastActivityAt: now - 1,
           listSourceKey: 'web',
           listSiteKey: 'domain:example.com',
         }),
@@ -775,7 +775,7 @@ describe('conversations pagination storage-idb', () => {
       ]);
       expect(first.items.map((item) => item.commentThreadCount)).toEqual([2, 2]);
       expect(first.hasMore).toBe(true);
-      expect(first.cursor).toEqual({ lastCapturedAt: now - 1, id: duplicateId });
+      expect(first.cursor).toEqual({ lastActivityAt: now - 1, id: duplicateId });
 
       const second = await getConversationListPage({ sourceKey: 'all', siteKey: 'all', limit: 2 }, first.cursor!);
       expect(second.items.map((item) => item.conversationKey)).toEqual(['after-shared']);

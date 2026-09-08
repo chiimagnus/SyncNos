@@ -20,23 +20,23 @@ beforeEach(() => {
 });
 
 describe('notion-sync-service', () => {
-  it('sets AI multi_select on create', async () => {
+  it('forwards explicit create properties without injecting generic metadata', async () => {
     let lastReq: any = null;
     notionFetchImpl = async (req: any) => {
       lastReq = req;
       return { id: 'p1' };
     };
+    const properties = {
+      Name: { title: [{ type: 'text', text: { content: 'Hello' } }] },
+      URL: { url: 'https://x' },
+      Date: { date: { start: '2026-02-23T12:34:56.000Z' } },
+      AI: { multi_select: [{ name: 'ChatGPT' }] },
+    };
 
-    await notionSyncService.createPageInDatabase('t', {
-      databaseId: 'db',
-      title: 'Hello',
-      url: 'https://x',
-      ai: 'chatgpt',
-    });
+    await notionSyncService.createPageInDatabase('t', { databaseId: 'db', properties });
     expect(lastReq.method).toBe('POST');
     expect(lastReq.path).toBe('/v1/pages');
-    expect(lastReq.body.properties.AI.multi_select[0].name).toBe('ChatGPT');
-    expect(lastReq.body.properties.Date?.date?.start).toBeTruthy();
+    expect(lastReq.body.properties).toEqual(properties);
   });
 
   it('respects explicit properties (article should not inject AI)', async () => {
@@ -59,59 +59,23 @@ describe('notion-sync-service', () => {
     expect(lastReq.body.properties.Author).toBeTruthy();
   });
 
-  it('uses capturedAt when generating Date on create', async () => {
-    let lastReq: any = null;
-    notionFetchImpl = async (req: any) => {
-      lastReq = req;
-      return { id: 'p1' };
-    };
-
-    await notionSyncService.createPageInDatabase('t', {
-      databaseId: 'db',
-      title: 'Hello',
-      url: 'https://x',
-      ai: 'chatgpt',
-      capturedAt: Date.parse('2026-02-23T12:34:56.000Z'),
-    });
-    expect(lastReq.body.properties.Date?.date?.start).toBe('2026-02-23T12:34:56.000Z');
-  });
-
-  it('sets AI multi_select on update', async () => {
+  it('forwards explicit update properties including the activity Date', async () => {
     let lastReq: any = null;
     notionFetchImpl = async (req: any) => {
       lastReq = req;
       return { ok: true };
     };
-
-    await notionSyncService.updatePageProperties('t', { pageId: 'p1', title: 'Hello', url: 'https://x', ai: 'gemini' });
-    expect(lastReq.method).toBe('PATCH');
-    expect(lastReq.path).toBe('/v1/pages/p1');
-    expect(lastReq.body.properties.AI.multi_select[0].name).toBe('Gemini');
-    expect(lastReq.body.properties.Date).toBeUndefined();
-  });
-
-  it('uses null URL when missing/empty to avoid Notion validation errors', async () => {
-    let lastReq: any = null;
-    notionFetchImpl = async (req: any) => {
-      lastReq = req;
-      return { id: 'p1' };
+    const properties = {
+      Name: { title: [{ type: 'text', text: { content: 'Hello' } }] },
+      URL: { url: null },
+      Date: { date: { start: '2026-02-24T12:34:56.000Z' } },
+      AI: { multi_select: [{ name: 'Gemini' }] },
     };
 
-    await notionSyncService.createPageInDatabase('t', {
-      databaseId: 'db',
-      title: 'Hello',
-      url: '' as any,
-      ai: 'chatgpt',
-    });
-    expect(lastReq.body.properties.URL.url).toBeNull();
-
-    await notionSyncService.updatePageProperties('t', {
-      pageId: 'p1',
-      title: 'Hello',
-      url: undefined as any,
-      ai: 'chatgpt',
-    });
-    expect(lastReq.body.properties.URL.url).toBeNull();
+    await notionSyncService.updatePageProperties('t', { pageId: 'p1', properties });
+    expect(lastReq.method).toBe('PATCH');
+    expect(lastReq.path).toBe('/v1/pages/p1');
+    expect(lastReq.body.properties).toEqual(properties);
   });
 
   it('detects page database parent', async () => {
