@@ -1,7 +1,3 @@
-import {
-  ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA,
-  validateArticleCommentArchiveDocument,
-} from '@services/comments/domain/comment-archive';
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 import {
@@ -12,8 +8,7 @@ type UnknownRecord = Record<string, any>;
 
 export const BACKUP_ZIP_SCHEMA_VERSION = 3;
 export const LAST_BACKUP_EXPORT_AT_STORAGE_KEY = 'last_backup_export_at';
-export const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
-export const ARTICLE_COMMENTS_INDEX_SCHEMA_VERSION = ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA;
+const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
 
 const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   // Never export tokens (explicit product constraint).
@@ -235,11 +230,6 @@ export function validateImageCacheIndexDocument(doc: unknown): { ok: boolean; er
   }
 
   return { ok: true, error: '' };
-}
-
-export function validateArticleCommentsIndexDocument(doc: unknown): { ok: boolean; error: string } {
-  const result = validateArticleCommentArchiveDocument(doc);
-  return { ok: result.ok, error: result.error };
 }
 
 export function validateBackupManifest(doc: unknown): { ok: boolean; error: string } {

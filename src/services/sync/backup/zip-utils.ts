@@ -21,7 +21,7 @@ async function toUint8Array(data: unknown): Promise<Uint8Array> {
   return new TextEncoder().encode(String(data == null ? '' : data));
 }
 
-export function isUnsafeZipEntryName(name: unknown) {
+function isUnsafeZipEntryName(name: unknown) {
   const text = String(name || '');
   if (!text) return true;
   if (text.includes('\0')) return true;
@@ -39,7 +39,7 @@ function zipToUint8Array(data: Zippable, opts: ZipOptions): Uint8Array {
   return zipSync(data, opts);
 }
 
-export type ZipInputEntry = {
+type ZipInputEntry = {
   name: string;
   data: unknown;
   lastModified?: unknown;

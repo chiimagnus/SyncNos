@@ -157,7 +157,7 @@ function extFromImageContentType(contentType: string): string {
   return cleaned || 'bin';
 }
 
-export type BackupZipExportResult = {
+type BackupZipExportResult = {
   filename: string;
   blob: Blob;
   exportedAt: string;
@@ -171,7 +171,7 @@ export type BackupZipExportResult = {
   warnings: CommentArchiveSerializationWarning[];
 };
 
-export type BackupZipExportProgress = {
+type BackupZipExportProgress = {
   stage: 'open_db' | 'read_db' | 'read_storage' | 'assemble_files' | 'zip' | 'finalize';
 };
 
