@@ -1,4 +1,5 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
+import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
 import type { SyncJobStore } from '@services/sync/sync-job-store';
 
 export type NotionToken = {
@@ -12,7 +13,6 @@ export type NotionTokenStore = {
 
 export type NotionConversationKinds = {
   pick: (input: { source?: unknown; sourceType?: unknown }) => any;
-  getNotionStorageKeys?: () => string[];
 };
 
 export type NotionBackgroundStorage = {
@@ -33,9 +33,9 @@ export type NotionDbManager = {
   ensureDatabase: (input: {
     accessToken: string;
     parentPageId: string;
-    dbSpec: any;
+    dbSpec: ConversationKindDbSpec;
   }) => Promise<{ databaseId?: unknown }>;
-  clearCachedDatabaseId: (storageKey?: string) => Promise<any>;
+  clearCachedDatabaseId: (storageKey: string) => Promise<any>;
 };
 
 export type NotionSyncService = {
