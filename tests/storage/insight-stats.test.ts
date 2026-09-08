@@ -12,6 +12,7 @@ import { addArticleComment } from '@services/comments/data/storage-idb';
 import { getInsightStatsSourceData } from '@services/insight/insight-stats-source';
 import {
   buildInsightStats,
+  getInsightTimeRangeWindow,
   INSIGHT_ARTICLE_DOMAIN_LIMIT,
   INSIGHT_CHAT_SOURCE_LIMIT,
   INSIGHT_OTHER_LABEL,
@@ -472,6 +473,41 @@ describe('insight stats', () => {
       { label: INSIGHT_UNKNOWN_SOURCE_LABEL, count: 1 },
       { label: 'YouTube', count: 1 },
     ]);
+  });
+
+  it('keeps 7d windows and daily trend points aligned to local midnights across DST', () => {
+    const previousTimeZone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const now = new Date(2026, 2, 10, 12, 0, 0, 0).getTime();
+      const range = getInsightTimeRangeWindow('7d', now);
+      const conversations = Array.from({ length: 7 }, (_, index) => ({
+        id: index + 1,
+        sourceType: 'chat',
+        source: 'ChatGPT',
+        conversationKey: `dst-${index + 1}`,
+        lastActivityAt: new Date(2026, 2, 4 + index, 12, 0, 0, 0).getTime(),
+      }));
+
+      expect(new Date(range.since).getDate()).toBe(4);
+      expect(new Date(range.since).getHours()).toBe(0);
+
+      const stats = buildInsightStats(
+        {
+          conversations: conversations as any,
+          messageCounts: new Map(),
+          commentCounts: new Map(),
+        },
+        range,
+      );
+      expect(stats.chatCount).toBe(7);
+      expect(stats.chatDailyTrend).toHaveLength(7);
+      expect(stats.chatDailyTrend.map((point) => new Date(point.dayStart).getDate())).toEqual([4, 5, 6, 7, 8, 9, 10]);
+      expect(stats.chatDailyTrend.every((point) => new Date(point.dayStart).getHours() === 0)).toBe(true);
+    } finally {
+      if (previousTimeZone == null) delete process.env.TZ;
+      else process.env.TZ = previousTimeZone;
+    }
   });
 
   it('filters video trends and platforms by the selected range', async () => {
