@@ -1,12 +1,13 @@
 import type { Conversation } from '@services/conversations/domain/models';
+import { differenceInLocalCalendarDays, startOfLocalCalendarDay } from '@services/shared/local-calendar-day';
 
-export type ConversationSidebarGroupLabels = {
+type ConversationSidebarGroupLabels = {
   today: string;
   yesterday: string;
   earlier: string;
 };
 
-export type ConversationSidebarRenderItem =
+type ConversationSidebarRenderItem =
   | {
       type: 'section';
       key: string;
@@ -17,12 +18,6 @@ export type ConversationSidebarRenderItem =
       key: string;
       conversation: Conversation;
     };
-
-function toStartOfLocalDay(ts: number): number {
-  const date = new Date(ts);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
 
 function toMonthKey(ts: number): { year: number; month: number } {
   const date = new Date(ts);
@@ -55,9 +50,8 @@ function resolveSection(input: { ts: number; nowTs: number; locale: string; labe
     return { key: 'earlier', label: labels.earlier };
   }
 
-  const currentDay = toStartOfLocalDay(nowTs);
-  const targetDay = toStartOfLocalDay(ts);
-  const dayDiff = (currentDay - targetDay) / 86400000;
+  const targetDay = startOfLocalCalendarDay(ts);
+  const dayDiff = differenceInLocalCalendarDays(nowTs, ts);
 
   if (dayDiff === 0) {
     return { key: 'today', label: labels.today };
@@ -102,7 +96,7 @@ export function buildConversationSidebarRenderItems(input: {
 
   for (const conversation of conversations) {
     const id = Number((conversation as any)?.id);
-    const ts = Number((conversation as any)?.lastCapturedAt) || 0;
+    const ts = Number((conversation as any)?.lastActivityAt) || 0;
     const section = resolveSection({ ts, nowTs, locale, labels });
     if (section.key !== activeSectionKey) {
       activeSectionKey = section.key;

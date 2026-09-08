@@ -322,11 +322,39 @@ describe('background-router notion sync', () => {
     const removedFlatten = chromeMock.__removed.flat();
     expect(removedFlatten).toContain('notion_oauth_token_v1');
     expect(removedFlatten).toContain('notion_parent_page_id');
-    expect(removedFlatten).toContain('notion_db_id_syncnos_ai_chats');
-    expect(removedFlatten).toContain('notion_db_id_syncnos_web_articles');
+    for (const storageKey of conversationKinds.getNotionStorageKeys()) {
+      expect(removedFlatten).toContain(storageKey);
+    }
     expect(removedFlatten).toContain('notion_oauth_pending_state');
     expect(removedFlatten).toContain('notion_oauth_last_error');
     expect(removedFlatten).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
+  });
+
+  it('disconnect fails closed before credential deletion when canonical database keys are unavailable', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    const router = createBackgroundRouter({
+      fallback: (msg: any) => ({
+        ok: false,
+        data: null,
+        error: { message: `unknown message type: ${msg?.type}`, extra: null },
+      }),
+    });
+    registerNotionSettingsHandlers(router as any, {
+      conversationKinds: {
+        getNotionStorageKeys: () => {
+          throw new Error('canonical registry unavailable');
+        },
+      },
+      runExclusiveMaintenance: async (mutation) => await mutation(),
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+
+    expect(res).toMatchObject({ ok: false, error: { message: 'canonical registry unavailable' } });
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeTruthy();
+    expect(chromeMock.__removed.flat()).not.toContain('notion_oauth_token_v1');
   });
 
   it('rejects disconnect while a live notion run owns the provider before deleting credentials or config', async () => {
@@ -1175,6 +1203,7 @@ describe('background-router notion sync', () => {
               title: 'Same article title',
               url: 'https://x/article',
               notionPageId: 'p1',
+              lastActivityAt: 1000,
             },
             mapping: {
               notionPageId: 'p1',
@@ -1206,6 +1235,7 @@ describe('background-router notion sync', () => {
             properties: {
               Name: { title: [{ plain_text: 'Same article title' }] },
               URL: { url: 'https://x/article' },
+              'Last Activity': { date: { start: new Date(1000).toISOString() } },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
               'Comment Threads': { number: 0 },

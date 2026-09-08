@@ -66,7 +66,7 @@ function buildState() {
     title: 'Row action chat',
     source: 'chatgpt',
     conversationKey: 'conv-11',
-    lastCapturedAt: Date.now(),
+    lastActivityAt: Date.now(),
     url: 'https://example.com/chat/11',
   };
   return {
@@ -268,9 +268,9 @@ describe('ConversationListPane row actions', () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     currentState.items = [
-      { ...conversation, id: 11, lastCapturedAt: today.getTime() },
-      { ...conversation, id: 12, conversationKey: 'conv-12', lastCapturedAt: today.getTime() - 1000 },
-      { ...conversation, id: 13, conversationKey: 'conv-13', lastCapturedAt: yesterday.getTime() },
+      { ...conversation, id: 11, lastActivityAt: today.getTime() },
+      { ...conversation, id: 12, conversationKey: 'conv-12', lastActivityAt: today.getTime() - 1000 },
+      { ...conversation, id: 13, conversationKey: 'conv-13', lastActivityAt: yesterday.getTime() },
     ];
     currentState.listSummary = { totalCount: 3, todayCount: 2 };
     currentState.selectedIds = [11, 12];

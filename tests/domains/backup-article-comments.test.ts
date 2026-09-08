@@ -8,7 +8,6 @@ import {
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
   areBackupValuesEqual,
-  validateArticleCommentsIndexDocument,
   validateBackupManifest,
 } from '@services/sync/backup/backup-utils';
 
@@ -46,7 +45,6 @@ describe('backup article comments', () => {
     const result = validateArticleCommentArchiveDocument(doc);
     expect(result.ok).toBe(true);
     expect(result.warnings.map((warning) => warning.code)).toEqual(['v1_missing_author', 'v1_missing_locator']);
-    expect(validateArticleCommentsIndexDocument(doc).ok).toBe(true);
   });
 
   it('strictly validates V2 locator and field budgets', () => {

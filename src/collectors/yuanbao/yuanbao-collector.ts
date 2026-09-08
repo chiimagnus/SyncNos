@@ -103,7 +103,6 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
         title: env.document.title || 'Yuanbao',
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

@@ -149,7 +149,6 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
         title: env.document.title || 'Kimi',
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

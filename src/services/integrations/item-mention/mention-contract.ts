@@ -3,7 +3,7 @@ export type MentionCandidate = {
   title: string;
   source: string;
   domain: string;
-  lastCapturedAt: number;
+  lastActivityAt: number;
 };
 
 export type MentionSearchResult = {

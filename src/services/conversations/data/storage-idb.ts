@@ -90,6 +90,21 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
+function normalizeStoredActivityTimestamp(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function parseRequestedActivityTimestamp(
+  value: unknown,
+  allowZero: boolean,
+  fieldName: 'lastActivityAt' | 'activityAt' = 'lastActivityAt',
+): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || (!allowZero && n === 0)) throw new Error(`invalid ${fieldName}`);
+  return n;
+}
+
 function storedValueEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -149,10 +164,10 @@ function normalizeListKey(value: unknown, fallback: string): string {
 
 function toComparableCursor(cursor: ConversationListCursor | null | undefined): ConversationListCursor | null {
   if (!cursor) return null;
-  const lastCapturedAt = Number(cursor.lastCapturedAt);
+  const lastActivityAt = Number(cursor.lastActivityAt);
   const id = Number(cursor.id);
-  if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
-  return { lastCapturedAt, id };
+  if (!Number.isFinite(lastActivityAt) || !Number.isFinite(id) || id <= 0) return null;
+  return { lastActivityAt, id };
 }
 
 function invalidateConversationListStatsCache(): void {
@@ -182,7 +197,7 @@ async function findExistingArticleConversationByUrl(
   if (siteKey === 'unknown') return null;
   const canonicalConversationKey = identity.conversationKey;
 
-  const index = conversationsStore.index('by_listSiteKey_lastCapturedAt_id');
+  const index = conversationsStore.index('by_listSiteKey_lastActivityAt_id');
   const range = globalThis.IDBKeyRange.bound(
     [siteKey, -Infinity, -Infinity] as any,
     [siteKey, Infinity, Infinity] as any,
@@ -208,8 +223,8 @@ async function findExistingArticleConversationByUrl(
           canonicalConversationKey === safeString(best?.conversationKey);
         const rowMapped = !!safeString(row?.notionPageId);
         const bestMapped = !!safeString(best?.notionPageId);
-        const rowCapturedAt = Number(row?.lastCapturedAt) || 0;
-        const bestCapturedAt = Number(best?.lastCapturedAt) || 0;
+        const rowActivityAt = Number(row?.lastActivityAt) || 0;
+        const bestActivityAt = Number(best?.lastActivityAt) || 0;
         const rowId = Number(row?.id) || 0;
         const bestId = Number(best?.id) || 0;
 
@@ -217,10 +232,10 @@ async function findExistingArticleConversationByUrl(
           !best ||
           (rowCanonical && !bestCanonical) ||
           (rowCanonical === bestCanonical && rowMapped && !bestMapped) ||
-          (rowCanonical === bestCanonical && rowMapped === bestMapped && rowCapturedAt > bestCapturedAt) ||
+          (rowCanonical === bestCanonical && rowMapped === bestMapped && rowActivityAt > bestActivityAt) ||
           (rowCanonical === bestCanonical &&
             rowMapped === bestMapped &&
-            rowCapturedAt === bestCapturedAt &&
+            rowActivityAt === bestActivityAt &&
             rowId > bestId)
         ) {
           best = row;
@@ -460,7 +475,13 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
         : String(payloadConversationKey || existingConversationKey || '').trim();
 
       const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
-      const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
+      const hasRequestedActivityAt = Object.prototype.hasOwnProperty.call(payload, 'lastActivityAt');
+      const requestedActivityAt = hasRequestedActivityAt
+        ? parseRequestedActivityTimestamp(payload.lastActivityAt, true)
+        : 0;
+      const nextLastActivityAt = existing
+        ? Math.max(normalizeStoredActivityTimestamp(existing.lastActivityAt), requestedActivityAt)
+        : requestedActivityAt;
       const existingBase = existing && typeof existing === 'object' ? { ...existing } : {};
       delete existingBase.id;
       const baseRecord = normalizeConversationListRecord({
@@ -479,7 +500,7 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
             : [],
         notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
         feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
-        lastCapturedAt: nextLastCapturedAt,
+        lastActivityAt: nextLastActivityAt,
       });
 
       const record: any = withOptionalId(existing && existing.id, baseRecord);
@@ -596,7 +617,10 @@ export async function mergeConversationsByIds(input: {
         notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
         feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
         warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
-        lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || now,
+        lastActivityAt: Math.max(
+          normalizeStoredActivityTimestamp(keep.lastActivityAt),
+          normalizeStoredActivityTimestamp(remove.lastActivityAt),
+        ),
       });
 
       const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
@@ -863,6 +887,7 @@ export async function syncConversationMessages(
   options?: {
     mode?: 'snapshot' | 'incremental' | 'append';
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
+    activityAt?: number;
   },
 ): Promise<{ upserted: number; deleted: number }> {
   const requestedMode = options?.mode;
@@ -870,11 +895,33 @@ export async function syncConversationMessages(
     throw new Error(`Unknown message persistence mode: ${String(requestedMode)}`);
   }
   const mode = requestedMode || 'snapshot';
+  const activityAtProvided = !!options && Object.prototype.hasOwnProperty.call(options, 'activityAt');
+  const activityAt = activityAtProvided ? parseRequestedActivityTimestamp(options?.activityAt, false, 'activityAt') : 0;
   const db = await openDb();
+  let conversationActivityChanged = false;
 
-  return runTrackedTransaction(
-    { db, stores: ['messages'], revisionScopes: ['messages'] },
+  const result = await runTrackedTransaction(
+    {
+      db,
+      stores: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
+      revisionScopes: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
+    },
     async ({ stores, markChanged }) => {
+      let activityConversation: any = null;
+      if (activityAtProvided) {
+        activityConversation = await reqToPromise(stores.conversations.get(conversationId as any));
+        if (!activityConversation) throw new Error('conversation not found');
+      }
+      const commitActivity = async () => {
+        if (!activityConversation) return;
+        const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
+        if (activityAt <= current) return;
+        activityConversation = { ...activityConversation, lastActivityAt: activityAt };
+        await reqToPromise(stores.conversations.put(activityConversation));
+        markChanged('conversations');
+        conversationActivityChanged = true;
+      };
+
       const idx = stores.messages.index('by_conversationId_messageKey');
       const diff = options?.diff || null;
       const normalizeKeys = (value: unknown): string[] => {
@@ -1018,6 +1065,7 @@ export async function syncConversationMessages(
           deleted += 1;
         }
 
+        await commitActivity();
         return { upserted, deleted };
       }
 
@@ -1075,9 +1123,12 @@ export async function syncConversationMessages(
         deleted += 1;
       }
 
+      await commitActivity();
       return { upserted, deleted };
     },
   );
+  if (conversationActivityChanged) invalidateConversationListStatsCache();
+  return result;
 }
 
 function normalizeConversationListSiteFilterKey(value: unknown): string {
@@ -1106,10 +1157,10 @@ function buildListPageRange(
   cursor: ConversationListCursor | null,
 ): {
   indexName:
-    | 'by_lastCapturedAt_id'
-    | 'by_listSourceKey_lastCapturedAt_id'
-    | 'by_listSourceKey_listSiteKey_lastCapturedAt_id'
-    | 'by_listSiteKey_lastCapturedAt_id';
+    | 'by_lastActivityAt_id'
+    | 'by_listSourceKey_lastActivityAt_id'
+    | 'by_listSourceKey_listSiteKey_lastActivityAt_id'
+    | 'by_listSiteKey_lastActivityAt_id';
   range: IDBKeyRange | null;
 } {
   const sourceKey = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
@@ -1124,7 +1175,7 @@ function buildListPageRange(
   if (hasSourceFilter && hasSiteFilter) {
     if (!cursor) {
       return {
-        indexName: 'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+        indexName: 'by_listSourceKey_listSiteKey_lastActivityAt_id',
         range: keyRangeApi.bound(
           [sourceKey, siteKey, MIN_KEY, MIN_KEY] as any,
           [sourceKey, siteKey, MAX_KEY, MAX_KEY] as any,
@@ -1132,10 +1183,10 @@ function buildListPageRange(
       };
     }
     return {
-      indexName: 'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+      indexName: 'by_listSourceKey_listSiteKey_lastActivityAt_id',
       range: keyRangeApi.bound(
         [sourceKey, siteKey, MIN_KEY, MIN_KEY] as any,
-        [sourceKey, siteKey, cursor.lastCapturedAt, cursor.id] as any,
+        [sourceKey, siteKey, cursor.lastActivityAt, cursor.id] as any,
         false,
         true,
       ),
@@ -1145,15 +1196,15 @@ function buildListPageRange(
   if (hasSourceFilter) {
     if (!cursor) {
       return {
-        indexName: 'by_listSourceKey_lastCapturedAt_id',
+        indexName: 'by_listSourceKey_lastActivityAt_id',
         range: keyRangeApi.bound([sourceKey, MIN_KEY, MIN_KEY] as any, [sourceKey, MAX_KEY, MAX_KEY] as any),
       };
     }
     return {
-      indexName: 'by_listSourceKey_lastCapturedAt_id',
+      indexName: 'by_listSourceKey_lastActivityAt_id',
       range: keyRangeApi.bound(
         [sourceKey, MIN_KEY, MIN_KEY] as any,
-        [sourceKey, cursor.lastCapturedAt, cursor.id] as any,
+        [sourceKey, cursor.lastActivityAt, cursor.id] as any,
         false,
         true,
       ),
@@ -1163,15 +1214,15 @@ function buildListPageRange(
   if (hasSiteFilter) {
     if (!cursor) {
       return {
-        indexName: 'by_listSiteKey_lastCapturedAt_id',
+        indexName: 'by_listSiteKey_lastActivityAt_id',
         range: keyRangeApi.bound([siteKey, MIN_KEY, MIN_KEY] as any, [siteKey, MAX_KEY, MAX_KEY] as any),
       };
     }
     return {
-      indexName: 'by_listSiteKey_lastCapturedAt_id',
+      indexName: 'by_listSiteKey_lastActivityAt_id',
       range: keyRangeApi.bound(
         [siteKey, MIN_KEY, MIN_KEY] as any,
-        [siteKey, cursor.lastCapturedAt, cursor.id] as any,
+        [siteKey, cursor.lastActivityAt, cursor.id] as any,
         false,
         true,
       ),
@@ -1179,11 +1230,11 @@ function buildListPageRange(
   }
 
   if (!cursor) {
-    return { indexName: 'by_lastCapturedAt_id', range: null };
+    return { indexName: 'by_lastActivityAt_id', range: null };
   }
   return {
-    indexName: 'by_lastCapturedAt_id',
-    range: keyRangeApi.upperBound([cursor.lastCapturedAt, cursor.id] as any, true),
+    indexName: 'by_lastActivityAt_id',
+    range: keyRangeApi.upperBound([cursor.lastActivityAt, cursor.id] as any, true),
   };
 }
 
@@ -1199,7 +1250,7 @@ function buildListTimestampRange(
   const siteKey = normalizeConversationListSiteFilterKey(query.siteKey);
   const MIN_ID = 0;
 
-  if (indexName === 'by_listSourceKey_listSiteKey_lastCapturedAt_id') {
+  if (indexName === 'by_listSourceKey_listSiteKey_lastActivityAt_id') {
     return keyRangeApi.bound(
       [sourceKey, siteKey, startInclusive, MIN_ID] as any,
       [sourceKey, siteKey, endExclusive, MIN_ID] as any,
@@ -1207,7 +1258,7 @@ function buildListTimestampRange(
       true,
     );
   }
-  if (indexName === 'by_listSourceKey_lastCapturedAt_id') {
+  if (indexName === 'by_listSourceKey_lastActivityAt_id') {
     return keyRangeApi.bound(
       [sourceKey, startInclusive, MIN_ID] as any,
       [sourceKey, endExclusive, MIN_ID] as any,
@@ -1215,7 +1266,7 @@ function buildListTimestampRange(
       true,
     );
   }
-  if (indexName === 'by_listSiteKey_lastCapturedAt_id') {
+  if (indexName === 'by_listSiteKey_lastActivityAt_id') {
     return keyRangeApi.bound(
       [siteKey, startInclusive, MIN_ID] as any,
       [siteKey, endExclusive, MIN_ID] as any,
@@ -1320,7 +1371,7 @@ async function readConversationListPageItems(input: {
   const nextCursor =
     hasMore && tail
       ? toComparableCursor({
-          lastCapturedAt: Number(tail.lastCapturedAt) || 0,
+          lastActivityAt: Number(tail.lastActivityAt) || 0,
           id: Number(tail.id) || 0,
         })
       : null;
@@ -1357,7 +1408,7 @@ async function readConversationListSummaryAndFacets(input: {
   );
   const todayCountPromise = reqToPromise<number>(summaryIndex.count(todayRange as any));
 
-  const sourceFacetRequest = store.index('by_listSourceKey_lastCapturedAt_id').openKeyCursor();
+  const sourceFacetRequest = store.index('by_listSourceKey_lastActivityAt_id').openKeyCursor();
   const sourceFacetsPromise = new Promise<void>((resolve, reject) => {
     sourceFacetRequest.onerror = () => reject(sourceFacetRequest.error || new Error('source facet cursor failed'));
     sourceFacetRequest.onsuccess = () => {
@@ -1374,7 +1425,7 @@ async function readConversationListSummaryAndFacets(input: {
     };
   });
 
-  const siteFacetIndex = store.index('by_listSourceKey_listSiteKey_lastCapturedAt_id');
+  const siteFacetIndex = store.index('by_listSourceKey_listSiteKey_lastActivityAt_id');
   const siteFacetRange = globalThis.IDBKeyRange.bound(
     [siteFacetSourceScope, '', 0, 0] as any,
     [siteFacetSourceScope, '\uffff', Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] as any,
@@ -1513,7 +1564,7 @@ function toConversationListOpenTarget(input: any): ConversationListOpenTarget | 
     title: safeString(input.title) || undefined,
     url: safeString(input.url) || undefined,
     sourceType: safeString(input.sourceType) || undefined,
-    lastCapturedAt: Number(input.lastCapturedAt) || 0,
+    lastActivityAt: Number(input.lastActivityAt) || 0,
   };
 }
 
@@ -1691,7 +1742,7 @@ type ConversationMentionCandidate = {
   title: string;
   source: string;
   domain: string;
-  lastCapturedAt: number;
+  lastActivityAt: number;
 };
 
 function readConversationMentionCandidatesFromStore(
@@ -1702,7 +1753,7 @@ function readConversationMentionCandidatesFromStore(
   const candidates: ConversationMentionCandidate[] = [];
   let scannedCount = 0;
   const startedAt = Date.now();
-  const cursorReq = conversationsStore.index('by_lastCapturedAt_id').openCursor(null, 'prev');
+  const cursorReq = conversationsStore.index('by_lastActivityAt_id').openCursor(null, 'prev');
 
   return new Promise((resolve, reject) => {
     cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
@@ -1720,7 +1771,7 @@ function readConversationMentionCandidatesFromStore(
           title: safeString(record?.title),
           source: safeString(record?.source),
           domain: listSiteKey.startsWith('domain:') ? listSiteKey.slice('domain:'.length) : '',
-          lastCapturedAt: Number(record?.lastCapturedAt) || 0,
+          lastActivityAt: Number(record?.lastActivityAt) || 0,
         });
       }
 

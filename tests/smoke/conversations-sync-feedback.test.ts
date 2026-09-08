@@ -140,7 +140,7 @@ const baseConversation = {
   title: 'Sync feedback chat',
   source: 'chatgpt',
   conversationKey: 'conv-11',
-  lastCapturedAt: Date.now(),
+  lastActivityAt: Date.now(),
   url: 'https://example.com/chat/11',
 };
 

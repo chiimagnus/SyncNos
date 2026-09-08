@@ -15,6 +15,7 @@ describe('remote-markdown-writer', () => {
         sourceType: 'chat',
         conversationKey: 'k',
         url: 'https://example.com/chat',
+        lastActivityAt: Date.parse('2026-09-08T02:00:00.000Z'),
       },
       messages: [{ messageKey: 'm1', sequence: 1, role: 'assistant', contentMarkdown: 'hi' }],
       syncnosObject: {
@@ -27,8 +28,9 @@ describe('remote-markdown-writer', () => {
     });
     expect(md).toContain('---');
     expect(md).toContain('url:');
+    expect(md).toContain('last_activity_at: "2026-09-08T02:00:00.000Z"');
     expect(md).toContain('syncnos:');
-    expect(md).toContain(`# ${w.MESSAGES_HEADING}`);
+    expect(md).toContain('# Conversations');
     expect(md).toContain('## 1 assistant');
     expect(md).toContain('hi');
   });
@@ -42,6 +44,7 @@ describe('remote-markdown-writer', () => {
         sourceType: 'article',
         conversationKey: 'k',
         url: 'https://example.com',
+        lastActivityAt: Date.parse('2026-09-08T03:00:00.000Z'),
       },
       messages: [{ messageKey: 'article_body', sequence: 1, role: 'assistant', contentMarkdown: 'Body **md**' }],
       comments: [
@@ -74,15 +77,35 @@ describe('remote-markdown-writer', () => {
         lastSyncedMessageKey: 'article_body',
       },
     });
-    expect(md).toContain(`## ${w.ARTICLE_HEADING}`);
-    expect(md).toContain(`## ${w.COMMENTS_HEADING}`);
-    expect(md).not.toContain(`## ${w.MESSAGES_HEADING}`);
+    expect(md).toContain('## Article');
+    expect(md).toContain('## Comments');
+    expect(md).not.toContain('## Conversations');
+    expect(md).toContain('last_activity_at: "2026-09-08T03:00:00.000Z"');
     expect(md).toContain('comments_root_count: 1');
     expect(md).toContain('> Quoted');
     expect(md.match(/^- You \|/gm)?.length || 0).toBe(2);
     expect(md).toContain('  Root');
     expect(md).toContain('  Reply');
   });
+
+  it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
+    'omits invalid Activity %s without inventing a timestamp',
+    async (lastActivityAt) => {
+      const w = await loadWriter();
+      const md = w.buildFullNoteMarkdown({
+        conversation: {
+          sourceType: 'chat',
+          source: 'chatgpt',
+          conversationKey: 'invalid-activity',
+          lastActivityAt,
+        },
+        messages: [{ messageKey: 'm1', sequence: 1, role: 'assistant', contentMarkdown: 'body' }],
+        syncnosObject: { source: 'chatgpt', conversationKey: 'invalid-activity', schemaVersion: 1 },
+      });
+
+      expect(md).not.toContain('last_activity_at:');
+    },
+  );
 
   it('keeps default/local comment timestamps compatible and supports deterministic UTC rendering', async () => {
     const w = await loadWriter();

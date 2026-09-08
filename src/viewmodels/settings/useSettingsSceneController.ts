@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '@services/sync/backup/export';
+import { exportBackupZip } from '@services/sync/backup/export';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
-import {
-  importBackupLegacyJsonMerge,
-  importBackupZipV2Merge,
-  type ImportProgress,
-  type ImportStats,
-} from '@services/sync/backup/import';
+import { importBackupZipMerge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import {
   FEISHU_DEFAULTS,
@@ -25,7 +20,6 @@ import {
   OBSIDIAN_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
-import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
@@ -62,7 +56,6 @@ import {
 
 import {
   formatProgress,
-  isZipFile,
   openHttpUrl,
   unwrap,
   type ApiResponse,
@@ -82,46 +75,25 @@ const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion')
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
 const FEISHU_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('feishu');
 const GITHUB_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('github');
-const FALLBACK_NOTION_DB_STORAGE_KEYS = [
-  'notion_db_id_syncnos_ai_chats',
-  'notion_db_id_syncnos_web_articles',
-  'notion_db_id_syncnos_videos',
-];
-const FALLBACK_CHAT_DB_SPEC = {
-  title: 'SyncNos-AI Chats',
-  storageKey: 'notion_db_id_syncnos_ai_chats',
-} as const;
-const FALLBACK_ARTICLE_DB_SPEC = {
-  title: 'SyncNos-Web Articles',
-  storageKey: 'notion_db_id_syncnos_web_articles',
-} as const;
-const FALLBACK_VIDEO_DB_SPEC = {
-  title: 'SyncNos-Videos',
-  storageKey: 'notion_db_id_syncnos_videos',
-} as const;
-
-function getKindDbSpec(kindId: string, fallback: { title: string; storageKey: string }) {
-  try {
-    const spec = (conversationKinds as any)?.getNotionDbSpecByKindId?.(kindId) as ConversationKindDbSpec | null;
-    const storageKey = String(spec?.storageKey || '').trim();
-    const title = String(spec?.title || '').trim();
-    if (storageKey && title) return { storageKey, title };
-  } catch (_e) {
-    // ignore and fallback
-  }
-  return { ...fallback };
+function getKindDbSpec(kindId: string) {
+  const spec = conversationKinds.getNotionDbSpecByKindId(kindId);
+  const storageKey = String(spec?.storageKey || '').trim();
+  const title = String(spec?.title || '').trim();
+  if (!storageKey || !title) throw new Error(`missing Notion database spec for kind: ${kindId}`);
+  return { storageKey, title };
 }
 
 function getNotionDbStorageKeys() {
-  try {
-    const keys = conversationKinds?.getNotionStorageKeys?.();
-    if (Array.isArray(keys) && keys.length) {
-      return Array.from(new Set(keys.map((key) => String(key || '').trim()).filter(Boolean)));
-    }
-  } catch (_e) {
-    // ignore and fallback
-  }
-  return FALLBACK_NOTION_DB_STORAGE_KEYS.slice();
+  const keys = Array.from(
+    new Set(
+      conversationKinds
+        .getNotionStorageKeys()
+        .map((key) => String(key || '').trim())
+        .filter(Boolean),
+    ),
+  );
+  if (!keys.length) throw new Error('missing Notion database storage keys');
+  return keys;
 }
 
 function isFirefoxFamilyBrowser() {
@@ -176,7 +148,7 @@ type RunTaskOptions = {
   onError?: (message: string) => void;
 };
 
-export type UseSettingsSceneControllerArgs = {
+type UseSettingsSceneControllerArgs = {
   activeSection: SettingsSectionKey;
   focusKey?: string;
 };
@@ -358,9 +330,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
-  const chatDbSpec = useMemo(() => getKindDbSpec('chat', FALLBACK_CHAT_DB_SPEC), []);
-  const articleDbSpec = useMemo(() => getKindDbSpec('article', FALLBACK_ARTICLE_DB_SPEC), []);
-  const videoDbSpec = useMemo(() => getKindDbSpec('video', FALLBACK_VIDEO_DB_SPEC), []);
+  const chatDbSpec = useMemo(() => getKindDbSpec('chat'), []);
+  const articleDbSpec = useMemo(() => getKindDbSpec('article'), []);
+  const videoDbSpec = useMemo(() => getKindDbSpec('video'), []);
   const [notionAdvancedOpen, setNotionAdvancedOpen] = useState(false);
   const [notionChatDatabaseId, setNotionChatDatabaseId] = useState<string>('');
   const [notionArticleDatabaseId, setNotionArticleDatabaseId] = useState<string>('');
@@ -1982,7 +1954,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         // Ensure status paint happens before the potentially long synchronous zip step.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-        const result = await exportBackupZipV2({
+        const result = await exportBackupZip({
           onProgress: ({ stage }) => {
             const label = stageLabel(stage);
             if (label) setExportStatus(`${t('backupExporting')} (${label})`);
@@ -2013,23 +1985,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       await runTask(
         async () => {
-          const asZip = await isZipFile(file);
-          let stats: ImportStats;
-
-          if (asZip) {
-            const entries = await extractZipEntries(file);
-            stats = await importBackupZipV2Merge(entries, (progress: ImportProgress) => {
-              const view = formatProgress(progress);
-              setImportStatus(view.text);
-            });
-          } else {
-            const text = await file.text();
-            const doc = JSON.parse(text);
-            stats = await importBackupLegacyJsonMerge(doc, (progress: ImportProgress) => {
-              const view = formatProgress(progress);
-              setImportStatus(view.text);
-            });
-          }
+          const entries = await extractZipEntries(file);
+          const stats: ImportStats = await importBackupZipMerge(entries, (progress: ImportProgress) => {
+            const view = formatProgress(progress);
+            setImportStatus(view.text);
+          });
 
           setImportStats(stats);
           setImportStatus(t('backupImported'));

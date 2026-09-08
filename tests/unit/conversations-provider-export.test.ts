@@ -114,7 +114,7 @@ function conversation(id: number) {
     conversationKey: `chat-${id}`,
     title: `Chat ${id}`,
     url: `https://example.com/${id}`,
-    lastCapturedAt: 1_700_000_000_000 + id,
+    lastActivityAt: 1_700_000_000_000 + id,
   };
 }
 

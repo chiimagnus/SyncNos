@@ -128,7 +128,7 @@ describe('background-router conversations', () => {
 
     const res = await router.__handleMessageForTests({
       type: 'upsertConversation',
-      payload: { source: 'chatgpt', conversationKey: 'k-321', title: 'Title' },
+      payload: { source: 'chatgpt', conversationKey: 'k-321', title: 'Title', lastActivityAt: 100 },
     });
 
     expect(res.ok).toBe(true);
@@ -138,9 +138,65 @@ describe('background-router conversations', () => {
       source: 'chatgpt',
       conversationKey: 'k-321',
       title: 'Title',
+      lastActivityAt: 100,
     });
     await Promise.resolve();
     expect(onConversationChanged).toHaveBeenCalledWith(321, expectedReason);
+  });
+
+  it('does not auto-sync a capture preparation UPSERT even when the stored row already has positive activity', async () => {
+    const onConversationChanged = vi.fn(async () => {});
+    storageMocks.upsertConversation.mockResolvedValue({
+      id: 321,
+      source: 'chatgpt',
+      conversationKey: 'k-321',
+      lastActivityAt: 999,
+      __isNew: false,
+    });
+    const router = createRouter({ onConversationChanged });
+
+    const res = await router.__handleMessageForTests({
+      type: 'upsertConversation',
+      payload: { source: 'chatgpt', conversationKey: 'k-321', lastActivityAt: 0 },
+    });
+
+    expect(res.ok).toBe(true);
+    await Promise.resolve();
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
+
+  it('passes explicit capture activity through message persistence before auto-sync', async () => {
+    const onConversationChanged = vi.fn(async () => {});
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const router = createRouter({ onConversationChanged });
+
+    const res = await router.__handleMessageForTests({
+      type: 'syncConversationMessages',
+      conversationId: 123,
+      messages: [],
+      activityAt: 456,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(123, [], {
+      mode: 'snapshot',
+      diff: null,
+      activityAt: 456,
+    });
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenCalledWith(123, 'syncConversationMessages');
+  });
+
+  it('rejects invalid explicit activity before message persistence', async () => {
+    const router = createRouter();
+    const res = await router.__handleMessageForTests({
+      type: 'syncConversationMessages',
+      conversationId: 123,
+      messages: [],
+      activityAt: 0,
+    });
+    expect(res).toMatchObject({ ok: false, error: { message: 'invalid activityAt' } });
+    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
   });
 
   it('persists syncConversationMessages and emits the durable auto-sync change signal', async () => {

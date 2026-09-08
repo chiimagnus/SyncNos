@@ -1,4 +1,3 @@
-import { optionNameForSource as defaultOptionNameForSource } from '@services/sync/notion/notion-ai.ts';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
 import { upgradeImageBlocksToFileUploads as upgradeNotionImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader.ts';
 import {
@@ -11,10 +10,6 @@ const APPEND_BATCH = 90;
 const APPEND_MAX_ATTEMPTS = 5;
 const CLEAR_DELETE_CONCURRENCY = 6;
 const CLEAR_DELETE_MAX_ATTEMPTS = 5;
-
-function aiLabelForSource(source: unknown): string {
-  return defaultOptionNameForSource(source);
-}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -227,97 +222,29 @@ async function appendChildren(accessToken: string, pageId: string, blocks: unkno
   return { results: appended, count: appended.length };
 }
 
-function buildPageProperties({
-  title,
-  url,
-  ai,
-  includeDate,
-  capturedAt,
-}: {
-  title?: string;
-  url?: string;
-  ai?: unknown;
-  includeDate?: boolean;
-  capturedAt?: unknown;
-}) {
-  function coerceHttpUrlOrNull(input: unknown): string | null {
-    const raw = String(input ?? '').trim();
-    if (!raw) return null;
-    try {
-      const parsed = new URL(raw);
-      const protocol = String(parsed.protocol || '').toLowerCase();
-      if (protocol !== 'http:' && protocol !== 'https:') return null;
-      return raw;
-    } catch (_e) {
-      return null;
-    }
+function requireExplicitProperties(properties: unknown): Record<string, unknown> {
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    throw new Error('notion page properties required');
   }
-
-  const props: Record<string, any> = {
-    Name: { title: [{ type: 'text', text: { content: title || 'Untitled' } }] },
-    // Notion rejects empty string for URL properties; use null when missing/invalid.
-    URL: { url: coerceHttpUrlOrNull(url) },
-  };
-  if (includeDate) {
-    const at = Number(capturedAt);
-    const stamp = Number.isFinite(at) && at > 0 ? at : Date.now();
-    props.Date = { date: { start: new Date(stamp).toISOString() } };
-  }
-  const aiName = aiLabelForSource(ai);
-  if (aiName) props.AI = { multi_select: [{ name: aiName }] };
-  return props;
-}
-
-function resolveProperties({
-  properties,
-  title,
-  url,
-  ai,
-  includeDate,
-  capturedAt,
-}: {
-  properties?: any;
-  title?: string;
-  url?: string;
-  ai?: unknown;
-  includeDate?: boolean;
-  capturedAt?: unknown;
-}) {
-  if (properties && typeof properties === 'object') return properties;
-  return buildPageProperties({ title, url, ai, includeDate, capturedAt });
+  return properties as Record<string, unknown>;
 }
 
 async function createPageInDatabase(
   accessToken: string,
-  {
-    databaseId,
-    title,
-    url,
-    ai,
-    properties,
-    capturedAt,
-  }: { databaseId?: string; title?: string; url?: string; ai?: unknown; properties?: any; capturedAt?: unknown },
+  { databaseId, properties }: { databaseId?: string; properties?: Record<string, unknown> },
 ) {
   const body = {
     parent: { database_id: databaseId },
-    properties: resolveProperties({ properties, title, url, ai, includeDate: true, capturedAt }),
+    properties: requireExplicitProperties(properties),
   };
   return notionFetch({ accessToken, method: 'POST', path: '/v1/pages', body });
 }
 
 async function updatePageProperties(
   accessToken: string,
-  {
-    pageId,
-    title,
-    url,
-    ai,
-    properties,
-  }: { pageId?: string; title?: string; url?: string; ai?: unknown; properties?: any },
+  { pageId, properties }: { pageId?: string; properties?: Record<string, unknown> },
 ) {
-  const body = {
-    properties: resolveProperties({ properties, title, url, ai, includeDate: false }),
-  };
+  const body = { properties: requireExplicitProperties(properties) };
   return notionFetch({ accessToken, method: 'PATCH', path: `/v1/pages/${pageId}`, body });
 }
 
@@ -381,5 +308,4 @@ export {
   pageBelongsToDatabase,
   hasExternalImageBlocks,
   upgradeImageBlocksToFileUploads,
-  aiLabelForSource,
 };

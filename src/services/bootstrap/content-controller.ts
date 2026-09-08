@@ -119,9 +119,10 @@ export function createContentController(deps: Deps) {
     },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
+    const activityAt = Date.now();
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-      payload: snapshot.conversation,
+      payload: { ...snapshot.conversation, lastActivityAt: 0 },
     });
     if (!conversationRes?.ok) {
       throw new Error(conversationRes?.error?.message || 'upsertConversation failed');
@@ -137,6 +138,7 @@ export function createContentController(deps: Deps) {
       diff: options?.diff || null,
       conversationSourceType: snapshot?.conversation?.sourceType || 'chat',
       conversationUrl: snapshot?.conversation?.url || '',
+      activityAt,
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');

@@ -1,21 +1,21 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
+import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
 import type { SyncJobStore } from '@services/sync/sync-job-store';
 
-export type NotionToken = {
+type NotionToken = {
   accessToken: string;
   [key: string]: unknown;
 };
 
-export type NotionTokenStore = {
+type NotionTokenStore = {
   getToken: () => Promise<NotionToken | null>;
 };
 
-export type NotionConversationKinds = {
+type NotionConversationKinds = {
   pick: (input: { source?: unknown; sourceType?: unknown }) => any;
-  getNotionStorageKeys?: () => string[];
 };
 
-export type NotionBackgroundStorage = {
+type NotionBackgroundStorage = {
   getSyncMappingByConversation: (conversationId: number) => Promise<any>;
   getMessagesByConversationId: (conversationId: number) => Promise<any[]>;
   setConversationNotionPageId: (
@@ -25,20 +25,20 @@ export type NotionBackgroundStorage = {
   ) => Promise<any>;
   setSyncCursor: (conversationId: number, cursor: any) => Promise<any>;
   patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any>;
-  getArticleCommentsByConversationId?: (conversationId: number) => Promise<ArticleCommentDto[]>;
-  attachOrphanArticleCommentsToConversation?: (canonicalUrl: string, conversationId: number) => Promise<any>;
+  getArticleCommentsByConversationId: (conversationId: number) => Promise<ArticleCommentDto[]>;
+  attachOrphanArticleCommentsToConversation: (canonicalUrl: string, conversationId: number) => Promise<any>;
 };
 
-export type NotionDbManager = {
+type NotionDbManager = {
   ensureDatabase: (input: {
     accessToken: string;
     parentPageId: string;
-    dbSpec: any;
+    dbSpec: ConversationKindDbSpec;
   }) => Promise<{ databaseId?: unknown }>;
-  clearCachedDatabaseId: (storageKey?: string) => Promise<any>;
+  clearCachedDatabaseId: (storageKey: string) => Promise<any>;
 };
 
-export type NotionSyncService = {
+type NotionSyncService = {
   getPage: (accessToken: string, pageId: string) => Promise<any>;
   createPageInDatabase: (accessToken: string, input: any) => Promise<any>;
   updatePageProperties: (accessToken: string, input: any) => Promise<any>;

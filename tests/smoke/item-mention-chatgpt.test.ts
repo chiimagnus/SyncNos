@@ -42,7 +42,7 @@ function candidate(id: number, title = `Candidate ${id}`) {
     domain: 'chatgpt.com',
     url: '',
     sourceType: 'chat',
-    lastCapturedAt: id,
+    lastActivityAt: id,
   };
 }
 
@@ -128,7 +128,7 @@ describe('item mention chatgpt controller', () => {
                 domain: 'x',
                 url: '',
                 sourceType: 'chat',
-                lastCapturedAt: 1,
+                lastActivityAt: 1,
               },
             ],
           },
@@ -182,7 +182,7 @@ describe('item mention chatgpt controller', () => {
                 domain: 'a.com',
                 url: '',
                 sourceType: 'chat',
-                lastCapturedAt: 1,
+                lastActivityAt: 1,
               },
               {
                 conversationId: 2,
@@ -191,7 +191,7 @@ describe('item mention chatgpt controller', () => {
                 domain: 'b.com',
                 url: '',
                 sourceType: 'chat',
-                lastCapturedAt: 2,
+                lastActivityAt: 2,
               },
             ],
           },
@@ -245,7 +245,7 @@ describe('item mention chatgpt controller', () => {
                 domain: 'a.com',
                 url: '',
                 sourceType: 'chat',
-                lastCapturedAt: 1,
+                lastActivityAt: 1,
               },
             ],
           },

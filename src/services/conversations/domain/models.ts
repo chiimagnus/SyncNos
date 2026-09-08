@@ -14,7 +14,7 @@ export type Conversation = {
   notionPageUrl?: string;
   notionWorkspaceSlug?: string;
   feishuDocId?: string;
-  lastCapturedAt?: number;
+  lastActivityAt: number;
   commentThreadCount?: number;
 };
 

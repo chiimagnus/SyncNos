@@ -107,7 +107,7 @@ function baseConversation(id: number, source = 'chatgpt') {
     title: `Conversation ${id}`,
     source,
     conversationKey: `conv-${id}`,
-    lastCapturedAt: Date.now() - id * 1000,
+    lastActivityAt: Date.now() - id * 1000,
     url: `https://example.com/chat/${id}`,
   };
 }
@@ -145,7 +145,7 @@ function buildState(overrides: Record<string, unknown> = {}) {
     loadingInitialList: false,
     loadingMoreList: false,
     listError: null,
-    listCursor: { lastCapturedAt: Date.now() - 9999, id: 1 },
+    listCursor: { lastActivityAt: Date.now() - 9999, id: 1 },
     listHasMore: true,
     listSummary: { totalCount: items.length, todayCount: items.length },
     listFacets: {
@@ -303,15 +303,15 @@ describe('ConversationListPane pagination behaviors', () => {
         baseConversation(11),
         {
           ...baseConversation(22),
-          lastCapturedAt: new Date(2026, 5, 17, 9, 0, 0, 0).getTime(),
+          lastActivityAt: new Date(2026, 5, 17, 9, 0, 0, 0).getTime(),
         },
         {
           ...baseConversation(33),
-          lastCapturedAt: new Date(2026, 5, 14, 9, 0, 0, 0).getTime(),
+          lastActivityAt: new Date(2026, 5, 14, 9, 0, 0, 0).getTime(),
         },
         {
           ...baseConversation(44),
-          lastCapturedAt: new Date(2026, 4, 20, 9, 0, 0, 0).getTime(),
+          lastActivityAt: new Date(2026, 4, 20, 9, 0, 0, 0).getTime(),
         },
       ],
     });

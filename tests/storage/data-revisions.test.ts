@@ -10,7 +10,7 @@ import {
 import { closeDbForTests, DB_VERSION, openDb } from '@platform/idb/schema';
 import { readDataRevision, readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
-import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
+import { importBackupZipMerge } from '@services/sync/backup/import';
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -416,18 +416,36 @@ describe('data revision storage', () => {
 
     await addArticleComment({ conversationId: null, canonicalUrl: url, commentText: 'orphan' });
     expect(await readDataRevision('article_comments')).toBe(4);
-    expect(await attachOrphanCommentsToConversation(url, 77)).toEqual({ updated: 1 });
+    const { upsertConversation } = await import('@services/conversations/data/storage-idb');
+    const owner = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: `article:${url}`,
+      title: 'Revision comments',
+      url,
+      lastActivityAt: 0,
+    });
+    const ownerId = Number(owner.id);
+    expect(await attachOrphanCommentsToConversation(url, ownerId)).toEqual({ updated: 1 });
     expect(await readDataRevision('article_comments')).toBe(5);
-    expect(await attachOrphanCommentsToConversation(url, 77)).toEqual({ updated: 0 });
+    expect(await attachOrphanCommentsToConversation(url, ownerId)).toEqual({ updated: 0 });
     expect(await readDataRevision('article_comments')).toBe(5);
 
     const nextUrl = 'https://example.com/revision-comments-next';
     expect(
-      await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl: url, toCanonicalUrl: nextUrl, conversationId: 77 }),
+      await migrateArticleCommentsCanonicalUrl({
+        fromCanonicalUrl: url,
+        toCanonicalUrl: nextUrl,
+        conversationId: ownerId,
+      }),
     ).toEqual({ updated: 1 });
     expect(await readDataRevision('article_comments')).toBe(6);
     expect(
-      await migrateArticleCommentsCanonicalUrl({ fromCanonicalUrl: url, toCanonicalUrl: nextUrl, conversationId: 77 }),
+      await migrateArticleCommentsCanonicalUrl({
+        fromCanonicalUrl: url,
+        toCanonicalUrl: nextUrl,
+        conversationId: ownerId,
+      }),
     ).toEqual({ updated: 0 });
     expect(await readDataRevision('article_comments')).toBe(6);
   });
@@ -455,7 +473,7 @@ describe('data revision storage', () => {
       source: 'debug',
       conversationKey: 'merge-noop',
       title: 'No-op',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const keepId = Number(keep.id);
     const before = await readDataRevisionSnapshot();
@@ -575,7 +593,7 @@ describe('data revision storage', () => {
       source: 'debug',
       conversationKey: 'mapping-revision-scopes',
       title: 'Mapping revisions',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const conversationId = Number(conversation.id);
     const baseline = await readDataRevisionSnapshot();
@@ -593,159 +611,7 @@ describe('data revision storage', () => {
     expect(await readDataRevision('conversations')).toBe(baseline.conversations + 1);
   });
 
-  it('advances conversations once for real Legacy backup changes and stays stable for identical re-imports', async () => {
-    const buildBackup = (lastCapturedAt: number) => ({
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          {
-            id: 99,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            conversationKey: 'legacy-conversation-revision',
-            title: 'Legacy',
-            url: 'https://chatgpt.com/c/legacy-conversation-revision',
-            lastCapturedAt,
-          },
-        ],
-        messages: [],
-        sync_mappings: [],
-      },
-      storageLocal: {},
-    });
-
-    expect(await readDataRevision('conversations')).toBe(0);
-    const first = await importBackupLegacyJsonMerge(buildBackup(10));
-    expect(first.conversationsAdded).toBe(1);
-    expect(first.conversationsUpdated).toBe(0);
-    expect(await readDataRevision('conversations')).toBe(1);
-
-    const repeated = await importBackupLegacyJsonMerge(buildBackup(10));
-    expect(repeated.conversationsAdded).toBe(0);
-    expect(repeated.conversationsUpdated).toBe(0);
-    expect(await readDataRevision('conversations')).toBe(1);
-
-    const changed = await importBackupLegacyJsonMerge(buildBackup(20));
-    expect(changed.conversationsAdded).toBe(0);
-    expect(changed.conversationsUpdated).toBe(1);
-    expect(await readDataRevision('conversations')).toBe(2);
-  });
-
-  it('advances messages once for real Legacy changes and stays stable for equivalent re-imports', async () => {
-    const buildBackup = (messageOneUpdatedAt: number) => ({
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          {
-            id: 99,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            conversationKey: 'legacy-message-revision',
-            title: 'Legacy',
-            url: 'https://chatgpt.com/c/legacy-message-revision',
-            lastCapturedAt: 10,
-          },
-        ],
-        messages: [
-          {
-            id: 500,
-            conversationId: 99,
-            messageKey: 'm1',
-            role: 'user',
-            contentText: 'first',
-            contentMarkdown: '',
-            sequence: 1,
-            updatedAt: messageOneUpdatedAt,
-          },
-          {
-            id: 501,
-            conversationId: 99,
-            messageKey: 'm2',
-            role: 'assistant',
-            contentText: 'second',
-            contentMarkdown: '',
-            sequence: 2,
-            updatedAt: 10,
-          },
-        ],
-        sync_mappings: [],
-      },
-      storageLocal: {},
-    });
-
-    expect(await readDataRevision('messages')).toBe(0);
-    const first = await importBackupLegacyJsonMerge(buildBackup(10));
-    expect(first.messagesAdded).toBe(2);
-    expect(first.messagesUpdated).toBe(0);
-    expect(await readDataRevision('messages')).toBe(1);
-
-    const repeated = await importBackupLegacyJsonMerge(buildBackup(10));
-    expect(repeated.messagesAdded).toBe(0);
-    expect(repeated.messagesUpdated).toBe(0);
-    expect(await readDataRevision('messages')).toBe(1);
-
-    const changed = await importBackupLegacyJsonMerge(buildBackup(11));
-    expect(changed.messagesAdded).toBe(0);
-    expect(changed.messagesUpdated).toBe(1);
-    expect(await readDataRevision('messages')).toBe(2);
-  });
-
-  it('tracks Legacy mapping and mirror mutations independently', async () => {
-    const conversation = {
-      id: 99,
-      sourceType: 'chat',
-      source: 'chatgpt',
-      conversationKey: 'legacy-mapping-revision',
-      title: 'Legacy',
-      url: 'https://chatgpt.com/c/legacy-mapping-revision',
-      lastCapturedAt: 10,
-    };
-    const mapping = {
-      id: 500,
-      source: 'chatgpt',
-      conversationKey: 'legacy-mapping-revision',
-      notionPageId: 'page-legacy',
-      notionPageUrl: 'https://notion.so/page-legacy',
-      notionWorkspaceSlug: 'workspace',
-      lastSyncedAt: 10,
-    };
-    const buildBackup = (mappings: unknown[]) => ({
-      schemaVersion: 1,
-      stores: { conversations: [conversation], messages: [], sync_mappings: mappings },
-      storageLocal: {},
-    });
-
-    await importBackupLegacyJsonMerge(buildBackup([]));
-    expect(await readDataRevision('conversations')).toBe(1);
-    expect(await readDataRevision('sync_mappings')).toBe(0);
-
-    const first = await importBackupLegacyJsonMerge(buildBackup([mapping]));
-    expect(first.mappingsAdded).toBe(1);
-    expect(await readDataRevision('conversations')).toBe(2);
-    expect(await readDataRevision('sync_mappings')).toBe(1);
-
-    const repeated = await importBackupLegacyJsonMerge(buildBackup([mapping]));
-    expect(repeated.mappingsAdded).toBe(0);
-    expect(repeated.mappingsUpdated).toBe(0);
-    expect(await readDataRevision('conversations')).toBe(2);
-    expect(await readDataRevision('sync_mappings')).toBe(1);
-
-    const db = await openDb();
-    const repairTx = db.transaction(['conversations'], 'readwrite');
-    const conversationStore = repairTx.objectStore('conversations');
-    const persisted = await requestResult<any>(conversationStore.getAll());
-    delete persisted[0].notionPageId;
-    await requestResult(conversationStore.put(persisted[0]));
-    await txDone(repairTx);
-
-    const repaired = await importBackupLegacyJsonMerge(buildBackup([mapping]));
-    expect(repaired.mappingsAdded).toBe(0);
-    expect(repaired.mappingsUpdated).toBe(0);
-    expect(await readDataRevision('conversations')).toBe(3);
-    expect(await readDataRevision('sync_mappings')).toBe(1);
-  });
-
-  it('clears stale conversation mirrors for explicit empty mappings in Legacy and ZIP imports', async () => {
+  it('clears stale conversation mirrors for explicit empty mappings in ZIP imports', async () => {
     const source = 'chatgpt';
     const conversationKey = 'cleared-mapping-mirror';
     const incomingConversation = {
@@ -755,7 +621,7 @@ describe('data revision storage', () => {
       conversationKey,
       title: 'Cleared mapping',
       url: 'https://chatgpt.com/c/cleared-mapping-mirror',
-      lastCapturedAt: 10,
+      lastActivityAt: 10,
     };
     const clearedMapping = {
       source,
@@ -763,11 +629,6 @@ describe('data revision storage', () => {
       notionPageId: '',
       feishuDocId: '',
       updatedAt: 10,
-    };
-    const legacyBackup = {
-      schemaVersion: 1,
-      stores: { conversations: [incomingConversation], messages: [], sync_mappings: [clearedMapping] },
-      storageLocal: {},
     };
     const encoder = new TextEncoder();
     const entryPath = 'sources/chatgpt/cleared-mapping-mirror.json';
@@ -846,28 +707,14 @@ describe('data revision storage', () => {
     };
 
     await seedStaleMirror();
-    const legacyBaseline = await readDataRevisionSnapshot();
-    await importBackupLegacyJsonMerge(legacyBackup);
-    expect(await readDataRevisionSnapshot()).toMatchObject({
-      conversations: legacyBaseline.conversations + 1,
-      sync_mappings: legacyBaseline.sync_mappings,
-    });
-    await expectClearedMirror();
-    await importBackupLegacyJsonMerge(legacyBackup);
-    expect(await readDataRevisionSnapshot()).toMatchObject({
-      conversations: legacyBaseline.conversations + 1,
-      sync_mappings: legacyBaseline.sync_mappings,
-    });
-
-    await seedStaleMirror();
     const zipBaseline = await readDataRevisionSnapshot();
-    await importBackupZipV2Merge(zipEntries);
+    await importBackupZipMerge(zipEntries);
     expect(await readDataRevisionSnapshot()).toMatchObject({
       conversations: zipBaseline.conversations + 1,
       sync_mappings: zipBaseline.sync_mappings,
     });
     await expectClearedMirror();
-    await importBackupZipV2Merge(zipEntries);
+    await importBackupZipMerge(zipEntries);
     expect(await readDataRevisionSnapshot()).toMatchObject({
       conversations: zipBaseline.conversations + 1,
       sync_mappings: zipBaseline.sync_mappings,
@@ -915,11 +762,11 @@ describe('data revision storage', () => {
       ],
     ]);
 
-    const first = await importBackupZipV2Merge(entries);
+    const first = await importBackupZipMerge(entries);
     expect(first.conversationsAdded).toBe(1);
     expect(await readDataRevision('conversations')).toBe(1);
 
-    const repeated = await importBackupZipV2Merge(entries);
+    const repeated = await importBackupZipMerge(entries);
     expect(repeated.conversationsAdded).toBe(0);
     expect(repeated.conversationsUpdated).toBe(0);
     expect(await readDataRevision('conversations')).toBe(1);
@@ -989,11 +836,11 @@ describe('data revision storage', () => {
       ],
     ]);
 
-    const first = await importBackupZipV2Merge(entries);
+    const first = await importBackupZipMerge(entries);
     expect(first.commentsAdded).toBe(1);
     expect(await readDataRevision('article_comments')).toBe(1);
 
-    const repeated = await importBackupZipV2Merge(entries);
+    const repeated = await importBackupZipMerge(entries);
     expect(repeated.commentsAdded).toBe(0);
     expect(repeated.commentsUpdated).toBe(0);
     expect(await readDataRevision('article_comments')).toBe(1);
@@ -1102,7 +949,7 @@ describe('data revision storage', () => {
       ],
     ]);
 
-    const first = await importBackupZipV2Merge(entries);
+    const first = await importBackupZipMerge(entries);
     expect(first).toMatchObject({
       conversationsAdded: 1,
       messagesAdded: 1,
@@ -1118,7 +965,7 @@ describe('data revision storage', () => {
       image_cache: 1,
     });
 
-    const repeated = await importBackupZipV2Merge(entries);
+    const repeated = await importBackupZipMerge(entries);
     expect(repeated).toMatchObject({
       conversationsAdded: 0,
       conversationsUpdated: 0,

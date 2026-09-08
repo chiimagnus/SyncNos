@@ -99,7 +99,6 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
         title: env.document.title || 'DeepSeek',
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

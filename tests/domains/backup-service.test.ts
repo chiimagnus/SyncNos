@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
 import { FEISHU_MESSAGE_TYPES, INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
-import { exportBackupZipV2 } from '@services/sync/backup/export';
-import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
+import { exportBackupZip } from '@services/sync/backup/export';
+import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { upsertConversation } from '@services/conversations/data/storage-idb';
+import { buildBackupV2FixtureEntries } from '../helpers/backup-v2-fixture';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -88,6 +89,26 @@ function legacyArticleZipEntriesForImport(): Map<string, Uint8Array> {
   ]);
 }
 
+function emptyBackupZipEntries(storageLocal: Record<string, unknown> = {}): Map<string, Uint8Array> {
+  const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+  return new Map([
+    [
+      'manifest.json',
+      encode({
+        backupSchemaVersion: 2,
+        exportedAt: '2026-09-03T00:00:00.000Z',
+        db: { name: 'webclipper', version: 12 },
+        counts: { conversations: 0, messages: 0, sync_mappings: 0 },
+        config: { storageLocalPath: 'config/storage-local.json' },
+        index: { conversationsCsvPath: 'sources/conversations.csv' },
+        sources: [],
+      }),
+    ],
+    ['config/storage-local.json', encode({ schemaVersion: 1, storageLocal })],
+    ['sources/conversations.csv', new TextEncoder().encode('source,conversationKey\n')],
+  ]);
+}
+
 async function assertLegacyArticleImportConvergesToCanonicalIdentity(): Promise<void> {
   const importedDb = await openDb();
   const beforeTx = importedDb.transaction(['conversations', 'sync_mappings'], 'readonly');
@@ -118,7 +139,7 @@ async function assertLegacyArticleImportConvergesToCanonicalIdentity(): Promise<
     conversationKey: CANONICAL_ARTICLE_KEY,
     title: 'Canonical article',
     url: CANONICAL_ARTICLE_URL,
-    lastCapturedAt: 20,
+    lastActivityAt: 20,
   });
   expect(Number(converged.id)).toBe(localId);
   expect(converged.__isNew).toBe(false);
@@ -249,50 +270,25 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
-  it.each([
-    [
-      'legacy JSON',
-      () =>
-        importBackupLegacyJsonMerge({
-          schemaVersion: 1,
-          stores: {
-            conversations: [legacyArticleConversationForImport()],
-            messages: [],
-            sync_mappings: [legacyArticleMappingForImport()],
-          },
-          storageLocal: {},
-        }),
-    ],
-    ['ZIP v2', () => importBackupZipV2Merge(legacyArticleZipEntriesForImport())],
-  ])(
-    'keeps post-v11 %s legacy article identity reachable until canonical runtime convergence',
-    async (_label, runImport) => {
-      await runImport();
-      await assertLegacyArticleImportConvergesToCanonicalIdentity();
-    },
-  );
+  it('keeps post-v11 ZIP v2 legacy article identity reachable until canonical runtime convergence', async () => {
+    await importBackupZipMerge(legacyArticleZipEntriesForImport());
+    await assertLegacyArticleImportConvergesToCanonicalIdentity();
+  });
 
-  it('restores canonical JSON display settings only through the background owner route', async () => {
+  it('does not require the conversations CSV entry for bounded ZIP v2 compatibility', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    const stats = await importBackupLegacyJsonMerge({
-      schemaVersion: 1,
-      stores: { conversations: [], messages: [], sync_mappings: [] },
-      storageLocal: { inpage_display_mode: 'supported', inpage_retired_setting: true },
-    });
+    const { entries, expected } = buildBackupV2FixtureEntries();
+    entries.delete('sources/conversations.csv');
 
-    expect(stats.settingsApplied).toBe(1);
-    expect(chromeMock.__runtimeMessages).toContainEqual({
-      type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE,
-      mode: 'supported',
-    });
-    expect(chromeMock.__store.inpage_display_mode).toBe('supported');
-    expect(chromeMock.__store.inpage_retired_setting).toBeUndefined();
-    expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
+    const stats = await importBackupZipMerge(entries);
+
+    expect(stats.conversationsAdded).toBe(expected.counts.conversations);
+    expect(stats.messagesAdded).toBe(expected.counts.messages);
   });
 
   it('restores canonical ZIP display settings as one logical setting', async () => {
@@ -301,29 +297,8 @@ describe('backup service', () => {
     globalThis.chrome = chromeMock;
     // @ts-expect-error test global
     globalThis.browser = undefined;
-    const enc = new TextEncoder();
-    const entries = new Map<string, Uint8Array>();
-    entries.set(
-      'manifest.json',
-      enc.encode(
-        JSON.stringify({
-          backupSchemaVersion: 2,
-          exportedAt: '2026-09-03T00:00:00.000Z',
-          db: { name: 'webclipper', version: 1 },
-          counts: { conversations: 0, messages: 0, sync_mappings: 0 },
-          config: { storageLocalPath: 'config/storage-local.json' },
-          index: { conversationsCsvPath: 'sources/conversations.csv' },
-          sources: [],
-        }),
-      ),
-    );
-    entries.set(
-      'config/storage-local.json',
-      enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: { inpage_display_mode: 'all' } })),
-    );
-    entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
-
-    const stats = await importBackupZipV2Merge(entries);
+    const entries = emptyBackupZipEntries({ inpage_display_mode: 'all' });
+    const stats = await importBackupZipMerge(entries);
     expect(stats.settingsApplied).toBe(1);
     expect(chromeMock.__runtimeMessages).toContainEqual({ type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'all' });
     expect(chromeMock.__store.inpage_display_mode).toBe('all');
@@ -340,17 +315,13 @@ describe('backup service', () => {
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    await expect(
-      importBackupLegacyJsonMerge({
-        schemaVersion: 1,
-        stores: { conversations: [], messages: [], sync_mappings: [] },
-        storageLocal: { inpage_display_mode: 'off' },
-      }),
-    ).rejects.toThrow('display owner failed');
+    await expect(importBackupZipMerge(emptyBackupZipEntries({ inpage_display_mode: 'off' }))).rejects.toThrow(
+      'display owner failed',
+    );
     expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
   });
 
-  it('exportBackupZipV2 emits manifest + bundles and filters storage.local', async () => {
+  it('exportBackupZip emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',
       notion_oauth_pending_state: 'pending-a',
@@ -398,7 +369,7 @@ describe('backup service', () => {
         title: 'Hello',
         url: 'https://x',
         warningFlags: [],
-        lastCapturedAt: 1,
+        lastActivityAt: 1,
       }) as any,
     );
     const imgId = await reqToPromise<number>(
@@ -445,7 +416,7 @@ describe('backup service', () => {
       t.onabort = () => reject(t.error);
     });
 
-    const out = await exportBackupZipV2();
+    const out = await exportBackupZip();
     expect(out.filename.endsWith('.zip')).toBe(true);
 
     const entries = await extractZipEntries(out.blob);
@@ -453,7 +424,7 @@ describe('backup service', () => {
     expect(entries.has('config/storage-local.json')).toBe(true);
 
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
-    expect(manifest.backupSchemaVersion).toBe(2);
+    expect(manifest.backupSchemaVersion).toBe(3);
     expect(manifest.counts.conversations).toBe(1);
     expect(manifest.counts.github_cleanup_outbox).toBeUndefined();
     expect(manifest.assets.imageCacheIndexPath).toBe('assets/image-cache/index.json');
@@ -521,7 +492,7 @@ describe('backup service', () => {
 
     closeDbForTests();
     await deleteDb('webclipper');
-    await importBackupZipV2Merge(entries);
+    await importBackupZipMerge(entries);
     const restoredDb = await openDb();
     const restoredTx = restoredDb.transaction(['conversations', 'sync_mappings', 'github_cleanup_outbox'], 'readonly');
     const restoredConversations = await reqToPromise<any[]>(restoredTx.objectStore('conversations').getAll());
@@ -588,7 +559,7 @@ describe('backup service', () => {
         notionWorkspaceSlug: 'workspace',
         feishuDocId: 'doc-1',
         warningFlags: [],
-        lastCapturedAt: 10,
+        lastActivityAt: 10,
       }) as any,
     );
     await reqToPromise(
@@ -644,7 +615,7 @@ describe('backup service', () => {
     expect(conversationIdA).toBe(100);
     expect(mappingIdA).toBe(200);
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
     const bundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
@@ -667,7 +638,7 @@ describe('backup service', () => {
     closeDbForTests();
     await deleteDb('webclipper');
 
-    const stats = await importBackupZipV2Merge(entries);
+    const stats = await importBackupZipMerge(entries);
     expect(stats.conversationsAdded).toBe(1);
     expect(stats.messagesAdded).toBe(1);
     expect(stats.mappingsAdded).toBe(1);
@@ -733,9 +704,109 @@ describe('backup service', () => {
     expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending-b');
     expect(chromeMock.__store.notion_oauth_last_error).toBe('error-b');
     expect(chromeMock.__store.notion_parent_page_id).toBe('parent-a');
+
+    const repeated = await importBackupZipMerge(entries);
+    expect(repeated).toMatchObject({
+      conversationsAdded: 0,
+      conversationsUpdated: 0,
+      messagesAdded: 0,
+      messagesUpdated: 0,
+      mappingsAdded: 0,
+      mappingsUpdated: 0,
+    });
   });
 
-  it('importBackupZipV2Merge restores image cache and rewrites only real Markdown asset images', async () => {
+  it('restores historical comment activity without inventing zero timestamps and stays idempotent on re-import', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations', 'article_comments'], 'readwrite');
+    const conversationId = await reqToPromise<number>(
+      seedTx.objectStore('conversations').add({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/comment-activity-backup',
+        title: 'Comment activity backup',
+        url: 'https://example.com/comment-activity-backup',
+        warningFlags: [],
+        lastActivityAt: 10,
+        listSourceKey: 'web',
+        listSiteKey: 'domain:example.com',
+      }) as IDBRequest<number>,
+    );
+    await reqToPromise(
+      seedTx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId,
+        canonicalUrl: 'https://example.com/comment-activity-backup',
+        authorName: '',
+        quoteText: '',
+        commentText: 'historical activity',
+        locator: null,
+        createdAt: 20,
+        updatedAt: 20,
+      }),
+    );
+    await reqToPromise(
+      seedTx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId,
+        canonicalUrl: 'https://example.com/comment-activity-backup',
+        authorName: '',
+        quoteText: '',
+        commentText: 'unknown historical activity',
+        locator: null,
+        createdAt: 0,
+        updatedAt: 0,
+      }),
+    );
+    await new Promise<void>((resolve, reject) => {
+      seedTx.oncomplete = () => resolve();
+      seedTx.onerror = () => reject(seedTx.error);
+      seedTx.onabort = () => reject(seedTx.error);
+    });
+
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+
+    const first = await importBackupZipMerge(entries);
+    expect(first).toMatchObject({ commentsAdded: 2, commentsUpdated: 0 });
+
+    const restoredDb = await openDb();
+    const verifyTx = restoredDb.transaction(['conversations', 'article_comments'], 'readonly');
+    const [restoredConversation] = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll());
+    const restoredComments = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
+    await new Promise<void>((resolve, reject) => {
+      verifyTx.oncomplete = () => resolve();
+      verifyTx.onerror = () => reject(verifyTx.error);
+      verifyTx.onabort = () => reject(verifyTx.error);
+    });
+
+    expect(restoredConversation.lastActivityAt).toBe(20);
+    expect(restoredComments.map((row) => row.createdAt).sort((left, right) => left - right)).toEqual([0, 20]);
+
+    const repeated = await importBackupZipMerge(entries);
+    expect(repeated).toMatchObject({
+      conversationsAdded: 0,
+      conversationsUpdated: 0,
+      commentsAdded: 0,
+      commentsUpdated: 0,
+      commentsSkipped: 2,
+    });
+    const [afterRepeat] = await reqToPromise<any[]>(
+      (await openDb()).transaction(['conversations'], 'readonly').objectStore('conversations').getAll(),
+    );
+    expect(afterRepeat.lastActivityAt).toBe(20);
+  });
+
+  it('importBackupZipMerge restores image cache and rewrites only real Markdown asset images', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -752,7 +823,7 @@ describe('backup service', () => {
         title: 'Hello',
         url: 'https://x',
         warningFlags: [],
-        lastCapturedAt: 1,
+        lastActivityAt: 1,
       }) as any,
     );
     const oldImgId = await reqToPromise<number>(
@@ -806,13 +877,13 @@ describe('backup service', () => {
       t.onabort = () => reject(t.error);
     });
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
 
     closeDbForTests();
     await deleteDb('webclipper');
 
-    const stats = await importBackupZipV2Merge(entries);
+    const stats = await importBackupZipMerge(entries);
     expect(stats.conversationsAdded + stats.conversationsUpdated).toBeGreaterThanOrEqual(1);
 
     const db2 = await openDb();
@@ -871,7 +942,7 @@ describe('backup service', () => {
       localEditTx.onabort = () => reject(localEditTx.error);
     });
 
-    const olderBackupStats = await importBackupZipV2Merge(entries);
+    const olderBackupStats = await importBackupZipMerge(entries);
     expect(olderBackupStats.messagesUpdated).toBe(0);
     const preservedLocalTx = db2.transaction(['messages'], 'readonly');
     const preservedLocal = await reqToPromise<any>(
@@ -900,7 +971,7 @@ describe('backup service', () => {
       deleteAssetTx.onabort = () => reject(deleteAssetTx.error);
     });
 
-    const repeatedStats = await importBackupZipV2Merge(entries);
+    const repeatedStats = await importBackupZipMerge(entries);
     expect(repeatedStats.messagesUpdated).toBe(1);
 
     const restoredAgainTx = db2.transaction(['messages', 'image_cache'], 'readonly');
@@ -925,7 +996,7 @@ describe('backup service', () => {
     expect(restoredAgainMarkdown).toContain(`    ![indented](syncnos-asset://${oldImgId})`);
   });
 
-  it('importBackupZipV2Merge tolerates a missing image index while preserving literal/code private URIs', async () => {
+  it('importBackupZipMerge rejects a missing current manifest-declared conversations index', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -933,94 +1004,69 @@ describe('backup service', () => {
     globalThis.browser = undefined;
 
     const db = await openDb();
-    const t = db.transaction(['conversations', 'messages', 'image_cache'], 'readwrite');
-    const convId = await reqToPromise<number>(
-      t.objectStore('conversations').add({
+    const tx = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('conversations').add({
         sourceType: 'chat',
         source: 'chatgpt',
-        conversationKey: 'c1',
-        title: 'Hello',
-        url: 'https://x',
+        conversationKey: 'missing-conversations-index',
+        title: 'Missing conversations index',
+        url: 'https://example.com/missing-conversations-index',
         warningFlags: [],
-        lastCapturedAt: 1,
-      }) as any,
-    );
-    const oldImgId = await reqToPromise<number>(
-      t.objectStore('image_cache').add({
-        conversationId: convId,
-        url: 'https://img.example/x.png',
-        blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
-        byteSize: 3,
-        contentType: 'image/png',
-        createdAt: 1,
-        updatedAt: 1,
-      }) as any,
-    );
-    await reqToPromise(
-      t.objectStore('messages').add({
-        conversationId: convId,
-        messageKey: 'm1',
-        role: 'user',
-        contentMarkdown: `hi\n\n![x](syncnos-asset://${oldImgId})`,
-        sequence: 1,
-        updatedAt: 1,
+        lastActivityAt: 1,
       }) as any,
     );
     await new Promise<void>((resolve, reject) => {
-      t.oncomplete = () => resolve();
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
-
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
-    const indexPath = String(manifest.assets?.imageCacheIndexPath || '');
-    const indexDoc = JSON.parse(new TextDecoder().decode(entries.get(indexPath)!));
-    const blobPath = String(indexDoc.assets?.[0]?.blobPath || '');
-
-    const bundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
-    const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
-    bundle.messages[0].contentMarkdown = [
-      `![x](syncnos-asset://${oldImgId})`,
-      `literal syncnos-asset://${oldImgId}`,
-      `\`![inline](syncnos-asset://${oldImgId})\``,
-      '```md',
-      `![fenced](syncnos-asset://${oldImgId})`,
-      '```',
-      `    ![indented](syncnos-asset://${oldImgId})`,
-    ].join('\n');
-    entries.set(bundlePath, new TextEncoder().encode(JSON.stringify(bundle)));
+    const indexPath = String(manifest.index?.conversationsCsvPath || '');
     entries.delete(indexPath);
-    if (blobPath) entries.delete(blobPath);
 
-    closeDbForTests();
-    await deleteDb('webclipper');
-
-    await importBackupZipV2Merge(entries);
-
-    const db2 = await openDb();
-    const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
-    const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll() as any);
-    const assets = await reqToPromise<any[]>(t2.objectStore('image_cache').getAll() as any);
-    await new Promise<void>((resolve, reject) => {
-      t2.oncomplete = () => resolve();
-      t2.onerror = () => reject(t2.error);
-      t2.onabort = () => reject(t2.error);
-    });
-
-    expect(assets.length).toBe(0);
-    const restoredMarkdown = String(msgs[0].contentMarkdown || '');
-    expect(restoredMarkdown).not.toContain(`![x](syncnos-asset://${oldImgId})`);
-    expect(restoredMarkdown).toContain('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
-    expect(restoredMarkdown).toContain(`literal syncnos-asset://${oldImgId}`);
-    expect(restoredMarkdown).toContain(`\`![inline](syncnos-asset://${oldImgId})\``);
-    expect(restoredMarkdown).toContain(`![fenced](syncnos-asset://${oldImgId})`);
-    expect(restoredMarkdown).toContain(`    ![indented](syncnos-asset://${oldImgId})`);
+    await expect(importBackupZipMerge(entries)).rejects.toThrow(`Missing entry: ${indexPath}`);
   });
 
-  it('importBackupZipV2Merge tolerates missing image blob and falls back to https url', async () => {
+  it('importBackupZipMerge rejects a missing manifest-declared image index', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'missing-index',
+        title: 'Missing index',
+        url: 'https://example.com/missing-index',
+        warningFlags: [],
+        lastActivityAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const indexPath = String(manifest.assets?.imageCacheIndexPath || '');
+    entries.delete(indexPath);
+
+    await expect(importBackupZipMerge(entries)).rejects.toThrow(`Missing entry: ${indexPath}`);
+  });
+
+  it('importBackupZipMerge tolerates missing image blob and falls back to https url', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -1037,7 +1083,7 @@ describe('backup service', () => {
         title: 'Hello',
         url: 'https://x',
         warningFlags: [],
-        lastCapturedAt: 1,
+        lastActivityAt: 1,
       }) as any,
     );
     const oldImgId = await reqToPromise<number>(
@@ -1067,7 +1113,7 @@ describe('backup service', () => {
       t.onabort = () => reject(t.error);
     });
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
 
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
@@ -1079,7 +1125,7 @@ describe('backup service', () => {
     closeDbForTests();
     await deleteDb('webclipper');
 
-    await importBackupZipV2Merge(entries);
+    await importBackupZipMerge(entries);
 
     const db2 = await openDb();
     const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
@@ -1112,7 +1158,7 @@ describe('backup service', () => {
         title: 'A',
         url: 'https://example.com/a',
         warningFlags: [],
-        lastCapturedAt: 1,
+        lastActivityAt: 1,
       }) as any,
     );
     const conversationB = await reqToPromise<number>(
@@ -1123,7 +1169,7 @@ describe('backup service', () => {
         title: 'B',
         url: 'https://example.com/b',
         warningFlags: [],
-        lastCapturedAt: 2,
+        lastActivityAt: 2,
       }) as any,
     );
     const assetA = await reqToPromise<number>(
@@ -1174,7 +1220,7 @@ describe('backup service', () => {
       tx.onabort = () => reject(tx.error);
     });
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
     const bundlePaths = (manifest.sources || []).flatMap((group: any) => group.files || []);
@@ -1202,7 +1248,7 @@ describe('backup service', () => {
 
     closeDbForTests();
     await deleteDb('webclipper');
-    await importBackupZipV2Merge(entries);
+    await importBackupZipMerge(entries);
 
     const restoredDb = await openDb();
     const readTx = restoredDb.transaction(['conversations', 'messages', 'image_cache'], 'readonly');
@@ -1237,7 +1283,7 @@ describe('backup service', () => {
     expect(markdownB).toContain('![own-b](https://img.example/b.png)');
   });
 
-  it('importBackupZipV2Merge tolerates missing conversation bundle entry', async () => {
+  it('importBackupZipMerge rejects a missing manifest-declared conversation bundle', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -1245,129 +1291,68 @@ describe('backup service', () => {
     globalThis.browser = undefined;
 
     const db = await openDb();
-    const t = db.transaction(['conversations', 'messages'], 'readwrite');
-    const conv1 = await reqToPromise<number>(
-      t.objectStore('conversations').add({
-        sourceType: 'chat',
-        source: 'notionai',
-        conversationKey: 'c1',
-        title: '打招呼',
-        url: 'https://x',
-        warningFlags: [],
-        lastCapturedAt: 1,
-      }) as any,
-    );
-    const conv2 = await reqToPromise<number>(
-      t.objectStore('conversations').add({
+    const tx = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('conversations').add({
         sourceType: 'chat',
         source: 'chatgpt',
-        conversationKey: 'c2',
-        title: 'Hello',
-        url: 'https://y',
+        conversationKey: 'missing-bundle',
+        title: 'Missing bundle',
+        url: 'https://example.com/missing-bundle',
         warningFlags: [],
-        lastCapturedAt: 2,
-      }) as any,
-    );
-    await reqToPromise(
-      t.objectStore('messages').add({
-        conversationId: conv1,
-        messageKey: 'm1',
-        role: 'user',
-        contentMarkdown: 'hi',
-        sequence: 1,
-        updatedAt: 1,
-      }) as any,
-    );
-    await reqToPromise(
-      t.objectStore('messages').add({
-        conversationId: conv2,
-        messageKey: 'm2',
-        role: 'user',
-        contentMarkdown: 'hi',
-        sequence: 1,
-        updatedAt: 2,
+        lastActivityAt: 1,
       }) as any,
     );
     await new Promise<void>((resolve, reject) => {
-      t.oncomplete = () => resolve();
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const bundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
+    entries.delete(bundlePath);
 
-    // Remove the first referenced bundle entry to simulate a user-edited / corrupted zip.
-    const firstBundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
-    if (firstBundlePath) entries.delete(firstBundlePath);
-
-    closeDbForTests();
-    await deleteDb('webclipper');
-
-    const stats = await importBackupZipV2Merge(entries);
-    expect(stats.conversationsAdded + stats.conversationsUpdated).toBeGreaterThanOrEqual(1);
-
-    const db2 = await openDb();
-    const t2 = db2.transaction(['conversations'], 'readonly');
-    const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll() as any);
-    await new Promise<void>((resolve, reject) => {
-      t2.oncomplete = () => resolve();
-      t2.onerror = () => reject(t2.error);
-      t2.onabort = () => reject(t2.error);
-    });
-    expect(convs.length).toBe(1);
+    await expect(importBackupZipMerge(entries)).rejects.toThrow(`Missing entry: ${bundlePath}`);
   });
 
-  it('importBackupZipV2Merge recovers bundles when manifest paths do not match zip entry names', async () => {
+  it('importBackupZipMerge does not scan undeclared bundle paths when the manifest path is wrong', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    closeDbForTests();
-    await deleteDb('webclipper');
-
-    const manifest = {
-      backupSchemaVersion: 2,
-      exportedAt: '2026-03-17T00:00:00.000Z',
-      db: { name: 'webclipper', version: 1 },
-      counts: { conversations: 1, messages: 1, sync_mappings: 0 },
-      config: { storageLocalPath: 'config/storage-local.json' },
-      index: { conversationsCsvPath: 'sources/conversations.csv' },
-      sources: [{ source: 'notionai', conversationCount: 1, files: ['sources/notionai/notionai-打招呼-abc.json'] }],
-    };
-
-    const bundle = {
-      schemaVersion: 1,
-      conversation: {
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('conversations').add({
         sourceType: 'chat',
         source: 'notionai',
-        conversationKey: 'c1',
-        title: '打招呼',
-        url: 'https://x',
+        conversationKey: 'wrong-manifest-path',
+        title: 'Wrong manifest path',
+        url: 'https://example.com/wrong-manifest-path',
         warningFlags: [],
-        lastCapturedAt: 1,
-      },
-      messages: [
-        { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 },
-      ],
-      syncMapping: null,
-    };
+        lastActivityAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
 
-    // Simulate older zips where non-ASCII filenames were encoded without the UTF-8 flag:
-    // the bundle exists, but under a different decoded entry name than the manifest-declared path.
-    const entries = new Map<string, Uint8Array>();
-    const enc = new TextEncoder();
-    entries.set('manifest.json', enc.encode(JSON.stringify(manifest)));
-    entries.set('config/storage-local.json', enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} })));
-    entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
-    entries.set('sources/notionai/notionai-µëôµï¢σæ╝-abc.json', enc.encode(JSON.stringify(bundle)));
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const declaredPath = String(manifest.sources?.[0]?.files?.[0] || '');
+    const actual = entries.get(declaredPath)!;
+    entries.delete(declaredPath);
+    entries.set('sources/notionai/mojibake-fallback.json', actual);
 
-    const stats = await importBackupZipV2Merge(entries);
-    expect(stats.conversationsAdded).toBe(1);
-    expect(stats.messagesAdded).toBe(1);
+    await expect(importBackupZipMerge(entries)).rejects.toThrow(`Missing entry: ${declaredPath}`);
   });
 
   it('keeps legacy comments orphaned when the same canonical URL maps to multiple conversations', async () => {
@@ -1398,7 +1383,7 @@ describe('backup service', () => {
         title: conversationKey,
         url: 'https://example.com/shared',
         warningFlags: [],
-        lastCapturedAt: 1,
+        lastActivityAt: 1,
       },
       messages: [],
       syncMapping: null,
@@ -1427,407 +1412,13 @@ describe('backup service', () => {
       ['assets/article-comments/index.json', enc.encode(JSON.stringify(comments))],
     ]);
 
-    const stats = await importBackupZipV2Merge(entries);
+    const stats = await importBackupZipMerge(entries);
     expect(stats.commentsAdded).toBe(1);
     const db = await openDb();
     const tx = db.transaction(['article_comments'], 'readonly');
     const rows = await reqToPromise<any[]>(tx.objectStore('article_comments').getAll());
     expect(rows).toHaveLength(1);
     expect(rows[0]?.conversationId ?? null).toBeNull();
-  });
-
-  it('importBackupLegacyJsonMerge merges into IndexedDB and applies allowlisted settings only', async () => {
-    const chromeMock = mockChromeStorage();
-    // @ts-expect-error test global
-    globalThis.chrome = chromeMock;
-    // @ts-expect-error test global
-    globalThis.browser = undefined;
-
-    const doc = {
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          {
-            id: 10,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            conversationKey: 'c1',
-            title: 'T',
-            url: 'https://x',
-            warningFlags: [],
-            lastCapturedAt: 1,
-          },
-        ],
-        messages: [
-          {
-            id: 1,
-            conversationId: 10,
-            messageKey: 'm1',
-            role: 'user',
-            contentText: 'hi',
-            contentMarkdown: '',
-            sequence: 1,
-            updatedAt: 1,
-          },
-        ],
-        sync_mappings: [
-          {
-            id: 200,
-            source: 'chatgpt',
-            conversationKey: 'c1',
-            notionPageId: 'np1',
-            notionPageUrl: 'https://www.notion.so/ws/np1',
-            notionWorkspaceSlug: 'ws',
-            lastSyncedMessageKey: 'm1',
-            lastSyncedSequence: 1,
-            lastSyncedAt: 100,
-            lastSyncedMessageUpdatedAt: 1,
-            notionSections: { conversations: { headingBlockId: 'h1' } },
-            notionSectionCursors: {
-              conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1, lastSyncedMessageUpdatedAt: 1 },
-            },
-            notionSectionDigests: { article: { digest: 'digest-1', lastSyncedAt: 100 } },
-            feishuDocId: 'doc1',
-            feishuLastContentHash: 'hash1',
-            futureProviderMetadata: { version: 1 },
-            updatedAt: 101,
-          },
-        ],
-        github_cleanup_outbox: [
-          {
-            id: 999,
-            remoteKey: 'github.com/attacker/injected@main',
-            paths: ['README.md'],
-            reason: 'delete',
-            createdAt: 1,
-            nextAttemptAt: 1,
-          },
-        ],
-      },
-      storageLocal: {
-        notion_oauth_client_id: 'cid',
-        notion_oauth_pending_state: 'pending-legacy',
-        notion_oauth_last_error: 'legacy-error',
-        notion_parent_page_id: 'pid',
-        notion_oauth_token_v1: { accessToken: 'secret' },
-        feishu_oauth_token_v1: { accessToken: 'feishu-secret' },
-        feishu_oauth_client_id: 'legacy-feishu-app-id',
-        feishu_oauth_client_secret: 'legacy-feishu-client-secret',
-        feishu_oauth_token_exchange_proxy_url: 'https://legacy-worker.example.com/exchange',
-        feishu_oauth_pending_state: 'legacy-feishu-pending',
-        feishu_oauth_last_error: 'legacy-feishu-error',
-        feishu_chat_folder: 'LegacyChats',
-      },
-    };
-
-    const stats = await importBackupLegacyJsonMerge(doc);
-    expect(stats.conversationsAdded).toBe(1);
-    expect(stats.messagesAdded).toBe(1);
-    expect(stats.mappingsAdded).toBe(1);
-    expect(stats.settingsApplied).toBeGreaterThanOrEqual(1);
-
-    const db = await openDb();
-    const t = db.transaction(['conversations', 'messages', 'sync_mappings', 'github_cleanup_outbox'], 'readonly');
-    const convs = await reqToPromise<any[]>(t.objectStore('conversations').getAll() as any);
-    const msgs = await reqToPromise<any[]>(t.objectStore('messages').getAll() as any);
-    const maps = await reqToPromise<any[]>(t.objectStore('sync_mappings').getAll() as any);
-    const cleanupRows = await reqToPromise<any[]>(t.objectStore('github_cleanup_outbox').getAll() as any);
-    await new Promise<void>((resolve, reject) => {
-      t.oncomplete = () => resolve();
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error);
-    });
-
-    expect(convs.length).toBe(1);
-    expect(convs[0]).toMatchObject({
-      listSourceKey: 'chatgpt',
-      listSiteKey: 'domain:x',
-    });
-    expect(msgs.length).toBe(1);
-    expect(maps.length).toBe(1);
-    expect(cleanupRows).toEqual([]);
-    expect(maps[0]).toMatchObject({
-      source: 'chatgpt',
-      conversationKey: 'c1',
-      notionPageId: 'np1',
-      notionPageUrl: 'https://www.notion.so/ws/np1',
-      notionWorkspaceSlug: 'ws',
-      notionSections: { conversations: { headingBlockId: 'h1' } },
-      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 } },
-      notionSectionDigests: { article: { digest: 'digest-1' } },
-      feishuDocId: 'doc1',
-      feishuLastContentHash: 'hash1',
-      futureProviderMetadata: { version: 1 },
-    });
-    expect(maps[0].id).not.toBe(200);
-    expect(convs[0]).toMatchObject({
-      notionPageId: 'np1',
-      notionPageUrl: 'https://www.notion.so/ws/np1',
-      notionWorkspaceSlug: 'ws',
-      feishuDocId: 'doc1',
-    });
-
-    // Ensure secrets are not stored via settings merge.
-    expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_token_v1'))).toBe(
-      false,
-    );
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_client_id')),
-    ).toBe(false);
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_pending_state')),
-    ).toBe(false);
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_last_error')),
-    ).toBe(false);
-    expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_token_v1'))).toBe(
-      false,
-    );
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_client_secret')),
-    ).toBe(false);
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_pending_state')),
-    ).toBe(false);
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_last_error')),
-    ).toBe(false);
-    expect(chromeMock.__store).toMatchObject({
-      notion_parent_page_id: 'pid',
-      feishu_oauth_client_id: 'legacy-feishu-app-id',
-      feishu_oauth_token_exchange_proxy_url: 'https://legacy-worker.example.com/exchange',
-      feishu_chat_folder: 'LegacyChats',
-    });
-    expect(chromeMock.__runtimeMessages).toContainEqual({
-      type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
-      clientId: 'legacy-feishu-app-id',
-      tokenExchangeProxyUrl: 'https://legacy-worker.example.com/exchange',
-    });
-    expect(
-      chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_client_id')),
-    ).toBe(false);
-    expect(
-      chromeMock.__setPayloads.some((p) =>
-        Object.prototype.hasOwnProperty.call(p, 'feishu_oauth_token_exchange_proxy_url'),
-      ),
-    ).toBe(false);
-  });
-
-  it('keeps Legacy conversation remap on a no-op so later message rows target the existing local id', async () => {
-    const chromeMock = mockChromeStorage();
-    // @ts-expect-error test global
-    globalThis.chrome = chromeMock;
-    // @ts-expect-error test global
-    globalThis.browser = undefined;
-
-    const conversation = {
-      id: 99,
-      sourceType: 'chat',
-      source: 'chatgpt',
-      conversationKey: 'legacy-remap-noop',
-      title: 'Stable',
-      url: 'https://chatgpt.com/c/legacy-remap-noop',
-      warningFlags: [],
-      lastCapturedAt: 10,
-    };
-    const baseDoc = {
-      schemaVersion: 1,
-      stores: { conversations: [conversation], messages: [], sync_mappings: [] },
-      storageLocal: {},
-    };
-
-    const first = await importBackupLegacyJsonMerge(baseDoc);
-    expect(first.conversationsAdded).toBe(1);
-    const db = await openDb();
-    const firstTx = db.transaction(['conversations'], 'readonly');
-    const persisted = await reqToPromise<any>(
-      firstTx
-        .objectStore('conversations')
-        .index('by_source_conversationKey')
-        .get(['chatgpt', 'legacy-remap-noop']) as any,
-    );
-    await new Promise<void>((resolve, reject) => {
-      firstTx.oncomplete = () => resolve();
-      firstTx.onerror = () => reject(firstTx.error);
-      firstTx.onabort = () => reject(firstTx.error);
-    });
-    const localConversationId = Number(persisted.id);
-
-    const repeated = await importBackupLegacyJsonMerge({
-      ...baseDoc,
-      stores: {
-        ...baseDoc.stores,
-        messages: [
-          {
-            id: 500,
-            conversationId: 99,
-            messageKey: 'm-remap',
-            role: 'user',
-            contentText: 'mapped',
-            contentMarkdown: '',
-            sequence: 1,
-            updatedAt: 1,
-          },
-        ],
-      },
-    });
-
-    expect(repeated.conversationsAdded).toBe(0);
-    expect(repeated.conversationsUpdated).toBe(0);
-    expect(repeated.messagesAdded).toBe(1);
-    const verifyTx = db.transaction(['messages'], 'readonly');
-    const message = await reqToPromise<any>(
-      verifyTx
-        .objectStore('messages')
-        .index('by_conversationId_messageKey')
-        .get([localConversationId, 'm-remap']) as any,
-    );
-    await new Promise<void>((resolve, reject) => {
-      verifyTx.oncomplete = () => resolve();
-      verifyTx.onerror = () => reject(verifyTx.error);
-      verifyTx.onabort = () => reject(verifyTx.error);
-    });
-    expect(message).toMatchObject({
-      conversationId: localConversationId,
-      messageKey: 'm-remap',
-      contentMarkdown: 'mapped',
-    });
-    expect(message).not.toHaveProperty('contentText');
-  });
-
-  it('keeps Legacy message imports idempotent after remapping local identities', async () => {
-    const doc = {
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          {
-            id: 99,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            conversationKey: 'legacy-message-noop',
-            title: 'Stable',
-            url: 'https://chatgpt.com/c/legacy-message-noop',
-            warningFlags: [],
-            lastCapturedAt: 10,
-          },
-        ],
-        messages: [
-          {
-            id: 500,
-            conversationId: 99,
-            messageKey: 'm-stable',
-            role: 'user',
-            contentText: 'stable',
-            contentMarkdown: '',
-            sequence: 1,
-          },
-        ],
-        sync_mappings: [],
-      },
-      storageLocal: {},
-    };
-
-    const first = await importBackupLegacyJsonMerge(doc);
-    expect(first.messagesAdded).toBe(1);
-    const db = await openDb();
-    const firstTx = db.transaction(['messages'], 'readonly');
-    const persisted = await reqToPromise<any>(firstTx.objectStore('messages').getAll() as any);
-    await new Promise<void>((resolve, reject) => {
-      firstTx.oncomplete = () => resolve();
-      firstTx.onerror = () => reject(firstTx.error);
-      firstTx.onabort = () => reject(firstTx.error);
-    });
-    expect(persisted).toHaveLength(1);
-    expect(persisted[0]).toMatchObject({ conversationId: 1, messageKey: 'm-stable', contentMarkdown: 'stable' });
-    expect(persisted[0]).not.toHaveProperty('contentText');
-    expect(persisted[0].id).not.toBe(500);
-    expect(persisted[0].updatedAt).toBeGreaterThan(0);
-
-    const repeated = await importBackupLegacyJsonMerge(doc);
-    expect(repeated.messagesAdded).toBe(0);
-    expect(repeated.messagesUpdated).toBe(0);
-
-    const changed = await importBackupLegacyJsonMerge({
-      ...doc,
-      stores: {
-        ...doc.stores,
-        messages: [
-          {
-            ...doc.stores.messages[0],
-            contentText: 'changed',
-            updatedAt: Number(persisted[0].updatedAt) + 1,
-          },
-        ],
-      },
-    });
-    expect(changed.messagesAdded).toBe(0);
-    expect(changed.messagesUpdated).toBe(1);
-
-    const changedTx = db.transaction(['messages'], 'readonly');
-    const changedPersisted = await reqToPromise<any>(changedTx.objectStore('messages').getAll() as any);
-    await new Promise<void>((resolve, reject) => {
-      changedTx.oncomplete = () => resolve();
-      changedTx.onerror = () => reject(changedTx.error);
-      changedTx.onabort = () => reject(changedTx.error);
-    });
-    expect(changedPersisted).toHaveLength(1);
-    expect(changedPersisted[0]).toMatchObject({ contentMarkdown: 'changed' });
-    expect(changedPersisted[0]).not.toHaveProperty('contentText');
-  });
-
-  it('skips equivalent Legacy mappings without losing conversation mirrors', async () => {
-    const doc = {
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          {
-            id: 99,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            conversationKey: 'legacy-mapping-noop',
-            title: 'Stable',
-            url: 'https://chatgpt.com/c/legacy-mapping-noop',
-            warningFlags: [],
-            lastCapturedAt: 10,
-          },
-        ],
-        messages: [],
-        sync_mappings: [
-          {
-            id: 500,
-            source: 'chatgpt',
-            conversationKey: 'legacy-mapping-noop',
-            notionPageId: 'page-stable',
-            notionPageUrl: 'https://notion.so/page-stable',
-            notionWorkspaceSlug: 'workspace',
-            lastSyncedAt: 10,
-          },
-        ],
-      },
-      storageLocal: {},
-    };
-
-    const first = await importBackupLegacyJsonMerge(doc);
-    expect(first.mappingsAdded).toBe(1);
-
-    const repeated = await importBackupLegacyJsonMerge(doc);
-    expect(repeated.mappingsAdded).toBe(0);
-    expect(repeated.mappingsUpdated).toBe(0);
-
-    const db = await openDb();
-    const verifyTx = db.transaction(['conversations'], 'readonly');
-    const conversation = await reqToPromise<any>(verifyTx.objectStore('conversations').getAll() as any);
-    await new Promise<void>((resolve, reject) => {
-      verifyTx.oncomplete = () => resolve();
-      verifyTx.onerror = () => reject(verifyTx.error);
-      verifyTx.onabort = () => reject(verifyTx.error);
-    });
-    expect(conversation).toHaveLength(1);
-    expect(conversation[0]).toMatchObject({
-      notionPageId: 'page-stable',
-      notionPageUrl: 'https://notion.so/page-stable',
-      notionWorkspaceSlug: 'workspace',
-    });
   });
 
   it('keeps committed ZIP conversations when progress listeners fail', async () => {
@@ -1862,7 +1453,7 @@ describe('backup service', () => {
               conversationKey: 'zip-progress',
               title: 'Progress',
               url: 'https://chatgpt.com/c/zip-progress',
-              lastCapturedAt: 10,
+              lastActivityAt: 10,
             },
             messages: [],
             syncMapping: null,
@@ -1872,12 +1463,12 @@ describe('backup service', () => {
     ]);
 
     await expect(
-      importBackupZipV2Merge(entries, () => {
+      importBackupZipMerge(entries, () => {
         throw new Error('sync listener failure');
       }),
     ).resolves.toMatchObject({ conversationsAdded: 1 });
     await expect(
-      importBackupZipV2Merge(entries, (() => Promise.reject(new Error('async listener failure'))) as any),
+      importBackupZipMerge(entries, (() => Promise.reject(new Error('async listener failure'))) as any),
     ).resolves.toMatchObject({
       conversationsAdded: 0,
       conversationsUpdated: 0,
@@ -1916,7 +1507,7 @@ describe('backup service', () => {
                 conversationKey: 'zip-legacy-text-only',
                 title: 'Legacy text-only ZIP',
                 url: 'https://chatgpt.com/c/zip-legacy-text-only',
-                lastCapturedAt: 10,
+                lastActivityAt: 10,
               },
               messages: [
                 {
@@ -1934,10 +1525,10 @@ describe('backup service', () => {
         ],
       ]);
 
-    const first = await importBackupZipV2Merge(buildEntries('stable', 10));
+    const first = await importBackupZipMerge(buildEntries('stable', 10));
     expect(first).toMatchObject({ messagesAdded: 1, messagesUpdated: 0 });
 
-    const changed = await importBackupZipV2Merge(buildEntries('changed', 11));
+    const changed = await importBackupZipMerge(buildEntries('changed', 11));
     expect(changed).toMatchObject({ messagesAdded: 0, messagesUpdated: 1 });
 
     const db = await openDb();
@@ -1953,44 +1544,7 @@ describe('backup service', () => {
     expect(messages[0]).not.toHaveProperty('contentText');
   });
 
-  it('keeps committed Legacy conversations when progress listeners fail', async () => {
-    const doc = {
-      schemaVersion: 1,
-      stores: {
-        conversations: [
-          {
-            id: 99,
-            sourceType: 'chat',
-            source: 'chatgpt',
-            conversationKey: 'legacy-progress',
-            title: 'Legacy progress',
-            url: 'https://chatgpt.com/c/legacy-progress',
-            lastCapturedAt: 10,
-          },
-        ],
-        messages: [],
-        sync_mappings: [],
-      },
-      storageLocal: {},
-    };
-    const failAfterConversationCommit = (progress: { done: number; stage: string }) => {
-      if (progress.stage === 'conversations' && progress.done > 0) throw new Error('sync listener failure');
-    };
-    const rejectAfterConversationCommit = (progress: { done: number; stage: string }) => {
-      if (progress.stage === 'conversations' && progress.done > 0)
-        return Promise.reject(new Error('async listener failure'));
-    };
-
-    await expect(importBackupLegacyJsonMerge(doc, failAfterConversationCommit)).resolves.toMatchObject({
-      conversationsAdded: 1,
-    });
-    await expect(importBackupLegacyJsonMerge(doc, rejectAfterConversationCommit)).resolves.toMatchObject({
-      conversationsAdded: 0,
-      conversationsUpdated: 0,
-    });
-  });
-
-  it('importBackupZipV2Merge keeps provider states atomic and mirrors the final targets', async () => {
+  it('importBackupZipMerge keeps provider states atomic and mirrors the final targets', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -2011,7 +1565,7 @@ describe('backup service', () => {
           notionPageUrl: key === 'same' ? 'https://notion.so/old-same' : 'https://notion.so/page-local',
           notionWorkspaceSlug: 'local-ws',
           feishuDocId: key === 'same' ? 'doc-same' : 'doc-local',
-          lastCapturedAt: 1,
+          lastActivityAt: 1,
         }) as any,
       );
     }
@@ -2122,7 +1676,7 @@ describe('backup service', () => {
               conversationKey: item.key,
               title: item.key,
               url: `https://example.com/${item.key}`,
-              lastCapturedAt: 2,
+              lastActivityAt: 2,
             },
             messages: [],
             syncMapping: item.mapping,
@@ -2131,7 +1685,7 @@ describe('backup service', () => {
       );
     });
 
-    await importBackupZipV2Merge(entries);
+    await importBackupZipMerge(entries);
 
     const verifyDb = await openDb();
     const verifyTx = verifyDb.transaction(['conversations', 'sync_mappings'], 'readonly');

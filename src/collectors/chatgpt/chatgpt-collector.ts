@@ -933,7 +933,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         title: findTitle(messages),
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now(),
       },
       messages,
       captureMeta: {

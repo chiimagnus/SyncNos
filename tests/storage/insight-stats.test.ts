@@ -12,6 +12,7 @@ import { addArticleComment } from '@services/comments/data/storage-idb';
 import { getInsightStatsSourceData } from '@services/insight/insight-stats-source';
 import {
   buildInsightStats,
+  getInsightTimeRangeWindow,
   INSIGHT_ARTICLE_DOMAIN_LIMIT,
   INSIGHT_CHAT_SOURCE_LIMIT,
   INSIGHT_OTHER_LABEL,
@@ -39,7 +40,7 @@ async function seedConversation(input: {
   conversationKey: string;
   title?: string;
   url?: string;
-  lastCapturedAt?: number;
+  lastActivityAt?: number;
   messageCount?: number;
 }) {
   const conversation = await upsertConversation({
@@ -48,7 +49,7 @@ async function seedConversation(input: {
     conversationKey: input.conversationKey,
     title: input.title,
     url: input.url,
-    lastCapturedAt: input.lastCapturedAt || 0,
+    lastActivityAt: input.lastActivityAt || 0,
   });
   const conversationId = Number(conversation.id);
 
@@ -118,7 +119,7 @@ describe('insight stats', () => {
       conversationKey: 'article:borrowed-connection',
       title: 'Borrowed connection',
       url: 'https://example.com/borrowed-connection',
-      lastCapturedAt: 10,
+      lastActivityAt: 10,
     });
     await addArticleComment({
       conversationId: conversation.id,
@@ -138,7 +139,7 @@ describe('insight stats', () => {
       source: 'ChatGPT',
       conversationKey: 'chat-key-only',
       title: 'Key only chat',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const articleId = await seedConversation({
       sourceType: 'article',
@@ -146,7 +147,7 @@ describe('insight stats', () => {
       conversationKey: 'article-key-only',
       title: 'Key only article',
       url: 'https://example.com/key-only',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
     const videoId = await seedConversation({
       sourceType: 'video',
@@ -154,7 +155,7 @@ describe('insight stats', () => {
       conversationKey: 'video-key-only',
       title: 'Key only video',
       url: 'https://youtube.com/watch?v=key-only',
-      lastCapturedAt: 3,
+      lastActivityAt: 3,
     });
 
     const largeMarkdown = `# payload\n\n${'markdown '.repeat(20_000)}`;
@@ -256,7 +257,7 @@ describe('insight stats', () => {
       source: 'ChatGPT',
       conversationKey: 'chat-abort',
       title: 'Abort chat',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
       messageCount: 2,
     });
 
@@ -286,7 +287,7 @@ describe('insight stats', () => {
       source: 'ChatGPT',
       conversationKey: 'chat-1',
       title: 'Architecture',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
       messageCount: 6,
     });
     await seedConversation({
@@ -294,7 +295,7 @@ describe('insight stats', () => {
       source: 'Gemini',
       conversationKey: 'chat-2',
       title: '',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
       messageCount: 9,
     });
     await seedConversation({
@@ -303,7 +304,7 @@ describe('insight stats', () => {
       conversationKey: 'article-1',
       title: 'Medium article',
       url: 'https://medium.com/p/123?ref=home',
-      lastCapturedAt: 3,
+      lastActivityAt: 3,
     });
     await seedConversation({
       sourceType: 'article',
@@ -311,7 +312,7 @@ describe('insight stats', () => {
       conversationKey: 'article-2',
       title: 'SSPai article',
       url: 'https://sspai.com/post/100',
-      lastCapturedAt: 4,
+      lastActivityAt: 4,
     });
 
     const stats = await readInsightStats();
@@ -357,7 +358,7 @@ describe('insight stats', () => {
       conversationKey: 'article-invalid',
       title: 'Broken',
       url: 'notaurl',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
 
     const stats = await readInsightStats();
@@ -373,7 +374,7 @@ describe('insight stats', () => {
       conversationKey: 'article-sspai-www',
       title: 'SSPai www',
       url: 'https://www.sspai.com/post/1',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     await seedConversation({
       sourceType: 'article',
@@ -381,7 +382,7 @@ describe('insight stats', () => {
       conversationKey: 'article-sspai-root',
       title: 'SSPai root',
       url: 'https://sspai.com/post/2',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
     await seedConversation({
       sourceType: 'article',
@@ -389,7 +390,7 @@ describe('insight stats', () => {
       conversationKey: 'article-dedao-m',
       title: 'Dedao mobile',
       url: 'https://m.dedao.cn/xxx',
-      lastCapturedAt: 3,
+      lastActivityAt: 3,
     });
     await seedConversation({
       sourceType: 'article',
@@ -397,7 +398,7 @@ describe('insight stats', () => {
       conversationKey: 'article-github-io',
       title: 'GitHub Pages',
       url: 'https://foo.github.io/bar',
-      lastCapturedAt: 4,
+      lastActivityAt: 4,
     });
 
     const stats = await readInsightStats();
@@ -417,7 +418,7 @@ describe('insight stats', () => {
       source: 'ChatGPT',
       conversationKey: 'chat-known',
       title: 'Known chat',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
       messageCount: 2,
     });
     await seedConversation({
@@ -426,7 +427,7 @@ describe('insight stats', () => {
       conversationKey: 'article-known',
       title: 'Known article',
       url: 'https://example.com/post',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
     await seedConversation({
       sourceType: 'video',
@@ -434,7 +435,7 @@ describe('insight stats', () => {
       conversationKey: 'video-known',
       title: 'Saved transcript',
       url: 'https://www.youtube.com/watch?v=abc',
-      lastCapturedAt: 3,
+      lastActivityAt: 3,
     });
     await seedConversation({
       sourceType: 'video',
@@ -442,7 +443,7 @@ describe('insight stats', () => {
       conversationKey: 'video-bilibili',
       title: 'Bilibili transcript',
       url: 'https://www.bilibili.com/video/BV1xx411c7mD/',
-      lastCapturedAt: 4,
+      lastActivityAt: 4,
     });
     await seedConversation({
       sourceType: 'video',
@@ -450,14 +451,14 @@ describe('insight stats', () => {
       conversationKey: 'video-unknown-platform',
       title: 'Unknown platform transcript',
       url: 'https://example.com/watch?v=abc',
-      lastCapturedAt: 5,
+      lastActivityAt: 5,
     });
     await seedConversation({
       sourceType: 'unknown',
       source: 'Unknown',
       conversationKey: 'unknown-ignored',
       title: 'Ignored type',
-      lastCapturedAt: 4,
+      lastActivityAt: 4,
     });
 
     const stats = await readInsightStats();
@@ -474,6 +475,41 @@ describe('insight stats', () => {
     ]);
   });
 
+  it('keeps 7d windows and daily trend points aligned to local midnights across DST', () => {
+    const previousTimeZone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const now = new Date(2026, 2, 10, 12, 0, 0, 0).getTime();
+      const range = getInsightTimeRangeWindow('7d', now);
+      const conversations = Array.from({ length: 7 }, (_, index) => ({
+        id: index + 1,
+        sourceType: 'chat',
+        source: 'ChatGPT',
+        conversationKey: `dst-${index + 1}`,
+        lastActivityAt: new Date(2026, 2, 4 + index, 12, 0, 0, 0).getTime(),
+      }));
+
+      expect(new Date(range.since).getDate()).toBe(4);
+      expect(new Date(range.since).getHours()).toBe(0);
+
+      const stats = buildInsightStats(
+        {
+          conversations: conversations as any,
+          messageCounts: new Map(),
+          commentCounts: new Map(),
+        },
+        range,
+      );
+      expect(stats.chatCount).toBe(7);
+      expect(stats.chatDailyTrend).toHaveLength(7);
+      expect(stats.chatDailyTrend.map((point) => new Date(point.dayStart).getDate())).toEqual([4, 5, 6, 7, 8, 9, 10]);
+      expect(stats.chatDailyTrend.every((point) => new Date(point.dayStart).getHours() === 0)).toBe(true);
+    } finally {
+      if (previousTimeZone == null) delete process.env.TZ;
+      else process.env.TZ = previousTimeZone;
+    }
+  });
+
   it('filters video trends and platforms by the selected range', async () => {
     const dayMs = 24 * 60 * 60 * 1000;
     await seedConversation({
@@ -482,7 +518,7 @@ describe('insight stats', () => {
       conversationKey: 'video-before-range',
       title: 'Earlier transcript',
       url: 'https://www.youtube.com/watch?v=abc',
-      lastCapturedAt: dayMs,
+      lastActivityAt: dayMs,
     });
     await seedConversation({
       sourceType: 'video',
@@ -490,7 +526,7 @@ describe('insight stats', () => {
       conversationKey: 'video-in-range',
       title: 'Current transcript',
       url: 'https://www.bilibili.com/video/BV1xx411c7mD/',
-      lastCapturedAt: dayMs * 2,
+      lastActivityAt: dayMs * 2,
     });
 
     const stats = await readInsightStats({ since: dayMs * 2, until: dayMs * 2 + 1 });
@@ -507,7 +543,7 @@ describe('insight stats', () => {
       conversationKey: 'article-most-comments',
       title: 'Most commented article',
       url: 'https://example.com/most',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
     const articleSecond = await seedConversation({
       sourceType: 'article',
@@ -515,7 +551,7 @@ describe('insight stats', () => {
       conversationKey: 'article-second-comments',
       title: 'Second commented article',
       url: 'https://example.com/second',
-      lastCapturedAt: 2,
+      lastActivityAt: 2,
     });
     const videoMost = await seedConversation({
       sourceType: 'video',
@@ -523,7 +559,7 @@ describe('insight stats', () => {
       conversationKey: 'video-most-comments',
       title: 'Most commented video',
       url: 'https://youtube.com/watch?v=most',
-      lastCapturedAt: 3,
+      lastActivityAt: 3,
     });
     const videoSecond = await seedConversation({
       sourceType: 'video',
@@ -531,7 +567,7 @@ describe('insight stats', () => {
       conversationKey: 'video-second-comments',
       title: 'Second commented video',
       url: 'https://bilibili.com/video/BV1xx411c7mD',
-      lastCapturedAt: 4,
+      lastActivityAt: 4,
     });
 
     for (const [conversationId, canonicalUrl, count] of [
@@ -568,7 +604,7 @@ describe('insight stats', () => {
         source: `Source-${index}`,
         conversationKey: `chat-tail-${index}`,
         title: `Chat ${index}`,
-        lastCapturedAt: index,
+        lastActivityAt: index,
         messageCount: index + 1,
       });
     }
@@ -580,7 +616,7 @@ describe('insight stats', () => {
         conversationKey: `article-tail-${index}`,
         title: `Article ${index}`,
         url: `https://domain-${index}.example-${index}.com/post`,
-        lastCapturedAt: index,
+        lastActivityAt: index,
       });
     }
 

@@ -647,7 +647,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         title: extractConversationTitle(),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
-        lastCapturedAt: Date.now(),
       },
       messages,
       captureMeta,

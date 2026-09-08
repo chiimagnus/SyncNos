@@ -3,6 +3,7 @@ import type { Conversation } from '@services/conversations/domain/models';
 import type { InsightStatsSourceData } from '@services/insight/insight-stats-source';
 import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 import { encodeConversationLoc } from '@services/shared/conversation-loc';
+import { shiftLocalCalendarDays, startOfLocalCalendarDay } from '@services/shared/local-calendar-day';
 
 export type InsightTimeRange = 'all' | 'today' | '7d' | '30d';
 
@@ -49,8 +50,8 @@ export type InsightStats = {
 
 export const INSIGHT_CHAT_SOURCE_LIMIT = 4;
 export const INSIGHT_ARTICLE_DOMAIN_LIMIT = 8;
-export const INSIGHT_VIDEO_PLATFORM_LIMIT = 3;
-export const INSIGHT_TOP_CONVERSATION_LIMIT = 3;
+const INSIGHT_VIDEO_PLATFORM_LIMIT = 3;
+const INSIGHT_TOP_CONVERSATION_LIMIT = 3;
 export const INSIGHT_OTHER_LABEL = t('insightOtherLabel');
 export const INSIGHT_UNKNOWN_DOMAIN_LABEL = t('insightUnknownLabel');
 export const INSIGHT_UNKNOWN_SOURCE_LABEL = t('insightUnknownLabel');
@@ -108,14 +109,6 @@ function parseVideoPlatform(url: unknown, source: unknown): string {
   return INSIGHT_UNKNOWN_SOURCE_LABEL;
 }
 
-function getStartOfLocalDay(ts: number): number {
-  if (!Number.isFinite(ts) || ts <= 0) return Number.NaN;
-  const date = new Date(ts);
-  if (!Number.isFinite(date.getTime())) return Number.NaN;
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
-
 function buildDailyTrend(options: {
   counts: Map<number, number>;
   unknownCount: number;
@@ -125,18 +118,17 @@ function buildDailyTrend(options: {
   const since = Number(options.since);
   const until = Number(options.until);
   const hasRange = Number.isFinite(since) && Number.isFinite(until) && since > 0 && until > 0 && until >= since;
-  const dayMs = 24 * 60 * 60 * 1000;
   const out: InsightDailyTrendPoint[] = [];
 
   const unknownCount = Math.max(0, Math.floor(options.unknownCount || 0));
   const counts = options.counts;
 
   if (hasRange) {
-    const start = getStartOfLocalDay(since);
-    const end = getStartOfLocalDay(until);
+    const start = startOfLocalCalendarDay(since);
+    const end = startOfLocalCalendarDay(until);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return out;
 
-    for (let cursor = start; cursor <= end; cursor += dayMs) {
+    for (let cursor = start; cursor <= end; cursor = shiftLocalCalendarDays(cursor, 1)) {
       out.push({ dayStart: cursor, count: counts.get(cursor) || 0 });
     }
     return out;
@@ -154,14 +146,14 @@ function buildDailyTrend(options: {
   const maxDay = keys[keys.length - 1];
   if (unknownCount > 0) out.push({ dayStart: -1, count: unknownCount });
 
-  for (let cursor = minDay; cursor <= maxDay; cursor += dayMs) {
+  for (let cursor = minDay; cursor <= maxDay; cursor = shiftLocalCalendarDays(cursor, 1)) {
     out.push({ dayStart: cursor, count: counts.get(cursor) || 0 });
   }
 
   return out;
 }
 
-export function createEmptyInsightStats(): InsightStats {
+function createEmptyInsightStats(): InsightStats {
   return {
     totalClips: 0,
     chatCount: 0,
@@ -213,14 +205,11 @@ function createInsightTopClip(
 export function getInsightTimeRangeWindow(range: InsightTimeRange, now = Date.now()): { since: number; until: number } {
   if (range === 'all') return { since: 0, until: 0 };
   const until = Number.isFinite(now) ? now : Date.now();
-  const start = new Date(until);
-  start.setHours(0, 0, 0, 0);
-  const startOfToday = start.getTime();
-  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfToday = startOfLocalCalendarDay(until);
 
   if (range === 'today') return { since: startOfToday, until };
-  if (range === '7d') return { since: startOfToday - dayMs * 6, until };
-  return { since: startOfToday - dayMs * 29, until };
+  if (range === '7d') return { since: shiftLocalCalendarDays(startOfToday, -6), until };
+  return { since: shiftLocalCalendarDays(startOfToday, -29), until };
 }
 
 export function buildInsightStats(
@@ -246,12 +235,12 @@ export function buildInsightStats(
   let videoUnknownDateCount = 0;
 
   for (const conversation of data.conversations) {
-    if (hasRange && !isWithinRange(conversation.lastCapturedAt, since, until)) {
+    if (hasRange && !isWithinRange(conversation.lastActivityAt, since, until)) {
       continue;
     }
 
     const sourceType = normalizeSourceType(conversation.sourceType);
-    const dayStart = getStartOfLocalDay(Number(conversation.lastCapturedAt) || 0);
+    const dayStart = startOfLocalCalendarDay(Number(conversation.lastActivityAt) || 0);
 
     if (sourceType === 'chat') {
       stats.chatCount += 1;

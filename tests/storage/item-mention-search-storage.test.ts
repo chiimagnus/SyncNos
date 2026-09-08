@@ -55,7 +55,7 @@ describe('item mention candidate pool storage', () => {
       conversationKey: 'm-a',
       title: 'No keyword here',
       url: 'https://chatgpt.com/c/a',
-      lastCapturedAt: ts,
+      lastActivityAt: ts,
     });
     const b = await upsertConversation({
       sourceType: 'article',
@@ -63,7 +63,7 @@ describe('item mention candidate pool storage', () => {
       conversationKey: 'm-b',
       title: 'OpenAI article',
       url: 'https://openai.com/blog',
-      lastCapturedAt: ts - 1,
+      lastActivityAt: ts - 1,
     });
 
     const res = await readConversationMentionCandidatePool({ maxScan: 1000, maxDurationMs: 10_000 });
@@ -94,7 +94,7 @@ describe('item mention candidate pool storage', () => {
           url: 'https://url-derived.example/path',
           listSourceKey: 'chatgpt',
           listSiteKey: 'domain:persisted-contract.example',
-          lastCapturedAt: 1,
+          lastActivityAt: 1,
         }),
       ),
     );
@@ -121,7 +121,7 @@ describe('item mention candidate pool storage', () => {
           conversationKey: `pool-${index}`,
           title: index === 50 ? 'OpenAI' : `Row ${index}`,
           url: `https://example.com/${index}`,
-          lastCapturedAt: now - index,
+          lastActivityAt: now - index,
         }),
       ),
     );
@@ -139,7 +139,7 @@ describe('item mention candidate pool storage', () => {
       conversationKey: 'recent-only',
       title: 'Recent only',
       url: 'https://chatgpt.com/c/recent-only',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
 
     const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
@@ -159,7 +159,7 @@ describe('item mention candidate pool storage', () => {
       conversationKey: 'snapshot-one',
       title: 'One',
       url: 'https://chatgpt.com/c/one',
-      lastCapturedAt: 1,
+      lastActivityAt: 1,
     });
 
     const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
@@ -181,7 +181,7 @@ describe('item mention candidate pool storage', () => {
         conversationKey: `guard-${index}`,
         title: `Guard ${index}`,
         url: `https://example.com/${index}`,
-        lastCapturedAt: now - index,
+        lastActivityAt: now - index,
       });
     }
 

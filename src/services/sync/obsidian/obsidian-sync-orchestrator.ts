@@ -186,7 +186,7 @@ async function decideSyncModeForConversation({
   forceFull?: boolean;
   onConversationLoaded?: (conversation: any) => void | Promise<void>;
 }) {
-  const convo = await defaultBackgroundStorage.getConversationById(conversationId);
+  let convo = await defaultBackgroundStorage.getConversationById(conversationId);
   if (convo && onConversationLoaded) await onConversationLoaded(convo);
   if (!convo) {
     return {
@@ -224,7 +224,15 @@ async function decideSyncModeForConversation({
   if (isArticle) {
     const canonicalUrl = safeString(convo?.url);
     if (canonicalUrl) {
-      await defaultBackgroundStorage.attachOrphanArticleCommentsToConversation(canonicalUrl, conversationId);
+      const attached = await defaultBackgroundStorage.attachOrphanArticleCommentsToConversation(
+        canonicalUrl,
+        conversationId,
+      );
+      if (Number(attached?.updated) > 0) {
+        const refreshed = await defaultBackgroundStorage.getConversationById(conversationId);
+        if (!refreshed) throw new Error('conversation not found after comment attach');
+        convo = refreshed;
+      }
     }
     articleComments = parseArticleCommentDtos(
       await defaultBackgroundStorage.getArticleCommentsByConversationId(conversationId),

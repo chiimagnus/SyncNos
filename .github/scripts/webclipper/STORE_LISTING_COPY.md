@@ -1,8 +1,8 @@
 # SyncNos Store Listing Copy
 
-This file is the canonical source for browser-store marketing copy. Keep feature claims aligned with `README.md` and `README.zh-CN.md`; avoid hard-coded platform counts that can drift.
+This file is the canonical source for browser-store marketing copy. Store publishing workflows do not upload this text automatically; release maintainers copy it into the store listings. Update it when user-visible source/output capabilities or privacy claims change, and keep those claims aligned with `README.md` and `README.zh-CN.md`. Avoid hard-coded platform counts that can drift.
 
-The localized manifest short descriptions live in `public/_locales/*/messages.json` and must stay within the Safari 112-character limit.
+Localized manifest short descriptions are a separate source in `public/_locales/*/messages.json`; repository checks enforce the Safari 112-character limit.
 
 ## English
 

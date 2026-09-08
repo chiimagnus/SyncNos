@@ -10,7 +10,6 @@ import {
   mergeConversationRecord,
   mergeMessageRecord,
   uniqueConversationKey,
-  validateBackupDocument,
   validateBackupManifest,
   validateConversationBundle,
   validateStorageLocalDocument,
@@ -269,187 +268,20 @@ async function applyImportedSyncMappings(input: {
   return { processed, syncMappingsChanged, conversationRowsChanged };
 }
 
-export async function importBackupLegacyJsonMerge(
-  doc: unknown,
-  onProgress?: (p: ImportProgress) => void,
-): Promise<ImportStats> {
-  const validation = validateBackupDocument(doc);
-  if (!validation.ok) throw new Error(validation.error || 'Invalid backup file.');
-
-  const d: any = doc;
-  const stores = d.stores || {};
-  const backupConversations = Array.isArray(stores.conversations) ? stores.conversations : [];
-  const backupMessages = Array.isArray(stores.messages) ? stores.messages : [];
-  const backupMappings = Array.isArray(stores.sync_mappings) ? stores.sync_mappings : [];
-
-  const filteredSettings = filterStorageForBackup(d.storageLocal || {});
-  const settingsKeys = Object.keys(filteredSettings);
-
-  const stats = makeStats();
-
-  const totalWork = backupConversations.length + backupMessages.length + backupMappings.length + settingsKeys.length;
-  const progress: ImportProgress = { done: 0, total: totalWork, stage: '' };
-  const report = () => reportImportProgressBestEffort(onProgress, progress);
-  const bump = (n: number, stage: string) => {
-    progress.done += Number(n) || 0;
-    if (stage) progress.stage = stage;
-    report();
-  };
-  report();
-
-  const backupConvoIdToUnique = new Map<number, string>();
-  for (const c of backupConversations) {
-    if (!c) continue;
-    const uk = uniqueConversationKey(c);
-    if (!uk) continue;
-    const id = Number((c as any).id);
-    if (Number.isFinite(id) && id > 0) backupConvoIdToUnique.set(id, uk);
-  }
-
-  const db = await openDb();
-  const uniqueToLocalId = new Map<string, number>();
-
-  // 1) Upsert conversations by (source, conversationKey).
-  {
-    progress.stage = 'conversations';
-    report();
-    await runTrackedTransaction(
-      { db, stores: ['conversations'], revisionScopes: ['conversations'] },
-      async ({ stores: s, markChanged }) => {
-        const idx = s.conversations.index('by_source_conversationKey');
-        let stageChanged = false;
-
-        for (const incoming of backupConversations) {
-          if (!incoming) continue;
-          const source = incoming.source ? String(incoming.source) : '';
-          const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
-          if (!source || !conversationKey) continue;
-
-          const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-          const merged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
-          merged.source = source;
-          merged.conversationKey = conversationKey;
-          const uk = uniqueConversationKey(merged);
-
-          if (existing?.id) {
-            const localId = Number(existing.id);
-            merged.id = localId;
-            uniqueToLocalId.set(uk, localId);
-            if (areBackupValuesEqual(merged, existing)) continue;
-
-            await reqToPromise(s.conversations.put(merged as any));
-            stats.conversationsUpdated += 1;
-            stageChanged = true;
-            continue;
-          }
-
-          const id = Number(await reqToPromise(s.conversations.add(merged as any) as any));
-          uniqueToLocalId.set(uk, id);
-          stats.conversationsAdded += 1;
-          stageChanged = true;
-        }
-
-        if (stageChanged) markChanged('conversations');
-      },
-    );
-    bump(backupConversations.length, 'conversations');
-  }
-
-  // 2) Upsert messages by (localConversationId, messageKey).
-  {
-    progress.stage = 'messages';
-    report();
-    const stageNow = Date.now();
-    await runTrackedTransaction(
-      { db, stores: ['messages'], revisionScopes: ['messages'] },
-      async ({ stores: s, markChanged }) => {
-        const idx = s.messages.index('by_conversationId_messageKey');
-
-        for (const incoming of backupMessages) {
-          if (!incoming) continue;
-          const backupConversationId = Number(incoming.conversationId);
-          const messageKey = incoming.messageKey ? String(incoming.messageKey) : '';
-          if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
-            stats.messagesSkipped += 1;
-            continue;
-          }
-          const uk = backupConvoIdToUnique.get(backupConversationId) || '';
-          const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
-          if (!localConversationId) {
-            stats.messagesSkipped += 1;
-            continue;
-          }
-
-          const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
-          const base = {
-            ...(incoming || {}),
-            conversationId: localConversationId,
-            messageKey,
-            ...(existing?.id ? { id: existing.id } : {}),
-          };
-          const merged = mergeMessageRecord(existing, base);
-          merged.conversationId = localConversationId;
-          merged.messageKey = messageKey;
-
-          if (existing?.id) {
-            merged.id = existing.id;
-            if (areBackupValuesEqual(merged, existing)) continue;
-            if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0))
-              merged.updatedAt = stageNow;
-
-            await reqToPromise(s.messages.put(merged as any));
-            stats.messagesUpdated += 1;
-            markChanged('messages');
-            continue;
-          }
-
-          delete merged.id;
-          if (!(Number.isFinite(Number(merged.updatedAt)) && Number(merged.updatedAt) > 0)) merged.updatedAt = stageNow;
-          await reqToPromise(s.messages.add(merged as any));
-          stats.messagesAdded += 1;
-          markChanged('messages');
-        }
-      },
-    );
-    bump(backupMessages.length, 'messages');
-  }
-
-  progress.stage = 'mappings';
-  report();
-  const mappingResult = await runTrackedTransaction(
-    { db, stores: ['sync_mappings', 'conversations'], revisionScopes: ['sync_mappings', 'conversations'] },
-    async ({ stores: s, markChanged }) => {
-      const result = await applyImportedSyncMappings({
-        stores: { sync_mappings: s.sync_mappings, conversations: s.conversations },
-        mappings: backupMappings,
-        stats,
-      });
-      if (result.syncMappingsChanged) markChanged('sync_mappings');
-      if (result.conversationRowsChanged) markChanged('conversations');
-      return result;
-    },
-  );
-  bump(mappingResult.processed, 'mappings');
-
-  // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
-  progress.stage = 'settings';
-  report();
-  if (settingsKeys.length) {
-    await applyImportedStorageSettings(filteredSettings);
-    stats.settingsApplied = settingsKeys.length;
-    bump(settingsKeys.length, 'settings');
-  }
-
-  return stats;
-}
-
-export async function importBackupZipV2Merge(
+export async function importBackupZipMerge(
   entries: Map<string, Uint8Array>,
   onProgress?: (p: ImportProgress) => void,
 ): Promise<ImportStats> {
   const manifest = readJsonEntry(entries, 'manifest.json');
   const manifestValidation = validateBackupManifest(manifest);
   if (!manifestValidation.ok) throw new Error(manifestValidation.error || 'Invalid manifest.json');
+  const backupSchemaVersion = Number((manifest as any).backupSchemaVersion);
+  const isCurrentBackup = backupSchemaVersion === 3;
+  const conversationsCsvPath =
+    manifest && (manifest as any).index ? String((manifest as any).index.conversationsCsvPath || '').trim() : '';
+  if (isCurrentBackup && !entries.has(conversationsCsvPath)) {
+    throw new Error(`Missing entry: ${conversationsCsvPath}`);
+  }
 
   const configPath = manifest && manifest.config ? String(manifest.config.storageLocalPath || '') : '';
   const configDoc = configPath ? readJsonEntry(entries, configPath) : null;
@@ -469,8 +301,10 @@ export async function importBackupZipV2Merge(
 
   const imageCacheIndexPath =
     manifest && (manifest as any).assets ? String((manifest as any).assets.imageCacheIndexPath || '').trim() : '';
-  const imageCacheIndexDoc =
-    imageCacheIndexPath && entries.has(imageCacheIndexPath) ? readJsonEntry(entries, imageCacheIndexPath) : null;
+  if (imageCacheIndexPath && !entries.has(imageCacheIndexPath)) {
+    throw new Error(`Missing entry: ${imageCacheIndexPath}`);
+  }
+  const imageCacheIndexDoc = imageCacheIndexPath ? readJsonEntry(entries, imageCacheIndexPath) : null;
   if (imageCacheIndexDoc) {
     const imageValidation = validateImageCacheIndexDocument(imageCacheIndexDoc);
     if (!imageValidation.ok) throw new Error(imageValidation.error || 'Invalid image cache index');
@@ -480,10 +314,10 @@ export async function importBackupZipV2Merge(
 
   const articleCommentsIndexPath =
     manifest && (manifest as any).assets ? String((manifest as any).assets.articleCommentsIndexPath || '').trim() : '';
-  const articleCommentsIndexDoc =
-    articleCommentsIndexPath && entries.has(articleCommentsIndexPath)
-      ? readJsonEntry(entries, articleCommentsIndexPath)
-      : null;
+  if (articleCommentsIndexPath && !entries.has(articleCommentsIndexPath)) {
+    throw new Error(`Missing entry: ${articleCommentsIndexPath}`);
+  }
+  const articleCommentsIndexDoc = articleCommentsIndexPath ? readJsonEntry(entries, articleCommentsIndexPath) : null;
   const preparedArticleComments = articleCommentsIndexDoc
     ? prepareArticleCommentArchiveImport(articleCommentsIndexDoc)
     : { items: [] as PreparedArticleCommentArchiveItem[], warnings: [] };
@@ -495,19 +329,10 @@ export async function importBackupZipV2Merge(
   const seenUnique = new Set<string>();
   let totalMessages = 0;
 
-  const loadedBundleEntryNames = new Set<string>();
-  const missingBundleEntryNames: string[] = [];
-
   for (const filePath of convoFiles) {
     if (!filePath) continue;
-    // Resilience: some user-edited / corrupted zips may have a manifest that references missing bundles.
-    // Prefer importing the rest of the backup instead of hard-failing the entire import.
     const bundleBytes = entries.get(filePath);
-    if (!bundleBytes) {
-      missingBundleEntryNames.push(filePath);
-      continue;
-    }
-    loadedBundleEntryNames.add(filePath);
+    if (!bundleBytes) throw new Error(`Missing entry: ${filePath}`);
     const bundle = JSON.parse(decodeUtf8(bundleBytes));
     const bundleValidation = validateConversationBundle(bundle);
     if (!bundleValidation.ok) {
@@ -528,46 +353,17 @@ export async function importBackupZipV2Merge(
     if ((bundle as any).syncMapping) incomingMappings.push((bundle as any).syncMapping);
   }
 
-  // Backward-compat resilience: older backup zips may have non-ASCII bundle filenames encoded without the UTF-8 flag,
-  // which makes unzip libraries decode entry names as mojibake. In that case, manifest-declared paths won't match
-  // the actual zip entry names, so we would incorrectly skip most bundles.
-  //
-  // If the manifest references missing bundles, fall back to scanning all `sources/**/*.json` entries that validate
-  // as conversation bundles.
-  if (missingBundleEntryNames.length) {
-    const fallbackCandidates: string[] = [];
-    for (const name of entries.keys()) {
-      if (!name) continue;
-      if (!name.startsWith('sources/')) continue;
-      if (!name.endsWith('.json')) continue;
-      if (loadedBundleEntryNames.has(name)) continue;
-      fallbackCandidates.push(name);
-    }
-
-    for (const name of fallbackCandidates) {
-      const bytes = entries.get(name);
-      if (!bytes) continue;
-      let bundle: any;
-      try {
-        bundle = JSON.parse(decodeUtf8(bytes));
-      } catch (_e) {
-        continue;
-      }
-      const bundleValidation = validateConversationBundle(bundle);
-      if (!bundleValidation.ok) continue;
-
-      const convo = bundle.conversation;
-      const uk = uniqueConversationKey(convo);
-      if (!uk) continue;
-      if (seenUnique.has(uk)) throw new Error('Duplicate conversation key in zip');
-      seenUnique.add(uk);
-
-      const msgs = Array.isArray(bundle.messages) ? bundle.messages : [];
-      messagesByUniqueKey.set(uk, msgs);
-      totalMessages += msgs.length;
-
-      incomingConversations.push(convo);
-      if (bundle.syncMapping) incomingMappings.push(bundle.syncMapping);
+  if (isCurrentBackup) {
+    const expectedCounts = (manifest as any).counts || {};
+    const actualCounts: Record<string, number> = {
+      conversations: incomingConversations.length,
+      messages: totalMessages,
+      sync_mappings: incomingMappings.length,
+      image_cache: imageCacheAssets.length,
+      article_comments: articleCommentItems.length,
+    };
+    for (const [key, actual] of Object.entries(actualCounts)) {
+      if (Number(expectedCounts[key]) !== actual) throw new Error(`Backup count mismatch: ${key}`);
     }
   }
 
@@ -615,7 +411,9 @@ export async function importBackupZipV2Merge(
           if (!source || !conversationKey) continue;
 
           const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-          const normalizedMerged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+          const normalizedMerged = normalizeConversationListRecord(
+            mergeConversationRecord(existing, incoming, { allowLegacyLastCapturedAt: backupSchemaVersion === 2 }),
+          );
           normalizedMerged.source = source;
           normalizedMerged.conversationKey = conversationKey;
           const uk = uniqueConversationKey(normalizedMerged);
@@ -668,9 +466,17 @@ export async function importBackupZipV2Merge(
     progress.stage = 'Comments';
     report();
     await runTrackedTransaction(
-      { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+      { db, stores: ['article_comments', 'conversations'], revisionScopes: ['article_comments', 'conversations'] },
       async ({ stores: s, markChanged }) => {
         const store = s.article_comments;
+        const activityByConversationId = new Map<number, number>();
+        const noteHistoricalActivity = (conversationId: number | null, createdAt: number) => {
+          if (!Number.isSafeInteger(conversationId) || Number(conversationId) <= 0) return;
+          const timestamp = Number(createdAt);
+          if (!Number.isFinite(timestamp) || timestamp <= 0) return;
+          const id = Number(conversationId);
+          activityByConversationId.set(id, Math.max(activityByConversationId.get(id) || 0, timestamp));
+        };
         const index = store.index('by_canonicalUrl_createdAt');
         const existingByFingerprint = new Map<string, AnyRecord>();
         const existingBaseKeyById = new Map<number, string>();
@@ -708,7 +514,6 @@ export async function importBackupZipV2Merge(
         }
 
         const incomingIdToLocalId = new Map<number, number>();
-        const now = Date.now();
         for (const item of articleCommentItems) {
           const parentId =
             item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
@@ -716,6 +521,7 @@ export async function importBackupZipV2Merge(
             item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
               ? uniqueToLocalId.get(item.uniqueKey)!
               : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
+          noteHistoricalActivity(mappedConversationId, item.createdAt);
           const existing = existingByFingerprint.get(item.fingerprint) ?? null;
 
           if (existing?.id) {
@@ -736,7 +542,10 @@ export async function importBackupZipV2Merge(
               commentText:
                 incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
               locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
-              createdAt: Number(existing.createdAt) || item.createdAt || now,
+              createdAt:
+                Number.isFinite(Number(existing.createdAt)) && Number(existing.createdAt) >= 0
+                  ? Number(existing.createdAt)
+                  : item.createdAt,
               updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
             };
             if (areBackupValuesEqual(next, existing)) {
@@ -758,13 +567,23 @@ export async function importBackupZipV2Merge(
             quoteText: item.quoteText,
             commentText: item.commentText,
             locator: item.locator,
-            createdAt: item.createdAt || now,
-            updatedAt: item.updatedAt || item.createdAt || now,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
           };
           const newId = Number(await reqToPromise(store.add(record as any) as any));
           if (Number.isSafeInteger(newId) && newId > 0) incomingIdToLocalId.set(item.commentId, newId);
           stats.commentsAdded += 1;
           markChanged('article_comments');
+        }
+
+        for (const [conversationId, historicalActivityAt] of activityByConversationId) {
+          const conversation = await reqToPromise<any>(s.conversations.get(conversationId as any));
+          if (!conversation) continue;
+          const currentActivityAt = Number(conversation.lastActivityAt);
+          const current = Number.isFinite(currentActivityAt) && currentActivityAt > 0 ? currentActivityAt : 0;
+          if (historicalActivityAt <= current) continue;
+          await reqToPromise(s.conversations.put({ ...conversation, lastActivityAt: historicalActivityAt }));
+          markChanged('conversations');
         }
       },
     );

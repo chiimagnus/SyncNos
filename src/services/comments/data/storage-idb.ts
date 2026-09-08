@@ -5,7 +5,9 @@ import { normalizeArticleCommentLocator } from '@services/comments/domain/commen
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export class ArticleCommentInvariantError extends Error {
-  constructor(public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch') {
+  constructor(
+    public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch' | 'conversation_not_found',
+  ) {
     super(code);
     this.name = 'ArticleCommentInvariantError';
   }
@@ -61,6 +63,11 @@ function normalizeTimestamp(value: unknown, fallback: number): number {
   return t;
 }
 
+function normalizeActivityTimestamp(value: unknown): number {
+  const t = Number(value);
+  return Number.isFinite(t) && t > 0 ? t : 0;
+}
+
 function normalizeCommentText(value: unknown): string {
   return String(value || '').trim();
 }
@@ -107,8 +114,12 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
 
   const db = await openDb();
   return runTrackedTransaction(
-    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    { db, stores: ['article_comments', 'conversations'], revisionScopes: ['article_comments', 'conversations'] },
     async ({ stores, markChanged }) => {
+      const conversation =
+        conversationId == null ? null : await reqToPromise<any>(stores.conversations.get(conversationId as any));
+      if (conversationId != null && !conversation) throw new ArticleCommentInvariantError('conversation_not_found');
+
       if (parentId != null) {
         const parent = await reqToPromise<any>(stores.article_comments.get(parentId));
         if (!parent) throw new ArticleCommentInvariantError('parent_not_found');
@@ -123,6 +134,13 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
 
       const id = await reqToPromise<number>(stores.article_comments.add(row) as any);
       markChanged('article_comments');
+      if (conversation) {
+        const currentActivityAt = normalizeActivityTimestamp(conversation.lastActivityAt);
+        if (createdAt > currentActivityAt) {
+          await reqToPromise(stores.conversations.put({ ...conversation, lastActivityAt: createdAt }));
+          markChanged('conversations');
+        }
+      }
       return toComment({ ...row, id });
     },
   );
@@ -167,7 +185,7 @@ export async function deleteArticleCommentById(id: number): Promise<ArticleComme
 
   const db = await openDb();
   return runTrackedTransaction(
-    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    { db, stores: ['article_comments', 'conversations'], revisionScopes: ['article_comments', 'conversations'] },
     async ({ stores, markChanged }) => {
       const store = stores.article_comments;
       const rows = (await reqToPromise<any[]>(store.getAll() as any)) || [];
@@ -216,6 +234,17 @@ export async function deleteArticleCommentById(id: number): Promise<ArticleComme
 
       await Promise.all([...descendants].map((rowId) => reqToPromise(store.delete(rowId) as any)));
       markChanged('article_comments');
+      if (conversationId != null) {
+        const conversation = await reqToPromise<any>(stores.conversations.get(conversationId as any));
+        if (conversation) {
+          const deletedAt = Date.now();
+          const currentActivityAt = normalizeActivityTimestamp(conversation.lastActivityAt);
+          if (deletedAt > currentActivityAt) {
+            await reqToPromise(stores.conversations.put({ ...conversation, lastActivityAt: deletedAt }));
+            markChanged('conversations');
+          }
+        }
+      }
       return { deleted: true, conversationId };
     },
   );
@@ -231,24 +260,35 @@ export async function attachOrphanCommentsToConversation(
 
   const db = await openDb();
   return runTrackedTransaction(
-    { db, stores: ['article_comments'], revisionScopes: ['article_comments'] },
+    { db, stores: ['article_comments', 'conversations'], revisionScopes: ['article_comments', 'conversations'] },
     async ({ stores, markChanged }) => {
+      const conversation = await reqToPromise<any>(stores.conversations.get(normalizedConversationId as any));
+      if (!conversation) throw new ArticleCommentInvariantError('conversation_not_found');
       const store = stores.article_comments;
       const idx = store.index('by_canonicalUrl_createdAt');
       const range = globalThis.IDBKeyRange.bound([normalizedUrl, -Infinity] as any, [normalizedUrl, Infinity] as any);
       const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
       let updated = 0;
+      let latestHistoricalActivityAt = 0;
       const now = Date.now();
       for (const row of rows) {
         if (!row) continue;
         const current = normalizeConversationId(row?.conversationId);
         if (current) continue;
+        latestHistoricalActivityAt = Math.max(latestHistoricalActivityAt, normalizeActivityTimestamp(row.createdAt));
         row.conversationId = normalizedConversationId;
         row.updatedAt = now;
         await reqToPromise(store.put(row));
         updated += 1;
       }
-      if (updated > 0) markChanged('article_comments');
+      if (updated > 0) {
+        markChanged('article_comments');
+        const currentActivityAt = normalizeActivityTimestamp(conversation.lastActivityAt);
+        if (latestHistoricalActivityAt > currentActivityAt) {
+          await reqToPromise(stores.conversations.put({ ...conversation, lastActivityAt: latestHistoricalActivityAt }));
+          markChanged('conversations');
+        }
+      }
       return { updated };
     },
   );

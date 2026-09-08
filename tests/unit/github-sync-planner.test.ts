@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildConversationBasename, stableConversationId10 } from '@services/conversations/domain/file-naming';
-import type { GithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
+import {
+  buildGithubMarkdownProjection,
+  type GithubMarkdownProjection,
+} from '@services/sync/github/github-markdown-projection';
 import { planGithubConversationSync } from '@services/sync/github/github-sync-planner';
 
 const remoteKey = 'github.com/owner/repo@main';
@@ -56,6 +59,30 @@ describe('github sync planner', () => {
     expect(plan.status).toBe('no_changes');
     expect(plan.operations).toEqual([]);
     expect(plan.nextContinuity.githubManagedFiles[p.markdownPath]?.sha).toBe(markdownSha);
+  });
+
+  it('writes Markdown when canonical Activity is the only projected change', async () => {
+    const messages = [{ messageKey: 'm1', sequence: 1, role: 'assistant', contentMarkdown: 'same body' }];
+    const firstConversation = { ...convo, lastActivityAt: 1_000 };
+    const nextConversation = { ...convo, lastActivityAt: 2_000 };
+    const first = await buildGithubMarkdownProjection({ conversation: firstConversation, messages });
+    const next = await buildGithubMarkdownProjection({ conversation: nextConversation, messages });
+    const plan = planGithubConversationSync({
+      conversation: nextConversation,
+      remoteKey,
+      projection: next,
+      mapping: {
+        githubRemoteKey: remoteKey,
+        githubProjectionFingerprint: first.projectionFingerprint,
+        githubManagedFiles: {
+          [first.markdownPath]: { kind: 'markdown', contentHash: first.markdownContentHash, sha: markdownSha },
+        },
+      },
+      mode: 'incremental',
+    });
+
+    expect(plan.status).toBe('changed');
+    expect(plan.operations).toContainEqual({ type: 'write', path: next.markdownPath, content: next.markdownText });
   });
 
   it('reconcile redeclares unchanged authoritative paths with known SHAs', () => {

@@ -1,6 +1,6 @@
 # 排障
 
-通用开发环境与提交前验证见 [CONTRIBUTING.md](CONTRIBUTING.md)。本页只记录故障诊断；仅检查默认浏览器产物时可运行 `npm run check`。
+本页面向维护者，只记录可复用的开发/运行故障诊断，不拥有产品契约或验证门槛。通用环境与提交前验证见 [CONTRIBUTING.md](CONTRIBUTING.md)；仅检查默认浏览器产物时可运行 `npm run check`。当消息生命周期、OAuth/发布诊断或 Zen 流程发生变化时同步更新本页。
 
 ## 常见问题
 

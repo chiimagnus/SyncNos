@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-09-06**
+**Last Updated: 2026-09-08**
 
 This Privacy Policy applies to SyncNos WebClipper (the “Extension”), including its supported Chromium, Firefox-family, and Safari builds.
 
@@ -28,7 +28,7 @@ The Extension stores durable captured content in browser IndexedDB. Browser exte
 
 Selected content exports and Backup ZIP files are assembled locally, but they have different data scopes.
 
-A selected Markdown or JSON export contains the selected captured content and any referenced internal images that can be materialized from that content's own local image-cache scope. Selected export does not include sync mappings, article comments, settings, OAuth/authentication state, or provider secrets. Exporting does not make a new image network request: existing remote `http(s)` image targets and historical `data:image/...` targets remain in the exported content rather than being fetched into the archive. The public JSON shape is documented in [docs/export-json-v1.md](docs/export-json-v1.md).
+A selected Markdown or JSON export contains the selected captured content and any referenced internal images that can be materialized from that content's own local image-cache scope. Selected export does not include sync mappings, article comments, settings, OAuth/authentication state, or provider secrets. Exporting does not make a new image network request: existing remote `http(s)` image targets and historical `data:image/...` targets remain in the exported content rather than being fetched into the archive.
 
 Backup ZIP is the separate restore package. It may include captured content, sync mappings, cached images, article comments, and non-sensitive settings. Backup filtering excludes authentication secrets including Notion and Feishu OAuth tokens, Notion and Feishu client secrets, the Obsidian Local REST API key, and GitHub Device Flow/auth state containing access tokens, refresh tokens, or pending device credentials.
 
@@ -57,7 +57,7 @@ The repository's Feishu Worker also performs best-effort request rate limiting u
 
 ### Obsidian
 
-Obsidian sync uses the Local REST API plugin on your computer. The current client uses a local HTTP endpoint (by default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. SyncNos does not require an external SyncNos server for this path.
+Obsidian sync uses the Local REST API plugin on your computer. The current client supports only a local HTTP endpoint for this integration (by default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. SyncNos does not require an external SyncNos server for this path.
 
 ### GitHub
 

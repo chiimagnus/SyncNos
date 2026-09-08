@@ -1,34 +1,42 @@
 import { buildAiOptions } from '@services/sync/notion/notion-ai.ts';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
-import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
+import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract.ts';
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
-const DEFAULT_DB_STORAGE_KEY = 'notion_db_id_syncnos_ai_chats';
 const SEARCH_PAGE_SIZE = 100;
 const SEARCH_MAX_PAGES = 10;
 
-async function getCachedDatabaseId(storageKey: unknown) {
-  const key = String(storageKey || '').trim() || DEFAULT_DB_STORAGE_KEY;
+function requireStorageKey(storageKey: unknown): string {
+  const key = String(storageKey || '').trim();
+  if (!key) throw new Error('notion database storageKey required');
+  return key;
+}
+
+function requireDbSpec(dbSpec: unknown): ConversationKindDbSpec {
+  if (!dbSpec || typeof dbSpec !== 'object') throw new Error('notion dbSpec required');
+  const spec = dbSpec as ConversationKindDbSpec;
+  if (!String(spec.title || '').trim()) throw new Error('notion dbSpec title required');
+  requireStorageKey(spec.storageKey);
+  if (!spec.properties || typeof spec.properties !== 'object') throw new Error('notion dbSpec properties required');
+  return spec;
+}
+
+async function getCachedDatabaseId(storageKey: string) {
+  const key = requireStorageKey(storageKey);
   const res = await storageGet([key]);
   return String((res && (res as any)[key]) || '');
 }
 
-async function setCachedDatabaseId(storageKey: unknown, databaseId: unknown) {
-  const key = String(storageKey || '').trim() || DEFAULT_DB_STORAGE_KEY;
+async function setCachedDatabaseId(storageKey: string, databaseId: unknown) {
+  const key = requireStorageKey(storageKey);
   await storageSet({ [key]: databaseId || '' });
   return true;
 }
 
-async function clearCachedDatabaseId(storageKey: unknown) {
-  const key = String(storageKey || '').trim() || DEFAULT_DB_STORAGE_KEY;
+async function clearCachedDatabaseId(storageKey: string) {
+  const key = requireStorageKey(storageKey);
   await storageRemove([key]);
   return true;
-}
-
-function defaultDbSpec() {
-  const spec = builtInConversationKinds.getNotionDbSpecByKindId('chat');
-  if (!spec) throw new Error('chat notion database spec missing');
-  return spec;
 }
 
 function isUsableDatabase(database: any): boolean {
@@ -139,16 +147,15 @@ async function searchDatabases(
 
 async function updateDatabase(
   accessToken: string,
-  { databaseId, properties }: { databaseId?: string; properties?: Record<string, unknown> },
+  { databaseId, properties }: { databaseId: string; properties: Record<string, unknown> },
 ) {
-  const body = { properties: properties || {} };
+  const body = { properties };
   return notionFetch({ accessToken, method: 'PATCH', path: `/v1/databases/${databaseId}`, body });
 }
 
-function materializeDbProperties(dbSpec: any) {
-  const spec = dbSpec && typeof dbSpec === 'object' ? dbSpec : defaultDbSpec();
-  const raw = spec.properties && typeof spec.properties === 'object' ? spec.properties : {};
-  const props = { ...raw };
+function materializeDbProperties(dbSpec: ConversationKindDbSpec) {
+  const raw = dbSpec.properties;
+  const props = { ...raw } as Record<string, any>;
 
   // If the schema includes `AI` multi-select, fill options from Notion AI helper if available.
   const ai = props.AI;
@@ -158,14 +165,27 @@ function materializeDbProperties(dbSpec: any) {
   return props;
 }
 
-async function createDatabase(accessToken: string, { parentPageId, dbSpec }: { parentPageId?: string; dbSpec?: any }) {
-  const spec = dbSpec && typeof dbSpec === 'object' ? dbSpec : defaultDbSpec();
+async function createDatabase(
+  accessToken: string,
+  { parentPageId, dbSpec }: { parentPageId: string; dbSpec: ConversationKindDbSpec },
+) {
+  const spec = dbSpec;
   const body = {
     parent: { type: 'page_id', page_id: parentPageId },
     title: [{ type: 'text', text: { content: spec.title } }],
     properties: materializeDbProperties(spec),
   };
   return notionFetch({ accessToken, method: 'POST', path: '/v1/databases', body });
+}
+
+function notionPropertyType(property: unknown): string {
+  return property && typeof property === 'object' ? String((property as any).type || '').trim() : '';
+}
+
+function schemaIncompatible(propertyName: string, expectedType: string, actualType: string): Error {
+  return new Error(
+    `notion database schema incompatible: ${propertyName} must be ${expectedType}${actualType ? `, got ${actualType}` : ''}`,
+  );
 }
 
 async function ensureDatabaseSchema({
@@ -175,36 +195,47 @@ async function ensureDatabaseSchema({
 }: {
   accessToken: string;
   databaseId: string;
-  dbSpec?: any;
+  dbSpec: ConversationKindDbSpec;
 }) {
-  const spec = dbSpec && typeof dbSpec === 'object' ? dbSpec : defaultDbSpec();
+  const spec = dbSpec;
   const db = await getDatabase(accessToken, databaseId);
-  const props = db && db.properties ? db.properties : {};
+  const props = { ...(db && db.properties ? db.properties : {}) } as Record<string, any>;
   const patch = spec.ensureSchemaPatch && typeof spec.ensureSchemaPatch === 'object' ? spec.ensureSchemaPatch : {};
 
-  // If the DB has an `AI` property but it's not a multi_select, we can't patch it in-place.
-  // Signal failure so callers can surface a clear error or rebuild strategy.
+  const lastActivity = props['Last Activity'];
+  if (lastActivity) {
+    const type = notionPropertyType(lastActivity);
+    if (type !== 'date') throw schemaIncompatible('Last Activity', 'date', type);
+  } else if (props.Date) {
+    const type = notionPropertyType(props.Date);
+    if (type !== 'date') throw schemaIncompatible('Date', 'date', type);
+    await updateDatabase(accessToken, {
+      databaseId,
+      properties: { Date: { name: 'Last Activity' } },
+    });
+    props['Last Activity'] = { ...props.Date, type: 'date' };
+    delete props.Date;
+  }
+
   if (patch.AI) {
-    const ai = props && props.AI ? props.AI : null;
-    if (ai && ai.type && ai.type !== 'multi_select') return false;
+    const ai = props.AI;
+    if (ai) {
+      const type = notionPropertyType(ai);
+      if (type !== 'multi_select') throw schemaIncompatible('AI', 'multi_select', type);
+    }
   }
 
   const missing: Record<string, any> = {};
   for (const [k, v] of Object.entries(patch)) {
-    if (!props || !props[k]) missing[k] = v;
+    if (!props[k]) missing[k] = v;
   }
   if (!Object.keys(missing).length) return true;
 
-  // Best-effort: add missing properties if possible.
   if (missing.AI && missing.AI.multi_select && typeof missing.AI.multi_select === 'object') {
     missing.AI = { multi_select: { ...missing.AI.multi_select, options: buildAiOptions() } };
   }
-  try {
-    await updateDatabase(accessToken, { databaseId, properties: missing });
-    return true;
-  } catch (_e) {
-    return false;
-  }
+  await updateDatabase(accessToken, { databaseId, properties: missing });
+  return true;
 }
 
 async function ensureDatabase({
@@ -213,10 +244,10 @@ async function ensureDatabase({
   dbSpec,
 }: {
   accessToken: string;
-  parentPageId?: string;
-  dbSpec?: any;
+  parentPageId: string;
+  dbSpec: ConversationKindDbSpec;
 }) {
-  const spec = dbSpec && typeof dbSpec === 'object' ? dbSpec : defaultDbSpec();
+  const spec = requireDbSpec(dbSpec);
   const cached = await getCachedDatabaseId(spec.storageKey);
   if (cached) {
     try {
@@ -258,4 +289,4 @@ async function ensureDatabase({
   return { databaseId: created.id, title: spec.title, reused: false, database: created };
 }
 
-export { ensureDatabase, ensureDatabaseSchema, clearCachedDatabaseId, DEFAULT_DB_STORAGE_KEY };
+export { ensureDatabase, clearCachedDatabaseId };

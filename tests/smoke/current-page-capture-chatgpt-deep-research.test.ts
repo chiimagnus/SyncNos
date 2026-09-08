@@ -79,7 +79,6 @@ describe('current-page-capture chatgpt deep research hydration', () => {
               title: 'New chat',
               url: 'https://chatgpt.com/c/conv1',
               warningFlags: [],
-              lastCapturedAt: Date.now(),
             },
             captureMeta: { completeness: 'complete', identityVerified: true },
             messages: [

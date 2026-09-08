@@ -58,7 +58,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     | { conversationId: number; title?: string; isNew: boolean; url?: string; subtitleStatus: 'ok' }
   > {
     const extracted = await extractVideoTranscriptFromCurrentPage();
-    const capturedAt = Date.now();
+    const activityAt = Date.now();
 
     const rawUrl = normalizeText(extracted?.meta?.url || location.href);
     const url = normalizeText(rawUrl);
@@ -95,7 +95,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         author,
         publishedAt: '',
         warningFlags: [],
-        lastCapturedAt: capturedAt,
+        lastActivityAt: 0,
         platform,
         durationSeconds,
         thumbnailUrl,
@@ -116,7 +116,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         role: 'transcript',
         contentMarkdown: transcriptMarkdown,
         sequence: 1,
-        updatedAt: capturedAt,
+        updatedAt: activityAt,
       },
     ];
 
@@ -127,6 +127,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       diff: null,
       conversationSourceType: 'video',
       conversationUrl: url,
+      activityAt,
     });
     if (!messagesRes?.ok) {
       throw toError(messagesRes?.error?.message || 'syncConversationMessages failed');

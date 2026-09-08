@@ -230,7 +230,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
 
   if (!textContent) throw toError('No article content detected');
 
-  const capturedAt = Date.now();
+  const activityAt = Date.now();
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: WEB_ARTICLE_SOURCE,
@@ -240,7 +240,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     author,
     publishedAt,
     warningFlags,
-    lastCapturedAt: capturedAt,
   });
 
   const body = textContent;
@@ -252,7 +251,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
       role: 'article',
       contentMarkdown: markdown,
       sequence: 1,
-      updatedAt: capturedAt,
+      updatedAt: activityAt,
     },
   ];
 
@@ -300,7 +299,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     });
   }
 
-  await syncConversationMessages(conversationId, messagesToSave);
+  await syncConversationMessages(conversationId, messagesToSave, { activityAt });
 
   return {
     isNew: conversation.__isNew,
@@ -310,7 +309,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     author,
     publishedAt,
     warningFlags,
-    lastCapturedAt: capturedAt,
   };
 }
 
@@ -321,25 +319,20 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const articleIdentity = buildCanonicalWebArticleIdentity(normalizedUrl)!;
   const canonicalUrl = articleIdentity.url;
   const key = articleIdentity.conversationKey;
-  try {
-    const existing = await getConversationBySourceConversationKey(WEB_ARTICLE_SOURCE, key);
-    if (existing) {
-      const warningFlags = Array.isArray(existing.warningFlags)
-        ? existing.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
-        : [];
-      return {
-        isNew: false,
-        conversationId: existing.id,
-        url: canonicalUrl,
-        title: normalizeText(existing.title || '') || fallbackTitle(canonicalUrl, tab.title || ''),
-        author: normalizeText(existing.author || ''),
-        publishedAt: normalizeText(existing.publishedAt || ''),
-        warningFlags,
-        lastCapturedAt: Number(existing.lastCapturedAt) || null,
-      };
-    }
-  } catch (_e) {
-    // ignore and fallback to capture
+  const existing = await getConversationBySourceConversationKey(WEB_ARTICLE_SOURCE, key);
+  if (existing) {
+    const warningFlags = Array.isArray(existing.warningFlags)
+      ? existing.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    return {
+      isNew: false,
+      conversationId: existing.id,
+      url: canonicalUrl,
+      title: normalizeText(existing.title || '') || fallbackTitle(canonicalUrl, tab.title || ''),
+      author: normalizeText(existing.author || ''),
+      publishedAt: normalizeText(existing.publishedAt || ''),
+      warningFlags,
+    };
   }
 
   return await fetchActiveTabArticle({ tabId: Number((tab as any)?.id) });

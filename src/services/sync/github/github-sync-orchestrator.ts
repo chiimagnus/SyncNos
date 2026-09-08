@@ -217,9 +217,9 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
 
     for (const conversationId of ids) {
       try {
-        const row = await services.storage.getSyncMappingByConversation(conversationId);
+        let row = await services.storage.getSyncMappingByConversation(conversationId);
         if (!row?.conversation) throw new Error('conversation not found');
-        const conversation = row.conversation;
+        let conversation = row.conversation;
         const conversationTitle = safeString(conversation.title);
         await lifecycle.setItem(conversationId, { conversationTitle, currentStage: 'staging_projection' });
         const messages = await services.storage.getMessagesByConversationId(conversationId);
@@ -227,7 +227,16 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
         if (safeString(conversation.sourceType) === 'article') {
           const canonicalUrl = safeString(conversation.url);
           if (canonicalUrl) {
-            await services.storage.attachOrphanArticleCommentsToConversation(canonicalUrl, conversationId);
+            const attached = await services.storage.attachOrphanArticleCommentsToConversation(
+              canonicalUrl,
+              conversationId,
+            );
+            if (Number((attached as any)?.updated) > 0) {
+              const refreshed = await services.storage.getSyncMappingByConversation(conversationId);
+              if (!refreshed?.conversation) throw new Error('conversation not found after comment attach');
+              row = refreshed;
+              conversation = refreshed.conversation;
+            }
           }
           comments = await services.storage.getArticleCommentsByConversationId(conversationId);
         }

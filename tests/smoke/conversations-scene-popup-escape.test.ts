@@ -32,7 +32,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
         title: 'First chat',
         source: 'gemini',
         conversationKey: 'conv-11',
-        lastCapturedAt: Date.now(),
+        lastActivityAt: Date.now(),
         url: 'https://example.com/chat/11',
       },
     ],

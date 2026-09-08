@@ -46,7 +46,7 @@ type ListQueryPayload = {
 };
 
 type ListCursorPayload = {
-  lastCapturedAt: number;
+  lastActivityAt: number;
   id: number;
 };
 
@@ -96,10 +96,10 @@ function parseListQueryPayload(msg: any): { query: ListQueryPayload; errorField?
 
 function parseListCursorPayload(value: unknown): ListCursorPayload | null {
   if (!value || typeof value !== 'object') return null;
-  const lastCapturedAt = Number((value as any).lastCapturedAt);
+  const lastActivityAt = Number((value as any).lastActivityAt);
   const id = Number((value as any).id);
-  if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
-  return { lastCapturedAt, id };
+  if (!Number.isFinite(lastActivityAt) || lastActivityAt < 0 || !Number.isSafeInteger(id) || id <= 0) return null;
+  return { lastActivityAt, id };
 }
 
 export function registerConversationHandlers(router: AnyRouter, deps: ConversationHandlersDeps) {
@@ -177,14 +177,17 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
     const convo = await upsertConversation(payload);
-    fireAndForget(
-      deps.onConversationChanged(
-        convo.id,
-        convo.__isNew
-          ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
-          : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
-      ),
-    );
+    const requestedActivityAt = Number(payload.lastActivityAt);
+    if (Number.isFinite(requestedActivityAt) && requestedActivityAt > 0) {
+      fireAndForget(
+        deps.onConversationChanged(
+          convo.id,
+          convo.__isNew
+            ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
+            : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+        ),
+      );
+    }
     return router.ok(convo);
   });
 
@@ -226,6 +229,11 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
     const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
     const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
+    const hasActivityAt = Object.prototype.hasOwnProperty.call(msg || {}, 'activityAt');
+    const activityAt = hasActivityAt ? Number(msg?.activityAt) : undefined;
+    if (hasActivityAt && (!Number.isFinite(activityAt) || Number(activityAt) <= 0)) {
+      return router.err('invalid activityAt');
+    }
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
     try {
@@ -296,7 +304,11 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       });
     }
 
-    const res = await syncConversationMessages(conversationId, messages, { mode, diff });
+    const res = await syncConversationMessages(conversationId, messages, {
+      mode,
+      diff,
+      ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
+    });
     fireAndForget(
       deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
     );

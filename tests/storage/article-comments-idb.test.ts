@@ -45,6 +45,27 @@ beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.IDBKeyRange = IDBKeyRange;
   await deleteDb('webclipper');
+  const db = await openDb();
+  const transaction = db.transaction(['conversations'], 'readwrite');
+  for (const id of [1, 2, 7, 9, 41, 42, 51, 71, 77, 123]) {
+    await reqToPromise(
+      transaction.objectStore('conversations').add({
+        id,
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: `article:https://example.com/test-owner-${id}`,
+        title: `Owner ${id}`,
+        url: `https://example.com/test-owner-${id}`,
+        warningFlags: [],
+        lastActivityAt: 0,
+      }) as IDBRequest<number>,
+    );
+  }
+  await new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
 });
 
 afterEach(() => {
@@ -52,6 +73,22 @@ afterEach(() => {
 });
 
 describe('article comments storage-idb', () => {
+  it('fails closed for a stale non-null conversationId without writing comment or revisions', async () => {
+    const beforeComments = await readDataRevision('article_comments');
+    const beforeConversations = await readDataRevision('conversations');
+    await expect(
+      addArticleComment({
+        conversationId: 999_999,
+        canonicalUrl: 'https://example.com/stale-owner',
+        commentText: 'must not persist',
+        createdAt: 10,
+      }),
+    ).rejects.toThrow('conversation_not_found');
+    expect(await listArticleCommentsByCanonicalUrl('https://example.com/stale-owner')).toEqual([]);
+    expect(await readDataRevision('article_comments')).toBe(beforeComments);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations);
+  });
+
   it('adds, lists by canonicalUrl, and deletes', async () => {
     const url = 'https://example.com/a#hash';
 

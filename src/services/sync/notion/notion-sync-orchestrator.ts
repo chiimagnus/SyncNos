@@ -500,7 +500,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           trace.mark('load conversation');
 
           const mapped = await storage.getSyncMappingByConversation(id);
-          const convo = mapped && mapped.conversation ? mapped.conversation : null;
+          let convo = mapped && mapped.conversation ? mapped.conversation : null;
           const mapping = mapped && mapped.mapping ? mapped.mapping : null;
           if (!convo) {
             lifecycle.recordResult({
@@ -525,7 +525,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           if (!pageSpec) throw new Error(`missing notion pageSpec for kind ${kind.id}`);
           let articleCommentsLoaded = false;
           let articleCommentsLoadFailed = false;
-          let articleCommentsSourceAvailable = false;
           let cachedArticleComments: ArticleCommentDto[] = [];
           const ensureArticleCommentsLoaded = async (failureMessage: string) => {
             if (articleCommentsLoaded) return cachedArticleComments;
@@ -535,26 +534,29 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               cachedArticleComments = [];
               return cachedArticleComments;
             }
-            if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
-              articleCommentsSourceAvailable = true;
-              try {
-                const url = String(convo?.url || '').trim();
-                if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                  await storage.attachOrphanArticleCommentsToConversation(url, id);
+            let canonicalRereadPending = false;
+            try {
+              const url = String(convo?.url || '').trim();
+              if (url) {
+                const attached = await storage.attachOrphanArticleCommentsToConversation(url, id);
+                if (Number(attached?.updated) > 0) {
+                  canonicalRereadPending = true;
+                  const refreshed = await storage.getSyncMappingByConversation(id);
+                  if (!refreshed?.conversation) throw new Error('conversation not found after comment attach');
+                  convo = refreshed.conversation;
+                  canonicalRereadPending = false;
                 }
-                const loaded = await storage.getArticleCommentsByConversationId(id);
-                cachedArticleComments = parseArticleCommentDtos(loaded);
-              } catch (e) {
-                articleCommentsLoadFailed = true;
-                warnings.push({
-                  code: 'notion_article_comments_fetch_failed',
-                  message: String(failureMessage || 'Failed to load local article comments.'),
-                  extra: { error: e && (e as any).message ? String((e as any).message) : String(e) },
-                });
-                cachedArticleComments = [];
               }
-            } else {
-              articleCommentsSourceAvailable = false;
+              const loaded = await storage.getArticleCommentsByConversationId(id);
+              cachedArticleComments = parseArticleCommentDtos(loaded);
+            } catch (e) {
+              if (canonicalRereadPending) throw e;
+              articleCommentsLoadFailed = true;
+              warnings.push({
+                code: 'notion_article_comments_fetch_failed',
+                message: String(failureMessage || 'Failed to load local article comments.'),
+                extra: { error: e && (e as any).message ? String((e as any).message) : String(e) },
+              });
               cachedArticleComments = [];
             }
             (convo as any).commentThreadCount = computeArticleCommentThreadCount(cachedArticleComments);
@@ -613,7 +615,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,
                 properties: createProperties,
-                capturedAt: convo.lastCapturedAt,
               });
             } catch (createErr) {
               const shouldRecoverDb = isMissingDatabaseError(createErr);
@@ -631,7 +632,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,
                 properties: createProperties,
-                capturedAt: convo.lastCapturedAt,
               });
             }
             pageId = created && created.id ? created.id : '';
@@ -661,10 +661,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               const comments = await ensureArticleCommentsLoaded(
                 'Failed to load local article comments; syncing article body only.',
               );
-              const commentsDigest =
-                !articleCommentsSourceAvailable || articleCommentsLoadFailed
-                  ? null
-                  : computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
+              const commentsDigest = articleCommentsLoadFailed
+                ? null
+                : computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
               let commentThreads = 0;
               let commentItems = 0;
 
@@ -856,10 +855,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             let commentsDigest: string | null = null;
             let commentThreads = 0;
             let commentItems = 0;
-            commentsDigest =
-              !articleCommentsSourceAvailable || articleCommentsLoadFailed
-                ? null
-                : computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+            commentsDigest = articleCommentsLoadFailed
+              ? null
+              : computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
             const prevCommentsDigest =
               mapping &&
               mapping.notionSectionDigests &&

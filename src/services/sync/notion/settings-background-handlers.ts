@@ -11,23 +11,17 @@ type AnyRouter = {
 };
 
 type Deps = {
-  conversationKinds: { getNotionStorageKeys?: () => unknown[] } | null;
+  conversationKinds: { getNotionStorageKeys: () => unknown[] };
   runExclusiveMaintenance: <T>(mutation: () => Promise<T>) => Promise<T>;
 };
 
 function getNotionDisconnectStorageKeys(deps: Deps): string[] {
   const base = ['notion_parent_page_id', 'notion_parent_page_title'];
-
-  const notionDbKeys = (() => {
-    try {
-      const keys = deps.conversationKinds?.getNotionStorageKeys?.();
-      if (Array.isArray(keys) && keys.length) return keys.map((k: any) => String(k || '').trim()).filter(Boolean);
-    } catch (_e) {
-      // ignore
-    }
-    return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles', 'notion_db_id_syncnos_videos'];
-  })();
-
+  const notionDbKeys = deps.conversationKinds
+    .getNotionStorageKeys()
+    .map((key) => String(key || '').trim())
+    .filter(Boolean);
+  if (!notionDbKeys.length) throw new Error('missing Notion database storage keys');
   return Array.from(new Set([...base, ...notionDbKeys]));
 }
 
@@ -80,8 +74,9 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
       await deps.runExclusiveMaintenance(async () => {
+        const storageKeys = getNotionDisconnectStorageKeys(deps);
         await clearNotionOAuthAttemptAndToken();
-        await storageRemove(getNotionDisconnectStorageKeys(deps));
+        await storageRemove(storageKeys);
       });
       return router.ok({ disconnected: true });
     } catch (error) {

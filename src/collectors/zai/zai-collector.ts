@@ -164,7 +164,6 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
         title: findTitle(),
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

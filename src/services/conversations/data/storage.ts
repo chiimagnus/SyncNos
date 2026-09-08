@@ -64,6 +64,7 @@ export async function syncConversationMessages(
   options?: {
     mode?: 'snapshot' | 'incremental' | 'append';
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
+    activityAt?: number;
   },
 ) {
   return await idb.syncConversationMessages(conversationId, messages, options);

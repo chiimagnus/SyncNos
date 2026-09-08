@@ -17,7 +17,7 @@ import {
 import { createDataRevisionObserver } from '@services/data-revisions/observer';
 import { readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
 import { subscribeDataRevisionWake } from '@services/data-revisions/wake';
-import { importBackupZipV2Merge } from '@services/sync/backup/import';
+import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 
 import {
@@ -242,7 +242,7 @@ describe('reload-free data consistency production chain', () => {
     }
 
     const fixture = buildBackupV2FixtureEntries();
-    const first = await importBackupZipV2Merge(fixture.entries);
+    const first = await importBackupZipMerge(fixture.entries);
     expect(first).toMatchObject({
       conversationsAdded: 3,
       messagesAdded: 4,
@@ -303,7 +303,7 @@ describe('reload-free data consistency production chain', () => {
     const observer = createRealRevisionObserver();
     const listConsumer = await mountListConsumerHarness(observer);
     const readsBeforeIdenticalImport = listConsumer.reads;
-    const repeated = await importBackupZipV2Merge(fixture.entries);
+    const repeated = await importBackupZipMerge(fixture.entries);
     expect(repeated).toMatchObject({
       conversationsAdded: 0,
       conversationsUpdated: 0,
@@ -335,7 +335,7 @@ describe('reload-free data consistency production chain', () => {
       `    ![indented](syncnos-asset://${backupAssetId})`,
     ].join('\n');
     fixture.entries.set(chatPath, new TextEncoder().encode(JSON.stringify(chatBundle, null, 2)));
-    await importBackupZipV2Merge(fixture.entries);
+    await importBackupZipMerge(fixture.entries);
 
     const chat = await getConversationBySourceConversationKey(
       fixture.expected.chat.source,
@@ -362,7 +362,7 @@ describe('reload-free data consistency production chain', () => {
     });
 
     const beforeRestore = await readDataRevisionSnapshot();
-    const stats = await importBackupZipV2Merge(fixture.entries);
+    const stats = await importBackupZipMerge(fixture.entries);
     expect(stats.messagesUpdated).toBe(1);
 
     const afterRestore = await readDataRevisionSnapshot();
@@ -393,7 +393,7 @@ describe('reload-free data consistency production chain', () => {
 
   it('replays a failed mounted List canonical read against an unchanged revision vector and preserves the last-good bundle', async () => {
     const base = buildBackupV2FixtureEntries();
-    await importBackupZipV2Merge(base.entries);
+    await importBackupZipMerge(base.entries);
 
     const observer = createRealRevisionObserver();
     const listConsumer = await mountListConsumerHarness(observer);
@@ -405,7 +405,7 @@ describe('reload-free data consistency production chain', () => {
 
     listConsumer.failNext();
     const changed = buildBackupV2FixtureEntries({ extraChatWarning: 'fixture-warning-updated' });
-    const stats = await importBackupZipV2Merge(changed.entries);
+    const stats = await importBackupZipMerge(changed.entries);
     expect(stats).toMatchObject({
       conversationsAdded: 0,
       conversationsUpdated: 1,
@@ -440,7 +440,7 @@ describe('reload-free data consistency production chain', () => {
 
   it('distinguishes a Comments canonical-read rejection from authoritative empty and converges by same-vector replay', async () => {
     const fixture = buildBackupV2FixtureEntries();
-    await importBackupZipV2Merge(fixture.entries);
+    await importBackupZipMerge(fixture.entries);
     const article = await getConversationBySourceConversationKey(
       fixture.expected.article.source,
       fixture.expected.article.conversationKey,

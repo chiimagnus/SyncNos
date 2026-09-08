@@ -8,7 +8,7 @@ import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-reco
 import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 12;
+export const DB_VERSION = 13;
 
 type MigrationContext = {
   tx: IDBTransaction;
@@ -82,29 +82,51 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   return Array.from(values);
 }
 
-function normalizeConversationRecordsForV11({ tx }: MigrationContext): void {
+function validActivityTimestamp(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function migrateConversationRecordsForV13({ tx }: MigrationContext, onDone: MigrationDone): void {
   const conversationsStore = tx.objectStore('conversations');
+  const commentsIndex = tx.objectStore('article_comments').index('by_conversationId_createdAt');
   const req = conversationsStore.openCursor();
   req.onsuccess = () => {
     const cursor = req.result;
-    if (!cursor) return;
+    if (!cursor) return onDone();
+
     const value = (cursor.value || {}) as Record<string, unknown>;
-    const normalized = normalizeConversationListRecord(value);
-    const hasRetiredFields =
-      Object.prototype.hasOwnProperty.call(normalized, 'description') ||
-      Object.prototype.hasOwnProperty.call(normalized, '__canonicalUrl') ||
-      Object.prototype.hasOwnProperty.call(normalized, '__canonicalKey');
-    if (normalized === value && !hasRetiredFields) {
+    const normalized = normalizeConversationListRecord(value) as Record<string, unknown>;
+    const conversationId = Number(value.id);
+    const baseActivityAt = Math.max(
+      validActivityTimestamp(value.lastActivityAt),
+      validActivityTimestamp(value.lastCapturedAt),
+    );
+
+    const persist = (latestCommentCreatedAt: number) => {
+      const next = {
+        ...normalized,
+        lastActivityAt: Math.max(baseActivityAt, latestCommentCreatedAt),
+      } as Record<string, unknown>;
+      delete next.lastCapturedAt;
+      delete next.description;
+      delete next.__canonicalUrl;
+      delete next.__canonicalKey;
+      cursor.update(next as any);
       cursor.continue();
+    };
+
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      persist(0);
       return;
     }
 
-    const next = { ...normalized } as Record<string, unknown>;
-    delete next.description;
-    delete next.__canonicalUrl;
-    delete next.__canonicalKey;
-    cursor.update(next as any);
-    cursor.continue();
+    const range = globalThis.IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+    const commentReq = commentsIndex.openCursor(range, 'prev');
+    commentReq.onsuccess = () => {
+      const latest = commentReq.result?.value as Record<string, unknown> | undefined;
+      persist(validActivityTimestamp(latest?.createdAt));
+    };
   };
 }
 
@@ -344,7 +366,7 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
     next.publishedAt = safeString(next.publishedAt) || safeString(incoming.publishedAt);
     next.notionPageId = safeString(next.notionPageId) || safeString(incoming.notionPageId);
     next.warningFlags = mergeStringArray(next.warningFlags, incoming.warningFlags);
-    next.lastCapturedAt = pickMaxFiniteNumber(next.lastCapturedAt, incoming.lastCapturedAt) || Date.now();
+    next.lastCapturedAt = pickMaxFiniteNumber(next.lastCapturedAt, incoming.lastCapturedAt) || 0;
     return next;
   }
 
@@ -545,53 +567,50 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
 }
 
 function ensureConversationsStore(db: IDBDatabase, tx: IDBTransaction | null): void {
+  const ensureCurrentIndexes = (store: IDBObjectStore) => {
+    if (!store.indexNames.contains('by_source_conversationKey')) {
+      store.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
+    }
+    if (!store.indexNames.contains('by_lastActivityAt_id')) {
+      store.createIndex('by_lastActivityAt_id', ['lastActivityAt', 'id'], { unique: false });
+    }
+    if (!store.indexNames.contains('by_listSourceKey_lastActivityAt_id')) {
+      store.createIndex('by_listSourceKey_lastActivityAt_id', ['listSourceKey', 'lastActivityAt', 'id'], {
+        unique: false,
+      });
+    }
+    if (!store.indexNames.contains('by_listSourceKey_listSiteKey_lastActivityAt_id')) {
+      store.createIndex(
+        'by_listSourceKey_listSiteKey_lastActivityAt_id',
+        ['listSourceKey', 'listSiteKey', 'lastActivityAt', 'id'],
+        { unique: false },
+      );
+    }
+    if (!store.indexNames.contains('by_listSiteKey_lastActivityAt_id')) {
+      store.createIndex('by_listSiteKey_lastActivityAt_id', ['listSiteKey', 'lastActivityAt', 'id'], {
+        unique: false,
+      });
+    }
+  };
+
   if (!db.objectStoreNames.contains('conversations')) {
     const store = db.createObjectStore('conversations', { keyPath: 'id', autoIncrement: true });
-    store.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
-    store.createIndex('by_lastCapturedAt', 'lastCapturedAt', { unique: false });
-    store.createIndex('by_lastCapturedAt_id', ['lastCapturedAt', 'id'], { unique: false });
-    store.createIndex('by_listSourceKey_lastCapturedAt_id', ['listSourceKey', 'lastCapturedAt', 'id'], {
-      unique: false,
-    });
-    store.createIndex(
-      'by_listSourceKey_listSiteKey_lastCapturedAt_id',
-      ['listSourceKey', 'listSiteKey', 'lastCapturedAt', 'id'],
-      { unique: false },
-    );
-    store.createIndex('by_listSiteKey_lastCapturedAt_id', ['listSiteKey', 'lastCapturedAt', 'id'], {
-      unique: false,
-    });
+    ensureCurrentIndexes(store);
     return;
   }
 
   if (!tx) return;
   const store = tx.objectStore('conversations');
-  if (!store.indexNames.contains('by_source_conversationKey')) {
-    store.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
+  for (const retiredIndex of [
+    'by_lastCapturedAt',
+    'by_lastCapturedAt_id',
+    'by_listSourceKey_lastCapturedAt_id',
+    'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+    'by_listSiteKey_lastCapturedAt_id',
+  ]) {
+    if (store.indexNames.contains(retiredIndex)) store.deleteIndex(retiredIndex);
   }
-  if (!store.indexNames.contains('by_lastCapturedAt')) {
-    store.createIndex('by_lastCapturedAt', 'lastCapturedAt', { unique: false });
-  }
-  if (!store.indexNames.contains('by_lastCapturedAt_id')) {
-    store.createIndex('by_lastCapturedAt_id', ['lastCapturedAt', 'id'], { unique: false });
-  }
-  if (!store.indexNames.contains('by_listSourceKey_lastCapturedAt_id')) {
-    store.createIndex('by_listSourceKey_lastCapturedAt_id', ['listSourceKey', 'lastCapturedAt', 'id'], {
-      unique: false,
-    });
-  }
-  if (!store.indexNames.contains('by_listSourceKey_listSiteKey_lastCapturedAt_id')) {
-    store.createIndex(
-      'by_listSourceKey_listSiteKey_lastCapturedAt_id',
-      ['listSourceKey', 'listSiteKey', 'lastCapturedAt', 'id'],
-      { unique: false },
-    );
-  }
-  if (!store.indexNames.contains('by_listSiteKey_lastCapturedAt_id')) {
-    store.createIndex('by_listSiteKey_lastCapturedAt_id', ['listSiteKey', 'lastCapturedAt', 'id'], {
-      unique: false,
-    });
-  }
+  ensureCurrentIndexes(store);
 }
 
 function ensureMessagesStore(db: IDBDatabase, tx: IDBTransaction | null): void {
@@ -713,13 +732,13 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
 
   if (!tx || oldVersion === 0 || oldVersion >= DB_VERSION) return;
 
-  const finish = () => {
-    if (oldVersion < 11) normalizeConversationRecordsForV11({ tx });
-    normalizeMessageRecordsForV12({ tx });
+  const migrateMessages = () => {
+    if (oldVersion < 12) normalizeMessageRecordsForV12({ tx });
   };
+  const migrateActivity = () => migrateConversationRecordsForV13({ tx }, migrateMessages);
   const migrateArticles = () => {
-    if (oldVersion >= 4) return finish();
-    migrateLegacyArticleConversations({ tx }, finish);
+    if (oldVersion >= 4) return migrateActivity();
+    migrateLegacyArticleConversations({ tx }, migrateActivity);
   };
 
   if (oldVersion >= 2) return migrateArticles();

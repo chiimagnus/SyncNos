@@ -62,7 +62,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
         source: 'web',
         sourceType: 'article',
         conversationKey: 'conv-11',
-        lastCapturedAt: Date.now(),
+        lastActivityAt: Date.now(),
         url: 'https://example.com/article/11',
       },
     ],

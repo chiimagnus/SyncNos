@@ -15,12 +15,12 @@ type CurrentPageCaptureDeps = {
   collectorsRegistry: CollectorRegistryLike | null;
 };
 
-export type CurrentPageCaptureProgress = {
+type CurrentPageCaptureProgress = {
   kind?: 'default' | 'error';
   message: string;
 };
 
-export type CurrentPageCaptureState = {
+type CurrentPageCaptureState = {
   available: boolean;
   kind: 'chat' | 'article' | 'unsupported';
   label: string;
@@ -153,9 +153,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const integrity = resolveCaptureIntegrity(collectorId, snapshot);
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
+    const activityAt = Date.now();
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-      payload: normalizedSnapshot.conversation,
+      payload: { ...normalizedSnapshot.conversation, lastActivityAt: 0 },
     });
     if (!conversationRes?.ok) {
       throw new Error(conversationRes?.error?.message || 'upsertConversation failed');
@@ -169,6 +170,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       diff: integrity.persistence.diff,
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
       conversationUrl: normalizedSnapshot?.conversation?.url || '',
+      activityAt,
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');

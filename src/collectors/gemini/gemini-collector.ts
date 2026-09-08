@@ -977,7 +977,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
         title: extractConversationTitle(),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
-        lastCapturedAt: Date.now(),
       },
       messages,
     };

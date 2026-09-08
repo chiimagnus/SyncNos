@@ -25,6 +25,55 @@ describe('conversation-kinds', () => {
     expect(chat.notion.dbSpec.storageKey).toBe('notion_db_id_syncnos_ai_chats');
   });
 
+  it('projects lastActivityAt into Notion Last Activity on create and update for every built-in kind', () => {
+    const kinds = loadConversationKinds();
+    const at = Date.parse('2026-09-08T01:02:03.000Z');
+    for (const id of ['chat', 'article', 'video']) {
+      const kind = kinds.list().find((item) => item.id === id)!;
+      const conversation = {
+        sourceType: id === 'chat' ? 'chat' : id,
+        source: id === 'chat' ? 'chatgpt' : id === 'article' ? 'web' : 'video',
+        title: id,
+        url: `https://example.com/${id}`,
+        lastActivityAt: at,
+      };
+      expect(kind.notion.pageSpec.buildCreateProperties(conversation)['Last Activity']).toEqual({
+        date: { start: '2026-09-08T01:02:03.000Z' },
+      });
+      expect(kind.notion.pageSpec.buildUpdateProperties(conversation)['Last Activity']).toEqual({
+        date: { start: '2026-09-08T01:02:03.000Z' },
+      });
+    }
+  });
+
+  it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
+    'projects invalid Activity %s as an explicit null Notion Last Activity without inventing now',
+    (lastActivityAt) => {
+      const chat = loadConversationKinds()
+        .list()
+        .find((item) => item.id === 'chat')!;
+      const properties = chat.notion.pageSpec.buildUpdateProperties({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        title: 'T',
+        url: 'https://example.com',
+        lastActivityAt,
+      });
+      expect(properties['Last Activity']).toEqual({ date: null });
+    },
+  );
+
+  it('declares only Last Activity as the SyncNos Notion activity field for every built-in kind', () => {
+    for (const kind of loadConversationKinds().list()) {
+      expect(kind.notion.dbSpec.properties['Last Activity']).toEqual({ date: {} });
+      expect(kind.notion.dbSpec.ensureSchemaPatch?.['Last Activity']).toEqual({ date: {} });
+      expect(kind.notion.dbSpec.properties.Date).toBeUndefined();
+      const projected = kind.notion.pageSpec.buildUpdateProperties({ lastActivityAt: 1 });
+      expect(projected['Last Activity']).toBeDefined();
+      expect(projected.Date).toBeUndefined();
+    }
+  });
+
   it('does not expose pageSpec.shouldRebuild (rebuild strategy is handled by orchestrator)', () => {
     const kinds = loadConversationKinds();
     const kind = kinds.pick({ sourceType: 'article' });
