@@ -1207,7 +1207,7 @@ describe('background-router notion sync', () => {
             properties: {
               Name: { title: [{ plain_text: 'Same article title' }] },
               URL: { url: 'https://x/article' },
-              Date: { date: { start: new Date(1000).toISOString() } },
+              'Last Activity': { date: { start: new Date(1000).toISOString() } },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
               'Comment Threads': { number: 0 },

@@ -138,11 +138,12 @@ const chatKind: ConversationKindDefinition = {
       storageKey: 'notion_db_id_syncnos_ai_chats',
       properties: {
         Name: { title: {} },
-        Date: { date: {} },
+        'Last Activity': { date: {} },
         URL: { url: {} },
         AI: { multi_select: { options: [] } },
       },
       ensureSchemaPatch: {
+        'Last Activity': { date: {} },
         AI: { multi_select: { options: [] } },
       },
     },
@@ -152,7 +153,7 @@ const chatKind: ConversationKindDefinition = {
         return {
           Name: asTitle(data.title),
           URL: asUrl(data.url),
-          Date: asDate(data.lastActivityAt),
+          'Last Activity': asDate(data.lastActivityAt),
           AI: { multi_select: [{ name: aiLabelForSource(data.source) }] },
         };
       },
@@ -161,7 +162,7 @@ const chatKind: ConversationKindDefinition = {
         return {
           Name: asTitle(data.title),
           URL: asUrl(data.url),
-          Date: asDate(data.lastActivityAt),
+          'Last Activity': asDate(data.lastActivityAt),
           AI: { multi_select: [{ name: aiLabelForSource(data.source) }] },
         };
       },
@@ -184,13 +185,14 @@ const articleKind: ConversationKindDefinition = {
       storageKey: 'notion_db_id_syncnos_web_articles',
       properties: {
         Name: { title: {} },
-        Date: { date: {} },
+        'Last Activity': { date: {} },
         URL: { url: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
         'Comment Threads': { number: {} },
       },
       ensureSchemaPatch: {
+        'Last Activity': { date: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
         'Comment Threads': { number: {} },
@@ -202,7 +204,7 @@ const articleKind: ConversationKindDefinition = {
         return {
           Name: asTitle(data.title),
           URL: asUrl(data.url),
-          Date: asDate(data.lastActivityAt),
+          'Last Activity': asDate(data.lastActivityAt),
           Author: asRichText(data.author),
           Published: asRichText(data.publishedAt),
           'Comment Threads': asNumber((data as any).commentThreadCount),
@@ -213,7 +215,7 @@ const articleKind: ConversationKindDefinition = {
         return {
           Name: asTitle(data.title),
           URL: asUrl(data.url),
-          Date: asDate(data.lastActivityAt),
+          'Last Activity': asDate(data.lastActivityAt),
           Author: asRichText(data.author),
           Published: asRichText(data.publishedAt),
           'Comment Threads': asNumber((data as any).commentThreadCount),
@@ -238,7 +240,7 @@ const videoKind: ConversationKindDefinition = {
       storageKey: 'notion_db_id_syncnos_videos',
       properties: {
         Name: { title: {} },
-        Date: { date: {} },
+        'Last Activity': { date: {} },
         URL: { url: {} },
         Platform: { select: { options: [] } },
         Author: { rich_text: {} },
@@ -248,6 +250,7 @@ const videoKind: ConversationKindDefinition = {
         'Has Timestamps': { checkbox: {} },
       },
       ensureSchemaPatch: {
+        'Last Activity': { date: {} },
         Platform: { select: { options: [] } },
         Author: { rich_text: {} },
         Duration: { number: {} },
@@ -262,7 +265,7 @@ const videoKind: ConversationKindDefinition = {
         return {
           Name: asTitle(data.title),
           URL: asUrl(data.url),
-          Date: asDate(data.lastActivityAt),
+          'Last Activity': asDate(data.lastActivityAt),
           Platform: asSelect((data as any).platform),
           Author: asRichText(data.author),
           Duration: asNumber((data as any).durationSeconds),
@@ -276,7 +279,7 @@ const videoKind: ConversationKindDefinition = {
         return {
           Name: asTitle(data.title),
           URL: asUrl(data.url),
-          Date: asDate(data.lastActivityAt),
+          'Last Activity': asDate(data.lastActivityAt),
           Platform: asSelect((data as any).platform),
           Author: asRichText(data.author),
           Duration: asNumber((data as any).durationSeconds),

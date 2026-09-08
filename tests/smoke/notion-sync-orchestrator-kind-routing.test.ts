@@ -70,8 +70,7 @@ describe('notion-sync-orchestrator kind routing', () => {
       },
     };
 
-    const storage = {
-      getSyncMappingByConversation: async (id: number) => {
+    const getSyncMappingByConversation = vi.fn(async (id: number) => {
         if (id === 1) {
           return {
             conversation: {
@@ -97,7 +96,11 @@ describe('notion-sync-orchestrator kind routing', () => {
           },
           mapping: null,
         };
-      },
+      });
+    const attachOrphanArticleCommentsToConversation = vi.fn(async () => ({ updated: 0 }));
+    const storage = {
+      getSyncMappingByConversation,
+      attachOrphanArticleCommentsToConversation,
       getMessagesByConversationId: async () => [
         { messageKey: 'm1', role: 'assistant', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 },
       ],
@@ -191,11 +194,85 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(articleCreate.properties.Author).toBeTruthy();
     expect(articleCreate.properties['Comment Threads']).toEqual({ number: 1 });
     expect(chatCreate.properties.AI).toBeTruthy();
+    expect(attachOrphanArticleCommentsToConversation).toHaveBeenCalledTimes(1);
+    expect(getSyncMappingByConversation).toHaveBeenCalledTimes(2);
 
     expect(upgradeConversationIds.sort((a, b) => a - b)).toEqual([1, 2]);
 
     // Update properties only happen on subsequent syncs; keep coverage minimal here.
     expect(updateCalls.length).toBe(0);
+  });
+
+  it('refreshes article Activity after orphan attach before creating the Notion page', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+    let readCount = 0;
+    const getSyncMappingByConversation = vi.fn(async () => {
+      readCount += 1;
+      return {
+        conversation: {
+          id: 1,
+          sourceType: 'article',
+          source: 'web',
+          title: 'Article refresh',
+          url: 'https://example.com/article-refresh',
+          lastActivityAt: readCount === 1 ? 1_000 : 5_000,
+        },
+        mapping: null,
+      };
+    });
+    const createPageInDatabase = vi.fn(async () => ({ id: 'p_article_refresh' }));
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+      storage: {
+        getSyncMappingByConversation,
+        attachOrphanArticleCommentsToConversation: async () => ({ updated: 1 }),
+        getArticleCommentsByConversationId: async () => [],
+        getMessagesByConversationId: async () => [
+          { messageKey: 'article_body', role: 'assistant', contentMarkdown: 'body', sequence: 1, updatedAt: 1 },
+        ],
+        setConversationNotionPageId: async () => true,
+        setSyncCursor: async () => true,
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
+      syncService: {
+        getPage: async () => {
+          throw new Error('unused');
+        },
+        createPageInDatabase,
+        updatePageProperties: async () => ({ ok: true }),
+        appendChildren: async (_token: string, _blockId: string, blocks: any[]) => ({
+          results: blocks.map((_, index) => ({ id: `heading_${index}` })),
+        }),
+        messagesToBlocks: () => [],
+        isPageUsableForDatabase: () => true,
+      },
+      jobStore,
+    });
+
+    const result = await orchestrator.syncConversations({ conversationIds: [1], instanceId: 'i' });
+
+    expect(result.okCount).toBe(1);
+    expect(getSyncMappingByConversation).toHaveBeenCalledTimes(2);
+    expect(createPageInDatabase).toHaveBeenCalledWith(
+      't',
+      expect.objectContaining({
+        properties: expect.objectContaining({
+          'Last Activity': { date: { start: new Date(5_000).toISOString() } },
+        }),
+      }),
+    );
   });
 
   it('fails closed before appending blocks when image upgrade throws unexpectedly', async () => {

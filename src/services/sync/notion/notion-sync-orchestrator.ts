@@ -500,7 +500,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           trace.mark('load conversation');
 
           const mapped = await storage.getSyncMappingByConversation(id);
-          const convo = mapped && mapped.conversation ? mapped.conversation : null;
+          let convo = mapped && mapped.conversation ? mapped.conversation : null;
           const mapping = mapped && mapped.mapping ? mapped.mapping : null;
           if (!convo) {
             lifecycle.recordResult({
@@ -540,7 +540,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               try {
                 const url = String(convo?.url || '').trim();
                 if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                  await storage.attachOrphanArticleCommentsToConversation(url, id);
+                  const attached = await storage.attachOrphanArticleCommentsToConversation(url, id);
+                  if (Number(attached?.updated) > 0) {
+                    const refreshed = await storage.getSyncMappingByConversation(id);
+                    if (refreshed?.conversation) convo = refreshed.conversation;
+                  }
                 }
                 const loaded = await storage.getArticleCommentsByConversationId(id);
                 cachedArticleComments = parseArticleCommentDtos(loaded);

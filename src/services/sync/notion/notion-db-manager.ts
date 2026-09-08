@@ -168,6 +168,16 @@ async function createDatabase(accessToken: string, { parentPageId, dbSpec }: { p
   return notionFetch({ accessToken, method: 'POST', path: '/v1/databases', body });
 }
 
+function notionPropertyType(property: unknown): string {
+  return property && typeof property === 'object' ? String((property as any).type || '').trim() : '';
+}
+
+function schemaIncompatible(propertyName: string, expectedType: string, actualType: string): Error {
+  return new Error(
+    `notion database schema incompatible: ${propertyName} must be ${expectedType}${actualType ? `, got ${actualType}` : ''}`,
+  );
+}
+
 async function ensureDatabaseSchema({
   accessToken,
   databaseId,
@@ -179,32 +189,43 @@ async function ensureDatabaseSchema({
 }) {
   const spec = dbSpec && typeof dbSpec === 'object' ? dbSpec : defaultDbSpec();
   const db = await getDatabase(accessToken, databaseId);
-  const props = db && db.properties ? db.properties : {};
+  const props = { ...(db && db.properties ? db.properties : {}) } as Record<string, any>;
   const patch = spec.ensureSchemaPatch && typeof spec.ensureSchemaPatch === 'object' ? spec.ensureSchemaPatch : {};
 
-  // If the DB has an `AI` property but it's not a multi_select, we can't patch it in-place.
-  // Signal failure so callers can surface a clear error or rebuild strategy.
+  const lastActivity = props['Last Activity'];
+  if (lastActivity) {
+    const type = notionPropertyType(lastActivity);
+    if (type !== 'date') throw schemaIncompatible('Last Activity', 'date', type);
+  } else if (props.Date) {
+    const type = notionPropertyType(props.Date);
+    if (type !== 'date') throw schemaIncompatible('Date', 'date', type);
+    await updateDatabase(accessToken, {
+      databaseId,
+      properties: { Date: { name: 'Last Activity' } },
+    });
+    props['Last Activity'] = { ...props.Date, type: 'date' };
+    delete props.Date;
+  }
+
   if (patch.AI) {
-    const ai = props && props.AI ? props.AI : null;
-    if (ai && ai.type && ai.type !== 'multi_select') return false;
+    const ai = props.AI;
+    if (ai) {
+      const type = notionPropertyType(ai);
+      if (type !== 'multi_select') throw schemaIncompatible('AI', 'multi_select', type);
+    }
   }
 
   const missing: Record<string, any> = {};
   for (const [k, v] of Object.entries(patch)) {
-    if (!props || !props[k]) missing[k] = v;
+    if (!props[k]) missing[k] = v;
   }
   if (!Object.keys(missing).length) return true;
 
-  // Best-effort: add missing properties if possible.
   if (missing.AI && missing.AI.multi_select && typeof missing.AI.multi_select === 'object') {
     missing.AI = { multi_select: { ...missing.AI.multi_select, options: buildAiOptions() } };
   }
-  try {
-    await updateDatabase(accessToken, { databaseId, properties: missing });
-    return true;
-  } catch (_e) {
-    return false;
-  }
+  await updateDatabase(accessToken, { databaseId, properties: missing });
+  return true;
 }
 
 async function ensureDatabase({

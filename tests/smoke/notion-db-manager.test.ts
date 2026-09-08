@@ -70,6 +70,8 @@ describe('notion-db-manager', () => {
     expect(create).toBeTruthy();
     expect(create.body.title?.[0]?.text?.content).toBe('SyncNos-AI Chats');
     expect(create.body.properties?.AI?.multi_select).toBeTruthy();
+    expect(create.body.properties?.['Last Activity']?.date).toBeTruthy();
+    expect(create.body.properties?.Date).toBeUndefined();
   });
 
   it('creates SyncNos-Web Articles database when missing (dbSpec-driven + separate cache key)', async () => {
@@ -90,12 +92,13 @@ describe('notion-db-manager', () => {
       storageKey: 'notion_db_id_syncnos_web_articles',
       properties: {
         Name: { title: {} },
-        Date: { date: {} },
+        'Last Activity': { date: {} },
         URL: { url: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
       },
       ensureSchemaPatch: {
+        'Last Activity': { date: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
       },
@@ -109,10 +112,12 @@ describe('notion-db-manager', () => {
     const create = calls.find((c) => c.method === 'POST' && c.path === '/v1/databases');
     expect(create.body.title?.[0]?.text?.content).toBe('SyncNos-Web Articles');
     expect(create.body.properties?.Author?.rich_text).toBeTruthy();
+    expect(create.body.properties?.['Last Activity']?.date).toBeTruthy();
+    expect(create.body.properties?.Date).toBeUndefined();
     expect(create.body.properties?.AI).toBeFalsy();
   });
 
-  it('best-effort adds AI property when reusing cached database without AI', async () => {
+  it('renames legacy Date before adding missing AI when reusing a cached database', async () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
@@ -134,11 +139,55 @@ describe('notion-db-manager', () => {
     expect(res.reused).toBe(true);
     expect(res.databaseId).toBe('db1');
 
-    const patched = calls.some((c) => c.method === 'PATCH' && c.path === '/v1/databases/db1');
-    expect(patched).toBe(true);
+    const patches = calls.filter((c) => c.method === 'PATCH' && c.path === '/v1/databases/db1');
+    expect(patches).toHaveLength(2);
+    expect(patches[0]?.body?.properties).toEqual({ Date: { name: 'Last Activity' } });
+    expect(patches[1]?.body?.properties?.AI?.multi_select).toBeTruthy();
   });
 
-  it('returns false when cached database has AI property with wrong type', async () => {
+  it('renames legacy Date idempotently and preserves an existing user Date when Last Activity already exists', async () => {
+    const calls: any[] = [];
+    let properties: Record<string, any> = {
+      Name: { type: 'title' },
+      Date: { type: 'date' },
+      URL: { type: 'url' },
+      AI: { type: 'multi_select' },
+    };
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+        return { id: 'db1', properties: { ...properties } };
+      }
+      if (req.method === 'PATCH' && req.path === '/v1/databases/db1') {
+        if (req.body?.properties?.Date?.name === 'Last Activity') {
+          properties = {
+            ...properties,
+            'Last Activity': { ...properties.Date, type: 'date' },
+          };
+          delete properties.Date;
+        }
+        return { ok: true };
+      }
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    await notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' });
+    await notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' });
+    expect(calls.filter((c) => c.method === 'PATCH')).toHaveLength(1);
+
+    properties = {
+      ...properties,
+      Date: { type: 'rich_text' },
+    };
+    calls.length = 0;
+    await notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' });
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
+  });
+
+  it('throws when cached database has AI property with wrong type', async () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
@@ -147,7 +196,7 @@ describe('notion-db-manager', () => {
           id: 'db1',
           properties: {
             Name: { type: 'title' },
-            Date: { type: 'date' },
+            'Last Activity': { type: 'date' },
             URL: { type: 'url' },
             AI: { type: 'select' },
           },
@@ -159,9 +208,65 @@ describe('notion-db-manager', () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: 'db1' } });
 
-    const ok = await notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' });
-    expect(ok).toBe(false);
+    await expect(notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' })).rejects.toThrow(
+      'AI must be multi_select',
+    );
     expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
+  });
+
+  it.each([
+    ['Last Activity', { type: 'rich_text' }],
+    ['Date', { type: 'rich_text' }],
+  ])('rejects incompatible %s activity schema without patching', async (propertyName, propertyValue) => {
+    const calls: any[] = [];
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+        return {
+          id: 'db1',
+          properties: {
+            Name: { type: 'title' },
+            URL: { type: 'url' },
+            AI: { type: 'multi_select' },
+            [propertyName]: propertyValue,
+          },
+        };
+      }
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    await expect(notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' })).rejects.toThrow(
+      `${propertyName} must be date`,
+    );
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
+  });
+
+  it('propagates schema PATCH failures instead of continuing sync', async () => {
+    notionFetchImpl = async (req: any) => {
+      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+        return {
+          id: 'db1',
+          properties: {
+            Name: { type: 'title' },
+            Date: { type: 'date' },
+            URL: { type: 'url' },
+            AI: { type: 'multi_select' },
+          },
+        };
+      }
+      if (req.method === 'PATCH' && req.path === '/v1/databases/db1') throw new Error('schema patch failed');
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    await expect(notionDbManager.ensureDatabaseSchema({ accessToken: 't', databaseId: 'db1' })).rejects.toThrow(
+      'schema patch failed',
+    );
   });
 
   it('clears stale cached database id and recreates database on object_not_found', async () => {
@@ -257,7 +362,7 @@ describe('notion-db-manager', () => {
           parent: { type: 'page_id', page_id: 'p_old' },
           properties: {
             Name: { type: 'title' },
-            Date: { type: 'date' },
+            'Last Activity': { type: 'date' },
             URL: { type: 'url' },
             AI: { type: 'multi_select' },
           },
@@ -288,7 +393,7 @@ describe('notion-db-manager', () => {
           parent: { type: 'page_id', page_id: 'p_new' },
           properties: {
             Name: { type: 'title' },
-            Date: { type: 'date' },
+            'Last Activity': { type: 'date' },
             URL: { type: 'url' },
             AI: { type: 'multi_select' },
           },
@@ -355,7 +460,7 @@ describe('notion-db-manager', () => {
           parent: { type: 'page_id', page_id: 'p_target' },
           properties: {
             Name: { type: 'title' },
-            Date: { type: 'date' },
+            'Last Activity': { type: 'date' },
             URL: { type: 'url' },
             AI: { type: 'multi_select' },
           },
