@@ -2,7 +2,7 @@ import type { ArticleCommentLocatorV2, ArticleCommentSurfaceHint } from '@servic
 import { captureCommentBoundaryPath, encodeCommentNodePath } from '@services/comments/locator/comment-boundary-path';
 import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { captureCommentRootSnapshot } from '@services/comments/locator/comment-root-snapshot';
-import { createCommentDomTextIndex } from '@services/comments/locator/dom-text-index';
+import { createCommentDomTextIndex, type CommentDomTextIndex } from '@services/comments/locator/dom-text-index';
 
 const CONTEXT_LENGTH = 64;
 
@@ -11,9 +11,10 @@ export function captureCommentAnchor(input: {
   range: Range;
   surfaceHint: ArticleCommentSurfaceHint;
   documentRoot?: Element | null;
+  index?: CommentDomTextIndex;
 }): ArticleCommentLocatorV2 | null {
   const { root, range } = input;
-  const index = createCommentDomTextIndex(root);
+  const index = input.index?.root === root ? input.index : createCommentDomTextIndex(root);
   const offsets = index.rangeToOffsets(range);
   if (!offsets || offsets.end <= offsets.start) return null;
 
@@ -21,7 +22,7 @@ export function captureCommentAnchor(input: {
   if (!exact || index.text.slice(offsets.start, offsets.end) !== exact) return null;
 
   const boundaryPath = captureCommentBoundaryPath(root, range);
-  const rootEvidence = captureCommentRootSnapshot(root);
+  const rootEvidence = captureCommentRootSnapshot(root, { index });
   if (!boundaryPath || !rootEvidence) return null;
 
   const prefix = index.text.slice(Math.max(0, offsets.start - CONTEXT_LENGTH), offsets.start);
@@ -43,4 +44,34 @@ export function captureCommentAnchor(input: {
     rootEvidence,
     ...(documentRelativeRootPath ? { documentRelativeRootPath } : {}),
   };
+}
+
+export function captureUniqueExactCommentAnchor(input: {
+  root: Element;
+  exact: unknown;
+  surfaceHint: ArticleCommentSurfaceHint;
+  documentRoot?: Element | null;
+  index?: CommentDomTextIndex;
+  maxTextLength?: number;
+}): ArticleCommentLocatorV2 | null {
+  const exact = toCanonicalCommentQuote(input.exact);
+  if (!exact) return null;
+
+  const index = input.index?.root === input.root ? input.index : createCommentDomTextIndex(input.root);
+  const maxTextLength = Math.max(0, Math.floor(Number(input.maxTextLength ?? 400_000) || 0));
+  if (index.text.length > maxTextLength) return null;
+
+  const start = index.text.indexOf(exact);
+  if (start < 0) return null;
+  if (index.text.indexOf(exact, start + Math.max(1, exact.length)) >= 0) return null;
+
+  const range = index.offsetsToRange(start, start + exact.length);
+  if (!range) return null;
+  return captureCommentAnchor({
+    root: input.root,
+    range,
+    surfaceHint: input.surfaceHint,
+    documentRoot: input.documentRoot,
+    index,
+  });
 }

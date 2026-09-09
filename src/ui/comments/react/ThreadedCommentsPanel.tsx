@@ -321,6 +321,7 @@ export function ThreadedCommentsPanel({
                       discussion.setActiveRoot(id);
                       discussion.dispatch({ type: 'focus-reply', rootId: id });
                     });
+                    if (root.importSource === 'dedao' && root.locator) void runLocate(id);
                   }}
                   rootMenuTriggerRef={focusController.registerMenuTrigger(rootId)}
                   getReplyMenuTriggerRef={(replyId) => focusController.registerMenuTrigger(replyId)}

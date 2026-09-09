@@ -5,7 +5,12 @@ import {
   type ThreadedCommentsPanelApi,
   type CommentLocatorSurfaceRoots,
 } from '@ui/comments';
-import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
+import { captureUniqueExactCommentAnchor } from '@services/comments/locator/capture-comment-anchor';
+import type {
+  CommentSidebarHost,
+  CommentSidebarPanelApi,
+  CommentSidebarSession,
+} from '@services/comments/sidebar/comment-sidebar-contract';
 
 export type ArticleCommentsSectionProps = {
   sidebarSession: CommentSidebarSession;
@@ -14,6 +19,66 @@ export type ArticleCommentsSectionProps = {
   subscribeLocatorSurfaceRoots?: (listener: () => void) => () => void;
   fullWidth?: boolean;
 };
+
+function withAppImportedLocators(host: CommentSidebarHost, roots: CommentLocatorSurfaceRoots | null) {
+  const snapshot = host.getSnapshot();
+  if (!roots?.sourceRoot || !snapshot.comments.length) return snapshot;
+
+  let changed = false;
+  const comments = snapshot.comments.map((item) => {
+    if (
+      item.locator ||
+      item.parentId != null ||
+      item.importSource !== 'dedao' ||
+      !item.importKey ||
+      !String(item.quoteText || '')
+    ) {
+      return item;
+    }
+
+    const locator = captureUniqueExactCommentAnchor({
+      root: roots.sourceRoot,
+      exact: item.quoteText,
+      surfaceHint: 'app',
+    });
+    if (!locator) return item;
+    changed = true;
+    return { ...item, locator };
+  });
+
+  return changed ? { ...snapshot, comments } : snapshot;
+}
+
+function createAppLocatorPanel(input: {
+  panel: ThreadedCommentsPanelApi;
+  getRoots: () => CommentLocatorSurfaceRoots | null;
+  subscribeRoots: () => ((listener: () => void) => () => void) | undefined;
+}): CommentSidebarPanelApi {
+  return {
+    attachHost(host) {
+      const decoratedHost: CommentSidebarHost = {
+        getSnapshot: () => withAppImportedLocators(host, input.getRoots()),
+        subscribe(listener) {
+          const unsubscribeHost = host.subscribe(listener);
+          const subscribeRoots = input.subscribeRoots();
+          const unsubscribeRoots =
+            typeof subscribeRoots === 'function'
+              ? subscribeRoots(() => {
+                  listener();
+                  input.panel.refreshLocatorRoots();
+                })
+              : () => {};
+          return () => {
+            unsubscribeRoots();
+            unsubscribeHost();
+          };
+        },
+        actions: host.actions,
+      };
+      return input.panel.attachHost(decoratedHost);
+    },
+  };
+}
 
 export function ArticleCommentsSection(props: ArticleCommentsSectionProps) {
   return <ArticleCommentsPanelMount {...props} />;
@@ -37,6 +102,7 @@ function ArticleCommentsPanelMount({
   const locatorSurfaceRootsGetterRef = useRef<() => CommentLocatorSurfaceRoots | null>(
     typeof getLocatorSurfaceRoots === 'function' ? getLocatorSurfaceRoots : () => null,
   );
+  const locatorSurfaceRootsSubscriberRef = useRef<typeof subscribeLocatorSurfaceRoots>(subscribeLocatorSurfaceRoots);
   useEffect(() => {
     locatorSurfaceRootsGetterRef.current =
       typeof getLocatorSurfaceRoots === 'function' ? getLocatorSurfaceRoots : () => null;
@@ -44,8 +110,7 @@ function ArticleCommentsPanelMount({
   }, [getLocatorSurfaceRoots]);
 
   useEffect(() => {
-    if (typeof subscribeLocatorSurfaceRoots !== 'function') return;
-    return subscribeLocatorSurfaceRoots(() => apiRef.current?.refreshLocatorRoots());
+    locatorSurfaceRootsSubscriberRef.current = subscribeLocatorSurfaceRoots;
   }, [subscribeLocatorSurfaceRoots]);
 
   useEffect(() => {
@@ -66,7 +131,13 @@ function ArticleCommentsPanelMount({
       deferReactUpdates: true,
     });
     apiRef.current = mounted.api;
-    const panelLease = sidebarSession.attachPanel(mounted.api as any);
+    const panelLease = sidebarSession.attachPanel(
+      createAppLocatorPanel({
+        panel: mounted.api,
+        getRoots: () => locatorSurfaceRootsGetterRef.current(),
+        subscribeRoots: () => locatorSurfaceRootsSubscriberRef.current,
+      }),
+    );
 
     return () => {
       panelLease.dispose();

@@ -46,6 +46,9 @@ function toCommentSidebarItem(input: CommentSidebarTestItemInput, index: number)
     quoteText: String(input.quoteText || ''),
     commentText: String(input.commentText),
     locator: input.locator || null,
+    ...(input.importSource && input.importKey
+      ? { importSource: String(input.importSource), importKey: String(input.importKey) }
+      : {}),
     createdAt: Number.isFinite(createdAt) ? createdAt : index + 1,
     updatedAt: Number.isFinite(updatedAt) ? updatedAt : Number.isFinite(createdAt) ? createdAt : index + 1,
   };

@@ -1,7 +1,11 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, test } from 'vitest';
 
-import { captureCommentAnchor } from '../../src/services/comments/locator/capture-comment-anchor';
+import {
+  captureCommentAnchor,
+  captureUniqueExactCommentAnchor,
+} from '../../src/services/comments/locator/capture-comment-anchor';
+import { resolveCommentAnchor } from '../../src/services/comments/locator/resolve-comment-anchor';
 
 describe('captureCommentAnchor', () => {
   test('builds a V2 locator from explicit validated root and range', () => {
@@ -42,5 +46,40 @@ describe('captureCommentAnchor', () => {
     const range = document.createRange();
     range.selectNodeContents(outside);
     expect(captureCommentAnchor({ root, range, surfaceHint: 'app' })).toBeNull();
+  });
+
+  test('materializes an app locator only for one exact quote occurrence', () => {
+    const document = new JSDOM('<article>alpha <b>unique quote</b> omega</article>').window.document;
+    const root = document.querySelector('article')!;
+
+    const locator = captureUniqueExactCommentAnchor({
+      root,
+      exact: 'unique quote',
+      surfaceHint: 'app',
+    });
+
+    expect(locator).toMatchObject({
+      v: 2,
+      surfaceHint: 'app',
+      quote: { exact: 'unique quote', prefix: 'alpha ', suffix: ' omega' },
+      position: { start: 6, end: 18 },
+    });
+    expect(locator).toBeTruthy();
+    const resolved = resolveCommentAnchor({ locator: locator!, roots: [root] });
+    expect(resolved.ok).toBe(true);
+    if (resolved.ok) expect(resolved.range.toString()).toBe('unique quote');
+  });
+
+  test('refuses ambiguous exact quotes instead of guessing', () => {
+    const document = new JSDOM('<article>same middle same</article>').window.document;
+    const root = document.querySelector('article')!;
+
+    expect(
+      captureUniqueExactCommentAnchor({
+        root,
+        exact: 'same',
+        surfaceHint: 'app',
+      }),
+    ).toBeNull();
   });
 });

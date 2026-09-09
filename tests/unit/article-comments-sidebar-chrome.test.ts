@@ -160,6 +160,80 @@ describe('ArticleCommentsSection shared chrome', () => {
     ).toBeTruthy();
   });
 
+  it('materializes exact APP locators for imported Dedao comments without guessing duplicates', async () => {
+    const session = createCommentSidebarSession();
+    const sourceRoot = document.createElement('article');
+    sourceRoot.textContent = 'alpha unique quote omega repeated repeated';
+    document.body.appendChild(sourceRoot);
+
+    await act(async () => {
+      root!.render(
+        createElement(ArticleCommentsSection, {
+          sidebarSession: session,
+          getLocatorSurfaceRoots: () => ({ sourceRoot, scrollRoot: sourceRoot }),
+        }),
+      );
+    });
+
+    await act(async () => {
+      session.requestOpen();
+      session.updateHost({
+        comments: [
+          {
+            id: 1,
+            parentId: null,
+            conversationId: 21,
+            canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
+            authorName: 'Me',
+            quoteText: 'unique quote',
+            commentText: '划线',
+            locator: null,
+            importSource: 'dedao',
+            importKey: 'line-1',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          {
+            id: 2,
+            parentId: null,
+            conversationId: 21,
+            canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
+            authorName: 'Me',
+            quoteText: 'repeated',
+            commentText: '划线',
+            locator: null,
+            importSource: 'dedao',
+            importKey: 'line-2',
+            createdAt: 2,
+            updatedAt: 2,
+          },
+        ],
+      });
+    });
+
+    const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    const shadow = host?.shadowRoot;
+    await vi.waitFor(() => {
+      expect(shadow?.querySelector('[data-thread-root-id="1"]')).toBeTruthy();
+      expect(shadow?.querySelector('[data-thread-root-id="2"]')).toBeTruthy();
+    });
+
+    const exactQuote = shadow?.querySelector(
+      '[data-thread-root-id="1"] .webclipper-inpage-comments-panel__thread-quote',
+    ) as HTMLElement | null;
+    const duplicateQuote = shadow?.querySelector(
+      '[data-thread-root-id="2"] .webclipper-inpage-comments-panel__thread-quote',
+    ) as HTMLElement | null;
+    expect(exactQuote?.getAttribute('data-locator-invalid')).toBeNull();
+    expect(
+      (exactQuote?.querySelector('.webclipper-inpage-comments-panel__quote-locate') as HTMLButtonElement).disabled,
+    ).toBe(false);
+    expect(duplicateQuote?.getAttribute('data-locator-invalid')).toBe('1');
+    expect(
+      (duplicateQuote?.querySelector('.webclipper-inpage-comments-panel__quote-locate') as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it('defers the nested React root cleanup until the parent commit finishes', async () => {
     const session = createCommentSidebarSession();
     const sourceRoot = document.createElement('article');

@@ -213,6 +213,53 @@ describe('Threaded comments panel locate', () => {
     expect(document.querySelector('[data-webclipper-comment-highlights]')).toBeNull();
   });
 
+  it('locates an imported Dedao root when its comment body is activated', async () => {
+    const scrollRoot = createScrollRoot();
+    const article = document.createElement('article');
+    article.textContent = 'Hello world';
+    scrollRoot.appendChild(article);
+    document.body.appendChild(scrollRoot);
+    const range = createResolvedRange(article);
+    (resolveCommentAnchor as any).mockReturnValue({ ok: true, range, root: article, rootIndex: 0 });
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const mounted = mountThreadedCommentsPanel(host, {
+      overlay: false,
+      showHeader: false,
+      variant: 'sidebar',
+      locatorEnv: 'app',
+      getLocatorSurfaceRoots: () => ({ sourceRoot: article, scrollRoot }),
+    });
+
+    getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
+      {
+        id: 7,
+        parentId: null,
+        createdAt: 1000,
+        quoteText: 'world',
+        commentText: '划线',
+        locator,
+        importSource: 'dedao',
+        importKey: 'line-7',
+      },
+    ]);
+    await flushReactScheduler();
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
+    const rootComment = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement;
+    const beforeBodyClick = (resolveCommentAnchor as any).mock.calls.length;
+    rootComment.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    await flushReactScheduler();
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+
+    expect((resolveCommentAnchor as any).mock.calls.length).toBeGreaterThan(beforeBodyClick);
+    expect((scrollRoot as any).scrollTo).toHaveBeenCalledWith({ top: 70, behavior: 'smooth' });
+    expect(Array.from(registeredHighlights.keys()).some((name) => name.includes('active'))).toBe(true);
+
+    mounted.cleanup();
+  });
+
   it('does not invoke the resolver when the surface root is missing', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
