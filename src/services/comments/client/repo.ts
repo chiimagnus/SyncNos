@@ -1,7 +1,6 @@
 import { COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { send } from '@platform/runtime/runtime';
 import type { ArticleCommentLocator } from '@services/comments/domain/comment-locator';
-import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { parseArticleCommentDto, parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
 
@@ -23,8 +22,7 @@ export async function addArticleComment(input: {
   commentText: string;
   locator?: ArticleCommentLocator | null;
 }): Promise<ArticleCommentDto> {
-  const payload = { ...input, locator: normalizeArticleCommentLocator(input.locator) };
-  const res = await send<ApiResponse<ArticleCommentDto>>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, payload);
+  const res = await send<ApiResponse<ArticleCommentDto>>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, input);
   const parsed = parseArticleCommentDto(unwrap(res));
   if (!parsed) throw new Error('invalid article comment response');
   return parsed;

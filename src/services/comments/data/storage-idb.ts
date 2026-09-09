@@ -86,6 +86,8 @@ function normalizeCommentText(value: unknown): string {
 }
 
 function toComment(row: any): ArticleComment {
+  const importSource = safeString(row?.importSource);
+  const importKey = safeString(row?.importKey);
   const comment: ArticleComment = {
     id: Number(row?.id),
     parentId: normalizeParentId(row?.parentId),
@@ -95,9 +97,7 @@ function toComment(row: any): ArticleComment {
     quoteText: safeString(row?.quoteText),
     commentText: normalizeCommentText(row?.commentText),
     locator: normalizeArticleCommentLocator(row?.locator),
-    ...(safeString(row?.importSource) && safeString(row?.importKey)
-      ? { importSource: safeString(row.importSource), importKey: safeString(row.importKey) }
-      : {}),
+    ...(importSource && importKey ? { importSource, importKey } : {}),
     createdAt: Number(row?.createdAt) || 0,
     updatedAt: Number(row?.updatedAt) || 0,
   };
@@ -168,14 +168,14 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
 export async function syncImportedArticleComments(
   items: ImportedArticleCommentInput[],
 ): Promise<{ created: number; updated: number }> {
-  const normalized = (Array.isArray(items) ? items : [])
+  const normalized = items
     .map((item) => {
-      const importSource = safeString(item?.importSource);
-      const importKey = safeString(item?.importKey);
-      const conversationId = normalizeConversationId(item?.conversationId);
-      const canonicalUrl = normalizeCanonicalUrl(item?.canonicalUrl);
-      const quoteText = safeString(item?.quoteText);
-      const commentText = normalizeCommentText(item?.commentText);
+      const importSource = safeString(item.importSource);
+      const importKey = safeString(item.importKey);
+      const conversationId = normalizeConversationId(item.conversationId);
+      const canonicalUrl = normalizeCanonicalUrl(item.canonicalUrl);
+      const quoteText = safeString(item.quoteText);
+      const commentText = normalizeCommentText(item.commentText);
       if (
         !importSource ||
         !importKey ||
@@ -190,17 +190,17 @@ export async function syncImportedArticleComments(
         })
       )
         return null;
-      const createdAt = normalizeTimestamp(item?.createdAt, Date.now());
+      const createdAt = normalizeTimestamp(item.createdAt, Date.now());
       return {
         importSource,
         importKey,
         conversationId,
         canonicalUrl,
-        authorName: safeString(item?.authorName) || '',
+        authorName: safeString(item.authorName),
         quoteText,
         commentText,
         createdAt,
-        updatedAt: normalizeTimestamp(item?.updatedAt, createdAt),
+        updatedAt: normalizeTimestamp(item.updatedAt, createdAt),
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -237,21 +237,21 @@ export async function syncImportedArticleComments(
         const existing = existingByImportIdentity.get(identity);
         latestHistoricalActivityAt = Math.max(latestHistoricalActivityAt, item.createdAt);
         if (!existing) {
-          await reqToPromise(
-            stores.article_comments.add({
-              parentId: null,
-              conversationId,
-              canonicalUrl,
-              authorName: item.authorName,
-              quoteText: item.quoteText,
-              commentText: item.commentText,
-              locator: null,
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt,
-              importSource: item.importSource,
-              importKey: item.importKey,
-            }) as any,
-          );
+          const row = {
+            parentId: null,
+            conversationId,
+            canonicalUrl,
+            authorName: item.authorName,
+            quoteText: item.quoteText,
+            commentText: item.commentText,
+            locator: null,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            importSource: item.importSource,
+            importKey: item.importKey,
+          };
+          const id = await reqToPromise<number>(stores.article_comments.add(row) as any);
+          existingByImportIdentity.set(identity, { ...row, id });
           created += 1;
           continue;
         }
@@ -275,7 +275,6 @@ export async function syncImportedArticleComments(
           safeString(existing.quoteText) !== next.quoteText ||
           normalizeCommentText(existing.commentText) !== next.commentText ||
           normalizeCanonicalUrl(existing.canonicalUrl) !== next.canonicalUrl ||
-          normalizeConversationId(existing.conversationId) !== next.conversationId ||
           Number(existing.createdAt) !== next.createdAt ||
           Number(existing.updatedAt) !== next.updatedAt ||
           normalizeParentId(existing.parentId) !== null ||

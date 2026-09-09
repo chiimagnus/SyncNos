@@ -6,6 +6,7 @@ import {
   type CommentLocatorSurfaceRoots,
 } from '@ui/comments';
 import { captureUniqueExactCommentAnchor } from '@services/comments/locator/capture-comment-anchor';
+import { createCommentDomTextIndex, type CommentDomTextIndex } from '@services/comments/locator/dom-text-index';
 import type {
   CommentSidebarHost,
   CommentSidebarPanelApi,
@@ -25,19 +26,13 @@ function withAppImportedLocators(host: CommentSidebarHost, roots: CommentLocator
   if (!roots?.sourceRoot || !snapshot.comments.length) return snapshot;
 
   let changed = false;
+  let index: CommentDomTextIndex | null = null;
   const comments = snapshot.comments.map((item) => {
-    if (
-      item.locator ||
-      item.parentId != null ||
-      item.importSource !== 'dedao' ||
-      !item.importKey ||
-      !String(item.quoteText || '')
-    ) {
-      return item;
-    }
+    if (item.locator || item.parentId != null || item.importSource !== 'dedao') return item;
 
+    index ??= createCommentDomTextIndex(roots.sourceRoot);
     const locator = captureUniqueExactCommentAnchor({
-      root: roots.sourceRoot,
+      index,
       exact: item.quoteText,
       surfaceHint: 'app',
     });

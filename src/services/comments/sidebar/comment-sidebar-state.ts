@@ -1,5 +1,4 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
-import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
 
 export type CommentSidebarItem = ArticleCommentDto;
@@ -55,52 +54,24 @@ export type CommentSidebarHostActions = {
   retry: () => void | Promise<void>;
 };
 
-function cloneAttachment(input?: Partial<CommentSidebarComposerAttachment> | null): CommentSidebarComposerAttachment {
-  const revision = Number(input?.selectionRevision);
+export function createCommentSidebarHostSnapshot(): CommentSidebarHostSnapshot {
   return {
-    displayQuote: String(input?.displayQuote ?? '').replace(/\r\n?/g, '\n'),
-    locator: normalizeArticleCommentLocator(input?.locator),
-    selectionRevision: Number.isSafeInteger(revision) && revision >= 0 ? revision : 0,
-  };
-}
-
-function cloneItems(items: CommentSidebarItem[] | null | undefined): CommentSidebarItem[] {
-  return Array.isArray(items)
-    ? items.map((item) => ({
-        ...item,
-        locator: normalizeArticleCommentLocator(item.locator),
-      }))
-    : [];
-}
-
-export function createCommentSidebarHostSnapshot(
-  input: Partial<CommentSidebarHostSnapshot> = {},
-): CommentSidebarHostSnapshot {
-  const focusComposerSignal = Number(input.focusComposerSignal);
-  const source = String(input.lastOpenSource ?? '').trim();
-  return {
-    open: input.open === true,
-    busy: input.busy === true,
-    composerAttachment: cloneAttachment(input.composerAttachment),
-    comments: cloneItems(input.comments),
-    focusComposerSignal:
-      Number.isSafeInteger(focusComposerSignal) && focusComposerSignal >= 0 ? focusComposerSignal : 0,
-    lastOpenSource: source || null,
-    contextKey: String(input.contextKey ?? ''),
-    loadStatus: ['idle', 'loading', 'ready', 'stale_error'].includes(String(input.loadStatus))
-      ? (input.loadStatus as CommentSidebarLoadStatus)
-      : 'idle',
-    loadError:
-      input.loadError && typeof input.loadError === 'object'
-        ? { code: String(input.loadError.code || 'unknown'), message: String(input.loadError.message || '') }
-        : null,
+    open: false,
+    busy: false,
+    composerAttachment: { displayQuote: '', locator: null, selectionRevision: 0 },
+    comments: [],
+    focusComposerSignal: 0,
+    lastOpenSource: null,
+    contextKey: '',
+    loadStatus: 'idle',
+    loadError: null,
   };
 }
 
 export function createCommentSidebarHostActions(
   readCallbacks: () => CommentSidebarHostActionCallbacks,
 ): CommentSidebarHostActions {
-  const read = () => readCallbacks?.() || {};
+  const read = () => readCallbacks();
   return Object.freeze({
     save: (text: string) => read().onSave?.(text),
     reply: (parentId: number, text: string) => read().onReply?.(parentId, text),

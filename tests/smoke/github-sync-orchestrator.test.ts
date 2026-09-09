@@ -234,7 +234,9 @@ describe('github sync orchestrator staging through production sync', () => {
             conversationId: 3,
             canonicalUrl: article.url,
             quoteText: 'Quote',
-            commentText: 'Owned comment',
+            commentText: '',
+            importSource: 'dedao',
+            importKey: 'line-30',
             createdAt: 1,
             updatedAt: 1,
           },
@@ -259,7 +261,9 @@ describe('github sync orchestrator staging through production sync', () => {
     expect(services.storage.attachOrphanArticleCommentsToConversation).toHaveBeenCalledWith(article.url, 3);
     expect(services.storage.getArticleCommentsByConversationId).toHaveBeenCalledWith(3);
     const write = stagedOperations.find((operation) => operation.type === 'write');
-    expect(write?.type === 'write' ? String(write.content) : '').toContain('Owned comment');
+    const markdown = write?.type === 'write' ? String(write.content) : '';
+    expect(markdown).toContain('> Quote');
+    expect(markdown).not.toContain('划线');
   });
 
   it('isolates one local projection failure and keeps other safe staged rows', async () => {

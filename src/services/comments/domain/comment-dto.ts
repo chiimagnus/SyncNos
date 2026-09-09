@@ -71,7 +71,7 @@ export function serializeArticleCommentDto(value: ArticleComment): ArticleCommen
   return {
     ...value,
     authorName: value.authorName ?? null,
-    locator: normalizeArticleCommentLocator(value.locator),
+    locator: value.locator ?? null,
   };
 }
 

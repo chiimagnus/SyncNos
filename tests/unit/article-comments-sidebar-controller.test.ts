@@ -214,6 +214,13 @@ describe('article-comments-sidebar-controller', () => {
     session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
     expect(await handlers.onSave('')).toBe(false);
     expect(adapter.addRoot).not.toHaveBeenCalled();
+
+    session.setComposerAttachment({
+      displayQuote: 'Quoted',
+      locator: { ...locator, quote: { ...locator.quote, exact: 'Different quote' } },
+    });
+    expect(await handlers.onSave('')).toBe(false);
+    expect(adapter.addRoot).not.toHaveBeenCalled();
   });
 
   it('updates quote and locator from composer selection requests', async () => {

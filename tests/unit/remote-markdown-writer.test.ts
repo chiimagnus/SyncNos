@@ -88,6 +88,34 @@ describe('remote-markdown-writer', () => {
     expect(md).toContain('  Reply');
   });
 
+  it('renders highlight-only article roots without placeholder comment text', async () => {
+    const w = await loadWriter();
+    const md = w.buildFullNoteMarkdown({
+      conversation: {
+        sourceType: 'article',
+        url: 'https://example.com/highlight',
+      },
+      messages: [{ messageKey: 'article_body', sequence: 1, contentMarkdown: 'Body' }],
+      comments: [
+        {
+          id: 1,
+          parentId: null,
+          conversationId: 1,
+          canonicalUrl: 'https://example.com/highlight',
+          quoteText: 'Highlight only',
+          commentText: '',
+          createdAt: Date.UTC(2026, 0, 2, 3, 4),
+          updatedAt: Date.UTC(2026, 0, 2, 3, 4),
+        },
+      ],
+    });
+
+    expect(md).toContain('comments_root_count: 1');
+    expect(md).toContain('> Highlight only');
+    expect(md.match(/^- You \|/gm)?.length || 0).toBe(1);
+    expect(md).not.toContain('划线');
+  });
+
   it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
     'omits invalid Activity %s without inventing a timestamp',
     async (lastActivityAt) => {

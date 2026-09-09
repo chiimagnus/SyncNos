@@ -824,6 +824,95 @@ describe('backup service', () => {
     expect(afterRepeat.lastActivityAt).toBe(20);
   });
 
+  it('merges imported highlights by source identity when legacy and current representations differ', async () => {
+    const { entries: fixtureEntries } = buildBackupV2FixtureEntries();
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const buildEntries = (
+      commentText: string,
+      updatedAt = 100,
+      uniqueKey = 'web||article:https://example.com/reload-free-article',
+      imported = true,
+    ) => {
+      const entries = new Map(fixtureEntries);
+      const manifest = JSON.parse(decoder.decode(entries.get('manifest.json')!));
+      manifest.counts.article_comments = 1;
+      entries.set('manifest.json', encoder.encode(JSON.stringify(manifest)));
+      entries.set(
+        'assets/article-comments/index.json',
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 2,
+            comments: [
+              {
+                commentId: 801,
+                parentCommentId: null,
+                uniqueKey,
+                canonicalUrl: 'https://example.com/reload-free-article',
+                authorName: 'Comment Author',
+                ...(imported ? { importSource: 'dedao', importKey: 'line-1' } : {}),
+                quoteText: 'Imported highlight',
+                commentText,
+                locator: null,
+                createdAt: 100,
+                updatedAt,
+              },
+            ],
+          }),
+        ),
+      );
+      return entries;
+    };
+
+    const current = await importBackupZipMerge(buildEntries(''));
+    expect(current).toMatchObject({ commentsAdded: 1, commentsUpdated: 0 });
+
+    const legacy = await importBackupZipMerge(buildEntries('划线', 100, 'legacy-web||legacy-article-key'));
+    expect(legacy).toMatchObject({ commentsAdded: 0, commentsUpdated: 0, commentsSkipped: 1 });
+
+    const db = await openDb();
+    const transaction = db.transaction(['article_comments'], 'readonly');
+    const rows = await reqToPromise<any[]>(transaction.objectStore('article_comments').getAll());
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      importSource: 'dedao',
+      importKey: 'line-1',
+      quoteText: 'Imported highlight',
+      commentText: '',
+    });
+
+    const newer = await importBackupZipMerge(buildEntries('Source note added later', 101));
+    expect(newer).toMatchObject({ commentsAdded: 0, commentsUpdated: 1 });
+    const verifyUpdate = db.transaction(['article_comments'], 'readonly');
+    const updatedRows = await reqToPromise<any[]>(verifyUpdate.objectStore('article_comments').getAll());
+    await new Promise<void>((resolve, reject) => {
+      verifyUpdate.oncomplete = () => resolve();
+      verifyUpdate.onerror = () => reject(verifyUpdate.error);
+      verifyUpdate.onabort = () => reject(verifyUpdate.error);
+    });
+    expect(updatedRows).toHaveLength(1);
+    expect(updatedRows[0]?.commentText).toBe('Source note added later');
+
+    const ordinary = await importBackupZipMerge(
+      buildEntries('Source note added later', 101, 'web||article:https://example.com/reload-free-article', false),
+    );
+    expect(ordinary).toMatchObject({ commentsAdded: 1, commentsUpdated: 0 });
+    const verifyNamespaces = db.transaction(['article_comments'], 'readonly');
+    const separateRows = await reqToPromise<any[]>(verifyNamespaces.objectStore('article_comments').getAll());
+    await new Promise<void>((resolve, reject) => {
+      verifyNamespaces.oncomplete = () => resolve();
+      verifyNamespaces.onerror = () => reject(verifyNamespaces.error);
+      verifyNamespaces.onabort = () => reject(verifyNamespaces.error);
+    });
+    expect(separateRows).toHaveLength(2);
+    expect(separateRows.filter((row) => row.importSource === 'dedao' && row.importKey === 'line-1')).toHaveLength(1);
+  });
+
   it('importBackupZipMerge restores image cache and rewrites only real Markdown asset images', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

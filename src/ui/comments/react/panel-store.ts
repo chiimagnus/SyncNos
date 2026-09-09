@@ -119,7 +119,7 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStoreCo
 
     const syncHostSnapshot = () => {
       if (disposed || currentHost !== host || leaseId !== hostLeaseSequence) return;
-      hostSnapshot = createCommentSidebarHostSnapshot(host.getSnapshot());
+      hostSnapshot = host.getSnapshot();
       rebuild();
     };
 

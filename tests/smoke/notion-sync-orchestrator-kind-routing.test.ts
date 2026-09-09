@@ -117,7 +117,9 @@ describe('notion-sync-orchestrator kind routing', () => {
             createdAt: 1,
             updatedAt: 1,
             quoteText: 'q',
-            commentText: 'root',
+            commentText: '',
+            importSource: 'dedao',
+            importKey: 'line-1',
           },
           {
             id: 2,

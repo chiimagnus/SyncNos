@@ -22,8 +22,8 @@ export type ArticleComment = {
   quoteText: string;
   commentText: string;
   locator?: ArticleCommentLocator | null;
-  importSource?: string | null;
-  importKey?: string | null;
+  importSource?: string;
+  importKey?: string;
   createdAt: number;
   updatedAt: number;
 };

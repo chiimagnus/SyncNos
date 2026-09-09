@@ -55,6 +55,45 @@ describe('article comment runtime DTO', () => {
         updatedAt: 1,
       }),
     ).toMatchObject({ id: 1, quoteText: 'quote', commentText: '', locator });
+
+    expect(
+      parseArticleCommentDto({
+        id: 2,
+        parentId: null,
+        conversationId: 2,
+        canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
+        quoteText: 'imported quote',
+        commentText: '',
+        locator: null,
+        importSource: 'dedao',
+        importKey: 'line-2',
+        createdAt: 2,
+        updatedAt: 2,
+      }),
+    ).toMatchObject({
+      id: 2,
+      quoteText: 'imported quote',
+      commentText: '',
+      locator: null,
+      importSource: 'dedao',
+      importKey: 'line-2',
+    });
+
+    expect(
+      parseArticleCommentDto({
+        id: 3,
+        parentId: null,
+        conversationId: 2,
+        canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
+        quoteText: 'imported quote',
+        commentText: '',
+        locator: null,
+        importSource: 'dedao',
+        importKey: '',
+        createdAt: 3,
+        updatedAt: 3,
+      }),
+    ).toBeNull();
   });
 
   it.each([

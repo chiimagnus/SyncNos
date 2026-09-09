@@ -205,7 +205,7 @@ async function extractDedaoCourseArticleAnnotations(
         func: collectDedaoCourseArticleAnnotationsInMainWorld,
       });
       const snapshot = results?.[0]?.result;
-      if (snapshot?.matched === true && snapshot?.ready === true) {
+      if (snapshot?.ready === true) {
         return Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
       }
     } catch (error) {
@@ -301,12 +301,12 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
       await syncImportedArticleComments(
         dedaoAnnotations.map((annotation) => ({
           importSource: 'dedao',
-          importKey: annotation.id || `${annotation.range}\u0000${annotation.quote}`,
+          importKey: annotation.id,
           conversationId,
           canonicalUrl,
           authorName: annotation.authorName || '得到',
           quoteText: annotation.quote,
-          commentText: annotation.note || '',
+          commentText: annotation.note,
           createdAt: toMilliseconds(annotation.createdAt),
           updatedAt: toMilliseconds(annotation.updatedAt),
         })),

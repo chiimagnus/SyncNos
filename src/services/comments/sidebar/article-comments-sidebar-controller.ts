@@ -6,6 +6,7 @@ import type {
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
 import { normalizeCommentSidebarQuoteText } from '@services/comments/sidebar/comment-sidebar-session';
+import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -542,8 +543,8 @@ export function createArticleCommentsSidebarController(input: {
 
         const attachment = session.getSnapshot().composerAttachment;
         const quoteText = normalizeCommentSidebarQuoteText(attachment.displayQuote);
-        const locator = quoteText ? normalizeArticleCommentLocator(attachment.locator) : null;
-        if (!value && (!quoteText || !locator)) return false;
+        const locator = quoteText ? attachment.locator : null;
+        if (!hasValidArticleCommentContent({ parentId: null, quoteText, commentText: value, locator })) return false;
         const selectionRevision = attachment.selectionRevision;
         const created = await adapter.addRoot({
           canonicalUrl,

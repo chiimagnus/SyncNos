@@ -103,6 +103,45 @@ describe('Threaded comments panel shortcuts', () => {
     mounted.cleanup();
   });
 
+  it('sends a highlight-only root on Cmd+Enter when quote and locator match', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onSave = vi.fn().mockResolvedValue({ ok: true, createdRootId: 2 });
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const driver = getCommentSidebarPanelTestDriver(mounted.api);
+    driver.replaceActionCallbacks({ onSave });
+    driver.session.setComposerAttachment({
+      displayQuote: 'highlight',
+      locator: {
+        v: 1,
+        env: 'app',
+        quote: { type: 'TextQuoteSelector', exact: 'highlight' },
+        position: { type: 'TextPositionSelector', start: 0, end: 9 },
+      },
+    });
+    await flushReactScheduler();
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
+    const textarea = panel.shadowRoot!.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.dispatchEvent(
+      new window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('');
+    mounted.cleanup();
+  });
+
   it('sends reply on Cmd+Enter', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

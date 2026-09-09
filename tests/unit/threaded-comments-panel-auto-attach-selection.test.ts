@@ -142,6 +142,35 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.cleanup();
   });
 
+  it('keeps highlight-only submit disabled when the attached locator points at different text', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const driver = getCommentSidebarPanelTestDriver(mounted.api);
+    const onSave = vi.fn(async () => ({ ok: true, createdRootId: 8 }));
+    driver.replaceActionCallbacks({ onSave } as any);
+    driver.session.setComposerAttachment({
+      displayQuote: 'Quoted text',
+      locator: {
+        v: 1,
+        env: 'app',
+        quote: { type: 'TextQuoteSelector', exact: 'Different text' },
+        position: { type: 'TextPositionSelector', start: 0, end: 14 },
+      },
+    });
+    await flushCommentsReactWork();
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
+    const send = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__send') as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    send.click();
+    await flushCommentsReactWork();
+
+    expect(onSave).not.toHaveBeenCalled();
+    mounted.cleanup();
+  });
+
   it('requests selection when Selection.toString() is empty but Range contains text (Firefox quirk)', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

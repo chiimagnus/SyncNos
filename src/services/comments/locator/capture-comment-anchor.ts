@@ -47,28 +47,23 @@ export function captureCommentAnchor(input: {
 }
 
 export function captureUniqueExactCommentAnchor(input: {
-  root: Element;
+  index: CommentDomTextIndex;
   exact: unknown;
   surfaceHint: ArticleCommentSurfaceHint;
   documentRoot?: Element | null;
-  index?: CommentDomTextIndex;
-  maxTextLength?: number;
 }): ArticleCommentLocatorV2 | null {
   const exact = toCanonicalCommentQuote(input.exact);
   if (!exact) return null;
 
-  const index = input.index?.root === input.root ? input.index : createCommentDomTextIndex(input.root);
-  const maxTextLength = Math.max(0, Math.floor(Number(input.maxTextLength ?? 400_000) || 0));
-  if (index.text.length > maxTextLength) return null;
-
+  const index = input.index;
   const start = index.text.indexOf(exact);
   if (start < 0) return null;
-  if (index.text.indexOf(exact, start + Math.max(1, exact.length)) >= 0) return null;
+  if (index.text.indexOf(exact, start + exact.length) >= 0) return null;
 
   const range = index.offsetsToRange(start, start + exact.length);
   if (!range) return null;
   return captureCommentAnchor({
-    root: input.root,
+    root: index.root,
     range,
     surfaceHint: input.surfaceHint,
     documentRoot: input.documentRoot,

@@ -24,6 +24,7 @@ import {
 } from '@services/shared/markdown-image-references';
 import { formatSyncnosAssetUrl, isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
+import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
@@ -202,6 +203,16 @@ function normalizeHttpUrl(raw: unknown): string {
   } catch (_e) {
     return '';
   }
+}
+
+function buildImportedArticleCommentMergeKey(input: {
+  canonicalUrl: string;
+  importSource: unknown;
+  importKey: unknown;
+}): string {
+  const importSource = safeString(input.importSource);
+  const importKey = safeString(input.importKey);
+  return importSource && importKey ? [input.canonicalUrl, importSource, importKey].join('\u0000') : '';
 }
 
 const CONVERSATION_MAPPING_MIRROR_FIELDS = [
@@ -480,6 +491,7 @@ export async function importBackupZipMerge(
         };
         const index = store.index('by_canonicalUrl_createdAt');
         const existingByFingerprint = new Map<string, AnyRecord>();
+        const existingByImportIdentity = new Map<string, AnyRecord>();
         const existingBaseKeyById = new Map<number, string>();
         const existingRows: AnyRecord[] = [];
 
@@ -490,36 +502,44 @@ export async function importBackupZipMerge(
           const rows = range ? (await reqToPromise<any[]>(index.getAll(range) as any)) || [] : [];
           for (const row of rows) {
             const id = Number(row?.id);
-            const url = normalizeHttpUrl(row?.canonicalUrl);
             const quoteText = String(row?.quoteText || '');
             const commentText = safeString(row?.commentText);
             const parentId = Number(row?.parentId);
             if (
               !Number.isSafeInteger(id) ||
               id <= 0 ||
-              !url ||
               !hasValidArticleCommentContent({
                 parentId: Number.isSafeInteger(parentId) && parentId > 0 ? parentId : null,
                 quoteText,
                 commentText,
-                locator: row?.locator,
-                importSource: row?.importSource,
-                importKey: row?.importKey,
+                locator: normalizeArticleCommentLocator(row?.locator),
+                importSource: safeString(row?.importSource),
+                importKey: safeString(row?.importKey),
               })
             )
               continue;
+            const uniqueKey = uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '';
             const baseKey = buildArticleCommentArchiveBaseKey({
-              uniqueKey: uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '',
-              canonicalUrl: url,
+              uniqueKey,
+              canonicalUrl,
               createdAt: Number(row?.createdAt) || 0,
               quoteText,
               commentText,
             });
             existingBaseKeyById.set(id, baseKey);
+            const importedMergeKey = buildImportedArticleCommentMergeKey({
+              canonicalUrl,
+              importSource: row?.importSource,
+              importKey: row?.importKey,
+            });
+            if (importedMergeKey && !existingByImportIdentity.has(importedMergeKey)) {
+              existingByImportIdentity.set(importedMergeKey, row);
+            }
             existingRows.push(row);
           }
         }
         for (const row of existingRows) {
+          if (safeString(row.importSource) && safeString(row.importKey)) continue;
           const id = Number(row.id);
           const baseKey = existingBaseKeyById.get(id) ?? '';
           const parentId = Number(row.parentId);
@@ -538,15 +558,23 @@ export async function importBackupZipMerge(
               ? uniqueToLocalId.get(item.uniqueKey)!
               : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
           noteHistoricalActivity(mappedConversationId, item.createdAt);
-          const existing = existingByFingerprint.get(item.fingerprint) ?? null;
+          const importedMergeKey = buildImportedArticleCommentMergeKey({
+            canonicalUrl: item.canonicalUrl,
+            importSource: item.importSource,
+            importKey: item.importKey,
+          });
+          const existing = importedMergeKey
+            ? (existingByImportIdentity.get(importedMergeKey) ?? null)
+            : (existingByFingerprint.get(item.fingerprint) ?? null);
 
           if (existing?.id) {
             const existingId = Number(existing.id);
             incomingIdToLocalId.set(item.commentId, existingId);
             const incomingUpdatedAt = Number(item.updatedAt) || 0;
             const existingUpdatedAt = Number(existing.updatedAt) || 0;
-            const importSource = safeString(existing.importSource) || item.importSource || '';
-            const importKey = safeString(existing.importKey) || item.importKey || '';
+            const incomingContentWins = importedMergeKey
+              ? incomingUpdatedAt > existingUpdatedAt
+              : incomingUpdatedAt >= existingUpdatedAt;
             const next = {
               ...existing,
               parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
@@ -555,12 +583,13 @@ export async function importBackupZipMerge(
                   ? mappedConversationId
                   : existing.conversationId,
               canonicalUrl: item.canonicalUrl,
-              authorName: incomingUpdatedAt >= existingUpdatedAt ? (item.authorName ?? '') : existing.authorName,
-              quoteText: incomingUpdatedAt >= existingUpdatedAt ? item.quoteText : String(existing.quoteText || ''),
-              commentText:
-                incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
-              locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
-              ...(importSource && importKey ? { importSource, importKey } : {}),
+              authorName: incomingContentWins ? (item.authorName ?? '') : existing.authorName,
+              quoteText: incomingContentWins ? item.quoteText : String(existing.quoteText || ''),
+              commentText: incomingContentWins ? item.commentText : String(existing.commentText || ''),
+              locator: incomingContentWins ? item.locator : existing.locator,
+              ...(item.importSource && item.importKey
+                ? { importSource: item.importSource, importKey: item.importKey }
+                : {}),
               createdAt:
                 Number.isFinite(Number(existing.createdAt)) && Number(existing.createdAt) >= 0
                   ? Number(existing.createdAt)
@@ -573,6 +602,7 @@ export async function importBackupZipMerge(
             }
 
             await reqToPromise(store.put(next as any));
+            if (importedMergeKey) existingByImportIdentity.set(importedMergeKey, next as AnyRecord);
             stats.commentsUpdated += 1;
             markChanged('article_comments');
             continue;
@@ -593,7 +623,10 @@ export async function importBackupZipMerge(
             updatedAt: item.updatedAt,
           };
           const newId = Number(await reqToPromise(store.add(record as any) as any));
-          if (Number.isSafeInteger(newId) && newId > 0) incomingIdToLocalId.set(item.commentId, newId);
+          if (Number.isSafeInteger(newId) && newId > 0) {
+            incomingIdToLocalId.set(item.commentId, newId);
+            if (importedMergeKey) existingByImportIdentity.set(importedMergeKey, { ...record, id: newId });
+          }
           stats.commentsAdded += 1;
           markChanged('article_comments');
         }

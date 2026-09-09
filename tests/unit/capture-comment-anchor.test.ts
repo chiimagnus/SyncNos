@@ -6,6 +6,7 @@ import {
   captureUniqueExactCommentAnchor,
 } from '../../src/services/comments/locator/capture-comment-anchor';
 import { resolveCommentAnchor } from '../../src/services/comments/locator/resolve-comment-anchor';
+import { createCommentDomTextIndex } from '../../src/services/comments/locator/dom-text-index';
 
 describe('captureCommentAnchor', () => {
   test('builds a V2 locator from explicit validated root and range', () => {
@@ -53,7 +54,7 @@ describe('captureCommentAnchor', () => {
     const root = document.querySelector('article')!;
 
     const locator = captureUniqueExactCommentAnchor({
-      root,
+      index: createCommentDomTextIndex(root),
       exact: 'unique quote',
       surfaceHint: 'app',
     });
@@ -76,7 +77,7 @@ describe('captureCommentAnchor', () => {
 
     expect(
       captureUniqueExactCommentAnchor({
-        root,
+        index: createCommentDomTextIndex(root),
         exact: 'same',
         surfaceHint: 'app',
       }),

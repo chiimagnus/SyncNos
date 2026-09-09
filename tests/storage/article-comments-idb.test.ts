@@ -152,6 +152,15 @@ describe('article comments storage-idb', () => {
     await expect(
       addArticleComment({
         conversationId: 7,
+        canonicalUrl: 'https://example.com/highlight-only',
+        quoteText: 'highlight',
+        commentText: '',
+        locator: { ...locator, quote: { ...locator.quote, exact: 'different' } },
+      }),
+    ).rejects.toThrow('commentText or anchored quote required');
+    await expect(
+      addArticleComment({
+        conversationId: 7,
         parentId: highlight.id,
         canonicalUrl: 'https://example.com/highlight-only',
         quoteText: '',
@@ -184,6 +193,17 @@ describe('article comments storage-idb', () => {
         commentText: '第一版批注',
         createdAt: 2000,
         updatedAt: 2000,
+      },
+      {
+        importSource: 'dedao',
+        importKey: 'line-1',
+        conversationId: 7,
+        canonicalUrl,
+        authorName: '持弛',
+        quoteText: '原文划线',
+        commentText: '',
+        createdAt: 1000,
+        updatedAt: 1000,
       },
     ]);
     expect(first).toEqual({ created: 2, updated: 0 });

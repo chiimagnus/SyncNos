@@ -6,7 +6,7 @@ import { isDiscussionSubmitShortcut } from './use-discussion-keyboard';
 type RootCommentComposerProps = {
   value: string;
   disabled: boolean;
-  canSubmitEmpty?: boolean;
+  canSubmit: boolean;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void | Promise<void>;
   textareaRef?: Ref<HTMLTextAreaElement>;
@@ -20,7 +20,7 @@ function assignRef(ref: Ref<HTMLTextAreaElement> | undefined, node: HTMLTextArea
 export function RootCommentComposer({
   value,
   disabled,
-  canSubmitEmpty = false,
+  canSubmit,
   onChange,
   onSubmit,
   textareaRef,
@@ -75,7 +75,7 @@ export function RootCommentComposer({
             type="button"
             className="webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon"
             aria-label={t('tooltipCommentSendDetailed')}
-            disabled={disabled || (!String(value || '').trim() && !canSubmitEmpty)}
+            disabled={disabled || !canSubmit}
             onClick={() => void onSubmit(value)}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">

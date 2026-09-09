@@ -11,8 +11,10 @@ const storageMocks = vi.hoisted(() => ({
   listArticleCommentsByConversationId: vi.fn(),
   migrateArticleCommentsCanonicalUrl: vi.fn(),
 }));
+const sharedStorageMocks = vi.hoisted(() => ({ storageGet: vi.fn(async () => ({})) }));
 
 vi.mock('@services/comments/data/storage', () => storageMocks);
+vi.mock('@services/shared/storage', () => sharedStorageMocks);
 
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 
@@ -34,9 +36,69 @@ function createRouter() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sharedStorageMocks.storageGet.mockResolvedValue({});
 });
 
 describe('article comments background handler mutation side effects', () => {
+  it('accepts a highlight-only root through the runtime boundary and schedules auto-sync', async () => {
+    const locator = {
+      v: 1 as const,
+      env: 'app' as const,
+      quote: { type: 'TextQuoteSelector' as const, exact: 'highlight' },
+      position: { type: 'TextPositionSelector' as const, start: 0, end: 9 },
+    };
+    storageMocks.addArticleComment.mockImplementation(async (input: any) => ({
+      id: 17,
+      ...input,
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT)?.({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 31,
+      parentId: null,
+      quoteText: 'highlight',
+      commentText: '',
+      locator,
+    });
+
+    expect(response?.ok).toBe(true);
+    expect(response?.data).toMatchObject({ id: 17, quoteText: 'highlight', commentText: '', locator });
+    expect(storageMocks.addArticleComment).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 31, quoteText: 'highlight', commentText: '', locator }),
+    );
+    expect(onConversationChanged).toHaveBeenCalledWith(
+      31,
+      AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+    );
+  });
+
+  it('rejects an empty unanchored root at the runtime boundary before storage', async () => {
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT)?.({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 31,
+      parentId: null,
+      quoteText: 'highlight',
+      commentText: '',
+      locator: null,
+    });
+
+    expect(response).toEqual({
+      ok: false,
+      data: null,
+      error: { message: 'invalid article comment payload', extra: null },
+    });
+    expect(storageMocks.addArticleComment).not.toHaveBeenCalled();
+    expect(onConversationChanged).not.toHaveBeenCalled();
+  });
   it('returns ok and schedules auto-sync from the committed delete result owner', async () => {
     storageMocks.deleteArticleCommentById.mockResolvedValue({ deleted: true, conversationId: 31 });
     const onConversationChanged = vi.fn();

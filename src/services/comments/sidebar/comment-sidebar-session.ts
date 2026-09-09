@@ -48,7 +48,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   }
 
   function subscribe(listener: () => void) {
-    if (disposed || typeof listener !== 'function') return () => {};
+    if (disposed) return () => {};
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
@@ -68,17 +68,14 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
 
   function publish(next: Partial<CommentSidebarHostSnapshot>) {
     if (disposed) return;
-    snapshot = createCommentSidebarHostSnapshot({
-      ...snapshot,
-      ...next,
-    });
+    snapshot = { ...snapshot, ...next };
     notify();
   }
 
   const host: CommentSidebarHost = Object.freeze({ getSnapshot, subscribe, actions });
 
   function attachPanel(nextPanel: CommentSidebarPanelApi): CommentSidebarPanelLease {
-    if (disposed || !nextPanel || typeof nextPanel.attachHost !== 'function') return createReleasedPanelLease();
+    if (disposed) return createReleasedPanelLease();
 
     attachedPanel?.lease.dispose();
     const id = ++panelLeaseSequence;
@@ -118,8 +115,8 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   }): CommentSidebarComposerAttachment {
     if (disposed) return snapshot.composerAttachment;
     const nextAttachment = {
-      displayQuote: normalizeCommentSidebarQuoteText(input?.displayQuote),
-      locator: normalizeArticleCommentLocator(input?.locator),
+      displayQuote: normalizeCommentSidebarQuoteText(input.displayQuote),
+      locator: normalizeArticleCommentLocator(input.locator),
       selectionRevision: snapshot.composerAttachment.selectionRevision + 1,
     };
     publish({ composerAttachment: nextAttachment });
@@ -145,16 +142,20 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   }
 
   function updateHost(input: CommentSidebarHostUpdate) {
-    if (disposed || !input || typeof input !== 'object') return;
+    if (disposed) return;
     if ('actionCallbacks' in input) {
-      actionCallbacks =
-        input.actionCallbacks && typeof input.actionCallbacks === 'object' ? { ...input.actionCallbacks } : {};
+      actionCallbacks = { ...(input.actionCallbacks ?? {}) };
     }
     const next: Partial<CommentSidebarHostSnapshot> = {};
     if ('busy' in input) next.busy = input.busy === true;
-    if ('comments' in input) next.comments = Array.isArray(input.comments) ? input.comments : [];
+    if ('comments' in input) {
+      next.comments = (input.comments ?? []).map((item) => ({
+        ...item,
+        locator: normalizeArticleCommentLocator(item.locator),
+      }));
+    }
     if ('loadStatus' in input) next.loadStatus = input.loadStatus;
-    if ('loadError' in input) next.loadError = input.loadError || null;
+    if ('loadError' in input) next.loadError = input.loadError ? { ...input.loadError } : null;
     if ('contextKey' in input) next.contextKey = String(input.contextKey ?? '');
     if (Object.keys(next).length) publish(next);
   }

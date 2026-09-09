@@ -80,54 +80,34 @@ function createPanelMock() {
 }
 
 describe('comment-sidebar-host-state', () => {
-  it('creates a serializable snapshot from domain DTO items without retaining mutable input', () => {
+  it('detaches mutable host data once when it enters the session', () => {
+    const session = createCommentSidebarSession();
     const locator = {
       v: 1 as const,
       env: 'app' as const,
       quote: { type: 'TextQuoteSelector' as const, exact: 'quoted text' },
       position: { type: 'TextPositionSelector' as const, start: 2, end: 13 },
     };
-    const item = { ...createComment(7), locator };
-    const input = {
-      open: true,
-      busy: true,
-      composerAttachment: {
-        displayQuote: 'first\r\nsecond',
-        locator,
-        selectionRevision: 4,
-      },
-      comments: [item],
-      focusComposerSignal: 3,
-      lastOpenSource: ' app ',
-    };
+    const comment = { ...createComment(7), locator };
+    const loadError = { code: 'read_failed', message: 'failed' };
 
-    const snapshot = createCommentSidebarHostSnapshot(input);
-    input.composerAttachment.displayQuote = 'mutated';
-    input.comments[0].commentText = 'mutated';
+    session.updateHost({ comments: [comment], loadError });
+    session.setComposerAttachment({ displayQuote: 'first\r\nsecond', locator });
+
+    comment.commentText = 'mutated';
+    loadError.message = 'mutated';
     locator.quote.exact = 'mutated';
 
-    expect(snapshot).toEqual({
-      open: true,
-      busy: true,
-      composerAttachment: {
-        displayQuote: 'first\nsecond',
-        locator: {
-          v: 1,
-          env: 'app',
-          quote: { type: 'TextQuoteSelector', exact: 'quoted text' },
-          position: { type: 'TextPositionSelector', start: 2, end: 13 },
-        },
-        selectionRevision: 4,
-      },
-      comments: [{ ...item, commentText: 'comment-7', locator: snapshot.comments[0].locator }],
-      focusComposerSignal: 3,
-      lastOpenSource: 'app',
-      contextKey: '',
-      loadStatus: 'idle',
-      loadError: null,
+    const snapshot = session.getSnapshot();
+    expect(snapshot.comments[0]).toMatchObject({
+      commentText: 'comment-7',
+      locator: { quote: { exact: 'quoted text' } },
     });
-    expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
-    expect(Object.values(snapshot).some((value) => typeof value === 'function')).toBe(false);
+    expect(snapshot.loadError).toEqual({ code: 'read_failed', message: 'failed' });
+    expect(snapshot.composerAttachment).toMatchObject({
+      displayQuote: 'first\nsecond',
+      locator: { quote: { exact: 'quoted text' } },
+    });
   });
 
   it('keeps one stable action object while reading the latest callbacks', async () => {

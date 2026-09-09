@@ -114,6 +114,31 @@ describe('notion article comments blocks', () => {
     expect(replyBullet).toBeTruthy();
   });
 
+  it('keeps highlight-only roots as quote + metadata without inventing comment text', async () => {
+    const renderer = await loadNotionCommentsRenderer();
+    const res = renderer.buildNotionCommentsBlocks([
+      {
+        id: 1,
+        parentId: null,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        quoteText: 'Highlight only',
+        commentText: '',
+        createdAt: 100,
+        updatedAt: 100,
+      },
+    ]);
+
+    expect(res.threads).toBe(1);
+    expect(res.items).toBe(0);
+    expect(res.blocks).toHaveLength(2);
+    expect(res.blocks[0]?.type).toBe('quote');
+    expect(res.blocks[0]?.quote?.rich_text?.[0]?.text?.content).toBe('Highlight only');
+    expect(res.blocks[1]?.type).toBe('bulleted_list_item');
+    expect(res.blocks[1]?.bulleted_list_item?.children).toBeUndefined();
+    expect(JSON.stringify(res.blocks)).not.toContain('划线');
+  });
+
   it('splits oversized comment text into a bullet with continuation paragraphs', async () => {
     const renderer = await loadNotionCommentsRenderer();
     const longText = 'x'.repeat(4200);

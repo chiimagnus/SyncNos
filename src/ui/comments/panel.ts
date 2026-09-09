@@ -2,7 +2,7 @@ import { createElement, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root as ReactRoot } from 'react-dom/client';
 
-import { normalizeArticleCommentLocator, type ArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import type { ArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { resolveCommentAnchor } from '@services/comments/locator/resolve-comment-anchor';
 import type { CommentSidebarHostActions } from '@services/comments/sidebar/comment-sidebar-contract';
 
@@ -289,7 +289,7 @@ export function mountThreadedCommentsPanel(
     panelStore
       .getSnapshot()
       .comments.filter((item) => item.parentId == null)
-      .map((item) => ({ commentId: Number(item.id), locator: normalizeArticleCommentLocator(item.locator) }));
+      .map((item) => ({ commentId: Number(item.id), locator: item.locator ?? null }));
   const syncAnchorMarkers = async () => {
     if (disposed) return;
     if (!panelStore.getSnapshot().open) {
@@ -359,8 +359,7 @@ export function mountThreadedCommentsPanel(
             .getSnapshot()
             .comments.find((item) => Number(item?.id) === Number(rootId) && item?.parentId == null);
           if (!root) return { ok: false, reason: 'missing_locator' };
-          const locator = normalizeArticleCommentLocator(root.locator);
-          const result = await anchorController.locate({ commentId: Number(root.id), locator });
+          const result = await anchorController.locate({ commentId: Number(root.id), locator: root.locator ?? null });
           if (!result.ok) return result;
           try {
             const scrollRoot = pickScrollRoot(options, result.range, result.root);
@@ -408,7 +407,7 @@ export function mountThreadedCommentsPanel(
     const markerKey = snapshot.open
       ? snapshot.comments
           .filter((item) => item.parentId == null)
-          .map((item) => `${item.id}:${item.updatedAt}:${JSON.stringify(normalizeArticleCommentLocator(item.locator))}`)
+          .map((item) => `${item.id}:${item.updatedAt}:${JSON.stringify(item.locator ?? null)}`)
           .join('|')
       : '';
     if (markerKey === appliedMarkerKey) return;

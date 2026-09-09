@@ -238,7 +238,7 @@ describe('Threaded comments panel locate', () => {
         parentId: null,
         createdAt: 1000,
         quoteText: 'world',
-        commentText: '划线',
+        commentText: '',
         locator,
         importSource: 'dedao',
         importKey: 'line-7',

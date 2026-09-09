@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useDiscussionPanel } from '@viewmodels/comments/useDiscussionPanel';
@@ -47,9 +48,13 @@ export function ThreadedCommentsPanel({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const busy = discussion.busy;
-  const canSubmitHighlightOnly = Boolean(
-    String(snapshot.composerAttachment.displayQuote || '').trim() && snapshot.composerAttachment.locator,
-  );
+  const canSubmitHighlightOnly = hasValidArticleCommentContent({
+    parentId: null,
+    quoteText: snapshot.composerAttachment.displayQuote,
+    commentText: '',
+    locator: snapshot.composerAttachment.locator,
+  });
+  const canSubmitRoot = Boolean(String(composerText || '').trim()) || canSubmitHighlightOnly;
   const submitError = discussion.state.submit.status === 'error' ? discussion.state.submit.error : null;
 
   useLayoutEffect(() => {
@@ -292,7 +297,7 @@ export function ThreadedCommentsPanel({
         <RootCommentComposer
           value={composerText}
           disabled={busy}
-          canSubmitEmpty={canSubmitHighlightOnly}
+          canSubmit={canSubmitRoot}
           textareaRef={composerTextareaRef}
           onChange={updateComposerText}
           onSubmit={(value) => submitComposer(value)}

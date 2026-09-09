@@ -176,25 +176,20 @@ describe('article-fetch-service', () => {
         cb([
           {
             result: {
-              matched: true,
               ready: true,
               annotations: [
                 {
                   id: 'line-1',
-                  range: '6:0,6:20',
                   quote: '人们冒险往往不是为了贪图更多，而是为了“回本”。',
                   note: '',
-                  tag: '',
                   authorName: '持弛',
                   createdAt: 1,
                   updatedAt: 1,
                 },
                 {
                   id: 'note-1',
-                  range: '27:0,27:20',
                   quote: '第二是「现状偏见」。',
                   note: '我会更喜欢待在学校，习惯作为一个学生。',
-                  tag: '笔记',
                   authorName: '持弛',
                   createdAt: 2,
                   updatedAt: 2,

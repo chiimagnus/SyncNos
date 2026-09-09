@@ -75,7 +75,9 @@ describe('obsidian article sync replaces sections without duplicating headings',
         conversationId: 1,
         canonicalUrl: 'https://example.com',
         quoteText: 'Quoted',
-        commentText: 'Root',
+        commentText: '',
+        importSource: 'dedao',
+        importKey: 'line-1',
         createdAt: 1,
         updatedAt: 1,
       },
@@ -204,8 +206,9 @@ describe('obsidian article sync replaces sections without duplicating headings',
     expect(lastPutBody.match(/^##\s+Comments\s*$/gm)?.length || 0).toBe(1);
     expect(lastPutBody).toContain('> Quoted');
     expect(lastPutBody.match(/^- You \|/gm)?.length || 0).toBe(2);
-    expect(lastPutBody).toContain('  Root');
+    expect(lastPutBody).not.toContain('  Root');
     expect(lastPutBody).toContain('  Reply');
+    expect(lastPutBody).not.toContain('划线');
     expect(lastPutBody).not.toContain('## Tail');
     expect(lastPutBody).not.toContain('Keep tail');
   });
