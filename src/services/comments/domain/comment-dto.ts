@@ -34,6 +34,8 @@ export function parseArticleCommentDto(value: unknown): ArticleCommentDto | null
   const createdAt = Number(row.createdAt);
   const updatedAt = Number(row.updatedAt);
   if (!id || !canonicalUrl || !commentText || !Number.isFinite(createdAt) || !Number.isFinite(updatedAt)) return null;
+  const importSource = String(row.importSource ?? '').trim();
+  const importKey = String(row.importKey ?? '').trim();
   return {
     id,
     parentId: positiveInt(row.parentId),
@@ -43,6 +45,7 @@ export function parseArticleCommentDto(value: unknown): ArticleCommentDto | null
     quoteText: String(row.quoteText ?? ''),
     commentText,
     locator: normalizeArticleCommentLocator(row.locator),
+    ...(importSource && importKey ? { importSource, importKey } : {}),
     createdAt,
     updatedAt,
   };

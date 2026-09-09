@@ -11,6 +11,7 @@ import {
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
   migrateArticleCommentsCanonicalUrl,
+  syncImportedArticleComments,
 } from '@services/comments/data/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
@@ -119,6 +120,68 @@ describe('article comments storage-idb', () => {
 
     const after = await listArticleCommentsByCanonicalUrl('https://example.com/a');
     expect(after.map((c) => c.id)).toEqual([c2.id]);
+  });
+
+  it('idempotently creates and updates imported Dedao annotations without duplicating comments', async () => {
+    const canonicalUrl = 'https://www.dedao.cn/course/article?id=example';
+    const first = await syncImportedArticleComments([
+      {
+        importSource: 'dedao',
+        importKey: 'line-1',
+        conversationId: 7,
+        canonicalUrl,
+        authorName: '持弛',
+        quoteText: '原文划线',
+        commentText: '划线',
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+      {
+        importSource: 'dedao',
+        importKey: 'note-1',
+        conversationId: 7,
+        canonicalUrl,
+        authorName: '持弛',
+        quoteText: '带批注的原文',
+        commentText: '第一版批注',
+        createdAt: 2000,
+        updatedAt: 2000,
+      },
+    ]);
+    expect(first).toEqual({ created: 2, updated: 0 });
+
+    const second = await syncImportedArticleComments([
+      {
+        importSource: 'dedao',
+        importKey: 'line-1',
+        conversationId: 7,
+        canonicalUrl,
+        authorName: '持弛',
+        quoteText: '原文划线',
+        commentText: '划线',
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+      {
+        importSource: 'dedao',
+        importKey: 'note-1',
+        conversationId: 7,
+        canonicalUrl,
+        authorName: '持弛',
+        quoteText: '带批注的原文',
+        commentText: '修改后的批注',
+        createdAt: 2000,
+        updatedAt: 3000,
+      },
+    ]);
+    expect(second).toEqual({ created: 0, updated: 1 });
+
+    const comments = await listArticleCommentsByConversationId(7);
+    expect(comments).toHaveLength(2);
+    expect(comments.map((item) => [item.quoteText, item.commentText])).toEqual([
+      ['原文划线', '划线'],
+      ['带批注的原文', '修改后的批注'],
+    ]);
   });
 
   it('returns a stable missing result without revision churn or guessing context from malformed children', async () => {

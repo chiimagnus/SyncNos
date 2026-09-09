@@ -13,6 +13,8 @@ export const COMMENT_ARCHIVE_BUDGET = Object.freeze({
   quote: 20_000,
   author: 512,
   uniqueKey: 2_048,
+  importSource: 128,
+  importKey: 2_048,
   url: 16_384,
 });
 
@@ -22,6 +24,8 @@ export type ArticleCommentArchiveItem = {
   uniqueKey: string;
   canonicalUrl: string;
   authorName: string | null;
+  importSource?: string;
+  importKey?: string;
   quoteText: string;
   commentText: string;
   locator: ArticleCommentLocator | null;
@@ -138,6 +142,14 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
       authorName = author.trim() || null;
     }
 
+    const importSourceRaw = boundedString(row.importSource ?? '', COMMENT_ARCHIVE_BUDGET.importSource);
+    const importKeyRaw = boundedString(row.importKey ?? '', COMMENT_ARCHIVE_BUDGET.importKey);
+    if (importSourceRaw == null || importKeyRaw == null)
+      return fail('Invalid article comment import identity', warnings);
+    const importSource = importSourceRaw.trim();
+    const importKey = importKeyRaw.trim();
+    if (Boolean(importSource) !== Boolean(importKey)) return fail('Invalid article comment import identity', warnings);
+
     let locator: ArticleCommentLocator | null = null;
     if (schemaVersion === ARTICLE_COMMENT_ARCHIVE_SCHEMA_V1 && !own(row, 'locator')) {
       warnings.push({ code: 'v1_missing_locator', commentId });
@@ -153,6 +165,7 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
       uniqueKey,
       canonicalUrl,
       authorName,
+      ...(importSource && importKey ? { importSource, importKey } : {}),
       quoteText,
       commentText,
       locator,
@@ -211,6 +224,7 @@ function archiveItemFromDto(
     uniqueKey: dto.conversationId == null ? '' : (uniqueKeyByConversationId.get(dto.conversationId) ?? ''),
     canonicalUrl: dto.canonicalUrl,
     authorName: dto.authorName ?? null,
+    ...(dto.importSource && dto.importKey ? { importSource: dto.importSource, importKey: dto.importKey } : {}),
     quoteText: dto.quoteText,
     commentText: dto.commentText,
     locator: dto.locator ?? null,

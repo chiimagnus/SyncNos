@@ -529,6 +529,8 @@ export async function importBackupZipMerge(
             incomingIdToLocalId.set(item.commentId, existingId);
             const incomingUpdatedAt = Number(item.updatedAt) || 0;
             const existingUpdatedAt = Number(existing.updatedAt) || 0;
+            const importSource = safeString(existing.importSource) || item.importSource || '';
+            const importKey = safeString(existing.importKey) || item.importKey || '';
             const next = {
               ...existing,
               parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
@@ -542,6 +544,7 @@ export async function importBackupZipMerge(
               commentText:
                 incomingUpdatedAt >= existingUpdatedAt ? item.commentText : String(existing.commentText || ''),
               locator: incomingUpdatedAt >= existingUpdatedAt ? item.locator : existing.locator,
+              ...(importSource && importKey ? { importSource, importKey } : {}),
               createdAt:
                 Number.isFinite(Number(existing.createdAt)) && Number(existing.createdAt) >= 0
                   ? Number(existing.createdAt)
@@ -567,6 +570,9 @@ export async function importBackupZipMerge(
             quoteText: item.quoteText,
             commentText: item.commentText,
             locator: item.locator,
+            ...(item.importSource && item.importKey
+              ? { importSource: item.importSource, importKey: item.importKey }
+              : {}),
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
           };

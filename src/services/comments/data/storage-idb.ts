@@ -4,6 +4,18 @@ import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
+export type ImportedArticleCommentInput = {
+  importSource: string;
+  importKey: string;
+  conversationId: number;
+  canonicalUrl: string;
+  authorName?: string | null;
+  quoteText?: string | null;
+  commentText: string;
+  createdAt?: number | null;
+  updatedAt?: number | null;
+};
+
 export class ArticleCommentInvariantError extends Error {
   constructor(
     public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch' | 'conversation_not_found',
@@ -82,6 +94,9 @@ function toComment(row: any): ArticleComment {
     quoteText: safeString(row?.quoteText),
     commentText: normalizeCommentText(row?.commentText),
     locator: normalizeArticleCommentLocator(row?.locator),
+    ...(safeString(row?.importSource) && safeString(row?.importKey)
+      ? { importSource: safeString(row.importSource), importKey: safeString(row.importKey) }
+      : {}),
     createdAt: Number(row?.createdAt) || 0,
     updatedAt: Number(row?.updatedAt) || 0,
   };
@@ -142,6 +157,123 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
         }
       }
       return toComment({ ...row, id });
+    },
+  );
+}
+
+export async function syncImportedArticleComments(
+  items: ImportedArticleCommentInput[],
+): Promise<{ created: number; updated: number }> {
+  const normalized = (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const importSource = safeString(item?.importSource);
+      const importKey = safeString(item?.importKey);
+      const conversationId = normalizeConversationId(item?.conversationId);
+      const canonicalUrl = normalizeCanonicalUrl(item?.canonicalUrl);
+      const commentText = normalizeCommentText(item?.commentText);
+      if (!importSource || !importKey || !conversationId || !canonicalUrl || !commentText) return null;
+      const createdAt = normalizeTimestamp(item?.createdAt, Date.now());
+      return {
+        importSource,
+        importKey,
+        conversationId,
+        canonicalUrl,
+        authorName: safeString(item?.authorName) || '',
+        quoteText: safeString(item?.quoteText),
+        commentText,
+        createdAt,
+        updatedAt: normalizeTimestamp(item?.updatedAt, createdAt),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+  if (!normalized.length) return { created: 0, updated: 0 };
+
+  const conversationId = normalized[0].conversationId;
+  const canonicalUrl = normalized[0].canonicalUrl;
+  if (normalized.some((item) => item.conversationId !== conversationId || item.canonicalUrl !== canonicalUrl)) {
+    throw new Error('imported article comments must share one article context');
+  }
+
+  const db = await openDb();
+  return runTrackedTransaction(
+    { db, stores: ['article_comments', 'conversations'], revisionScopes: ['article_comments', 'conversations'] },
+    async ({ stores, markChanged }) => {
+      const conversation = await reqToPromise<any>(stores.conversations.get(conversationId as any));
+      if (!conversation) throw new ArticleCommentInvariantError('conversation_not_found');
+
+      const index = stores.article_comments.index('by_conversationId_createdAt');
+      const range = globalThis.IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+      const existingRows = (await reqToPromise<any[]>(index.getAll(range) as any)) || [];
+      const existingByImportIdentity = new Map<string, any>();
+      for (const row of existingRows) {
+        const source = safeString(row?.importSource);
+        const key = safeString(row?.importKey);
+        if (source && key) existingByImportIdentity.set(`${source}\u0000${key}`, row);
+      }
+
+      let created = 0;
+      let updated = 0;
+      let latestHistoricalActivityAt = 0;
+      for (const item of normalized) {
+        const identity = `${item.importSource}\u0000${item.importKey}`;
+        const existing = existingByImportIdentity.get(identity);
+        latestHistoricalActivityAt = Math.max(latestHistoricalActivityAt, item.createdAt);
+        if (!existing) {
+          await reqToPromise(
+            stores.article_comments.add({
+              parentId: null,
+              conversationId,
+              canonicalUrl,
+              authorName: item.authorName,
+              quoteText: item.quoteText,
+              commentText: item.commentText,
+              locator: null,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+              importSource: item.importSource,
+              importKey: item.importKey,
+            }) as any,
+          );
+          created += 1;
+          continue;
+        }
+
+        const next = {
+          ...existing,
+          parentId: null,
+          conversationId,
+          canonicalUrl,
+          authorName: item.authorName,
+          quoteText: item.quoteText,
+          commentText: item.commentText,
+          locator: null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          importSource: item.importSource,
+          importKey: item.importKey,
+        };
+        const changed =
+          safeString(existing.authorName) !== next.authorName ||
+          safeString(existing.quoteText) !== next.quoteText ||
+          normalizeCommentText(existing.commentText) !== next.commentText ||
+          normalizeCanonicalUrl(existing.canonicalUrl) !== next.canonicalUrl ||
+          normalizeConversationId(existing.conversationId) !== next.conversationId ||
+          Number(existing.createdAt) !== next.createdAt ||
+          Number(existing.updatedAt) !== next.updatedAt ||
+          normalizeParentId(existing.parentId) !== null ||
+          existing.locator != null;
+        if (!changed) continue;
+        await reqToPromise(stores.article_comments.put(next));
+        updated += 1;
+      }
+
+      if (created > 0 || updated > 0) markChanged('article_comments');
+      const currentActivityAt = normalizeActivityTimestamp(conversation.lastActivityAt);
+      if (latestHistoricalActivityAt > currentActivityAt) {
+        await reqToPromise(stores.conversations.put({ ...conversation, lastActivityAt: latestHistoricalActivityAt }));
+        markChanged('conversations');
+      }
+      return { created, updated };
     },
   );
 }

@@ -14,6 +14,10 @@ const imageInlineMocks = {
   inlineChatImagesInMessages: vi.fn(),
 };
 
+const commentMocks = {
+  syncImportedArticleComments: vi.fn(),
+};
+
 vi.mock('@services/conversations/data/storage', () => ({
   upsertConversation: storageMocks.upsertConversation,
   syncConversationMessages: storageMocks.syncConversationMessages,
@@ -26,6 +30,10 @@ vi.mock('@platform/storage/local', () => ({
 
 vi.mock('@services/conversations/data/image-inline', () => ({
   inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
+}));
+
+vi.mock('@services/comments/data/storage', () => ({
+  syncImportedArticleComments: commentMocks.syncImportedArticleComments,
 }));
 
 async function loadArticleFetchService() {
@@ -45,6 +53,7 @@ afterEach(() => {
   settingsMocks.storageGet.mockReset();
   settingsMocks.storageSet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
+  commentMocks.syncImportedArticleComments.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
@@ -154,6 +163,118 @@ describe('article-fetch-service', () => {
       sequence: 1,
       contentMarkdown: '## Heading\n\n![img](syncnos-asset://conversation/11/a.png)\n\nHello world article text.',
     });
+  });
+
+  it('syncs Dedao underline and attached-note annotations into article comments', async () => {
+    storageMocks.upsertConversation.mockImplementation(async (payload: any) => ({ id: 21, ...payload, __isNew: true }));
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+    commentMocks.syncImportedArticleComments.mockResolvedValue({ created: 2, updated: 0 });
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      if (details?.world === 'MAIN') {
+        cb([
+          {
+            result: {
+              matched: true,
+              ready: true,
+              annotations: [
+                {
+                  id: 'line-1',
+                  range: '6:0,6:20',
+                  quote: '人们冒险往往不是为了贪图更多，而是为了“回本”。',
+                  note: '',
+                  tag: '',
+                  authorName: '持弛',
+                  createdAt: 1,
+                  updatedAt: 1,
+                },
+                {
+                  id: 'note-1',
+                  range: '27:0,27:20',
+                  quote: '第二是「现状偏见」。',
+                  note: '我会更喜欢待在学校，习惯作为一个学生。',
+                  tag: '笔记',
+                  authorName: '持弛',
+                  createdAt: 2,
+                  updatedAt: 2,
+                },
+              ],
+            },
+          },
+        ]);
+        return;
+      }
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: '前景理论',
+          author: '万维钢',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>正文</p></body></html>',
+          contentMarkdown: '# 前景理论\n\n正文',
+          textContent: '正文',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([
+            {
+              id: 88,
+              url: 'https://www.dedao.cn/course/article?id=example',
+              title: '前景理论 - 得到APP',
+            },
+          ]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const service = await loadArticleFetchService();
+    await service.fetchActiveTabArticle();
+
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    expect(executeScript.mock.calls[0][0]).toMatchObject({
+      target: { tabId: 88, allFrames: false },
+      world: 'MAIN',
+    });
+
+    expect(commentMocks.syncImportedArticleComments).toHaveBeenCalledTimes(1);
+    expect(commentMocks.syncImportedArticleComments.mock.calls[0][0]).toEqual([
+      expect.objectContaining({
+        importSource: 'dedao',
+        importKey: 'line-1',
+        conversationId: 21,
+        canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
+        authorName: '持弛',
+        quoteText: '人们冒险往往不是为了贪图更多，而是为了“回本”。',
+        commentText: '划线',
+        createdAt: 1000,
+        updatedAt: 1000,
+      }),
+      expect.objectContaining({
+        importSource: 'dedao',
+        importKey: 'note-1',
+        commentText: '我会更喜欢待在学校，习惯作为一个学生。',
+        createdAt: 2000,
+        updatedAt: 2000,
+      }),
+    ]);
+
+    const [, messages] = storageMocks.syncConversationMessages.mock.calls[0];
+    expect(messages[0].contentMarkdown).toBe('# 前景理论\n\n正文');
   });
 
   it('navigates discourse topic to /1 when current floor misses OP and keeps topic-level canonical url', async () => {

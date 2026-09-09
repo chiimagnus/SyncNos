@@ -13,6 +13,11 @@ import { storageGet } from '@platform/storage/local';
 import { getAntiHotlinkRulesSnapshot, includesAnyAntiHotlinkDomain } from '@platform/webext/anti-hotlink-rules-store';
 import { CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import {
+  collectDedaoCourseArticleAnnotationsInMainWorld,
+  type DedaoCourseArticleAnnotation,
+} from '@collectors/web/dedao-course-article-annotations';
+import { syncImportedArticleComments } from '@services/comments/data/storage';
+import {
   buildDiscourseTopicFloorUrl,
   isSameDiscourseTopicFloorUrl,
   parseDiscourseTopicUrl,
@@ -176,6 +181,45 @@ async function shouldCaptureXiaohongshuComments(): Promise<boolean> {
   }
 }
 
+function isDedaoCourseArticleUrl(value: unknown): boolean {
+  try {
+    const url = new URL(String(value || ''));
+    const host = url.hostname.toLowerCase();
+    return (host === 'dedao.cn' || host.endsWith('.dedao.cn')) && /^\/course\/article\b/i.test(url.pathname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function extractDedaoCourseArticleAnnotations(
+  tabId: number,
+  url: string,
+): Promise<DedaoCourseArticleAnnotation[]> {
+  if (!isDedaoCourseArticleUrl(url)) return [];
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const results = await scriptingExecuteScript({
+        target: { tabId, allFrames: false },
+        world: 'MAIN',
+        func: collectDedaoCourseArticleAnnotationsInMainWorld,
+      });
+      const snapshot = results?.[0]?.result;
+      if (snapshot?.matched === true && snapshot?.ready === true) {
+        return Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
+      }
+    } catch (error) {
+      console.warn('[ArticleFetch] failed to extract Dedao annotations, continue without them', {
+        tabId,
+        error: error instanceof Error ? error.message : String(error || ''),
+      });
+      return [];
+    }
+    if (attempt < 2) await sleep(250);
+  }
+  return [];
+}
+
 export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) {
   const tab = await resolveTargetTab(tabId);
   const targetTabId = Number(tab.id);
@@ -219,6 +263,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     throw toError(DISCOURSE_OP_NOT_FOUND_ERROR);
   }
 
+  const dedaoAnnotations = await extractDedaoCourseArticleAnnotations(targetTabId, normalizedUrl);
   const textContent = normalizeText(extracted.textContent || '');
   const markdownContent = normalizeText(extracted.contentMarkdown || '');
   const title = normalizeText(extracted.title || '') || fallbackTitle(canonicalUrl, tab.title || '');
@@ -245,6 +290,35 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const body = textContent;
   const markdown = markdownContent || body;
   const conversationId = conversation.id;
+
+  if (dedaoAnnotations.length) {
+    const toMilliseconds = (value: number) => {
+      const timestamp = Number(value);
+      if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
+      return timestamp < 10_000_000_000 ? Math.round(timestamp * 1000) : Math.round(timestamp);
+    };
+    try {
+      await syncImportedArticleComments(
+        dedaoAnnotations.map((annotation) => ({
+          importSource: 'dedao',
+          importKey: annotation.id || `${annotation.range}\u0000${annotation.quote}`,
+          conversationId,
+          canonicalUrl,
+          authorName: annotation.authorName || '得到',
+          quoteText: annotation.quote,
+          commentText: annotation.note || '划线',
+          createdAt: toMilliseconds(annotation.createdAt),
+          updatedAt: toMilliseconds(annotation.updatedAt),
+        })),
+      );
+    } catch (error) {
+      console.warn('[ArticleFetch] failed to sync Dedao annotations into comments, article capture continues', {
+        conversationId,
+        error: error instanceof Error ? error.message : String(error || ''),
+      });
+    }
+  }
+
   let messagesToSave = [
     {
       messageKey: 'article_body',

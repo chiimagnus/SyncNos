@@ -5,6 +5,10 @@ export async function addArticleComment(payload: AddArticleCommentInput) {
   return await idb.addArticleComment(payload);
 }
 
+export async function syncImportedArticleComments(items: idb.ImportedArticleCommentInput[]) {
+  return await idb.syncImportedArticleComments(items);
+}
+
 export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string) {
   return await idb.listArticleCommentsByCanonicalUrl(canonicalUrl);
 }

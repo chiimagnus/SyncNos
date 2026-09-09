@@ -118,6 +118,8 @@ describe('backup article comments', () => {
           conversationId: 10,
           canonicalUrl: 'https://example.com/a',
           authorName: 'A',
+          importSource: 'dedao',
+          importKey: 'note-1',
           quoteText: 'q',
           commentText: 'root',
           locator,
@@ -146,9 +148,16 @@ describe('backup article comments', () => {
       [2, 1],
     ]);
     expect(serialized.document.comments[1]?.authorName).toBe('A');
+    expect(serialized.document.comments[1]).toMatchObject({ importSource: 'dedao', importKey: 'note-1' });
     expect(serialized.document.comments[1]?.locator).toEqual(locator);
     expect(serialized.warnings).toContainEqual({ code: 'orphan_promoted', commentId: 3 });
     expect(validateArticleCommentArchiveDocument(serialized.document).ok).toBe(true);
+    expect(
+      validateArticleCommentArchiveDocument({
+        schemaVersion: 2,
+        comments: [root({ importSource: 'dedao', importKey: '' })],
+      }).ok,
+    ).toBe(false);
   });
 
   it('prepares roots before replies and promotes compatible V1 orphans', () => {
