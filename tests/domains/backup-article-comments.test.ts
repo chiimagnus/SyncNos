@@ -60,6 +60,33 @@ describe('backup article comments', () => {
     ).toBe(false);
   });
 
+  it('accepts highlight-only roots with a locator or import identity but rejects empty replies', () => {
+    const locator = {
+      v: 1 as const,
+      env: 'app' as const,
+      quote: { type: 'TextQuoteSelector' as const, exact: 'q' },
+      position: { type: 'TextPositionSelector' as const, start: 0, end: 1 },
+    };
+    expect(
+      validateArticleCommentArchiveDocument({
+        schemaVersion: 2,
+        comments: [root({ commentText: '', locator })],
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateArticleCommentArchiveDocument({
+        schemaVersion: 2,
+        comments: [root({ commentText: '', importSource: 'dedao', importKey: 'line-1' })],
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateArticleCommentArchiveDocument({
+        schemaVersion: 2,
+        comments: [root({ commentText: '', parentCommentId: 9, locator })],
+      }).ok,
+    ).toBe(false);
+  });
+
   it('rejects duplicate, cyclic, nested-parent and cross-context graphs', () => {
     expect(validateArticleCommentArchiveDocument({ schemaVersion: 2, comments: [root(), root()] }).ok).toBe(false);
     expect(

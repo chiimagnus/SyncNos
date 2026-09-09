@@ -108,7 +108,9 @@ export function CommentThread({
               />
             </div>
           </div>
-          <div className="webclipper-inpage-comments-panel__text">{String(root.commentText || '')}</div>
+          {String(root.commentText || '').trim() ? (
+            <div className="webclipper-inpage-comments-panel__text">{String(root.commentText || '')}</div>
+          ) : null}
         </div>
       </div>
       <CommentReplyList

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseArticleCommentAddRequest } from '@services/comments/domain/comment-dto';
+import { parseArticleCommentAddRequest, parseArticleCommentDto } from '@services/comments/domain/comment-dto';
+
+const locator = {
+  v: 1 as const,
+  env: 'app' as const,
+  quote: { type: 'TextQuoteSelector' as const, exact: 'quote' },
+  position: { type: 'TextPositionSelector' as const, start: 0, end: 5 },
+};
 
 const valid = {
   canonicalUrl: 'https://example.com/article',
@@ -16,6 +23,38 @@ describe('article comment runtime DTO', () => {
     expect(parseArticleCommentAddRequest(valid)).toMatchObject({ conversationId: null, parentId: null });
     const { conversationId: _conversationId, parentId: _parentId, ...withoutIds } = valid;
     expect(parseArticleCommentAddRequest(withoutIds)).toMatchObject({ conversationId: null, parentId: null });
+  });
+
+  it('accepts highlight-only roots only when they carry an anchored quote', () => {
+    expect(parseArticleCommentAddRequest({ ...valid, commentText: '', locator })).toMatchObject({
+      parentId: null,
+      quoteText: 'quote',
+      commentText: '',
+      locator,
+    });
+    expect(parseArticleCommentAddRequest({ ...valid, commentText: '', locator: null })).toBeNull();
+    expect(
+      parseArticleCommentAddRequest({
+        ...valid,
+        commentText: '',
+        locator: { ...locator, quote: { ...locator.quote, exact: 'different' } },
+      }),
+    ).toBeNull();
+    expect(parseArticleCommentAddRequest({ ...valid, parentId: 7, commentText: '', locator })).toBeNull();
+
+    expect(
+      parseArticleCommentDto({
+        id: 1,
+        parentId: null,
+        conversationId: 2,
+        canonicalUrl: 'https://example.com/article',
+        quoteText: 'quote',
+        commentText: '',
+        locator,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    ).toMatchObject({ id: 1, quoteText: 'quote', commentText: '', locator });
   });
 
   it.each([

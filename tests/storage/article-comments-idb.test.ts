@@ -122,6 +122,44 @@ describe('article comments storage-idb', () => {
     expect(after.map((c) => c.id)).toEqual([c2.id]);
   });
 
+  it('stores highlight-only roots with a locator but still rejects empty unanchored roots and replies', async () => {
+    const locator = {
+      v: 1 as const,
+      env: 'app' as const,
+      quote: { type: 'TextQuoteSelector' as const, exact: 'highlight' },
+      position: { type: 'TextPositionSelector' as const, start: 0, end: 9 },
+    };
+    const highlight = await addArticleComment({
+      conversationId: 7,
+      canonicalUrl: 'https://example.com/highlight-only',
+      quoteText: 'highlight',
+      commentText: '',
+      locator,
+      createdAt: 100,
+    });
+    expect(highlight.commentText).toBe('');
+    expect(highlight.locator).toEqual(locator);
+
+    await expect(
+      addArticleComment({
+        conversationId: 7,
+        canonicalUrl: 'https://example.com/highlight-only',
+        quoteText: 'highlight',
+        commentText: '',
+        locator: null,
+      }),
+    ).rejects.toThrow('commentText or anchored quote required');
+    await expect(
+      addArticleComment({
+        conversationId: 7,
+        parentId: highlight.id,
+        canonicalUrl: 'https://example.com/highlight-only',
+        quoteText: '',
+        commentText: '',
+      }),
+    ).rejects.toThrow('commentText or anchored quote required');
+  });
+
   it('idempotently creates and updates imported Dedao annotations without duplicating comments', async () => {
     const canonicalUrl = 'https://www.dedao.cn/course/article?id=example';
     const first = await syncImportedArticleComments([
@@ -132,7 +170,7 @@ describe('article comments storage-idb', () => {
         canonicalUrl,
         authorName: '持弛',
         quoteText: '原文划线',
-        commentText: '划线',
+        commentText: '',
         createdAt: 1000,
         updatedAt: 1000,
       },
@@ -158,7 +196,7 @@ describe('article comments storage-idb', () => {
         canonicalUrl,
         authorName: '持弛',
         quoteText: '原文划线',
-        commentText: '划线',
+        commentText: '',
         createdAt: 1000,
         updatedAt: 1000,
       },
@@ -179,7 +217,7 @@ describe('article comments storage-idb', () => {
     const comments = await listArticleCommentsByConversationId(7);
     expect(comments).toHaveLength(2);
     expect(comments.map((item) => [item.quoteText, item.commentText])).toEqual([
-      ['原文划线', '划线'],
+      ['原文划线', ''],
       ['带批注的原文', '修改后的批注'],
     ]);
   });

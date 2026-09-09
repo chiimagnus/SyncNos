@@ -764,6 +764,24 @@ describe('backup service', () => {
         updatedAt: 0,
       }),
     );
+    await reqToPromise(
+      seedTx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId,
+        canonicalUrl: 'https://example.com/comment-activity-backup',
+        authorName: '',
+        quoteText: 'highlight only',
+        commentText: '',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'highlight only' },
+          position: { type: 'TextPositionSelector', start: 0, end: 14 },
+        },
+        createdAt: 15,
+        updatedAt: 15,
+      }),
+    );
     await new Promise<void>((resolve, reject) => {
       seedTx.oncomplete = () => resolve();
       seedTx.onerror = () => reject(seedTx.error);
@@ -777,7 +795,7 @@ describe('backup service', () => {
     await deleteDb('webclipper');
 
     const first = await importBackupZipMerge(entries);
-    expect(first).toMatchObject({ commentsAdded: 2, commentsUpdated: 0 });
+    expect(first).toMatchObject({ commentsAdded: 3, commentsUpdated: 0 });
 
     const restoredDb = await openDb();
     const verifyTx = restoredDb.transaction(['conversations', 'article_comments'], 'readonly');
@@ -790,7 +808,7 @@ describe('backup service', () => {
     });
 
     expect(restoredConversation.lastActivityAt).toBe(20);
-    expect(restoredComments.map((row) => row.createdAt).sort((left, right) => left - right)).toEqual([0, 20]);
+    expect(restoredComments.map((row) => row.createdAt).sort((left, right) => left - right)).toEqual([0, 15, 20]);
 
     const repeated = await importBackupZipMerge(entries);
     expect(repeated).toMatchObject({
@@ -798,7 +816,7 @@ describe('backup service', () => {
       conversationsUpdated: 0,
       commentsAdded: 0,
       commentsUpdated: 0,
-      commentsSkipped: 2,
+      commentsSkipped: 3,
     });
     const [afterRepeat] = await reqToPromise<any[]>(
       (await openDb()).transaction(['conversations'], 'readonly').objectStore('conversations').getAll(),

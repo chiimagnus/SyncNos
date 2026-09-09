@@ -113,6 +113,35 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.cleanup();
   });
 
+  it('submits an empty root when a valid quote locator is attached', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const driver = getCommentSidebarPanelTestDriver(mounted.api);
+    const onSave = vi.fn(async () => ({ ok: true, createdRootId: 7 }));
+    driver.replaceActionCallbacks({ onSave } as any);
+    driver.session.setComposerAttachment({
+      displayQuote: 'Quoted text',
+      locator: {
+        v: 1,
+        env: 'app',
+        quote: { type: 'TextQuoteSelector', exact: 'Quoted text' },
+        position: { type: 'TextPositionSelector', start: 0, end: 11 },
+      },
+    });
+    await flushCommentsReactWork();
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
+    const send = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__send') as HTMLButtonElement;
+    expect(send.disabled).toBe(false);
+    send.click();
+    await flushCommentsReactWork();
+
+    expect(onSave).toHaveBeenCalledWith('');
+    mounted.cleanup();
+  });
+
   it('requests selection when Selection.toString() is empty but Range contains text (Firefox quirk)', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

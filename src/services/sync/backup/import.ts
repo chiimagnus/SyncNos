@@ -23,6 +23,7 @@ import {
   replaceMarkdownImageReferences,
 } from '@services/shared/markdown-image-references';
 import { formatSyncnosAssetUrl, isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
+import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
@@ -490,13 +491,28 @@ export async function importBackupZipMerge(
           for (const row of rows) {
             const id = Number(row?.id);
             const url = normalizeHttpUrl(row?.canonicalUrl);
+            const quoteText = String(row?.quoteText || '');
             const commentText = safeString(row?.commentText);
-            if (!Number.isSafeInteger(id) || id <= 0 || !url || !commentText) continue;
+            const parentId = Number(row?.parentId);
+            if (
+              !Number.isSafeInteger(id) ||
+              id <= 0 ||
+              !url ||
+              !hasValidArticleCommentContent({
+                parentId: Number.isSafeInteger(parentId) && parentId > 0 ? parentId : null,
+                quoteText,
+                commentText,
+                locator: row?.locator,
+                importSource: row?.importSource,
+                importKey: row?.importKey,
+              })
+            )
+              continue;
             const baseKey = buildArticleCommentArchiveBaseKey({
               uniqueKey: uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '',
               canonicalUrl: url,
               createdAt: Number(row?.createdAt) || 0,
-              quoteText: String(row?.quoteText || ''),
+              quoteText,
               commentText,
             });
             existingBaseKeyById.set(id, baseKey);

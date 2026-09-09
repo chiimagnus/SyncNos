@@ -1,3 +1,4 @@
+import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { parseArticleCommentLocator, type ArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { parseArticleCommentDto, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
@@ -126,7 +127,6 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
     if (quoteText == null) return fail('Invalid article comment quoteText', warnings);
     const commentRaw = boundedString(row.commentText, COMMENT_ARCHIVE_BUDGET.text);
     const commentText = commentRaw?.trim() ?? '';
-    if (!commentText) return fail('Invalid article comment commentText', warnings);
 
     const createdAt = finiteTimestamp(row.createdAt);
     const updatedAt = finiteTimestamp(row.updatedAt);
@@ -157,6 +157,19 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
       const parsed = parseArticleCommentLocator(row.locator);
       if (!parsed.ok) return fail(`Invalid article comment locator: ${parsed.reason}`, warnings);
       locator = parsed.value;
+    }
+
+    if (
+      !hasValidArticleCommentContent({
+        parentId: parentCommentId,
+        quoteText,
+        commentText,
+        locator,
+        importSource,
+        importKey,
+      })
+    ) {
+      return fail('Invalid article comment content', warnings);
     }
 
     const item: ArticleCommentArchiveItem = {

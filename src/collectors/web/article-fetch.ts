@@ -306,7 +306,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
           canonicalUrl,
           authorName: annotation.authorName || '得到',
           quoteText: annotation.quote,
-          commentText: annotation.note || '划线',
+          commentText: annotation.note || '',
           createdAt: toMilliseconds(annotation.createdAt),
           updatedAt: toMilliseconds(annotation.updatedAt),
         })),

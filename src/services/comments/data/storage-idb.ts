@@ -1,6 +1,7 @@
 import type { AddArticleCommentInput, ArticleComment } from '@services/comments/domain/models';
 import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
+import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
@@ -108,12 +109,15 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const canonicalUrl = normalizeCanonicalUrl(input?.canonicalUrl);
   const commentText = normalizeCommentText(input?.commentText);
   const quoteText = safeString(input?.quoteText);
+  const parentId = normalizeParentId(input?.parentId);
+  const locator = normalizeArticleCommentLocator(input?.locator);
   if (!canonicalUrl) throw new Error('canonicalUrl required');
-  if (!commentText) throw new Error('commentText required');
+  if (!hasValidArticleCommentContent({ parentId, quoteText, commentText, locator })) {
+    throw new Error('commentText or anchored quote required');
+  }
 
   const createdAt = normalizeTimestamp(input?.createdAt, now);
   const updatedAt = normalizeTimestamp(input?.updatedAt, createdAt);
-  const parentId = normalizeParentId(input?.parentId);
   const conversationId = normalizeConversationId(input?.conversationId);
   const row: any = {
     parentId,
@@ -122,7 +126,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
     authorName: safeString(input?.authorName) || '',
     quoteText,
     commentText,
-    locator: normalizeArticleCommentLocator(input?.locator),
+    locator,
     createdAt,
     updatedAt,
   };
@@ -170,8 +174,22 @@ export async function syncImportedArticleComments(
       const importKey = safeString(item?.importKey);
       const conversationId = normalizeConversationId(item?.conversationId);
       const canonicalUrl = normalizeCanonicalUrl(item?.canonicalUrl);
+      const quoteText = safeString(item?.quoteText);
       const commentText = normalizeCommentText(item?.commentText);
-      if (!importSource || !importKey || !conversationId || !canonicalUrl || !commentText) return null;
+      if (
+        !importSource ||
+        !importKey ||
+        !conversationId ||
+        !canonicalUrl ||
+        !hasValidArticleCommentContent({
+          parentId: null,
+          quoteText,
+          commentText,
+          importSource,
+          importKey,
+        })
+      )
+        return null;
       const createdAt = normalizeTimestamp(item?.createdAt, Date.now());
       return {
         importSource,
@@ -179,7 +197,7 @@ export async function syncImportedArticleComments(
         conversationId,
         canonicalUrl,
         authorName: safeString(item?.authorName) || '',
-        quoteText: safeString(item?.quoteText),
+        quoteText,
         commentText,
         createdAt,
         updatedAt: normalizeTimestamp(item?.updatedAt, createdAt),

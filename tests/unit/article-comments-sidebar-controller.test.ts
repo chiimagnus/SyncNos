@@ -179,6 +179,43 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
   });
 
+  it('saves an empty root only when the composer carries a valid quote locator', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const locator = {
+      v: 1 as const,
+      env: 'app' as const,
+      quote: { type: 'TextQuoteSelector' as const, exact: 'Quoted' },
+      position: { type: 'TextPositionSelector' as const, start: 0, end: 6 },
+    };
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 92 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
+    };
+
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+    await controller.open({ ensureContext: true });
+    const handlers = panel.getState().handlers;
+
+    session.setComposerAttachment({ displayQuote: 'Quoted', locator });
+    expect(await handlers.onSave('')).toEqual({ ok: true, createdRootId: 92 });
+    expect(adapter.addRoot).toHaveBeenCalledWith({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 21,
+      quoteText: 'Quoted',
+      commentText: '',
+      locator,
+    });
+
+    adapter.addRoot.mockClear();
+    session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
+    expect(await handlers.onSave('')).toBe(false);
+    expect(adapter.addRoot).not.toHaveBeenCalled();
+  });
+
   it('updates quote and locator from composer selection requests', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);

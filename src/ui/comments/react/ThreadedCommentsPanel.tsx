@@ -47,6 +47,9 @@ export function ThreadedCommentsPanel({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const busy = discussion.busy;
+  const canSubmitHighlightOnly = Boolean(
+    String(snapshot.composerAttachment.displayQuote || '').trim() && snapshot.composerAttachment.locator,
+  );
   const submitError = discussion.state.submit.status === 'error' ? discussion.state.submit.error : null;
 
   useLayoutEffect(() => {
@@ -74,7 +77,7 @@ export function ThreadedCommentsPanel({
   const submitComposer = useCallback(
     async (rawText?: string | null) => {
       const text = String(rawText ?? composerTextareaRef.current?.value ?? composerText ?? '').trim();
-      if (!text || busy) return;
+      if ((!text && !canSubmitHighlightOnly) || busy) return;
       const result = await discussion.submitRoot(text);
       if (unmountedRef.current || result === undefined) return;
       const createdRootId = resolveTargetRootIdFromSaveResult(result);
@@ -85,7 +88,7 @@ export function ThreadedCommentsPanel({
         });
       }
     },
-    [busy, composerText, discussion, syncLocalState],
+    [busy, canSubmitHighlightOnly, composerText, discussion, syncLocalState],
   );
 
   const normalizedGraph = useMemo(
@@ -289,6 +292,7 @@ export function ThreadedCommentsPanel({
         <RootCommentComposer
           value={composerText}
           disabled={busy}
+          canSubmitEmpty={canSubmitHighlightOnly}
           textareaRef={composerTextareaRef}
           onChange={updateComposerText}
           onSubmit={(value) => submitComposer(value)}

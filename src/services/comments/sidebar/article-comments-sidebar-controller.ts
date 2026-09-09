@@ -534,7 +534,6 @@ export function createArticleCommentsSidebarController(input: {
         const generation = mutationGeneration;
         if (!isMutationCurrent(generation)) return false;
         const value = safeString(text);
-        if (!value) return false;
 
         const ctx = await ensureContextForAction(generation);
         if (!isMutationCurrent(generation)) return false;
@@ -543,13 +542,15 @@ export function createArticleCommentsSidebarController(input: {
 
         const attachment = session.getSnapshot().composerAttachment;
         const quoteText = normalizeCommentSidebarQuoteText(attachment.displayQuote);
+        const locator = quoteText ? normalizeArticleCommentLocator(attachment.locator) : null;
+        if (!value && (!quoteText || !locator)) return false;
         const selectionRevision = attachment.selectionRevision;
         const created = await adapter.addRoot({
           canonicalUrl,
           conversationId: normalizeConversationId(ctx?.conversationId),
           quoteText,
           commentText: value,
-          locator: quoteText ? normalizeArticleCommentLocator(attachment.locator) : null,
+          locator,
         });
         if (!isMutationCurrent(generation)) return false;
         composerSelectionRequestSeq += 1;

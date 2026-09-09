@@ -260,7 +260,7 @@ describe('article-fetch-service', () => {
         canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
         authorName: '持弛',
         quoteText: '人们冒险往往不是为了贪图更多，而是为了“回本”。',
-        commentText: '划线',
+        commentText: '',
         createdAt: 1000,
         updatedAt: 1000,
       }),
