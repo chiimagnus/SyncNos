@@ -33,6 +33,7 @@ collectors -> services/shared
 - 会话列表必须使用 `bootstrap + loadMore` 分页，禁止恢复全量读取。
 - ChatGPT 与 Google AI Studio 的虚拟列表会卸载离屏轮次，禁止加入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`；完整历史只走手动抓取和 `prepareManualCapture()`。
 - 评论选区只附加到根评论 composer；reply 输入框和评论面板内选区不得覆盖正文引用。
+- 根评论允许仅划线：正文引用可在评论正文为空时保存，但必须有可验证的定位或稳定导入身份；reply 仍必须有非空正文。
 - 评论定位只接受全局唯一 exact Range，不新增模糊匹配、比例滚动或父元素高亮回退。
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
