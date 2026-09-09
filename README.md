@@ -56,7 +56,7 @@ SyncNos is local-first: captured content is saved locally before any optional sy
 
 ### Web articles
 
-Any `http(s)` page can be captured manually. SyncNos extracts readable content and relevant metadata, with site-specific fallbacks where needed.
+Any `http(s)` page can be captured manually. SyncNos extracts readable content and relevant metadata, with site-specific fallbacks where needed. Captured articles support comments and highlight-only annotations; on Dedao course articles, personal highlights and notes available on the signed-in page are also imported into the article comment layer.
 
 ### Video transcripts
 
