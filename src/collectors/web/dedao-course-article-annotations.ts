@@ -2,7 +2,6 @@ export type DedaoCourseArticleAnnotation = {
   id: string;
   quote: string;
   note: string;
-  authorName: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -59,7 +58,6 @@ export function collectDedaoCourseArticleAnnotationsInMainWorld(): DedaoCourseAr
       id,
       quote,
       note,
-      authorName: normalizeText(meta?.notesOwner?.name),
       createdAt: normalizeTimestamp(meta?.createTime),
       updatedAt: normalizeTimestamp(meta?.updateTime),
     });

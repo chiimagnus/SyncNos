@@ -214,7 +214,7 @@ describe('article comments storage-idb', () => {
         importKey: 'line-1',
         conversationId: 7,
         canonicalUrl,
-        authorName: '持弛',
+        authorName: 'Chii',
         quoteText: '原文划线',
         commentText: '',
         createdAt: 1000,
@@ -225,20 +225,20 @@ describe('article comments storage-idb', () => {
         importKey: 'note-1',
         conversationId: 7,
         canonicalUrl,
-        authorName: '持弛',
+        authorName: 'Chii',
         quoteText: '带批注的原文',
         commentText: '修改后的批注',
         createdAt: 2000,
         updatedAt: 3000,
       },
     ]);
-    expect(second).toEqual({ created: 0, updated: 1 });
+    expect(second).toEqual({ created: 0, updated: 2 });
 
     const comments = await listArticleCommentsByConversationId(7);
     expect(comments).toHaveLength(2);
-    expect(comments.map((item) => [item.quoteText, item.commentText])).toEqual([
-      ['原文划线', ''],
-      ['带批注的原文', '修改后的批注'],
+    expect(comments.map((item) => [item.authorName, item.quoteText, item.commentText])).toEqual([
+      ['Chii', '原文划线', ''],
+      ['Chii', '带批注的原文', '修改后的批注'],
     ]);
   });
 

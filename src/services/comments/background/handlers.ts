@@ -9,11 +9,7 @@ import {
 } from '@services/comments/data/storage';
 import { ArticleCommentInvariantError } from '@services/comments/data/storage-idb';
 import { storageGet } from '@services/shared/storage';
-import {
-  ABOUT_YOU_USER_NAME_STORAGE_KEY,
-  DEFAULT_ABOUT_YOU_USER_NAME,
-  normalizeUserName,
-} from '@services/shared/user-profile';
+import { ABOUT_YOU_USER_NAME_STORAGE_KEY, resolveAboutYouUserName } from '@services/shared/user-profile';
 import {
   AUTO_SYNC_CONVERSATION_CHANGED_REASONS,
   type AutoSyncConversationChangedReason,
@@ -61,7 +57,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     if (!request) return router.err('invalid article comment payload');
 
     const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
-    const authorName = normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+    const authorName = resolveAboutYouUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]);
 
     let comment;
     try {

@@ -68,8 +68,8 @@ describe('dedao course article annotations', () => {
     expect(result.annotations[1]).toMatchObject({
       quote: '第二是「现状偏见」。',
       note: '我会更喜欢待在学校，习惯作为一个学生。',
-      authorName: '持弛',
     });
+    expect(result.annotations[1]).not.toHaveProperty('authorName');
   });
 
   it('does not match non-course Dedao pages', () => {
