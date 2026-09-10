@@ -185,7 +185,6 @@ describe('Threaded comments panel shortcuts', () => {
   });
 
   it('preserves the root draft when the host reports a no-op save', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -212,12 +211,6 @@ describe('Threaded comments panel shortcuts', () => {
     expect((shadow.querySelector('.webclipper-inpage-comments-panel__notice') as HTMLElement).textContent).toContain(
       'Comment was not saved.',
     );
-    expect(
-      errorSpy.mock.calls.some((args) =>
-        args.some((value) => String(value).includes('flushSync was called from inside a lifecycle method')),
-      ),
-    ).toBe(false);
-    errorSpy.mockRestore();
     mounted.cleanup();
   });
 

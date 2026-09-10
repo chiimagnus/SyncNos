@@ -17,21 +17,14 @@ export type ThreadedCommentsPanelStoreController = {
   actions: CommentSidebarHostActions;
   attachHost: (host: CommentSidebarHost) => CommentSidebarPanelLease;
   setNotice: (input: { message: string; visible: boolean }) => void;
-  setHasFocusWithinPanel: (value: boolean) => void;
-  setPendingFocusRootId: (rootId: number | null) => void;
   dispose: () => void;
 };
 
-type LocalPanelSnapshot = Pick<
-  ThreadedCommentsPanelSnapshot,
-  'noticeMessage' | 'noticeVisible' | 'hasFocusWithinPanel' | 'pendingFocusRootId'
->;
+type LocalPanelSnapshot = Pick<ThreadedCommentsPanelSnapshot, 'noticeMessage' | 'noticeVisible'>;
 
 const EMPTY_LOCAL_SNAPSHOT: LocalPanelSnapshot = {
   noticeMessage: '',
   noticeVisible: false,
-  hasFocusWithinPanel: false,
-  pendingFocusRootId: null,
 };
 
 function combineSnapshots(
@@ -146,15 +139,6 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStoreCo
       patchLocal({
         noticeMessage: String(input?.message || ''),
         noticeVisible: input?.visible === true,
-      });
-    },
-    setHasFocusWithinPanel(value) {
-      patchLocal({ hasFocusWithinPanel: value === true });
-    },
-    setPendingFocusRootId(rootId) {
-      const normalized = Number(rootId);
-      patchLocal({
-        pendingFocusRootId: Number.isFinite(normalized) && normalized > 0 ? Math.round(normalized) : null,
       });
     },
     dispose() {

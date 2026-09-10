@@ -6,8 +6,6 @@ import type {
 export type ThreadedCommentsPanelSnapshot = CommentSidebarHostSnapshot & {
   noticeMessage: string;
   noticeVisible: boolean;
-  hasFocusWithinPanel: boolean;
-  pendingFocusRootId: number | null;
 };
 
 export type ThreadLocateResult = { ok: true } | { ok: false; reason: string };
@@ -21,7 +19,6 @@ export type ThreadedCommentsPanelProps = {
   snapshot: ThreadedCommentsPanelSnapshot;
   actions: CommentSidebarHostActions;
   onRequestClose: () => void;
-  setPendingFocusRootId?: (rootId: number | null) => void;
   locateThreadRoot?: (rootId: number) => Promise<ThreadLocateResult>;
   onActiveRootChange?: (rootId: number | null) => void;
   onLocateFailed?: (reason: string) => void;

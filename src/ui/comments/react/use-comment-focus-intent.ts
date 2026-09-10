@@ -1,6 +1,5 @@
 import type { DiscussionAction, DiscussionFocusIntent } from '@viewmodels/comments/discussion-reducer';
 import { useLayoutEffect, useRef, type Dispatch, type MutableRefObject, type RefCallback } from 'react';
-import { resolvePendingFocusTarget } from './focus-rules';
 
 type MenuTarget = number;
 
@@ -13,10 +12,7 @@ type UseCommentFocusIntentInput = {
   dispatch: Dispatch<DiscussionAction>;
   composerRef: MutableRefObject<HTMLTextAreaElement | null>;
   replyRefs: MutableRefObject<Record<number, HTMLTextAreaElement | null>>;
-  pendingFocusRootId: number | null;
-  rootIds: ReadonlySet<number>;
   focusScopeKey: unknown;
-  setPendingFocusRootId?: (rootId: number | null) => void;
 };
 
 function focusNode(node: HTMLTextAreaElement | HTMLButtonElement | null | undefined): boolean {
@@ -34,20 +30,8 @@ function focusNode(node: HTMLTextAreaElement | HTMLButtonElement | null | undefi
 }
 
 export function useCommentFocusIntent(input: UseCommentFocusIntentInput) {
-  const {
-    open,
-    busy,
-    focusComposerSignal,
-    quoteText,
-    focusIntent,
-    dispatch,
-    composerRef,
-    replyRefs,
-    pendingFocusRootId,
-    rootIds,
-    focusScopeKey,
-    setPendingFocusRootId,
-  } = input;
+  const { open, busy, focusComposerSignal, quoteText, focusIntent, dispatch, composerRef, replyRefs, focusScopeKey } =
+    input;
   const lastComposerSignalRef = useRef(0);
   const lastQuoteRef = useRef('');
   const menuTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -81,19 +65,6 @@ export function useCommentFocusIntent(input: UseCommentFocusIntentInput) {
     if (intent.kind === 'menu') focused = focusNode(menuTriggerRefs.current[String(intent.target)]);
     if (focused) dispatch({ type: 'consume-focus', epoch: intent.epoch });
   }, [busy, composerRef, dispatch, focusIntent, focusScopeKey, open, replyRefs]);
-
-  useLayoutEffect(() => {
-    if (!open || busy) return;
-    const rootId = resolvePendingFocusTarget({
-      pendingFocusRootId: pendingFocusRootId,
-      fallbackPendingFocusRootId: null,
-      hasFocusWithinPanel: true,
-      existingRootIds: rootIds,
-    });
-    if (rootId == null) return;
-    if (!focusNode(replyRefs.current[rootId])) return;
-    setPendingFocusRootId?.(null);
-  }, [busy, focusScopeKey, open, pendingFocusRootId, replyRefs, rootIds, setPendingFocusRootId]);
 
   const registerMenuTrigger = (target: MenuTarget): RefCallback<HTMLButtonElement> => {
     const key = String(target);

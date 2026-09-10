@@ -5,7 +5,6 @@ import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useDiscussionPanel } from '@viewmodels/comments/useDiscussionPanel';
 import { flushSync } from 'react-dom';
 
-import { resolveTargetRootIdForReply, resolveTargetRootIdFromSaveResult } from './focus-rules';
 import type { ThreadedCommentsPanelProps } from './types';
 import { useCommentSelectionAttachment } from './use-comment-selection-attachment';
 import { RootCommentComposer } from './RootCommentComposer';
@@ -26,7 +25,6 @@ export function ThreadedCommentsPanel({
   snapshot,
   actions,
   onRequestClose,
-  setPendingFocusRootId,
   locateThreadRoot,
   onActiveRootChange,
   onLocateFailed,
@@ -38,6 +36,7 @@ export function ThreadedCommentsPanel({
   const composerText = discussion.state.rootDraft;
   const replyTexts = discussion.state.replyDrafts;
   const armedDeleteId = discussion.state.confirmDelete;
+  const activeRootId = discussion.state.activeRootId;
   const panelSurfaceRef = useRef<HTMLDivElement | null>(null);
   const selectionAttachment = useCommentSelectionAttachment({
     open: snapshot.open,
@@ -85,7 +84,11 @@ export function ThreadedCommentsPanel({
       if ((!text && !canSubmitHighlightOnly) || busy) return;
       const result = await discussion.submitRoot(text);
       if (unmountedRef.current || result === undefined) return;
-      const createdRootId = resolveTargetRootIdFromSaveResult(result);
+      const rawCreatedRootId = result && typeof result === 'object' ? result.createdRootId : null;
+      const createdRootId =
+        typeof rawCreatedRootId === 'number' && Number.isSafeInteger(rawCreatedRootId) && rawCreatedRootId > 0
+          ? rawCreatedRootId
+          : null;
       if (createdRootId != null) {
         syncLocalState(() => {
           discussion.setActiveRoot(createdRootId);
@@ -105,7 +108,6 @@ export function ThreadedCommentsPanel({
     loadStatus: snapshot.loadStatus,
     hasComments: roots.length > 0,
   });
-  const rootIdSet = useMemo(() => new Set(roots.map((item) => Number(item.id))), [roots]);
   const repliesByRoot = useMemo(
     () => new Map(normalizedGraph.threads.map((thread) => [Number(thread.root.id), thread.replies] as const)),
     [normalizedGraph],
@@ -133,10 +135,8 @@ export function ThreadedCommentsPanel({
       if (!text || busy) return;
       await discussion.submitReply(rootId, text);
       if (unmountedRef.current) return;
-      const targetRootId = resolveTargetRootIdForReply(rootId);
-      if (targetRootId == null) return;
       syncLocalState(() => {
-        discussion.dispatch({ type: 'focus-reply', rootId: targetRootId });
+        discussion.dispatch({ type: 'focus-reply', rootId });
       });
     },
     [busy, discussion, replyTexts, syncLocalState],
@@ -150,7 +150,6 @@ export function ThreadedCommentsPanel({
   };
 
   useLayoutEffect(() => {
-    const activeRootId = discussion.state.activeRootId;
     const pathContainsActiveThread = (event: Event) => {
       if (activeRootId == null) return false;
       const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
@@ -184,7 +183,7 @@ export function ThreadedCommentsPanel({
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
       document.removeEventListener('focusin', onDocumentFocusIn, true);
     };
-  }, [discussion.state.activeRootId, discussionDispatch, updateArmedDeleteId]);
+  }, [activeRootId, discussionDispatch, updateArmedDeleteId]);
 
   const handleDelete = async (id: number) => {
     if (busy) return;
@@ -246,11 +245,9 @@ export function ThreadedCommentsPanel({
     if (wasConfirming) discussion.setOpenMenu(null);
   };
 
-  const effectiveActiveRootId = discussion.state.activeRootId;
-
   useLayoutEffect(() => {
-    onActiveRootChange?.(effectiveActiveRootId);
-  }, [effectiveActiveRootId, onActiveRootChange]);
+    onActiveRootChange?.(activeRootId);
+  }, [activeRootId, onActiveRootChange]);
 
   const focusController = useCommentFocusIntent({
     open: snapshot.open,
@@ -261,10 +258,7 @@ export function ThreadedCommentsPanel({
     dispatch: discussion.dispatch,
     composerRef: composerTextareaRef,
     replyRefs: replyTextareaRefs,
-    pendingFocusRootId: snapshot.pendingFocusRootId,
-    rootIds: rootIdSet,
     focusScopeKey: snapshot.comments,
-    setPendingFocusRootId,
   });
   const notice = useCommentNotice({
     message: snapshot.noticeMessage,
@@ -331,7 +325,7 @@ export function ThreadedCommentsPanel({
                   key={rootId}
                   root={root}
                   replies={replies}
-                  active={effectiveActiveRootId === rootId}
+                  active={activeRootId === rootId}
                   busy={busy}
                   openMenuId={typeof discussion.state.openMenu === 'number' ? discussion.state.openMenu : null}
                   rootMenuActions={getRootMenuActions(rootId)}
@@ -357,7 +351,7 @@ export function ThreadedCommentsPanel({
                   onReplyMenuToggle={toggleReplyMenu}
                   onMenuAction={runMenuAction}
                 >
-                  {effectiveActiveRootId === rootId ? (
+                  {activeRootId === rootId ? (
                     <ReplyComposer
                       rootId={rootId}
                       value={replyTexts[rootId] || ''}
