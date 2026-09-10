@@ -168,7 +168,10 @@ describe('article-fetch-service', () => {
   it('syncs Dedao underline and attached-note annotations into article comments', async () => {
     storageMocks.upsertConversation.mockImplementation(async (payload: any) => ({ id: 21, ...payload, __isNew: true }));
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+    settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
+      if (keys.includes('about_you_user_name')) return { about_you_user_name: 'Chii' };
+      return { web_article_cache_images_enabled: false };
+    });
     commentMocks.syncImportedArticleComments.mockResolvedValue({ created: 2, updated: 0 });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
@@ -253,7 +256,7 @@ describe('article-fetch-service', () => {
         importKey: 'line-1',
         conversationId: 21,
         canonicalUrl: 'https://www.dedao.cn/course/article?id=example',
-        authorName: '持弛',
+        authorName: 'Chii',
         quoteText: '人们冒险往往不是为了贪图更多，而是为了“回本”。',
         commentText: '',
         createdAt: 1000,

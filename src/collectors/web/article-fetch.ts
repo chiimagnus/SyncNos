@@ -17,6 +17,7 @@ import {
   type DedaoCourseArticleAnnotation,
 } from '@collectors/web/dedao-course-article-annotations';
 import { syncImportedArticleComments } from '@services/comments/data/storage';
+import { ABOUT_YOU_USER_NAME_STORAGE_KEY, resolveAboutYouUserName } from '@services/shared/user-profile';
 import {
   buildDiscourseTopicFloorUrl,
   isSameDiscourseTopicFloorUrl,
@@ -298,13 +299,15 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
       return timestamp < 10_000_000_000 ? Math.round(timestamp * 1000) : Math.round(timestamp);
     };
     try {
+      const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+      const authorName = resolveAboutYouUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]);
       await syncImportedArticleComments(
         dedaoAnnotations.map((annotation) => ({
           importSource: 'dedao',
           importKey: annotation.id,
           conversationId,
           canonicalUrl,
-          authorName: annotation.authorName || '得到',
+          authorName,
           quoteText: annotation.quote,
           commentText: annotation.note,
           createdAt: toMilliseconds(annotation.createdAt),
