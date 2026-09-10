@@ -150,22 +150,41 @@ export function ThreadedCommentsPanel({
   };
 
   useLayoutEffect(() => {
+    const activeRootId = discussion.state.activeRootId;
+    const pathContainsActiveThread = (event: Event) => {
+      if (activeRootId == null) return false;
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      return path.some((node) => {
+        const element = node as HTMLElement | null;
+        return Number(element?.dataset?.threadRootId) === activeRootId;
+      });
+    };
+    const dismissReplyOutsideActiveThread = (event: Event) => {
+      if (activeRootId != null && !pathContainsActiveThread(event)) {
+        discussionDispatch({ type: 'activate-root', rootId: null });
+      }
+    };
     const onDocumentPointerDown = (event: PointerEvent) => {
       const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-      for (const node of path) {
+      const isDeleteAction = path.some((node) => {
         const element = node as Element | null;
-        if (!element || typeof (element as any).matches !== 'function') continue;
-        if ((element as Element).matches('button[data-webclipper-comment-delete-id]')) {
-          return;
-        }
-      }
-      updateArmedDeleteId(null);
+        return Boolean(
+          element &&
+          typeof (element as any).matches === 'function' &&
+          element.matches('button[data-webclipper-comment-delete-id]'),
+        );
+      });
+      if (!isDeleteAction) updateArmedDeleteId(null);
+      dismissReplyOutsideActiveThread(event);
     };
+    const onDocumentFocusIn = (event: FocusEvent) => dismissReplyOutsideActiveThread(event);
     document.addEventListener('pointerdown', onDocumentPointerDown, true);
+    document.addEventListener('focusin', onDocumentFocusIn, true);
     return () => {
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+      document.removeEventListener('focusin', onDocumentFocusIn, true);
     };
-  }, [updateArmedDeleteId]);
+  }, [discussion.state.activeRootId, discussionDispatch, updateArmedDeleteId]);
 
   const handleDelete = async (id: number) => {
     if (busy) return;
@@ -227,7 +246,7 @@ export function ThreadedCommentsPanel({
     if (wasConfirming) discussion.setOpenMenu(null);
   };
 
-  const effectiveActiveRootId = discussion.state.activeRootId ?? (roots.length === 1 ? Number(roots[0]?.id) : null);
+  const effectiveActiveRootId = discussion.state.activeRootId;
 
   useLayoutEffect(() => {
     onActiveRootChange?.(effectiveActiveRootId);

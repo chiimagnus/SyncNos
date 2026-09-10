@@ -156,6 +156,8 @@ describe('Threaded comments panel shortcuts', () => {
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
+    (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click();
+    await flushReactScheduler();
 
     const textarea = shadow.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
@@ -229,6 +231,8 @@ describe('Threaded comments panel shortcuts', () => {
     driver.replaceActionCallbacks({ onReply });
     driver.replaceComments([{ id: 1, parentId: null, createdAt: 1000, commentText: 'root' }]);
     const shadow = (host.querySelector('webclipper-threaded-comments-panel') as HTMLElement).shadowRoot!;
+    (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click();
+    await flushReactScheduler();
     const textarea = shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as HTMLTextAreaElement;
     textarea.value = 'keep reply draft';
     textarea.dispatchEvent(new window.Event('input', { bubbles: true, cancelable: true }));

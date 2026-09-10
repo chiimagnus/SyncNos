@@ -277,6 +277,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
+    (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click();
+    await flushCommentsReactWork();
     const reply = shadow.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
     ) as HTMLTextAreaElement | null;

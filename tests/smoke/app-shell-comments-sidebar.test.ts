@@ -400,7 +400,7 @@ describe('AppShell comments sidebar', () => {
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
     await waitForCommentsUi(() => {
-      expect(shadow?.querySelector('.webclipper-inpage-comments-panel__reply-textarea')).toBeTruthy();
+      expect(shadow?.querySelector('.webclipper-inpage-comments-panel__comment')).toBeTruthy();
     });
 
     act(() => {
@@ -467,6 +467,9 @@ describe('AppShell comments sidebar', () => {
       ?.textContent?.trim();
     expect(quoteAfterComposerTyping).toBe(selectedText);
 
+    act(() => {
+      (shadow?.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement | null)?.click();
+    });
     const reply = (await waitForCommentsUi(() => {
       const el = shadow?.querySelector(
         '.webclipper-inpage-comments-panel__reply-textarea',

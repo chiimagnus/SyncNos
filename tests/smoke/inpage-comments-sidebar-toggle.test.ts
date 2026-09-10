@@ -205,6 +205,10 @@ describe('inpage comments sidebar toggle', () => {
 
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
+    await act(async () => {
+      (shadow?.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement | null)?.click();
+      await flushReactScheduler();
+    });
     const reply = shadow?.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
     ) as HTMLTextAreaElement | null;
