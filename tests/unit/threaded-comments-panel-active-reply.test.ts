@@ -42,6 +42,68 @@ describe('single active reply composer', () => {
     await flush();
     cleanupDom();
   });
+  it('does not auto-open a reply composer for a single root', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
+      { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
+    ]);
+    await flush();
+    const shadow = host.querySelector('webclipper-threaded-comments-panel')!.shadowRoot!;
+    expect(shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea')).toBeNull();
+    mounted.cleanup();
+  });
+
+  it('dismisses the active reply composer outside its thread and preserves the draft', async () => {
+    const host = document.createElement('div');
+    const outside = document.createElement('button');
+    document.body.append(host, outside);
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
+      { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
+    ]);
+    await flush();
+    const shadow = host.querySelector('webclipper-threaded-comments-panel')!.shadowRoot!;
+    const comment = shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement;
+    comment.click();
+    await flush();
+    let textarea = shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+    textarea.value = 'kept draft';
+    textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+
+    outside.dispatchEvent(new window.Event('pointerdown', { bubbles: true, composed: true }));
+    await flush();
+    expect(shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea')).toBeNull();
+
+    comment.click();
+    await flush();
+    textarea = shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as HTMLTextAreaElement;
+    expect(textarea.value).toBe('kept draft');
+    mounted.cleanup();
+  });
+
+  it('dismisses the active reply composer when keyboard focus moves outside its thread', async () => {
+    const host = document.createElement('div');
+    const outside = document.createElement('button');
+    document.body.append(host, outside);
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
+      { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
+    ]);
+    await flush();
+    const shadow = host.querySelector('webclipper-threaded-comments-panel')!.shadowRoot!;
+    (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click();
+    await flush();
+    expect(shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea')).toBeTruthy();
+
+    outside.focus();
+    await flush();
+    expect(shadow.querySelector('.webclipper-inpage-comments-panel__reply-textarea')).toBeNull();
+    mounted.cleanup();
+  });
+
   it('mounts only for the active root and preserves drafts across switches', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

@@ -20,7 +20,6 @@ import type { MountOptions, ThreadedCommentsPanelApi } from './types';
 type ThreadedCommentsPanelReactBridgeProps = {
   store: ThreadedCommentsPanelStore;
   actions: CommentSidebarHostActions;
-  setPendingFocusRootId: (rootId: number | null) => void;
   variant: 'sidebar';
   fullWidth: boolean;
   surfaceBg?: string;
@@ -45,7 +44,6 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
     snapshot,
     actions: props.actions,
     onRequestClose: props.onRequestClose,
-    setPendingFocusRootId: props.setPendingFocusRootId,
     locateThreadRoot: props.locateThreadRoot,
     onActiveRootChange: props.onActiveRootChange,
     onLocateFailed: props.onLocateFailed,
@@ -347,7 +345,6 @@ export function mountThreadedCommentsPanel(
       createElement(ThreadedCommentsPanelReactBridge, {
         store: panelStore,
         actions: panelController.actions,
-        setPendingFocusRootId: panelController.setPendingFocusRootId,
         variant,
         fullWidth: isFullWidth,
         surfaceBg: surfaceBg || undefined,
@@ -416,30 +413,6 @@ export function mountThreadedCommentsPanel(
   };
   let unsubscribeHostEffects: (() => void) | null = null;
 
-  const onShadowFocusIn = () => {
-    asyncReactUpdate(() => {
-      panelController.setHasFocusWithinPanel(true);
-    });
-  };
-  const onShadowFocusOut = () => {
-    try {
-      asyncReactUpdate(() => {
-        panelController.setHasFocusWithinPanel(Boolean(shadow.activeElement));
-      });
-    } catch (_e) {
-      asyncReactUpdate(() => {
-        panelController.setHasFocusWithinPanel(false);
-      });
-    }
-  };
-
-  try {
-    shadow.addEventListener('focusin', onShadowFocusIn);
-    shadow.addEventListener('focusout', onShadowFocusOut);
-  } catch (_e) {
-    // ignore
-  }
-
   apiRef = {
     attachHost(host) {
       if (disposed) return Object.freeze({ dispose() {} });
@@ -465,10 +438,6 @@ export function mountThreadedCommentsPanel(
       () => {
         unsubscribeHostEffects?.();
         unsubscribeHostEffects = null;
-      },
-      () => {
-        shadow.removeEventListener('focusin', onShadowFocusIn);
-        shadow.removeEventListener('focusout', onShadowFocusOut);
       },
       () => panelController.dispose(),
       () => {

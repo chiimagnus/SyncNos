@@ -76,6 +76,13 @@ function seedOneRootComment(session: ReturnType<typeof createCommentSidebarSessi
 }
 
 async function exerciseReplyAndDelete(shadow: ShadowRoot, expectedRootId: number) {
+  const comment = shadow.querySelector(
+    `.webclipper-inpage-comments-panel__thread[data-thread-root-id='${expectedRootId}'] .webclipper-inpage-comments-panel__comment`,
+  ) as HTMLElement | null;
+  expect(comment).toBeTruthy();
+  comment!.click();
+  await flushTasks();
+
   const replyTextarea = shadow.querySelector(
     '.webclipper-inpage-comments-panel__reply-textarea',
   ) as HTMLTextAreaElement | null;
