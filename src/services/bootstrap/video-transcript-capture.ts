@@ -30,10 +30,13 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     return runtime.send(type, payload);
   }
 
-  async function captureVideoTranscript(): Promise<
-    | { conversationId: null; title?: string; url?: string; subtitleStatus: 'empty' }
-    | { conversationId: number; title?: string; isNew: boolean; url?: string; subtitleStatus: 'ok' }
-  > {
+  async function captureVideoTranscript(): Promise<{
+    conversationId: number;
+    title?: string;
+    isNew: boolean;
+    url?: string;
+    subtitleStatus: 'ok' | 'empty';
+  }> {
     const extracted = await extractVideoTranscriptFromCurrentPage();
     const activityAt = Date.now();
 
@@ -52,16 +55,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
 
     const transcriptCues = toCanonicalVideoTranscriptCues(Array.isArray(extracted?.cues) ? extracted.cues : []);
     const transcriptMarkdown = formatVideoTranscriptMarkdown(transcriptCues);
-    const subtitleStatus: 'ok' | 'empty' = transcriptMarkdown ? 'ok' : 'empty';
-
-    if (subtitleStatus === 'empty') {
-      return {
-        conversationId: null,
-        title: title || undefined,
-        url,
-        subtitleStatus,
-      };
-    }
+    const subtitleStatus: 'ok' | 'empty' = transcriptCues.length ? 'ok' : 'empty';
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: {
@@ -89,10 +83,12 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       messageKey: 'video_transcript',
       role: 'transcript',
       contentMarkdown: transcriptMarkdown,
-      transcriptCues,
       sequence: 1,
       updatedAt: activityAt,
     };
+    if (transcriptCues.length) {
+      message.transcriptCues = transcriptCues;
+    }
     if (extracted?.chapters !== null) {
       message.videoChapters = normalizeCanonicalVideoChapters(extracted?.chapters);
     }
@@ -118,7 +114,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       title: title || undefined,
       url,
       isNew,
-      subtitleStatus: 'ok',
+      subtitleStatus,
     };
   }
 

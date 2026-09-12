@@ -183,8 +183,15 @@ function buildConversationMessageRecord(input: {
   };
 
   if (messageKey === 'video_transcript') {
-    if (Object.prototype.hasOwnProperty.call(message, 'transcriptCues') && message.transcriptCues !== undefined) {
+    const hasIncomingTranscriptCues =
+      Object.prototype.hasOwnProperty.call(message, 'transcriptCues') && message.transcriptCues !== undefined;
+    if (hasIncomingTranscriptCues) {
       baseRecord.transcriptCues = normalizeCanonicalVideoTranscriptCues(message.transcriptCues);
+    } else if (existing) {
+      baseRecord.contentMarkdown = String(existing.contentMarkdown || '');
+      if (Object.prototype.hasOwnProperty.call(existing, 'transcriptCues')) {
+        baseRecord.transcriptCues = normalizeCanonicalVideoTranscriptCues(existing.transcriptCues);
+      }
     }
     if (Object.prototype.hasOwnProperty.call(message, 'videoChapters') && message.videoChapters !== undefined) {
       baseRecord.videoChapters = normalizeCanonicalVideoChapters(message.videoChapters);

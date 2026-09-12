@@ -74,20 +74,16 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
         {},
       );
       const data = unwrap(response);
-      if (data.kind === 'video' && data.subtitleStatus === 'empty') {
-        await refreshState();
-        setStatus({ kind: 'default', message: t('videoTranscriptTipNoSubtitles') });
-        return data;
-      }
-
       await onCaptured?.();
       await refreshState();
       setStatus({
         kind: 'default',
         message:
-          data.kind === 'chat' && data.captureCompleteness === 'partial'
-            ? t('partialCaptureSaved')
-            : buildCaptureSuccessTipMessage({ isNew: data.isNew, title: data.title }),
+          data.kind === 'video' && data.subtitleStatus === 'empty'
+            ? t('videoTranscriptTipNoSubtitles')
+            : data.kind === 'chat' && data.captureCompleteness === 'partial'
+              ? t('partialCaptureSaved')
+              : buildCaptureSuccessTipMessage({ isNew: data.isNew, title: data.title }),
       });
       return data;
     } catch (error) {

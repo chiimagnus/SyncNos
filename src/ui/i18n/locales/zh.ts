@@ -51,7 +51,7 @@ export const zh: { [K in TranslationKey]: string } = {
   contextMenuSaveCurrentPage: '保存当前页面',
   contextMenuSaveCurrentAiChat: '保存当前 AI 对话',
   contextMenuSaveCurrentVideoTranscript: '保存视频字幕',
-  videoTranscriptTipNoSubtitles: '未检测到字幕，未保存。',
+  videoTranscriptTipNoSubtitles: '未检测到字幕；已保存可用的视频信息。',
   articlesSectionHeading: '网页文章采集',
   articlesSectionIntro: '提取当前网页的正文并保存为一篇文章。',
   articlesSectionSupportedHeading: '支持范围',

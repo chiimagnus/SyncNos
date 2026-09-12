@@ -152,7 +152,7 @@ describe('video transcript capture service', () => {
     expect(message.videoChapters).toEqual([]);
   });
 
-  it('does not create an empty Video when no canonical cues remain', async () => {
+  it('saves Video metadata and chapters even when no canonical cues remain', async () => {
     mocks.extractVideoTranscriptFromCurrentPage.mockResolvedValue({
       meta: {
         platform: 'bilibili',
@@ -172,12 +172,23 @@ describe('video transcript capture service', () => {
     const runtime = successfulRuntime();
 
     await expect(createVideoTranscriptCaptureService({ runtime }).captureVideoTranscript()).resolves.toEqual({
-      conversationId: null,
+      conversationId: 7,
       title: 'No subtitles',
       url: 'https://www.bilibili.com/video/BV1TEST12345/',
+      isNew: true,
       subtitleStatus: 'empty',
     });
-    expect(runtime.send).not.toHaveBeenCalled();
+    expect(runtime.send).toHaveBeenCalledTimes(2);
+    expect(runtime.send.mock.calls[0]?.[1]).toMatchObject({
+      payload: { videoDescription: 'context', durationSeconds: 10 },
+    });
+    const message = ((runtime.send.mock.calls[1]?.[1] as any)?.messages || [])[0];
+    expect(message).toMatchObject({
+      messageKey: 'video_transcript',
+      contentMarkdown: '',
+      videoChapters: [{ title: 'Chapter', startSeconds: 0, endSeconds: 10 }],
+    });
+    expect(message).not.toHaveProperty('transcriptCues');
   });
 
   it('propagates canonical runtime failures instead of reporting a saved Video', async () => {

@@ -3607,7 +3607,23 @@ describe('canonical video storage', () => {
       },
     ]);
     stored = (await getMessagesByConversationId(id))[0] as any;
-    expect(stored).not.toHaveProperty('transcriptCues');
+    expect(stored.contentMarkdown).toBe('[00:03] second');
+    expect(stored.transcriptCues).toEqual([{ startSeconds: 3, endSeconds: null, text: 'second' }]);
+    expect(stored.videoChapters).toEqual([]);
+
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'video_transcript',
+        role: 'transcript',
+        contentMarkdown: '',
+        sequence: 1,
+        updatedAt: 103,
+        transcriptCues: [],
+      },
+    ]);
+    stored = (await getMessagesByConversationId(id))[0] as any;
+    expect(stored.contentMarkdown).toBe('');
+    expect(stored.transcriptCues).toEqual([]);
     expect(stored.videoChapters).toEqual([]);
   });
 

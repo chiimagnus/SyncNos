@@ -49,7 +49,7 @@ export const en = {
   contextMenuSaveCurrentPage: 'Save current page',
   contextMenuSaveCurrentAiChat: 'Save current AI chat',
   contextMenuSaveCurrentVideoTranscript: 'Save video transcript',
-  videoTranscriptTipNoSubtitles: 'No subtitles detected (not saved).',
+  videoTranscriptTipNoSubtitles: 'No subtitles detected; available video details were saved.',
   articlesSectionHeading: 'Web article capture',
   articlesSectionIntro: 'Extract the main content from the current page and save it as a web article.',
   articlesSectionSupportedHeading: 'Supported',

@@ -46,16 +46,7 @@ export type CurrentPageCaptureResult =
       captureReasons?: string[];
     })
   | (CurrentPageSavedResult & { kind: 'article' })
-  | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: 'ok' })
-  | {
-      kind: 'video';
-      label: string;
-      collectorId: 'video';
-      conversationId: null;
-      title?: string;
-      isNew: false;
-      subtitleStatus: 'empty';
-    };
+  | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: 'ok' | 'empty' });
 
 function errorMessage(error: unknown, fallback: string): string {
   const maybeError = error as { message?: unknown };
@@ -232,27 +223,22 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     try {
       if (target.kind === 'video') {
         const result = await videoCapture.captureVideoTranscript();
-        if (result.subtitleStatus === 'empty') {
-          report(t('videoTranscriptTipNoSubtitles'), 'default');
-          return {
-            kind: 'video',
-            label: target.label,
-            collectorId: 'video',
-            conversationId: null,
-            title: result.title,
-            isNew: false,
-            subtitleStatus: 'empty',
-          };
-        }
-        report(buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' }), 'default');
+        const conversationId = normalizeConversationId(result.conversationId);
+        if (conversationId == null) throw new Error('invalid video capture response');
+        report(
+          result.subtitleStatus === 'empty'
+            ? t('videoTranscriptTipNoSubtitles')
+            : buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' }),
+          'default',
+        );
         return {
           kind: 'video',
           label: target.label,
           collectorId: 'video',
-          conversationId: normalizeConversationId(result.conversationId),
+          conversationId,
           title: result.title,
           isNew: result.isNew,
-          subtitleStatus: 'ok',
+          subtitleStatus: result.subtitleStatus,
         };
       }
 
