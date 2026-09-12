@@ -19,7 +19,7 @@ function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
 }
 
-function formatTranscriptMarkdown(cues: Array<{ start: number; text: string }>, hasTimestamps: boolean): string {
+function formatTranscriptMarkdown(cues: Array<{ start: number; text: string }>): string {
   const lines: string[] = [];
   const pad2 = (n: number) => String(Math.max(0, Math.floor(n))).padStart(2, '0');
   const fmt = (sec: number) => {
@@ -33,11 +33,8 @@ function formatTranscriptMarkdown(cues: Array<{ start: number; text: string }>, 
   for (const cue of cues || []) {
     const text = normalizeText((cue as any)?.text || '');
     if (!text) continue;
-    if (hasTimestamps && Number.isFinite(Number((cue as any)?.start))) {
-      lines.push(`${fmt(Number((cue as any).start))} ${text}`);
-    } else {
-      lines.push(text);
-    }
+    if (!Number.isFinite(Number((cue as any)?.start))) continue;
+    lines.push(`${fmt(Number((cue as any).start))} ${text}`);
   }
 
   return normalizeText(lines.join('\n'));
@@ -73,7 +70,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     const thumbnailUrl = normalizeText(extracted?.meta?.thumbnailUrl || '');
 
     const cues = Array.isArray(extracted?.cues) ? extracted.cues : [];
-    const transcriptMarkdown = formatTranscriptMarkdown(cues, extracted?.hasTimestamps === true);
+    const transcriptMarkdown = formatTranscriptMarkdown(cues);
     const subtitleStatus: 'ok' | 'empty' = transcriptMarkdown ? 'ok' : 'empty';
 
     if (subtitleStatus === 'empty') {
@@ -99,8 +96,6 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         platform,
         durationSeconds,
         thumbnailUrl,
-        transcriptSource: extracted?.source || 'C',
-        hasTimestamps: extracted?.hasTimestamps === true,
       },
     });
     if (!conversationRes?.ok) {

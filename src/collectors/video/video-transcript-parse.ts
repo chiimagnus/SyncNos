@@ -1,3 +1,5 @@
+import type { VideoChapter } from '@services/shared/video-capture';
+
 export type TranscriptCue = {
   start: number;
   end?: number;
@@ -8,6 +10,14 @@ function normalizeText(value: unknown): string {
   return String(value || '')
     .replace(/\r\n/g, '\n')
     .trim();
+}
+
+function readNonNegativeNumber(value: unknown): number | null {
+  if (value == null) return null;
+  const text = typeof value === 'string' ? value.trim() : value;
+  if (text === '') return null;
+  const number = Number(text);
+  return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
 function decodeHtmlEntities(input: string): string {
@@ -81,7 +91,7 @@ export function parseWebVtt(text: string): TranscriptCue[] {
 
     const joined = normalizeText(texts.join('\n').replace(/<[^>]+>/g, ''));
     if (!joined) continue;
-    cues.push({ start, ...(end != null ? { end } : null), text: joined });
+    cues.push({ start, ...(end != null && end >= start ? { end } : null), text: joined });
   }
 
   return cues;
@@ -91,16 +101,21 @@ export function parseYoutubeTimedtextXml(text: string): TranscriptCue[] {
   const src = normalizeText(text);
   if (!src) return [];
   const cues: TranscriptCue[] = [];
-  const re = /<text\b[^>]*\bstart="([^"]+)"[^>]*?(?:\bdur="([^"]+)")?[^>]*>([\s\S]*?)<\/text>/gim;
+  const re = /<text\b([^>]*)>([\s\S]*?)<\/text>/gim;
+  const readAttribute = (attributes: string, name: string) => {
+    const match = attributes.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'));
+    return match ? (match[1] ?? match[2] ?? '') : null;
+  };
+
   for (;;) {
-    const m = re.exec(src);
-    if (!m) break;
-    const start = Number(m[1]);
-    const dur = m[2] != null ? Number(m[2]) : NaN;
-    if (!Number.isFinite(start)) continue;
-    const end = Number.isFinite(dur) ? start + dur : undefined;
+    const match = re.exec(src);
+    if (!match) break;
+    const start = readNonNegativeNumber(readAttribute(match[1] || '', 'start'));
+    if (start == null) continue;
+    const duration = readNonNegativeNumber(readAttribute(match[1] || '', 'dur'));
+    const end = duration == null ? undefined : start + duration;
     const raw = decodeHtmlEntities(
-      String(m[3] || '')
+      String(match[2] || '')
         .replace(/\s+/g, ' ')
         .trim(),
     );
@@ -119,11 +134,11 @@ export function parseYoutubeJson3(text: string): TranscriptCue[] {
     const events = Array.isArray(json?.events) ? json.events : [];
     const out: TranscriptCue[] = [];
     for (const ev of events) {
-      const tStartMs = Number(ev?.tStartMs);
-      const dDurationMs = Number(ev?.dDurationMs);
-      if (!Number.isFinite(tStartMs)) continue;
+      const tStartMs = readNonNegativeNumber(ev?.tStartMs);
+      const dDurationMs = readNonNegativeNumber(ev?.dDurationMs);
+      if (tStartMs == null) continue;
       const start = tStartMs / 1000;
-      const end = Number.isFinite(dDurationMs) ? start + dDurationMs / 1000 : undefined;
+      const end = dDurationMs == null ? undefined : start + dDurationMs / 1000;
       const segs = Array.isArray(ev?.segs) ? ev.segs : [];
       const text = normalizeText(
         segs
@@ -145,22 +160,42 @@ export function parseBilibiliSubtitleJson(text: string): TranscriptCue[] {
   if (!src) return [];
   try {
     const json: any = JSON.parse(src);
-    const body =
-      (Array.isArray(json?.body) ? json.body : null) ??
-      (Array.isArray(json?.data?.body) ? json.data.body : null) ??
-      (Array.isArray(json?.result?.body) ? json.result.body : null) ??
-      (Array.isArray(json?.subtitle?.body) ? json.subtitle.body : null) ??
-      [];
+    const body = Array.isArray(json?.body) ? json.body : [];
     const out: TranscriptCue[] = [];
     for (const item of body) {
-      const start = Number(item?.from);
-      const end = Number(item?.to);
-      const content = normalizeText(String(item?.content || ''));
-      if (!Number.isFinite(start) || !content) continue;
-      out.push({ start, ...(Number.isFinite(end) ? { end } : null), text: content });
+      const start = readNonNegativeNumber(item?.from);
+      const end = readNonNegativeNumber(item?.to);
+      const content = normalizeText(item?.content);
+      if (start == null || !content) continue;
+      out.push({ start, ...(end != null && end >= start ? { end } : null), text: content });
     }
     return out;
   } catch (_e) {
     return [];
+  }
+}
+
+export function parseBilibiliViewPointsJson(text: string): VideoChapter[] | null {
+  const src = normalizeText(text);
+  if (!src) return null;
+  try {
+    const json: any = JSON.parse(src);
+    if (Number(json?.code) !== 0 || !Array.isArray(json?.data?.view_points)) return null;
+
+    const chapters: VideoChapter[] = [];
+    for (const item of json.data.view_points) {
+      const title = normalizeText(item?.content).replace(/\s+/g, ' ');
+      const startSeconds = readNonNegativeNumber(item?.from);
+      const end = readNonNegativeNumber(item?.to);
+      if (!title || startSeconds == null) continue;
+      chapters.push({
+        title,
+        startSeconds,
+        endSeconds: end != null && end >= startSeconds ? end : null,
+      });
+    }
+    return chapters;
+  } catch (_error) {
+    return null;
   }
 }
