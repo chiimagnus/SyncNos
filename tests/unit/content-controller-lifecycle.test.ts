@@ -94,6 +94,12 @@ function createHarness(options?: {
         const pending = options?.manualCaptures?.[manualIndex++];
         if (pending) await pending.promise;
       }),
+      getCurrentPageCaptureState: vi.fn(() => ({
+        available: true,
+        kind: 'chat',
+        label: 'Fetch AI Chat',
+        collectorId: 'gemini',
+      })),
     } as any,
     inpageButton: {
       ensureInpageButton: (config: any) => buttonConfigs.push(config),
