@@ -18,7 +18,7 @@ Capture useful content while keeping local browser storage as the source of trut
 
 - Save supported AI conversations.
 - Extract readable content and relevant metadata from web pages.
-- Capture YouTube and Bilibili transcripts/subtitles, including timestamps when available.
+- Capture already-loaded YouTube and Bilibili transcripts/subtitles with timestamps, and preserve Bilibili player chapters/highlights when the current page provides them.
 - Review and organize captured content locally before deciding where it goes next.
 
 Choose what happens next:
@@ -47,7 +47,7 @@ SyncNos 是一款本地优先、开源的浏览器剪藏器，用来保存 AI �
 
 - 保存受支持的 AI 对话；
 - 提取网页正文和相关元数据；
-- 捕获 YouTube 与 Bilibili 已加载的字幕/转录文本，并在可用时保留时间戳；
+- 捕获 YouTube 与 Bilibili 已加载的字幕/转录文本并保留时间戳；当前 Bilibili 播放器提供章节/看点时也会一并保存；
 - 先在本地浏览、整理已保存内容，再决定是否同步或导出。
 
 按需处理本地内容：

@@ -56,11 +56,11 @@ SyncNos is local-first: captured content is saved locally before any optional sy
 
 ### Web articles
 
-Any `http(s)` page can be captured manually. SyncNos extracts readable content and relevant metadata, with site-specific fallbacks where needed. Captured articles support comments and highlight-only annotations; on Dedao course articles, personal highlights and notes available on the signed-in page are also imported into the article comment layer.
+Ordinary `http(s)` pages can be captured manually. Supported Video URLs are routed to Video capture instead of being stored as web articles. SyncNos extracts readable article content and relevant metadata, with site-specific fallbacks where needed. Captured articles support comments and highlight-only annotations; on Dedao course articles, personal highlights and notes available on the signed-in page are also imported into the article comment layer.
 
 ### Video transcripts
 
-YouTube and Bilibili pages can capture transcripts/subtitles that the page has already loaded, including timestamps when available.
+Video capture supports YouTube `watch` / `youtu.be` pages and Bilibili BV video pages. Popup, the in-page save button, and the single dynamic SyncNos context-menu action all use the same Video route. SyncNos saves the already-loaded transcript with precise timestamp ranges plus useful source context such as title, author, description, duration, and thumbnail; Bilibili player chapters/highlights are also saved when the current page has naturally loaded them. If subtitles are not loaded, nothing is saved and the page does not fall back to Web Article capture. SyncNos does not download the audio/video stream, and Bilibili `av` pages, YouTube Shorts, arbitrary `/video/*` paths, statistics/tags, and chapter images are outside this supported contract.
 
 ## Output Targets
 

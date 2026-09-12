@@ -4,7 +4,7 @@
 
 ## 本地真源
 
-- AI 对话、文章、视频字幕及其消息先保存到浏览器本地；外部同步目标和导出文件都是派生结果。
+- AI 对话、文章、Video 采集内容及其消息先保存到浏览器本地；外部同步目标和导出文件都是派生结果。Video 的本地真源包括必要的视频来源上下文、可读 transcript Markdown、精确时间 cue，以及当前播放器实际提供的结构化章节/看点；外部 provider 不反向定义这些内容事实。
 - conversation 的 canonical 业务时间是 `lastActivityAt`。成功抓取/重抓取，以及评论新增、回复、删除等真实用户活动可以推进它；纯阅读、provider sync、identity rewrite、schema/backup migration 不得用执行时刻伪造 Activity。
 - 同步 mapping、cursor、远端状态和其它派生恢复状态不能反向覆盖本地内容事实。
 - 虚拟列表来源只有在完整性得到确认后才能做完整快照；不完整采集只能合并已验证内容，不能因为当前 DOM 缺失而删除历史消息。
