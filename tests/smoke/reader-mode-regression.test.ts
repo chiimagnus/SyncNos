@@ -272,19 +272,53 @@ describe('reader mode regression', () => {
     expect(articleOutlineSlot?.querySelector('[data-reader-rail-wrap="outline"]')).toBeTruthy();
     expect(shell?.querySelector('[data-reader-header-toolbar="true"]')).toBeNull();
 
+    currentState.activeId = 12;
     currentState.selectedConversation = {
       id: 12,
       title: 'Video',
-      source: 'web',
+      source: 'video',
       sourceType: 'video',
       conversationKey: 'video-12',
       url: 'https://example.com/video',
+      videoDescription: 'Description outside narration',
+    } as any;
+    currentState.detail = {
+      conversationId: 12,
+      messages: [
+        {
+          id: 'v-1',
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '# Transcript heading\n\n[00:01.234 → 00:03.456] transcript body',
+          videoChapters: [
+            { title: 'Intro chapter', startSeconds: 0, endSeconds: 30 },
+            { title: 'Main chapter', startSeconds: 30, endSeconds: null },
+          ],
+        },
+      ],
     } as any;
 
     renderRoot(root!);
     await flushDom();
 
     expect(document.querySelector('[data-reader-shell="article"]')).toBeTruthy();
+    const metadataColumn = document.querySelector('[data-reader-metadata-column="true"]') as HTMLElement | null;
+    const sentenceRoot = document.querySelector('[data-reader-sentence-root="true"]') as HTMLElement | null;
+    expect(metadataColumn).toBeTruthy();
+    expect(sentenceRoot).toBeTruthy();
+    expect(metadataColumn?.querySelector('[data-video-description="true"]')?.textContent).toContain(
+      'Description outside narration',
+    );
+    expect(metadataColumn?.querySelector('[data-video-chapters="true"]')?.textContent).toContain('[00:00 → 00:30]');
+    expect(metadataColumn?.querySelector('[data-video-chapters="true"]')?.textContent).toContain('Main chapter');
+    expect(sentenceRoot?.textContent || '').toContain('Transcript heading');
+    expect(sentenceRoot?.textContent || '').toContain('transcript body');
+    expect(sentenceRoot?.textContent || '').not.toContain('Description outside narration');
+    expect(sentenceRoot?.textContent || '').not.toContain('Intro chapter');
+    expect(Boolean(metadataColumn!.compareDocumentPosition(sentenceRoot!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(
+      true,
+    );
+
     const videoMoreButton = document.querySelector(
       '[data-detail-header-more-trigger="true"]',
     ) as HTMLButtonElement | null;
@@ -294,8 +328,20 @@ describe('reader mode regression', () => {
     });
     await flushDom();
     expect(document.querySelector('[data-reader-header-toolbar="true"]')).toBeTruthy();
-    expect(await waitForSelector('[data-reader-rail-wrap="outline"]')).toBeTruthy();
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 220));
+    });
+    expect(await waitForSelector('[data-reader-outline-entry][aria-label="Transcript heading"]')).toBeTruthy();
+    const videoOutline = document.querySelector('[data-reader-rail-wrap="outline"]') as HTMLElement | null;
+    expect(videoOutline).toBeTruthy();
+    const outlineLabels = Array.from(videoOutline!.querySelectorAll('[data-reader-outline-entry]')).map((entry) =>
+      entry.getAttribute('aria-label'),
+    );
+    expect(new Set(outlineLabels)).toEqual(new Set(['Transcript heading']));
+    expect(outlineLabels).not.toContain('Intro chapter');
+    expect(outlineLabels).not.toContain('Description outside narration');
 
+    currentState.activeId = 13;
     currentState.selectedConversation = {
       id: 13,
       title: 'Chat',

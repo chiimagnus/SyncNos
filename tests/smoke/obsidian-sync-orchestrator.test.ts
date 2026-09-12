@@ -159,6 +159,70 @@ describe('obsidian-sync-orchestrator', () => {
     expect(syncRes.results[0].ok).toBe(true);
   });
 
+  it('writes Video notes into the Video folder with semantic description chapters and transcript body', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video:https://example.com/watch/1',
+      title: 'Video',
+      url: 'https://example.com/watch/1',
+      platform: 'bilibili',
+      author: 'Creator',
+      durationSeconds: 90,
+      videoDescription: 'Description body',
+      lastActivityAt: 10,
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      {
+        messageKey: 'video_transcript',
+        sequence: 1,
+        role: 'transcript',
+        contentMarkdown: '[00:01.234] hello',
+        videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+        updatedAt: 10,
+      },
+    ]);
+
+    let putBody = '';
+    let putUrl = '';
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        putUrl = String(url || '');
+        putBody = String(init?.body || '');
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'video' });
+
+    expect(syncRes.results[0]).toMatchObject({ ok: true, mode: 'full_rebuild' });
+    expect(decodeURIComponent(putUrl)).toContain('SyncNos-Videos');
+    expect(putBody).toContain('platform: "bilibili"');
+    expect(putBody).toContain('## Description\n\nDescription body');
+    expect(putBody).toContain('## Chapters\n\n- [00:00 → 00:30] Intro');
+    expect(putBody).toContain('## Transcript\n\n[00:01.234] hello');
+    expect(putBody).not.toContain('# Conversations');
+    expect(putBody).not.toContain('## 1 transcript');
+  });
+
   it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
     const { syncJobSetPayloads } = setupChromeStorage({ failSyncJobWrites: true });
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');

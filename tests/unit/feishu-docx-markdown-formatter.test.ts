@@ -53,6 +53,43 @@ describe('feishu docx markdown formatter', () => {
     expect(out).not.toContain('\n## Content\n');
   });
 
+  it('inherits the semantic Video document without chat role headings', async () => {
+    const out = await formatConversationMarkdownForFeishuDocxSync(
+      {
+        id: 2,
+        source: 'video',
+        sourceType: 'video',
+        conversationKey: 'video:https://example.com/watch/2',
+        title: 'Video',
+        url: 'https://example.com/watch/2',
+        author: 'Creator',
+        platform: 'bilibili',
+        durationSeconds: 60,
+        videoDescription: 'Description body',
+      } as any,
+      {
+        conversationId: 2,
+        messages: [
+          {
+            id: 2,
+            conversationId: 2,
+            messageKey: 'video_transcript',
+            role: 'transcript',
+            contentMarkdown: '[00:01.234] hello',
+            videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+          } as any,
+        ],
+      } as any,
+    );
+
+    expect(out).toContain('- Platform: bilibili');
+    expect(out).toContain('## Description\n\nDescription body');
+    expect(out).toContain('## Chapters\n\n- [00:00 → 00:30] Intro');
+    expect(out).toContain('## Transcript\n\n[00:01.234] hello');
+    expect(out).not.toContain('# Conversations');
+    expect(out).not.toContain('# transcript');
+  });
+
   it.each([0, Number.NaN, Number.POSITIVE_INFINITY, 9e99])(
     'omits invalid Last Activity metadata for %s',
     async (lastActivityAt) => {

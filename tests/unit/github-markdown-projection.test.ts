@@ -68,7 +68,7 @@ describe('github markdown projection', () => {
       conversation: current,
       messages: [
         {
-          messageKey: sourceType === 'article' ? 'article_body' : 'm1',
+          messageKey: sourceType === 'article' ? 'article_body' : sourceType === 'video' ? 'video_transcript' : 'm1',
           sequence: 1,
           role: 'assistant',
           contentMarkdown: 'body',
@@ -82,6 +82,39 @@ describe('github markdown projection', () => {
     expect(projection.markdownText).not.toContain('lastSyncedAt');
     expect(projection.markdownContentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(projection.projectionFingerprint).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('changes Video Markdown and content hash when semantic Video content changes', async () => {
+    const current = conversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video-key',
+      title: 'Video',
+      url: 'https://example.com/video',
+      platform: 'bilibili',
+      videoDescription: 'Description A',
+    });
+    const baseMessage = {
+      messageKey: 'video_transcript',
+      sequence: 1,
+      role: 'transcript',
+      contentMarkdown: '[00:01.000] hello',
+      videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 10 }],
+    };
+    const first = await buildGithubMarkdownProjection({ conversation: current, messages: [baseMessage] });
+    const second = await buildGithubMarkdownProjection({
+      conversation: { ...current, videoDescription: 'Description B' },
+      messages: [{ ...baseMessage, contentMarkdown: '[00:01.000] changed' }],
+    });
+
+    expect(first.markdownPath).toContain('VideosScripts/');
+    expect(first.markdownText).toContain('## Description\n\nDescription A');
+    expect(first.markdownText).toContain('## Chapters\n\n- [00:00 → 00:10] Intro');
+    expect(first.markdownText).toContain('## Transcript\n\n[00:01.000] hello');
+    expect(first.markdownText).not.toContain('# Conversations');
+    expect(second.markdownText).toContain('Description B');
+    expect(second.markdownText).toContain('[00:01.000] changed');
+    expect(second.markdownContentHash).not.toBe(first.markdownContentHash);
   });
 
   it('changes rendered Markdown and hashes when only canonical Activity changes', async () => {

@@ -140,16 +140,28 @@ describe('countConversationMessageTextUnits', () => {
     ).toBe(0);
   });
 
-  it('derives timestamp-free text for saved video transcripts', () => {
+  it('derives timestamp-free text for saved video transcripts across old and canonical time formats', () => {
     expect(
       countConversationMessageTextUnits([
-        { messageKey: 'video_transcript', contentMarkdown: '00:01 你好 world\n01:02:03 next line' },
+        {
+          messageKey: 'video_transcript',
+          contentMarkdown: [
+            '00:01 你好 world',
+            '01:02:03 next line',
+            '[00:01.234] alpha beta',
+            '[00:01.234 → 00:03.456] gamma',
+            '[01:02:03.004 → 01:02:05.006] delta',
+          ].join('\n'),
+        },
       ]),
-    ).toBe(5);
+    ).toBe(9);
   });
 
   it('keeps timestamp-like text for ordinary messages', () => {
     expect(countConversationMessageTextUnits([{ messageKey: 'm1', contentMarkdown: '00:01 你好 world' }])).toBe(4);
+    expect(
+      countConversationMessageTextUnits([{ messageKey: 'm1', contentMarkdown: '[00:01.234 → 00:03.456] gamma' }]),
+    ).toBeGreaterThan(1);
   });
 
   it('counts source-site comments when the collector includes them in saved Markdown', () => {

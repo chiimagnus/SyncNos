@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-09-08**
+**Last Updated: 2026-09-12**
 
 This Privacy Policy applies to SyncNos WebClipper (the “Extension”), including its supported Chromium, Firefox-family, and Safari builds.
 
@@ -16,11 +16,14 @@ Depending on the feature you invoke or enable, the Extension may read data that 
 
 - AI conversation messages and related page metadata;
 - article text, title, URL, author, publish date, and site-specific metadata;
-- video transcripts/subtitles that the page has already loaded;
+- video page metadata needed for capture context, such as title, URL, author, description, duration, and thumbnail;
+- video transcripts/subtitles that the page has already loaded, plus player-provided chapter/segment metadata when available;
 - image URLs embedded in captured content;
 - text selections and locator metadata used for local article comments.
 
-Supported non-virtualized AI sites can be captured automatically when AI auto-save is enabled. ChatGPT and Google AI Studio require explicit manual capture because their virtualized lists cannot be treated as complete automatically. Article capture is manually initiated.
+Supported non-virtualized AI sites can be captured automatically when AI auto-save is enabled. ChatGPT and Google AI Studio require explicit manual capture because their virtualized lists cannot be treated as complete automatically. Article and Video capture are manually initiated.
+
+For Bilibili chapters/highlights, SyncNos consumes the player response that the current page naturally loads; this feature does not add a separate Bilibili WBI/API request.
 
 ## 3. Local Storage and Backups
 

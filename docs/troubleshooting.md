@@ -12,7 +12,8 @@
 | OAuth Connect 无响应 | client id、redirect URI、pending state、Worker endpoint 和浏览器日志。 |
 | GitHub 手动同步选中了多条，但 commit 的 changed files 更少 | 这是可能的正常结果：手动同步使用 `reconcile`，未变化的受管路径也可能参与声明，但 GitHub 最终 tree diff 只显示真正变化的文件。SyncNos commit message 固定为 `SyncNos GitHub sync`，不再用选中数或 staged 数冒充 changed-file 数。 |
 | article 只有文本没有图片 | 图片设置、anti-hotlink rule、referer 与下载 warning；文本成功仍是成功。 |
-| 视频提示没有字幕 | 先在页面开启并等待字幕请求加载，再 capture。 |
+| 视频提示没有字幕 | 先在页面开启并等待字幕请求加载，再 capture；未加载字幕时不会创建空 Video，也不会降级成 Article。 |
+| Bilibili 字幕已保存但没有章节/看点 | 章节取自当前页播放器自然加载的章节 response；当前视频没有章节或该 response 尚未被页面加载时，字幕仍可正常保存。 |
 | `Could not establish connection` / `Receiving end does not exist` | 先按发送方向和生命周期分类：content → background 冷启动、background → content 尚未注入、port 已建立后关闭、旧 context 失效是不同问题。不要用通用 retry 掩盖 background cold-start，也不要把 `message port closed` 或 `Extension context invalidated` 当成 missing receiver。 |
 
 ### 连接错误的五类生命周期

@@ -205,6 +205,231 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(updateCalls.length).toBe(0);
   });
 
+  it('creates Video pages in SyncNos-Videos with one semantic Transcript section and no inner role heading', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+    const ensureCalls: any[] = [];
+    const createCalls: any[] = [];
+    const appendCalls: Array<{ blockId: string; blocks: any[] }> = [];
+    const messagesToBlocks = vi.fn((messages: any[]) => {
+      const body = String(messages?.[0]?.contentMarkdown || '');
+      return [
+        {
+          type: 'heading_3',
+          heading_3: { rich_text: [{ plain_text: 'transcript' }] },
+        },
+        {
+          type: 'paragraph',
+          paragraph: { rich_text: [{ plain_text: body }] },
+        },
+      ];
+    });
+    const patchSyncMapping = vi.fn(async () => true);
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+      storage: {
+        getSyncMappingByConversation: async () => ({
+          conversation: {
+            id: 9,
+            sourceType: 'video',
+            source: 'video',
+            title: 'Video',
+            url: 'https://www.bilibili.com/video/BV1FwY4zkEef/',
+            author: 'Creator',
+            platform: 'bilibili',
+            durationSeconds: 90,
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+            videoDescription: 'Description body',
+            lastActivityAt: 2_000,
+          },
+          mapping: null,
+        }),
+        getMessagesByConversationId: async () => [
+          {
+            messageKey: 'video_transcript',
+            role: 'transcript',
+            sequence: 1,
+            updatedAt: 2_000,
+            contentMarkdown: '[00:01.234] hello',
+            videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+          },
+        ],
+        getArticleCommentsByConversationId: async () => [],
+        attachOrphanArticleCommentsToConversation: async () => ({ updated: 0 }),
+        setConversationNotionPageId: async () => true,
+        setSyncCursor: async () => true,
+        patchSyncMapping,
+      },
+      conversationKinds,
+      dbManager: {
+        ensureDatabase: async ({ dbSpec }: any) => {
+          ensureCalls.push(dbSpec);
+          return { databaseId: 'db_videos' };
+        },
+      },
+      syncService: {
+        getPage: async () => {
+          throw new Error('unused');
+        },
+        createPageInDatabase: async (_token: string, req: any) => {
+          createCalls.push(req);
+          return { id: 'p_video' };
+        },
+        updatePageProperties: async () => ({ ok: true }),
+        appendChildren: async (_token: string, blockId: string, blocks: any[]) => {
+          appendCalls.push({ blockId, blocks });
+          return {
+            results: blocks.map((_, index) => ({ id: blockId === 'p_video' ? `h_video_${index}` : `b_${index}` })),
+          };
+        },
+        messagesToBlocks,
+        isPageUsableForDatabase: () => true,
+      },
+      jobStore,
+    });
+
+    const result = await orchestrator.syncConversations({ conversationIds: [9], instanceId: 'video-create' });
+
+    expect(result.results[0]).toMatchObject({ ok: true, mode: 'created' });
+    expect(ensureCalls[0]?.storageKey).toBe('notion_db_id_syncnos_videos');
+    expect(createCalls[0]?.databaseId).toBe('db_videos');
+    expect(createCalls[0]?.properties).toMatchObject({
+      Platform: { select: { name: 'bilibili' } },
+      Duration: { number: 90 },
+    });
+    expect(createCalls[0]?.properties).not.toHaveProperty('Transcript Source');
+    expect(createCalls[0]?.properties).not.toHaveProperty('Has Timestamps');
+    expect(messagesToBlocks).toHaveBeenCalledTimes(1);
+    const projectedMessage = messagesToBlocks.mock.calls[0]?.[0]?.[0];
+    expect(projectedMessage).toMatchObject({ role: 'transcript', messageKey: 'video_transcript' });
+    expect(projectedMessage.contentMarkdown).toContain('## Description\n\nDescription body');
+    expect(projectedMessage.contentMarkdown).toContain('## Chapters\n\n- [00:00 → 00:30] Intro');
+    expect(projectedMessage.contentMarkdown).toContain('[00:01.234] hello');
+    expect(projectedMessage.contentMarkdown).not.toContain('## Transcript');
+    const bodyAppend = appendCalls.find((call) => call.blockId.startsWith('h_video_'));
+    expect(bodyAppend?.blocks).toHaveLength(1);
+    expect(bodyAppend?.blocks[0]?.type).toBe('paragraph');
+    expect(patchSyncMapping).toHaveBeenCalledWith(9, {
+      notionSections: { conversations: { headingBlockId: 'h_video_0' } },
+    });
+  });
+
+  it('rebuilds the existing Video Transcript section when the canonical transcript message is updated', async () => {
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    let currentJob: any = null;
+    const jobStore = {
+      getJob: async () => currentJob,
+      setJob: async (job: any) => {
+        currentJob = job;
+        return true;
+      },
+    };
+    const fetchCalls: any[] = [];
+    const appendCalls: Array<{ blockId: string; blocks: any[] }> = [];
+    const patchSyncMapping = vi.fn(async () => true);
+    const messagesToBlocks = vi.fn((messages: any[]) => [
+      { type: 'heading_3', heading_3: { rich_text: [{ plain_text: 'transcript' }] } },
+      { type: 'paragraph', paragraph: { rich_text: [{ plain_text: String(messages?.[0]?.contentMarkdown || '') }] } },
+    ]);
+
+    notionFetchImpl = async (req: any) => {
+      fetchCalls.push(req);
+      if (req.method === 'DELETE' && req.path === '/v1/blocks/h_video') return { ok: true };
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+      storage: {
+        getSyncMappingByConversation: async () => ({
+          conversation: {
+            id: 9,
+            sourceType: 'video',
+            source: 'video',
+            title: 'Video',
+            url: 'https://example.com/video',
+            platform: 'bilibili',
+            videoDescription: 'Updated description',
+            lastActivityAt: 2_000,
+            notionPageId: 'p_video',
+          },
+          mapping: {
+            notionPageId: 'p_video',
+            lastSyncedMessageKey: 'video_transcript',
+            lastSyncedSequence: 1,
+            lastSyncedAt: 1_000,
+            notionSections: { conversations: { headingBlockId: 'h_video' } },
+          },
+        }),
+        getMessagesByConversationId: async () => [
+          {
+            messageKey: 'video_transcript',
+            role: 'transcript',
+            sequence: 1,
+            updatedAt: 2_000,
+            contentMarkdown: '[00:02.000] updated transcript',
+            videoChapters: [{ title: 'Updated chapter', startSeconds: 0, endSeconds: 20 }],
+          },
+        ],
+        getArticleCommentsByConversationId: async () => [],
+        attachOrphanArticleCommentsToConversation: async () => ({ updated: 0 }),
+        setConversationNotionPageId: async () => true,
+        setSyncCursor: async () => true,
+        patchSyncMapping,
+      },
+      conversationKinds,
+      dbManager: { ensureDatabase: async () => ({ databaseId: 'db_videos' }) },
+      syncService: {
+        getPage: async () => ({
+          id: 'p_video',
+          parent: { type: 'database_id', database_id: 'db_videos' },
+          archived: false,
+          in_trash: false,
+          properties: {},
+        }),
+        isPageUsableForDatabase: () => true,
+        createPageInDatabase: async () => ({ id: 'unused' }),
+        updatePageProperties: async () => ({ ok: true }),
+        appendChildren: async (_token: string, blockId: string, blocks: any[]) => {
+          appendCalls.push({ blockId, blocks });
+          return {
+            results: blocks.map((_, index) => ({ id: blockId === 'p_video' ? `h_new_${index}` : `b_${index}` })),
+          };
+        },
+        messagesToBlocks,
+      },
+      jobStore,
+    });
+
+    const result = await orchestrator.syncConversations({ conversationIds: [9], instanceId: 'video-rebuild' });
+
+    expect(result.results[0]).toMatchObject({ ok: true, mode: 'rebuilt', appended: 0 });
+    expect(fetchCalls).toContainEqual(expect.objectContaining({ method: 'DELETE', path: '/v1/blocks/h_video' }));
+    expect(messagesToBlocks).toHaveBeenCalledTimes(1);
+    const projected = messagesToBlocks.mock.calls[0]?.[0]?.[0]?.contentMarkdown;
+    expect(projected).toContain('## Description\n\nUpdated description');
+    expect(projected).toContain('## Chapters\n\n- [00:00 → 00:20] Updated chapter');
+    expect(projected).toContain('[00:02.000] updated transcript');
+    const recreatedBody = appendCalls.find((call) => call.blockId.startsWith('h_new_'));
+    expect(recreatedBody?.blocks).toHaveLength(1);
+    expect(recreatedBody?.blocks[0]?.type).toBe('paragraph');
+    expect(patchSyncMapping).toHaveBeenCalledWith(9, {
+      notionSections: { conversations: { headingBlockId: 'h_new_0' } },
+    });
+  });
+
   it('refreshes article Activity after orphan attach before creating the Notion page', async () => {
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();

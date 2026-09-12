@@ -57,7 +57,10 @@ type JsonArticleItem = JsonCommon & {
 type JsonVideoItem = JsonCommon & {
   type: 'video';
   author: string | null;
+  description: string | null;
   transcript: JsonContent;
+  cues: Array<{ startSeconds: number | null; endSeconds: number | null; text: string }>;
+  chapters: Array<{ title: string; startSeconds: number; endSeconds: number | null }>;
 };
 
 type JsonExportItem = JsonChatItem | JsonArticleItem | JsonVideoItem;
@@ -103,9 +106,13 @@ function normalizeContent(message: ConversationMessage | null | undefined): Json
   return markdown == null ? null : { format: 'markdown', value: markdown };
 }
 
-function findSemanticMessage(messages: ConversationMessage[], messageKey: string): ConversationMessage | null {
+function findArticleSemanticMessage(messages: ConversationMessage[], messageKey: string): ConversationMessage | null {
   const semantic = messages.find((message) => message.messageKey === messageKey);
   return semantic || messages[0] || null;
+}
+
+function findExactMessage(messages: ConversationMessage[], messageKey: string): ConversationMessage | null {
+  return messages.find((message) => message.messageKey === messageKey) || null;
 }
 
 async function materializeContentMarkdown(input: {
@@ -188,7 +195,7 @@ async function buildJsonItem(input: {
   }
 
   if (kindId === ARTICLE_KIND_ID) {
-    const sourceMessage = findSemanticMessage(input.messages, 'article_body');
+    const sourceMessage = findArticleSemanticMessage(input.messages, 'article_body');
     const materialized = await materializeContentMarkdown({
       conversationId: input.conversation.id,
       basename: input.basename,
@@ -208,7 +215,7 @@ async function buildJsonItem(input: {
   }
 
   if (kindId === VIDEO_KIND_ID) {
-    const sourceMessage = findSemanticMessage(input.messages, 'video_transcript');
+    const sourceMessage = findExactMessage(input.messages, 'video_transcript');
     const materialized = await materializeContentMarkdown({
       conversationId: input.conversation.id,
       basename: input.basename,
@@ -220,7 +227,22 @@ async function buildJsonItem(input: {
         ...commonFields(input.conversation, 'video'),
         attachments: materialized.attachments,
         author: nullableMetadataString(input.conversation.author),
+        description: nullableMetadataString(input.conversation.videoDescription),
         transcript: materialized.contents[0]!,
+        cues: Array.isArray(sourceMessage?.transcriptCues)
+          ? sourceMessage.transcriptCues.map((cue) => ({
+              startSeconds: cue.startSeconds,
+              endSeconds: cue.endSeconds,
+              text: cue.text,
+            }))
+          : [],
+        chapters: Array.isArray(sourceMessage?.videoChapters)
+          ? sourceMessage.videoChapters.map((chapter) => ({
+              title: chapter.title,
+              startSeconds: chapter.startSeconds,
+              endSeconds: chapter.endSeconds,
+            }))
+          : [],
       },
       zipAttachments: materialized.zipAttachments,
     };

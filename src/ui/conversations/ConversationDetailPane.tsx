@@ -19,6 +19,7 @@ import { MenuPopover } from '@ui/shared/MenuPopover';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
+import { formatVideoTimecode } from '@services/conversations/domain/video-content';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 
@@ -175,6 +176,20 @@ export function ConversationDetailPane({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
+  const isVideo = String((selected as any)?.sourceType || '') === 'video';
+  const videoDescription = isVideo ? String((selected as any)?.videoDescription || '').trim() : '';
+  const videoTranscriptMessage =
+    isVideo && Array.isArray(detail?.messages)
+      ? detail.messages.find((message: any) => String(message?.messageKey || '') === 'video_transcript') || null
+      : null;
+  const videoChapters =
+    isVideo && Array.isArray((videoTranscriptMessage as any)?.videoChapters)
+      ? ((videoTranscriptMessage as any).videoChapters as Array<{
+          title: string;
+          startSeconds: number;
+          endSeconds: number | null;
+        }>)
+      : [];
   const textCount = useMemo(() => {
     if (!selected) return null;
     if (!Array.isArray(detail?.messages) || !detail.messages.length) return null;
@@ -290,7 +305,15 @@ export function ConversationDetailPane({
       </h2>
       {selected ? (
         <div className="tw-mt-1.5 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-          {urlEditing ? (
+          {isVideo ? (
+            <div
+              className="tw-min-w-0 tw-flex-1 tw-truncate"
+              data-video-source-url="true"
+              title={displayedUrl || t('noLinkAvailable')}
+            >
+              {displayedUrl || t('noLinkAvailable')}
+            </div>
+          ) : urlEditing ? (
             <>
               <input
                 ref={urlInputRef}
@@ -349,6 +372,35 @@ export function ConversationDetailPane({
           {t('selectConversationHint')}
         </div>
       )}
+      {selected && isVideo && videoDescription ? (
+        <section className="tw-mt-5" data-video-description="true">
+          <h3 className="tw-m-0 tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('videoDescriptionLabel')}
+          </h3>
+          <div className="tw-mt-1.5 tw-whitespace-pre-wrap tw-text-sm tw-leading-6 tw-text-[var(--text-secondary)]">
+            {videoDescription}
+          </div>
+        </section>
+      ) : null}
+      {selected && isVideo && videoChapters.length ? (
+        <section className="tw-mt-5" data-video-chapters="true">
+          <h3 className="tw-m-0 tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('videoChaptersLabel')}
+          </h3>
+          <ul className="tw-mb-0 tw-mt-1.5 tw-list-none tw-p-0 tw-text-sm tw-leading-6 tw-text-[var(--text-secondary)]">
+            {videoChapters.map((chapter, index) => {
+              const start = formatVideoTimecode(chapter.startSeconds);
+              const range =
+                chapter.endSeconds == null ? start : `${start} → ${formatVideoTimecode(chapter.endSeconds)}`;
+              return (
+                <li key={`${start}-${index}`}>
+                  <span className="tw-font-mono">[{range}]</span> {chapter.title}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 
