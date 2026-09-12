@@ -505,14 +505,12 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
             calls.push({ op: 'append', pageId: _pageId });
             return { ok: true };
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -562,7 +560,6 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => calls.push({ op: 'clear' }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
             calls.push({ op: 'append', blocks: _blocks });
             return { ok: true };
@@ -572,7 +569,6 @@ describe('background-router notion sync', () => {
             return [{ kind: 'blocks', count: messages.length }];
           },
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -581,7 +577,6 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('appended');
     expect(blocksFromCount).toBe(1);
-    expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
 
@@ -681,17 +676,12 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ id: 'p1', parent: { database_id: 'db1' }, properties: {} }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async (_t: string, targetId: string) => {
-            calls.push({ op: 'clear', targetId });
-            return { ok: true };
-          },
           appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
             calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
             return { results: [], count: 0 };
           },
           messagesToBlocks: (_messages: any[]) => [],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -717,7 +707,7 @@ describe('background-router notion sync', () => {
     expect(String(cursorCall?.cursor?.notionSectionDigests?.comments?.digest || '')).not.toBe('old');
   });
 
-  it('avoids clearing the whole page when cursor is missing and only comments changed (web articles)', async () => {
+  it('rebuilds only the comments section when the cursor is missing and only comments changed', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();
@@ -806,10 +796,6 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          clearPageChildren: async (_t: string, targetId: string) => {
-            calls.push({ op: 'clear', targetId });
-            return { ok: true };
-          },
           appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
             calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
             return { results: [], count: 0 };
@@ -819,7 +805,6 @@ describe('background-router notion sync', () => {
             return [];
           },
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -844,7 +829,7 @@ describe('background-router notion sync', () => {
     expect(String(cursorCall?.cursor?.notionSectionDigests?.comments?.digest || '')).not.toBe('old');
   });
 
-  it('avoids clearing the whole page when cursor is missing and only article changed (web articles)', async () => {
+  it('rebuilds only the article section when the cursor is missing and only the article changed', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();
@@ -919,10 +904,6 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          clearPageChildren: async (_t: string, targetId: string) => {
-            calls.push({ op: 'clear', targetId });
-            return { ok: true };
-          },
           appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
             calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
             return { results: [], count: 0 };
@@ -935,7 +916,6 @@ describe('background-router notion sync', () => {
             },
           ],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1017,17 +997,12 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          clearPageChildren: async () => {
-            calls.push({ op: 'clear' });
-            return { ok: true };
-          },
           appendChildren: async () => {
             calls.push({ op: 'append' });
             return { ok: true };
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1036,7 +1011,6 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('updated_properties');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
-    expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
     expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
   });
@@ -1098,17 +1072,12 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          clearPageChildren: async () => {
-            calls.push({ op: 'clear' });
-            return { ok: true };
-          },
           appendChildren: async () => {
             calls.push({ op: 'append' });
             return { ok: true };
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1117,7 +1086,6 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('updated_properties');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
-    expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
   });
 
@@ -1162,7 +1130,6 @@ describe('background-router notion sync', () => {
             properties: {},
           }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => calls.push({ op: 'clear' }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
             calls.push({ op: 'append', blocks: _blocks });
             return { ok: true };
@@ -1172,7 +1139,6 @@ describe('background-router notion sync', () => {
             return [{ kind: 'blocks', count: messages.length }];
           },
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1181,7 +1147,6 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('appended');
     expect(blocksFromCount).toBe(1);
-    expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
 
@@ -1245,17 +1210,12 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          clearPageChildren: async () => {
-            calls.push({ op: 'clear' });
-            return { ok: true };
-          },
           appendChildren: async () => {
             calls.push({ op: 'append' });
             return { ok: true };
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1264,7 +1224,6 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('no_changes');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(false);
-    expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
     expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
   });
@@ -1317,7 +1276,6 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async (_t: string, pageId: string) => {
             const conversationId = Number(String(pageId).split('_')[1]);
             started.push(conversationId);
@@ -1330,7 +1288,6 @@ describe('background-router notion sync', () => {
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1389,14 +1346,12 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async (_t: string, _blockId: string, blocks: any[]) => ({
             ok: true,
             results: Array.isArray(blocks) ? blocks.map((_b, i) => ({ id: `test_block_${_blockId}_${i}` })) : [],
           }),
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore: delayedJobStore,
         conversationKinds,
@@ -1471,11 +1426,9 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => calls.push({ op: 'clear' }),
           appendChildren: async () => calls.push({ op: 'append' }),
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
-          pageBelongsToDatabase: () => true,
         },
         jobStore,
       },
@@ -1484,7 +1437,6 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('rebuilt');
     expect(calls.some((c) => c.op === 'append')).toBe(true);
-    expect(calls.some((c) => c.op === 'clear')).toBe(false);
     const fetchCalls = (((globalThis as any).fetch as any)?.mock?.calls || []).map((args: any[]) => ({
       url: String(args?.[0] || ''),
       method: String(args?.[1]?.method || 'GET').toUpperCase(),
@@ -1518,11 +1470,9 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async () => ({ ok: true }),
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -1580,7 +1530,6 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
             appendedBlocks = blocks;
             calls.push({ op: 'append', pageId: _pageId });
@@ -1593,7 +1542,6 @@ describe('background-router notion sync', () => {
               image: { type: 'external', external: { url: 'https://example.com/a.png' } },
             },
           ],
-          hasExternalImageBlocks: () => true,
           upgradeImageBlocksToFileUploads: async () => [
             {
               object: 'block',
@@ -1602,7 +1550,6 @@ describe('background-router notion sync', () => {
             },
           ],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -1646,7 +1593,6 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
             appendedBlocks = blocks;
             return { ok: true };
@@ -1658,11 +1604,9 @@ describe('background-router notion sync', () => {
               image: { type: 'external', external: { url: 'https://example.com/a.png' } },
             },
           ],
-          hasExternalImageBlocks: () => true,
           // Simulate "degraded" behavior: upgrade attempted but image remains external.
           upgradeImageBlocksToFileUploads: async (accessToken: string, blocks: any[]) => blocks,
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -1671,6 +1615,66 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(appendedBlocks[0]?.image?.type).toBe('external');
     expect(job.perConversation[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+  });
+
+  it('returns warning when a local image upload is replaced with the omission placeholder', async () => {
+    const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [
+            {
+              messageKey: 'm1',
+              role: 'user',
+              contentMarkdown: '![](syncnos-asset://42)',
+              sequence: 1,
+            },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          updatePageProperties: async () => ({ ok: true }),
+          appendChildren: async () => ({ ok: true }),
+          messagesToBlocks: () => [
+            {
+              object: 'block',
+              type: 'image',
+              image: { type: 'external', external: { url: 'syncnos-asset://42' } },
+            },
+          ],
+          upgradeImageBlocksToFileUploads: async () => [
+            {
+              object: 'block',
+              type: 'paragraph',
+              paragraph: {
+                rich_text: [{ type: 'text', text: { content: '[Image omitted: local image upload failed]' } }],
+              },
+            },
+          ],
+          isPageUsableForDatabase: () => false,
+        },
+        jobStore,
+      },
+    });
+
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].warnings).toContainEqual(
+      expect.objectContaining({ code: 'notion_inline_image_upload_failed', extra: { count: 1 } }),
+    );
   });
 
   it('preserves warnings when a later Notion step fails', async () => {
@@ -1704,7 +1708,6 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          clearPageChildren: async () => ({ ok: true }),
           appendChildren: async () => {
             throw new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 500');
           },
@@ -1715,10 +1718,8 @@ describe('background-router notion sync', () => {
               image: { type: 'external', external: { url: 'https://example.com/a.png' } },
             },
           ],
-          hasExternalImageBlocks: () => true,
           upgradeImageBlocksToFileUploads: async (accessToken: string, blocks: any[]) => blocks,
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -1778,7 +1779,6 @@ describe('background-router notion sync', () => {
           appendChildren: async () => ({ ok: true }),
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -1841,7 +1841,6 @@ describe('background-router notion sync', () => {
           appendChildren: async () => ({ ok: true }),
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -1974,7 +1973,6 @@ describe('background-router notion sync', () => {
           },
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -2021,7 +2019,6 @@ describe('background-router notion sync', () => {
           },
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },
@@ -2067,7 +2064,6 @@ describe('background-router notion sync', () => {
           },
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
-          pageBelongsToDatabase: () => false,
         },
         jobStore,
       },

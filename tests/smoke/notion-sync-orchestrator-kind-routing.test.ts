@@ -164,7 +164,6 @@ describe('notion-sync-orchestrator kind routing', () => {
           image: { type: 'external', external: { url: 'syncnos-asset://42' } },
         },
       ],
-      hasExternalImageBlocks: () => true,
       upgradeImageBlocksToFileUploads: async (_token: string, blocks: any[], conversationId: number) => {
         upgradeConversationIds.push(conversationId);
         return blocks;
@@ -629,7 +628,6 @@ describe('notion-sync-orchestrator kind routing', () => {
           },
         ],
         isPageUsableForDatabase: () => true,
-        hasExternalImageBlocks: () => true,
         upgradeImageBlocksToFileUploads: async () => {
           throw new Error('forced image upgrader failure');
         },

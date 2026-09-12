@@ -90,8 +90,8 @@ function normalizeEquationExpression(expression: unknown): string {
   return String(expression || '').trim();
 }
 
-function canUseNativeEquation(expression: unknown): boolean {
-  return normalizeEquationExpression(expression).length <= MAX_EQUATION_EXPRESSION;
+function canUseNativeEquation(expression: string): boolean {
+  return expression.length <= MAX_EQUATION_EXPRESSION;
 }
 
 function inlineEquationFallbackRich(expression: unknown) {
@@ -193,129 +193,155 @@ function chunkRichText(list: any) {
   return chunks;
 }
 
-function inlineMarkdownToRichText(markdown: unknown, base: any = {}, link?: unknown) {
+type InlineMarkerKind = 'link' | 'equation' | 'bold' | 'strike' | 'italic';
+
+type InlineParseTask =
+  | { mode: 'code' | 'plain'; input: string; annotations: any; link?: unknown }
+  | { mode: 'emit-code'; content: string; annotations: any; link?: unknown };
+
+function firstInlineMarker(input: string): { kind: InlineMarkerKind; index: number } | null {
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (char === '[') return { kind: 'link', index };
+    if (char === '$') return { kind: 'equation', index };
+    if (char === '*') return { kind: input[index + 1] === '*' ? 'bold' : 'italic', index };
+    if (char === '~' && input[index + 1] === '~') return { kind: 'strike', index };
+  }
+  return null;
+}
+
+function inlineMarkdownToRichText(markdown: unknown) {
   const src = String(markdown || '');
   if (!src) return [];
 
-  function parseWithCode(input: string, ann: any): any[] {
-    const m = input.match(/`+/);
-    if (!m || m.index === undefined) return parsePlain(input, ann);
-    const idx = m.index;
-    const fence = m[0];
-    const before = input.slice(0, idx);
-    const rest = input.slice(idx + fence.length);
-    const endIdx = rest.indexOf(fence);
-    if (endIdx < 0) return parsePlain(input, ann);
-    const codeContent = rest.slice(0, endIdx);
-    const after = rest.slice(endIdx + fence.length);
-    return [
-      ...parsePlain(before, ann),
-      textRich(codeContent, { annotations: { ...ann, code: true }, link }),
-      ...parseWithCode(after, ann),
-    ];
-  }
+  const out: any[] = [];
+  const stack: InlineParseTask[] = [{ mode: 'code', input: src, annotations: {} }];
 
-  function parsePlain(input: string, ann: any): any[] {
-    if (!input) return [];
+  while (stack.length) {
+    const task = stack.pop()!;
+    if (task.mode === 'emit-code') {
+      out.push(
+        textRich(task.content, {
+          annotations: { ...task.annotations, code: true },
+          link: task.link,
+        }),
+      );
+      continue;
+    }
 
-    const candidates: Array<{ kind: string; idx: number; prio: number }> = [];
+    if (!task.input) continue;
+    if (task.mode === 'code') {
+      const marker = task.input.match(/`+/);
+      if (!marker || marker.index === undefined) {
+        stack.push({ ...task, mode: 'plain' });
+        continue;
+      }
 
-    const linkIdx = input.indexOf('[');
-    if (linkIdx >= 0) candidates.push({ kind: 'link', idx: linkIdx, prio: 1 });
+      const fence = marker[0];
+      const before = task.input.slice(0, marker.index);
+      const rest = task.input.slice(marker.index + fence.length);
+      const endIndex = rest.indexOf(fence);
+      if (endIndex < 0) {
+        stack.push({ ...task, mode: 'plain' });
+        continue;
+      }
 
-    const eqIdx = input.indexOf('$');
-    if (eqIdx >= 0) candidates.push({ kind: 'equation', idx: eqIdx, prio: 2 });
+      const codeContent = rest.slice(0, endIndex);
+      const after = rest.slice(endIndex + fence.length);
+      if (after) stack.push({ mode: 'code', input: after, annotations: task.annotations, link: task.link });
+      stack.push({ mode: 'emit-code', content: codeContent, annotations: task.annotations, link: task.link });
+      if (before) stack.push({ mode: 'plain', input: before, annotations: task.annotations, link: task.link });
+      continue;
+    }
 
-    const boldIdx = input.indexOf('**');
-    if (boldIdx >= 0) candidates.push({ kind: 'bold', idx: boldIdx, prio: 3 });
+    const marker = firstInlineMarker(task.input);
+    if (!marker) {
+      out.push(textRich(task.input, { annotations: task.annotations, link: task.link }));
+      continue;
+    }
 
-    const strikeIdx = input.indexOf('~~');
-    if (strikeIdx >= 0) candidates.push({ kind: 'strike', idx: strikeIdx, prio: 4 });
+    const before = task.input.slice(0, marker.index);
+    const rest = task.input.slice(marker.index);
+    if (before) out.push(textRich(before, { annotations: task.annotations, link: task.link }));
 
-    const italicIdx = input.indexOf('*');
-    if (italicIdx >= 0) candidates.push({ kind: 'italic', idx: italicIdx, prio: 5 });
-
-    if (!candidates.length) return [textRich(input, { annotations: ann, link })];
-    candidates.sort((a, b) => a.idx - b.idx || (a.prio || 9) - (b.prio || 9));
-
-    const next = candidates[0];
-    const before = input.slice(0, next.idx);
-    const rest = input.slice(next.idx);
-    const out = [];
-    if (before) out.push(textRich(before, { annotations: ann, link }));
-
-    if (next.kind === 'link') {
+    if (marker.kind === 'link') {
       const close = rest.indexOf('](');
       const end = close >= 0 ? rest.indexOf(')', close + 2) : -1;
       if (close >= 0 && end >= 0) {
         const linkText = rest.slice(1, close);
         const url = rest.slice(close + 2, end);
         const tail = rest.slice(end + 1);
-        const inner = inlineMarkdownToRichText(linkText, ann, url);
-        out.push(...inner);
-        out.push(...parsePlain(tail, ann));
-        return out;
+        if (tail) stack.push({ mode: 'plain', input: tail, annotations: task.annotations, link: task.link });
+        if (linkText) stack.push({ mode: 'code', input: linkText, annotations: task.annotations, link: url });
+        continue;
       }
-    }
-
-    if (next.kind === 'equation') {
-      if (rest.startsWith('$$')) {
-        // Block equations are handled by the block parser; keep literal.
-      } else {
+    } else if (marker.kind === 'equation') {
+      if (!rest.startsWith('$$')) {
         const end = rest.indexOf('$', 1);
         if (end > 1) {
-          const expr = rest.slice(1, end);
+          const expression = rest.slice(1, end);
           const tail = rest.slice(end + 1);
-          out.push(...inlineEquationRich(expr));
-          out.push(...parsePlain(tail, ann));
-          return out;
+          out.push(...inlineEquationRich(expression));
+          if (tail) stack.push({ mode: 'plain', input: tail, annotations: task.annotations, link: task.link });
+          continue;
         }
       }
-    }
-
-    if (next.kind === 'bold') {
+    } else if (marker.kind === 'bold') {
       const end = rest.indexOf('**', 2);
       if (end > 2) {
         const inner = rest.slice(2, end);
         const tail = rest.slice(end + 2);
-        out.push(...parsePlain(inner, { ...ann, bold: true }));
-        out.push(...parsePlain(tail, ann));
-        return out;
+        if (tail) stack.push({ mode: 'plain', input: tail, annotations: task.annotations, link: task.link });
+        if (inner) {
+          stack.push({
+            mode: 'plain',
+            input: inner,
+            annotations: { ...task.annotations, bold: true },
+            link: task.link,
+          });
+        }
+        continue;
       }
-    }
-
-    if (next.kind === 'strike') {
+    } else if (marker.kind === 'strike') {
       const end = rest.indexOf('~~', 2);
       if (end > 2) {
         const inner = rest.slice(2, end);
         const tail = rest.slice(end + 2);
-        out.push(...parsePlain(inner, { ...ann, strikethrough: true }));
-        out.push(...parsePlain(tail, ann));
-        return out;
-      }
-    }
-
-    if (next.kind === 'italic') {
-      if (rest.startsWith('**')) {
-        // Let bold handler own it.
-      } else {
-        const end = rest.indexOf('*', 1);
-        if (end > 1) {
-          const inner = rest.slice(1, end);
-          const tail = rest.slice(end + 1);
-          out.push(...parsePlain(inner, { ...ann, italic: true }));
-          out.push(...parsePlain(tail, ann));
-          return out;
+        if (tail) stack.push({ mode: 'plain', input: tail, annotations: task.annotations, link: task.link });
+        if (inner) {
+          stack.push({
+            mode: 'plain',
+            input: inner,
+            annotations: { ...task.annotations, strikethrough: true },
+            link: task.link,
+          });
         }
+        continue;
+      }
+    } else if (!rest.startsWith('**')) {
+      const end = rest.indexOf('*', 1);
+      if (end > 1) {
+        const inner = rest.slice(1, end);
+        const tail = rest.slice(end + 1);
+        if (tail) stack.push({ mode: 'plain', input: tail, annotations: task.annotations, link: task.link });
+        if (inner) {
+          stack.push({
+            mode: 'plain',
+            input: inner,
+            annotations: { ...task.annotations, italic: true },
+            link: task.link,
+          });
+        }
+        continue;
       }
     }
 
-    out.push(textRich(rest.slice(0, 1), { annotations: ann, link }));
-    out.push(...parsePlain(rest.slice(1), ann));
-    return out;
+    out.push(textRich(rest.slice(0, 1), { annotations: task.annotations, link: task.link }));
+    const tail = rest.slice(1);
+    if (tail) stack.push({ mode: 'plain', input: tail, annotations: task.annotations, link: task.link });
   }
 
-  return mergeRichText(parseWithCode(src, base));
+  return out;
 }
 
 function blocksFromInlineRichText(type: string, richText: any) {
@@ -555,7 +581,8 @@ function markdownToNotionBlocks(markdown: string) {
     out.push(...blocksFromInlineRichText('paragraph', rich));
   }
 
-  return out;
+  if (out.length || !src.trim()) return out;
+  return blocksFromInlineRichText('paragraph', [textRich(src)]);
 }
 
-export { inlineMarkdownToRichText, markdownToNotionBlocks };
+export { markdownToNotionBlocks };
