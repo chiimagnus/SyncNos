@@ -1,8 +1,8 @@
-import { getPageTitle, notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
+import { getPageTitle, notionFetch } from '@services/sync/notion/notion-api.ts';
 
-export type NotionParentPageOption = { id: string; title: string };
+type NotionParentPageOption = { id: string; title: string };
 
-type NotionFetch = typeof defaultNotionFetch;
+const SEARCH_PAGE_SIZE = 50;
 
 function normalizeId(id: unknown) {
   return String(id || '')
@@ -21,8 +21,7 @@ function isSearchUsableParentPage(item: any) {
   const parent = item.parent || null;
   if (!parent) return true;
   if (parent.database_id) return false;
-  if (parent.type === 'database_id') return false;
-  return true;
+  return parent.type !== 'database_id';
 }
 
 function toOption(page: any): NotionParentPageOption | null {
@@ -34,39 +33,34 @@ function toOption(page: any): NotionParentPageOption | null {
 function dedupeOptions(list: NotionParentPageOption[]) {
   const out: NotionParentPageOption[] = [];
   const seen = new Set<string>();
-  for (const item of Array.isArray(list) ? list : []) {
-    const id = normalizeId(item?.id);
+  for (const item of list) {
+    const id = normalizeId(item.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    out.push({ id: String(item.id || '').trim(), title: String(item.title || '').trim() || String(item.id || '') });
+    out.push({ id: item.id.trim(), title: item.title.trim() || item.id });
   }
   return out;
 }
 
-async function searchParentPagesOnce(
-  notionFetch: NotionFetch,
-  accessToken: string,
-  input: { pageSize: number; startCursor?: string | null },
-) {
-  const body: any = {
+async function searchParentPagesOnce(accessToken: string, startCursor: string | null) {
+  const body = {
     filter: { property: 'object', value: 'page' },
     sort: { direction: 'descending', timestamp: 'last_edited_time' },
-    page_size: input.pageSize,
+    page_size: SEARCH_PAGE_SIZE,
+    ...(startCursor ? { start_cursor: startCursor } : {}),
   };
-  if (input.startCursor) body.start_cursor = String(input.startCursor);
   const res = await notionFetch({ accessToken, method: 'POST', path: '/v1/search', body });
   const results = Array.isArray(res?.results) ? res.results : [];
-  const pages = results.filter(isSearchUsableParentPage);
   return {
-    pages,
+    pages: results.filter(isSearchUsableParentPage),
     allResults: results,
     hasMore: !!res?.has_more,
     nextCursor: res?.next_cursor ? String(res.next_cursor) : '',
   };
 }
 
-async function retrievePage(notionFetch: NotionFetch, accessToken: string, pageId: string) {
-  const safeId = String(pageId || '').trim();
+async function retrievePage(accessToken: string, pageId: string) {
+  const safeId = pageId.trim();
   if (!safeId) return null;
   try {
     const page = await notionFetch({
@@ -74,8 +68,7 @@ async function retrievePage(notionFetch: NotionFetch, accessToken: string, pageI
       method: 'GET',
       path: `/v1/pages/${encodeURIComponent(safeId)}`,
     });
-    if (!page || page.object !== 'page') return null;
-    if (isPageArchived(page)) return null;
+    if (!page || page.object !== 'page' || isPageArchived(page)) return null;
     return page;
   } catch (_e) {
     return null;
@@ -84,31 +77,21 @@ async function retrievePage(notionFetch: NotionFetch, accessToken: string, pageI
 
 export async function listNotionParentPages(
   accessToken: string,
-  {
-    savedPageId,
-    pageSize = 50,
-    maxPages = 20,
-    notionFetchImpl = defaultNotionFetch,
-  }: { savedPageId?: string; pageSize?: number; maxPages?: number; notionFetchImpl?: NotionFetch } = {},
+  { savedPageId }: { savedPageId?: string } = {},
 ): Promise<{ pages: NotionParentPageOption[]; resolvedSaved: NotionParentPageOption | null }> {
-  const token = String(accessToken || '').trim();
+  const token = accessToken.trim();
   if (!token) throw new Error('missing notion access token');
 
   const savedNorm = normalizeId(savedPageId);
   let cursor: string | null = null;
-  let guard = 0;
   let foundPages: any[] = [];
   let resolvedSaved: any = null;
 
-  while (guard < maxPages) {
-    guard += 1;
-    const { pages, allResults, hasMore, nextCursor } = await searchParentPagesOnce(notionFetchImpl, token, {
-      pageSize,
-      startCursor: cursor,
-    });
+  for (;;) {
+    const { pages, allResults, hasMore, nextCursor } = await searchParentPagesOnce(token, cursor);
 
     if (savedNorm && !resolvedSaved) {
-      const hit = allResults.find((p: any) => normalizeId(p?.id) === savedNorm) || null;
+      const hit = allResults.find((page: any) => normalizeId(page?.id) === savedNorm) || null;
       if (hit && hit.object === 'page' && !isPageArchived(hit)) resolvedSaved = hit;
     }
 
@@ -121,15 +104,13 @@ export async function listNotionParentPages(
   }
 
   if (savedNorm && !resolvedSaved) {
-    resolvedSaved = await retrievePage(notionFetchImpl, token, String(savedPageId || '').trim());
+    resolvedSaved = await retrievePage(token, String(savedPageId || '').trim());
   }
 
   const list = foundPages.map(toOption).filter(Boolean) as NotionParentPageOption[];
-  const savedOpt = resolvedSaved ? toOption(resolvedSaved) : null;
-  const merged = savedOpt ? [savedOpt, ...list] : list;
-
+  const savedOption = resolvedSaved ? toOption(resolvedSaved) : null;
   return {
-    pages: dedupeOptions(merged),
-    resolvedSaved: savedOpt,
+    pages: dedupeOptions(savedOption ? [savedOption, ...list] : list),
+    resolvedSaved: savedOption,
   };
 }

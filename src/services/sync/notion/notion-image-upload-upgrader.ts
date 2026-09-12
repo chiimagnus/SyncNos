@@ -36,37 +36,18 @@ function parseDataImageUrl(dataUrl: unknown) {
   const approxBytes = Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
   if (approxBytes > MAX_IMAGE_BYTES) throw new Error(`image too large: ${approxBytes}`);
 
-  function base64ToBytes(b64: unknown): Uint8Array {
-    const raw = String(b64 || '');
-    if (!raw) return new Uint8Array();
-    if (typeof atob === 'function') {
-      const bin = atob(raw);
-      const out = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
-      return out;
-    }
-    if (typeof Buffer !== 'undefined') {
-      try {
-        const buf = Buffer.from(raw, 'base64');
-        return new Uint8Array(buf);
-      } catch (_e) {
-        return new Uint8Array();
-      }
-    }
-    return new Uint8Array();
-  }
-
-  const bytes = base64ToBytes(payload);
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   if (!bytes.byteLength) throw new Error('data image decoded empty');
   return { bytes, contentType };
 }
 
-function paragraphBlock(text: unknown) {
-  const content = String(text || '').trim();
+function paragraphBlock(content: string) {
   return {
     object: 'block',
     type: 'paragraph',
-    paragraph: { rich_text: [{ type: 'text', text: { content: content || '[Image omitted]' } }] },
+    paragraph: { rich_text: [{ type: 'text', text: { content } }] },
   };
 }
 
@@ -93,22 +74,12 @@ function guessContentTypeFromUrl(url: unknown): string {
   return '';
 }
 
-function guessFilenameFromUrl(url: unknown): string {
-  return notionFilesApi.guessFilenameFromUrl(url);
-}
-
-async function downloadBytes(url: unknown) {
-  if (typeof fetch !== 'function') throw new Error('fetch missing');
-  const target = String(url || '').trim();
-  let credentials: RequestCredentials = 'include';
-  try {
-    const u = new URL(target);
-    // Attachment URLs may require Notion auth cookies on `notion.so`.
-    // The redirected CDN (`notionusercontent.com`) should work without credentials.
-    if (/(\.|^)notionusercontent\.com$/i.test(u.hostname)) credentials = 'omit';
-  } catch (_e) {
-    // ignore
-  }
+async function downloadBytes(url: string) {
+  const target = url.trim();
+  const hostname = new URL(target).hostname;
+  // Attachment URLs may require Notion auth cookies on `notion.so`.
+  // The redirected CDN (`notionusercontent.com`) should work without credentials.
+  const credentials: RequestCredentials = /(\.|^)notionusercontent\.com$/i.test(hostname) ? 'omit' : 'include';
   const res = await fetch(target, {
     method: 'GET',
     redirect: 'follow',
@@ -117,19 +88,18 @@ async function downloadBytes(url: unknown) {
     headers: { Accept: 'image/*,*/*;q=0.8' },
   });
   if (!res.ok) {
-    const finalUrl = res && res.url ? String(res.url) : target;
+    const finalUrl = res.url ? String(res.url) : target;
     throw new Error(`image download failed HTTP ${res.status} ${sanitizeUrlForLog(finalUrl)}`);
   }
-  const ct = res.headers && res.headers.get ? String(res.headers.get('content-type') || '') : '';
+  const ct = String(res.headers.get('content-type') || '');
   const buf = await res.arrayBuffer();
   const bytes = new Uint8Array(buf);
-  return { bytes, contentType: ct.split(';')[0].trim(), contentLength: bytes.byteLength };
+  return { bytes, contentType: ct.split(';')[0].trim() };
 }
 
-function toFileUploadImageBlock(block: any, uploadId: unknown) {
+function toFileUploadImageBlock(block: any, uploadId: string) {
   return {
     ...block,
-    type: 'image',
     image: {
       type: 'file_upload',
       file_upload: { id: uploadId },
@@ -137,53 +107,53 @@ function toFileUploadImageBlock(block: any, uploadId: unknown) {
   };
 }
 
-async function uploadFromExternalUrl(files: any, accessToken: string, url: unknown) {
-  const created = await files.createExternalURLUpload({ accessToken, url });
+async function uploadFromExternalUrl(accessToken: string, url: string) {
+  const created = await notionFilesApi.createExternalURLUpload({ accessToken, url });
   const id = created && created.id ? String(created.id).trim() : '';
   if (!id) throw new Error('missing file upload id');
-  const ready = await files.waitUntilUploaded({ accessToken, id });
-  return ready && ready.id ? String(ready.id).trim() : id;
+  await notionFilesApi.waitUntilUploaded({ accessToken, id });
+  return id;
 }
 
-async function uploadFromBytes(files: any, accessToken: string, url: unknown) {
+async function uploadFromBytes(accessToken: string, url: string) {
   const dl = await downloadBytes(url);
-  if (!dl || !(dl.bytes instanceof Uint8Array) || !dl.bytes.byteLength) throw new Error('download empty');
+  if (!dl.bytes.byteLength) throw new Error('download empty');
   if (dl.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${dl.bytes.byteLength}`);
   const ct = dl.contentType || guessContentTypeFromUrl(url) || 'application/octet-stream';
-  const filename = guessFilenameFromUrl(url);
-  const up = await files.createFileUpload({
+  const filename = notionFilesApi.guessFilenameFromUrl(url);
+  const up = await notionFilesApi.createFileUpload({
     accessToken,
     filename,
     contentType: ct,
   });
   const fileId = up && up.id ? String(up.id).trim() : '';
   if (!fileId) throw new Error('missing file upload id');
-  await files.sendFileUpload({ accessToken, id: fileId, bytes: dl.bytes, filename, contentType: ct });
-  const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
-  return ready && ready.id ? String(ready.id).trim() : fileId;
+  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes: dl.bytes, filename, contentType: ct });
+  await notionFilesApi.waitUntilUploaded({ accessToken, id: fileId });
+  return fileId;
 }
 
-async function uploadFromDataUrl(files: any, accessToken: string, dataUrl: unknown) {
+async function uploadFromDataUrl(accessToken: string, dataUrl: string) {
   const parsed = parseDataImageUrl(dataUrl);
   const bytes = parsed.bytes;
-  const contentType = parsed.contentType || 'application/octet-stream';
+  const contentType = parsed.contentType;
   if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${bytes.byteLength}`);
 
   const ext = guessExtensionFromContentType(contentType);
   const filename = `image.${ext}`;
-  const up = await files.createFileUpload({
+  const up = await notionFilesApi.createFileUpload({
     accessToken,
     filename,
     contentType,
   });
   const fileId = up && up.id ? String(up.id).trim() : '';
   if (!fileId) throw new Error('missing file upload id');
-  await files.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
-  const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
-  return ready && ready.id ? String(ready.id).trim() : fileId;
+  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
+  await notionFilesApi.waitUntilUploaded({ accessToken, id: fileId });
+  return fileId;
 }
 
-async function uploadFromSyncnosAsset(files: any, accessToken: string, assetId: number, asset: ImageCacheAsset | null) {
+async function uploadFromSyncnosAsset(accessToken: string, assetId: number, asset: ImageCacheAsset | null) {
   if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
   const bytes = new Uint8Array(await asset.blob.arrayBuffer());
@@ -196,27 +166,24 @@ async function uploadFromSyncnosAsset(files: any, accessToken: string, assetId: 
   const ext = guessExtensionFromContentType(contentType);
   const filename = `image-${assetId}.${ext}`;
 
-  const up = await files.createFileUpload({
+  const up = await notionFilesApi.createFileUpload({
     accessToken,
     filename,
     contentType,
   });
   const fileId = up && up.id ? String(up.id).trim() : '';
   if (!fileId) throw new Error('missing file upload id');
-  await files.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
-  const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
-  return ready && ready.id ? String(ready.id).trim() : fileId;
+  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
+  await notionFilesApi.waitUntilUploaded({ accessToken, id: fileId });
+  return fileId;
 }
 
-async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any, conversationId: number) {
-  const list = Array.isArray(blocks) ? blocks : [];
-  if (!list.length) return [];
-  const files = notionFilesApi;
+async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any[], conversationId: number) {
   const localAssetIds: number[] = [];
   const seenLocalAssetIds = new Set<number>();
-  for (const block of list) {
-    if (!block || block.type !== 'image' || !block.image || block.image.type !== 'external') continue;
-    const url = block.image?.external?.url ? String(block.image.external.url).trim() : '';
+  for (const block of blocks) {
+    if (block?.type !== 'image' || block.image?.type !== 'external') continue;
+    const url = String(block.image.external?.url || '').trim();
     const assetId = parseSyncnosAssetId(url);
     if (assetId == null || seenLocalAssetIds.has(assetId)) continue;
     seenLocalAssetIds.add(assetId);
@@ -230,12 +197,12 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any,
   const cache = new Map<string, string>();
   const out: any[] = [];
 
-  for (const b of list) {
-    if (!b || b.type !== 'image' || !b.image || b.image.type !== 'external') {
+  for (const b of blocks) {
+    if (b?.type !== 'image' || b.image?.type !== 'external') {
       out.push(b);
       continue;
     }
-    const url = b.image && b.image.external && b.image.external.url ? String(b.image.external.url).trim() : '';
+    const url = String(b.image.external?.url || '').trim();
     if (!url) {
       out.push(b);
       continue;
@@ -243,66 +210,48 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any,
 
     const assetId = parseSyncnosAssetId(url);
     const isInternalAsset = isSyncnosAssetUrl(url);
+    const isDataImage = isDataImageUrl(url);
     let uploadId = cache.get(url) || '';
     if (!uploadId) {
-      if (isDataImageUrl(url)) {
+      if (isDataImage) {
         try {
-          uploadId = await uploadFromDataUrl(files, accessToken, url);
-          if (uploadId) cache.set(url, uploadId);
+          uploadId = await uploadFromDataUrl(accessToken, url);
+          cache.set(url, uploadId);
         } catch (e) {
           const msg = e && (e as any).message ? String((e as any).message) : String(e);
-          try {
-            console.warn('[NotionImageUpload] data_url upload failed:', msg);
-          } catch (_e2) {
-            // ignore
-          }
-          uploadId = '';
+          console.warn('[NotionImageUpload] data_url upload failed:', msg);
         }
       } else if (isInternalAsset) {
         if (assetId != null) {
           try {
-            uploadId = await uploadFromSyncnosAsset(files, accessToken, assetId, localAssets.get(assetId) || null);
-            if (uploadId) cache.set(url, uploadId);
+            uploadId = await uploadFromSyncnosAsset(accessToken, assetId, localAssets.get(assetId) || null);
+            cache.set(url, uploadId);
           } catch (e) {
             const msg = e && (e as any).message ? String((e as any).message) : String(e);
-            try {
-              console.warn('[NotionImageUpload] syncnos_asset upload failed:', assetId, msg);
-            } catch (_e2) {
-              // ignore
-            }
-            uploadId = '';
+            console.warn('[NotionImageUpload] syncnos_asset upload failed:', assetId, msg);
           }
         }
       } else {
         try {
-          uploadId = await uploadFromExternalUrl(files, accessToken, url);
-          if (uploadId) cache.set(url, uploadId);
+          uploadId = await uploadFromExternalUrl(accessToken, url);
+          cache.set(url, uploadId);
         } catch (e) {
           const brief = sanitizeUrlForLog(url);
           const msg = e && (e as any).message ? String((e as any).message) : String(e);
+          console.warn('[NotionImageUpload] external_url failed:', brief, msg);
           try {
-            console.warn('[NotionImageUpload] external_url failed:', brief, msg);
-          } catch (_e2) {
-            // ignore
-          }
-          try {
-            uploadId = await uploadFromBytes(files, accessToken, url);
-            if (uploadId) cache.set(url, uploadId);
+            uploadId = await uploadFromBytes(accessToken, url);
+            cache.set(url, uploadId);
           } catch (e2) {
             const msg2 = e2 && (e2 as any).message ? String((e2 as any).message) : String(e2);
-            try {
-              console.warn('[NotionImageUpload] byte upload failed:', brief, msg2);
-            } catch (_e3) {
-              // ignore
-            }
-            uploadId = '';
+            console.warn('[NotionImageUpload] byte upload failed:', brief, msg2);
           }
         }
       }
     }
 
     if (!uploadId) {
-      if (isDataImageUrl(url) || isInternalAsset) {
+      if (isDataImage || isInternalAsset) {
         out.push(paragraphBlock('[Image omitted: local image upload failed]'));
       } else out.push(b);
       continue;

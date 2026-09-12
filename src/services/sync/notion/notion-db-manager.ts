@@ -4,39 +4,18 @@ import type { ConversationKindDbSpec } from '@services/protocols/conversation-ki
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
 const SEARCH_PAGE_SIZE = 100;
-const SEARCH_MAX_PAGES = 10;
-
-function requireStorageKey(storageKey: unknown): string {
-  const key = String(storageKey || '').trim();
-  if (!key) throw new Error('notion database storageKey required');
-  return key;
-}
-
-function requireDbSpec(dbSpec: unknown): ConversationKindDbSpec {
-  if (!dbSpec || typeof dbSpec !== 'object') throw new Error('notion dbSpec required');
-  const spec = dbSpec as ConversationKindDbSpec;
-  if (!String(spec.title || '').trim()) throw new Error('notion dbSpec title required');
-  requireStorageKey(spec.storageKey);
-  if (!spec.properties || typeof spec.properties !== 'object') throw new Error('notion dbSpec properties required');
-  return spec;
-}
 
 async function getCachedDatabaseId(storageKey: string) {
-  const key = requireStorageKey(storageKey);
-  const res = await storageGet([key]);
-  return String((res && (res as any)[key]) || '');
+  const res = await storageGet([storageKey]);
+  return String((res as any)?.[storageKey] || '');
 }
 
-async function setCachedDatabaseId(storageKey: string, databaseId: unknown) {
-  const key = requireStorageKey(storageKey);
-  await storageSet({ [key]: databaseId || '' });
-  return true;
+async function setCachedDatabaseId(storageKey: string, databaseId: string) {
+  await storageSet({ [storageKey]: databaseId });
 }
 
 async function clearCachedDatabaseId(storageKey: string) {
-  const key = requireStorageKey(storageKey);
-  await storageRemove([key]);
-  return true;
+  await storageRemove([storageKey]);
 }
 
 function isUsableDatabase(database: any): boolean {
@@ -55,19 +34,11 @@ function normalizeNotionId(id: unknown): string {
 }
 
 function readParentPageId(database: any): string {
-  try {
-    const parent = database && database.parent ? database.parent : null;
-    if (!parent || typeof parent !== 'object') return '';
-    if (parent.page_id) return String(parent.page_id).trim();
-    return '';
-  } catch (_e) {
-    return '';
-  }
+  return database?.parent?.page_id ? String(database.parent.page_id).trim() : '';
 }
 
-function matchesParentPage(database: any, parentPageId: unknown): boolean {
+function matchesParentPage(database: any, parentPageId: string): boolean {
   const expected = normalizeNotionId(parentPageId);
-  if (!expected) return true;
   const actual = normalizeNotionId(readParentPageId(database));
   return !!actual && actual === expected;
 }
@@ -86,45 +57,25 @@ function normalizeTitle(value: unknown): string {
     .toLowerCase();
 }
 
-function parseHttpStatus(error: unknown): number {
-  const fromField = Number(error && (error as any).status);
-  if (Number.isFinite(fromField) && fromField > 0) return fromField;
-  const message = String((error && (error as any).message) || error || '');
-  const matched = message.match(/\bHTTP\s+(\d{3})\b/i);
-  return matched ? Number(matched[1]) : 0;
-}
-
-function parseNotionErrorCode(error: unknown): string {
-  const direct = String((error && (error as any).code) || '').trim();
-  if (direct) return direct;
-  const message = String((error && (error as any).message) || error || '');
-  const matched = message.match(/"code"\s*:\s*"([^"]+)"/i);
-  return matched ? String(matched[1] || '').trim() : '';
-}
-
 function isMissingDatabaseError(error: unknown): boolean {
-  const status = parseHttpStatus(error);
-  if (status === 404 || status === 410) return true;
-  const code = parseNotionErrorCode(error).toLowerCase();
-  return code === 'object_not_found';
+  const status = Number((error as any)?.status || 0);
+  const code = String((error as any)?.code || '')
+    .trim()
+    .toLowerCase();
+  return status === 404 || status === 410 || code === 'object_not_found';
 }
 
 async function getDatabase(accessToken: string, databaseId: string) {
   return notionFetch({ accessToken, method: 'GET', path: `/v1/databases/${databaseId}` });
 }
 
-async function searchDatabases(
-  accessToken: string,
-  { query, parentPageId }: { query?: string; parentPageId?: string },
-) {
+async function searchDatabases(accessToken: string, { query, parentPageId }: { query: string; parentPageId: string }) {
   const results: any[] = [];
   let cursor = '';
-  let pageCount = 0;
 
-  while (pageCount < SEARCH_MAX_PAGES) {
-    pageCount += 1;
+  for (;;) {
     const body = {
-      query: query || '',
+      query,
       filter: { property: 'object', value: 'database' },
       sort: { direction: 'descending', timestamp: 'last_edited_time' },
       page_size: SEARCH_PAGE_SIZE,
@@ -169,11 +120,10 @@ async function createDatabase(
   accessToken: string,
   { parentPageId, dbSpec }: { parentPageId: string; dbSpec: ConversationKindDbSpec },
 ) {
-  const spec = dbSpec;
   const body = {
     parent: { type: 'page_id', page_id: parentPageId },
-    title: [{ type: 'text', text: { content: spec.title } }],
-    properties: materializeDbProperties(spec),
+    title: [{ type: 'text', text: { content: dbSpec.title } }],
+    properties: materializeDbProperties(dbSpec),
   };
   return notionFetch({ accessToken, method: 'POST', path: '/v1/databases', body });
 }
@@ -197,10 +147,9 @@ async function ensureDatabaseSchema({
   databaseId: string;
   dbSpec: ConversationKindDbSpec;
 }) {
-  const spec = dbSpec;
   const db = await getDatabase(accessToken, databaseId);
   const props = { ...(db && db.properties ? db.properties : {}) } as Record<string, any>;
-  const patch = spec.ensureSchemaPatch && typeof spec.ensureSchemaPatch === 'object' ? spec.ensureSchemaPatch : {};
+  const patch = dbSpec.ensureSchemaPatch || {};
 
   const lastActivity = props['Last Activity'];
   if (lastActivity) {
@@ -229,13 +178,12 @@ async function ensureDatabaseSchema({
   for (const [k, v] of Object.entries(patch)) {
     if (!props[k]) missing[k] = v;
   }
-  if (!Object.keys(missing).length) return true;
+  if (!Object.keys(missing).length) return;
 
   if (missing.AI && missing.AI.multi_select && typeof missing.AI.multi_select === 'object') {
     missing.AI = { multi_select: { ...missing.AI.multi_select, options: buildAiOptions() } };
   }
   await updateDatabase(accessToken, { databaseId, properties: missing });
-  return true;
 }
 
 async function ensureDatabase({
@@ -247,46 +195,45 @@ async function ensureDatabase({
   parentPageId: string;
   dbSpec: ConversationKindDbSpec;
 }) {
-  const spec = requireDbSpec(dbSpec);
-  const cached = await getCachedDatabaseId(spec.storageKey);
+  const cached = await getCachedDatabaseId(dbSpec.storageKey);
   if (cached) {
     try {
       const db = await getDatabase(accessToken, cached);
       if (!isUsableDatabase(db)) {
-        await clearCachedDatabaseId(spec.storageKey);
+        await clearCachedDatabaseId(dbSpec.storageKey);
       } else if (!matchesParentPage(db, parentPageId)) {
-        await clearCachedDatabaseId(spec.storageKey);
+        await clearCachedDatabaseId(dbSpec.storageKey);
       } else {
-        await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec: spec });
-        return { databaseId: cached, title: spec.title, reused: true, database: db };
+        await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec });
+        return { databaseId: cached, title: dbSpec.title, reused: true, database: db };
       }
     } catch (error) {
       if (isMissingDatabaseError(error)) {
-        await clearCachedDatabaseId(spec.storageKey);
+        await clearCachedDatabaseId(dbSpec.storageKey);
       } else {
         throw error;
       }
     }
   }
 
-  const found = await searchDatabases(accessToken, { query: spec.title, parentPageId });
-  const results = Array.isArray(found.results) ? found.results : [];
-  const wantedTitle = normalizeTitle(spec.title);
+  const found = await searchDatabases(accessToken, { query: dbSpec.title, parentPageId });
+  const results = found.results;
+  const wantedTitle = normalizeTitle(dbSpec.title);
   const exact = results.find((d: any) => {
     if (!matchesParentPage(d, parentPageId)) return false;
     const title = readDatabaseTitle(d);
     return normalizeTitle(title) === wantedTitle;
   });
   if (exact && exact.id) {
-    await setCachedDatabaseId(spec.storageKey, exact.id);
-    await ensureDatabaseSchema({ accessToken, databaseId: exact.id, dbSpec: spec });
-    return { databaseId: exact.id, title: spec.title, reused: true, database: exact };
+    await setCachedDatabaseId(dbSpec.storageKey, exact.id);
+    await ensureDatabaseSchema({ accessToken, databaseId: exact.id, dbSpec });
+    return { databaseId: exact.id, title: dbSpec.title, reused: true, database: exact };
   }
 
-  const created = await createDatabase(accessToken, { parentPageId, dbSpec: spec });
+  const created = await createDatabase(accessToken, { parentPageId, dbSpec });
   if (!created || !created.id) throw new Error('create database failed');
-  await setCachedDatabaseId(spec.storageKey, created.id);
-  return { databaseId: created.id, title: spec.title, reused: false, database: created };
+  await setCachedDatabaseId(dbSpec.storageKey, created.id);
+  return { databaseId: created.id, title: dbSpec.title, reused: false, database: created };
 }
 
 export { ensureDatabase, clearCachedDatabaseId };

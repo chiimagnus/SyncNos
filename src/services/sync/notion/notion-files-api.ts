@@ -8,23 +8,18 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function isHttpUrl(url: unknown): boolean {
-  const text = String(url || '').trim();
-  return /^https?:\/\//i.test(text);
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url.trim());
 }
 
-function sanitizeFilename(name: unknown): string {
-  const cleaned = String(name || '')
-    .replaceAll('"', '')
-    .replaceAll('\n', '')
-    .replaceAll('\r', '')
-    .trim();
+function sanitizeFilename(name: string): string {
+  const cleaned = name.replaceAll('"', '').replaceAll('\n', '').replaceAll('\r', '').trim();
   return cleaned || 'image.jpg';
 }
 
-function guessFilenameFromUrl(url: unknown): string {
+function guessFilenameFromUrl(url: string): string {
   try {
-    const u = new URL(String(url || ''));
+    const u = new URL(url);
     const last =
       String(u.pathname || '')
         .split('/')
@@ -44,18 +39,10 @@ function describeFileImportResult(value: unknown): string {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value)) return `[${value.length} items]`;
   if (typeof value === 'object') {
-    try {
-      const keys = Object.keys(value);
-      if (keys.length <= 6) return `{${keys.join(',')}}`;
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      const s = JSON.stringify(value);
-      return s && s.length > 220 ? `${s.slice(0, 220)}…` : s || '';
-    } catch (_e) {
-      return '{object}';
-    }
+    const keys = Object.keys(value);
+    if (keys.length <= 6) return `{${keys.join(',')}}`;
+    const text = JSON.stringify(value);
+    return text.length > 220 ? `${text.slice(0, 220)}…` : text;
   }
   return String(value);
 }
@@ -66,12 +53,12 @@ async function createExternalURLUpload({
   filename,
   contentType,
 }: {
-  accessToken?: string | null;
-  url?: string;
+  accessToken: string;
+  url: string;
   filename?: string;
   contentType?: string;
 }) {
-  const target = String(url || '').trim();
+  const target = url.trim();
   if (!isHttpUrl(target)) throw new Error('invalid external image url');
   const body: Record<string, unknown> = {
     mode: 'external_url',
@@ -93,15 +80,13 @@ async function createFileUpload({
   accessToken,
   filename,
   contentType,
-  contentLength: _contentLength,
 }: {
-  accessToken?: string | null;
-  filename?: string;
-  contentType?: string;
-  contentLength?: number;
+  accessToken: string;
+  filename: string;
+  contentType: string;
 }) {
-  const name = sanitizeFilename(filename || '');
-  const ct = String(contentType || '').trim() || 'application/octet-stream';
+  const name = sanitizeFilename(filename);
+  const ct = contentType.trim() || 'application/octet-stream';
   const body = {
     mode: 'single_part',
     filename: name,
@@ -123,21 +108,18 @@ async function sendFileUpload({
   filename,
   contentType,
 }: {
-  accessToken?: string | null;
-  id?: string;
-  bytes?: Uint8Array | ArrayBuffer;
-  filename?: string;
-  contentType?: string;
+  accessToken: string;
+  id: string;
+  bytes: Uint8Array;
+  filename: string;
+  contentType: string;
 }) {
-  const uploadId = String(id || '').trim();
+  const uploadId = id.trim();
   if (!uploadId) throw new Error('missing upload id');
-  if (!(bytes instanceof Uint8Array) && !(bytes instanceof ArrayBuffer)) throw new Error('invalid bytes');
-  if (typeof FormData === 'undefined' || typeof Blob === 'undefined') throw new Error('FormData/Blob missing');
-  const name = sanitizeFilename(filename || 'image.jpg');
-  const ct = String(contentType || '').trim() || 'application/octet-stream';
-  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const name = sanitizeFilename(filename);
+  const ct = contentType.trim() || 'application/octet-stream';
   const form = new FormData();
-  const blob = new Blob([data as BlobPart], { type: ct });
+  const blob = new Blob([bytes as BlobPart], { type: ct });
   form.append('file', blob, name);
 
   const res = await fetch(`https://api.notion.com/v1/file_uploads/${encodeURIComponent(uploadId)}/send`, {
@@ -149,13 +131,13 @@ async function sendFileUpload({
     },
     body: form,
   });
-  const text = await res.text().catch(() => '');
+  const text = await res.text();
   if (!res.ok) throw new Error(`notion api failed: POST /v1/file_uploads/${uploadId}/send HTTP ${res.status} ${text}`);
   return text ? JSON.parse(text) : {};
 }
 
-async function retrieveUpload({ accessToken, id }: { accessToken?: string | null; id?: string }) {
-  const uploadId = String(id || '').trim();
+async function retrieveUpload({ accessToken, id }: { accessToken: string; id: string }) {
+  const uploadId = id.trim();
   if (!uploadId) throw new Error('missing upload id');
   return defaultNotionFetch({
     accessToken,
@@ -172,12 +154,12 @@ async function waitUntilUploaded({
   pollIntervalMs,
   maxAttempts,
 }: {
-  accessToken?: string | null;
-  id?: string;
+  accessToken: string;
+  id: string;
   pollIntervalMs?: number;
   maxAttempts?: number;
-} = {}) {
-  const uploadId = String(id || '').trim();
+}) {
+  const uploadId = id.trim();
   if (!uploadId) throw new Error('missing upload id');
   const interval = Number.isFinite(Number(pollIntervalMs))
     ? Math.max(50, Number(pollIntervalMs))
@@ -201,13 +183,4 @@ async function waitUntilUploaded({
   throw new Error('file upload timed out');
 }
 
-export {
-  FILE_UPLOAD_VERSION,
-  sanitizeFilename,
-  guessFilenameFromUrl,
-  createExternalURLUpload,
-  createFileUpload,
-  sendFileUpload,
-  retrieveUpload,
-  waitUntilUploaded,
-};
+export { guessFilenameFromUrl, createExternalURLUpload, createFileUpload, sendFileUpload, waitUntilUploaded };

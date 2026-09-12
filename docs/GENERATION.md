@@ -21,7 +21,7 @@
 | `PRIVACY.md` | 用户：权限、凭据、本地/外部数据流与第三方边界 | manifest/host permission、OAuth 模式、secret storage/backup exclusion、外部网络目标或本地→远端数据范围变化；核对 `wxt.config.ts`、provider auth/network、backup filtering | README；发布/商店隐私声明 |
 | `docs/storage.md` | 维护者：local-first、一致性、备份/恢复、失败语义 | IDB/revision、canonical read、backup/import、asset remap、continuity/恢复边界变化；核对 storage/backup 源码与 migration/revision/backup tests | `AGENTS.md`、README Backup 入口、PRIVACY、CONTRIBUTING 的数据审查要求 |
 | `docs/CONTRIBUTING.md` | 贡献者：开发工作流、提交/PR 和验证责任 | package scripts、CI gate、贡献流程、manual validation 或文档治理责任变化；以 `package.json`、workflows、PR/Issue templates 为证据 | README、AGENTS、PR template、issue flow |
-| `docs/troubleshooting.md` | 维护者：可复用故障诊断，不拥有产品契约 | 消息生命周期、OAuth/发布诊断、Zen 流程变化；以对应源码、脚本和 regression tests 为证据 | CONTRIBUTING |
+| `docs/troubleshooting.md` | 维护者：可复用故障诊断，不拥有产品契约 | 消息生命周期、OAuth/发布、provider 同步失败/恢复诊断、Zen 流程变化；以对应源码、脚本和 regression tests 为证据 | CONTRIBUTING |
 | Feishu EN/ZH setup guides | 用户：配置飞书 OAuth/DocX 同步 | OAuth redirect/scope、Direct/Proxy 模式、Settings 字段或必要用户步骤变化；以 Feishu auth/Settings 源码与 tests 为证据 | README；Settings 的 “Open Setup Guide” |
 | Obsidian EN/ZH setup guides | 用户：配置 Local REST API | transport 支持、默认 endpoint/header、Settings 字段或必要插件步骤变化；以 Obsidian settings/client 源码与 tests 为证据 | README；Settings 的 “Open Setup Guide” |
 | `.github/scripts/webclipper/STORE_LISTING_COPY.md` | 发布维护者：浏览器商店长/短文案的人工 source copy | 用户可见来源/输出能力、隐私声明或商店文案变化；与 README/Privacy 对照。localized manifest 描述另由 `public/_locales/*/messages.json` 拥有，长度由仓库脚本校验 | 人工商店发布流程；不是 workflow 自动上传输入 |
