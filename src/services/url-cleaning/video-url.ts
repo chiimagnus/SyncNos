@@ -30,7 +30,8 @@ function detectBilibiliHost(hostname: string): VideoPlatform | null {
 function readYoutubeVideoId(url: URL): string {
   const host = normalizeHost(url.hostname);
   if (host === 'youtu.be') {
-    return url.pathname.replace(/^\/+/, '').split('/')[0]?.trim() || '';
+    const match = url.pathname.match(/^\/([^/]+)\/?$/);
+    return match?.[1]?.trim() || '';
   }
   if (host === 'www.youtube.com' && url.pathname === '/watch') {
     return String(url.searchParams.get('v') || '').trim();

@@ -34,6 +34,8 @@ describe('video URL classification', () => {
     expect(detectSupportedVideoPagePlatform('https://www.youtube.com/')).toBeNull();
     expect(detectSupportedVideoPagePlatform('https://www.youtube.com/watch?v=abc123')).toBe('youtube');
     expect(detectSupportedVideoPagePlatform('https://youtu.be/abc123?t=2')).toBe('youtube');
+    expect(detectSupportedVideoPagePlatform('https://youtu.be/abc123/extra')).toBeNull();
+    expect(canonicalizeVideoUrl('https://youtu.be/abc123/extra#fragment')).toBe('https://youtu.be/abc123/extra');
     expect(canonicalizeVideoUrl('https://youtu.be/abc123?t=2#fragment')).toBe('https://www.youtube.com/watch?v=abc123');
     expect(canonicalizeVideoUrl('https://www.youtube.com/watch?v=abc123&list=ignored#fragment')).toBe(
       'https://www.youtube.com/watch?v=abc123',
