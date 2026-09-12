@@ -2,6 +2,7 @@ import { formatConversationTitle, t } from '@i18n';
 import type { Conversation } from '@services/conversations/domain/models';
 import type { InsightStatsSourceData } from '@services/insight/insight-stats-source';
 import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
+import { detectVideoPlatformHost } from '@services/url-cleaning/video-url';
 import { encodeConversationLoc } from '@services/shared/conversation-loc';
 import { shiftLocalCalendarDays, startOfLocalCalendarDay } from '@services/shared/local-calendar-day';
 
@@ -98,14 +99,14 @@ function parseHostname(value: unknown): string {
   return hostname || INSIGHT_UNKNOWN_DOMAIN_LABEL;
 }
 
-function parseVideoPlatform(url: unknown, source: unknown): string {
-  const hostname = parseHostnameFromUrl(url).toLowerCase();
-  if (hostname === 'youtu.be' || hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) return 'YouTube';
-  if (hostname === 'bilibili.com' || hostname.endsWith('.bilibili.com')) return 'Bilibili';
+function parseVideoPlatform(conversation: Conversation): string {
+  const platform = safeString(conversation.platform).toLowerCase();
+  if (platform === 'youtube') return 'YouTube';
+  if (platform === 'bilibili') return 'Bilibili';
 
-  const sourceName = safeString(source).toLowerCase();
-  if (sourceName === 'youtube') return 'YouTube';
-  if (sourceName === 'bilibili') return 'Bilibili';
+  const urlPlatform = detectVideoPlatformHost(conversation.url);
+  if (urlPlatform === 'youtube') return 'YouTube';
+  if (urlPlatform === 'bilibili') return 'Bilibili';
   return INSIGHT_UNKNOWN_SOURCE_LABEL;
 }
 
@@ -286,7 +287,7 @@ export function buildInsightStats(
 
     if (sourceType === 'video') {
       stats.videoCount += 1;
-      const platform = parseVideoPlatform(conversation.url, conversation.source);
+      const platform = parseVideoPlatform(conversation);
       videoPlatforms.set(platform, (videoPlatforms.get(platform) || 0) + 1);
 
       const commentCount = Number(data.commentCounts.get(Number(conversation.id)) || 0);

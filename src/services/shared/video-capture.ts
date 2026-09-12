@@ -7,7 +7,6 @@ export type VideoChapter = {
 };
 
 export type VideoPageMetaCandidate = {
-  platform: VideoPlatform;
   identityUrl: string;
   title?: string;
   author?: string;

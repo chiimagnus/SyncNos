@@ -54,7 +54,6 @@ describe('video transcript extraction', () => {
     installDom(pageB, '<div class="bpx-player-subtitle-panel-text"><span>stale DOM subtitle</span></div>');
     installMetaResponder({
       state: {
-        platform: 'bilibili',
         identityUrl: pageB,
         title: 'B title',
         author: 'B author',
@@ -108,13 +107,19 @@ describe('video transcript extraction', () => {
     });
   });
 
+  it('rejects direct extraction on unsupported pages instead of constructing an unknown Video', async () => {
+    installDom('https://www.bilibili.com/opus/123456');
+    setResponses([]);
+
+    await expect(extractVideoTranscriptFromCurrentPage()).rejects.toThrow('unsupported video page');
+  });
+
   it('canonicalizes a Bilibili watch-later container to the same BV identity for metadata, subtitles, and chapters', async () => {
     const watchLater = 'https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792';
     const canonical = 'https://www.bilibili.com/video/BV1FwY4zkEef/';
     installDom(watchLater);
     installMetaResponder({
       state: {
-        platform: 'bilibili',
         identityUrl: canonical,
         title: 'Watch later title',
         description: 'Watch later description',
@@ -147,7 +152,7 @@ describe('video transcript extraction', () => {
     const pageB = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(pageB, '<div class="bpx-player-subtitle-panel-text"><span>must not be used</span></div>');
     installMetaResponder({
-      state: { platform: 'bilibili', identityUrl: pageB, title: 'B' },
+      state: { identityUrl: pageB, title: 'B' },
       dom: null,
     });
     setResponses([
@@ -172,7 +177,7 @@ describe('video transcript extraction', () => {
   it('falls back to an earlier current-page WBI response when the latest response cannot determine chapters', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
-    installMetaResponder({ state: { platform: 'bilibili', identityUrl: page }, dom: null });
+    installMetaResponder({ state: { identityUrl: page }, dom: null });
     setResponses([
       {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
@@ -202,7 +207,7 @@ describe('video transcript extraction', () => {
   it('treats the latest current-page explicit empty view_points array as a chapter clear', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
-    installMetaResponder({ state: { platform: 'bilibili', identityUrl: page }, dom: null });
+    installMetaResponder({ state: { identityUrl: page }, dom: null });
     setResponses([
       {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
@@ -227,7 +232,6 @@ describe('video transcript extraction', () => {
     installDom(pageB);
     installMetaResponder({
       state: {
-        platform: 'bilibili',
         identityUrl: pageA,
         title: 'A title',
         author: 'A author',
@@ -236,7 +240,6 @@ describe('video transcript extraction', () => {
         thumbnailUrl: 'https://example.com/a.jpg',
       },
       dom: {
-        platform: 'bilibili',
         identityUrl: pageB,
         title: 'B title',
         author: 'B author',
@@ -257,6 +260,32 @@ describe('video transcript extraction', () => {
     });
   });
 
+  it('falls back to an earlier current-page YouTube timedtext response when the latest response is not parseable', async () => {
+    const page = 'https://www.youtube.com/watch?v=current';
+    installDom(page);
+    installMetaResponder({
+      state: { identityUrl: page, title: 'Current video' },
+      dom: null,
+    });
+    setResponses([
+      {
+        url: 'https://www.youtube.com/api/timedtext?v=current&lang=en',
+        pageUrl: page,
+        bodyText: '<transcript><text start="1.25" dur="1.5">valid</text></transcript>',
+        at: 1,
+      },
+      {
+        url: 'https://www.youtube.com/api/timedtext?v=current&lang=en&fmt=invalid',
+        pageUrl: page,
+        bodyText: '{not valid json',
+        at: 2,
+      },
+    ]);
+
+    const extracted = await extractVideoTranscriptFromCurrentPage();
+    expect(extracted.cues).toEqual([{ start: 1.25, end: 2.75, text: 'valid' }]);
+  });
+
   it('does not use stale YouTube transcript DOM when no current timedtext response exists', async () => {
     const page = 'https://www.youtube.com/watch?v=current';
     installDom(
@@ -264,7 +293,7 @@ describe('video transcript extraction', () => {
       '<ytd-transcript-segment-renderer><span class="segment-timestamp">0:01</span><span class="segment-text">stale</span></ytd-transcript-segment-renderer>',
     );
     installMetaResponder({
-      state: { platform: 'youtube', identityUrl: page, title: 'Current video' },
+      state: { identityUrl: page, title: 'Current video' },
       dom: null,
     });
     setResponses([
@@ -297,7 +326,7 @@ describe('video page metadata request', () => {
             __syncnos: true,
             type: 'SYNCNOS_VIDEO_META_RESPONSE',
             requestId: 'wrong-id',
-            meta: { state: { platform: 'bilibili', identityUrl: 'wrong' }, dom: null },
+            meta: { state: { identityUrl: 'wrong' }, dom: null },
           },
         }),
       );
@@ -308,25 +337,32 @@ describe('video page metadata request', () => {
             __syncnos: true,
             type: 'SYNCNOS_VIDEO_META_RESPONSE',
             requestId,
-            meta: { state: { platform: 'bilibili', identityUrl: location.href }, dom: null },
+            meta: { state: { identityUrl: location.href }, dom: null },
           },
         }),
       );
     });
 
-    await expect(requestVideoPageMeta({ timeoutMs: 50 })).resolves.toEqual({
-      state: { platform: 'bilibili', identityUrl: location.href },
+    await expect(requestVideoPageMeta()).resolves.toEqual({
+      state: { identityUrl: location.href },
       dom: null,
     });
     expect(removeSpy).toHaveBeenCalledWith('message', expect.any(Function));
   });
 
   it('times out without polling or retaining a pending request', async () => {
-    installDom('https://www.youtube.com/watch?v=current');
-    const removeSpy = vi.spyOn(window, 'removeEventListener');
-    vi.spyOn(window, 'postMessage').mockImplementation(() => undefined);
+    vi.useFakeTimers();
+    try {
+      installDom('https://www.youtube.com/watch?v=current');
+      const removeSpy = vi.spyOn(window, 'removeEventListener');
+      vi.spyOn(window, 'postMessage').mockImplementation(() => undefined);
 
-    await expect(requestVideoPageMeta({ timeoutMs: 1 })).resolves.toBeNull();
-    expect(removeSpy).toHaveBeenCalledWith('message', expect.any(Function));
+      const pending = requestVideoPageMeta();
+      await vi.advanceTimersByTimeAsync(1_200);
+      await expect(pending).resolves.toBeNull();
+      expect(removeSpy).toHaveBeenCalledWith('message', expect.any(Function));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

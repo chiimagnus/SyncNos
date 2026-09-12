@@ -139,7 +139,6 @@ describe('video transcript main-world interceptor', () => {
     expect(posted[0]).toMatchObject({
       url: 'https://www.youtube.com/api/timedtext',
       pageUrl: pageB,
-      contentType: 'application/json',
       bodyText: JSON.stringify(xhr.response),
     });
   });
@@ -233,7 +232,6 @@ describe('video transcript main-world interceptor', () => {
       requestId: 'youtube-meta',
       meta: {
         state: {
-          platform: 'youtube',
           identityUrl: 'https://www.youtube.com/watch?v=abc',
           title: 'Title',
           author: 'Author',
@@ -278,7 +276,6 @@ describe('video transcript main-world interceptor', () => {
     dispatchMetaRequest('bilibili-meta');
     const response = findPosted(postSpy, 'SYNCNOS_VIDEO_META_RESPONSE')[0];
     expect(response.meta.state).toEqual({
-      platform: 'bilibili',
       identityUrl: 'https://www.bilibili.com/video/BV1STATE1234/?p=2',
       title: 'State title',
       author: 'State author',
@@ -287,7 +284,6 @@ describe('video transcript main-world interceptor', () => {
       thumbnailUrl: 'https://example.com/state.jpg',
     });
     expect(response.meta.dom).toEqual({
-      platform: 'bilibili',
       identityUrl: 'https://www.bilibili.com/video/BV1DOM123456/?p=2',
       title: 'DOM title',
       author: 'DOM author',

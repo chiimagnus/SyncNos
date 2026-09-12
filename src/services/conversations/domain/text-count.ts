@@ -13,7 +13,7 @@ type CountableMessage = {
 };
 
 const VIDEO_TIMESTAMP_PREFIX_RE =
-  /^\s*(?:\[(?:\d{2}:)?\d{2}:\d{2}(?:\.\d{1,3})?(?:\s+→\s+(?:\d{2}:)?\d{2}:\d{2}(?:\.\d{1,3})?)?\]|(?:\d{2}:)?\d{2}:\d{2})\s+/gm;
+  /^\s*(?:\[(?:\d{2,}:)?\d{2}:\d{2}(?:\.\d{1,3})?(?:\s+→\s+(?:\d{2,}:)?\d{2}:\d{2}(?:\.\d{1,3})?)?\]|(?:\d{2,}:)?\d{2}:\d{2})\s+/gm;
 
 function isEastAsianCountChar(char: string): boolean {
   return LETTER_OR_NUMBER_RE.test(char) && EAST_ASIAN_SCRIPT_RE.test(char);

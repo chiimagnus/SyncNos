@@ -3,7 +3,6 @@ import type { VideoPageMetaCandidates } from '@services/shared/video-capture';
 type StoreResponse = {
   url: string;
   pageUrl: string;
-  contentType?: string;
   bodyText: string;
   at: number;
 };
@@ -39,10 +38,7 @@ function randomId(): string {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-export function requestVideoPageMeta(options?: { timeoutMs?: number }): Promise<VideoPageMetaCandidates | null> {
-  const requestedTimeout = Number(options?.timeoutMs);
-  const timeoutMs =
-    Number.isFinite(requestedTimeout) && requestedTimeout >= 0 ? Math.floor(requestedTimeout) : DEFAULT_META_TIMEOUT_MS;
+export function requestVideoPageMeta(): Promise<VideoPageMetaCandidates | null> {
   const requestId = randomId();
 
   return new Promise((resolve) => {
@@ -74,7 +70,7 @@ export function requestVideoPageMeta(options?: { timeoutMs?: number }): Promise<
     };
 
     window.addEventListener('message', onMessage);
-    timer = setTimeout(() => finish(null), timeoutMs);
+    timer = setTimeout(() => finish(null), DEFAULT_META_TIMEOUT_MS);
 
     try {
       window.postMessage({ __syncnos: true, type: 'SYNCNOS_VIDEO_META_REQUEST', requestId }, '*');

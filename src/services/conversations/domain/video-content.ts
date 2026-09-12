@@ -1,12 +1,10 @@
-import type { VideoChapter, VideoPlatform } from '@services/shared/video-capture';
+import type { VideoChapter } from '@services/shared/video-capture';
 
 export type VideoTranscriptCue = {
   startSeconds: number;
   endSeconds: number | null;
   text: string;
 };
-
-export type { VideoChapter, VideoPlatform };
 
 function normalizeText(value: unknown): string {
   return String(value ?? '')

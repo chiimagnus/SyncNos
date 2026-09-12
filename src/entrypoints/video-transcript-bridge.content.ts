@@ -3,7 +3,6 @@ import { classifyVideoResponseUrl } from '@services/shared/video-capture';
 type StoreResponse = {
   url: string;
   pageUrl: string;
-  contentType?: string;
   bodyText: string;
   at: number;
 };
@@ -25,18 +24,18 @@ function getStore(): VideoTranscriptBridgeStore {
   return created;
 }
 
-function pushResponse(store: VideoTranscriptBridgeStore, next: StoreResponse) {
-  const url = String(next?.url || '').trim();
-  const pageUrl = String(next?.pageUrl || '').trim();
-  const bodyText = String(next?.bodyText || '');
+function pushResponse(store: VideoTranscriptBridgeStore, next: unknown) {
+  const input = next && typeof next === 'object' ? (next as Record<string, unknown>) : {};
+  const url = String(input.url || '').trim();
+  const pageUrl = String(input.pageUrl || '').trim();
+  const bodyText = String(input.bodyText || '');
   if (!classifyVideoResponseUrl(url) || !pageUrl || !bodyText || bodyText.length > MAX_BODY_CHARS) return;
 
   store.responses.push({
     url,
     pageUrl,
-    contentType: next?.contentType ? String(next.contentType) : undefined,
     bodyText,
-    at: Number(next?.at) || Date.now(),
+    at: Number(input.at) || Date.now(),
   });
   if (store.responses.length > MAX_RESPONSES) {
     store.responses.splice(0, store.responses.length - MAX_RESPONSES);
@@ -53,13 +52,7 @@ export default defineContentScript({
       if (event.source !== window) return;
       const data: any = event.data;
       if (!data || data.__syncnos !== true || data.type !== 'SYNCNOS_VIDEO_INTERCEPTED') return;
-      pushResponse(store, {
-        url: String(data.url || ''),
-        pageUrl: String(data.pageUrl || ''),
-        contentType: data.contentType ? String(data.contentType) : undefined,
-        bodyText: String(data.bodyText || ''),
-        at: Number(data.at) || Date.now(),
-      });
+      pushResponse(store, data);
     });
   },
 });

@@ -59,7 +59,6 @@ describe('video transcript isolated bridge', () => {
       type: 'SYNCNOS_VIDEO_INTERCEPTED',
       url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/current.json',
       pageUrl: location.href,
-      contentType: 'application/json',
       bodyText: '{"body":[]}',
       at: 10,
     });
@@ -90,7 +89,6 @@ describe('video transcript isolated bridge', () => {
         {
           url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/current.json',
           pageUrl: location.href,
-          contentType: 'application/json',
           bodyText: '{"body":[]}',
           at: 10,
         },
