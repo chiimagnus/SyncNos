@@ -68,7 +68,6 @@ describe('video transcript capture service', () => {
         title: 'Video title',
         url: 'https://www.bilibili.com/video/BV1TEST12345/',
         author: 'Author',
-        lastActivityAt: 0,
         platform: 'bilibili',
         durationSeconds: 123.5,
         thumbnailUrl: 'https://example.com/thumb.jpg',
@@ -87,7 +86,6 @@ describe('video transcript capture service', () => {
         conversationId: 7,
         mode: 'snapshot',
         conversationSourceType: 'video',
-        conversationUrl: 'https://www.bilibili.com/video/BV1TEST12345/',
         messages: [
           {
             messageKey: 'video_transcript',

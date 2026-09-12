@@ -10,12 +10,6 @@ type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
 
-function normalizeText(text: unknown) {
-  return String(text || '')
-    .replace(/\r\n/g, '\n')
-    .trim();
-}
-
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
 }
@@ -34,26 +28,21 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     conversationId: number;
     title?: string;
     isNew: boolean;
-    url?: string;
+    url: string;
     subtitleStatus: 'ok' | 'empty';
   }> {
     const extracted = await extractVideoTranscriptFromCurrentPage();
     const activityAt = Date.now();
-
-    const rawUrl = normalizeText(extracted?.meta?.url || location.href);
-    const url = normalizeText(rawUrl);
-
-    const title = normalizeText(extracted?.meta?.title || '');
-    const author = normalizeText(extracted?.meta?.author || '');
-    const platform = normalizeText(extracted?.meta?.platform || '');
-    const durationSeconds =
-      extracted?.meta?.durationSeconds != null && Number.isFinite(Number(extracted.meta.durationSeconds))
-        ? Math.max(0, Number(extracted.meta.durationSeconds))
-        : null;
-    const thumbnailUrl = normalizeText(extracted?.meta?.thumbnailUrl || '');
-    const videoDescription = normalizeText(extracted?.meta?.description || '');
-
-    const transcriptCues = toCanonicalVideoTranscriptCues(Array.isArray(extracted?.cues) ? extracted.cues : []);
+    const {
+      url,
+      title,
+      author,
+      platform,
+      durationSeconds,
+      thumbnailUrl,
+      description: videoDescription,
+    } = extracted.meta;
+    const transcriptCues = toCanonicalVideoTranscriptCues(extracted.cues);
     const transcriptMarkdown = formatVideoTranscriptMarkdown(transcriptCues);
     const subtitleStatus: 'ok' | 'empty' = transcriptCues.length ? 'ok' : 'empty';
 
@@ -65,7 +54,6 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         title,
         url,
         author,
-        lastActivityAt: 0,
         platform,
         durationSeconds,
         thumbnailUrl,
@@ -89,18 +77,15 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     if (transcriptCues.length) {
       message.transcriptCues = transcriptCues;
     }
-    if (extracted?.chapters !== null) {
-      message.videoChapters = normalizeCanonicalVideoChapters(extracted?.chapters);
+    if (extracted.chapters !== null) {
+      message.videoChapters = normalizeCanonicalVideoChapters(extracted.chapters);
     }
-    const messages = [message];
 
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId: conversation.id,
-      messages,
+      messages: [message],
       mode: 'snapshot',
-      diff: null,
       conversationSourceType: 'video',
-      conversationUrl: url,
       activityAt,
     });
     if (!messagesRes?.ok) {
