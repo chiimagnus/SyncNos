@@ -80,6 +80,49 @@ describe('current-page-capture content handlers', () => {
     expect(response?.data).toEqual({ title: 'Hello' });
   });
 
+  it('routes video context-menu progress through the unified current-page handler', async () => {
+    let registeredListener: any = null;
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            registeredListener = listener;
+          }),
+          removeListener: vi.fn(),
+        },
+      },
+    };
+
+    const captureCurrentPage = vi.fn(async (input?: any) => {
+      input?.onProgress?.({ message: 'No subtitles detected (not saved).', kind: 'default' });
+      return {
+        kind: 'video',
+        label: 'Fetch Video Transcript',
+        collectorId: 'video',
+        conversationId: null,
+        isNew: false,
+        subtitleStatus: 'empty',
+      };
+    });
+    const showSaveTip = vi.fn();
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+      inpageTip: { showSaveTip },
+    });
+
+    let response: any = null;
+    expect(
+      registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'contextmenu' } }, {}, (value: any) => {
+        response = value;
+      }),
+    ).toBe(true);
+    await waitFor(() => response?.ok === true);
+
+    expect(captureCurrentPage).toHaveBeenCalledTimes(1);
+    expect(showSaveTip).toHaveBeenCalledWith('No subtitles detected (not saved).', { kind: 'default' });
+    expect(response?.data).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: null });
+  });
+
   it('registers capture listeners immediately and waits for locale before service work', async () => {
     const locale = deferred<void>();
     let registeredListener: any = null;

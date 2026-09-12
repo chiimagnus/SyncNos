@@ -87,7 +87,6 @@ export const ITEM_MENTION_MESSAGE_TYPES = {
 export const CONTENT_MESSAGE_TYPES = {
   OPEN_INPAGE_COMMENTS_PANEL: 'openInpageCommentsPanel',
   EXTRACT_WEB_ARTICLE: 'extractWebArticle',
-  CAPTURE_VIDEO_TRANSCRIPT: 'captureVideoTranscript',
 } as const;
 
 export const COMMENTS_MESSAGE_TYPES = {

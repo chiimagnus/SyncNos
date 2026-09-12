@@ -85,6 +85,26 @@ afterEach(() => {
 });
 
 describe('clipper context menu runtime settings', () => {
+  it('uses the single generic save click route for video-capable pages', async () => {
+    const api = (globalThis.chrome as any).contextMenus;
+    tabsMocks.query.mockResolvedValue([{ id: 7, url: 'https://www.bilibili.com/video/BV1FwY4zkEef/' }]);
+    await registerMenu({
+      ready: Promise.resolve(),
+      readDisplayMode: vi.fn().mockResolvedValue('all'),
+      setDisplayMode: vi.fn(),
+    });
+    await flush();
+    api.emitClick('syncnos_clipper_save_current_page');
+    await flush();
+    expect(tabsMocks.send).toHaveBeenCalledWith(7, {
+      type: 'captureCurrentPage',
+      payload: { source: 'contextmenu' },
+    });
+    expect(api.create.mock.calls.map(([value]: any[]) => value?.id)).not.toContain(
+      'syncnos_clipper_save_video_transcript',
+    );
+  });
+
   it('waits for ready and reads display through injected owner-facing reader', async () => {
     const api = (globalThis.chrome as any).contextMenus;
     const ready = deferred<void>();

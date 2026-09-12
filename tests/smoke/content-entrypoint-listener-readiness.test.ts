@@ -118,7 +118,7 @@ describe('content entrypoint listener readiness', () => {
     const main = await loadContentMain();
     const started = Promise.resolve(main());
     await flushMicrotasks();
-    expect(listeners).toHaveLength(4);
+    expect(listeners).toHaveLength(3);
 
     let response: any = null;
     expect(
@@ -159,9 +159,14 @@ describe('content entrypoint listener readiness', () => {
     const started = Promise.resolve(main());
     await flushMicrotasks();
 
-    expect(addListener).toHaveBeenCalledTimes(4);
+    expect(addListener).toHaveBeenCalledTimes(3);
     expect(mocks.startContentBootstrap).not.toHaveBeenCalled();
     expect(mocks.createContentController).not.toHaveBeenCalled();
+
+    expect(mocks.createVideoTranscriptCaptureService).toHaveBeenCalledTimes(1);
+    expect(mocks.createCurrentPageCaptureService).toHaveBeenCalledWith(
+      expect.objectContaining({ videoCapture: expect.any(Object) }),
+    );
 
     locale.resolve();
     await started;

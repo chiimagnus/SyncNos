@@ -8,6 +8,7 @@ import { JSDOM } from 'jsdom';
 import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels/settings/types';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
+import { VideosSection } from '../../src/ui/settings/sections/VideosSection';
 import { ObsidianSettingsSection } from '../../src/ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '../../src/ui/settings/sections/GitHubSettingsSection';
 import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
@@ -35,6 +36,29 @@ describe('settings section definitions', () => {
       ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
+  });
+
+  it('shows the exact supported video URL forms and bounded Bilibili chapter capability', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+    act(() => {
+      root.render(createElement(VideosSection));
+    });
+
+    const monoTokens = Array.from(document.querySelectorAll('.tw-font-mono')).map((node) => node.textContent?.trim());
+    expect(monoTokens).toEqual(['youtube.com/watch', 'youtu.be', 'bilibili.com/video/BV…']);
+    expect(monoTokens).not.toContain('bilibili.com/video');
+    const text = document.body.textContent || '';
+    expect(text).toContain('chapters/highlights');
+    expect(text).toContain('when available');
+    expect(text).toContain('Bilibili av');
+    expect(text).toContain('YouTube Shorts');
+    expect(text.toLowerCase()).not.toContain('chapter images');
+    expect(text.toLowerCase()).not.toContain('click chapter');
+
+    act(() => root.unmount());
+    cleanupDom();
   });
 
   it('hides group titles and separates sidebar groups', () => {

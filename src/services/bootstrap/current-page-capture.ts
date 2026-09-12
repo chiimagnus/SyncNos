@@ -5,6 +5,8 @@ import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from 
 import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
+import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
+import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -13,6 +15,7 @@ type RuntimeClient = {
 type CurrentPageCaptureDeps = {
   runtime: RuntimeClient | null;
   collectorsRegistry: CollectorRegistryLike | null;
+  videoCapture: Pick<VideoTranscriptCaptureService, 'captureVideoTranscript'>;
 };
 
 type CurrentPageCaptureProgress = {
@@ -20,24 +23,39 @@ type CurrentPageCaptureProgress = {
   message: string;
 };
 
-type CurrentPageCaptureState = {
+export type CurrentPageCaptureState = {
   available: boolean;
-  kind: 'chat' | 'article' | 'unsupported';
+  kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;
   reason?: string;
 };
 
-export type CurrentPageCaptureResult = {
-  kind: 'chat' | 'article';
+type CurrentPageSavedResult = {
   label: string;
   collectorId: string | null;
   conversationId: number | null;
   title?: string;
   isNew: boolean;
-  captureCompleteness?: 'complete' | 'partial';
-  captureReasons?: string[];
 };
+
+export type CurrentPageCaptureResult =
+  | (CurrentPageSavedResult & {
+      kind: 'chat';
+      captureCompleteness?: 'complete' | 'partial';
+      captureReasons?: string[];
+    })
+  | (CurrentPageSavedResult & { kind: 'article' })
+  | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: 'ok' })
+  | {
+      kind: 'video';
+      label: string;
+      collectorId: 'video';
+      conversationId: null;
+      title?: string;
+      isNew: false;
+      subtitleStatus: 'empty';
+    };
 
 function errorMessage(error: unknown, fallback: string): string {
   const maybeError = error as { message?: unknown };
@@ -107,6 +125,7 @@ function markUnresolvedDeepResearch(snapshot: any): void {
 export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   const runtime = deps.runtime;
   const collectorsRegistry = deps.collectorsRegistry;
+  const videoCapture = deps.videoCapture;
 
   function send(type: string, payload?: Record<string, unknown>) {
     if (!runtime || typeof runtime.send !== 'function') {
@@ -116,6 +135,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   }
 
   function resolveCaptureTarget() {
+    if (detectSupportedVideoPagePlatform(globalThis.location?.href || '')) {
+      return {
+        available: true,
+        kind: 'video' as const,
+        label: t('fetchVideoTranscript'),
+        collectorId: 'video' as const,
+        collector: null,
+      };
+    }
+
     const collector = resolveActiveOrInpageCollector(collectorsRegistry);
     if (!collector) {
       return {
@@ -192,7 +221,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const onProgress = input?.onProgress;
     const target = resolveCaptureTarget();
 
-    if (!target.available || !target.collector) {
+    if (!target.available) {
       throw new Error(target.reason || t('currentPageCannotBeCaptured'));
     }
 
@@ -201,6 +230,32 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     };
 
     try {
+      if (target.kind === 'video') {
+        const result = await videoCapture.captureVideoTranscript();
+        if (result.subtitleStatus === 'empty') {
+          report(t('videoTranscriptTipNoSubtitles'), 'default');
+          return {
+            kind: 'video',
+            label: target.label,
+            collectorId: 'video',
+            conversationId: null,
+            title: result.title,
+            isNew: false,
+            subtitleStatus: 'empty',
+          };
+        }
+        report(buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' }), 'default');
+        return {
+          kind: 'video',
+          label: target.label,
+          collectorId: 'video',
+          conversationId: normalizeConversationId(result.conversationId),
+          title: result.title,
+          isNew: result.isNew,
+          subtitleStatus: 'ok',
+        };
+      }
+
       if (target.kind === 'article') {
         const response = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
         if (!response?.ok) {
@@ -220,6 +275,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           isNew,
         };
       }
+
+      if (!target.collector) throw new Error(t('currentPageCannotBeCaptured'));
 
       let preparedCapture: unknown;
       if (typeof target.collector.prepareManualCapture === 'function') {

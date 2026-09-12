@@ -125,7 +125,15 @@ function createHarness(options: {
       pickActive: () => ({ id: options.collectorId || 'gemini', collector: { capture } }),
       list: () => [],
     },
-    currentPageCapture: { captureCurrentPage: vi.fn() } as any,
+    currentPageCapture: {
+      captureCurrentPage: vi.fn(),
+      getCurrentPageCaptureState: vi.fn(() => ({
+        available: true,
+        kind: 'chat',
+        label: 'Fetch AI Chat',
+        collectorId: options.collectorId || 'gemini',
+      })),
+    } as any,
     inpageButton: { ensureInpageButton: ensureButton, cleanupButtons: vi.fn(), setSaving: vi.fn() },
     inpageTip: { showSaveTip: vi.fn() },
     createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = {
+  getConversationBySourceConversationKey: vi.fn(),
   upsertConversation: vi.fn(),
   syncConversationMessages: vi.fn(),
 };
@@ -19,6 +20,7 @@ const commentMocks = {
 };
 
 vi.mock('@services/conversations/data/storage', () => ({
+  getConversationBySourceConversationKey: storageMocks.getConversationBySourceConversationKey,
   upsertConversation: storageMocks.upsertConversation,
   syncConversationMessages: storageMocks.syncConversationMessages,
 }));
@@ -48,6 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  storageMocks.getConversationBySourceConversationKey.mockReset();
   storageMocks.upsertConversation.mockReset();
   storageMocks.syncConversationMessages.mockReset();
   settingsMocks.storageGet.mockReset();
@@ -703,6 +706,94 @@ describe('article-fetch-service', () => {
 
     expect(data.conversationId).toBe(73);
     expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://www.bilibili.com/video/BV1FwY4zkEef/',
+    'https://www.youtube.com/watch?v=abc123',
+    'https://youtu.be/abc123',
+  ])('fails closed before any article side effect for supported video url %s', async (url) => {
+    const sendMessage = vi.fn();
+    const executeScript = vi.fn();
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 7, url, title: 'Video' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const mod = await import('../../src/collectors/web/article-fetch.ts');
+    await expect(mod.fetchActiveTabArticle()).rejects.toThrow('supported video pages must use video capture');
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(executeScript).not.toHaveBeenCalled();
+    expect(settingsMocks.storageGet).not.toHaveBeenCalled();
+    expect(storageMocks.upsertConversation).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before existing article lookup for supported video urls', async () => {
+    storageMocks.getConversationBySourceConversationKey.mockResolvedValue({
+      id: 99,
+      source: 'web',
+      conversationKey: 'article:https://www.bilibili.com/video/BV1FwY4zkEef/',
+      title: 'Legacy mistaken article',
+    });
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 7, url: 'https://www.bilibili.com/video/BV1FwY4zkEef/', title: 'Video' }]),
+      },
+    };
+
+    const mod = await import('../../src/collectors/web/article-fetch.ts');
+    await expect(mod.resolveOrCaptureActiveTabArticle()).rejects.toThrow(
+      'supported video pages must use video capture',
+    );
+    expect(storageMocks.getConversationBySourceConversationKey).not.toHaveBeenCalled();
+    expect(storageMocks.upsertConversation).not.toHaveBeenCalled();
+  });
+
+  it('keeps Bilibili opus on the article path', async () => {
+    storageMocks.upsertConversation.mockImplementation(async (payload: any) => ({ id: 74, ...payload, __isNew: true }));
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          title: 'Bilibili Opus',
+          author: 'UP',
+          publishedAt: '',
+          contentMarkdown: 'opus body',
+          textContent: 'opus body',
+          warningFlags: [],
+        },
+      });
+    });
+    const executeScript = vi.fn();
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 74, url: 'https://www.bilibili.com/opus/123456', title: 'Opus' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const mod = await import('../../src/collectors/web/article-fetch.ts');
+    const result = await mod.fetchActiveTabArticle();
+    expect(result.conversationId).toBe(74);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(storageMocks.upsertConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceType: 'article', url: 'https://www.bilibili.com/opus/123456' }),
+    );
   });
 
   it('rejects non-http active tab url', async () => {
