@@ -106,8 +106,11 @@ function parseYoutubeBody(bodyText: string): TranscriptCue[] {
 }
 
 function extractYoutubeCuesFromIntercept(currentUrl: string): TranscriptCue[] {
-  const picked = listCurrentResponses(currentUrl, 'youtube-timedtext')[0];
-  return picked ? parseYoutubeBody(picked.bodyText) : [];
+  for (const item of listCurrentResponses(currentUrl, 'youtube-timedtext')) {
+    const cues = parseYoutubeBody(item.bodyText);
+    if (cues.length) return cues;
+  }
+  return [];
 }
 
 function extractBilibiliCuesFromIntercept(currentUrl: string): TranscriptCue[] {

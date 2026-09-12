@@ -257,6 +257,32 @@ describe('video transcript extraction', () => {
     });
   });
 
+  it('falls back to an earlier current-page YouTube timedtext response when the latest response is not parseable', async () => {
+    const page = 'https://www.youtube.com/watch?v=current';
+    installDom(page);
+    installMetaResponder({
+      state: { platform: 'youtube', identityUrl: page, title: 'Current video' },
+      dom: null,
+    });
+    setResponses([
+      {
+        url: 'https://www.youtube.com/api/timedtext?v=current&lang=en',
+        pageUrl: page,
+        bodyText: '<transcript><text start="1.25" dur="1.5">valid</text></transcript>',
+        at: 1,
+      },
+      {
+        url: 'https://www.youtube.com/api/timedtext?v=current&lang=en&fmt=invalid',
+        pageUrl: page,
+        bodyText: '{not valid json',
+        at: 2,
+      },
+    ]);
+
+    const extracted = await extractVideoTranscriptFromCurrentPage();
+    expect(extracted.cues).toEqual([{ start: 1.25, end: 2.75, text: 'valid' }]);
+  });
+
   it('does not use stale YouTube transcript DOM when no current timedtext response exists', async () => {
     const page = 'https://www.youtube.com/watch?v=current';
     installDom(
