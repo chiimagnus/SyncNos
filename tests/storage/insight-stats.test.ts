@@ -151,7 +151,8 @@ describe('insight stats', () => {
     });
     const videoId = await seedConversation({
       sourceType: 'video',
-      source: 'YouTube',
+      source: 'video',
+      platform: 'youtube',
       conversationKey: 'video-key-only',
       title: 'Key only video',
       url: 'https://youtube.com/watch?v=key-only',
@@ -431,7 +432,8 @@ describe('insight stats', () => {
     });
     await seedConversation({
       sourceType: 'video',
-      source: 'YouTube',
+      source: 'video',
+      platform: 'youtube',
       conversationKey: 'video-known',
       title: 'Saved transcript',
       url: 'https://www.youtube.com/watch?v=abc',
@@ -555,7 +557,8 @@ describe('insight stats', () => {
     });
     const videoMost = await seedConversation({
       sourceType: 'video',
-      source: 'YouTube',
+      source: 'video',
+      platform: 'youtube',
       conversationKey: 'video-most-comments',
       title: 'Most commented video',
       url: 'https://youtube.com/watch?v=most',
@@ -563,7 +566,8 @@ describe('insight stats', () => {
     });
     const videoSecond = await seedConversation({
       sourceType: 'video',
-      source: 'Bilibili',
+      source: 'video',
+      platform: 'bilibili',
       conversationKey: 'video-second-comments',
       title: 'Second commented video',
       url: 'https://bilibili.com/video/BV1xx411c7mD',
