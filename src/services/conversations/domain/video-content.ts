@@ -1,4 +1,4 @@
-import type { VideoChapter, VideoPlatform } from '@services/shared/video-capture';
+import type { VideoChapter } from '@services/shared/video-capture';
 
 export type VideoTranscriptCue = {
   startSeconds: number;
