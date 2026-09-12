@@ -7,6 +7,7 @@ import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
 import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery, tabsSendMessage, tabsUpdate } from '@platform/webext/tabs';
 import { storageGet } from '@platform/storage/local';
@@ -56,6 +57,12 @@ function normalizeText(text: unknown) {
   return String(text || '')
     .replace(/\r\n/g, '\n')
     .trim();
+}
+
+function assertNotSupportedVideoPage(url: string) {
+  if (detectSupportedVideoPagePlatform(url)) {
+    throw toError('supported video pages must use video capture');
+  }
 }
 
 function hasWarningFlag(warningFlags: unknown, flag: string): boolean {
@@ -226,6 +233,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const targetTabId = Number(tab.id);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
+  assertNotSupportedVideoPage(normalizedUrl);
   const discourseTopic = parseDiscourseTopicUrl(normalizedUrl);
   const articleIdentity = buildCanonicalWebArticleIdentity(normalizedUrl)!;
   const canonicalUrl = articleIdentity.url;
@@ -393,6 +401,7 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const tab = await resolveTargetTab(tabId);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
+  assertNotSupportedVideoPage(normalizedUrl);
   const articleIdentity = buildCanonicalWebArticleIdentity(normalizedUrl)!;
   const canonicalUrl = articleIdentity.url;
   const key = articleIdentity.conversationKey;
