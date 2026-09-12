@@ -284,4 +284,131 @@ describe('backup backup-utils', () => {
     expect(merged.contentMarkdown).toBe('hi');
     expect(merged.updatedAt).toBe(20);
   });
+
+  it('mergeConversationRecord preserves local canonical Video metadata, fills missing values, and drops retired fields', () => {
+    const merged = mergeConversationRecord(
+      {
+        id: 10,
+        sourceType: 'video',
+        source: 'video',
+        conversationKey: 'video:https://example.com/video',
+        title: 'Local',
+        url: 'https://example.com/video',
+        platform: 'bilibili',
+        durationSeconds: 120.5,
+        thumbnailUrl: 'https://example.com/local.jpg',
+        videoDescription: 'Local description',
+        transcriptSource: 'C',
+        hasTimestamps: false,
+        description: 'retired description',
+        lastActivityAt: 20,
+      },
+      {
+        sourceType: 'video',
+        source: 'video',
+        conversationKey: 'video:https://example.com/video',
+        title: 'Backup',
+        url: 'https://example.com/video',
+        platform: 'youtube',
+        durationSeconds: 999,
+        thumbnailUrl: 'https://example.com/backup.jpg',
+        videoDescription: 'Backup description',
+        transcriptSource: 'A',
+        hasTimestamps: true,
+        lastActivityAt: 30,
+      },
+    );
+
+    expect(merged).toMatchObject({
+      platform: 'bilibili',
+      durationSeconds: 120.5,
+      thumbnailUrl: 'https://example.com/local.jpg',
+      videoDescription: 'Local description',
+      lastActivityAt: 30,
+    });
+    expect(merged).not.toHaveProperty('transcriptSource');
+    expect(merged).not.toHaveProperty('hasTimestamps');
+    expect(merged).not.toHaveProperty('description');
+
+    const filled = mergeConversationRecord(
+      {
+        sourceType: 'video',
+        source: 'video',
+        conversationKey: 'video:https://example.com/missing',
+        title: 'Local',
+        url: 'https://example.com/missing',
+        platform: 'invalid',
+        durationSeconds: -1,
+        thumbnailUrl: '',
+        videoDescription: '',
+        lastActivityAt: 1,
+      },
+      {
+        sourceType: 'video',
+        source: 'video',
+        conversationKey: 'video:https://example.com/missing',
+        platform: 'youtube',
+        durationSeconds: 42.25,
+        thumbnailUrl: 'https://example.com/backup.jpg',
+        videoDescription: 'Backup description',
+        lastActivityAt: 2,
+      },
+    );
+    expect(filled).toMatchObject({
+      platform: 'youtube',
+      durationSeconds: 42.25,
+      thumbnailUrl: 'https://example.com/backup.jpg',
+      videoDescription: 'Backup description',
+    });
+  });
+
+  it('mergeMessageRecord keeps structured Video content only from the winning transcript row', () => {
+    const older = {
+      conversationId: 1,
+      messageKey: 'video_transcript',
+      role: 'transcript',
+      contentMarkdown: 'older',
+      updatedAt: 10,
+      transcriptCues: [{ startSeconds: 1, endSeconds: 2, text: 'older', raw: true }],
+      videoChapters: [{ title: 'Old', startSeconds: 0, endSeconds: 10, imgUrl: 'raw' }],
+    };
+    const newerWithoutStructuredFields = {
+      conversationId: 1,
+      messageKey: 'video_transcript',
+      role: 'transcript',
+      contentMarkdown: 'newer',
+      updatedAt: 20,
+    };
+
+    const merged = mergeMessageRecord(older, newerWithoutStructuredFields);
+    expect(merged.contentMarkdown).toBe('newer');
+    expect(merged).not.toHaveProperty('transcriptCues');
+    expect(merged).not.toHaveProperty('videoChapters');
+
+    const canonicalWinner = mergeMessageRecord(newerWithoutStructuredFields, {
+      ...older,
+      updatedAt: 30,
+      transcriptCues: [{ startSeconds: 1.234, endSeconds: 3.456, text: 'winner', raw: true }],
+      videoChapters: [{ title: ' Winner\nchapter ', startSeconds: 0, endSeconds: 30, imgUrl: 'raw' }],
+    });
+    expect(canonicalWinner.transcriptCues).toEqual([{ startSeconds: 1.234, endSeconds: 3.456, text: 'winner' }]);
+    expect(canonicalWinner.videoChapters).toEqual([{ title: 'Winner chapter', startSeconds: 0, endSeconds: 30 }]);
+  });
+
+  it('mergeMessageRecord removes stray Video structured fields from non-transcript messages', () => {
+    const merged = mergeMessageRecord(
+      {},
+      {
+        conversationId: 1,
+        messageKey: 'ordinary',
+        role: 'assistant',
+        contentMarkdown: 'ordinary',
+        updatedAt: 10,
+        transcriptCues: [{ startSeconds: 1, endSeconds: null, text: 'stray' }],
+        videoChapters: [{ title: 'stray', startSeconds: 0, endSeconds: null }],
+      },
+    );
+    expect(merged).not.toHaveProperty('transcriptCues');
+    expect(merged).not.toHaveProperty('videoChapters');
+  });
 });

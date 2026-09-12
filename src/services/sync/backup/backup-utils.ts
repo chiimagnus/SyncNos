@@ -1,6 +1,10 @@
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 import {
+  normalizeCanonicalVideoChapters,
+  normalizeCanonicalVideoTranscriptCues,
+} from '@services/conversations/domain/video-content';
+import {
   canonicalizeInpageDisplayModeStorageRecord,
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
 } from '@services/shared/inpage-display-mode';
@@ -120,6 +124,47 @@ export function mergeConversationRecord(
   next.publishedAt = pickStringPreferExisting(a.publishedAt, b.publishedAt);
   next.warningFlags = mergeWarningFlags(a.warningFlags, b.warningFlags);
 
+  if (
+    String(next.sourceType || '')
+      .trim()
+      .toLowerCase() === 'video'
+  ) {
+    const existingPlatform = String(a.platform || '')
+      .trim()
+      .toLowerCase();
+    const incomingPlatform = String(b.platform || '')
+      .trim()
+      .toLowerCase();
+    const platform =
+      existingPlatform === 'youtube' || existingPlatform === 'bilibili'
+        ? existingPlatform
+        : incomingPlatform === 'youtube' || incomingPlatform === 'bilibili'
+          ? incomingPlatform
+          : '';
+    if (platform) next.platform = platform;
+    else delete next.platform;
+
+    const validDuration = (value: unknown) => {
+      if (value == null || (typeof value === 'string' && !value.trim())) return null;
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+    };
+    const durationSeconds = validDuration(a.durationSeconds) ?? validDuration(b.durationSeconds);
+    if (durationSeconds != null) next.durationSeconds = durationSeconds;
+    else delete next.durationSeconds;
+
+    const thumbnailUrl = pickStringPreferExisting(a.thumbnailUrl, b.thumbnailUrl);
+    if (thumbnailUrl) next.thumbnailUrl = thumbnailUrl;
+    else delete next.thumbnailUrl;
+    const videoDescription = pickStringPreferExisting(a.videoDescription, b.videoDescription);
+    if (videoDescription) next.videoDescription = videoDescription;
+    else delete next.videoDescription;
+
+    delete next.transcriptSource;
+    delete next.hasTimestamps;
+    delete next.description;
+  }
+
   // notionPageId: never overwrite a non-empty local mapping.
   const notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
   const hasExplicitEmptyNotionPageId = [a, b].some(
@@ -152,6 +197,7 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
   const b = normalizeLegacyMessageRecord(incoming);
 
   const preferIncoming = !hasExisting || shouldPreferIncomingMessage(a, b);
+  const winner = preferIncoming ? b : a;
   const next = preferIncoming ? { ...a, ...b } : { ...b, ...a };
   next.role = pickStringPreferExisting(next.role, 'assistant') || 'assistant';
 
@@ -166,6 +212,22 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
   if (Number.isFinite(bSeq)) next.sequence = bSeq;
   else if (Number.isFinite(aSeq)) next.sequence = aSeq;
   else next.sequence = 0;
+
+  if (String(next.messageKey || '') === 'video_transcript') {
+    if (Object.prototype.hasOwnProperty.call(winner, 'transcriptCues')) {
+      next.transcriptCues = normalizeCanonicalVideoTranscriptCues(winner.transcriptCues);
+    } else {
+      delete next.transcriptCues;
+    }
+    if (Object.prototype.hasOwnProperty.call(winner, 'videoChapters')) {
+      next.videoChapters = normalizeCanonicalVideoChapters(winner.videoChapters);
+    } else {
+      delete next.videoChapters;
+    }
+  } else {
+    delete next.transcriptCues;
+    delete next.videoChapters;
+  }
 
   return next;
 }

@@ -7,7 +7,12 @@ import { exportBackupZip } from '@services/sync/backup/export';
 import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
-import { upsertConversation } from '@services/conversations/data/storage-idb';
+import {
+  getConversationById,
+  getMessagesByConversationId,
+  syncConversationMessages,
+  upsertConversation,
+} from '@services/conversations/data/storage-idb';
 import { buildBackupV2FixtureEntries } from '../helpers/backup-v2-fixture';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -319,6 +324,101 @@ describe('backup service', () => {
       'display owner failed',
     );
     expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
+  });
+
+  it('round-trips canonical Video metadata, cues and chapters through the ZIP backup without duplication', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const conversation = await upsertConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video:https://www.bilibili.com/video/BV1BACKUP123/',
+      title: 'Backup Video',
+      url: 'https://www.bilibili.com/video/BV1BACKUP123/',
+      author: 'Author',
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'Full description',
+      lastActivityAt: 100,
+    });
+    const conversationId = Number(conversation.id);
+    await syncConversationMessages(conversationId, [
+      {
+        messageKey: 'video_transcript',
+        role: 'transcript',
+        contentMarkdown: '[00:01.234 → 00:03.456] hello',
+        transcriptCues: [{ startSeconds: 1.234, endSeconds: 3.456, text: 'hello' }],
+        videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+        sequence: 1,
+        updatedAt: 100,
+      },
+    ]);
+
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const videoGroup = manifest.sources.find((group: any) => group.source === 'video');
+    expect(videoGroup?.files).toHaveLength(1);
+    const bundle = JSON.parse(new TextDecoder().decode(entries.get(videoGroup.files[0])!));
+    expect(bundle.conversation).toMatchObject({
+      sourceType: 'video',
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'Full description',
+    });
+    expect(bundle.messages).toEqual([
+      expect.objectContaining({
+        messageKey: 'video_transcript',
+        contentMarkdown: '[00:01.234 → 00:03.456] hello',
+        transcriptCues: [{ startSeconds: 1.234, endSeconds: 3.456, text: 'hello' }],
+        videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+      }),
+    ]);
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+
+    const first = await importBackupZipMerge(entries);
+    expect(first.conversationsAdded).toBe(1);
+    expect(first.messagesAdded).toBe(1);
+
+    const restoredDb = await openDb();
+    const tx = restoredDb.transaction(['conversations'], 'readonly');
+    const restoredRows = await reqToPromise<any[]>(tx.objectStore('conversations').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    expect(restoredRows).toHaveLength(1);
+    const restoredId = Number(restoredRows[0].id);
+    expect(await getConversationById(restoredId)).toMatchObject({
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'Full description',
+    });
+    expect(await getMessagesByConversationId(restoredId)).toEqual([
+      expect.objectContaining({
+        messageKey: 'video_transcript',
+        contentMarkdown: '[00:01.234 → 00:03.456] hello',
+        transcriptCues: [{ startSeconds: 1.234, endSeconds: 3.456, text: 'hello' }],
+        videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+      }),
+    ]);
+
+    const repeated = await importBackupZipMerge(entries);
+    expect(repeated.conversationsAdded).toBe(0);
+    expect(repeated.messagesAdded).toBe(0);
+    expect(
+      (await getMessagesByConversationId(restoredId)).filter((row) => row.messageKey === 'video_transcript'),
+    ).toHaveLength(1);
   });
 
   it('exportBackupZip emits manifest + bundles and filters storage.local', async () => {

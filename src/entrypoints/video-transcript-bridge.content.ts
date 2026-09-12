@@ -1,15 +1,15 @@
+import { classifyVideoResponseUrl } from '@services/shared/video-capture';
+
 type StoreResponse = {
   url: string;
+  pageUrl: string;
   contentType?: string;
   bodyText: string;
   at: number;
 };
 
-type StoreMetaByRequestId = Record<string, any>;
-
 type VideoTranscriptBridgeStore = {
   responses: StoreResponse[];
-  metaByRequestId: StoreMetaByRequestId;
 };
 
 const STORE_KEY = '__SYNCNOS_VIDEO_TRANSCRIPT_BRIDGE__';
@@ -19,72 +19,47 @@ const MAX_BODY_CHARS = 2_000_000;
 function getStore(): VideoTranscriptBridgeStore {
   const anyGlobal = globalThis as any;
   const existing = anyGlobal[STORE_KEY] as VideoTranscriptBridgeStore | undefined;
-  if (
-    existing &&
-    Array.isArray(existing.responses) &&
-    existing.metaByRequestId &&
-    typeof existing.metaByRequestId === 'object'
-  ) {
-    return existing;
-  }
-  const created: VideoTranscriptBridgeStore = { responses: [], metaByRequestId: {} };
+  if (existing && Array.isArray(existing.responses)) return existing;
+  const created: VideoTranscriptBridgeStore = { responses: [] };
   anyGlobal[STORE_KEY] = created;
   return created;
 }
 
-function safeSliceBody(text: string): string {
-  const value = String(text || '');
-  if (value.length <= MAX_BODY_CHARS) return value;
-  return value.slice(0, MAX_BODY_CHARS);
-}
-
 function pushResponse(store: VideoTranscriptBridgeStore, next: StoreResponse) {
   const url = String(next?.url || '').trim();
+  const pageUrl = String(next?.pageUrl || '').trim();
   const bodyText = String(next?.bodyText || '');
-  if (!url || !bodyText) return;
-  const item: StoreResponse = {
+  if (!classifyVideoResponseUrl(url) || !pageUrl || !bodyText || bodyText.length > MAX_BODY_CHARS) return;
+
+  store.responses.push({
     url,
+    pageUrl,
     contentType: next?.contentType ? String(next.contentType) : undefined,
-    bodyText: safeSliceBody(bodyText),
+    bodyText,
     at: Number(next?.at) || Date.now(),
-  };
-  store.responses.push(item);
+  });
   if (store.responses.length > MAX_RESPONSES) {
     store.responses.splice(0, store.responses.length - MAX_RESPONSES);
   }
 }
 
 export default defineContentScript({
-  matches: [
-    'https://www.youtube.com/watch*',
-    'https://youtu.be/*',
-    'https://www.bilibili.com/video/*',
-    'https://bilibili.com/video/*',
-  ],
+  matches: ['https://www.youtube.com/*', 'https://youtu.be/*', 'https://www.bilibili.com/*', 'https://bilibili.com/*'],
   runAt: 'document_start',
   main() {
     const store = getStore();
 
     window.addEventListener('message', (event: MessageEvent) => {
       if (event.source !== window) return;
-      const data: any = (event as any)?.data;
-      if (!data || data.__syncnos !== true) return;
-
-      if (data.type === 'SYNCNOS_VIDEO_INTERCEPTED') {
-        pushResponse(store, {
-          url: String(data.url || ''),
-          contentType: data.contentType ? String(data.contentType) : undefined,
-          bodyText: String(data.bodyText || ''),
-          at: Number(data.at) || Date.now(),
-        });
-        return;
-      }
-
-      if (data.type === 'SYNCNOS_VIDEO_META_RESPONSE') {
-        const requestId = String(data.requestId || '').trim();
-        if (!requestId) return;
-        store.metaByRequestId[requestId] = data.meta ?? null;
-      }
+      const data: any = event.data;
+      if (!data || data.__syncnos !== true || data.type !== 'SYNCNOS_VIDEO_INTERCEPTED') return;
+      pushResponse(store, {
+        url: String(data.url || ''),
+        pageUrl: String(data.pageUrl || ''),
+        contentType: data.contentType ? String(data.contentType) : undefined,
+        bodyText: String(data.bodyText || ''),
+        at: Number(data.at) || Date.now(),
+      });
     });
   },
 });

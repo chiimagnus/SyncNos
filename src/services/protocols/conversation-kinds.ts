@@ -76,14 +76,16 @@ function asNumber(value: unknown) {
   return { number: Number.isFinite(numeric) ? numeric : 0 };
 }
 
+function asNullableNonNegativeNumber(value: unknown) {
+  if (value == null || (typeof value === 'string' && !value.trim())) return { number: null };
+  const numeric = Number(value);
+  return { number: Number.isFinite(numeric) && numeric >= 0 ? numeric : null };
+}
+
 function asSelect(value: unknown) {
   const name = String(value || '').trim();
   if (!name) return { select: null };
   return { select: { name } };
-}
-
-function asCheckbox(value: unknown) {
-  return { checkbox: value === true };
 }
 
 function register(definition: ConversationKindDefinition): boolean {
@@ -246,8 +248,6 @@ const videoKind: ConversationKindDefinition = {
         Author: { rich_text: {} },
         Duration: { number: {} },
         Thumbnail: { url: {} },
-        'Transcript Source': { select: { options: [] } },
-        'Has Timestamps': { checkbox: {} },
       },
       ensureSchemaPatch: {
         'Last Activity': { date: {} },
@@ -255,8 +255,6 @@ const videoKind: ConversationKindDefinition = {
         Author: { rich_text: {} },
         Duration: { number: {} },
         Thumbnail: { url: {} },
-        'Transcript Source': { select: { options: [] } },
-        'Has Timestamps': { checkbox: {} },
       },
     },
     pageSpec: {
@@ -268,10 +266,8 @@ const videoKind: ConversationKindDefinition = {
           'Last Activity': asDate(data.lastActivityAt),
           Platform: asSelect((data as any).platform),
           Author: asRichText(data.author),
-          Duration: asNumber((data as any).durationSeconds),
+          Duration: asNullableNonNegativeNumber((data as any).durationSeconds),
           Thumbnail: asUrl((data as any).thumbnailUrl),
-          'Transcript Source': asSelect((data as any).transcriptSource),
-          'Has Timestamps': asCheckbox((data as any).hasTimestamps),
         };
       },
       buildUpdateProperties(conversation) {
@@ -282,10 +278,8 @@ const videoKind: ConversationKindDefinition = {
           'Last Activity': asDate(data.lastActivityAt),
           Platform: asSelect((data as any).platform),
           Author: asRichText(data.author),
-          Duration: asNumber((data as any).durationSeconds),
+          Duration: asNullableNonNegativeNumber((data as any).durationSeconds),
           Thumbnail: asUrl((data as any).thumbnailUrl),
-          'Transcript Source': asSelect((data as any).transcriptSource),
-          'Has Timestamps': asCheckbox((data as any).hasTimestamps),
         };
       },
     },

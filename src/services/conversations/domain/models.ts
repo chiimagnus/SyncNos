@@ -1,3 +1,6 @@
+import type { VideoChapter, VideoPlatform } from '@services/shared/video-capture';
+import type { VideoTranscriptCue } from '@services/conversations/domain/video-content';
+
 export type Conversation = {
   id: number;
   sourceType?: string;
@@ -16,6 +19,10 @@ export type Conversation = {
   feishuDocId?: string;
   lastActivityAt: number;
   commentThreadCount?: number;
+  platform?: VideoPlatform;
+  durationSeconds?: number | null;
+  thumbnailUrl?: string;
+  videoDescription?: string;
 };
 
 export type ConversationMessage = {
@@ -27,6 +34,8 @@ export type ConversationMessage = {
   contentMarkdown?: string;
   sequence?: number;
   updatedAt?: number;
+  transcriptCues?: VideoTranscriptCue[];
+  videoChapters?: VideoChapter[];
 };
 
 export type ConversationDetail = {

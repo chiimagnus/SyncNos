@@ -1,5 +1,9 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import {
+  normalizeCanonicalVideoChapters,
+  normalizeCanonicalVideoTranscriptCues,
+} from '@services/conversations/domain/video-content';
+import {
   hasReusableImageCachePayload,
   reusableImageCacheByteSize,
 } from '@services/conversations/data/image-cache-record';
@@ -155,6 +159,41 @@ function messageRecordsEquivalent(left: unknown, right: unknown): boolean {
   delete leftRecord.id;
   delete rightRecord.id;
   return storedValueEqual(leftRecord, rightRecord);
+}
+
+function buildConversationMessageRecord(input: {
+  conversationId: number;
+  message: any;
+  existing?: any;
+  contentMarkdown: string;
+  authorName: string;
+  sequence: number;
+  timestamp: ResolvedMessageTimestamp;
+}) {
+  const { conversationId, message, existing, contentMarkdown, authorName, sequence, timestamp } = input;
+  const messageKey = String(message?.messageKey || '');
+  const baseRecord: Record<string, unknown> = {
+    conversationId,
+    messageKey,
+    role: message?.role || 'assistant',
+    authorName: authorName || (existing ? existing.authorName || '' : ''),
+    contentMarkdown,
+    sequence,
+    ...(timestamp.present ? { updatedAt: timestamp.value } : null),
+  };
+
+  if (messageKey === 'video_transcript') {
+    if (Object.prototype.hasOwnProperty.call(message, 'transcriptCues') && message.transcriptCues !== undefined) {
+      baseRecord.transcriptCues = normalizeCanonicalVideoTranscriptCues(message.transcriptCues);
+    }
+    if (Object.prototype.hasOwnProperty.call(message, 'videoChapters') && message.videoChapters !== undefined) {
+      baseRecord.videoChapters = normalizeCanonicalVideoChapters(message.videoChapters);
+    } else if (existing && Object.prototype.hasOwnProperty.call(existing, 'videoChapters')) {
+      baseRecord.videoChapters = normalizeCanonicalVideoChapters(existing.videoChapters);
+    }
+  }
+
+  return withOptionalId(existing && existing.id, baseRecord);
 }
 
 function normalizeListKey(value: unknown, fallback: string): string {
@@ -484,7 +523,7 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
         : requestedActivityAt;
       const existingBase = existing && typeof existing === 'object' ? { ...existing } : {};
       delete existingBase.id;
-      const baseRecord = normalizeConversationListRecord({
+      const baseRecord: any = normalizeConversationListRecord({
         ...existingBase,
         sourceType: nextSourceType,
         source: nextSource,
@@ -502,6 +541,44 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
         feishuDocId: payload.feishuDocId || (existing ? existing.feishuDocId || '' : ''),
         lastActivityAt: nextLastActivityAt,
       });
+
+      delete baseRecord.transcriptSource;
+      delete baseRecord.hasTimestamps;
+      if (safeString(nextSourceType).toLowerCase() === 'video') {
+        const incomingPlatform = safeString(payload.platform).toLowerCase();
+        const existingPlatform = safeString(existing?.platform).toLowerCase();
+        const platform =
+          incomingPlatform === 'youtube' || incomingPlatform === 'bilibili'
+            ? incomingPlatform
+            : existingPlatform === 'youtube' || existingPlatform === 'bilibili'
+              ? existingPlatform
+              : '';
+        if (platform) baseRecord.platform = platform;
+        else delete baseRecord.platform;
+
+        const incomingDuration = Number(payload.durationSeconds);
+        const existingDuration = Number(existing?.durationSeconds);
+        const durationSeconds =
+          payload.durationSeconds != null && Number.isFinite(incomingDuration) && incomingDuration >= 0
+            ? incomingDuration
+            : existing?.durationSeconds != null && Number.isFinite(existingDuration) && existingDuration >= 0
+              ? existingDuration
+              : null;
+        baseRecord.durationSeconds = durationSeconds;
+
+        const incomingThumbnail = safeString(payload.thumbnailUrl);
+        const existingThumbnail = safeString(existing?.thumbnailUrl);
+        baseRecord.thumbnailUrl = incomingThumbnail || existingThumbnail;
+
+        const incomingDescription = safeString(payload.videoDescription);
+        const existingDescription = safeString(existing?.videoDescription);
+        baseRecord.videoDescription = incomingDescription || existingDescription;
+      } else {
+        delete baseRecord.platform;
+        delete baseRecord.durationSeconds;
+        delete baseRecord.thumbnailUrl;
+        delete baseRecord.videoDescription;
+      }
 
       const record: any = withOptionalId(existing && existing.id, baseRecord);
 
@@ -1031,16 +1108,15 @@ export async function syncConversationMessages(
             (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
             !!existingMarkdown.trim();
           const timestamp = resolveMessageTimestamp(existing, m.updatedAt, preserveExistingContent);
-          const baseRecord: Record<string, unknown> = {
+          const record: any = buildConversationMessageRecord({
             conversationId,
-            messageKey: key,
-            role: m.role || 'assistant',
-            authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
+            message: { ...m, messageKey: key },
+            existing,
             contentMarkdown: preserveExistingMarkdown ? existingMarkdown : incomingMarkdown,
+            authorName: incomingAuthorName,
             sequence,
-            ...(timestamp.present ? { updatedAt: timestamp.value } : null),
-          };
-          const record: any = withOptionalId(existing && existing.id, baseRecord);
+            timestamp,
+          });
           if (existing) {
             if (!messageRecordsEquivalent(existing, record)) {
               await reqToPromise(stores.messages.put(record));
@@ -1089,16 +1165,15 @@ export async function syncConversationMessages(
         const incomingMarkdown = String(m.contentMarkdown ?? '');
         const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
         const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
-        const baseRecord: Record<string, unknown> = {
+        const record: any = buildConversationMessageRecord({
           conversationId,
-          messageKey: m.messageKey,
-          role: m.role || 'assistant',
-          authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
+          message: m,
+          existing,
           contentMarkdown: incomingMarkdown,
+          authorName: incomingAuthorName,
           sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-          ...(timestamp.present ? { updatedAt: timestamp.value } : null),
-        };
-        const record: any = withOptionalId(existing && existing.id, baseRecord);
+          timestamp,
+        });
         if (existing) {
           if (!messageRecordsEquivalent(existing, record)) {
             await reqToPromise(stores.messages.put(record));

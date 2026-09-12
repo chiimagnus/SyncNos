@@ -1,7 +1,15 @@
+import { canonicalizeVideoUrl } from '@services/url-cleaning/video-url';
+import {
+  classifyVideoResponseUrl,
+  type VideoPageMetaCandidate,
+  type VideoPageMetaCandidates,
+} from '@services/shared/video-capture';
+
 type InterceptedResponsePayload = {
   __syncnos: true;
   type: 'SYNCNOS_VIDEO_INTERCEPTED';
   url: string;
+  pageUrl: string;
   contentType?: string;
   bodyText: string;
   at: number;
@@ -17,40 +25,34 @@ type MetaResponsePayload = {
   __syncnos: true;
   type: 'SYNCNOS_VIDEO_META_RESPONSE';
   requestId: string;
-  meta: any;
+  meta: VideoPageMetaCandidates;
 };
 
-const MAX_BODY_CHARS = 2_000_000;
-
-function normalizeUrl(raw: unknown): string {
-  return String(raw || '').trim();
+function normalizeText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .trim();
 }
 
-function isYoutubeHost(hostname: string): boolean {
-  const h = String(hostname || '').toLowerCase();
-  return h === 'www.youtube.com' || h.endsWith('.youtube.com') || h === 'youtu.be';
+function normalizeDuration(value: unknown): number | null {
+  if (value == null || (typeof value === 'string' && !value.trim())) return null;
+  const duration = Number(value);
+  return Number.isFinite(duration) && duration >= 0 ? duration : null;
 }
 
-function isBilibiliHost(hostname: string): boolean {
-  const h = String(hostname || '').toLowerCase();
-  return h === 'www.bilibili.com' || h.endsWith('.bilibili.com') || h === 'bilibili.com';
+function parseContentType(value: unknown): string {
+  return String(value || '').trim();
 }
 
-function shouldInterceptUrl(raw: string): boolean {
-  const url = normalizeUrl(raw);
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  if (lower.includes('youtube.com/api/timedtext')) return true;
-  if (lower.includes('/bfs/ai_subtitle/')) return true;
-  if (lower.includes('hdslb.com/bfs/subtitle/') && lower.includes('.json')) return true;
-  if (lower.includes('api.bilibili.com/x/player/wbi/v2')) return true;
-  return false;
-}
-
-function safeSliceBody(text: string): string {
-  const value = String(text || '');
-  if (value.length <= MAX_BODY_CHARS) return value;
-  return value.slice(0, MAX_BODY_CHARS);
+function resolveAbsoluteUrl(raw: unknown): string {
+  const source = typeof raw === 'object' && raw && 'url' in raw ? (raw as { url?: unknown }).url : raw;
+  const text = String(source ?? '').trim();
+  if (!text) return '';
+  try {
+    return new URL(text, document.baseURI || location.href).toString();
+  } catch (_error) {
+    return '';
+  }
 }
 
 function postIntercept(payload: Omit<InterceptedResponsePayload, '__syncnos' | 'type'>) {
@@ -68,63 +70,97 @@ function postIntercept(payload: Omit<InterceptedResponsePayload, '__syncnos' | '
   }
 }
 
-function parseContentType(value: unknown): string {
-  return String(value || '').trim();
-}
-
-function collectYoutubeMeta() {
+function collectYoutubeStateCandidate(): VideoPageMetaCandidate | null {
   try {
-    const pr: any = (window as any).ytInitialPlayerResponse;
-    const details = pr?.videoDetails || null;
-    const title = String(details?.title || '').trim();
-    const author = String(details?.author || '').trim();
-    const lengthSeconds = Number(details?.lengthSeconds);
-    const durationSeconds = Number.isFinite(lengthSeconds) ? Math.max(0, Math.floor(lengthSeconds)) : null;
+    const details: any = (window as any).ytInitialPlayerResponse?.videoDetails || null;
+    const videoId = normalizeText(details?.videoId);
+    if (!videoId) return null;
+    const identityUrl = canonicalizeVideoUrl(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`);
+    if (!identityUrl) return null;
 
     const thumbs = Array.isArray(details?.thumbnail?.thumbnails) ? details.thumbnail.thumbnails : [];
     const bestThumb = thumbs.length ? thumbs[thumbs.length - 1] : null;
-    const thumbnailUrl = bestThumb?.url ? String(bestThumb.url) : '';
-
     return {
       platform: 'youtube',
-      title,
-      author,
-      durationSeconds,
-      thumbnailUrl,
+      identityUrl,
+      title: normalizeText(details?.title),
+      author: normalizeText(details?.author),
+      description: normalizeText(details?.shortDescription),
+      durationSeconds: normalizeDuration(details?.lengthSeconds),
+      thumbnailUrl: normalizeText(bestThumb?.url),
     };
-  } catch (_e) {
+  } catch (_error) {
     return null;
   }
 }
 
-function collectBilibiliMeta() {
+function bilibiliIdentityFromState(bvid: string): string {
   try {
-    const state: any = (window as any).__INITIAL_STATE__;
-    const videoData = state?.videoData || null;
-    const title = String(videoData?.title || '').trim();
-    const author = String(videoData?.owner?.name || '').trim();
-    const durationSeconds = Number.isFinite(Number(videoData?.duration))
-      ? Math.max(0, Math.floor(Number(videoData.duration)))
-      : null;
-    const thumbnailUrl = String(videoData?.pic || '').trim();
+    const candidate = new URL(`https://www.bilibili.com/video/${bvid}/`);
+    const current = new URL(location.href);
+    const p = String(current.searchParams.get('p') || '').trim();
+    if (p) candidate.searchParams.set('p', p);
+    return canonicalizeVideoUrl(candidate.toString());
+  } catch (_error) {
+    return '';
+  }
+}
+
+function collectBilibiliStateCandidate(): VideoPageMetaCandidate | null {
+  try {
+    const videoData: any = (window as any).__INITIAL_STATE__?.videoData || null;
+    const bvid = normalizeText(videoData?.bvid);
+    if (!bvid) return null;
+    const identityUrl = bilibiliIdentityFromState(bvid);
+    if (!identityUrl) return null;
+
+    const desc = normalizeText(videoData?.desc);
+    const descV2 = Array.isArray(videoData?.desc_v2)
+      ? videoData.desc_v2
+          .map((item: any) => normalizeText(item?.raw_text))
+          .filter(Boolean)
+          .join('\n')
+      : '';
 
     return {
       platform: 'bilibili',
-      title,
-      author,
-      durationSeconds,
-      thumbnailUrl,
+      identityUrl,
+      title: normalizeText(videoData?.title),
+      author: normalizeText(videoData?.owner?.name),
+      description: desc || descV2,
+      durationSeconds: normalizeDuration(videoData?.duration),
+      thumbnailUrl: normalizeText(videoData?.pic),
     };
-  } catch (_e) {
+  } catch (_error) {
     return null;
   }
 }
 
-function collectMetaForPage() {
+function collectBilibiliDomCandidate(): VideoPageMetaCandidate | null {
+  try {
+    const identityUrl = canonicalizeVideoUrl(document.querySelector('link[rel="canonical"]')?.getAttribute('href'));
+    if (!identityUrl) return null;
+    return {
+      platform: 'bilibili',
+      identityUrl,
+      title: normalizeText((document.querySelector('h1.video-title') as HTMLElement | null)?.innerText),
+      author: normalizeText((document.querySelector('a.up-name') as HTMLElement | null)?.innerText),
+      description: normalizeText((document.querySelector('.desc-info-text') as HTMLElement | null)?.innerText),
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function collectMetaForPage(): VideoPageMetaCandidates {
   const host = String(location.hostname || '').toLowerCase();
-  if (isYoutubeHost(host)) return collectYoutubeMeta();
-  if (isBilibiliHost(host)) return collectBilibiliMeta();
-  return null;
+  if (host === 'www.youtube.com' || host === 'youtube.com' || host === 'youtu.be') {
+    return { state: collectYoutubeStateCandidate(), dom: null };
+  }
+  if (host === 'www.bilibili.com' || host === 'bilibili.com') {
+    return { state: collectBilibiliStateCandidate(), dom: collectBilibiliDomCandidate() };
+  }
+  return { state: null, dom: null };
 }
 
 function wrapFetch() {
@@ -132,26 +168,53 @@ function wrapFetch() {
   if (typeof original !== 'function') return;
 
   (globalThis as any).fetch = async function (...args: any[]) {
-    const res = await original.apply(this, args);
+    const pageUrl = String(location.href || '');
+    const response = await original.apply(this, args);
     try {
-      const url = normalizeUrl(res?.url || args?.[0]);
-      if (!shouldInterceptUrl(url)) return res;
-
-      const cloned = res?.clone?.();
-      if (!cloned || typeof cloned.text !== 'function') return res;
-      const contentType = parseContentType(cloned?.headers?.get?.('content-type') || '');
-      const bodyText = safeSliceBody(await cloned.text());
-      postIntercept({ url, contentType, bodyText, at: Date.now() });
-    } catch (_e) {
+      const url = resolveAbsoluteUrl(response?.url || args?.[0]);
+      if (!classifyVideoResponseUrl(url)) return response;
+      const cloned = response?.clone?.();
+      if (!cloned || typeof cloned.text !== 'function') return response;
+      const bodyText = String(await cloned.text());
+      if (!bodyText) return response;
+      postIntercept({
+        url,
+        pageUrl,
+        contentType: parseContentType(cloned?.headers?.get?.('content-type')),
+        bodyText,
+        at: Date.now(),
+      });
+    } catch (_error) {
       // ignore
     }
-    return res;
+    return response;
   };
+}
+
+function readXhrBody(xhr: any): string {
+  const responseType = String(xhr?.responseType || '');
+  if (!responseType || responseType === 'text') return String(xhr?.responseText || '');
+  if (responseType === 'json') {
+    if (xhr?.response == null) return '';
+    try {
+      return JSON.stringify(xhr.response);
+    } catch (_error) {
+      return '';
+    }
+  }
+  if (responseType === 'arraybuffer' && xhr?.response && typeof xhr.response.byteLength === 'number') {
+    try {
+      return typeof TextDecoder === 'function' ? new TextDecoder('utf-8').decode(xhr.response) : '';
+    } catch (_error) {
+      return '';
+    }
+  }
+  return '';
 }
 
 function wrapXhr() {
   const Xhr = (globalThis as any).XMLHttpRequest;
-  if (!Xhr || !Xhr.prototype) return;
+  if (!Xhr?.prototype) return;
 
   const originalOpen = Xhr.prototype.open;
   const originalSend = Xhr.prototype.send;
@@ -159,8 +222,8 @@ function wrapXhr() {
 
   Xhr.prototype.open = function (...args: any[]) {
     try {
-      (this as any).__syncnos_url = String(args?.[1] || '');
-    } catch (_e) {
+      (this as any).__syncnos_url = resolveAbsoluteUrl(args?.[1]);
+    } catch (_error) {
       // ignore
     }
     return originalOpen.apply(this, args);
@@ -168,43 +231,30 @@ function wrapXhr() {
 
   Xhr.prototype.send = function (...args: any[]) {
     try {
-      const url = normalizeUrl((this as any).__syncnos_url || '');
-      if (shouldInterceptUrl(url)) {
+      const url = String((this as any).__syncnos_url || '');
+      if (classifyVideoResponseUrl(url)) {
+        const pageUrl = String(location.href || '');
         this.addEventListener(
           'load',
           () => {
             try {
-              const contentType = parseContentType((this as any).getResponseHeader?.('content-type') || '');
-              let bodyText = safeSliceBody(String((this as any).responseText || ''));
-              if (!bodyText) {
-                const responseType = String((this as any).responseType || '');
-                const response = (this as any).response;
-                if (responseType === 'json' && response != null) {
-                  try {
-                    bodyText = safeSliceBody(JSON.stringify(response));
-                  } catch (_e) {
-                    // ignore
-                  }
-                } else if (responseType === 'arraybuffer' && response && typeof response.byteLength === 'number') {
-                  try {
-                    if (typeof TextDecoder === 'function') {
-                      bodyText = safeSliceBody(new TextDecoder('utf-8').decode(response));
-                    }
-                  } catch (_e) {
-                    // ignore
-                  }
-                }
-              }
+              const bodyText = readXhrBody(this);
               if (!bodyText) return;
-              postIntercept({ url, contentType, bodyText, at: Date.now() });
-            } catch (_e) {
+              postIntercept({
+                url,
+                pageUrl,
+                contentType: parseContentType((this as any).getResponseHeader?.('content-type')),
+                bodyText,
+                at: Date.now(),
+              });
+            } catch (_error) {
               // ignore
             }
           },
           { once: true } as any,
         );
       }
-    } catch (_e) {
+    } catch (_error) {
       // ignore
     }
     return originalSend.apply(this, args);
@@ -212,12 +262,7 @@ function wrapXhr() {
 }
 
 export default defineContentScript({
-  matches: [
-    'https://www.youtube.com/watch*',
-    'https://youtu.be/*',
-    'https://www.bilibili.com/video/*',
-    'https://bilibili.com/video/*',
-  ],
+  matches: ['https://www.youtube.com/*', 'https://youtu.be/*', 'https://www.bilibili.com/*', 'https://bilibili.com/*'],
   runAt: 'document_start',
   world: 'MAIN',
   main() {
@@ -226,24 +271,22 @@ export default defineContentScript({
 
     window.addEventListener('message', (event: MessageEvent) => {
       if (event.source !== window) return;
-      const data: any = (event as any)?.data;
-      if (!data || data.__syncnos !== true) return;
-      if (data.type !== 'SYNCNOS_VIDEO_META_REQUEST') return;
+      const data: any = event.data;
+      if (!data || data.__syncnos !== true || data.type !== 'SYNCNOS_VIDEO_META_REQUEST') return;
       const requestId = String((data as MetaRequestPayload).requestId || '').trim();
       if (!requestId) return;
 
       try {
-        const meta = collectMetaForPage();
         window.postMessage(
           {
             __syncnos: true,
             type: 'SYNCNOS_VIDEO_META_RESPONSE',
             requestId,
-            meta: meta || null,
+            meta: collectMetaForPage(),
           } satisfies MetaResponsePayload,
           '*',
         );
-      } catch (_e) {
+      } catch (_error) {
         // ignore
       }
     });
