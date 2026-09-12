@@ -59,7 +59,7 @@ type JsonVideoItem = JsonCommon & {
   author: string | null;
   description: string | null;
   transcript: JsonContent;
-  cues: Array<{ startSeconds: number | null; endSeconds: number | null; text: string }>;
+  cues: Array<{ startSeconds: number; endSeconds: number | null; text: string }>;
   chapters: Array<{ title: string; startSeconds: number; endSeconds: number | null }>;
 };
 
