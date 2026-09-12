@@ -3479,3 +3479,180 @@ describe('conversations storage-idb', () => {
     expect(merged?.listSiteKey).toBe('domain:example.com');
   });
 });
+
+describe('canonical video storage', () => {
+  it('persists Video metadata, preserves non-empty context, and clears obsolete diagnostics on recapture', async () => {
+    const payload = {
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video:https://www.bilibili.com/video/BV1TEST12345/',
+      title: 'Video',
+      url: 'https://www.bilibili.com/video/BV1TEST12345/',
+      author: 'Author',
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'Full description',
+      transcriptSource: 'A',
+      hasTimestamps: true,
+      lastActivityAt: 10,
+    };
+
+    const created = await upsertConversation(payload);
+    const id = Number(created.id);
+    expect(await getConversationById(id)).toMatchObject({
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'Full description',
+    });
+    expect(await getConversationById(id)).not.toHaveProperty('transcriptSource');
+    expect(await getConversationById(id)).not.toHaveProperty('hasTimestamps');
+
+    const stableRevision = await readDataRevision('conversations');
+    await upsertConversation({
+      ...payload,
+      platform: '',
+      durationSeconds: null,
+      thumbnailUrl: '',
+      videoDescription: '',
+      transcriptSource: undefined,
+      hasTimestamps: undefined,
+    });
+    expect(await readDataRevision('conversations')).toBe(stableRevision);
+    expect(await getConversationById(id)).toMatchObject({
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'Full description',
+    });
+
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    const store = tx.objectStore('conversations');
+    const raw = await reqToPromise<any>(store.get(id));
+    await reqToPromise(store.put({ ...raw, transcriptSource: 'C', hasTimestamps: false }));
+    await txDone(tx);
+
+    await upsertConversation({ ...payload, transcriptSource: undefined, hasTimestamps: undefined });
+    const cleaned = await getConversationById(id);
+    expect(cleaned).not.toHaveProperty('transcriptSource');
+    expect(cleaned).not.toHaveProperty('hasTimestamps');
+    expect(await readDataRevision('conversations')).toBe(stableRevision + 1);
+
+    await upsertConversation({ ...payload, videoDescription: 'Updated description' });
+    expect((await getConversationById(id))?.videoDescription).toBe('Updated description');
+    expect(await readDataRevision('conversations')).toBe(stableRevision + 2);
+  });
+
+  it('persists canonical transcript cues and applies chapter unknown/replace/clear semantics in every write path', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video:https://www.youtube.com/watch?v=storage',
+      title: 'Video storage',
+      url: 'https://www.youtube.com/watch?v=storage',
+      platform: 'youtube',
+      lastActivityAt: 1,
+    });
+    const id = Number(convo.id);
+    const initial = {
+      messageKey: 'video_transcript',
+      role: 'transcript',
+      contentMarkdown: '[00:01] first',
+      sequence: 1,
+      updatedAt: 100,
+      transcriptCues: [{ startSeconds: 1, endSeconds: 2, text: 'first', raw: true }],
+      videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 10, imgUrl: 'raw' }],
+    };
+
+    await syncConversationMessages(id, [initial]);
+    expect(await getMessagesByConversationId(id)).toEqual([
+      expect.objectContaining({
+        messageKey: 'video_transcript',
+        transcriptCues: [{ startSeconds: 1, endSeconds: 2, text: 'first' }],
+        videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 10 }],
+      }),
+    ]);
+    const initialRevision = await readDataRevision('messages');
+
+    await syncConversationMessages(id, [initial]);
+    expect(await readDataRevision('messages')).toBe(initialRevision);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          ...initial,
+          contentMarkdown: '[00:03] second',
+          updatedAt: 101,
+          transcriptCues: [{ startSeconds: 3, endSeconds: null, text: 'second' }],
+          videoChapters: undefined,
+        },
+      ],
+      { mode: 'incremental', diff: { added: [], updated: ['video_transcript'], removed: [] } },
+    );
+    let stored = (await getMessagesByConversationId(id))[0] as any;
+    expect(stored.transcriptCues).toEqual([{ startSeconds: 3, endSeconds: null, text: 'second' }]);
+    expect(stored.videoChapters).toEqual([{ title: 'Intro', startSeconds: 0, endSeconds: 10 }]);
+
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'video_transcript',
+        role: 'transcript',
+        contentMarkdown: '[00:04] no structured cue',
+        sequence: 1,
+        updatedAt: 102,
+        videoChapters: [],
+      },
+    ]);
+    stored = (await getMessagesByConversationId(id))[0] as any;
+    expect(stored).not.toHaveProperty('transcriptCues');
+    expect(stored.videoChapters).toEqual([]);
+  });
+
+  it('does not allow transcript-only structured fields on ordinary messages and keeps Activity-only recapture revision-safe', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'video',
+      source: 'video',
+      conversationKey: 'video:https://www.youtube.com/watch?v=activity',
+      title: 'Activity',
+      url: 'https://www.youtube.com/watch?v=activity',
+      platform: 'youtube',
+      lastActivityAt: 10,
+    });
+    const id = Number(convo.id);
+    const message = {
+      messageKey: 'video_transcript',
+      role: 'transcript',
+      contentMarkdown: '[00:01] same',
+      sequence: 1,
+      updatedAt: 100,
+      transcriptCues: [{ startSeconds: 1, endSeconds: null, text: 'same' }],
+    };
+    await syncConversationMessages(id, [message]);
+    const messageRevision = await readDataRevision('messages');
+    const conversationRevision = await readDataRevision('conversations');
+
+    await syncConversationMessages(id, [message], { activityAt: 20 });
+    expect(await readDataRevision('messages')).toBe(messageRevision);
+    expect(await readDataRevision('conversations')).toBe(conversationRevision + 1);
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
+
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'ordinary',
+        role: 'assistant',
+        contentMarkdown: 'ordinary',
+        sequence: 2,
+        updatedAt: 101,
+        transcriptCues: [{ startSeconds: 9, endSeconds: null, text: 'stray' }],
+        videoChapters: [{ title: 'stray', startSeconds: 0, endSeconds: null }],
+      },
+    ]);
+    const ordinary = (await getMessagesByConversationId(id))[0] as any;
+    expect(ordinary.messageKey).toBe('ordinary');
+    expect(ordinary).not.toHaveProperty('transcriptCues');
+    expect(ordinary).not.toHaveProperty('videoChapters');
+  });
+});
