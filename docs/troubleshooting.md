@@ -1,6 +1,6 @@
 # 排障
 
-本页面向维护者，只记录可复用的开发/运行故障诊断，不拥有产品契约或验证门槛。通用环境与提交前验证见 [CONTRIBUTING.md](CONTRIBUTING.md)；仅检查默认浏览器产物时可运行 `npm run check`。当消息生命周期、OAuth/发布诊断或 Zen 流程发生变化时同步更新本页。
+本页面向维护者，只记录可复用的开发/运行故障诊断，不拥有产品契约或验证门槛。通用环境与提交前验证见 [CONTRIBUTING.md](CONTRIBUTING.md)；仅检查默认浏览器产物时可运行 `npm run check`。当消息生命周期、OAuth/发布、provider 同步失败/恢复诊断或 Zen 流程发生变化时同步更新本页。
 
 ## 常见问题
 
@@ -10,6 +10,8 @@
 | Vitest 不退出 | 未释放的 timer、listener 或 React root；超时不是 PASS。 |
 | manifest/version 发布失败 | `wxt.config.ts`、tag 和 workflow 的版本校验。 |
 | OAuth Connect 无响应 | client id、redirect URI、pending state、Worker endpoint 和浏览器日志。 |
+| Notion 同步报 `notion database schema incompatible` | 先确认目标仍是 SyncNos 管理的数据库 schema。旧 `Date: date` 会自动重命名为 `Last Activity`；`Date` 或 `Last Activity` 类型不符属于真实不兼容状态。不要通过新增第二个 Activity 字段或放宽类型检查绕过迁移。 |
+| Notion 在托管 section 扫描/恢复时遇到 5xx 或 block retrieve 失败 | 按远端失败处理并重试；不要把 list/retrieve 失败转成“未找到”，否则会在已有 heading 旁创建重复 section。服务恢复后应重新扫描并复用原 heading。 |
 | GitHub 手动同步选中了多条，但 commit 的 changed files 更少 | 这是可能的正常结果：手动同步使用 `reconcile`，未变化的受管路径也可能参与声明，但 GitHub 最终 tree diff 只显示真正变化的文件。SyncNos commit message 固定为 `SyncNos GitHub sync`，不再用选中数或 staged 数冒充 changed-file 数。 |
 | article 只有文本没有图片 | 图片设置、anti-hotlink rule、referer 与下载 warning；文本成功仍是成功。 |
 | 视频提示没有字幕 | 这次没有可信字幕时仍会保存可用的视频信息，不会降级成 Article；如需补充字幕，等字幕加载后再次保存即可更新 transcript。 |

@@ -8,13 +8,10 @@ vi.mock('@services/sync/notion/notion-files-api.ts', () => {
     return filesApi;
   };
   return {
-    FILE_UPLOAD_VERSION: '2025-09-03',
-    sanitizeFilename: (name: any) => String(name || '').trim() || 'image.jpg',
     guessFilenameFromUrl: (_url: any) => 'image.jpg',
     createExternalURLUpload: (input: any) => getApi().createExternalURLUpload(input),
     createFileUpload: (input: any) => getApi().createFileUpload(input),
     sendFileUpload: (input: any) => getApi().sendFileUpload(input),
-    retrieveUpload: (input: any) => getApi().retrieveUpload(input),
     waitUntilUploaded: (input: any) => getApi().waitUntilUploaded(input),
   };
 });
@@ -47,9 +44,6 @@ describe('notion-sync-service image uploads', () => {
         throw new Error('should not be called');
       },
       sendFileUpload: async () => {
-        throw new Error('should not be called');
-      },
-      retrieveUpload: async () => {
         throw new Error('should not be called');
       },
     };
@@ -85,8 +79,8 @@ describe('notion-sync-service image uploads', () => {
         calls.push({ op: 'createExternalURLUpload' });
         throw new Error('validation_error');
       },
-      createFileUpload: async ({ filename, contentType, contentLength }: any) => {
-        calls.push({ op: 'createFileUpload', filename, contentType, contentLength });
+      createFileUpload: async ({ filename, contentType }: any) => {
+        calls.push({ op: 'createFileUpload', filename, contentType });
         return { id: 'u2' };
       },
       sendFileUpload: async ({ id, bytes, filename, contentType }: any) => {
@@ -97,7 +91,6 @@ describe('notion-sync-service image uploads', () => {
         calls.push({ op: 'waitUntilUploaded', id });
         return { id, status: 'uploaded' };
       },
-      retrieveUpload: async () => ({ id: 'u2', status: 'uploaded' }),
     };
 
     const blocks = [
@@ -146,7 +139,6 @@ describe('notion-sync-service image uploads', () => {
         calls.push({ op: 'waitUntilUploaded' });
         throw new Error('nope');
       },
-      retrieveUpload: async () => ({ id: 'u1', status: 'failed' }),
     };
 
     const blocks = [
@@ -184,7 +176,6 @@ describe('notion-sync-service image uploads', () => {
         calls.push({ op: 'waitUntilUploaded', id });
         return { id, status: 'uploaded' };
       },
-      retrieveUpload: async () => ({ id: 'u_data_1', status: 'uploaded' }),
     };
 
     const blocks = [
@@ -219,7 +210,6 @@ describe('notion-sync-service image uploads', () => {
         calls.push({ op: 'waitUntilUploaded' });
         throw new Error('nope');
       },
-      retrieveUpload: async () => ({ id: 'u_data_2', status: 'failed' }),
     };
 
     const blocks = [

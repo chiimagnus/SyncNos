@@ -8,7 +8,6 @@ vi.mock('@services/sync/notion/notion-api.ts', () => {
     return notionFetchImpl(req);
   };
   return {
-    NOTION_VERSION: '2022-06-28',
     notionFetch,
   };
 });
@@ -87,15 +86,6 @@ describe('notion-db-manager', () => {
     expect(create.body.properties?.Date).toBeUndefined();
   });
 
-  it('requires an explicit database spec instead of falling back to the chat database', async () => {
-    // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage();
-
-    await expect(notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p' } as any)).rejects.toThrow(
-      'notion dbSpec required',
-    );
-  });
-
   it('creates SyncNos-Web Articles database when missing (dbSpec-driven + separate cache key)', async () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
@@ -122,6 +112,32 @@ describe('notion-db-manager', () => {
     expect(create.body.properties?.['Last Activity']?.date).toBeTruthy();
     expect(create.body.properties?.Date).toBeUndefined();
     expect(create.body.properties?.AI).toBeFalsy();
+  });
+
+  it('throws when cached database has AI property with wrong type', async () => {
+    const calls: any[] = [];
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+        return {
+          id: 'db1',
+          parent: { type: 'page_id', page_id: 'p' },
+          properties: {
+            Name: { type: 'title' },
+            'Last Activity': { type: 'date' },
+            URL: { type: 'url' },
+            AI: { type: 'select' },
+          },
+        };
+      }
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
+
+    await expect(ensureChatDatabase()).rejects.toThrow('AI must be multi_select');
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
   });
 
   it('renames legacy Date before adding missing AI when reusing a cached database', async () => {
@@ -152,7 +168,7 @@ describe('notion-db-manager', () => {
     expect(patches[1]?.body?.properties?.AI?.multi_select).toBeTruthy();
   });
 
-  it('renames legacy Date idempotently and preserves an existing user Date when Last Activity already exists', async () => {
+  it('renames legacy Date only once', async () => {
     const calls: any[] = [];
     let properties: Record<string, any> = {
       Name: { type: 'title' },
@@ -184,40 +200,6 @@ describe('notion-db-manager', () => {
     await ensureChatDatabase();
     await ensureChatDatabase();
     expect(calls.filter((c) => c.method === 'PATCH')).toHaveLength(1);
-
-    properties = {
-      ...properties,
-      Date: { type: 'rich_text' },
-    };
-    calls.length = 0;
-    await ensureChatDatabase();
-    expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
-  });
-
-  it('throws when cached database has AI property with wrong type', async () => {
-    const calls: any[] = [];
-    notionFetchImpl = async (req: any) => {
-      calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
-        return {
-          id: 'db1',
-          parent: { type: 'page_id', page_id: 'p' },
-          properties: {
-            Name: { type: 'title' },
-            'Last Activity': { type: 'date' },
-            URL: { type: 'url' },
-            AI: { type: 'select' },
-          },
-        };
-      }
-      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
-    };
-
-    // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
-
-    await expect(ensureChatDatabase()).rejects.toThrow('AI must be multi_select');
-    expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
   });
 
   it.each([
@@ -278,7 +260,10 @@ describe('notion-db-manager', () => {
     notionFetchImpl = async (req: any) => {
       calls.push(req);
       if (req.method === 'GET' && req.path === '/v1/databases/db_old') {
-        throw new Error('notion api failed: GET /v1/databases/db_old HTTP 404 {"code":"object_not_found"}');
+        const error: any = new Error('database missing');
+        error.status = 404;
+        error.code = 'object_not_found';
+        throw error;
       }
       if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
       if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_new' };

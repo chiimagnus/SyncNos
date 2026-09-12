@@ -84,6 +84,15 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+let nextMockNotionBlockId = 0;
+
+function notionAppendResult(blocks: any[]) {
+  return {
+    results: blocks.map(() => ({ id: `test_block_${nextMockNotionBlockId++}` })),
+    count: blocks.length,
+  };
+}
+
 async function waitFor(predicate: () => boolean, label: string) {
   for (let i = 0; i < 50; i += 1) {
     if (predicate()) return true;
@@ -139,26 +148,6 @@ function createRouter({
       error: { message: `unknown message type: ${msg?.type}`, extra: null },
     }),
   });
-
-  // The Notion section engine expects `appendChildren()` to return created block ids when
-  // it appends toggle headings. Many unit tests don't care about the ids, so provide a
-  // compatibility wrapper here to keep mocks minimal.
-  if (notionServices?.syncService && typeof notionServices.syncService.appendChildren === 'function') {
-    let appendCounter = 0;
-    const originalAppend = notionServices.syncService.appendChildren.bind(notionServices.syncService);
-    notionServices.syncService.appendChildren = async (accessToken: string, blockId: string, blocks: any[]) => {
-      const res = await originalAppend(accessToken, blockId, blocks);
-      const count = Array.isArray(blocks) ? blocks.length : 0;
-      const existingResults = res && typeof res === 'object' ? (res as any).results : null;
-      if (Array.isArray(existingResults) && existingResults.length >= count) return res;
-      const nextResults = Array.isArray(existingResults) ? existingResults.slice() : [];
-      while (nextResults.length < count) nextResults.push({ id: `test_block_${appendCounter++}` });
-      return {
-        ...(res && typeof res === 'object' ? res : {}),
-        results: nextResults,
-      };
-    };
-  }
 
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     ...notionServices,
@@ -366,13 +355,14 @@ describe('background-router notion sync', () => {
       notionServices: {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => await mappingGate.promise,
           getMessagesByConversationId: async () => [],
         },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'unused' }) },
         syncService: {
           createPageInDatabase: async () => ({ id: 'unused' }),
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: () => [],
         },
         jobStore,
@@ -489,6 +479,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p_old' },
             mapping: { notionPageId: 'p_old', lastSyncedMessageKey: 'm0' },
@@ -507,7 +498,7 @@ describe('background-router notion sync', () => {
           updatePageProperties: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
             calls.push({ op: 'append', pageId: _pageId });
-            return { ok: true };
+            return notionAppendResult(_blocks);
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => false,
@@ -540,6 +531,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: {
@@ -562,7 +554,7 @@ describe('background-router notion sync', () => {
           updatePageProperties: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
             calls.push({ op: 'append', blocks: _blocks });
-            return { ok: true };
+            return notionAppendResult(_blocks);
           },
           messagesToBlocks: (messages: any[]) => {
             blocksFromCount = messages.length;
@@ -628,6 +620,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: {
               id: 1,
@@ -678,7 +671,7 @@ describe('background-router notion sync', () => {
           updatePageProperties: async () => ({ ok: true }),
           appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
             calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
-            return { results: [], count: 0 };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: (_messages: any[]) => [],
           isPageUsableForDatabase: () => true,
@@ -755,6 +748,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: {
               id: 1,
@@ -798,7 +792,7 @@ describe('background-router notion sync', () => {
           },
           appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
             calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
-            return { results: [], count: 0 };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: () => {
             calls.push({ op: 'messagesToBlocks' });
@@ -877,6 +871,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: {
               id: 1,
@@ -906,7 +901,7 @@ describe('background-router notion sync', () => {
           },
           appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
             calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
-            return { results: [], count: 0 };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: () => [
             {
@@ -950,6 +945,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: {
               id: 1,
@@ -962,6 +958,10 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'article_body',
               lastSyncedMessageUpdatedAt: 1000,
+              notionSections: {
+                article: { headingBlockId: 'h_article' },
+                comments: { headingBlockId: 'h_comments' },
+              },
               notionSectionDigests: {
                 article: { digest: computeArticleDigest('same body'), lastSyncedAt: 1000 },
               },
@@ -997,9 +997,9 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          appendChildren: async () => {
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => {
             calls.push({ op: 'append' });
-            return { ok: true };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
@@ -1026,6 +1026,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db_chats' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: {
               id: 1,
@@ -1072,9 +1073,9 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          appendChildren: async () => {
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => {
             calls.push({ op: 'append' });
-            return { ok: true };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
@@ -1101,6 +1102,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: {
@@ -1132,7 +1134,7 @@ describe('background-router notion sync', () => {
           updatePageProperties: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
             calls.push({ op: 'append', blocks: _blocks });
-            return { ok: true };
+            return notionAppendResult(_blocks);
           },
           messagesToBlocks: (messages: any[]) => {
             blocksFromCount = messages.length;
@@ -1161,6 +1163,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: {
               id: 1,
@@ -1174,6 +1177,10 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'article_body',
               lastSyncedMessageUpdatedAt: 1000,
+              notionSections: {
+                article: { headingBlockId: 'h_article' },
+                comments: { headingBlockId: 'h_comments' },
+              },
               notionSectionDigests: {
                 article: { digest: computeArticleDigest('same body'), lastSyncedAt: 1000 },
               },
@@ -1210,9 +1217,9 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
           },
-          appendChildren: async () => {
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => {
             calls.push({ op: 'append' });
-            return { ok: true };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
@@ -1246,6 +1253,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async (conversationId: number) => ({
             conversation: {
               id: conversationId,
@@ -1276,7 +1284,7 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          appendChildren: async (_t: string, pageId: string) => {
+          appendChildren: async (_t: string, pageId: string, blocks: any[]) => {
             const conversationId = Number(String(pageId).split('_')[1]);
             started.push(conversationId);
             active += 1;
@@ -1284,7 +1292,7 @@ describe('background-router notion sync', () => {
             const blocker = blockers.get(conversationId);
             if (blocker) await blocker.promise;
             active -= 1;
-            return { ok: true };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
@@ -1327,6 +1335,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async (conversationId: number) => ({
             conversation: {
               id: conversationId,
@@ -1346,10 +1355,7 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => ({
-            ok: true,
-            results: Array.isArray(blocks) ? blocks.map((_b, i) => ({ id: `test_block_${_blockId}_${i}` })) : [],
-          }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
         },
@@ -1414,6 +1420,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: { notionPageId: 'p1' },
@@ -1426,7 +1433,10 @@ describe('background-router notion sync', () => {
         syncService: {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
-          appendChildren: async () => calls.push({ op: 'append' }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => {
+            calls.push({ op: 'append' });
+            return notionAppendResult(blocks);
+          },
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
         },
@@ -1454,6 +1464,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1470,7 +1481,7 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => false,
         },
@@ -1509,6 +1520,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1533,7 +1545,7 @@ describe('background-router notion sync', () => {
           appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
             appendedBlocks = blocks;
             calls.push({ op: 'append', pageId: _pageId });
-            return { ok: true };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: () => [
             {
@@ -1572,6 +1584,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1595,7 +1608,7 @@ describe('background-router notion sync', () => {
           updatePageProperties: async () => ({ ok: true }),
           appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
             appendedBlocks = blocks;
-            return { ok: true };
+            return notionAppendResult(blocks);
           },
           messagesToBlocks: () => [
             {
@@ -1627,6 +1640,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1648,7 +1662,7 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           updatePageProperties: async () => ({ ok: true }),
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: () => [
             {
               object: 'block',
@@ -1687,6 +1701,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1756,6 +1771,7 @@ describe('background-router notion sync', () => {
           },
         },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1770,13 +1786,15 @@ describe('background-router notion sync', () => {
           createPageInDatabase: async (_t: string, payload: any) => {
             createCalls.push(payload.databaseId);
             if (payload.databaseId === 'db_stale') {
-              throw new Error(
-                'notion api failed: POST /v1/pages HTTP 404 {"code":"object_not_found","message":"Could not find database with ID: db_stale"}',
-              );
+              const error: any = new Error('database missing');
+              error.status = 404;
+              error.code = 'object_not_found';
+              error.notionMessage = 'Could not find database with ID: db_stale';
+              throw error;
             }
             return { id: 'p_new' };
           },
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
         },
@@ -1813,6 +1831,7 @@ describe('background-router notion sync', () => {
           clearCachedDatabaseId: async () => true,
         },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async (conversationId: number) => ({
             conversation: {
               id: conversationId,
@@ -1832,13 +1851,15 @@ describe('background-router notion sync', () => {
           createPageInDatabase: async (_t: string, payload: any) => {
             createCalls.push(payload.databaseId);
             if (payload.databaseId === 'db_stale') {
-              throw new Error(
-                'notion api failed: POST /v1/pages HTTP 404 {"code":"object_not_found","message":"Could not find database with ID: db_stale"}',
-              );
+              const error: any = new Error('database missing');
+              error.status = 404;
+              error.code = 'object_not_found';
+              error.notionMessage = 'Could not find database with ID: db_stale';
+              throw error;
             }
             return { id: `p_${createCalls.length}` };
           },
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
           isPageUsableForDatabase: () => false,
         },
@@ -1863,12 +1884,13 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => await blockedLookup.promise,
           getMessagesByConversationId: async () => [],
         },
         syncService: {
           createPageInDatabase: async () => ({ id: 'p1' }),
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => notionAppendResult(blocks),
           messagesToBlocks: () => [],
         },
         jobStore,
@@ -1948,6 +1970,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -1995,6 +2018,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
@@ -2039,6 +2063,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
+          patchSyncMapping: async () => true,
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,

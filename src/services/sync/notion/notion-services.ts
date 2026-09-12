@@ -1,5 +1,8 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
-import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
+import type {
+  ConversationKindDbSpec,
+  ConversationKindDefinition,
+} from '@services/protocols/conversation-kind-contract';
 import type { SyncJobStore } from '@services/sync/sync-job-store';
 
 type NotionToken = {
@@ -12,7 +15,7 @@ type NotionTokenStore = {
 };
 
 type NotionConversationKinds = {
-  pick: (input: { source?: unknown; sourceType?: unknown }) => any;
+  pick: (input: { source?: unknown; sourceType?: unknown }) => ConversationKindDefinition | null;
 };
 
 type NotionBackgroundStorage = {
@@ -24,7 +27,7 @@ type NotionBackgroundStorage = {
     meta?: { notionPageUrl?: string; notionWorkspaceSlug?: string },
   ) => Promise<any>;
   setSyncCursor: (conversationId: number, cursor: any) => Promise<any>;
-  patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any>;
+  patchSyncMapping: (conversationId: number, patch: Record<string, unknown>) => Promise<any>;
   getArticleCommentsByConversationId: (conversationId: number) => Promise<ArticleCommentDto[]>;
   attachOrphanArticleCommentsToConversation: (canonicalUrl: string, conversationId: number) => Promise<any>;
 };
@@ -34,17 +37,23 @@ type NotionDbManager = {
     accessToken: string;
     parentPageId: string;
     dbSpec: ConversationKindDbSpec;
-  }) => Promise<{ databaseId?: unknown }>;
+  }) => Promise<{ databaseId: string }>;
   clearCachedDatabaseId: (storageKey: string) => Promise<any>;
 };
 
 type NotionSyncService = {
   getPage: (accessToken: string, pageId: string) => Promise<any>;
-  createPageInDatabase: (accessToken: string, input: any) => Promise<any>;
-  updatePageProperties: (accessToken: string, input: any) => Promise<any>;
-  appendChildren: (accessToken: string, pageId: string, blocks: any[]) => Promise<any>;
+  createPageInDatabase: (
+    accessToken: string,
+    input: { databaseId: string; properties: Record<string, unknown> },
+  ) => Promise<any>;
+  updatePageProperties: (
+    accessToken: string,
+    input: { pageId: string; properties: Record<string, unknown> },
+  ) => Promise<any>;
+  appendChildren: (accessToken: string, pageId: string, blocks: any[]) => Promise<{ results: any[]; count: number }>;
   messagesToBlocks: (messages: any[]) => any[];
-  isPageUsableForDatabase: (page: any, databaseId?: string) => boolean;
+  isPageUsableForDatabase: (page: any, databaseId: string) => boolean;
   upgradeImageBlocksToFileUploads: (accessToken: string, blocks: any[], conversationId: number) => Promise<any[]>;
 };
 

@@ -137,6 +137,7 @@ describe('notion-sync-orchestrator kind routing', () => {
       },
       setConversationNotionPageId: async () => true,
       setSyncCursor: async () => true,
+      patchSyncMapping: async () => true,
     };
 
     const syncService = {
@@ -469,6 +470,7 @@ describe('notion-sync-orchestrator kind routing', () => {
         ],
         setConversationNotionPageId: async () => true,
         setSyncCursor: async () => true,
+        patchSyncMapping: async () => true,
       },
       conversationKinds,
       dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
@@ -681,7 +683,10 @@ describe('notion-sync-orchestrator kind routing', () => {
         },
         mapping: {
           notionPageId: 'p1',
-          notionSections: { article: { headingBlockId: 'h_article' } },
+          notionSections: {
+            article: { headingBlockId: 'h_article' },
+            comments: { headingBlockId: 'h_comments' },
+          },
           notionSectionDigests: { article: { digest: 'old' } },
         },
       }),
@@ -696,6 +701,7 @@ describe('notion-sync-orchestrator kind routing', () => {
       ],
       setConversationNotionPageId: async () => true,
       setSyncCursor: async () => true,
+      patchSyncMapping: async () => true,
     };
 
     notionFetchImpl = async (req: any) => {

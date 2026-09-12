@@ -9,20 +9,14 @@ interface NotionApiError extends Error {
 }
 
 interface NotionFetchArgs {
-  accessToken?: string | null;
+  accessToken: string;
   method: string;
   path: string;
   body?: unknown;
-  notionVersion?: string | null;
+  notionVersion?: string;
 }
 
-interface NotionSearchArgs {
-  accessToken?: string | null;
-  query?: string | null;
-  pageSize?: number | null;
-}
-
-function safeJsonParse(text: string | null | undefined): unknown {
+function safeJsonParse(text: string): unknown {
   try {
     return text ? JSON.parse(text) : null;
   } catch (_e) {
@@ -30,22 +24,15 @@ function safeJsonParse(text: string | null | undefined): unknown {
   }
 }
 
-function parseRetryAfterMs(res: Response | null | undefined): number {
-  try {
-    const raw =
-      res && res.headers && typeof res.headers.get === 'function'
-        ? String(res.headers.get('Retry-After') || '').trim()
-        : '';
-    if (!raw) return 0;
-    const sec = Number(raw);
-    if (Number.isFinite(sec) && sec > 0) return Math.round(sec * 1000);
-    const dateMs = Date.parse(raw);
-    if (!Number.isFinite(dateMs)) return 0;
-    const delta = dateMs - Date.now();
-    return delta > 0 ? delta : 0;
-  } catch (_e) {
-    return 0;
-  }
+function parseRetryAfterMs(res: Response): number {
+  const raw = String(res.headers.get('Retry-After') || '').trim();
+  if (!raw) return 0;
+  const sec = Number(raw);
+  if (Number.isFinite(sec) && sec > 0) return Math.round(sec * 1000);
+  const dateMs = Date.parse(raw);
+  if (!Number.isFinite(dateMs)) return 0;
+  const delta = dateMs - Date.now();
+  return delta > 0 ? delta : 0;
 }
 
 async function notionFetch({ accessToken, method, path, body, notionVersion }: NotionFetchArgs) {
@@ -83,70 +70,18 @@ async function notionFetch({ accessToken, method, path, body, notionVersion }: N
   return text ? JSON.parse(text) : {};
 }
 
-function getPageTitle(page: { properties?: Record<string, any>; url?: string } | null | undefined): string {
-  try {
-    const props = page && page.properties ? page.properties : {};
-    for (const key of Object.keys(props)) {
-      const p = props[key];
-      if (p && p.type === 'title' && Array.isArray(p.title)) {
-        const t = p.title
-          .map((x: any) => x.plain_text || '')
-          .join('')
-          .trim();
-        if (t) return t;
-      }
-    }
-  } catch (_e) {
-    // ignore
+function getPageTitle(page: { properties?: Record<string, any>; url?: string }): string {
+  const props = page.properties || {};
+  for (const key of Object.keys(props)) {
+    const property = props[key];
+    if (property?.type !== 'title' || !Array.isArray(property.title)) continue;
+    const title = property.title
+      .map((item: any) => item.plain_text || '')
+      .join('')
+      .trim();
+    if (title) return title;
   }
-  return page && page.url ? page.url : 'Untitled';
+  return page.url || 'Untitled';
 }
 
-function buildSearchBody({
-  query,
-  pageSize,
-  startCursor,
-}: {
-  query?: string | null;
-  pageSize?: number;
-  startCursor?: string | null;
-}): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    filter: { property: 'object', value: 'page' },
-    page_size: pageSize || 50,
-  };
-  const q = String(query || '').trim();
-  if (q) body.query = q;
-  if (startCursor) body.start_cursor = String(startCursor);
-  return body;
-}
-
-async function searchPages({ accessToken, query, pageSize }: NotionSearchArgs) {
-  const size = Number.isFinite(Number(pageSize)) && Number(pageSize) > 0 ? Number(pageSize) : 50;
-  let cursor: string | null = null;
-  let guard = 0;
-
-  while (guard < 20) {
-    guard += 1;
-    const body = buildSearchBody({ query, pageSize: size, startCursor: cursor });
-    const res = await notionFetch({ accessToken, method: 'POST', path: '/v1/search', body });
-    const results = Array.isArray(res && res.results) ? res.results : [];
-    const usableParentPages = results.filter((item: any) => {
-      if (!item || item.object !== 'page') return false;
-      const parent = item.parent || null;
-      if (!parent) return true;
-      if (parent.database_id) return false;
-      if (parent.type === 'database_id') return false;
-      return true;
-    });
-    if (usableParentPages.length) {
-      return { ...(res || {}), results: usableParentPages };
-    }
-    if (!res || !res.has_more || !res.next_cursor) break;
-    cursor = res.next_cursor;
-  }
-
-  return { results: [], has_more: false, next_cursor: null };
-}
-
-export { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
+export { notionFetch, getPageTitle };

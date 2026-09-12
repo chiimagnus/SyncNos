@@ -1,3 +1,4 @@
+import type { NotionServices } from '@services/sync/notion/notion-services';
 import {
   buildToggleHeadingBlock,
   findHeadingBlocksByTitle,
@@ -8,28 +9,30 @@ import {
 } from '@services/sync/notion/notion-section-blocks.ts';
 
 type ToggleHeadingLevel = 1 | 2 | 3;
+type NotionAppendService = Pick<NotionServices['syncService'], 'appendChildren'>;
+type NotionMappingStorage = Pick<NotionServices['storage'], 'patchSyncMapping'>;
 
-export type NotionManagedSectionSpec = {
+type NotionManagedSectionSpec = {
   id: string;
   title: string;
   level: ToggleHeadingLevel;
 };
 
-export type NotionManagedLayoutSpec = {
+type NotionManagedLayoutSpec = {
   sections: NotionManagedSectionSpec[];
 };
 
-export type NotionSectionAnchors = Record<string, { headingBlockId?: string }>;
+type NotionSectionAnchors = Record<string, { headingBlockId?: string }>;
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
 }
 
-export function getNotionSectionAnchorsFromMapping(mapping: unknown): NotionSectionAnchors {
+function getNotionSectionAnchorsFromMapping(mapping: unknown): NotionSectionAnchors {
   const m = mapping && typeof mapping === 'object' ? (mapping as any) : {};
   const raw = m.notionSections && typeof m.notionSections === 'object' ? (m.notionSections as any) : {};
   const out: NotionSectionAnchors = {};
-  for (const [key, value] of Object.entries(raw || {})) {
+  for (const [key, value] of Object.entries(raw)) {
     const sectionId = safeString(key);
     if (!sectionId) continue;
     const headingBlockId = safeString((value as any)?.headingBlockId);
@@ -39,7 +42,7 @@ export function getNotionSectionAnchorsFromMapping(mapping: unknown): NotionSect
 }
 
 export function layoutSpecForConversationKind(kindId: string): NotionManagedLayoutSpec {
-  const id = safeString(kindId).toLowerCase();
+  const id = kindId.trim().toLowerCase();
   if (id === 'article') {
     return {
       sections: [
@@ -58,68 +61,61 @@ export function layoutSpecForConversationKind(kindId: string): NotionManagedLayo
   };
 }
 
+async function findToggleHeadingBlockId(accessToken: string, pageId: string, title: string): Promise<string> {
+  const candidates = findHeadingBlocksByTitle(await listBlockChildren(accessToken, pageId), title);
+  const directId = safeString(candidates.find(isToggleHeadingBlock)?.id);
+  if (directId) return directId;
+
+  for (const candidate of candidates) {
+    const candidateId = safeString(candidate?.id);
+    if (!candidateId) continue;
+    const full = await retrieveBlock(accessToken, candidateId);
+    if (isToggleHeadingBlock(full)) return candidateId;
+  }
+  return '';
+}
+
+async function persistHeadingIdToMapping(
+  storage: NotionMappingStorage,
+  conversationId: number,
+  sectionId: string,
+  headingBlockId: string,
+): Promise<void> {
+  await storage.patchSyncMapping(conversationId, {
+    notionSections: { [sectionId]: { headingBlockId } },
+  });
+}
+
 export async function ensureSectionHeadingBlockId(input: {
   accessToken: string;
   pageId: string;
   section: NotionManagedSectionSpec;
   mapping: any | null | undefined;
-  notionSyncService: { appendChildren: (accessToken: string, blockId: string, blocks: any[]) => Promise<any> };
-  storage?: { patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any> };
-  conversationId?: number;
+  notionSyncService: NotionAppendService;
+  storage: NotionMappingStorage;
+  conversationId: number;
 }): Promise<{ headingBlockId: string; discoveredBy: 'mapping' | 'scan' | 'created' }> {
-  const sectionId = safeString(input?.section?.id);
-  const title = safeString(input?.section?.title);
-  const level = input?.section?.level || 2;
+  const sectionId = safeString(input.section.id);
+  const title = safeString(input.section.title);
   if (!sectionId || !title) throw new Error('invalid section spec');
 
-  const anchors = getNotionSectionAnchorsFromMapping(input?.mapping);
-  const fromMapping = safeString(anchors?.[sectionId]?.headingBlockId);
+  const anchors = getNotionSectionAnchorsFromMapping(input.mapping);
+  const fromMapping = safeString(anchors[sectionId]?.headingBlockId);
   if (fromMapping) return { headingBlockId: fromMapping, discoveredBy: 'mapping' };
 
-  const children = await listBlockChildren(input.accessToken, input.pageId);
-  const candidates = findHeadingBlocksByTitle(children, title);
-  let foundId = safeString(candidates.find((block) => isToggleHeadingBlock(block))?.id);
-  if (!foundId && candidates.length) {
-    for (const candidate of candidates) {
-      const candidateId = safeString((candidate as any)?.id);
-      if (!candidateId) continue;
-      const full = await retrieveBlock(input.accessToken, candidateId).catch(() => null);
-      if (!full) continue;
-      if (!isToggleHeadingBlock(full)) continue;
-      foundId = candidateId;
-      break;
-    }
-  }
-
+  const foundId = await findToggleHeadingBlockId(input.accessToken, input.pageId, title);
   if (foundId) {
-    await maybePersistHeadingIdToMapping(input, sectionId, foundId);
+    await persistHeadingIdToMapping(input.storage, input.conversationId, sectionId, foundId);
     return { headingBlockId: foundId, discoveredBy: 'scan' };
   }
 
   const appended = await input.notionSyncService.appendChildren(input.accessToken, input.pageId, [
-    buildToggleHeadingBlock(title, level),
+    buildToggleHeadingBlock(title, input.section.level),
   ]);
-  const results = Array.isArray((appended as any)?.results) ? (appended as any).results : [];
-  const createdId = safeString(results?.[0]?.id);
+  const createdId = safeString(appended.results[0]?.id);
   if (!createdId) throw new Error('failed to create section heading');
-  await maybePersistHeadingIdToMapping(input, sectionId, createdId);
+  await persistHeadingIdToMapping(input.storage, input.conversationId, sectionId, createdId);
   return { headingBlockId: createdId, discoveredBy: 'created' };
-}
-
-async function maybePersistHeadingIdToMapping(
-  input: {
-    storage?: { patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any> };
-    conversationId?: number;
-  },
-  sectionId: string,
-  headingBlockId: string,
-): Promise<void> {
-  const conversationId = Number(input?.conversationId);
-  if (!Number.isFinite(conversationId) || conversationId <= 0) return;
-  if (!input?.storage?.patchSyncMapping) return;
-  await input.storage.patchSyncMapping(conversationId, {
-    notionSections: { [sectionId]: { headingBlockId } },
-  });
 }
 
 export async function rebuildSectionByArchivingHeading(input: {
@@ -128,52 +124,18 @@ export async function rebuildSectionByArchivingHeading(input: {
   section: NotionManagedSectionSpec;
   currentHeadingBlockId: string;
   desiredBlocks: any[];
-  notionSyncService: { appendChildren: (accessToken: string, blockId: string, blocks: any[]) => Promise<any> };
+  notionSyncService: NotionAppendService;
 }): Promise<{ headingBlockId: string }> {
-  const currentId = safeString(input?.currentHeadingBlockId);
-  if (currentId) {
-    await archiveBlock(input.accessToken, currentId);
-  }
-  const heading = buildToggleHeadingBlock(input.section.title, input.section.level);
-  const headingRes = await input.notionSyncService.appendChildren(input.accessToken, input.pageId, [heading]);
-  const created = Array.isArray((headingRes as any)?.results) ? (headingRes as any).results : [];
-  const headingBlockId = safeString(created?.[0]?.id);
+  const currentId = safeString(input.currentHeadingBlockId);
+  if (currentId) await archiveBlock(input.accessToken, currentId);
+
+  const headingRes = await input.notionSyncService.appendChildren(input.accessToken, input.pageId, [
+    buildToggleHeadingBlock(input.section.title, input.section.level),
+  ]);
+  const headingBlockId = safeString(headingRes.results[0]?.id);
   if (!headingBlockId) throw new Error('failed to recreate section heading');
-  const blocks = Array.isArray(input.desiredBlocks) ? input.desiredBlocks : [];
-  if (blocks.length) {
-    await input.notionSyncService.appendChildren(input.accessToken, headingBlockId, blocks);
+  if (input.desiredBlocks.length) {
+    await input.notionSyncService.appendChildren(input.accessToken, headingBlockId, input.desiredBlocks);
   }
   return { headingBlockId };
-}
-
-export async function recoverSectionHeadingBlockId(input: {
-  accessToken: string;
-  pageId: string;
-  section: NotionManagedSectionSpec;
-  notionSyncService: { appendChildren: (accessToken: string, blockId: string, blocks: any[]) => Promise<any> };
-}): Promise<string> {
-  const title = safeString(input?.section?.title);
-  if (!title) throw new Error('invalid section spec');
-  const children = await listBlockChildren(input.accessToken, input.pageId);
-  const candidates = findHeadingBlocksByTitle(children, title);
-  let foundId = safeString(candidates.find((block) => isToggleHeadingBlock(block))?.id);
-  if (!foundId && candidates.length) {
-    for (const candidate of candidates) {
-      const candidateId = safeString((candidate as any)?.id);
-      if (!candidateId) continue;
-      const full = await retrieveBlock(input.accessToken, candidateId).catch(() => null);
-      if (!full) continue;
-      if (!isToggleHeadingBlock(full)) continue;
-      foundId = candidateId;
-      break;
-    }
-  }
-  if (foundId) return foundId;
-  const appended = await input.notionSyncService.appendChildren(input.accessToken, input.pageId, [
-    buildToggleHeadingBlock(title, input.section.level),
-  ]);
-  const results = Array.isArray((appended as any)?.results) ? (appended as any).results : [];
-  const createdId = safeString(results?.[0]?.id);
-  if (!createdId) throw new Error('failed to create section heading');
-  return createdId;
 }

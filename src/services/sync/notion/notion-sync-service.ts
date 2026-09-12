@@ -9,14 +9,6 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseHttpStatus(error: unknown): number {
-  const raw = error && (error as any).status != null ? Number((error as any).status) : NaN;
-  if (Number.isFinite(raw) && raw > 0) return raw;
-  const message = error && (error as any).message ? String((error as any).message) : String(error || '');
-  const m = message.match(/\bHTTP\s+(\d{3})\b/i);
-  return m ? Number(m[1]) : 0;
-}
-
 function normalizeNotionId(id: unknown): string {
   return String(id || '')
     .trim()
@@ -34,26 +26,26 @@ function retryDelayMs(error: unknown, attempt: number): number {
   return Math.min(5000, base + jitter);
 }
 
-function headingBlock(label: string, color?: string) {
+function headingBlock(label: string, color: string) {
   return {
     object: 'block',
     type: 'heading_3',
     heading_3: {
       rich_text: [{ type: 'text', text: { content: label } }],
-      color: color || 'default',
+      color,
     },
   };
 }
 
-function messagesToBlocks(messages: any) {
+function messagesToBlocks(messages: any[]) {
   const out = [];
-  for (const m of messages || []) {
+  for (const m of messages) {
     const role = m.role || 'assistant';
-    const authorName = m && m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : 'You';
+    const authorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : 'You';
     const label = role === 'user' ? authorName : role === 'assistant' ? 'Assistant' : role;
     out.push(headingBlock(label, role === 'user' ? 'green' : 'blue_background'));
-    const markdown = m && m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
-    if (!markdown) continue;
+    const markdown = String(m.contentMarkdown || '');
+    if (!markdown.trim()) continue;
     out.push(...markdownToNotionBlocks(markdown));
   }
   return out;
@@ -71,7 +63,7 @@ async function appendBatchWithRetry(accessToken: string, pageId: string, childre
         body: { children },
       });
     } catch (error) {
-      const status = parseHttpStatus(error);
+      const status = Number((error as any)?.status || 0);
       const retryable = status === 429 || status === 503;
       if (!retryable || attempt >= APPEND_MAX_ATTEMPTS) throw error;
 
@@ -81,10 +73,9 @@ async function appendBatchWithRetry(accessToken: string, pageId: string, childre
 }
 
 async function appendChildren(accessToken: string, pageId: string, blocks: any[]) {
-  const children = Array.from(blocks).filter((block) => block && typeof block === 'object');
   const appended = [];
-  for (let start = 0; start < children.length; start += APPEND_BATCH) {
-    const res = await appendBatchWithRetry(accessToken, pageId, children.slice(start, start + APPEND_BATCH));
+  for (let start = 0; start < blocks.length; start += APPEND_BATCH) {
+    const res = await appendBatchWithRetry(accessToken, pageId, blocks.slice(start, start + APPEND_BATCH));
     const results = Array.isArray(res && res.results) ? res.results : [];
     if (results.length) appended.push(...results);
   }
@@ -100,7 +91,7 @@ function requireExplicitProperties(properties: unknown): Record<string, unknown>
 
 async function createPageInDatabase(
   accessToken: string,
-  { databaseId, properties }: { databaseId?: string; properties?: Record<string, unknown> },
+  { databaseId, properties }: { databaseId: string; properties: Record<string, unknown> },
 ) {
   const body = {
     parent: { database_id: databaseId },
@@ -111,7 +102,7 @@ async function createPageInDatabase(
 
 async function updatePageProperties(
   accessToken: string,
-  { pageId, properties }: { pageId?: string; properties?: Record<string, unknown> },
+  { pageId, properties }: { pageId: string; properties: Record<string, unknown> },
 ) {
   const body = { properties: requireExplicitProperties(properties) };
   return notionFetch({ accessToken, method: 'PATCH', path: `/v1/pages/${pageId}`, body });
@@ -121,7 +112,7 @@ async function getPage(accessToken: string, pageId: string) {
   return notionFetch({ accessToken, method: 'GET', path: `/v1/pages/${pageId}` });
 }
 
-function isPageUsableForDatabase(page: any, databaseId: unknown): boolean {
+function isPageUsableForDatabase(page: any, databaseId: string): boolean {
   if (!page || typeof page !== 'object' || page.archived === true || page.in_trash === true) return false;
   const parent = page.parent;
   if (!parent || parent.type !== 'database_id') return false;

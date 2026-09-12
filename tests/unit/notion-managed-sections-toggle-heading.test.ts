@@ -75,4 +75,52 @@ describe('notion managed sections', () => {
       notionSections: { conversations: { headingBlockId: 'b1' } },
     });
   });
+
+  it('does not create a duplicate heading when candidate retrieval fails', async () => {
+    const sections = await loadFresh('@services/sync/notion/notion-managed-sections.ts');
+
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      const href = String(url);
+      if (method === 'GET' && href.includes('/v1/blocks/p1/children')) {
+        return notionHttpResponse({
+          results: [
+            {
+              object: 'block',
+              id: 'b1',
+              type: 'heading_2',
+              heading_2: {
+                rich_text: [{ type: 'text', text: { content: 'Conversations' }, plain_text: 'Conversations' }],
+              },
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        });
+      }
+      if (method === 'GET' && href.includes('/v1/blocks/b1')) {
+        return notionHttpResponse({ code: 'service_unavailable', message: 'retry later' }, 503);
+      }
+      throw new Error(`unexpected fetch: ${method} ${href}`);
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    const appendChildren = vi.fn(async () => ({ results: [{ id: 'new_heading' }], count: 1 }));
+    const patchSyncMapping = vi.fn(async () => true);
+
+    await expect(
+      sections.ensureSectionHeadingBlockId({
+        accessToken: 't',
+        pageId: 'p1',
+        section: { id: 'conversations', title: 'Conversations', level: 2 },
+        mapping: null,
+        notionSyncService: { appendChildren },
+        storage: { patchSyncMapping },
+        conversationId: 1,
+      }),
+    ).rejects.toMatchObject({ status: 503, code: 'service_unavailable' });
+
+    expect(appendChildren).not.toHaveBeenCalled();
+    expect(patchSyncMapping).not.toHaveBeenCalled();
+  });
 });
