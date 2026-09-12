@@ -16,6 +16,7 @@ import {
   recoverSectionHeadingBlockId,
 } from '@services/sync/notion/notion-managed-sections.ts';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import { formatVideoContentMarkdown } from '@services/conversations/domain/markdown';
 import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
@@ -341,7 +342,7 @@ function computeNotionArticleDigest(messagesList: unknown): string {
   return fnv1a32(JSON.stringify({ markdown }));
 }
 
-function stripLeadingArticleRoleHeading(blocks: unknown) {
+function stripLeadingRoleHeading(blocks: unknown, expectedLabel: string) {
   const list = Array.isArray(blocks) ? blocks.slice() : [];
   if (!list.length) return list;
   const first = list[0];
@@ -351,10 +352,55 @@ function stripLeadingArticleRoleHeading(blocks: unknown) {
   if (
     String(label || '')
       .trim()
-      .toLowerCase() !== 'article'
-  )
+      .toLowerCase() !==
+    String(expectedLabel || '')
+      .trim()
+      .toLowerCase()
+  ) {
     return list;
+  }
   return list.slice(1);
+}
+
+async function buildNonArticleBlocksForSync({
+  notionSyncService,
+  accessToken,
+  conversation,
+  kindId,
+  messagesList,
+  conversationId,
+}: {
+  notionSyncService: any;
+  accessToken?: string;
+  conversation: any;
+  kindId: string;
+  messagesList: any[];
+  conversationId: number;
+}) {
+  const sourceMessages = Array.isArray(messagesList) ? messagesList : [];
+  const projectedMessages =
+    kindId === 'video'
+      ? (() => {
+          const contentMarkdown = formatVideoContentMarkdown(conversation, sourceMessages, {
+            includeTranscriptHeading: false,
+          });
+          return contentMarkdown
+            ? [{ messageKey: 'video_transcript', role: 'transcript', sequence: 1, contentMarkdown }]
+            : [];
+        })()
+      : sourceMessages;
+  const built = await buildBlocksForSync({
+    notionSyncService,
+    accessToken,
+    source: conversation?.source,
+    messagesList: projectedMessages,
+    conversationId,
+  });
+  if (kindId !== 'video') return built;
+  return {
+    ...built,
+    blocks: stripLeadingRoleHeading(Array.isArray(built?.blocks) ? built.blocks : [], 'transcript'),
+  };
 }
 
 async function getNotionParentPageId() {
@@ -676,8 +722,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 messagesList: pickArticleBodyMessages(messages),
                 conversationId: id,
               });
-              const articleBlocks = stripLeadingArticleRoleHeading(
+              const articleBlocks = stripLeadingRoleHeading(
                 Array.isArray(builtArticle?.blocks) ? builtArticle.blocks : [],
+                'article',
               );
               if (Array.isArray(builtArticle?.warnings) && builtArticle.warnings.length)
                 warnings.push(...builtArticle.warnings);
@@ -755,10 +802,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             const conversationsSection = sections.find((s) => s && String(s.id) === 'conversations') || sections[0];
             if (!conversationsSection) throw new Error('missing conversations section spec');
 
-            const built = await buildBlocksForSync({
+            const built = await buildNonArticleBlocksForSync({
               notionSyncService,
               accessToken: accessToken,
-              source: convo.source,
+              conversation: convo,
+              kindId: kind.id,
               messagesList: messages,
               conversationId: id,
             });
@@ -919,8 +967,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   messagesList: pickArticleBodyMessages(messages),
                   conversationId: id,
                 });
-                articleBlocks = stripLeadingArticleRoleHeading(
+                articleBlocks = stripLeadingRoleHeading(
                   Array.isArray(builtArticle?.blocks) ? builtArticle.blocks : [],
+                  'article',
                 );
                 if (Array.isArray(builtArticle?.warnings) && builtArticle.warnings.length) {
                   warnings.push(...builtArticle.warnings);
@@ -1130,10 +1179,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             trace.mark('build blocks');
 
-            const built = await buildBlocksForSync({
+            const built = await buildNonArticleBlocksForSync({
               notionSyncService,
               accessToken: accessToken,
-              source: convo.source,
+              conversation: convo,
+              kindId: kind.id,
               messagesList: messages,
               conversationId: id,
             });
@@ -1211,10 +1261,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             trace.mark('build blocks');
 
-            const built = await buildBlocksForSync({
+            const built = await buildNonArticleBlocksForSync({
               notionSyncService,
               accessToken: accessToken,
-              source: convo.source,
+              conversation: convo,
+              kindId: kind.id,
               messagesList: inc.newMessages,
               conversationId: id,
             });

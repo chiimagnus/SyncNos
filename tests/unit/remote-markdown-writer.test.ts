@@ -88,6 +88,57 @@ describe('remote-markdown-writer', () => {
     expect(md).toContain('  Reply');
   });
 
+  it('renders Video metadata and semantic body without generic conversation role sections', async () => {
+    const w = await loadWriter();
+    const md = w.buildFullNoteMarkdown({
+      conversation: {
+        title: 'Video',
+        source: 'video',
+        sourceType: 'video',
+        conversationKey: 'video:https://example.com/watch/1',
+        url: 'https://example.com/watch/1',
+        platform: 'bilibili',
+        author: 'Creator',
+        durationSeconds: 65.5,
+        thumbnailUrl: 'https://example.com/thumb.jpg',
+        videoDescription: 'Description body',
+        lastActivityAt: Date.parse('2026-09-08T04:00:00.000Z'),
+      },
+      messages: [
+        {
+          messageKey: 'video_transcript',
+          sequence: 1,
+          role: 'transcript',
+          contentMarkdown: '[00:01.234 → 00:03.456] hello',
+          videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+        },
+      ],
+      syncnosObject: {
+        source: 'video',
+        conversationKey: 'video:https://example.com/watch/1',
+        schemaVersion: 1,
+        lastSyncedSequence: 1,
+        lastSyncedMessageKey: 'video_transcript',
+      },
+    });
+
+    expect(md).toContain('platform: "bilibili"');
+    expect(md).toContain('author: "Creator"');
+    expect(md).toContain('duration_seconds: 65.5');
+    expect(md).toContain('thumbnail_url: "https://example.com/thumb.jpg"');
+    expect(md).toContain('## Description\n\nDescription body');
+    expect(md).toContain('## Chapters\n\n- [00:00 → 00:30] Intro');
+    expect(md).toContain('## Transcript\n\n[00:01.234 → 00:03.456] hello');
+    expect(md).not.toContain('# Conversations');
+    expect(md).not.toContain('## 1 transcript');
+
+    const unknownDuration = w.buildFullNoteMarkdown({
+      conversation: { sourceType: 'video', durationSeconds: null },
+      messages: [{ messageKey: 'video_transcript', contentMarkdown: 'body' }],
+    });
+    expect(unknownDuration).not.toContain('duration_seconds:');
+  });
+
   it('renders highlight-only article roots without placeholder comment text', async () => {
     const w = await loadWriter();
     const md = w.buildFullNoteMarkdown({

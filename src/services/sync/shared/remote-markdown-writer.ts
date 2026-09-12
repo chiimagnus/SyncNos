@@ -1,6 +1,7 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import { formatVideoContentMarkdown } from '@services/conversations/domain/markdown';
 
 const MESSAGES_HEADING = 'Conversations';
 const ARTICLE_HEADING = 'Article';
@@ -230,6 +231,21 @@ function buildFullNoteMarkdown({
     const sections: string[] = [];
     sections.push(`## ${ARTICLE_HEADING}`, '', articleMd || '', '', `## ${COMMENTS_HEADING}`, '', commentsMd || '');
     return buildFrontmatterBlock(frontmatter) + `${sections.join('\n').trim()}\n`;
+  }
+
+  if (sourceType === 'video') {
+    const platform = safeString(c.platform);
+    const author = safeString(c.author);
+    const thumbnailUrl = safeString(c.thumbnailUrl);
+    const durationSeconds = c.durationSeconds == null ? null : Number(c.durationSeconds);
+    if (platform) frontmatter.platform = platform;
+    if (author) frontmatter.author = author;
+    if (durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+      frontmatter.duration_seconds = durationSeconds;
+    }
+    if (thumbnailUrl) frontmatter.thumbnail_url = thumbnailUrl;
+    const videoBody = formatVideoContentMarkdown(c, messages || []);
+    return buildFrontmatterBlock(frontmatter) + (videoBody ? `${videoBody}\n` : '');
   }
 
   const messagesMd = buildMessagesMarkdown(messages || []);
