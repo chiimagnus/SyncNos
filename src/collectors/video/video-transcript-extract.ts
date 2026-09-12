@@ -119,9 +119,11 @@ function extractBilibiliCuesFromIntercept(currentUrl: string): TranscriptCue[] {
 }
 
 function extractBilibiliChaptersFromIntercept(currentUrl: string): VideoChapter[] | null {
-  const picked = listCurrentResponses(currentUrl, 'bilibili-chapters')[0];
-  if (!picked) return null;
-  return parseBilibiliViewPointsJson(String(picked.bodyText || ''));
+  for (const item of listCurrentResponses(currentUrl, 'bilibili-chapters')) {
+    const chapters = parseBilibiliViewPointsJson(String(item.bodyText || ''));
+    if (chapters !== null) return chapters;
+  }
+  return null;
 }
 
 export async function extractVideoTranscriptFromCurrentPage(): Promise<VideoTranscriptExtraction> {

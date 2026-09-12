@@ -129,9 +129,12 @@ describe('video transcript parsers', () => {
     ]);
   });
 
-  it('distinguishes an explicit empty chapter list from an unknown response', () => {
+  it('distinguishes an explicit empty chapter list from an unknown or non-success response', () => {
     expect(parseBilibiliViewPointsJson(JSON.stringify({ code: 0, data: { view_points: [] } }))).toEqual([]);
     expect(parseBilibiliViewPointsJson(JSON.stringify({ code: -1, data: { view_points: [] } }))).toBeNull();
+    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: null, data: { view_points: [] } }))).toBeNull();
+    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: '', data: { view_points: [] } }))).toBeNull();
+    expect(parseBilibiliViewPointsJson(JSON.stringify({ data: { view_points: [] } }))).toBeNull();
     expect(parseBilibiliViewPointsJson(JSON.stringify({ code: 0, data: {} }))).toBeNull();
     expect(parseBilibiliViewPointsJson('{bad')).toBeNull();
   });

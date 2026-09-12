@@ -180,7 +180,7 @@ export function parseBilibiliViewPointsJson(text: string): VideoChapter[] | null
   if (!src) return null;
   try {
     const json: any = JSON.parse(src);
-    if (Number(json?.code) !== 0 || !Array.isArray(json?.data?.view_points)) return null;
+    if (typeof json?.code !== 'number' || json.code !== 0 || !Array.isArray(json?.data?.view_points)) return null;
 
     const chapters: VideoChapter[] = [];
     for (const item of json.data.view_points) {

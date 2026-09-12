@@ -135,7 +135,37 @@ describe('video transcript extraction', () => {
     expect(extracted.chapters).toBeNull();
   });
 
-  it('treats a current-page empty view_points array as an explicit chapter clear', async () => {
+  it('falls back to an earlier current-page WBI response when the latest response cannot determine chapters', async () => {
+    const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
+    installDom(page);
+    installMetaResponder({ state: { platform: 'bilibili', identityUrl: page }, dom: null });
+    setResponses([
+      {
+        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
+        pageUrl: page,
+        bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'subtitle' }] }),
+        at: 1,
+      },
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=valid',
+        pageUrl: page,
+        bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'Valid', from: 0, to: 20 }] } }),
+        at: 2,
+      },
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=latest-incomplete',
+        pageUrl: page,
+        bodyText: JSON.stringify({ code: 0, data: {} }),
+        at: 3,
+      },
+    ]);
+
+    expect((await extractVideoTranscriptFromCurrentPage()).chapters).toEqual([
+      { title: 'Valid', startSeconds: 0, endSeconds: 20 },
+    ]);
+  });
+
+  it('treats the latest current-page explicit empty view_points array as a chapter clear', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
     installMetaResponder({ state: { platform: 'bilibili', identityUrl: page }, dom: null });
