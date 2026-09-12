@@ -60,7 +60,7 @@ SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派
 
 ### 视频采集
 
-Video 采集支持 YouTube `watch` / `youtu.be` 页面与 Bilibili BV 视频页。Popup、页面内保存按钮和右键 SyncNos 的单一动态保存项都走同一套 Video 路由。SyncNos 会保存标题、作者、完整简介、时长、缩略图等可用来源上下文；页面已加载字幕时同时保存字幕/转录文本与精确时间范围，Bilibili 当前播放器已经自然加载章节/看点时也会一并保存。没有字幕时仍会创建或更新 Video，不会降级成网页文章；字幕稍后加载后再次保存即可补充或更新 transcript。SyncNos 不下载音视频流；Bilibili `av`、YouTube Shorts、任意 `/video/*`、播放统计/tags 与章节图片不属于当前支持契约。
+Video 采集支持 YouTube `watch` / `youtu.be` 页面、Bilibili BV 视频页，以及带合法 `bvid` 的 Bilibili 稍后再看播放页。Popup、页面内保存按钮和右键 SyncNos 的单一动态保存项都走同一套 Video 路由。SyncNos 会保存标题、作者、完整简介、时长、缩略图等可用来源上下文；页面已加载字幕时同时保存字幕/转录文本与精确时间范围，Bilibili 当前播放器已经自然加载章节/看点时也会一并保存。Bilibili 稍后再看 URL 会按 `bvid` 归一为同一个 `https://www.bilibili.com/video/<BV>/` identity（`oid` 不参与 SyncNos identity）。没有字幕时仍会创建或更新 Video，不会降级成网页文章；字幕稍后加载后再次保存即可补充或更新 transcript。SyncNos 不下载音视频流；Bilibili `av`、YouTube Shorts、任意 `/video/*`、播放统计/tags 与章节图片不属于当前支持契约。
 
 ## 输出目标
 

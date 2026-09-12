@@ -105,6 +105,12 @@ describe('content bootstrap display mode', () => {
     video.bootstrap.stop();
 
     displayMocks.read.mockResolvedValueOnce('supported');
+    const watchLater = harness('https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792');
+    await flush();
+    expect(watchLater.wrapper.start).toHaveBeenCalledTimes(1);
+    watchLater.bootstrap.stop();
+
+    displayMocks.read.mockResolvedValueOnce('supported');
     const unsupported = harness('example.com');
     await flush();
     expect(unsupported.wrapper.start).not.toHaveBeenCalled();

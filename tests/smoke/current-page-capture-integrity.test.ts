@@ -73,7 +73,11 @@ afterEach(() => {
 
 describe('current page capture integrity routing', () => {
   it('routes supported Bilibili and YouTube URLs through Video before the web fallback', async () => {
-    for (const url of ['https://www.bilibili.com/video/BV1FwY4zkEef/', 'https://www.youtube.com/watch?v=abc123']) {
+    for (const url of [
+      'https://www.bilibili.com/video/BV1FwY4zkEef/',
+      'https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792',
+      'https://www.youtube.com/watch?v=abc123',
+    ]) {
       const harness = createHarness({ collectorId: 'web', url });
       expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
         available: true,

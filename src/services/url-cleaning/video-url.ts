@@ -41,8 +41,14 @@ function readYoutubeVideoId(url: URL): string {
 
 function readBilibiliBvid(url: URL): string {
   if (!detectBilibiliHost(url.hostname)) return '';
-  const match = String(url.pathname || '').match(/^\/video\/(BV[0-9A-Za-z]+)\/?$/);
-  return match?.[1] || '';
+
+  const pathname = String(url.pathname || '');
+  const videoMatch = pathname.match(/^\/video\/(BV[0-9A-Za-z]+)\/?$/);
+  if (videoMatch?.[1]) return videoMatch[1];
+
+  if (!/^\/list\/watchlater\/?$/.test(pathname)) return '';
+  const queryBvid = String(url.searchParams.get('bvid') || '').trim();
+  return /^BV[0-9A-Za-z]+$/.test(queryBvid) ? queryBvid : '';
 }
 
 export function detectVideoPlatformHost(raw: unknown): VideoPlatform | null {

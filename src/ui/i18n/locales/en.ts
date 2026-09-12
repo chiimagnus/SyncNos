@@ -93,7 +93,7 @@ export const en = {
   videosSectionSupportedYoutubeSuffix: ' pages; supports both official and auto-generated captions.',
   videosSectionSupportedBilibiliPrefix: 'Bilibili: ',
   videosSectionSupportedBilibiliSuffix:
-    ' pages; supports uploader-provided and AI subtitles, plus player chapters/highlights when available.',
+    '; Watch Later pages are normalized by bvid to the same BV video identity; supports uploader-provided and AI subtitles, plus player chapters/highlights when available.',
   videosSectionHowToHeading: 'How to fetch',
   videosSectionHowToStep1: 'Open a supported video page.',
   videosSectionHowToStep2:

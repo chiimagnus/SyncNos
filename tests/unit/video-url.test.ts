@@ -17,6 +17,14 @@ describe('video URL classification', () => {
     expect(canonicalizeVideoUrl(`${base}?p=1&utm_source=x`)).toBe(base);
     expect(canonicalizeVideoUrl(`${base}?p=0`)).toBe(base);
     expect(canonicalizeVideoUrl(`${base}?p=not-a-number`)).toBe(base);
+
+    const watchLater =
+      'https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792&utm_source=x#part';
+    expect(detectSupportedVideoPagePlatform(watchLater)).toBe('bilibili');
+    expect(canonicalizeVideoUrl(watchLater)).toBe(base);
+    expect(
+      canonicalizeVideoUrl('https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792&p=2#part'),
+    ).toBe(`${base}?p=2`);
   });
 
   it('distinguishes a video-capable host from a supported Bilibili page', () => {
@@ -26,6 +34,10 @@ describe('video URL classification', () => {
     expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/video/av123')).toBeNull();
     expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/video/BV-foo')).toBeNull();
     expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/video/not-a-video-id')).toBeNull();
+    expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/list/watchlater?oid=115049943269792')).toBeNull();
+    expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/list/watchlater?bvid=BV-foo')).toBeNull();
+    expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/list/123?bvid=BV1FwY4zkEef')).toBeNull();
+    expect(detectSupportedVideoPagePlatform('https://www.bilibili.com/opus/123?bvid=BV1FwY4zkEef')).toBeNull();
     expect(detectVideoPlatformHost('https://m.bilibili.com/video/BV1FwY4zkEef/')).toBeNull();
   });
 

@@ -93,7 +93,8 @@ export const zh: { [K in TranslationKey]: string } = {
   videosSectionSupportedYoutubePrefix: 'YouTube：仅支持 ',
   videosSectionSupportedYoutubeSuffix: ' 视频页；支持官方字幕与自动生成字幕。',
   videosSectionSupportedBilibiliPrefix: 'Bilibili：仅支持 ',
-  videosSectionSupportedBilibiliSuffix: ' 视频页；支持 UP 主字幕与 AI 字幕，播放器已加载章节/看点时会一并保存。',
+  videosSectionSupportedBilibiliSuffix:
+    '；稍后再看页会按 bvid 归一到同一 BV 视频；支持 UP 主字幕与 AI 字幕，播放器已加载章节/看点时会一并保存。',
   videosSectionHowToHeading: '如何抓取',
   videosSectionHowToStep1: '打开受支持的视频页面。',
   videosSectionHowToStep2:

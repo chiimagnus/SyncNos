@@ -47,7 +47,12 @@ describe('settings section definitions', () => {
     });
 
     const monoTokens = Array.from(document.querySelectorAll('.tw-font-mono')).map((node) => node.textContent?.trim());
-    expect(monoTokens).toEqual(['youtube.com/watch', 'youtu.be', 'bilibili.com/video/BV…']);
+    expect(monoTokens).toEqual([
+      'youtube.com/watch',
+      'youtu.be',
+      'bilibili.com/video/BV…',
+      'bilibili.com/list/watchlater?bvid=BV…',
+    ]);
     expect(monoTokens).not.toContain('bilibili.com/video');
     const text = document.body.textContent || '';
     expect(text).toContain('chapters/highlights');

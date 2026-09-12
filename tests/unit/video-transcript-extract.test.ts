@@ -108,6 +108,40 @@ describe('video transcript extraction', () => {
     });
   });
 
+  it('canonicalizes a Bilibili watch-later container to the same BV identity for metadata, subtitles, and chapters', async () => {
+    const watchLater = 'https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792';
+    const canonical = 'https://www.bilibili.com/video/BV1FwY4zkEef/';
+    installDom(watchLater);
+    installMetaResponder({
+      state: {
+        platform: 'bilibili',
+        identityUrl: canonical,
+        title: 'Watch later title',
+        description: 'Watch later description',
+      },
+      dom: null,
+    });
+    setResponses([
+      {
+        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/watchlater.json',
+        pageUrl: watchLater,
+        bodyText: JSON.stringify({ body: [{ from: 1.25, to: 2.5, content: 'subtitle' }] }),
+        at: 1,
+      },
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=watchlater',
+        pageUrl: watchLater,
+        bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'Chapter', from: 0, to: 30 }] } }),
+        at: 2,
+      },
+    ]);
+
+    const extracted = await extractVideoTranscriptFromCurrentPage();
+    expect(extracted.meta.url).toBe(canonical);
+    expect(extracted.cues).toEqual([{ start: 1.25, end: 2.5, text: 'subtitle' }]);
+    expect(extracted.chapters).toEqual([{ title: 'Chapter', startSeconds: 0, endSeconds: 30 }]);
+  });
+
   it('returns empty subtitles and unknown chapters when only stale or identity-less Bilibili responses exist', async () => {
     const pageA = 'https://www.bilibili.com/video/BV1AAAAAAAAA/';
     const pageB = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';

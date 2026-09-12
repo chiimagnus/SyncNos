@@ -14,6 +14,7 @@
 | article 只有文本没有图片 | 图片设置、anti-hotlink rule、referer 与下载 warning；文本成功仍是成功。 |
 | 视频提示没有字幕 | 这次没有可信字幕时仍会保存可用的视频信息，不会降级成 Article；如需补充字幕，等字幕加载后再次保存即可更新 transcript。 |
 | Bilibili 视频已保存但没有章节/看点 | 章节取自当前页播放器自然加载的章节 response；当前视频没有章节或该 response 尚未被页面加载时，Video 仍会保存其它可用信息。 |
+| Bilibili 稍后再看页被当成网页文章或重复 Video | 仅 `/list/watchlater` 且带合法 `bvid` 的播放页属于 Video；SyncNos 会把它归一到 `/video/<BV>/`，忽略 `oid` 等列表参数。其它 `/list/*` 不会仅凭 `bvid` query 被提升为 Video。旧版本已经误存成 Article 的历史条目不会被自动删除，可按需手动清理。 |
 | `Could not establish connection` / `Receiving end does not exist` | 先按发送方向和生命周期分类：content → background 冷启动、background → content 尚未注入、port 已建立后关闭、旧 context 失效是不同问题。不要用通用 retry 掩盖 background cold-start，也不要把 `message port closed` 或 `Extension context invalidated` 当成 missing receiver。 |
 
 ### 连接错误的五类生命周期

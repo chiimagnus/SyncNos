@@ -710,6 +710,7 @@ describe('article-fetch-service', () => {
 
   it.each([
     'https://www.bilibili.com/video/BV1FwY4zkEef/',
+    'https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792',
     'https://www.youtube.com/watch?v=abc123',
     'https://youtu.be/abc123',
   ])('fails closed before any article side effect for supported video url %s', async (url) => {
