@@ -5,7 +5,6 @@ import { startContentBootstrap } from '@services/bootstrap/content.ts';
 import { registerInpageCommentsPanelContentHandlers } from '@services/bootstrap/inpage-comments-panel-content-handlers.ts';
 import { registerWebArticleExtractContentHandlers } from '@services/bootstrap/web-article-extract-content-handlers';
 import { createVideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
-import { registerVideoTranscriptCaptureContentHandlers } from '@services/bootstrap/video-transcript-capture-content-handlers';
 import { createCollectorEnv } from '@collectors/collector-env.ts';
 import { registerAllCollectors } from '@collectors/register-all.ts';
 import { createCollectorsRegistry } from '@collectors/registry.ts';
@@ -30,9 +29,11 @@ export default defineContentScript({
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
     const collectorsRegistry = createCollectorsRegistry();
     registerAllCollectors(collectorsRegistry, env);
+    const videoTranscriptCapture = createVideoTranscriptCaptureService({ runtime });
     const currentPageCapture = createCurrentPageCaptureService({
       runtime,
       collectorsRegistry,
+      videoCapture: videoTranscriptCapture,
     });
     const incrementalEngine = createAutoSaveIncrementalEngine();
     let captureCurrentPage = currentPageCapture.captureCurrentPage;
@@ -57,10 +58,6 @@ export default defineContentScript({
       }),
     });
     registerWebArticleExtractContentHandlers();
-    registerVideoTranscriptCaptureContentHandlers(createVideoTranscriptCaptureService({ runtime }), {
-      inpageTip: inpageTipApi,
-      localeReady,
-    });
 
     await localeReady.catch(() => undefined);
     const itemMentionController = createItemMentionController({ runtime, ui: inpageItemMentionApi });

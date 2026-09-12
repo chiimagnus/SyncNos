@@ -364,6 +364,7 @@ export const zh: { [K in TranslationKey]: string } = {
   unavailable: '不支持',
   fetchArticle: '抓取文章',
   fetchAiChat: '抓取 AI 对话',
+  fetchVideoTranscript: '抓取视频字幕',
   savingDots: '保存中...',
   loadingFullHistory: '正在加载完整历史...',
   captureFailedFallback: '获取失败',

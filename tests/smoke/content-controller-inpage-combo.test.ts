@@ -5,10 +5,8 @@ import { createCurrentPageCaptureService } from '@services/bootstrap/current-pag
 
 type TickFn = (() => void | Promise<void>) | null;
 
-function setupDom() {
-  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
-    url: 'https://app.notion.com/chat?t=0123456789abcdef0123456789abcdef&wfv=chat',
-  });
+function setupDom(url = 'https://app.notion.com/chat?t=0123456789abcdef0123456789abcdef&wfv=chat') {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { url });
   const g = globalThis as any;
   g.window = dom.window;
   g.document = dom.window.document;
@@ -60,6 +58,15 @@ function createHarness(options?: {
   const currentPageCapture = createCurrentPageCaptureService({
     runtime,
     collectorsRegistry,
+    videoCapture: {
+      captureVideoTranscript: vi.fn(async () => ({
+        conversationId: 99,
+        title: 'Video',
+        url: String(globalThis.location?.href || ''),
+        isNew: true,
+        subtitleStatus: 'ok' as const,
+      })),
+    },
   });
 
   const controller = createContentController({
@@ -126,9 +133,9 @@ afterEach(() => {
 });
 
 describe('content-controller inpage combo', () => {
-  it('wires double-click callback to open comments sidebar', async () => {
-    setupDom();
-    const harness = createHarness();
+  it('wires double-click callback only for article state', async () => {
+    setupDom('https://example.com/article');
+    const harness = createHarness({ collectorId: 'web' });
 
     await harness.runTick();
     const cfg = harness.getButtonConfig();
@@ -143,6 +150,26 @@ describe('content-controller inpage combo', () => {
     ).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+  });
+
+  it('does not retain article comments double-click when state changes to chat or video', async () => {
+    setupDom();
+    const chatHarness = createHarness();
+    await chatHarness.runTick();
+    expect(chatHarness.getButtonConfig()?.onDoubleClick).toBeUndefined();
+
+    const g = globalThis as any;
+    const videoDom = new JSDOM('<!doctype html><html><body></body></html>', {
+      url: 'https://www.bilibili.com/video/BV1FwY4zkEef/',
+    });
+    g.window = videoDom.window;
+    g.document = videoDom.window.document;
+    g.location = videoDom.window.location;
+    const videoHarness = createHarness({ collectorId: 'web' });
+    await videoHarness.runTick();
+    expect(videoHarness.getButtonConfig()?.collectorId).toBe('video');
+    expect(videoHarness.getButtonConfig()?.onDoubleClick).toBeUndefined();
+    videoDom.window.close();
   });
 
   it('emits easter-egg line for combo callback', async () => {

@@ -4,7 +4,7 @@ import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
-import type { CurrentPageCaptureResult } from '@services/bootstrap/current-page-capture';
+import type { CurrentPageCaptureResult, CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -12,13 +12,7 @@ type ApiResponse<T> = {
   error: { message: string; extra: unknown } | null;
 };
 
-type CaptureState = {
-  available: boolean;
-  kind: 'chat' | 'article' | 'unsupported';
-  label: string;
-  collectorId: string | null;
-  reason?: string;
-};
+type CaptureState = CurrentPageCaptureState;
 
 type CaptureStatus = {
   kind: 'default' | 'error';
@@ -80,12 +74,18 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
         {},
       );
       const data = unwrap(response);
+      if (data.kind === 'video' && data.subtitleStatus === 'empty') {
+        await refreshState();
+        setStatus({ kind: 'default', message: t('videoTranscriptTipNoSubtitles') });
+        return data;
+      }
+
       await onCaptured?.();
       await refreshState();
       setStatus({
         kind: 'default',
         message:
-          data.captureCompleteness === 'partial'
+          data.kind === 'chat' && data.captureCompleteness === 'partial'
             ? t('partialCaptureSaved')
             : buildCaptureSuccessTipMessage({ isNew: data.isNew, title: data.title }),
       });

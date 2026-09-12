@@ -368,6 +368,7 @@ export const en = {
   unavailable: 'Unavailable',
   fetchArticle: 'Fetch Article',
   fetchAiChat: 'Fetch AI Chat',
+  fetchVideoTranscript: 'Fetch Video Transcript',
   savingDots: 'Saving...',
   loadingFullHistory: 'Loading full history...',
   captureFailedFallback: 'Capture failed',

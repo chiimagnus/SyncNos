@@ -16,7 +16,6 @@ vi.mock('@collectors/web/article-extract/engine', () => ({
 
 import { CONTENT_MESSAGE_TYPES } from '../../src/platform/messaging/message-contracts';
 import { registerInpageCommentsPanelContentHandlers } from '../../src/services/bootstrap/inpage-comments-panel-content-handlers';
-import { registerVideoTranscriptCaptureContentHandlers } from '../../src/services/bootstrap/video-transcript-capture-content-handlers';
 import { registerWebArticleExtractContentHandlers } from '../../src/services/bootstrap/web-article-extract-content-handlers';
 
 function deferred<T = void>() {
@@ -73,67 +72,6 @@ afterEach(() => {
 });
 
 describe('content message locale readiness', () => {
-  it('keeps video listener registered while localized tip work waits for locale', async () => {
-    const locale = deferred<void>();
-    const runtime = installRuntime();
-    const captureVideoTranscript = vi.fn(async () => ({
-      conversationId: 11,
-      title: 'Talk',
-      isNew: true,
-      subtitleStatus: 'ok',
-    }));
-    const showSaveTip = vi.fn();
-
-    registerVideoTranscriptCaptureContentHandlers({ captureVideoTranscript } as any, {
-      inpageTip: { showSaveTip },
-      localeReady: locale.promise,
-    });
-
-    expect(runtime.addListener).toHaveBeenCalledTimes(1);
-    const pending = runtime.emit({
-      type: CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT,
-      payload: { source: 'contextmenu' },
-    });
-    expect(pending.returned).toBe(true);
-    for (let i = 0; i < 8; i += 1) await Promise.resolve();
-    expect(captureVideoTranscript).not.toHaveBeenCalled();
-    expect(showSaveTip).not.toHaveBeenCalled();
-
-    locale.resolve();
-    await waitFor(() => pending.getResponse()?.ok === true);
-    expect(captureVideoTranscript).toHaveBeenCalledTimes(1);
-    expect(showSaveTip).toHaveBeenCalledWith('Fetching...', { kind: 'default' });
-    expect(pending.getResponse()?.ok).toBe(true);
-  });
-
-  it('continues video capture after locale readiness rejects', async () => {
-    const locale = deferred<void>();
-    const runtime = installRuntime();
-    const captureVideoTranscript = vi.fn(async () => ({
-      conversationId: null,
-      title: 'Talk',
-      subtitleStatus: 'empty',
-    }));
-    const showSaveTip = vi.fn();
-
-    registerVideoTranscriptCaptureContentHandlers({ captureVideoTranscript } as any, {
-      inpageTip: { showSaveTip },
-      localeReady: locale.promise,
-    });
-
-    const pending = runtime.emit({
-      type: CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT,
-      payload: { source: 'contextmenu' },
-    });
-    locale.reject(new Error('locale failed'));
-    await waitFor(() => pending.getResponse()?.ok === true);
-
-    expect(captureVideoTranscript).toHaveBeenCalledTimes(1);
-    expect(showSaveTip).toHaveBeenCalledWith('Fetching...', { kind: 'default' });
-    expect(showSaveTip).toHaveBeenCalledWith('No subtitles detected (not saved).', { kind: 'default' });
-    expect(pending.getResponse()?.ok).toBe(true);
-  });
-
   it('keeps comments listener registered while panel open waits for locale', async () => {
     const locale = deferred<void>();
     const runtime = installRuntime();

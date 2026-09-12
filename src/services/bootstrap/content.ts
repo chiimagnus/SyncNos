@@ -5,6 +5,7 @@ import {
   type InpageDisplayMode,
 } from '@services/shared/inpage-display-mode';
 import { storageOnChanged } from '@services/shared/storage';
+import { detectSupportedVideoPagePlatform, detectVideoPlatformHost } from '@services/url-cleaning/video-url';
 
 type RuntimeClient = {
   onInvalidated?: (listener: (error: Error) => void) => () => void;
@@ -53,12 +54,49 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
   const runtime = input.runtime || null;
   const inpageButton = input.inpageButton;
   const wrapper = input.createController();
-  const supportedHost = isSupportedHost(globalThis.location?.hostname || '');
   let active: { stop?: () => void } | null = null;
   let disposed = false;
   let modeGeneration = 0;
+  let currentMode: InpageDisplayMode | null = null;
+  let hrefWatcher: ReturnType<typeof setInterval> | null = null;
+  let lastHref = '';
   let removeRuntimeInvalidation = () => {};
   let removeDisplayListener = () => {};
+
+  function currentHref() {
+    return String(globalThis.location?.href || '');
+  }
+
+  function isCurrentPageSupported() {
+    return isSupportedHost(globalThis.location?.hostname || '') || !!detectSupportedVideoPagePlatform(currentHref());
+  }
+
+  function stopHrefWatcher() {
+    if (hrefWatcher == null) return;
+    clearInterval(hrefWatcher);
+    hrefWatcher = null;
+    lastHref = '';
+  }
+
+  function syncHrefWatcher() {
+    const shouldWatch = currentMode === 'supported' && !!detectVideoPlatformHost(currentHref());
+    if (!shouldWatch) {
+      stopHrefWatcher();
+      return;
+    }
+    if (hrefWatcher != null) return;
+    lastHref = currentHref();
+    hrefWatcher = setInterval(() => {
+      if (disposed || currentMode !== 'supported') {
+        stopHrefWatcher();
+        return;
+      }
+      const href = currentHref();
+      if (href === lastHref) return;
+      lastHref = href;
+      applyDisplayMode('supported');
+    }, 500);
+  }
 
   function startController() {
     if (disposed) return;
@@ -81,21 +119,25 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
 
   function applyDisplayMode(mode: InpageDisplayMode) {
     if (disposed) return;
+    currentMode = mode;
     if (mode === 'off') {
       if (active) stopController();
+      syncHrefWatcher();
       return;
     }
 
     if (mode === 'supported') {
-      if (supportedHost) {
+      if (isCurrentPageSupported()) {
         if (!active) startController();
       } else if (active) {
         stopController();
       }
+      syncHrefWatcher();
       return;
     }
 
     if (!active) startController();
+    syncHrefWatcher();
   }
 
   function applyEffectiveRead(generation: number) {
@@ -115,6 +157,7 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
     modeGeneration += 1;
     removeRuntimeInvalidation();
     removeDisplayListener();
+    stopHrefWatcher();
     stopController();
   }
 

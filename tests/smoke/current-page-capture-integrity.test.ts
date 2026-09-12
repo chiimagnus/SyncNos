@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { t } from '@i18n';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
@@ -20,7 +20,14 @@ function chatSnapshot(options?: { completeness?: 'complete' | 'partial'; verifie
   };
 }
 
-function createHarness(input: { collectorId: string; snapshot?: any; prepare?: () => any; article?: any }) {
+function createHarness(input: {
+  collectorId: string;
+  snapshot?: any;
+  prepare?: () => any;
+  article?: any;
+  video?: any;
+  url?: string;
+}) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
   const runtime = {
@@ -36,17 +43,86 @@ function createHarness(input: { collectorId: string; snapshot?: any; prepare?: (
   };
   const collector: any = { capture };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
+  if (input.url) vi.stubGlobal('location', { href: input.url });
+  const videoCapture = {
+    captureVideoTranscript: vi.fn(
+      async () =>
+        input.video || {
+          conversationId: 77,
+          title: 'Video',
+          url: input.url,
+          isNew: true,
+          subtitleStatus: 'ok' as const,
+        },
+    ),
+  };
   const service = createCurrentPageCaptureService({
     runtime,
     collectorsRegistry: {
       pickActive: () => ({ id: input.collectorId, collector }),
       list: () => [],
     },
+    videoCapture,
   });
-  return { service, calls, capture, runtime };
+  return { service, calls, capture, runtime, videoCapture };
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('current page capture integrity routing', () => {
+  it('routes supported Bilibili and YouTube URLs through Video before the web fallback', async () => {
+    for (const url of ['https://www.bilibili.com/video/BV1FwY4zkEef/', 'https://www.youtube.com/watch?v=abc123']) {
+      const harness = createHarness({ collectorId: 'web', url });
+      expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
+        available: true,
+        kind: 'video',
+        collectorId: 'video',
+      });
+      const result = await harness.service.captureCurrentPage();
+      expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'ok', conversationId: 77, isNew: true });
+      expect(harness.videoCapture.captureVideoTranscript).toHaveBeenCalledTimes(1);
+      expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps a supported Video empty result on the Video route without article fallback or writes', async () => {
+    const url = 'https://www.bilibili.com/video/BV1FwY4zkEef/';
+    const harness = createHarness({
+      collectorId: 'web',
+      url,
+      video: { conversationId: null, title: 'Video', url, subtitleStatus: 'empty' },
+    });
+    const progress: any[] = [];
+    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+    expect(result).toMatchObject({
+      kind: 'video',
+      subtitleStatus: 'empty',
+      conversationId: null,
+      isNew: false,
+    });
+    expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipNoSubtitles'));
+    expect(harness.calls).toEqual([]);
+  });
+
+  it('propagates Video capture errors without falling back to Article', async () => {
+    const url = 'https://www.youtube.com/watch?v=broken';
+    const harness = createHarness({ collectorId: 'web', url });
+    harness.videoCapture.captureVideoTranscript.mockRejectedValueOnce(new Error('video failed'));
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('video failed');
+    expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
+  });
+
+  it('does not classify Bilibili opus or av as Video', () => {
+    for (const url of ['https://www.bilibili.com/opus/123', 'https://www.bilibili.com/video/av123']) {
+      const harness = createHarness({ collectorId: 'web', url });
+      expect(harness.service.getCurrentPageCaptureState()).toMatchObject({ kind: 'article', collectorId: 'web' });
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('persists explicit complete capture as snapshot in write order', async () => {
     const harness = createHarness({ collectorId: 'chatgpt', snapshot: chatSnapshot() });
 

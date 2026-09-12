@@ -1,10 +1,6 @@
 import type { CurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
-import {
-  resolveActiveCollector,
-  resolveActiveOrInpageCollector,
-  type CollectorRegistryLike,
-} from '@collectors/registry';
+import { resolveActiveCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
@@ -601,12 +597,13 @@ export function createContentController(deps: Deps) {
       const positionState = await ensureInpageButtonPositionLoadedOnce();
       if (stopped) return null;
       const collector = resolveActiveCollector(collectorsRegistry);
-      const inpageCollector = collector || resolveActiveOrInpageCollector(collectorsRegistry);
-      inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
+      const captureState = currentPageCapture.getCurrentPageCaptureState();
+      const buttonCollectorId = captureState.available ? captureState.collectorId || '' : '';
+      inpageButton?.cleanupButtons?.(buttonCollectorId);
       inpageButton?.ensureInpageButton?.({
-        collectorId: inpageCollector?.id,
+        collectorId: buttonCollectorId || undefined,
         onClick: clickSave,
-        onDoubleClick: openInpageCommentsSidebar,
+        onDoubleClick: captureState.kind === 'article' ? openInpageCommentsSidebar : undefined,
         onCombo: showComboLine,
         positionState,
         onPositionChange: (state: any) => {

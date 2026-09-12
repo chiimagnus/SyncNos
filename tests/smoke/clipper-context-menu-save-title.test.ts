@@ -108,6 +108,43 @@ describe('clipper context menu save title', () => {
     });
   });
 
+  it('switches to video title and keeps one generic save item', async () => {
+    const menusApi = createMenusApi();
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      contextMenus: menusApi,
+      storage: {
+        local: {
+          get: vi.fn((_keys: any, cb: any) => cb({})),
+          set: vi.fn((_v: any, cb: any) => cb?.()),
+        },
+        onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+    };
+
+    vi.mocked(tabsSendMessage).mockResolvedValue({
+      ok: true,
+      data: { available: true, kind: 'video', label: 'Fetch Video Transcript', collectorId: 'video' },
+      error: null,
+    } as any);
+
+    await registerMenu({
+      ready: Promise.resolve(),
+      readDisplayMode: async () => 'all',
+      setDisplayMode: async (mode) => mode,
+    });
+    await flushMicrotasks();
+    const createdIds = menusApi.create.mock.calls.map(([value]) => value?.id);
+    expect(createdIds).toContain('syncnos_clipper_save_current_page');
+    expect(createdIds).not.toContain('syncnos_clipper_save_video_transcript');
+
+    menusApi.__emitShown({ id: 7, url: 'https://www.bilibili.com/video/BV1FwY4zkEef/' });
+    await flushMicrotasks();
+    expect(menusApi.update).toHaveBeenCalledWith('syncnos_clipper_save_current_page', {
+      title: 'Save video transcript',
+    });
+  });
+
   it('registers listeners synchronously while localized menu work waits for locale readiness', async () => {
     const menusApi = createMenusApi();
     const locale = deferred<void>();

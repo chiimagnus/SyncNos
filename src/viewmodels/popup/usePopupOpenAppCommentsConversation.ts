@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
+import type { CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -10,13 +11,7 @@ type ApiResponse<T> = {
   error: { message: string; extra: unknown } | null;
 };
 
-type CaptureState = {
-  available: boolean;
-  kind: 'chat' | 'article' | 'unsupported';
-  label: string;
-  collectorId: string | null;
-  reason?: string;
-};
+type CaptureState = CurrentPageCaptureState;
 
 function unwrap<T>(response: ApiResponse<T>): T {
   if (!response || typeof response.ok !== 'boolean') {

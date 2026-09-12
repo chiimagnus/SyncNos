@@ -28,7 +28,7 @@ async function flush() {
 
 type StorageListener = (changes: any, areaName: string) => void;
 
-function harness(hostname = 'chatgpt.com') {
+function harness(locationInput = 'chatgpt.com') {
   let storageListener: StorageListener | null = null;
   const removeDisplay = vi.fn();
   storageMocks.onChanged.mockImplementation((listener: StorageListener) => {
@@ -53,7 +53,10 @@ function harness(hostname = 'chatgpt.com') {
     }),
   };
   const initRuntime = vi.fn();
-  Object.defineProperty(globalThis, 'location', { configurable: true, value: { hostname } });
+  const initialUrl = locationInput.includes('://') ? locationInput : `https://${locationInput}/`;
+  const parsed = new URL(initialUrl);
+  const locationState = { href: parsed.toString(), hostname: parsed.hostname };
+  Object.defineProperty(globalThis, 'location', { configurable: true, value: locationState });
   const bootstrap = startContentBootstrap({
     runtime,
     inpageButton: { initRuntime },
@@ -68,6 +71,11 @@ function harness(hostname = 'chatgpt.com') {
     removeRuntime,
     emitStorage: (changes: any, areaName = 'local') => storageListener?.(changes, areaName),
     invalidate: () => invalidationListener?.(new Error('Extension context invalidated')),
+    setHref: (href: string) => {
+      const next = new URL(href);
+      locationState.href = next.toString();
+      locationState.hostname = next.hostname;
+    },
   };
 }
 
@@ -91,10 +99,50 @@ describe('content bootstrap display mode', () => {
     supported.bootstrap.stop();
 
     displayMocks.read.mockResolvedValueOnce('supported');
+    const video = harness('https://www.bilibili.com/video/BV1FwY4zkEef/');
+    await flush();
+    expect(video.wrapper.start).toHaveBeenCalledTimes(1);
+    video.bootstrap.stop();
+
+    displayMocks.read.mockResolvedValueOnce('supported');
     const unsupported = harness('example.com');
     await flush();
     expect(unsupported.wrapper.start).not.toHaveBeenCalled();
     unsupported.bootstrap.stop();
+  });
+
+  it('tracks supported Video SPA path changes only while supported mode is active', async () => {
+    vi.useFakeTimers();
+    try {
+      displayMocks.read.mockResolvedValueOnce('supported');
+      const h = harness('https://www.youtube.com/');
+      await flush();
+      expect(h.wrapper.start).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(1);
+
+      h.setHref('https://www.youtube.com/watch?v=abc');
+      await vi.advanceTimersByTimeAsync(500);
+      expect(h.wrapper.start).toHaveBeenCalledTimes(1);
+
+      h.setHref('https://www.youtube.com/');
+      await vi.advanceTimersByTimeAsync(500);
+      expect(h.residents[0]?.stop).toHaveBeenCalledTimes(1);
+
+      h.emitStorage({ inpage_display_mode: { oldValue: 'supported', newValue: 'all' } });
+      expect(h.wrapper.start).toHaveBeenCalledTimes(2);
+      expect(vi.getTimerCount()).toBe(0);
+
+      h.setHref('https://www.youtube.com/watch?v=ignored-while-all');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(h.wrapper.start).toHaveBeenCalledTimes(2);
+
+      h.emitStorage({ inpage_display_mode: { oldValue: 'all', newValue: 'supported' } });
+      expect(vi.getTimerCount()).toBe(1);
+      h.bootstrap.stop();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('live toggles stop and restart exactly one resident', async () => {

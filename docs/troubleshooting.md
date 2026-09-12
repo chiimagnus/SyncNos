@@ -18,7 +18,7 @@
 ### 连接错误的五类生命周期
 
 - **content → background / background cold-start**：In Page 按钮已经存在、worker 冷启动后第一次点击失败而第二次立即成功，优先检查 background `runtime.onMessage` 是否在任何 `await` 之后才注册。background receiver 应 listener-first，不能靠 retry、keep-alive 或扩大 timeout 修复。
-- **background → content / 初始化顺序**：content receiver 必须先注册，再等待 locale 等异步初始化；需要语言的 Current Page / comments / video 在 handler 内等待，article extract 不依赖 locale readiness。
+- **background → content / 初始化顺序**：content receiver 必须先注册，再等待 locale 等异步初始化；需要语言的 Current Page / comments 在 handler 内等待，Video capture 复用 Current Page handler，不再有独立 Video receiver；article extract 不依赖 locale readiness。
 - **background → content / 尚未注入**：页面刚导航、content script 根本还没注入时，仍可能没有 receiver。这是真实平台窗口，不等价于 background cold-start；现有 article navigation 的一次 missing-receiver retry 只属于该 caller。
 - **message port closed**：listener/port 已经建立后又因导航、reload 或 teardown 关闭。这不是“从未有 receiver”，不得借用 missing-receiver retry 隐藏。
 - **`Extension context invalidated`**：extension reload/update 后旧页面脚本属于旧 context 生命周期，继续走现有 invalidated-context 处理；不要归入 receiving-end retry。content → background 不增加 retry。
