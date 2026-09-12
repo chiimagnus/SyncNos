@@ -484,6 +484,8 @@ export const en = {
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
   detailHeaderCacheImagesLabel: 'Cache images',
   detailTextCountLabel: 'Words',
+  videoDescriptionLabel: 'Description',
+  videoChaptersLabel: 'Chapters',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',

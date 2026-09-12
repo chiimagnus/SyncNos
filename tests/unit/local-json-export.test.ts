@@ -182,7 +182,7 @@ describe('local JSON v2 export', () => {
     });
   });
 
-  it('exports video_transcript as video and never leaks unsupported capture diagnostics', async () => {
+  it('exports exact video_transcript content with additive description, cues, and chapters', async () => {
     const c = conversation(4, {
       source: 'video',
       sourceType: 'video',
@@ -191,14 +191,18 @@ describe('local JSON v2 export', () => {
       platform: 'youtube',
       durationSeconds: 123,
       thumbnailUrl: 'https://example.com/thumb.jpg',
-      transcriptSource: 'C',
-      hasTimestamps: true,
+      videoDescription: ' Full description ',
     });
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 4,
       messages: [
         message('legacy', { contentMarkdown: 'wrong' }),
-        message('video_transcript', { role: 'transcript', contentMarkdown: '00:01 hello' }),
+        message('video_transcript', {
+          role: 'transcript',
+          contentMarkdown: '[00:01.234 → 00:03.456] hello',
+          transcriptCues: [{ startSeconds: 1.234, endSeconds: 3.456, text: 'hello' }],
+          videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
+        }),
       ],
     });
 
@@ -211,7 +215,10 @@ describe('local JSON v2 export', () => {
       source: 'video',
       key: 'video:https://example.com/watch/4',
       author: 'Creator',
-      transcript: { format: 'markdown', value: '00:01 hello' },
+      description: 'Full description',
+      transcript: { format: 'markdown', value: '[00:01.234 → 00:03.456] hello' },
+      cues: [{ startSeconds: 1.234, endSeconds: 3.456, text: 'hello' }],
+      chapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
       attachments: [],
     });
     expect(entry.value.messages).toBeUndefined();
@@ -219,11 +226,9 @@ describe('local JSON v2 export', () => {
     expect(entry.value).not.toHaveProperty('platform');
     expect(entry.value).not.toHaveProperty('durationSeconds');
     expect(entry.value).not.toHaveProperty('thumbnailUrl');
-    expect(entry.value).not.toHaveProperty('transcriptSource');
-    expect(entry.value).not.toHaveProperty('hasTimestamps');
   });
 
-  it('falls back to the first historical video message only when video_transcript is absent', async () => {
+  it('does not guess a non-canonical historical Video message as the transcript', async () => {
     const c = conversation(40, {
       source: 'video',
       sourceType: 'video',
@@ -231,14 +236,23 @@ describe('local JSON v2 export', () => {
     });
     mocks.getConversationDetail.mockResolvedValue({
       conversationId: 40,
-      messages: [message('legacy-transcript', { contentMarkdown: 'legacy md' })],
+      messages: [
+        message('legacy-transcript', {
+          contentMarkdown: 'legacy md',
+          transcriptCues: [{ startSeconds: 1, endSeconds: null, text: 'legacy' }],
+          videoChapters: [{ title: 'Legacy', startSeconds: 0, endSeconds: 2 }],
+        }),
+      ],
     });
 
     const result = await buildConversationsJsonZipExport({ conversations: [c] });
     const [entry] = await readJsonEntries(result.zipBlob);
     expect(entry.value).toMatchObject({
       type: 'video',
-      transcript: { format: 'markdown', value: 'legacy md' },
+      description: null,
+      transcript: null,
+      cues: [],
+      chapters: [],
     });
   });
 

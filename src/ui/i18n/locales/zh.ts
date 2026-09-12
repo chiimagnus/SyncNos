@@ -478,6 +478,8 @@ export const zh: { [K in TranslationKey]: string } = {
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
   detailHeaderCacheImagesLabel: '缓存图片',
   detailTextCountLabel: '字数',
+  videoDescriptionLabel: '简介',
+  videoChaptersLabel: '章节',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',

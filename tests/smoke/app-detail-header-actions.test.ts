@@ -67,6 +67,8 @@ vi.mock('../../src/ui/i18n', () => ({
       saveButton: 'Save',
       cancelButton: 'Cancel',
       detailTextCountLabel: 'Words',
+      videoDescriptionLabel: 'Description',
+      videoChaptersLabel: 'Chapters',
     };
     return labels[key] || key;
   },
@@ -620,6 +622,77 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 
+  it('renders Video description and chapters while keeping the canonical source URL read-only', async () => {
+    const updateSelectedConversationUrl = vi.fn(async () => {});
+    currentState.activeId = 21;
+    currentState.selectedConversation = {
+      id: 21,
+      title: 'Video',
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video-21',
+      url: 'https://www.bilibili.com/video/BV1FwY4zkEef/',
+      videoDescription: 'Line one\nLine two',
+    } as any;
+    currentState.detail = {
+      conversationId: 21,
+      messages: [
+        {
+          id: 2101,
+          conversationId: 21,
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '[00:01.234] transcript',
+          videoChapters: [
+            { title: 'Intro', startSeconds: 0, endSeconds: 30 },
+            { title: 'Main', startSeconds: 30, endSeconds: null },
+          ],
+        },
+      ],
+    } as any;
+    currentState.updateSelectedConversationUrl = updateSelectedConversationUrl;
+
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+
+    const sourceUrl = document.querySelector('[data-video-source-url="true"]') as HTMLElement | null;
+    expect(sourceUrl?.textContent).toBe('https://www.bilibili.com/video/BV1FwY4zkEef/');
+    expect(document.querySelector('[aria-label="Edit URL"]')).toBeNull();
+    expect(document.querySelector('input[inputmode="url"]')).toBeNull();
+    expect(document.querySelector('[data-video-description="true"]')?.textContent).toContain('Line one');
+    expect(document.querySelector('[data-video-description="true"]')?.textContent).toContain('Line two');
+    expect(document.querySelector('[data-video-chapters="true"]')?.textContent).toContain('[00:00 → 00:30] Intro');
+    expect(document.querySelector('[data-video-chapters="true"]')?.textContent).toContain('[00:30] Main');
+    act(() => {
+      sourceUrl?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(document.querySelector('input[inputmode="url"]')).toBeNull();
+    expect(updateSelectedConversationUrl).not.toHaveBeenCalled();
+
+    currentState.selectedConversation = { ...currentState.selectedConversation, videoDescription: '' } as any;
+    currentState.detail = {
+      conversationId: 21,
+      messages: [
+        {
+          id: 2101,
+          conversationId: 21,
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '[00:01.234] transcript',
+          videoChapters: [],
+        },
+      ],
+    } as any;
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-video-description="true"]')).toBeNull();
+    expect(document.querySelector('[data-video-chapters="true"]')).toBeNull();
+  });
+
   it('saves and cancels URL edits with compact explicit controls', async () => {
     const updateSelectedConversationUrl = vi.fn(async () => {});
     currentState.selectedConversation = {
@@ -932,7 +1005,7 @@ describe('ConversationDetailPane header actions', () => {
           conversationId: 41,
           messageKey: 'video_transcript',
           role: 'transcript',
-          contentMarkdown: '00:01 你好 world',
+          contentMarkdown: '[00:01.234 → 00:03.456] 你好 world',
         },
       ],
     } as any;

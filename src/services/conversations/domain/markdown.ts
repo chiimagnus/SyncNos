@@ -1,4 +1,5 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import { formatVideoChaptersMarkdown } from '@services/conversations/domain/video-content';
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
@@ -17,6 +18,10 @@ type FormatConversationMarkdownOptions = {
    * Defaults to 2 to keep the section under the document title.
    */
   articleContentHeadingLevel?: MarkdownHeadingLevel;
+};
+
+type FormatVideoContentMarkdownOptions = {
+  includeTranscriptHeading?: boolean;
 };
 
 function clampHeadingLevel(level: unknown, fallback: MarkdownHeadingLevel): MarkdownHeadingLevel {
@@ -77,6 +82,52 @@ function formatArticleMarkdown(
   return lines.join('\n');
 }
 
+export function formatVideoContentMarkdown(
+  conversation: Conversation,
+  messages: ConversationMessage[],
+  options: FormatVideoContentMarkdownOptions = {},
+) {
+  const transcript = (messages || []).find((message) => message?.messageKey === 'video_transcript') || null;
+  const sections: string[] = [];
+  const description = isNonEmptyString(conversation?.videoDescription)
+    ? String(conversation.videoDescription).trim()
+    : '';
+  if (description) sections.push(`## Description\n\n${description}`);
+
+  const chapters = Array.isArray(transcript?.videoChapters) ? transcript.videoChapters : [];
+  if (chapters.length) {
+    const chapterMarkdown = formatVideoChaptersMarkdown(chapters);
+    if (chapterMarkdown) sections.push(chapterMarkdown);
+  }
+
+  const transcriptBody = String(transcript?.contentMarkdown || '');
+  if (options.includeTranscriptHeading === false) {
+    if (transcriptBody) sections.push(transcriptBody);
+  } else {
+    sections.push(`## Transcript${transcriptBody ? `\n\n${transcriptBody}` : ''}`);
+  }
+  return sections.join('\n\n').trim();
+}
+
+function formatVideoMarkdown(conversation: Conversation, messages: ConversationMessage[]) {
+  const c = conversation || ({} as any);
+  const lines: string[] = [`# ${c.title || 'Untitled'}`, ''];
+  if (isNonEmptyString(c.platform)) lines.push(`- Platform: ${String(c.platform)}`);
+  if (isNonEmptyString(c.author)) lines.push(`- Author: ${String(c.author)}`);
+  const durationSeconds = c.durationSeconds == null ? null : Number(c.durationSeconds);
+  if (durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+    lines.push(`- Duration: ${durationSeconds}s`);
+  }
+  if (isNonEmptyString(c.thumbnailUrl)) lines.push(`- Thumbnail: ${String(c.thumbnailUrl)}`);
+  if (isNonEmptyString(c.url)) lines.push(`- URL: ${String(c.url)}`);
+  const lastActivityAt = formatIso(c.lastActivityAt);
+  if (lastActivityAt) lines.push(`- Last Activity: ${lastActivityAt}`);
+  lines.push('');
+  lines.push(formatVideoContentMarkdown(c, messages));
+  lines.push('');
+  return lines.join('\n');
+}
+
 function formatChatMarkdown(
   conversation: Conversation,
   messages: ConversationMessage[],
@@ -114,5 +165,6 @@ export function formatConversationMarkdown(
 ) {
   const sourceType = conversation?.sourceType ? String(conversation.sourceType) : '';
   if (sourceType === 'article') return formatArticleMarkdown(conversation, messages, options);
+  if (sourceType === 'video') return formatVideoMarkdown(conversation, messages);
   return formatChatMarkdown(conversation, messages, options);
 }

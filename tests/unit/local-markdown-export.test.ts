@@ -198,6 +198,79 @@ describe('local markdown export', () => {
     ).toEqual(firstAttachmentNames);
   });
 
+  it('exports Video as one semantic document with description, chapters, and exact transcript body', async () => {
+    const c = {
+      ...conversation(9, 'Video Talk'),
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video:https://www.bilibili.com/video/BV1FwY4zkEef/',
+      url: 'https://www.bilibili.com/video/BV1FwY4zkEef/',
+      author: 'Creator',
+      platform: 'bilibili',
+      durationSeconds: 123.5,
+      thumbnailUrl: 'https://example.com/thumb.jpg',
+      videoDescription: 'First line\nSecond line',
+      lastActivityAt: Date.parse('2026-09-12T01:02:03.000Z'),
+    } as any;
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 9,
+      messages: [
+        { messageKey: 'legacy', role: 'assistant', contentMarkdown: 'wrong first' },
+        {
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '[00:01.234 → 00:03.456] hello',
+          videoChapters: [
+            { title: 'Intro', startSeconds: 0, endSeconds: 30 },
+            { title: 'Main', startSeconds: 30, endSeconds: null },
+          ],
+        },
+      ],
+    });
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+
+    expect(markdown).toContain('# Video Talk');
+    expect(markdown).toContain('- Platform: bilibili');
+    expect(markdown).toContain('- Author: Creator');
+    expect(markdown).toContain('- Duration: 123.5s');
+    expect(markdown).toContain('- Thumbnail: https://example.com/thumb.jpg');
+    expect(markdown).toContain('- URL: https://www.bilibili.com/video/BV1FwY4zkEef/');
+    expect(markdown).toContain('## Description\n\nFirst line\nSecond line');
+    expect(markdown).toContain('## Chapters\n\n- [00:00 → 00:30] Intro\n- [00:30] Main');
+    expect(markdown).toContain('## Transcript\n\n[00:01.234 → 00:03.456] hello');
+    expect(markdown).not.toContain('wrong first');
+    expect(markdown).not.toContain('- Source:');
+    expect(markdown).not.toContain('## transcript');
+  });
+
+  it('does not serialize an unknown Video duration as zero', async () => {
+    const c = {
+      ...conversation(10, 'Video Unknown Duration'),
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video:https://example.com/watch/10',
+      url: 'https://example.com/watch/10',
+      durationSeconds: null,
+    } as any;
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 10,
+      messages: [
+        {
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '[00:01.000] hello',
+        },
+      ],
+    });
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+    expect(markdown).not.toContain('- Duration: 0s');
+    expect(markdown).not.toContain('- Duration:');
+  });
+
   it('claims unique basenames for colliding items and keeps attachment prefixes aligned', async () => {
     const items = [1, 2, 3].map((id) => ({
       ...conversation(id, 'Same title'),
