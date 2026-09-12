@@ -7,7 +7,7 @@ import {
   parseYoutubeTimedtextXml,
   type TranscriptCue,
 } from '@collectors/video/video-transcript-parse';
-import { canonicalizeVideoUrl } from '@services/url-cleaning/video-url';
+import { canonicalizeVideoUrl, detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import {
   classifyVideoResponseUrl,
   type VideoChapter,
@@ -17,8 +17,8 @@ import {
   type VideoResponseKind,
 } from '@services/shared/video-capture';
 
-export type VideoTranscriptMeta = {
-  platform: VideoPlatform | 'unknown';
+type VideoTranscriptMeta = {
+  platform: VideoPlatform;
   url: string;
   title: string;
   author: string;
@@ -27,7 +27,7 @@ export type VideoTranscriptMeta = {
   thumbnailUrl: string;
 };
 
-export type VideoTranscriptExtraction = {
+type VideoTranscriptExtraction = {
   meta: VideoTranscriptMeta;
   cues: TranscriptCue[];
   chapters: VideoChapter[] | null;
@@ -41,13 +41,6 @@ function normalizeText(value: unknown): string {
     .trim();
 }
 
-function inferPlatform(): VideoTranscriptMeta['platform'] {
-  const host = String(location.hostname || '').toLowerCase();
-  if (host === 'www.youtube.com' || host === 'youtube.com' || host === 'youtu.be') return 'youtube';
-  if (host === 'www.bilibili.com' || host === 'bilibili.com') return 'bilibili';
-  return 'unknown';
-}
-
 function normalizeDuration(value: unknown): number | null {
   if (value == null || (typeof value === 'string' && !value.trim())) return null;
   const duration = Number(value);
@@ -57,11 +50,10 @@ function normalizeDuration(value: unknown): number | null {
 function selectMetaCandidate(
   candidates: VideoPageMetaCandidates | null,
   currentUrl: string,
-  platform: VideoTranscriptMeta['platform'],
 ): VideoPageMetaCandidate | null {
-  if (!candidates || platform === 'unknown') return null;
+  if (!candidates) return null;
   for (const candidate of [candidates.state, candidates.dom]) {
-    if (!candidate || candidate.platform !== platform) continue;
+    if (!candidate) continue;
     const identityUrl = canonicalizeVideoUrl(candidate.identityUrl);
     if (identityUrl && identityUrl === currentUrl) return candidate;
   }
@@ -69,11 +61,13 @@ function selectMetaCandidate(
 }
 
 async function collectMeta(): Promise<VideoTranscriptMeta> {
-  const platform = inferPlatform();
   const href = String(location.href || '');
-  const canonical = canonicalizeVideoUrl(href) || href;
+  const platform = detectSupportedVideoPagePlatform(href);
+  if (!platform) throw new Error('unsupported video page');
+  const canonical = canonicalizeVideoUrl(href);
+  if (!canonical) throw new Error('invalid video URL');
   const candidates = await requestVideoPageMeta();
-  const candidate = selectMetaCandidate(candidates, canonical, platform);
+  const candidate = selectMetaCandidate(candidates, canonical);
 
   return {
     platform,
@@ -140,13 +134,9 @@ export async function extractVideoTranscriptFromCurrentPage(): Promise<VideoTran
     };
   }
 
-  if (meta.platform === 'bilibili') {
-    return {
-      meta,
-      cues: extractBilibiliCuesFromIntercept(meta.url),
-      chapters: extractBilibiliChaptersFromIntercept(meta.url),
-    };
-  }
-
-  return { meta, cues: [], chapters: null };
+  return {
+    meta,
+    cues: extractBilibiliCuesFromIntercept(meta.url),
+    chapters: extractBilibiliChaptersFromIntercept(meta.url),
+  };
 }

@@ -1,4 +1,4 @@
-import { canonicalizeVideoUrl } from '@services/url-cleaning/video-url';
+import { canonicalizeVideoUrl, detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import {
   classifyVideoResponseUrl,
   type VideoPageMetaCandidate,
@@ -76,7 +76,6 @@ function collectYoutubeStateCandidate(): VideoPageMetaCandidate | null {
     const thumbs = Array.isArray(details?.thumbnail?.thumbnails) ? details.thumbnail.thumbnails : [];
     const bestThumb = thumbs.length ? thumbs[thumbs.length - 1] : null;
     return {
-      platform: 'youtube',
       identityUrl,
       title: normalizeText(details?.title),
       author: normalizeText(details?.author),
@@ -118,7 +117,6 @@ function collectBilibiliStateCandidate(): VideoPageMetaCandidate | null {
       : '';
 
     return {
-      platform: 'bilibili',
       identityUrl,
       title: normalizeText(videoData?.title),
       author: normalizeText(videoData?.owner?.name),
@@ -136,7 +134,6 @@ function collectBilibiliDomCandidate(): VideoPageMetaCandidate | null {
     const identityUrl = canonicalizeVideoUrl(document.querySelector('link[rel="canonical"]')?.getAttribute('href'));
     if (!identityUrl) return null;
     return {
-      platform: 'bilibili',
       identityUrl,
       title: normalizeText((document.querySelector('h1.video-title') as HTMLElement | null)?.innerText),
       author: normalizeText((document.querySelector('a.up-name') as HTMLElement | null)?.innerText),
@@ -148,11 +145,9 @@ function collectBilibiliDomCandidate(): VideoPageMetaCandidate | null {
 }
 
 function collectMetaForPage(): VideoPageMetaCandidates {
-  const host = String(location.hostname || '').toLowerCase();
-  if (host === 'www.youtube.com' || host === 'youtube.com' || host === 'youtu.be') {
-    return { state: collectYoutubeStateCandidate(), dom: null };
-  }
-  if (host === 'www.bilibili.com' || host === 'bilibili.com') {
+  const platform = detectSupportedVideoPagePlatform(location.href);
+  if (platform === 'youtube') return { state: collectYoutubeStateCandidate(), dom: null };
+  if (platform === 'bilibili') {
     return { state: collectBilibiliStateCandidate(), dom: collectBilibiliDomCandidate() };
   }
   return { state: null, dom: null };
