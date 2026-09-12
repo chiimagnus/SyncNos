@@ -97,11 +97,18 @@ export function ArticleReaderView({
     [readerFeatures],
   );
   const detailConversationId = Number((detail as any)?.conversationId || (selected as any)?.id || activeId);
+  const isVideoReader =
+    String((selected as any)?.sourceType || '')
+      .trim()
+      .toLowerCase() === 'video';
+  const readerMessages = Array.isArray(detail?.messages)
+    ? isVideoReader
+      ? detail.messages.filter((message: any) => String(message?.contentMarkdown || '').trim())
+      : detail.messages
+    : [];
   const assetSrcById = useSyncnosAssetSrcMap({
     conversationId: Number.isFinite(detailConversationId) && detailConversationId > 0 ? detailConversationId : null,
-    markdowns: Array.isArray(detail?.messages)
-      ? detail.messages.map((message: any) => String(message?.contentMarkdown || ''))
-      : [],
+    markdowns: readerMessages.map((message: any) => String(message?.contentMarkdown || '')),
   });
   const { prefs, update, preview, commitPreview } = useReaderPrefs();
   const { mode: themeMode, update: updateThemeMode } = useAppThemeMode();
@@ -522,7 +529,7 @@ export function ArticleReaderView({
             <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p>
           ) : null}
 
-          {detail?.messages?.length ? (
+          {readerMessages.length ? (
             <div
               ref={assignMessagesRoot}
               className="tw-mt-3 tw-grid tw-w-full tw-gap-2.5 tw-mx-auto"
@@ -530,7 +537,7 @@ export function ArticleReaderView({
               data-reader-sentence-root="true"
               onClick={handleSentenceClick}
             >
-              {detail.messages.map((m: any) => {
+              {readerMessages.map((m: any) => {
                 const text = String((m as any).contentMarkdown || '');
 
                 return (
@@ -544,13 +551,13 @@ export function ArticleReaderView({
                 );
               })}
             </div>
-          ) : activeId ? (
+          ) : activeId && !isVideoReader ? (
             <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
-          ) : (
+          ) : !activeId ? (
             <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('selectAConversation')}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </>

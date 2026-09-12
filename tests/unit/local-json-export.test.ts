@@ -228,6 +228,35 @@ describe('local JSON v2 export', () => {
     expect(entry.value).not.toHaveProperty('thumbnailUrl');
   });
 
+  it('exports chapters and description while keeping transcript null when canonical Video has no subtitles', async () => {
+    const c = conversation(42, {
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video:metadata-only',
+      videoDescription: 'Metadata-only description',
+    });
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 42,
+      messages: [
+        message('video_transcript', {
+          role: 'transcript',
+          contentMarkdown: '',
+          videoChapters: [{ title: 'Intro only', startSeconds: 0, endSeconds: 45 }],
+        }),
+      ],
+    });
+
+    const result = await buildConversationsJsonZipExport({ conversations: [c] });
+    const [entry] = await readJsonEntries(result.zipBlob);
+    expect(entry.value).toMatchObject({
+      type: 'video',
+      description: 'Metadata-only description',
+      transcript: null,
+      cues: [],
+      chapters: [{ title: 'Intro only', startSeconds: 0, endSeconds: 45 }],
+    });
+  });
+
   it('does not guess a non-canonical historical Video message as the transcript', async () => {
     const c = conversation(40, {
       source: 'video',

@@ -132,6 +132,25 @@ describe('remote-markdown-writer', () => {
     expect(md).not.toContain('# Conversations');
     expect(md).not.toContain('## 1 transcript');
 
+    const metadataOnly = w.buildFullNoteMarkdown({
+      conversation: {
+        title: 'Metadata only',
+        source: 'video',
+        sourceType: 'video',
+        videoDescription: 'No subtitle description',
+      },
+      messages: [
+        {
+          messageKey: 'video_transcript',
+          contentMarkdown: '',
+          videoChapters: [{ title: 'Only chapter', startSeconds: 0, endSeconds: 45 }],
+        },
+      ],
+    });
+    expect(metadataOnly).toContain('## Description\n\nNo subtitle description');
+    expect(metadataOnly).toContain('## Chapters\n\n- [00:00 → 00:45] Only chapter');
+    expect(metadataOnly).not.toContain('## Transcript');
+
     const unknownDuration = w.buildFullNoteMarkdown({
       conversation: { sourceType: 'video', durationSeconds: null },
       messages: [{ messageKey: 'video_transcript', contentMarkdown: 'body' }],

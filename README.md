@@ -2,9 +2,9 @@
 
 # SyncNos
 
-Never lose an AI conversation, a useful article, or a video transcript again.
+Never lose an AI conversation, a useful article, or useful context from a video page again.
 
-Capture supported AI conversations, web articles, and YouTube/Bilibili transcripts into local browser storage first, then optionally sync to Notion, Obsidian, Feishu (Lark), or GitHub, export selected content as Markdown or JSON, or create a local Backup ZIP.
+Capture supported AI conversations, web articles, and useful context from YouTube/Bilibili video pages into local browser storage first, then optionally sync to Notion, Obsidian, Feishu (Lark), or GitHub, export selected content as Markdown or JSON, or create a local Backup ZIP.
 
 [SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
 
@@ -58,9 +58,9 @@ SyncNos is local-first: captured content is saved locally before any optional sy
 
 Ordinary `http(s)` pages can be captured manually. Supported Video URLs are routed to Video capture instead of being stored as web articles. SyncNos extracts readable article content and relevant metadata, with site-specific fallbacks where needed. Captured articles support comments and highlight-only annotations; on Dedao course articles, personal highlights and notes available on the signed-in page are also imported into the article comment layer.
 
-### Video transcripts
+### Video capture
 
-Video capture supports YouTube `watch` / `youtu.be` pages and Bilibili BV video pages. Popup, the in-page save button, and the single dynamic SyncNos context-menu action all use the same Video route. SyncNos saves the already-loaded transcript with precise timestamp ranges plus useful source context such as title, author, description, duration, and thumbnail; Bilibili player chapters/highlights are also saved when the current page has naturally loaded them. If subtitles are not loaded, nothing is saved and the page does not fall back to Web Article capture. SyncNos does not download the audio/video stream, and Bilibili `av` pages, YouTube Shorts, arbitrary `/video/*` paths, statistics/tags, and chapter images are outside this supported contract.
+Video capture supports YouTube `watch` / `youtu.be` pages and Bilibili BV video pages. Popup, the in-page save button, and the single dynamic SyncNos context-menu action all use the same Video route. SyncNos saves available source context such as title, author, description, duration, and thumbnail; when subtitles are already loaded, their transcript text and precise timestamp ranges are saved too, and Bilibili player chapters/highlights are preserved when the current page has naturally loaded them. A video is still created or updated when no subtitles are available, and it never falls back to Web Article capture; capturing again after subtitles load adds or updates the transcript. SyncNos does not download the audio/video stream, and Bilibili `av` pages, YouTube Shorts, arbitrary `/video/*` paths, statistics/tags, and chapter images are outside this supported contract.
 
 ## Output Targets
 

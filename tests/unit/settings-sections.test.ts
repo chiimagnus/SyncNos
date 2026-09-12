@@ -52,6 +52,10 @@ describe('settings section definitions', () => {
     const text = document.body.textContent || '';
     expect(text).toContain('chapters/highlights');
     expect(text).toContain('when available');
+    expect(text).toContain('videos without subtitles can still save');
+    expect(text).toContain('Save video');
+    expect(text).not.toContain('Save video transcript');
+    expect(text).not.toContain('No subtitles detected (not saved)');
     expect(text).toContain('Bilibili av');
     expect(text).toContain('YouTube Shorts');
     expect(text.toLowerCase()).not.toContain('chapter images');
