@@ -152,6 +152,7 @@ describe('video transcript extraction', () => {
     const pageB = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(pageB, '<div class="bpx-player-subtitle-panel-text"><span>must not be used</span></div>');
     installMetaResponder({
+      state: { identityUrl: pageB, title: 'B' },
       dom: null,
     });
     setResponses([
@@ -176,6 +177,7 @@ describe('video transcript extraction', () => {
   it('falls back to an earlier current-page WBI response when the latest response cannot determine chapters', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
+    installMetaResponder({ state: { identityUrl: page }, dom: null });
     setResponses([
       {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
@@ -205,6 +207,7 @@ describe('video transcript extraction', () => {
   it('treats the latest current-page explicit empty view_points array as a chapter clear', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
+    installMetaResponder({ state: { identityUrl: page }, dom: null });
     setResponses([
       {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
@@ -261,6 +264,7 @@ describe('video transcript extraction', () => {
     const page = 'https://www.youtube.com/watch?v=current';
     installDom(page);
     installMetaResponder({
+      state: { identityUrl: page, title: 'Current video' },
       dom: null,
     });
     setResponses([
@@ -289,6 +293,7 @@ describe('video transcript extraction', () => {
       '<ytd-transcript-segment-renderer><span class="segment-timestamp">0:01</span><span class="segment-text">stale</span></ytd-transcript-segment-renderer>',
     );
     installMetaResponder({
+      state: { identityUrl: page, title: 'Current video' },
       dom: null,
     });
     setResponses([
