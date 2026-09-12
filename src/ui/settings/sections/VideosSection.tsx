@@ -27,7 +27,7 @@ export function VideosSection() {
             {t('videosSectionSupportedYoutubeSuffix')}
           </li>
           <li>
-            {t('videosSectionSupportedBilibiliPrefix')} <Mono>bilibili.com/video</Mono>
+            {t('videosSectionSupportedBilibiliPrefix')} <Mono>bilibili.com/video/BV…</Mono>
             {t('videosSectionSupportedBilibiliSuffix')}
           </li>
         </ul>

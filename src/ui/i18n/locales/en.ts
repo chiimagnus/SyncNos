@@ -86,12 +86,14 @@ export const en = {
   aiChatsSectionTroubleshootingAutoSavePrefix: 'The auto-save toggle is in General settings: ',
   aiChatsSectionTroubleshootingAutoSaveSuffix: '.',
   videosSectionHeading: 'Video transcript capture',
-  videosSectionIntro: 'Capture YouTube/Bilibili subtitles that are already loaded by the page.',
+  videosSectionIntro:
+    'Capture YouTube/Bilibili subtitles already loaded by the page; Bilibili player chapters/highlights are saved too when available.',
   videosSectionSupportedHeading: 'Supported',
   videosSectionSupportedYoutubePrefix: 'YouTube: ',
   videosSectionSupportedYoutubeSuffix: ' pages; supports both official and auto-generated captions.',
   videosSectionSupportedBilibiliPrefix: 'Bilibili: ',
-  videosSectionSupportedBilibiliSuffix: ' pages; supports both uploader-provided subtitles and AI subtitles.',
+  videosSectionSupportedBilibiliSuffix:
+    ' pages; supports uploader-provided and AI subtitles, plus player chapters/highlights when available.',
   videosSectionHowToHeading: 'How to fetch',
   videosSectionHowToStep1: 'Open the video page and turn on captions/CC in the player.',
   videosSectionHowToStep2: 'Switch to the track/language you want (for Bilibili AI subtitles, select an AI subtitle track).',
@@ -101,7 +103,7 @@ export const en = {
   videosSectionTroubleshootingNoSubtitles:
     'If you see “No subtitles detected (not saved)”, captions likely have not loaded yet. Turn on captions / switch tracks, then try again (refresh if needed).',
   videosSectionTroubleshootingUnsupported:
-    'Only the URL types listed above are supported (for example, YouTube Shorts is not supported yet).',
+    'Only the URL types listed above are supported; Bilibili av pages and YouTube Shorts are not supported yet.',
   contextMenuInpageGroupTitle: 'Inpage Button',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
