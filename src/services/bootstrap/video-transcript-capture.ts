@@ -1,7 +1,6 @@
 import { extractVideoTranscriptFromCurrentPage } from '@collectors/video/video-transcript-extract';
 import {
   formatVideoTranscriptMarkdown,
-  normalizeCanonicalVideoChapters,
   toCanonicalVideoTranscriptCues,
 } from '@services/conversations/domain/video-content';
 import { CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
@@ -78,7 +77,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       message.transcriptCues = transcriptCues;
     }
     if (extracted.chapters !== null) {
-      message.videoChapters = normalizeCanonicalVideoChapters(extracted.chapters);
+      message.videoChapters = extracted.chapters;
     }
 
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {

@@ -40,8 +40,6 @@ function readYoutubeVideoId(url: URL): string {
 }
 
 function readBilibiliBvid(url: URL): string {
-  if (!detectBilibiliHost(url.hostname)) return '';
-
   const pathname = String(url.pathname || '');
   const videoMatch = pathname.match(/^\/video\/(BV[0-9A-Za-z]+)\/?$/);
   if (videoMatch?.[1]) return videoMatch[1];
@@ -60,39 +58,9 @@ export function detectVideoPlatformHost(raw: unknown): VideoPlatform | null {
 export function detectSupportedVideoPagePlatform(raw: unknown): VideoPlatform | null {
   const url = parseHttpUrl(raw);
   if (!url) return null;
-  const platform = detectVideoPlatformHost(url.toString());
-  if (platform === 'youtube') return readYoutubeVideoId(url) ? 'youtube' : null;
-  if (platform === 'bilibili') return readBilibiliBvid(url) ? 'bilibili' : null;
+  if (detectYoutubeHost(url.hostname)) return readYoutubeVideoId(url) ? 'youtube' : null;
+  if (detectBilibiliHost(url.hostname)) return readBilibiliBvid(url) ? 'bilibili' : null;
   return null;
-}
-
-function canonicalizeYoutubeUrl(url: URL): URL {
-  const videoId = readYoutubeVideoId(url);
-  if (!videoId) {
-    const unchanged = new URL(url.toString());
-    unchanged.hash = '';
-    return unchanged;
-  }
-  const canonical = new URL('https://www.youtube.com/watch');
-  canonical.searchParams.set('v', videoId);
-  return canonical;
-}
-
-function canonicalizeBilibiliUrl(url: URL): URL {
-  const bvid = readBilibiliBvid(url);
-  if (!bvid) {
-    const unchanged = new URL(url.toString());
-    unchanged.hash = '';
-    return unchanged;
-  }
-
-  const canonical = new URL(`https://www.bilibili.com/video/${bvid}/`);
-  const p = String(url.searchParams.get('p') || '').trim();
-  if (/^\d+$/.test(p)) {
-    const part = Number(p);
-    if (Number.isSafeInteger(part) && part > 1) canonical.searchParams.set('p', String(part));
-  }
-  return canonical;
 }
 
 export function canonicalizeVideoUrl(raw: unknown): string {
@@ -100,8 +68,27 @@ export function canonicalizeVideoUrl(raw: unknown): string {
   if (!url) return '';
   url.hash = '';
 
-  const platform = detectSupportedVideoPagePlatform(url.toString());
-  if (platform === 'youtube') return canonicalizeYoutubeUrl(url).toString();
-  if (platform === 'bilibili') return canonicalizeBilibiliUrl(url).toString();
+  if (detectYoutubeHost(url.hostname)) {
+    const videoId = readYoutubeVideoId(url);
+    if (videoId) {
+      const canonical = new URL('https://www.youtube.com/watch');
+      canonical.searchParams.set('v', videoId);
+      return canonical.toString();
+    }
+  }
+
+  if (detectBilibiliHost(url.hostname)) {
+    const bvid = readBilibiliBvid(url);
+    if (bvid) {
+      const canonical = new URL(`https://www.bilibili.com/video/${bvid}/`);
+      const p = String(url.searchParams.get('p') || '').trim();
+      if (/^\d+$/.test(p)) {
+        const part = Number(p);
+        if (Number.isSafeInteger(part) && part > 1) canonical.searchParams.set('p', String(part));
+      }
+      return canonical.toString();
+    }
+  }
+
   return url.toString();
 }

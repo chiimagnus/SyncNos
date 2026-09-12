@@ -25,7 +25,6 @@ function readNonNegativeNumber(value: unknown): number | null {
 }
 
 function normalizeEnd(value: unknown, startSeconds: number): number | null {
-  if (value === null) return null;
   const endSeconds = readNonNegativeNumber(value);
   return endSeconds != null && endSeconds >= startSeconds ? endSeconds : null;
 }

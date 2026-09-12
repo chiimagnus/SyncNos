@@ -31,12 +31,7 @@ function decodeHtmlEntities(input: string): string {
     .replace(/&#39;/g, "'")
     .replace(/&#(\d+);/g, (_m, n) => {
       const code = Number(n);
-      if (!Number.isFinite(code)) return '';
-      try {
-        return String.fromCharCode(code);
-      } catch (_e) {
-        return '';
-      }
+      return Number.isFinite(code) ? String.fromCharCode(code) : '';
     });
 }
 

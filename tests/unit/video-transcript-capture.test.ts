@@ -45,7 +45,7 @@ describe('video transcript capture service', () => {
         { start: 5, text: 'world' },
       ],
       chapters: [
-        { title: 'Intro', startSeconds: 0, endSeconds: 30, imgUrl: 'raw' },
+        { title: 'Intro', startSeconds: 0, endSeconds: 30 },
         { title: 'Main', startSeconds: 30, endSeconds: null },
       ],
     });

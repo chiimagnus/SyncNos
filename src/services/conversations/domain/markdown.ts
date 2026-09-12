@@ -95,10 +95,7 @@ export function formatVideoContentMarkdown(
   if (description) sections.push(`## Description\n\n${description}`);
 
   const chapters = Array.isArray(transcript?.videoChapters) ? transcript.videoChapters : [];
-  if (chapters.length) {
-    const chapterMarkdown = formatVideoChaptersMarkdown(chapters);
-    if (chapterMarkdown) sections.push(chapterMarkdown);
-  }
+  if (chapters.length) sections.push(formatVideoChaptersMarkdown(chapters));
 
   const transcriptBody = String(transcript?.contentMarkdown || '');
   if (transcriptBody) {

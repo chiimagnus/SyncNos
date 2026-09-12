@@ -4,7 +4,6 @@ type StoreResponse = {
   url: string;
   pageUrl: string;
   bodyText: string;
-  at: number;
 };
 
 type VideoTranscriptBridgeStore = {
@@ -22,9 +21,7 @@ function getStore(): VideoTranscriptBridgeStore | null {
 }
 
 export function listVideoInterceptedResponses(): StoreResponse[] {
-  const list = getStore()?.responses;
-  if (!Array.isArray(list) || !list.length) return [];
-  return list.slice();
+  return getStore()?.responses.slice() ?? [];
 }
 
 function randomId(): string {
@@ -42,12 +39,9 @@ export function requestVideoPageMeta(): Promise<VideoPageMetaCandidates | null> 
   const requestId = randomId();
 
   return new Promise((resolve) => {
-    let settled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const finish = (value: VideoPageMetaCandidates | null) => {
-      if (settled) return;
-      settled = true;
       window.removeEventListener('message', onMessage);
       if (timer != null) clearTimeout(timer);
       resolve(value);
