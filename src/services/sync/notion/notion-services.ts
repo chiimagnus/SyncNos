@@ -43,10 +43,9 @@ type NotionSyncService = {
   createPageInDatabase: (accessToken: string, input: any) => Promise<any>;
   updatePageProperties: (accessToken: string, input: any) => Promise<any>;
   appendChildren: (accessToken: string, pageId: string, blocks: any[]) => Promise<any>;
-  messagesToBlocks: (messages: any[], input?: any) => any[];
+  messagesToBlocks: (messages: any[]) => any[];
   isPageUsableForDatabase: (page: any, databaseId?: string) => boolean;
-  hasExternalImageBlocks?: (blocks: any[]) => boolean;
-  upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[], conversationId: number) => Promise<any[]>;
+  upgradeImageBlocksToFileUploads: (accessToken: string, blocks: any[], conversationId: number) => Promise<any[]>;
 };
 
 export type NotionServices = {

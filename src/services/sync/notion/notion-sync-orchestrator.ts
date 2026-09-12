@@ -157,7 +157,7 @@ function isStaleBlockAnchorError(error: unknown): boolean {
   return msg.includes('archived') || msg.includes('in_trash');
 }
 
-function toCurrentConversationTitle(convo: any, _id?: unknown): string {
+function toCurrentConversationTitle(convo: any): string {
   const title = convo && convo.title ? String(convo.title).trim() : '';
   if (title) return title;
   return '';
@@ -206,26 +206,21 @@ function pagePropertiesNeedUpdate(page: any, desiredProperties: any): boolean {
   return false;
 }
 
-function countExternalImageBlocks(blocks: unknown): number {
-  const list = Array.isArray(blocks) ? blocks : [];
+function countExternalImageBlocks(blocks: any[]): number {
   let count = 0;
-  for (const b of list) {
-    if (!b || b.type !== 'image' || !b.image) continue;
-    if (b.image.type === 'external') count += 1;
+  for (const block of blocks) {
+    if (block?.type === 'image' && block.image?.type === 'external') count += 1;
   }
   return count;
 }
 
-function countInlineImageOmittedPlaceholders(blocks: unknown): number {
-  const list = Array.isArray(blocks) ? blocks : [];
+function countOmittedImagePlaceholders(blocks: any[]): number {
   let count = 0;
-  for (const b of list) {
-    if (!b || b.type !== 'paragraph' || !b.paragraph) continue;
-    const rt = Array.isArray(b.paragraph.rich_text) ? b.paragraph.rich_text : [];
-    const text = rt
-      .map((x: any) => (x && x.type === 'text' && x.text && x.text.content ? String(x.text.content) : ''))
-      .join('');
-    if (text.includes('[Image omitted: inline image')) count += 1;
+  for (const block of blocks) {
+    if (block?.type !== 'paragraph') continue;
+    const richText = Array.isArray(block.paragraph?.rich_text) ? block.paragraph.rich_text : [];
+    const text = richText.map((item: any) => String(item?.text?.content || '')).join('');
+    if (text.includes('[Image omitted: local image upload failed]')) count += 1;
   }
   return count;
 }
@@ -233,20 +228,16 @@ function countInlineImageOmittedPlaceholders(blocks: unknown): number {
 async function buildBlocksForSync({
   notionSyncService,
   accessToken,
-  source,
   messagesList,
   conversationId,
 }: {
-  notionSyncService: any;
-  accessToken?: string;
-  source?: unknown;
-  messagesList?: any;
+  notionSyncService: NotionServices['syncService'];
+  accessToken: string;
+  messagesList: any[];
   conversationId: number;
 }) {
   const warnings: any[] = [];
-  let blocks = notionSyncService.messagesToBlocks(messagesList, {
-    source,
-  });
+  let blocks = notionSyncService.messagesToBlocks(messagesList);
   blocks = await maybeUpgradeBlocksWithNotionFileUploads({
     notionSyncService,
     accessToken,
@@ -264,26 +255,18 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   warnings,
   conversationId,
 }: {
-  notionSyncService: any;
-  accessToken?: string;
-  blocks?: any;
+  notionSyncService: NotionServices['syncService'];
+  accessToken: string;
+  blocks: any[];
   warnings: any[];
   conversationId: number;
 }) {
-  let nextBlocks = Array.isArray(blocks) ? blocks : [];
-  if (!nextBlocks.length || typeof notionSyncService.upgradeImageBlocksToFileUploads !== 'function') return nextBlocks;
-  if (
-    typeof notionSyncService.hasExternalImageBlocks === 'function' &&
-    !notionSyncService.hasExternalImageBlocks(nextBlocks)
-  ) {
-    return nextBlocks;
-  }
-
-  const externalBefore = countExternalImageBlocks(nextBlocks);
-  nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks, conversationId);
+  const externalBefore = countExternalImageBlocks(blocks);
+  if (!externalBefore) return blocks;
+  const nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, blocks, conversationId);
 
   const externalAfter = countExternalImageBlocks(nextBlocks);
-  if (externalBefore > 0 && externalAfter > 0) {
+  if (externalAfter > 0) {
     warnings.push({
       code: 'notion_image_upload_degraded',
       message: `Some images could not be uploaded to Notion and were kept as external URLs (${externalAfter}/${externalBefore}).`,
@@ -291,12 +274,12 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
     });
   }
 
-  const inlineOmitted = countInlineImageOmittedPlaceholders(nextBlocks);
-  if (inlineOmitted > 0) {
+  const omittedImages = countOmittedImagePlaceholders(nextBlocks);
+  if (omittedImages > 0) {
     warnings.push({
       code: 'notion_inline_image_upload_failed',
-      message: `Some inline images could not be uploaded to Notion and were replaced with placeholder text (${inlineOmitted}).`,
-      extra: { count: inlineOmitted },
+      message: `Some inline images could not be uploaded to Notion and were replaced with placeholder text (${omittedImages}).`,
+      extra: { count: omittedImages },
     });
   }
 
@@ -370,14 +353,14 @@ async function buildNonArticleBlocksForSync({
   messagesList,
   conversationId,
 }: {
-  notionSyncService: any;
-  accessToken?: string;
+  notionSyncService: NotionServices['syncService'];
+  accessToken: string;
   conversation: any;
   kindId: string;
   messagesList: any[];
   conversationId: number;
 }) {
-  const sourceMessages = Array.isArray(messagesList) ? messagesList : [];
+  const sourceMessages = messagesList;
   const projectedMessages =
     kindId === 'video'
       ? (() => {
@@ -392,7 +375,6 @@ async function buildNonArticleBlocksForSync({
   const built = await buildBlocksForSync({
     notionSyncService,
     accessToken,
-    source: conversation?.source,
     messagesList: projectedMessages,
     conversationId,
   });
@@ -557,7 +539,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             return;
           }
-          conversationTitle = toCurrentConversationTitle(convo, id);
+          conversationTitle = toCurrentConversationTitle(convo);
           await lifecycle.setItem(id, {
             conversationTitle,
             currentStage: 'preparing_sync',
@@ -718,7 +700,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               const builtArticle = await buildBlocksForSync({
                 notionSyncService,
                 accessToken: accessToken,
-                source: convo.source,
                 messagesList: pickArticleBodyMessages(messages),
                 conversationId: id,
               });
@@ -963,7 +944,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 const builtArticle = await buildBlocksForSync({
                   notionSyncService,
                   accessToken: accessToken,
-                  source: convo.source,
                   messagesList: pickArticleBodyMessages(messages),
                   conversationId: id,
                 });

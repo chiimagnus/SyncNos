@@ -226,7 +226,6 @@ describe('backup -> Notion sync continuity', () => {
       createPage: 0,
       updatePage: 0,
       appendChildren: 0,
-      clearPageChildren: 0,
       messagesToBlocks: 0,
     };
 
@@ -260,10 +259,6 @@ describe('backup -> Notion sync continuity', () => {
           calls.updatePage += 1;
           return {};
         },
-        async clearPageChildren() {
-          calls.clearPageChildren += 1;
-          return {};
-        },
         async appendChildren() {
           calls.appendChildren += 1;
           return { results: [] };
@@ -274,12 +269,6 @@ describe('backup -> Notion sync continuity', () => {
         },
         isPageUsableForDatabase(_page: unknown, databaseId?: string) {
           return databaseId === 'db-chat';
-        },
-        pageBelongsToDatabase(_page: unknown, databaseId: string) {
-          return databaseId === 'db-chat';
-        },
-        hasExternalImageBlocks() {
-          return false;
         },
         async upgradeImageBlocksToFileUploads(_accessToken: string, blocks: any[]) {
           return blocks;
@@ -310,7 +299,6 @@ describe('backup -> Notion sync continuity', () => {
       createPage: 0,
       updatePage: 0,
       appendChildren: 0,
-      clearPageChildren: 0,
       messagesToBlocks: 0,
     });
 
@@ -463,7 +451,6 @@ describe('backup -> Notion sync continuity', () => {
       createPage: 0,
       updatePage: 0,
       appendChildren: 0,
-      clearPageChildren: 0,
       messagesToBlocks: 0,
       directNotionHttp: 0,
     };
@@ -507,10 +494,6 @@ describe('backup -> Notion sync continuity', () => {
           calls.updatePage += 1;
           return {};
         },
-        async clearPageChildren() {
-          calls.clearPageChildren += 1;
-          return {};
-        },
         async appendChildren() {
           calls.appendChildren += 1;
           return { results: [] };
@@ -521,12 +504,6 @@ describe('backup -> Notion sync continuity', () => {
         },
         isPageUsableForDatabase(_page: unknown, databaseId?: string) {
           return databaseId === 'db-article';
-        },
-        pageBelongsToDatabase(_page: unknown, databaseId: string) {
-          return databaseId === 'db-article';
-        },
-        hasExternalImageBlocks() {
-          return false;
         },
         async upgradeImageBlocksToFileUploads(_accessToken: string, blocks: any[]) {
           return blocks;
@@ -557,7 +534,6 @@ describe('backup -> Notion sync continuity', () => {
       createPage: 0,
       updatePage: 0,
       appendChildren: 0,
-      clearPageChildren: 0,
       messagesToBlocks: 0,
       directNotionHttp: 0,
     });
