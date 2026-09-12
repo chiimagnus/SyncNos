@@ -73,7 +73,11 @@ afterEach(() => {
 
 describe('current page capture integrity routing', () => {
   it('routes supported Bilibili and YouTube URLs through Video before the web fallback', async () => {
-    for (const url of ['https://www.bilibili.com/video/BV1FwY4zkEef/', 'https://www.youtube.com/watch?v=abc123']) {
+    for (const url of [
+      'https://www.bilibili.com/video/BV1FwY4zkEef/',
+      'https://www.bilibili.com/list/watchlater?bvid=BV1FwY4zkEef&oid=115049943269792',
+      'https://www.youtube.com/watch?v=abc123',
+    ]) {
       const harness = createHarness({ collectorId: 'web', url });
       expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
         available: true,
@@ -88,23 +92,23 @@ describe('current page capture integrity routing', () => {
     }
   });
 
-  it('keeps a supported Video empty result on the Video route without article fallback or writes', async () => {
+  it('keeps a supported Video with no subtitles on the Video route and reports it as saved', async () => {
     const url = 'https://www.bilibili.com/video/BV1FwY4zkEef/';
     const harness = createHarness({
       collectorId: 'web',
       url,
-      video: { conversationId: null, title: 'Video', url, subtitleStatus: 'empty' },
+      video: { conversationId: 77, title: 'Video', url, isNew: true, subtitleStatus: 'empty' },
     });
     const progress: any[] = [];
     const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
     expect(result).toMatchObject({
       kind: 'video',
       subtitleStatus: 'empty',
-      conversationId: null,
-      isNew: false,
+      conversationId: 77,
+      isNew: true,
     });
     expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipNoSubtitles'));
-    expect(harness.calls).toEqual([]);
+    expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
   });
 
   it('propagates Video capture errors without falling back to Article', async () => {

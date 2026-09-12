@@ -341,6 +341,41 @@ describe('reader mode regression', () => {
     expect(outlineLabels).not.toContain('Intro chapter');
     expect(outlineLabels).not.toContain('Description outside narration');
 
+    currentState.activeId = 14;
+    currentState.selectedConversation = {
+      id: 14,
+      title: 'Metadata-only Video',
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video-14',
+      url: 'https://example.com/video-14',
+      videoDescription: 'Metadata-only description',
+    } as any;
+    currentState.detail = {
+      conversationId: 14,
+      messages: [
+        {
+          id: 'v-2',
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '',
+          videoChapters: [{ title: 'Only chapter', startSeconds: 0, endSeconds: 45 }],
+        },
+      ],
+    } as any;
+
+    renderRoot(root!);
+    await flushDom();
+
+    const metadataOnlyColumn = document.querySelector('[data-reader-metadata-column="true"]') as HTMLElement | null;
+    expect(metadataOnlyColumn?.querySelector('[data-video-description="true"]')?.textContent).toContain(
+      'Metadata-only description',
+    );
+    expect(metadataOnlyColumn?.querySelector('[data-video-chapters="true"]')?.textContent).toContain('Only chapter');
+    expect(document.querySelector('[data-reader-sentence-root="true"]')).toBeNull();
+    expect(document.body.textContent || '').not.toContain('noMessages');
+    expect(document.body.textContent || '').not.toContain('message');
+
     currentState.activeId = 13;
     currentState.selectedConversation = {
       id: 13,

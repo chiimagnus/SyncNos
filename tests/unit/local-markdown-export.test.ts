@@ -245,6 +245,34 @@ describe('local markdown export', () => {
     expect(markdown).not.toContain('## transcript');
   });
 
+  it('exports description and chapters without an empty Transcript section when Video has no subtitles', async () => {
+    const c = {
+      ...conversation(10, 'Metadata-only Video'),
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'video:https://www.bilibili.com/video/BV1META12345/',
+      url: 'https://www.bilibili.com/video/BV1META12345/',
+      videoDescription: 'Description without subtitles',
+    } as any;
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 10,
+      messages: [
+        {
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentMarkdown: '',
+          videoChapters: [{ title: 'Intro only', startSeconds: 0, endSeconds: 45 }],
+        },
+      ],
+    });
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+    expect(markdown).toContain('## Description\n\nDescription without subtitles');
+    expect(markdown).toContain('## Chapters\n\n- [00:00 → 00:45] Intro only');
+    expect(markdown).not.toContain('## Transcript');
+  });
+
   it('does not serialize an unknown Video duration as zero', async () => {
     const c = {
       ...conversation(10, 'Video Unknown Duration'),

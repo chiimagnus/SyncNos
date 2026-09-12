@@ -2,9 +2,9 @@
 
 # SyncNos
 
-把 AI 对话、网页文章和视频字幕先保存到浏览器本地，再决定是否同步或导出。
+把 AI 对话、网页文章和视频内容先保存到浏览器本地，再决定是否同步或导出。
 
-支持采集的 AI 对话、网页文章与 YouTube/Bilibili 字幕会先进入本地存储；之后可选择同步到 Notion / Obsidian / 飞书 / GitHub，把已选内容导出为 Markdown / JSON，或创建本地 Backup ZIP。
+支持采集的 AI 对话、网页文章与 YouTube/Bilibili 视频页面内容会先进入本地存储；Video 会保留可用的简介、章节与字幕等内容。之后可选择同步到 Notion / Obsidian / 飞书 / GitHub，把已选内容导出为 Markdown / JSON，或创建本地 Backup ZIP。
 
 [SyncNos 天使赞助者们😍](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
 
@@ -58,9 +58,9 @@ SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派
 
 普通 `http(s)` 页面都可以手动抓取；受支持的视频 URL 会直接进入 Video 采集，不会再保存成网页文章。SyncNos 提取可读正文和必要元数据，并在需要时使用站点特定的降级逻辑。抓取后的文章支持评论与仅划线注释；在已登录的得到课程文章页面中，页面可用的个人划线与笔记也会导入文章评论层。
 
-### 视频字幕
+### 视频采集
 
-Video 采集支持 YouTube `watch` / `youtu.be` 页面与 Bilibili BV 视频页。Popup、页面内保存按钮和右键 SyncNos 的单一动态保存项都走同一套 Video 路由。SyncNos 会保存页面已加载的字幕/转录文本与精确时间范围，并保留标题、作者、完整简介、时长、缩略图等必要来源上下文；Bilibili 当前播放器已经自然加载章节/看点时也会一并保存。字幕尚未加载时不会创建空 Video，也不会降级成网页文章。SyncNos 不下载音视频流；Bilibili `av`、YouTube Shorts、任意 `/video/*`、播放统计/tags 与章节图片不属于当前支持契约。
+Video 采集支持 YouTube `watch` / `youtu.be` 页面、Bilibili BV 视频页，以及带合法 `bvid` 的 Bilibili 稍后再看播放页。Popup、页面内保存按钮和右键 SyncNos 的单一动态保存项都走同一套 Video 路由。SyncNos 会保存标题、作者、完整简介、时长、缩略图等可用来源上下文；页面已加载字幕时同时保存字幕/转录文本与精确时间范围，Bilibili 当前播放器已经自然加载章节/看点时也会一并保存。Bilibili 稍后再看 URL 会按 `bvid` 归一为同一个 `https://www.bilibili.com/video/<BV>/` identity（`oid` 不参与 SyncNos identity）。没有字幕时仍会创建或更新 Video，不会降级成网页文章；字幕稍后加载后再次保存即可补充或更新 transcript。SyncNos 不下载音视频流；Bilibili `av`、YouTube Shorts、任意 `/video/*`、播放统计/tags 与章节图片不属于当前支持契约。
 
 ## 输出目标
 

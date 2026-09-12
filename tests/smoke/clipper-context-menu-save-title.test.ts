@@ -124,7 +124,7 @@ describe('clipper context menu save title', () => {
 
     vi.mocked(tabsSendMessage).mockResolvedValue({
       ok: true,
-      data: { available: true, kind: 'video', label: 'Fetch Video Transcript', collectorId: 'video' },
+      data: { available: true, kind: 'video', label: 'Save Video', collectorId: 'video' },
       error: null,
     } as any);
 
@@ -141,7 +141,7 @@ describe('clipper context menu save title', () => {
     menusApi.__emitShown({ id: 7, url: 'https://www.bilibili.com/video/BV1FwY4zkEef/' });
     await flushMicrotasks();
     expect(menusApi.update).toHaveBeenCalledWith('syncnos_clipper_save_current_page', {
-      title: 'Save video transcript',
+      title: 'Save video',
     });
   });
 

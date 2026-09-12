@@ -242,25 +242,117 @@ describe('Video Current Page persistence pipeline', () => {
     now = 5_000;
     extractionMocks.fixture = {
       ...fixture({
-        description: 'Must not persist',
+        description: 'Description without subtitles',
         text: 'unused',
         start: 11,
         end: 12,
-        chapters: [{ title: 'Must not persist', startSeconds: 0, endSeconds: 1 }],
+        chapters: [{ title: 'Metadata-only chapter', startSeconds: 60, endSeconds: 90 }],
       }),
       cues: [],
     };
     const empty = await currentPage.captureCurrentPage();
-    expect(empty).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: null, isNew: false });
+    expect(empty).toMatchObject({
+      kind: 'video',
+      subtitleStatus: 'empty',
+      conversationId: firstConversationId,
+      isNew: false,
+    });
     stored = await readVideoRows();
     expect(stored.conversations).toHaveLength(1);
     expect(stored.messages).toHaveLength(1);
-    expect(stored.conversations[0].videoDescription).toBe('Description v4');
-    expect(stored.conversations[0].lastActivityAt).toBe(4_000);
+    expect(stored.conversations[0].videoDescription).toBe('Description without subtitles');
+    expect(stored.conversations[0].lastActivityAt).toBe(5_000);
     expect(stored.messages[0].contentMarkdown).toBe('[00:09 → 00:10] chapters cleared');
-    expect(stored.messages[0].videoChapters).toEqual([]);
+    expect(stored.messages[0].transcriptCues).toEqual([{ startSeconds: 9, endSeconds: 10, text: 'chapters cleared' }]);
+    expect(stored.messages[0].videoChapters).toEqual([
+      { title: 'Metadata-only chapter', startSeconds: 60, endSeconds: 90 },
+    ]);
+
+    now = 6_000;
+    extractionMocks.fixture = {
+      ...fixture({
+        description: 'Description without subtitles again',
+        text: 'unused',
+        start: 13,
+        end: 14,
+        chapters: null,
+      }),
+      cues: [],
+    };
+    await currentPage.captureCurrentPage();
+    stored = await readVideoRows();
+    expect(stored.conversations[0].videoDescription).toBe('Description without subtitles again');
+    expect(stored.conversations[0].lastActivityAt).toBe(6_000);
+    expect(stored.messages[0].contentMarkdown).toBe('[00:09 → 00:10] chapters cleared');
+    expect(stored.messages[0].transcriptCues).toEqual([{ startSeconds: 9, endSeconds: 10, text: 'chapters cleared' }]);
+    expect(stored.messages[0].videoChapters).toEqual([
+      { title: 'Metadata-only chapter', startSeconds: 60, endSeconds: 90 },
+    ]);
 
     expect(sentTypes).not.toContain(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
     expect(sentTypes).not.toContain(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB);
+  });
+
+  it('creates a new metadata-only Video when subtitles are absent on the first capture', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(7_000);
+    const router = createBackgroundRouter({
+      fallback: (msg: any) => ({
+        ok: false,
+        data: null,
+        error: { message: `unexpected message type: ${msg?.type}`, extra: null },
+      }),
+    });
+    registerConversationHandlers(router, {
+      onConversationChanged: async () => {},
+      onRemoteCleanupPending: async () => {},
+    });
+    const runtime = {
+      send: async (type: string, payload: Record<string, unknown> = {}) => {
+        if (
+          type === ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB ||
+          type === ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB
+        ) {
+          throw new Error(`Article route must not be used for Video: ${type}`);
+        }
+        return await router.__handleMessageForTests({ type, ...payload });
+      },
+    };
+    const videoCapture = createVideoTranscriptCaptureService({ runtime });
+    const currentPage = createCurrentPageCaptureService({
+      runtime,
+      videoCapture,
+      collectorsRegistry: {
+        pickActive: () => ({ id: 'web', collector: { capture: vi.fn(() => null) } }),
+        list: () => [],
+      },
+    });
+
+    extractionMocks.fixture = {
+      ...fixture({
+        description: 'Metadata-only description',
+        text: 'unused',
+        start: 1,
+        end: 2,
+        chapters: [{ title: 'Only chapter', startSeconds: 0, endSeconds: 45 }],
+      }),
+      cues: [],
+    };
+    const result = await currentPage.captureCurrentPage();
+    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', isNew: true });
+
+    const stored = await readVideoRows();
+    expect(stored.conversations).toHaveLength(1);
+    expect(stored.conversations[0]).toMatchObject({
+      sourceType: 'video',
+      videoDescription: 'Metadata-only description',
+      lastActivityAt: 7_000,
+    });
+    expect(stored.messages).toHaveLength(1);
+    expect(stored.messages[0]).toMatchObject({
+      messageKey: 'video_transcript',
+      contentMarkdown: '',
+      videoChapters: [{ title: 'Only chapter', startSeconds: 0, endSeconds: 45 }],
+    });
+    expect(stored.messages[0]).not.toHaveProperty('transcriptCues');
   });
 });

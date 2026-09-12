@@ -95,13 +95,13 @@ describe('current-page-capture content handlers', () => {
     };
 
     const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({ message: 'No subtitles detected (not saved).', kind: 'default' });
+      input?.onProgress?.({ message: 'No subtitles detected; available video details were saved.', kind: 'default' });
       return {
         kind: 'video',
         label: 'Fetch Video Transcript',
         collectorId: 'video',
-        conversationId: null,
-        isNew: false,
+        conversationId: 42,
+        isNew: true,
         subtitleStatus: 'empty',
       };
     });
@@ -119,8 +119,10 @@ describe('current-page-capture content handlers', () => {
     await waitFor(() => response?.ok === true);
 
     expect(captureCurrentPage).toHaveBeenCalledTimes(1);
-    expect(showSaveTip).toHaveBeenCalledWith('No subtitles detected (not saved).', { kind: 'default' });
-    expect(response?.data).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: null });
+    expect(showSaveTip).toHaveBeenCalledWith('No subtitles detected; available video details were saved.', {
+      kind: 'default',
+    });
+    expect(response?.data).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 42, isNew: true });
   });
 
   it('registers capture listeners immediately and waits for locale before service work', async () => {

@@ -260,7 +260,7 @@ describe('notion-sync-orchestrator kind routing', () => {
             role: 'transcript',
             sequence: 1,
             updatedAt: 2_000,
-            contentMarkdown: '[00:01.234] hello',
+            contentMarkdown: '',
             videoChapters: [{ title: 'Intro', startSeconds: 0, endSeconds: 30 }],
           },
         ],
@@ -314,7 +314,7 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(projectedMessage).toMatchObject({ role: 'transcript', messageKey: 'video_transcript' });
     expect(projectedMessage.contentMarkdown).toContain('## Description\n\nDescription body');
     expect(projectedMessage.contentMarkdown).toContain('## Chapters\n\n- [00:00 → 00:30] Intro');
-    expect(projectedMessage.contentMarkdown).toContain('[00:01.234] hello');
+    expect(projectedMessage.contentMarkdown).not.toContain('hello');
     expect(projectedMessage.contentMarkdown).not.toContain('## Transcript');
     const bodyAppend = appendCalls.find((call) => call.blockId.startsWith('h_video_'));
     expect(bodyAppend?.blocks).toHaveLength(1);

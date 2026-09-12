@@ -16,7 +16,7 @@ vi.mock('@i18n', () => ({
       fetchingDots: 'Fetching...',
       checkingDots: 'Checking...',
       partialCaptureSaved: 'Partial capture saved',
-      videoTranscriptTipNoSubtitles: 'No subtitles detected (not saved).',
+      videoTranscriptTipNoSubtitles: 'No subtitles detected; available video details were saved.',
     })[key] || key,
 }));
 vi.mock('@services/shared/capture-tip', () => ({
@@ -72,7 +72,7 @@ afterEach(async () => {
 });
 
 describe('popup current-page video capture', () => {
-  it('shows video state and treats empty subtitles as not saved', async () => {
+  it('shows video state and treats empty subtitles as a saved metadata-only video', async () => {
     const onCaptured = vi.fn();
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
@@ -88,8 +88,8 @@ describe('popup current-page video capture', () => {
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',
-          conversationId: null,
-          isNew: false,
+          conversationId: 19,
+          isNew: true,
           subtitleStatus: 'empty',
           title: 'Talk',
         });
@@ -107,9 +107,12 @@ describe('popup current-page video capture', () => {
       result = await latest?.capture();
     });
 
-    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: null });
-    expect(onCaptured).not.toHaveBeenCalled();
-    expect(latest?.status).toEqual({ kind: 'default', message: 'No subtitles detected (not saved).' });
+    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 19, isNew: true });
+    expect(onCaptured).toHaveBeenCalledTimes(1);
+    expect(latest?.status).toEqual({
+      kind: 'default',
+      message: 'No subtitles detected; available video details were saved.',
+    });
     expect(sendMock.mock.calls.filter(([type]) => type === 'getActiveTabCaptureState')).toHaveLength(2);
   });
 

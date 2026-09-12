@@ -6,7 +6,7 @@ This Privacy Policy applies to SyncNos WebClipper (the “Extension”), includi
 
 ## 1. Purpose
 
-The Extension helps you capture supported AI conversations, web articles, and already-loaded video transcripts; manage local article comments and cached images; export local data; and optionally sync local content to external destinations that you configure.
+The Extension helps you capture supported AI conversations, web articles, and useful context from supported video pages, including already-loaded transcripts when available; manage local article comments and cached images; export local data; and optionally sync local content to external destinations that you configure.
 
 SyncNos is local-first. A successful local save is the primary record; external sync targets and exported files are derived copies.
 

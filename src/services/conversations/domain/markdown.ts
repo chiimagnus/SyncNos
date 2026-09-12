@@ -101,10 +101,9 @@ export function formatVideoContentMarkdown(
   }
 
   const transcriptBody = String(transcript?.contentMarkdown || '');
-  if (options.includeTranscriptHeading === false) {
-    if (transcriptBody) sections.push(transcriptBody);
-  } else {
-    sections.push(`## Transcript${transcriptBody ? `\n\n${transcriptBody}` : ''}`);
+  if (transcriptBody) {
+    if (options.includeTranscriptHeading === false) sections.push(transcriptBody);
+    else sections.push(`## Transcript\n\n${transcriptBody}`);
   }
   return sections.join('\n\n').trim();
 }
