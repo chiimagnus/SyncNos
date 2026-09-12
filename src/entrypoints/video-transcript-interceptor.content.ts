@@ -11,7 +11,6 @@ type InterceptedResponsePayload = {
   url: string;
   pageUrl: string;
   bodyText: string;
-  at: number;
 };
 
 type MetaRequestPayload = {
@@ -167,12 +166,7 @@ function wrapFetch() {
       if (!cloned || typeof cloned.text !== 'function') return response;
       const bodyText = String(await cloned.text());
       if (!bodyText) return response;
-      postIntercept({
-        url,
-        pageUrl,
-        bodyText,
-        at: Date.now(),
-      });
+      postIntercept({ url, pageUrl, bodyText });
     } catch (_error) {
       // ignore
     }
@@ -229,12 +223,7 @@ function wrapXhr() {
             try {
               const bodyText = readXhrBody(this);
               if (!bodyText) return;
-              postIntercept({
-                url,
-                pageUrl,
-                bodyText,
-                at: Date.now(),
-              });
+              postIntercept({ url, pageUrl, bodyText });
             } catch (_error) {
               // ignore
             }

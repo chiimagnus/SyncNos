@@ -54,8 +54,7 @@ function selectMetaCandidate(
   if (!candidates) return null;
   for (const candidate of [candidates.state, candidates.dom]) {
     if (!candidate) continue;
-    const identityUrl = canonicalizeVideoUrl(candidate.identityUrl);
-    if (identityUrl && identityUrl === currentUrl) return candidate;
+    if (canonicalizeVideoUrl(candidate.identityUrl) === currentUrl) return candidate;
   }
   return null;
 }
@@ -65,7 +64,6 @@ async function collectMeta(): Promise<VideoTranscriptMeta> {
   const platform = detectSupportedVideoPagePlatform(href);
   if (!platform) throw new Error('unsupported video page');
   const canonical = canonicalizeVideoUrl(href);
-  if (!canonical) throw new Error('invalid video URL');
   const candidates = await requestVideoPageMeta();
   const candidate = selectMetaCandidate(candidates, canonical);
 
@@ -83,11 +81,10 @@ async function collectMeta(): Promise<VideoTranscriptMeta> {
 function listCurrentResponses(currentUrl: string, kind: VideoResponseKind): InterceptedResponse[] {
   return listVideoInterceptedResponses()
     .filter((item) => {
-      if (!item || classifyVideoResponseUrl(item.url) !== kind) return false;
-      const pageUrl = canonicalizeVideoUrl(item.pageUrl);
-      return !!pageUrl && pageUrl === currentUrl;
+      if (classifyVideoResponseUrl(item.url) !== kind) return false;
+      return canonicalizeVideoUrl(item.pageUrl) === currentUrl;
     })
-    .sort((left, right) => Number(right.at) - Number(left.at));
+    .reverse();
 }
 
 function parseYoutubeBody(bodyText: string): TranscriptCue[] {
@@ -109,7 +106,7 @@ function extractYoutubeCuesFromIntercept(currentUrl: string): TranscriptCue[] {
 
 function extractBilibiliCuesFromIntercept(currentUrl: string): TranscriptCue[] {
   for (const item of listCurrentResponses(currentUrl, 'bilibili-subtitle')) {
-    const cues = parseBilibiliSubtitleJson(String(item.bodyText || ''));
+    const cues = parseBilibiliSubtitleJson(item.bodyText);
     if (cues.length) return cues;
   }
   return [];
@@ -117,7 +114,7 @@ function extractBilibiliCuesFromIntercept(currentUrl: string): TranscriptCue[] {
 
 function extractBilibiliChaptersFromIntercept(currentUrl: string): VideoChapter[] | null {
   for (const item of listCurrentResponses(currentUrl, 'bilibili-chapters')) {
-    const chapters = parseBilibiliViewPointsJson(String(item.bodyText || ''));
+    const chapters = parseBilibiliViewPointsJson(item.bodyText);
     if (chapters !== null) return chapters;
   }
   return null;

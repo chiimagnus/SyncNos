@@ -223,8 +223,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     try {
       if (target.kind === 'video') {
         const result = await videoCapture.captureVideoTranscript();
-        const conversationId = normalizeConversationId(result.conversationId);
-        if (conversationId == null) throw new Error('invalid video capture response');
         report(
           result.subtitleStatus === 'empty'
             ? t('videoTranscriptTipNoSubtitles')
@@ -235,7 +233,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           kind: 'video',
           label: target.label,
           collectorId: 'video',
-          conversationId,
+          conversationId: result.conversationId,
           title: result.title,
           isNew: result.isNew,
           subtitleStatus: result.subtitleStatus,

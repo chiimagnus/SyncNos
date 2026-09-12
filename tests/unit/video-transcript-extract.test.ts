@@ -68,25 +68,21 @@ describe('video transcript extraction', () => {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/a.json',
         pageUrl: pageA,
         bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'A subtitle' }] }),
-        at: 10,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=a',
         pageUrl: pageA,
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'A chapter', from: 0, to: 10 }] } }),
-        at: 11,
       },
       {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
         pageUrl: pageB,
         bodyText: JSON.stringify({ body: [{ from: 1.234, to: 3.456, content: 'B subtitle' }] }),
-        at: 20,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=b',
         pageUrl: pageB,
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'B chapter', from: 0, to: 30 }] } }),
-        at: 21,
       },
     ]);
 
@@ -131,13 +127,11 @@ describe('video transcript extraction', () => {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/watchlater.json',
         pageUrl: watchLater,
         bodyText: JSON.stringify({ body: [{ from: 1.25, to: 2.5, content: 'subtitle' }] }),
-        at: 1,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=watchlater',
         pageUrl: watchLater,
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'Chapter', from: 0, to: 30 }] } }),
-        at: 2,
       },
     ]);
 
@@ -160,12 +154,10 @@ describe('video transcript extraction', () => {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/a.json',
         pageUrl: pageA,
         bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'A subtitle' }] }),
-        at: 10,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=missing-page',
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'old', from: 0, to: 10 }] } }),
-        at: 11,
       },
     ]);
 
@@ -183,19 +175,16 @@ describe('video transcript extraction', () => {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
         pageUrl: page,
         bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'subtitle' }] }),
-        at: 1,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=valid',
         pageUrl: page,
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'Valid', from: 0, to: 20 }] } }),
-        at: 2,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=latest-incomplete',
         pageUrl: page,
         bodyText: JSON.stringify({ code: 0, data: {} }),
-        at: 3,
       },
     ]);
 
@@ -213,13 +202,11 @@ describe('video transcript extraction', () => {
         url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
         pageUrl: page,
         bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'subtitle' }] }),
-        at: 1,
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=b',
         pageUrl: page,
         bodyText: JSON.stringify({ code: 0, data: { view_points: [] } }),
-        at: 2,
       },
     ]);
 
@@ -272,13 +259,11 @@ describe('video transcript extraction', () => {
         url: 'https://www.youtube.com/api/timedtext?v=current&lang=en',
         pageUrl: page,
         bodyText: '<transcript><text start="1.25" dur="1.5">valid</text></transcript>',
-        at: 1,
       },
       {
         url: 'https://www.youtube.com/api/timedtext?v=current&lang=en&fmt=invalid',
         pageUrl: page,
         bodyText: '{not valid json',
-        at: 2,
       },
     ]);
 
@@ -301,7 +286,6 @@ describe('video transcript extraction', () => {
         url: 'https://www.youtube.com/api/timedtext?v=old',
         pageUrl: 'https://www.youtube.com/watch?v=old',
         bodyText: '<transcript><text start="1" dur="1">old</text></transcript>',
-        at: 1,
       },
     ]);
 

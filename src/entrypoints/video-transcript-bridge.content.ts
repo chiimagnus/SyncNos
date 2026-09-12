@@ -4,7 +4,6 @@ type StoreResponse = {
   url: string;
   pageUrl: string;
   bodyText: string;
-  at: number;
 };
 
 type VideoTranscriptBridgeStore = {
@@ -31,12 +30,7 @@ function pushResponse(store: VideoTranscriptBridgeStore, next: unknown) {
   const bodyText = String(input.bodyText || '');
   if (!classifyVideoResponseUrl(url) || !pageUrl || !bodyText || bodyText.length > MAX_BODY_CHARS) return;
 
-  store.responses.push({
-    url,
-    pageUrl,
-    bodyText,
-    at: Number(input.at) || Date.now(),
-  });
+  store.responses.push({ url, pageUrl, bodyText });
   if (store.responses.length > MAX_RESPONSES) {
     store.responses.splice(0, store.responses.length - MAX_RESPONSES);
   }

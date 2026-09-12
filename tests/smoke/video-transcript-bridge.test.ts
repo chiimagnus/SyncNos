@@ -60,7 +60,6 @@ describe('video transcript isolated bridge', () => {
       url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/current.json',
       pageUrl: location.href,
       bodyText: '{"body":[]}',
-      at: 10,
     });
     dispatch({
       __syncnos: true,
@@ -68,14 +67,12 @@ describe('video transcript isolated bridge', () => {
       url: 'https://evil.example/?next=https://www.youtube.com/api/timedtext',
       pageUrl: location.href,
       bodyText: 'evil',
-      at: 11,
     });
     dispatch({
       __syncnos: true,
       type: 'SYNCNOS_VIDEO_INTERCEPTED',
       url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/no-page.json',
       bodyText: '{"body":[]}',
-      at: 12,
     });
     dispatch({
       __syncnos: true,
@@ -90,7 +87,6 @@ describe('video transcript isolated bridge', () => {
           url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/current.json',
           pageUrl: location.href,
           bodyText: '{"body":[]}',
-          at: 10,
         },
       ],
     });
@@ -107,7 +103,6 @@ describe('video transcript isolated bridge', () => {
       url: 'https://api.bilibili.com/x/player/wbi/v2?limit=exact',
       pageUrl: location.href,
       bodyText: exactlyAtLimit,
-      at: 1,
     });
     expect((globalThis as any)[STORE_KEY].responses).toHaveLength(1);
     expect((globalThis as any)[STORE_KEY].responses[0].bodyText).toHaveLength(2_000_000);
@@ -118,7 +113,6 @@ describe('video transcript isolated bridge', () => {
       url: 'https://api.bilibili.com/x/player/wbi/v2?limit=over',
       pageUrl: location.href,
       bodyText: `${exactlyAtLimit}x`,
-      at: 2,
     });
     expect((globalThis as any)[STORE_KEY].responses).toHaveLength(1);
 
@@ -129,7 +123,6 @@ describe('video transcript isolated bridge', () => {
         url: `https://api.bilibili.com/x/player/wbi/v2?index=${index}`,
         pageUrl: location.href,
         bodyText: `body-${index}`,
-        at: 100 + index,
       });
     }
 
