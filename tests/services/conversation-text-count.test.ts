@@ -151,10 +151,11 @@ describe('countConversationMessageTextUnits', () => {
             '[00:01.234] alpha beta',
             '[00:01.234 → 00:03.456] gamma',
             '[01:02:03.004 → 01:02:05.006] delta',
+            '[100:00:00 → 100:00:01] epsilon',
           ].join('\n'),
         },
       ]),
-    ).toBe(9);
+    ).toBe(10);
   });
 
   it('keeps timestamp-like text for ordinary messages', () => {
