@@ -340,7 +340,7 @@ describe('video page metadata request', () => {
       );
     });
 
-    await expect(requestVideoPageMeta({ timeoutMs: 50 })).resolves.toEqual({
+    await expect(requestVideoPageMeta()).resolves.toEqual({
       state: { platform: 'bilibili', identityUrl: location.href },
       dom: null,
     });
@@ -348,11 +348,18 @@ describe('video page metadata request', () => {
   });
 
   it('times out without polling or retaining a pending request', async () => {
-    installDom('https://www.youtube.com/watch?v=current');
-    const removeSpy = vi.spyOn(window, 'removeEventListener');
-    vi.spyOn(window, 'postMessage').mockImplementation(() => undefined);
+    vi.useFakeTimers();
+    try {
+      installDom('https://www.youtube.com/watch?v=current');
+      const removeSpy = vi.spyOn(window, 'removeEventListener');
+      vi.spyOn(window, 'postMessage').mockImplementation(() => undefined);
 
-    await expect(requestVideoPageMeta({ timeoutMs: 1 })).resolves.toBeNull();
-    expect(removeSpy).toHaveBeenCalledWith('message', expect.any(Function));
+      const pending = requestVideoPageMeta();
+      await vi.advanceTimersByTimeAsync(1_200);
+      await expect(pending).resolves.toBeNull();
+      expect(removeSpy).toHaveBeenCalledWith('message', expect.any(Function));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
