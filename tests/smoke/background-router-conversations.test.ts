@@ -289,10 +289,7 @@ describe('background-router conversations', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith([
-      'ai_chat_cache_images_enabled',
-      'web_article_cache_images_enabled',
-    ]);
+    expect(localStorageMocks.storageGet).not.toHaveBeenCalled();
     expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
     expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2004, messages, {
       mode: 'snapshot',

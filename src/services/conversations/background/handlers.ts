@@ -240,23 +240,30 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         .toLowerCase() || 'chat';
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
-    try {
-      const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
-      const aboutYouUserName =
-        normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+    const needsDefaultUserAuthor = messages.some((message: any) => {
+      if (!message || typeof message !== 'object') return false;
+      const role = String(message.role || '')
+        .trim()
+        .toLowerCase();
+      return role === 'user' && !String(message.authorName || '').trim();
+    });
+    if (needsDefaultUserAuthor) {
+      try {
+        const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+        const aboutYouUserName =
+          normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
 
-      messages = messages.map((m: any) => {
-        if (!m || typeof m !== 'object') return m;
-        const role = String((m as any).role || '')
-          .trim()
-          .toLowerCase();
-        if (role !== 'user') return m;
-        const currentAuthor = String((m as any).authorName || '').trim();
-        if (currentAuthor) return m;
-        return { ...(m as any), authorName: aboutYouUserName };
-      });
-    } catch (_e) {
-      // ignore: authorName is optional and will fallback during rendering
+        messages = messages.map((message: any) => {
+          if (!message || typeof message !== 'object') return message;
+          const role = String(message.role || '')
+            .trim()
+            .toLowerCase();
+          if (role !== 'user' || String(message.authorName || '').trim()) return message;
+          return { ...message, authorName: aboutYouUserName };
+        });
+      } catch (_e) {
+        // ignore: authorName is optional and will fallback during rendering
+      }
     }
     if (sourceType !== 'video') {
       try {
