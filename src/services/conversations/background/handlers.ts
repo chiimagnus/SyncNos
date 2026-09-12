@@ -234,6 +234,10 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (hasActivityAt && (!Number.isFinite(activityAt) || Number(activityAt) <= 0)) {
       return router.err('invalid activityAt');
     }
+    const sourceType =
+      String(msg?.conversationSourceType || '')
+        .trim()
+        .toLowerCase() || 'chat';
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
     try {
@@ -254,54 +258,52 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     } catch (_e) {
       // ignore: authorName is optional and will fallback during rendering
     }
-    try {
-      const sourceType =
-        String(msg?.conversationSourceType || '')
-          .trim()
-          .toLowerCase() || 'chat';
-      const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
-      const enabled =
-        sourceType === 'article'
-          ? local?.web_article_cache_images_enabled === true
-          : local?.ai_chat_cache_images_enabled === true;
-      const keys =
-        (mode === 'incremental' || mode === 'append') && diff
-          ? new Set(
-              [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
-                .map((x) => String(x || '').trim())
-                .filter(Boolean),
-            )
-          : null;
-      const inlined = await inlineChatImagesInMessages({
-        conversationId,
-        conversationUrl: String(msg?.conversationUrl || ''),
-        messages,
-        onlyMessageKeys: keys,
-        enableHttpImages: enabled,
-      });
-      messages = inlined.messages;
-      if (
-        inlined.inlinedCount > 0 ||
-        inlined.downloadedCount > 0 ||
-        inlined.fromCacheCount > 0 ||
-        (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
-      ) {
-        console.info('[ImageInline]', {
+    if (sourceType !== 'video') {
+      try {
+        const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+        const enabled =
+          sourceType === 'article'
+            ? local?.web_article_cache_images_enabled === true
+            : local?.ai_chat_cache_images_enabled === true;
+        const keys =
+          (mode === 'incremental' || mode === 'append') && diff
+            ? new Set(
+                [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
+                  .map((x) => String(x || '').trim())
+                  .filter(Boolean),
+              )
+            : null;
+        const inlined = await inlineChatImagesInMessages({
+          conversationId,
+          conversationUrl: String(msg?.conversationUrl || ''),
+          messages,
+          onlyMessageKeys: keys,
+          enableHttpImages: enabled,
+        });
+        messages = inlined.messages;
+        if (
+          inlined.inlinedCount > 0 ||
+          inlined.downloadedCount > 0 ||
+          inlined.fromCacheCount > 0 ||
+          (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
+        ) {
+          console.info('[ImageInline]', {
+            conversationId,
+            mode,
+            inlinedCount: inlined.inlinedCount,
+            downloadedCount: inlined.downloadedCount,
+            fromCacheCount: inlined.fromCacheCount,
+            inlinedBytes: inlined.inlinedBytes,
+            warningFlags: inlined.warningFlags,
+          });
+        }
+      } catch (error) {
+        console.warn('[ImageInline] failed but capture continues', {
           conversationId,
           mode,
-          inlinedCount: inlined.inlinedCount,
-          downloadedCount: inlined.downloadedCount,
-          fromCacheCount: inlined.fromCacheCount,
-          inlinedBytes: inlined.inlinedBytes,
-          warningFlags: inlined.warningFlags,
+          error: error instanceof Error ? error.message : String(error || ''),
         });
       }
-    } catch (error) {
-      console.warn('[ImageInline] failed but capture continues', {
-        conversationId,
-        mode,
-        error: error instanceof Error ? error.message : String(error || ''),
-      });
     }
 
     const res = await syncConversationMessages(conversationId, messages, {

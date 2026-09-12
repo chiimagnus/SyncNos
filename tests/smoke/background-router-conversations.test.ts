@@ -269,6 +269,37 @@ describe('background-router conversations', () => {
     );
   });
 
+  it('skips chat/article image inlining for Video transcript messages', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const router = createRouter();
+    const messages = [
+      {
+        messageKey: 'video_transcript',
+        role: 'transcript',
+        contentMarkdown: '[00:01] ![caption](https://example.com/not-an-image.png)',
+      },
+    ];
+
+    const res = await router.__handleMessageForTests({
+      type: 'syncConversationMessages',
+      conversationId: 2004,
+      conversationSourceType: 'video',
+      conversationUrl: 'https://www.bilibili.com/video/BV1TEST12345/',
+      messages,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith([
+      'ai_chat_cache_images_enabled',
+      'web_article_cache_images_enabled',
+    ]);
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2004, messages, {
+      mode: 'snapshot',
+      diff: null,
+    });
+  });
+
   it('keeps transient protective policies through author normalization and image inlining', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
