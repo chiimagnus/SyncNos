@@ -139,7 +139,6 @@ describe('video transcript main-world interceptor', () => {
     expect(posted[0]).toMatchObject({
       url: 'https://www.youtube.com/api/timedtext',
       pageUrl: pageB,
-      contentType: 'application/json',
       bodyText: JSON.stringify(xhr.response),
     });
   });

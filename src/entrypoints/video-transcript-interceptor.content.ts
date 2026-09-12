@@ -10,7 +10,6 @@ type InterceptedResponsePayload = {
   type: 'SYNCNOS_VIDEO_INTERCEPTED';
   url: string;
   pageUrl: string;
-  contentType?: string;
   bodyText: string;
   at: number;
 };
@@ -38,10 +37,6 @@ function normalizeDuration(value: unknown): number | null {
   if (value == null || (typeof value === 'string' && !value.trim())) return null;
   const duration = Number(value);
   return Number.isFinite(duration) && duration >= 0 ? duration : null;
-}
-
-function parseContentType(value: unknown): string {
-  return String(value || '').trim();
 }
 
 function resolveAbsoluteUrl(raw: unknown): string {
@@ -180,7 +175,6 @@ function wrapFetch() {
       postIntercept({
         url,
         pageUrl,
-        contentType: parseContentType(cloned?.headers?.get?.('content-type')),
         bodyText,
         at: Date.now(),
       });
@@ -243,7 +237,6 @@ function wrapXhr() {
               postIntercept({
                 url,
                 pageUrl,
-                contentType: parseContentType((this as any).getResponseHeader?.('content-type')),
                 bodyText,
                 at: Date.now(),
               });

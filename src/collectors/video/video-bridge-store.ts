@@ -3,7 +3,6 @@ import type { VideoPageMetaCandidates } from '@services/shared/video-capture';
 type StoreResponse = {
   url: string;
   pageUrl: string;
-  contentType?: string;
   bodyText: string;
   at: number;
 };

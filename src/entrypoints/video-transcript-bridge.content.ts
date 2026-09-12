@@ -3,7 +3,6 @@ import { classifyVideoResponseUrl } from '@services/shared/video-capture';
 type StoreResponse = {
   url: string;
   pageUrl: string;
-  contentType?: string;
   bodyText: string;
   at: number;
 };
@@ -34,7 +33,6 @@ function pushResponse(store: VideoTranscriptBridgeStore, next: StoreResponse) {
   store.responses.push({
     url,
     pageUrl,
-    contentType: next?.contentType ? String(next.contentType) : undefined,
     bodyText,
     at: Number(next?.at) || Date.now(),
   });
@@ -56,7 +54,6 @@ export default defineContentScript({
       pushResponse(store, {
         url: String(data.url || ''),
         pageUrl: String(data.pageUrl || ''),
-        contentType: data.contentType ? String(data.contentType) : undefined,
         bodyText: String(data.bodyText || ''),
         at: Number(data.at) || Date.now(),
       });
