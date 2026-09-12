@@ -6,8 +6,6 @@ export type VideoTranscriptCue = {
   text: string;
 };
 
-export type { VideoChapter, VideoPlatform };
-
 function normalizeText(value: unknown): string {
   return String(value ?? '')
     .replace(/\r\n/g, '\n')
