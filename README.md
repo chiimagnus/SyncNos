@@ -29,6 +29,30 @@ SyncNos is local-first: captured content is saved locally before any optional sy
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari (macOS / iOS) | Build from source with Xcode |
 
+### Local CLI (macOS)
+
+The SyncNos CLI is a local frontend for the data and business logic owned by the running browser Extension. It does not maintain a second database and is not an offline daemon.
+
+Download `syncnos-cli-<version>.tgz` from the matching GitHub Release, then install and register the Native Messaging host for Chrome:
+
+```bash
+npm install -g ./syncnos-cli-<version>.tgz
+syncnos install --browser chrome
+syncnos doctor
+```
+
+In the same browser profile, open **Settings → General → Local CLI Integration** and enable **SyncNos CLI**. The browser must remain running for business CLI commands. `syncnos doctor` reports package/manifest/connection state without guessing which browser-side condition is responsible when the Extension is unreachable.
+
+CLI Native Messaging has a separate support boundary from Extension installation channels:
+
+| Browser / platform | CLI v1 status |
+| --- | --- |
+| Google Chrome / macOS | Release target. A real Chrome `connectNative → status/revision` smoke is required before a release is considered validated. |
+| Firefox / macOS | Not claimed as supported until a real browser round-trip passes. |
+| Helium / macOS | Not claimed in v1; Native Messaging discovery works through Chrome-compatible paths, but the full SyncNos product gate is incomplete. |
+| Zen / macOS | Not claimed in v1; the current CLI-enabled test XPI is not a signed release artifact, so the product gate is incomplete. |
+| Windows / Linux / Safari | Outside this CLI v1 scope. |
+
 ## Demo Video
 
 [![SyncNos demo video](docs/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)

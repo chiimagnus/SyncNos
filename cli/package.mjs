@@ -137,9 +137,11 @@ export async function packageCli({
   outDir,
   version,
   checkOnly = false,
+  requireWxtCoreMatch = false,
 } = {}) {
   const root = resolve(repoRoot);
   const prepared = await prepareCliPackage({ repoRoot: root, stagingDir, version });
+  if (requireWxtCoreMatch) assertReleaseCoreMatchesWxt(prepared.packageVersion, prepared.wxtVersion);
   if (checkOnly) return { ...prepared, tarballPath: null };
   const outputDir = resolve(outDir || join(root, '.output', 'cli'));
   await mkdir(outputDir, { recursive: true });
@@ -162,12 +164,16 @@ export async function packageCli({
 }
 
 function parseArgs(argv) {
-  const args = { version: null, checkOnly: false, outDir: null };
+  const args = { version: null, checkOnly: false, outDir: null, requireWxtCoreMatch: false };
   const input = Array.from(argv || []);
   while (input.length) {
     const token = input.shift();
     if (token === '--check') {
       args.checkOnly = true;
+      continue;
+    }
+    if (token === '--require-wxt-core-match') {
+      args.requireWxtCoreMatch = true;
       continue;
     }
     if (token === '--version') {
@@ -196,7 +202,12 @@ const isMain = !!process.argv[1] && pathToFileURL(process.argv[1]).href === impo
 if (isMain) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    const result = await packageCli({ version: args.version, checkOnly: args.checkOnly, outDir: args.outDir });
+    const result = await packageCli({
+      version: args.version,
+      checkOnly: args.checkOnly,
+      outDir: args.outDir,
+      requireWxtCoreMatch: args.requireWxtCoreMatch,
+    });
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     process.stderr.write(`${String(error?.code || 'cli_package_failed')}: ${String(error?.message || error)}\n`);

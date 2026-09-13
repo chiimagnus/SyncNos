@@ -46,6 +46,42 @@ jobs:
       - name: WebClipper gate (lint/format/compile/test)
         run: npm run gate:ci
 
+      - name: CLI package and installer tests
+        run: npm test -- --run tests/unit/cli-package.test.ts tests/unit/cli-installer.test.ts
+
+      - name: Build SyncNos CLI tgz
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          cli_version="${RELEASE_TAG#v}"
+          mkdir -p release-artifacts
+          node cli/package.mjs \
+            --version "$cli_version" \
+            --require-wxt-core-match \
+            --out release-artifacts
+
+      - name: Smoke install packaged SyncNos CLI
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          cli_version="${RELEASE_TAG#v}"
+          cli_tgz="release-artifacts/syncnos-cli-${cli_version}.tgz"
+          test -f "$cli_tgz"
+          prefix="$(mktemp -d)"
+          npm install -g "$cli_tgz" --prefix "$prefix" --ignore-scripts
+          "$prefix/bin/syncnos" --help >/dev/null
+          "$prefix/bin/syncnos" capabilities | node -e '
+            let input = "";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", (chunk) => (input += chunk));
+            process.stdin.on("end", () => {
+              const result = JSON.parse(input);
+              if (result?.ok !== true || !Number.isInteger(result?.data?.protocolVersion)) process.exit(1);
+            });
+          '
+
       - name: Build WebClipper Chrome zip
         run: |
           set -euo pipefail

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-09-12**
+**Last Updated: 2026-09-13**
 
 This Privacy Policy applies to SyncNos WebClipper (the “Extension”), including its supported Chromium, Firefox-family, and Safari builds.
 
@@ -33,9 +33,17 @@ Selected content exports and Backup ZIP files are assembled locally, but they ha
 
 A selected Markdown or JSON export contains the selected captured content and any referenced internal images that can be materialized from that content's own local image-cache scope. Selected export does not include sync mappings, article comments, settings, OAuth/authentication state, or provider secrets. Exporting does not make a new image network request: existing remote `http(s)` image targets and historical `data:image/...` targets remain in the exported content rather than being fetched into the archive.
 
-Backup ZIP is the separate restore package. It may include captured content, sync mappings, cached images, article comments, and non-sensitive settings. Backup filtering excludes authentication secrets including Notion and Feishu OAuth tokens, Notion and Feishu client secrets, the Obsidian Local REST API key, and GitHub Device Flow/auth state containing access tokens, refresh tokens, or pending device credentials.
+Backup ZIP is the separate restore package. It may include captured content, sync mappings, cached images, article comments, and non-sensitive settings. Backup filtering excludes authentication secrets including Notion and Feishu OAuth tokens, Notion and Feishu client secrets, the Obsidian Local REST API key, GitHub Device Flow/auth state containing access tokens, refresh tokens, or pending device credentials, and the Reader TTS AI API key.
 
 For the current backup, storage, and recovery contract, see [docs/storage.md](docs/storage.md).
+
+### Local CLI and Native Messaging
+
+On supported CLI targets, you can explicitly enable **Local CLI Integration** for a browser profile. The Extension then uses the optional browser `nativeMessaging` permission to connect to the local `app.syncnos.cli` Native Messaging host. The host and `syncnos` command communicate through same-user local IPC on the same computer; the host does not expose a remote network service, does not run an independent SyncNos database, and the CLI does not parse browser profile storage as a second source of truth.
+
+CLI RPC responses use a machine-safe surface and do not return provider OAuth tokens/secrets, Obsidian API keys, GitHub access credentials, or the Reader TTS AI API key. CLI file export/import operations use paths explicitly supplied by the user and transfer file contents locally between the Extension and host rather than through a SyncNos remote service.
+
+The local CLI instance identifier and the **Local CLI Integration enabled** state belong to the current machine/browser profile and are excluded from Backup ZIP migration. They can be recreated on another machine by enabling the integration there.
 
 ## 4. External Sync and Network Requests
 
@@ -85,6 +93,8 @@ Disconnecting an integration removes the corresponding active connection state a
 ## 6. Browser Permissions
 
 The manifest source of truth is `wxt.config.ts`. Current builds request the permissions needed for local storage, context-menu actions, tab/navigation handling, packaged script injection, scheduled auto-sync work, and anti-hotlink request handling. Browser-specific builds may use different declarative-network-request or tab-group permissions where the platform supports them.
+
+Non-Safari builds also declare `nativeMessaging` as an optional permission. SyncNos requests it only from the explicit **Local CLI Integration** user action; disabling the integration removes the permission when the browser exposes that API, and removal/revocation disables the stored integration state.
 
 The Extension currently declares `http://*/*` and `https://*/*` host access so it can capture arbitrary user-requested web pages and reach configured sync/OAuth/image endpoints. This broad access is not permission to upload page content by default; external transmission occurs through the features described in this policy.
 

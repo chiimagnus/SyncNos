@@ -36,13 +36,33 @@ describe('CLI package staging', () => {
     expect(localStage.packageVersion).toBe(wxtVersion);
   });
 
-  it('validates release core independently from packaging prerelease versions', () => {
+  it('validates release core independently from packaging prerelease versions', async () => {
     expect(assertReleaseCoreMatchesWxt('1.13.2-rc1', '1.13.2')).toBe(true);
     expect(() => assertReleaseCoreMatchesWxt('1.13.3-rc1', '1.13.2')).toThrow(/does not match/);
     expect(resolveCliPackageVersion({ explicitVersion: '1.13.3-rc1', wxtVersion: '1.13.2' })).toBe('1.13.3-rc1');
     expect(() => resolveCliPackageVersion({ explicitVersion: 'v1.13.2', wxtVersion: '1.13.2' })).toThrow(
       /Invalid npm semver/,
     );
+
+    await expect(
+      packageCli({
+        repoRoot: REPO_ROOT,
+        stagingDir: join(await tempDir('syncnos-cli-release-mismatch-'), 'package'),
+        version: '1.13.3-rc1',
+        checkOnly: true,
+        requireWxtCoreMatch: true,
+      }),
+    ).rejects.toMatchObject({ code: 'release_version_mismatch' });
+
+    await expect(
+      packageCli({
+        repoRoot: REPO_ROOT,
+        stagingDir: join(await tempDir('syncnos-cli-release-match-'), 'package'),
+        version: '1.13.2-rc1',
+        checkOnly: true,
+        requireWxtCoreMatch: true,
+      }),
+    ).resolves.toMatchObject({ packageVersion: '1.13.2-rc1', wxtVersion: '1.13.2' });
   });
 
   it('copies the canonical RPC contract byte-for-byte into an isolated staging package', async () => {

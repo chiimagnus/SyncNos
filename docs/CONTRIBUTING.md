@@ -2,7 +2,7 @@
 
 SyncNos 欢迎聚焦明确的 Bug 修复、站点适配器、文档改进，以及在不破坏仓库现有契约前提下进行的产品改动。
 
-本仓库**仅维护 SyncNos WebClipper**。
+本仓库维护 SyncNos WebClipper，以及与该 Extension 共用事实真源的本机 `syncnos` CLI / Native Messaging host。CLI 不拥有第二套业务数据库或独立协议真源。
 
 ## 开始之前
 
@@ -29,6 +29,16 @@ npm run dev:firefox
 npm run dev:zen
 npm run dev:safari
 ```
+
+CLI 开发与打包使用仓库自己的零依赖子包；不要从 root `package.json.version` 推导 CLI release 版本：
+
+```bash
+npm run cli:dev -- --help
+npm run cli:check
+npm run cli:pack
+```
+
+`cli:check` 使用 `wxt.config.ts` 的 Extension manifest version 做本地 fallback；正式 release/pre-release 必须由 workflow 从 tag 显式传入 npm semver，并要求 tag core version 与 WXT version 一致。
 
 涉及 Safari/Xcode 集成时，应使用仓库脚本，而不是手工维护生成的工程输出：
 
@@ -99,10 +109,11 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 | 代码 PR 准备接受审查 | `npm run gate:ci` |
 | 仅文档 / GitHub 模板变更 | 运行 `npm run format:check` 并检查本次修改的本地链接；若未修改运行时、构建或依赖文件，`gate:ci` 可填写 `N/A` 并说明原因 |
 | 生产构建、manifest、权限、打包或发布变更 | `npm run gate` |
+| CLI package / installer / Native Messaging 变更 | `npm run gate`、`npm run cli:check`，并运行 `tests/unit/cli-package.test.ts` / `tests/unit/cli-installer.test.ts`；涉及真实 browser discovery/permission/launch 时还必须做对应 macOS browser smoke |
 | 浏览器/站点专项行为 | 手动验证受影响的浏览器/站点路径；适用时运行对应的 `dev:*` / build 命令 |
 | 视觉行为 | 记录受影响状态的修改前/后效果，或提供等价截图 |
 
-对于触及 WebClipper 代码路径的非 Draft PR，GitHub Actions 当前会运行 `npm ci` 和 `npm run gate:ci`。该 CI 结果**不能**替代要求的本地 production build 或手动浏览器验证。
+对于触及 WebClipper 代码路径的非 Draft PR，GitHub Actions 当前会运行 `npm ci` 和 `npm run gate:ci`。该 CI 结果**不能**替代要求的本地 production build 或手动浏览器验证。release / pre-release workflow 会另外构建 CLI `.tgz`；它必须复用 resolved tag、拒绝非法 npm semver，并在 tag core version 与 WXT manifest version 不一致时直接失败。
 
 当改动涉及 [`AGENTS.md`](../AGENTS.md) 中的产品不变量时，请在 PR 中提供相应的架构专项扫描或定向测试证据。涉及 provider 同步生命周期时，定向验证至少应覆盖 manual / auto-sync 走同一任务入口、已知 conversation identity 在晚期失败后不降级，以及 provider 原有事务或并发语义没有被共享 progress lifecycle 改写。
 
@@ -112,7 +123,7 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 
 ## 数据与隐私变更
 
-SyncNos 采用 local-first，因此涉及 IndexedDB、备份/恢复、同步映射、OAuth、缓存图片、权限或迁移的改动，都需要明确审查失败路径。请说明外部目标失败时会发生什么，以及现有本地数据如何保持可恢复。
+SyncNos 采用 local-first，因此涉及 IndexedDB、备份/恢复、同步映射、OAuth、缓存图片、权限、Native Messaging/本机 CLI 或迁移的改动，都需要明确审查失败路径。请说明外部目标失败时会发生什么，以及现有本地数据如何保持可恢复。CLI/host 改动还应确认 Extension/IndexedDB 仍是唯一业务事实真源，machine-safe response 不泄露 provider secret / Reader TTS AI API key，且 installer/uninstaller 只操作声明过的固定路径。
 
 涉及 durable revision、跨 surface 刷新或备份 merge 的改动，定向验证还应覆盖：no-op 不制造 revision、业务数据与 revision 同事务提交、wake 丢失后仍可从 snapshot 收敛、canonical read reject 保留 last-good 并可 replay、相同备份重复导入保持幂等，以及恢复出的图片 local ID 与 Markdown asset 引用一致。若改动影响已挂载 UI，请至少做一次不 reload 的真实浏览器 smoke；通用命令仍按上面的验证矩阵执行。
 

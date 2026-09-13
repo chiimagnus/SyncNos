@@ -29,6 +29,30 @@ SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari（macOS / iOS） | 使用 Xcode 从源码构建 |
 
+### 本机 CLI（macOS）
+
+SyncNos CLI 是运行中浏览器 Extension 的本机前端，复用 Extension 已有的数据与业务逻辑；它不会维护第二份数据库，也不是离线 daemon。
+
+从对应 GitHub Release 下载 `syncnos-cli-<version>.tgz`，然后安装并为 Chrome 注册 Native Messaging host：
+
+```bash
+npm install -g ./syncnos-cli-<version>.tgz
+syncnos install --browser chrome
+syncnos doctor
+```
+
+在同一个浏览器 Profile 中打开 **设置 → 通用 → 本地 CLI 集成**，启用 **SyncNos CLI**。业务 CLI 命令依赖浏览器保持运行。`syncnos doctor` 会报告 package / manifest / 连接状态；当 Extension 不可达时只给出可验证的候选原因，不会猜测具体是哪一个浏览器侧条件。
+
+CLI Native Messaging 与“扩展可安装在哪些浏览器”是两套独立支持边界：
+
+| 浏览器 / 平台 | CLI v1 状态 |
+| --- | --- |
+| Google Chrome / macOS | v1 发布目标；正式发布前仍必须通过真实 Chrome 的 `connectNative → status/revision` smoke。 |
+| Firefox / macOS | 尚不声明支持，必须先通过真实浏览器 round-trip。 |
+| Helium / macOS | v1 尚不声明支持；Chrome-compatible Native Messaging discovery 已验证，但完整 SyncNos 产品 Gate 未完成。 |
+| Zen / macOS | v1 尚不声明支持；当前含 CLI 功能的测试 XPI 不是已签名发布物，完整产品 Gate 未完成。 |
+| Windows / Linux / Safari | 不属于本次 CLI v1 范围。 |
+
 ## 操作演示视频
 
 [![SyncNos 操作演示视频](docs/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
