@@ -115,6 +115,7 @@ export function buildNativeHostLauncher({ nodePath, nativeHostPath, platform = p
     return [
       '@echo off',
       'setlocal DisableDelayedExpansion',
+      'chcp 65001 >nul',
       `${batchQuote(node)} ${batchQuote(host)} %*`,
       'exit /b %errorlevel%',
       '',

@@ -263,12 +263,14 @@ describe('macOS CLI native host installer', () => {
     });
     const launcher = buildNativeHostLauncher({
       platform: 'win32',
-      nodePath: 'C:\\Program Files\\Node 100%\\node.exe',
-      nativeHostPath: 'C:\\Users\\example\\SyncNos\\native-host.mjs',
+      nodePath: 'C:\\Users\\测试用户\\Node 100%\\node.exe',
+      nativeHostPath: 'C:\\Users\\测试用户\\SyncNos\\native-host.mjs',
     });
     expect(launcher).toContain('setlocal DisableDelayedExpansion');
-    expect(launcher).toContain('"C:\\Program Files\\Node 100%%\\node.exe"');
-    expect(launcher).toContain('"C:\\Users\\example\\SyncNos\\native-host.mjs" %*');
+    expect(launcher).toContain('chcp 65001 >nul');
+    expect(launcher).toContain('"C:\\Users\\测试用户\\Node 100%%\\node.exe"');
+    expect(launcher).toContain('"C:\\Users\\测试用户\\SyncNos\\native-host.mjs" %*');
+    expect(launcher.indexOf('chcp 65001 >nul')).toBeLessThan(launcher.indexOf('测试用户'));
     expect(launcher).toContain('exit /b %errorlevel%');
   });
 
