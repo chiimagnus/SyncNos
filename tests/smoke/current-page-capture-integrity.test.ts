@@ -187,6 +187,7 @@ describe('current page capture integrity routing', () => {
       diff: null,
       chatgptProtectedImages: sidecar,
     });
+    expect(harness.calls[1].payload).not.toHaveProperty('conversationUrl');
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
   });
 
@@ -225,6 +226,43 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
+  it('does not silently run DOM capture when the Advanced setting cannot be read', async () => {
+    chatgptApiMocks.readEnabled.mockRejectedValue(new Error('storage unavailable'));
+    const prepare = vi.fn();
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: chatSnapshot(),
+      prepare,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('storage unavailable');
+    expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled();
+    expect(harness.capture).not.toHaveBeenCalled();
+    expect(harness.calls).toEqual([]);
+  });
+
+  it('blocks persistence if the captured ChatGPT route changes before the first local write', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockImplementation(async () => {
+      vi.stubGlobal('location', { href: 'https://chatgpt.com/c/conversation-2' });
+      return {
+        applicable: true,
+        snapshot: chatSnapshot(),
+        chatgptProtectedImages: null,
+      };
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: chatSnapshot(),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    expect(harness.calls).toEqual([]);
+  });
+
   it('reports protected-image failure as partial without changing the structural snapshot persistence mode', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     chatgptApiMocks.capture.mockResolvedValue({
@@ -256,7 +294,18 @@ describe('current page capture integrity routing', () => {
     });
   });
 
-  it('blocks message persistence if SPA navigation changes after API conversation upsert', async () => {
+  it('rejects malformed upsert responses before message persistence', async () => {
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot: chatSnapshot() });
+    harness.runtime.send.mockImplementationOnce(async (type: string, payload?: any) => {
+      harness.calls.push({ type, payload });
+      return { ok: true, data: { id: 7, __isNew: 'yes' } };
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('invalid upsertConversation response');
+    expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation']);
+  });
+
+  it('finishes persistence for the captured conversation if SPA navigation changes after the write has started', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     chatgptApiMocks.capture.mockResolvedValue({
       applicable: true,
@@ -274,8 +323,9 @@ describe('current page capture integrity routing', () => {
       return { ok: true, data: { id: 7, __isNew: true } };
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
-    expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation']);
+    await expect(harness.service.captureCurrentPage()).resolves.toMatchObject({ conversationId: 7, isNew: true });
+    expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
+    expect(harness.calls[1].payload).toMatchObject({ conversationId: 7, mode: 'snapshot' });
   });
 
   it('persists explicit complete capture as snapshot in write order', async () => {

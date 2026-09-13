@@ -1741,7 +1741,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onToggleChatgptApiCaptureEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
-        const enabled = await writeChatgptApiCaptureEnabled(next === true);
+        const enabled = await writeChatgptApiCaptureEnabled(next);
         setChatgptApiCaptureEnabled(enabled);
       });
     },

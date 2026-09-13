@@ -198,14 +198,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     }
 
     const conversation = conversationRes.data;
-    assertExpectedChatgptRoute();
+    const conversationId = normalizeConversationId(conversation?.id);
+    const isNew = (conversation as any)?.__isNew;
+    if (conversationId == null || typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
+
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      conversationId: conversation.id,
+      conversationId,
       messages: normalizedSnapshot.messages || [],
       mode: integrity.persistence.mode,
       diff: integrity.persistence.diff,
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
-      conversationUrl: normalizedSnapshot?.conversation?.url || '',
       activityAt,
       ...(options?.chatgptProtectedImages ? { chatgptProtectedImages: options.chatgptProtectedImages } : null),
     });
@@ -213,8 +215,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    const isNew = (conversation as any)?.__isNew;
-    if (typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
     const protectedImagesIncomplete = Array.isArray(messagesRes?.data?.imageWarningFlags)
       ? messagesRes.data.imageWarningFlags.includes('protected_images_incomplete')
       : false;
@@ -223,7 +223,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       ...(protectedImagesIncomplete ? ['chatgpt_api_images_incomplete'] : []),
     ]);
     return {
-      conversationId: normalizeConversationId(conversation.id),
+      conversationId,
       isNew,
       captureCompleteness: protectedImagesIncomplete ? 'partial' : integrity.meta?.completeness,
       captureReasons: captureReasons.length ? captureReasons : undefined,
