@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   ensureDisplayMode: vi.fn(),
   readDisplayMode: vi.fn(),
   setDisplayMode: vi.fn(),
+  startCliNativeBridge: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -82,6 +83,7 @@ vi.mock('@services/shared/inpage-display-mode', () => ({
   readEffectiveInpageDisplayMode: mocks.readDisplayMode,
   setCanonicalInpageDisplayMode: mocks.setDisplayMode,
 }));
+vi.mock('@services/cli/native-bridge', () => ({ startCliNativeBridge: mocks.startCliNativeBridge }));
 
 import { INPAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
@@ -202,6 +204,10 @@ describe('background entrypoint cold start', () => {
     expect(callback()).toBeUndefined();
 
     expect(onMessageAddListener).toHaveBeenCalledTimes(1);
+    expect(mocks.startCliNativeBridge).toHaveBeenCalledTimes(1);
+    expect(onMessageAddListener.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.startCliNativeBridge.mock.invocationCallOrder[0],
+    );
     expect(mocks.setupNotionOAuthNavigationListener).toHaveBeenCalledTimes(1);
     expect(mocks.setupFeishuOAuthNavigationListener).toHaveBeenCalledTimes(1);
     expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);

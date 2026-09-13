@@ -45,11 +45,6 @@ export function coerceSettingsSectionKey(value: string): SettingsSectionKey | nu
     .toLowerCase();
   if (!raw) return null;
   if (isSettingsSectionKey(raw)) return raw;
-
-  // Backward compat for older deep links/stored values.
-  if (raw === 'insight') return 'aboutyou';
-  if (raw === 'about') return 'aboutme';
-
   return null;
 }
 

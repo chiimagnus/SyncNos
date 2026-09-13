@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "nativeHostName": "app.syncnos.cli",
+  "nativeMessaging": {
+    "hostToExtensionMaxBytes": 1048576,
+    "extensionToHostMaxBytes": 67108864
+  },
+  "frames": {
+    "hello": "hello",
+    "helloAck": "hello-ack",
+    "rpcRequest": "rpc-request",
+    "rpcResponse": "rpc-response"
+  },
+  "publicMethods": ["system.ping", "revision.get"],
+  "browserRequired": []
+}

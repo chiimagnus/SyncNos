@@ -49,6 +49,8 @@ describe('backup backup-utils', () => {
       },
       github_auth_state_v2: { deviceCode: 'DEVICE_SENTINEL_SECRET' },
       [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
+      syncnos_cli_instance_id_v1: 'profile-instance',
+      syncnos_cli_integration_enabled_v1: true,
     });
     expect(filtered).toEqual({
       notion_parent_page_id: 'p1',

@@ -1,4 +1,5 @@
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
+import { CLI_INSTANCE_ID_STORAGE_KEY, CLI_INTEGRATION_ENABLED_STORAGE_KEY } from '@services/cli/cli-integration';
 import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 import {
   normalizeCanonicalVideoChapters,
@@ -34,6 +35,9 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'github_auth_state_v1',
   // Runtime-only cross-context invalidation metadata.
   DATA_REVISION_WAKE_STORAGE_KEY,
+  // CLI identity/opt-in are local to one browser profile and must never migrate through Backup.
+  CLI_INSTANCE_ID_STORAGE_KEY,
+  CLI_INTEGRATION_ENABLED_STORAGE_KEY,
 ]);
 
 function shouldIncludeStorageKeyInBackup(key: string): boolean {

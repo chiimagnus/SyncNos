@@ -62,6 +62,7 @@ const resolveManifest: UserManifestFn = (env) => {
     description: isSafari ? '__MSG_description__' : '__MSG_extDescription__',
     default_locale: 'en',
     permissions,
+    ...(isSafari ? {} : { optional_permissions: ['nativeMessaging'] }),
     host_permissions: ['http://*/*', 'https://*/*'],
     web_accessible_resources: [
       {

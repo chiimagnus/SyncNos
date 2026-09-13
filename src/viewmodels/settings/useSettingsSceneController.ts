@@ -65,6 +65,13 @@ import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { getCurrentLocale, getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
 import {
+  CLI_INTEGRATION_ENABLED_STORAGE_KEY,
+  disableCliIntegration,
+  enableCliIntegration,
+  readCliIntegrationCapability,
+  type CliIntegrationCapability,
+} from '@services/cli/cli-integration';
+import {
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
   normalizeInpageDisplayMode,
   readEffectiveInpageDisplayMode,
@@ -354,6 +361,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [aiChatDollarMentionEnabled, setAiChatDollarMentionEnabled] = useState<boolean>(true);
   const aiChatDollarMentionObservationRevisionRef = useRef(0);
   const [localePreference, setLocalePreference] = useState<LocalePreference>(() => getLocalePreference());
+  const [cliIntegrationAvailable, setCliIntegrationAvailable] = useState(false);
+  const [cliIntegrationEnabled, setCliIntegrationEnabled] = useState(false);
 
   // Insight
   const [insightStats, setInsightStats] = useState<InsightStats | null>(null);
@@ -375,6 +384,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   insightRangeRef.current = insightRange;
   const startInsightSourceReadRef = useRef<() => void>(() => {});
   const [aboutYouUserName, setAboutYouUserName] = useState<string>('');
+
+  const applyCliIntegrationStatus = useCallback((enabled: boolean, capability: CliIntegrationCapability) => {
+    setCliIntegrationAvailable(capability.available === true);
+    setCliIntegrationEnabled(enabled === true && capability.permissionGranted === true);
+  }, []);
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
@@ -686,7 +700,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const inpageDisplayObservationAtStart = inpageDisplayObservationRevisionRef.current;
     const aiChatAutoSaveObservationAtStart = aiChatAutoSaveObservationRevisionRef.current;
     const aiChatDollarMentionObservationAtStart = aiChatDollarMentionObservationRevisionRef.current;
-    const [, , local, obsidianRes, githubRes, antiHotlinkRulesDraft, effectiveInpageDisplayMode] = await Promise.all([
+    const [
+      ,
+      ,
+      local,
+      obsidianRes,
+      githubRes,
+      antiHotlinkRulesDraft,
+      effectiveInpageDisplayMode,
+      cliIntegrationCapability,
+    ] = await Promise.all([
       readNotionAuthStatus(),
       readFeishuAuthStatus(),
       storageGet([
@@ -718,11 +741,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
         LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ABOUT_YOU_USER_NAME_STORAGE_KEY,
+        CLI_INTEGRATION_ENABLED_STORAGE_KEY,
       ]),
       send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
       send<ApiResponse<any>>(GITHUB_MESSAGE_TYPES.GET_SETTINGS, {}),
       loadAntiHotlinkRulesForSettings({ forceRefresh: true }),
       readEffectiveInpageDisplayMode(),
+      readCliIntegrationCapability(),
     ]);
 
     if (notionAuthObservationRevisionRef.current === notionAuthObservationAtStart) {
@@ -747,6 +772,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianAutoSyncEnabled(local?.[OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
     setGithubSyncEnabled(local?.[GITHUB_SYNC_PROVIDER_ENABLED_KEY] !== false);
     setGithubAutoSyncEnabled(local?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
+    applyCliIntegrationStatus(local?.[CLI_INTEGRATION_ENABLED_STORAGE_KEY] === true, cliIntegrationCapability);
 
     setFeishuClientId(String(local?.feishu_oauth_client_id || ''));
     setFeishuClientSecret(String(local?.feishu_oauth_client_secret || ''));
@@ -796,6 +822,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const githubSettings = unwrap(githubRes);
     applyGithubSettingsResponse(githubSettings, githubAuthRequestSeq);
   }, [
+    applyCliIntegrationStatus,
     applyGithubSettingsResponse,
     articleDbSpec.storageKey,
     chatDbSpec.storageKey,
@@ -861,6 +888,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       }
       if (Object.prototype.hasOwnProperty.call(changes, GITHUB_AUTH_STATE_KEY)) {
         void refreshGithubAuthFromStorageSignal();
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, CLI_INTEGRATION_ENABLED_STORAGE_KEY)) {
+        const enabled = changes[CLI_INTEGRATION_ENABLED_STORAGE_KEY]?.newValue === true;
+        if (!enabled) {
+          setCliIntegrationEnabled(false);
+        } else {
+          void readCliIntegrationCapability()
+            .then((capability) => applyCliIntegrationStatus(true, capability))
+            .catch(() => setCliIntegrationEnabled(false));
+        }
       }
       if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_auto_save_enabled')) {
         aiChatAutoSaveObservationRevisionRef.current += 1;
@@ -936,6 +973,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     applyNotionErrorStorageObservation,
     applyNotionPendingStorageObservation,
     refreshFeishuAuthFromStorageSignal,
+    applyCliIntegrationStatus,
     refreshGithubAuthFromStorageSignal,
     refreshNotionAuthFromStorageSignal,
   ]);
@@ -1648,6 +1686,38 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleCliIntegration = useCallback(
+    async (next: boolean) => {
+      if (next) {
+        // Start permissions.request before entering runTask's queued promise chain so the browser still sees the click gesture.
+        const permissionOperation = enableCliIntegration().then(
+          (enabled) => ({ enabled, error: null as unknown }),
+          (error) => ({ enabled: false, error }),
+        );
+        await runTask(
+          async () => {
+            const result = await permissionOperation;
+            if (result.error) throw result.error;
+            const capability = await readCliIntegrationCapability();
+            applyCliIntegrationStatus(result.enabled, capability);
+          },
+          { fallbackMessage: 'enable local CLI integration failed' },
+        );
+        return;
+      }
+
+      await runTask(
+        async () => {
+          await disableCliIntegration();
+          const capability = await readCliIntegrationCapability();
+          applyCliIntegrationStatus(false, capability);
+        },
+        { fallbackMessage: 'disable local CLI integration failed' },
+      );
+    },
+    [applyCliIntegrationStatus, runTask],
+  );
+
   const onChangeLocalePreference = useCallback(
     async (next: LocalePreference) => {
       await runTask(async () => {
@@ -2209,6 +2279,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     inpageDisplayMode,
     onChangeInpageDisplayMode,
+    cliIntegrationAvailable,
+    cliIntegrationEnabled,
+    onToggleCliIntegration,
     localePreference,
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,

@@ -28,6 +28,7 @@ import {
   readEffectiveInpageDisplayMode,
   setCanonicalInpageDisplayMode,
 } from '@services/shared/inpage-display-mode';
+import { startCliNativeBridge } from '@services/cli/native-bridge';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -106,6 +107,12 @@ export default defineBackground(() => {
   });
 
   router.start();
+
+  try {
+    startCliNativeBridge(router);
+  } catch (_e) {
+    // Local CLI integration is optional and must never block the core background router.
+  }
 
   try {
     setupNotionOAuthNavigationListener();

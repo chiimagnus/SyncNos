@@ -46,6 +46,9 @@ export function InpageSection(props: {
   onSaveUserName: () => void;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
+  cliIntegrationAvailable: boolean;
+  cliIntegrationEnabled: boolean;
+  onToggleCliIntegration: (next: boolean) => void;
   localePreference: LocalePreference;
   onChangeLocalePreference: (next: LocalePreference) => void;
   aiChatAutoSaveEnabled: boolean;
@@ -75,6 +78,9 @@ export function InpageSection(props: {
     onSaveUserName,
     displayMode,
     onChangeDisplayMode,
+    cliIntegrationAvailable,
+    cliIntegrationEnabled,
+    onToggleCliIntegration,
     localePreference,
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
@@ -127,6 +133,25 @@ export function InpageSection(props: {
               ]}
             />
           </div>
+        </div>
+      </section>
+
+      <section className={cardClassName} aria-label={t('localCliIntegrationHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('localCliIntegrationHeading')}
+        </h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={cliIntegrationEnabled}
+            disabled={busy || !cliIntegrationAvailable}
+            onChange={(e) => onToggleCliIntegration(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('localCliIntegrationLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {cliIntegrationAvailable ? t('localCliIntegrationHint') : t('localCliIntegrationUnavailable')}
         </div>
       </section>
 

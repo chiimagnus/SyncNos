@@ -5,7 +5,14 @@ import { act, createElement, createRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels/settings/types';
+import {
+  DEFAULT_SETTINGS_SECTION_KEY,
+  SETTINGS_ACTIVE_SECTION_STORAGE_KEY,
+  SETTINGS_SECTION_GROUPS,
+  SETTINGS_SECTIONS,
+  coerceSettingsSectionKey,
+  readStoredSettingsSection,
+} from '../../src/viewmodels/settings/types';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 import { VideosSection } from '../../src/ui/settings/sections/VideosSection';
@@ -28,6 +35,25 @@ describe('settings section definitions', () => {
       'aboutyou',
       'aboutme',
     ]);
+  });
+
+  it('accepts only current settings section keys and drops retired deep-link aliases', () => {
+    expect(coerceSettingsSectionKey('aboutyou')).toBe('aboutyou');
+    expect(coerceSettingsSectionKey('aboutme')).toBe('aboutme');
+    expect(coerceSettingsSectionKey('insight')).toBeNull();
+    expect(coerceSettingsSectionKey('about')).toBeNull();
+  });
+
+  it('falls back to the current default for retired stored section aliases', () => {
+    setupDom();
+    try {
+      window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'insight');
+      expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
+      window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'about');
+      expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
+    } finally {
+      cleanupDom();
+    }
   });
 
   it('groups sections into integrations, behavior, and about areas', () => {
@@ -499,6 +525,9 @@ describe('inpage anti-hotlink advanced editor', () => {
       onSaveUserName: () => {},
       displayMode: 'supported',
       onChangeDisplayMode: () => {},
+      cliIntegrationAvailable: true,
+      cliIntegrationEnabled: false,
+      onToggleCliIntegration: () => {},
       localePreference: 'system',
       onChangeLocalePreference: () => {},
       aiChatAutoSaveEnabled: true,
@@ -526,6 +555,30 @@ describe('inpage anti-hotlink advanced editor', () => {
       root!.render(createElement(InpageSection, { ...baseProps, ...props }));
     });
   }
+
+  it('renders Local CLI Integration and forwards the user toggle', () => {
+    const onToggleCliIntegration = vi.fn();
+    renderInpage({ onToggleCliIntegration });
+
+    const section = document.querySelector('section[aria-label="Local CLI Integration"]');
+    const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    expect(section?.textContent).toContain('Enable SyncNos CLI');
+    expect(checkbox).toBeTruthy();
+    expect(checkbox?.disabled).toBe(false);
+
+    act(() => {
+      checkbox!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(onToggleCliIntegration).toHaveBeenCalledWith(true);
+  });
+
+  it('disables Local CLI Integration when Native Messaging is unavailable', () => {
+    renderInpage({ cliIntegrationAvailable: false });
+    const section = document.querySelector('section[aria-label="Local CLI Integration"]');
+    const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    expect(checkbox?.disabled).toBe(true);
+    expect(section?.textContent).toContain('Native Messaging is unavailable');
+  });
 
   it('renders advanced toggle button and triggers callback', () => {
     const onToggleAdvanced = vi.fn();

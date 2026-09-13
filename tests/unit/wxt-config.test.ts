@@ -46,4 +46,17 @@ describe('WXT browser-scoped Vite config', () => {
       expect(manifest.incognito).not.toBe('split');
     }
   });
+
+  it('declares nativeMessaging as optional only for Chrome and Firefox builds', async () => {
+    const chrome = await resolveManifest('chrome');
+    const firefox = await resolveManifest('firefox');
+    const safari = await resolveManifest('safari');
+
+    expect(chrome.permissions).not.toContain('nativeMessaging');
+    expect(firefox.permissions).not.toContain('nativeMessaging');
+    expect(chrome.optional_permissions).toEqual(['nativeMessaging']);
+    expect(firefox.optional_permissions).toEqual(['nativeMessaging']);
+    expect(safari.permissions).not.toContain('nativeMessaging');
+    expect(safari.optional_permissions).toBeUndefined();
+  });
 });

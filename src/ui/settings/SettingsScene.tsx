@@ -162,6 +162,9 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     inpageDisplayMode,
     onChangeInpageDisplayMode,
+    cliIntegrationAvailable,
+    cliIntegrationEnabled,
+    onToggleCliIntegration,
     localePreference,
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
@@ -454,6 +457,11 @@ export function SettingsScene(props: SettingsSceneProps) {
           displayMode={inpageDisplayMode}
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);
+          }}
+          cliIntegrationAvailable={cliIntegrationAvailable}
+          cliIntegrationEnabled={cliIntegrationEnabled}
+          onToggleCliIntegration={(next) => {
+            void onToggleCliIntegration(next);
           }}
           localePreference={localePreference}
           onChangeLocalePreference={(next) => {
