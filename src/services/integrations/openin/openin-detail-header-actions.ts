@@ -3,7 +3,7 @@ import { t } from '@i18n';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/notion-openin';
 import {
-  launchOpenTarget,
+  launchOpenTargetByConversationId,
   resolveOpenTargets,
   type OpenTargetDto,
   type OpenTargetProvider,
@@ -69,8 +69,12 @@ function buildAction({
     slot: 'open',
     ...(target.kind === 'external-url' ? { href: target.target } : null),
     onTrigger: async () => {
-      const result = await launchOpenTarget({
-        conversation,
+      const conversationId = Number(conversation.id);
+      if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+        throw new Error('Invalid conversation id');
+      }
+      const result = await launchOpenTargetByConversationId({
+        conversationId,
         target: target.provider,
         port: launchPort(port),
       });

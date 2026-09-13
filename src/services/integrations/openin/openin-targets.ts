@@ -60,7 +60,7 @@ type OpenTargetServices = {
 
 export type OpenTargetLaunchPort = {
   openExternalUrl: (url: string) => Promise<boolean>;
-  obsidian: ObsidianTargetActionPort;
+  obsidian?: ObsidianTargetActionPort;
 };
 
 export const defaultOpenTargetServices: OpenTargetServices = {
@@ -387,10 +387,12 @@ export async function launchOpenTargetByConversationId({
   conversationId,
   target,
   services = defaultOpenTargetServices,
+  port,
 }: {
   conversationId: unknown;
   target: unknown;
   services?: OpenTargetServices;
+  port?: OpenTargetLaunchPort;
 }) {
   const id = Number(conversationId);
   if (!Number.isSafeInteger(id) || id <= 0)
@@ -400,5 +402,5 @@ export async function launchOpenTargetByConversationId({
   const conversation = await services.getConversationById(id);
   if (!conversation)
     throw new OpenTargetError('conversation_not_found', 'Conversation not found', { conversationId: id });
-  return await launchOpenTarget({ conversation, target, services });
+  return await launchOpenTarget({ conversation, target, services, port });
 }
