@@ -444,7 +444,7 @@ export async function uninstallNativeHost({
   const options = { platform, homeDir, localAppDataDir, env };
   const targets = resolveRegistrationTargets(browsers, options);
   const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
-  const removedManifests = [];
+  const removedRegistrations = [];
   for (const target of targets) {
     const manifestPath = targetManifestPath(target, support);
     let registrationRemoved = false;
@@ -453,7 +453,7 @@ export async function uninstallNativeHost({
     }
     const manifestRemoved = await removeExactFile(manifestPath);
     if (registrationRemoved || manifestRemoved) {
-      removedManifests.push({
+      removedRegistrations.push({
         browser: target.browsers[0],
         browsers: [...target.browsers],
         registrationId: target.registrationId,
@@ -495,8 +495,8 @@ export async function uninstallNativeHost({
 
   return {
     browsers,
-    removedManifests,
-    remainingManifests: remaining,
+    removedRegistrations,
+    remainingRegistrations: remaining,
     launcherRemoved,
     launcherPath: support.launcherPath,
   };

@@ -130,7 +130,7 @@ describe('macOS CLI native host installer', () => {
     const firefox = await installNativeHost({ browser: 'firefox', homeDir, platform: 'darwin' });
 
     const chromeRemoved = await uninstallNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
-    expect(chromeRemoved.removedManifests).toEqual([
+    expect(chromeRemoved.removedRegistrations).toEqual([
       expect.objectContaining({ browser: 'chrome', registrationId: 'chrome', path: chrome.manifestPath }),
     ]);
     expect(chromeRemoved.launcherRemoved).toBe(false);
@@ -149,8 +149,8 @@ describe('macOS CLI native host installer', () => {
     const firefox = await installNativeHost({ browser: 'firefox', homeDir, platform: 'darwin' });
     const removed = await uninstallNativeHost({ homeDir, platform: 'darwin' });
     expect(removed.browsers).toEqual(expect.arrayContaining(['chrome', 'firefox']));
-    expect(removed.removedManifests.map((item) => item.browser)).toEqual(['chrome', 'firefox']);
-    expect(removed.remainingManifests).toEqual([]);
+    expect(removed.removedRegistrations.map((item) => item.browser)).toEqual(['chrome', 'firefox']);
+    expect(removed.remainingRegistrations).toEqual([]);
     expect(removed.launcherRemoved).toBe(true);
     await expect(lstat(chrome.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(lstat(firefox.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
