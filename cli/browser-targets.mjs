@@ -623,7 +623,17 @@ export function resolveRegistrationTargets(
     }
     grouped.set(target.registrationKey, { ...target, browsers: [target.browserId] });
   }
-  return Array.from(grouped.values());
+  const sharedByRegistration = new Map();
+  for (const browserId of listBrowserTargets({ platform })) {
+    const target = resolveBrowserTarget(browserId, { platform, homeDir, localAppDataDir, env });
+    const shared = sharedByRegistration.get(target.registrationKey) ?? [];
+    shared.push(target.browserId);
+    sharedByRegistration.set(target.registrationKey, shared);
+  }
+  return Array.from(grouped.values(), (target) => ({
+    ...target,
+    sharedByBrowsers: [...(sharedByRegistration.get(target.registrationKey) ?? target.browsers)],
+  }));
 }
 
 export function buildNativeHostManifest(target, launcherPath) {

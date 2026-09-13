@@ -367,7 +367,7 @@ export async function installNativeHosts({
     registrations.push({
       registrationId: target.registrationId,
       registrationKind: target.registrationKind,
-      sharedByBrowsers: [...target.browsers],
+      sharedByBrowsers: [...target.sharedByBrowsers],
       productionIdentity: target.productionIdentity,
       extensionIds: [...target.extensionIds],
       manifestPath: installed.manifestPath,
@@ -413,6 +413,7 @@ export async function installNativeHost({
       .toLowerCase(),
     registrationId: registration.registrationId,
     registrationKind: registration.registrationKind,
+    sharedByBrowsers: registration.sharedByBrowsers,
     extensionIds: registration.extensionIds,
     productionIdentity: registration.productionIdentity,
     launcherPath: installed.launcherPath,
@@ -441,9 +442,9 @@ export async function uninstallNativeHost({
   registryRunner,
 } = {}) {
   assertSupportedPlatform(platform);
-  const browsers = browser ? [String(browser).trim().toLowerCase()] : listBrowserTargets({ platform });
+  const requestedBrowsers = browser ? [String(browser).trim().toLowerCase()] : listBrowserTargets({ platform });
   const options = { platform, homeDir, localAppDataDir, env };
-  const targets = resolveRegistrationTargets(browsers, options);
+  const targets = resolveRegistrationTargets(requestedBrowsers, options);
   const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
   const removedRegistrations = [];
   for (const target of targets) {
@@ -455,8 +456,8 @@ export async function uninstallNativeHost({
     const manifestRemoved = await removeExactFile(manifestPath);
     if (registrationRemoved || manifestRemoved) {
       removedRegistrations.push({
-        browser: target.browsers[0],
-        browsers: [...target.browsers],
+        requestedBrowsers: [...target.browsers],
+        sharedByBrowsers: [...target.sharedByBrowsers],
         registrationId: target.registrationId,
         path: manifestPath,
         registryKey: target.registryKey,
@@ -470,8 +471,7 @@ export async function uninstallNativeHost({
     const state = await registrationPresence(target, support, registryRunner);
     if (state.present) {
       remaining.push({
-        browser: target.browsers[0],
-        browsers: [...target.browsers],
+        sharedByBrowsers: [...target.sharedByBrowsers],
         registrationId: target.registrationId,
         path: state.manifestPath,
         registryKey: target.registryKey,
@@ -495,7 +495,7 @@ export async function uninstallNativeHost({
   }
 
   return {
-    browsers,
+    requestedBrowsers,
     removedRegistrations,
     remainingRegistrations: remaining,
     launcherRemoved,
@@ -526,7 +526,11 @@ async function inspectLauncher({ launcherPath, expectedLauncher, platform }) {
 
 async function inspectRegistration(target, support, registryRunner) {
   const manifestPath = targetManifestPath(target, support);
-  const sharedByBrowsers = Array.isArray(target.browsers) ? [...target.browsers] : [target.browserId];
+  const sharedByBrowsers = Array.isArray(target.sharedByBrowsers)
+    ? [...target.sharedByBrowsers]
+    : Array.isArray(target.browsers)
+      ? [...target.browsers]
+      : [target.browserId];
   const state = await pathState(manifestPath);
   let registry = null;
   if (target.registrationKind === 'registry') {

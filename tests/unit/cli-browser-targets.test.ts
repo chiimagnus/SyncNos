@@ -67,12 +67,14 @@ describe('CLI browser target catalog', () => {
     expect(targets[0]).toMatchObject({
       registrationId: 'chrome',
       browsers: ['chrome', 'brave', 'helium'],
+      sharedByBrowsers: ['chrome', 'brave', 'helium', 'opera'],
       manifestPath:
         '/Users/example/Library/Application Support/Google/Chrome/NativeMessagingHosts/app.syncnos.cli.json',
     });
     expect(targets[1]).toMatchObject({
       registrationId: 'mozilla',
       browsers: ['firefox', 'zen'],
+      sharedByBrowsers: ['firefox', 'firefox-developer', 'zen'],
       manifestPath: '/Users/example/Library/Application Support/Mozilla/NativeMessagingHosts/app.syncnos.cli.json',
     });
   });

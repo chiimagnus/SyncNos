@@ -124,6 +124,26 @@ describe('macOS CLI native host installer', () => {
     expect((await readJson(firefox.manifestPath)).allowed_extensions).toEqual([FIREFOX_PRODUCTION_EXTENSION_ID]);
   });
 
+  it('reports the full browser impact of an explicit shared-target install and uninstall', async () => {
+    const homeDir = await tempHome();
+    const installed = await installNativeHost({ browser: 'brave', homeDir, platform: 'darwin' });
+    expect(installed).toMatchObject({
+      browser: 'brave',
+      registrationId: 'chrome',
+      sharedByBrowsers: ['chrome', 'brave', 'helium', 'opera'],
+    });
+
+    const removed = await uninstallNativeHost({ browser: 'brave', homeDir, platform: 'darwin' });
+    expect(removed.requestedBrowsers).toEqual(['brave']);
+    expect(removed.removedRegistrations).toEqual([
+      expect.objectContaining({
+        requestedBrowsers: ['brave'],
+        sharedByBrowsers: ['chrome', 'brave', 'helium', 'opera'],
+        registrationId: 'chrome',
+      }),
+    ]);
+  });
+
   it('uninstalls exact selected manifests and only removes the shared launcher after the final browser', async () => {
     const homeDir = await tempHome();
     const chrome = await installNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
@@ -131,7 +151,12 @@ describe('macOS CLI native host installer', () => {
 
     const chromeRemoved = await uninstallNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
     expect(chromeRemoved.removedRegistrations).toEqual([
-      expect.objectContaining({ browser: 'chrome', registrationId: 'chrome', path: chrome.manifestPath }),
+      expect.objectContaining({
+        requestedBrowsers: ['chrome'],
+        sharedByBrowsers: ['chrome', 'brave', 'helium', 'opera'],
+        registrationId: 'chrome',
+        path: chrome.manifestPath,
+      }),
     ]);
     expect(chromeRemoved.launcherRemoved).toBe(false);
     await expect(lstat(chrome.launcherPath)).resolves.toBeTruthy();
@@ -148,8 +173,16 @@ describe('macOS CLI native host installer', () => {
     const chrome = await installNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
     const firefox = await installNativeHost({ browser: 'firefox', homeDir, platform: 'darwin' });
     const removed = await uninstallNativeHost({ homeDir, platform: 'darwin' });
-    expect(removed.browsers).toEqual(expect.arrayContaining(['chrome', 'firefox']));
-    expect(removed.removedRegistrations.map((item) => item.browser)).toEqual(['chrome', 'firefox']);
+    expect(removed.requestedBrowsers).toEqual(expect.arrayContaining(['chrome', 'firefox']));
+    expect(removed.removedRegistrations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ registrationId: 'chrome', sharedByBrowsers: ['chrome', 'brave', 'helium', 'opera'] }),
+        expect.objectContaining({
+          registrationId: 'mozilla',
+          sharedByBrowsers: ['firefox', 'firefox-developer', 'zen'],
+        }),
+      ]),
+    );
     expect(removed.remainingRegistrations).toEqual([]);
     expect(removed.launcherRemoved).toBe(true);
     await expect(lstat(chrome.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });

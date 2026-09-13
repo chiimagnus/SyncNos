@@ -264,8 +264,8 @@ describe('syncnos CLI instance selection', () => {
     expect(installed.exitCode).toBe(0);
     expect(installed.json.data.detectedBrowsers.map((item: any) => item.id)).toEqual(['helium', 'zen']);
     expect(installed.json.data.registeredTargets).toEqual([
-      expect.objectContaining({ registrationId: 'chrome', sharedByBrowsers: ['helium'] }),
-      expect.objectContaining({ registrationId: 'mozilla', sharedByBrowsers: ['zen'] }),
+      expect.objectContaining({ registrationId: 'chrome', sharedByBrowsers: ['chrome', 'brave', 'helium', 'opera'] }),
+      expect.objectContaining({ registrationId: 'mozilla', sharedByBrowsers: ['firefox', 'firefox-developer', 'zen'] }),
     ]);
     expect(installed.json.data.notDetected).toEqual(expect.arrayContaining(['chrome', 'firefox']));
 
