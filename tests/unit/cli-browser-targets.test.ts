@@ -247,8 +247,6 @@ describe('CLI browser target catalog', () => {
     });
     const production = resolveBrowserTarget('chrome', { platform: 'darwin', homeDir: '/Users/example' });
     expect(overridden.allowlist).toEqual([`chrome-extension://${override}/`]);
-    expect(overridden.productionIdentity).toBe(false);
     expect(production.allowlist).toHaveLength(2);
-    expect(production.productionIdentity).toBe(true);
   });
 });

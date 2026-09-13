@@ -567,10 +567,6 @@ export function resolveBrowserTarget(
   const extensionIds = normalizeExtensionIds(definition.family, extensionId);
   const allowlist =
     definition.family === 'chromium' ? extensionIds.map((value) => `chrome-extension://${value}/`) : [...extensionIds];
-  const productionAllowlist =
-    definition.family === 'chromium'
-      ? productionIdsForFamily('chromium').map((value) => `chrome-extension://${value}/`)
-      : productionIdsForFamily('firefox');
 
   let manifestDir = null;
   let manifestPath = null;
@@ -597,7 +593,6 @@ export function resolveBrowserTarget(
     registrationKey,
     allowlistField: definition.family === 'chromium' ? 'allowed_origins' : 'allowed_extensions',
     extensionIds,
-    productionIdentity: JSON.stringify(allowlist) === JSON.stringify(productionAllowlist),
     manifestPath,
     registryKey,
     allowlist,
@@ -628,7 +623,7 @@ export function resolveRegistrationTargets(
   }
   return Array.from(grouped.values(), (target) => ({
     ...target,
-    sharedByBrowsers: [...(sharedByRegistration.get(target.registrationKey) ?? target.browsers)],
+    sharedByBrowsers: [...sharedByRegistration.get(target.registrationKey)],
   }));
 }
 

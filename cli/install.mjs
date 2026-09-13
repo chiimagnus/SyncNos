@@ -372,7 +372,7 @@ export async function installNativeHosts({
       registrationId: target.registrationId,
       registrationKind: target.registrationKind,
       sharedByBrowsers: [...target.sharedByBrowsers],
-      productionIdentity: target.productionIdentity,
+      productionIdentity: installed.validation.productionIdentity,
       extensionIds: [...target.extensionIds],
       manifestPath: installed.manifestPath,
       registryKey: target.registryKey,
@@ -530,11 +530,7 @@ async function inspectLauncher({ launcherPath, expectedLauncher, platform }) {
 
 async function inspectRegistration(target, support, registryRunner) {
   const manifestPath = targetManifestPath(target, support);
-  const sharedByBrowsers = Array.isArray(target.sharedByBrowsers)
-    ? [...target.sharedByBrowsers]
-    : Array.isArray(target.browsers)
-      ? [...target.browsers]
-      : [target.browserId];
+  const sharedByBrowsers = [...target.sharedByBrowsers];
   const state = await pathState(manifestPath);
   let registry = null;
   if (target.registrationKind === 'registry') {
