@@ -13,7 +13,9 @@ const originalChrome = (globalThis as any).chrome;
 const originalBrowser = (globalThis as any).browser;
 const originalNavigator = globalThis.navigator;
 
-function installChrome(options: { requestGranted?: boolean; permissionGranted?: boolean } = {}) {
+function installChrome(
+  options: { requestGranted?: boolean; permissionGranted?: boolean; exposeConnectNative?: boolean } = {},
+) {
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: { userAgent: 'Mozilla/5.0 Chrome/152.0 Safari/537.36' },
@@ -31,7 +33,7 @@ function installChrome(options: { requestGranted?: boolean; permissionGranted?: 
     runtime: {
       id: 'extension-id',
       lastError: null,
-      connectNative: vi.fn(),
+      ...(options.exposeConnectNative === false ? {} : { connectNative: vi.fn() }),
     },
     storage: {
       local: {
@@ -72,7 +74,13 @@ afterEach(() => {
 });
 
 describe('CLI integration preference', () => {
-  it('requests nativeMessaging immediately and persists opt-in only when granted', async () => {
+  it('requests nativeMessaging even when Chromium hides connectNative until permission is granted', async () => {
+    const hiddenBeforeGrant = installChrome({ requestGranted: true, exposeConnectNative: false });
+    const hiddenPromise = enableCliIntegration();
+    expect(hiddenBeforeGrant.requestCalled()).toBe(true);
+    await expect(hiddenPromise).resolves.toBe(true);
+    expect(hiddenBeforeGrant.store[CLI_INTEGRATION_ENABLED_STORAGE_KEY]).toBe(true);
+
     const denied = installChrome({ requestGranted: false });
     const deniedPromise = enableCliIntegration();
     expect(denied.requestCalled()).toBe(true);
@@ -89,6 +97,22 @@ describe('CLI integration preference', () => {
       enabled: true,
       permissionGranted: true,
     });
+  });
+
+  it('still rejects unsupported browser families even when the permissions API exists', async () => {
+    const chrome = installChrome({ requestGranted: true });
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { userAgent: 'Mozilla/5.0 Version/18.6 Safari/605.1.15' },
+    });
+
+    await expect(readCliIntegrationStatus()).resolves.toEqual({
+      available: false,
+      enabled: false,
+      permissionGranted: false,
+    });
+    await expect(enableCliIntegration()).resolves.toBe(false);
+    expect(chrome.requestCalled()).toBe(false);
   });
 
   it('persists disabled before removing the optional permission', async () => {

@@ -4,7 +4,7 @@ import {
   permissionsRemove,
   permissionsRequest,
 } from '@platform/webext/permissions';
-import { canConnectNativeHost } from '@platform/native-messaging/native-port';
+import { detectNativeMessagingBrowserFamily } from '@platform/native-messaging/native-port';
 import { storageGet, storageSet } from '@services/shared/storage';
 
 export const CLI_INTEGRATION_ENABLED_STORAGE_KEY = 'syncnos_cli_integration_enabled_v1';
@@ -23,7 +23,10 @@ export type CliIntegrationStatus = CliIntegrationCapability & {
 let instanceIdPromise: Promise<string> | null = null;
 
 export function isCliIntegrationAvailable(): boolean {
-  return permissionsApiAvailable() && canConnectNativeHost();
+  // Chromium-derived browsers may hide runtime.connectNative until the optional
+  // nativeMessaging permission is granted. Availability must describe whether
+  // the permission can be requested, not whether the gated API is visible yet.
+  return permissionsApiAvailable() && detectNativeMessagingBrowserFamily() !== 'unknown';
 }
 
 export async function readCliIntegrationCapability(): Promise<CliIntegrationCapability> {

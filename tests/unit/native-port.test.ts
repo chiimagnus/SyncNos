@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  canConnectNativeHost,
   detectNativeMessagingBrowserFamily,
   readExtensionRuntimeMetadata,
 } from '@platform/native-messaging/native-port';
@@ -36,13 +35,6 @@ describe('Native Messaging browser metadata', () => {
   ])('classifies %s without treating Safari as Chromium', (userAgent, expected) => {
     setUserAgent(userAgent);
     expect(detectNativeMessagingBrowserFamily()).toBe(expected);
-  });
-
-  it('keeps the CLI bridge unavailable for unsupported browser families even if connectNative exists', () => {
-    setUserAgent('Mozilla/5.0 Version/18.6 Safari/605.1.15');
-    (globalThis as any).browser = undefined;
-    (globalThis as any).chrome = { runtime: { connectNative() {} } };
-    expect(canConnectNativeHost()).toBe(false);
   });
 
   it('returns extension metadata for a supported Chromium runtime', () => {

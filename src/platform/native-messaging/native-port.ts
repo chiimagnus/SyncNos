@@ -42,10 +42,6 @@ export function detectNativeMessagingBrowserFamily(): ExtensionRuntimeMetadata['
   }
 }
 
-export function canConnectNativeHost(): boolean {
-  return detectNativeMessagingBrowserFamily() !== 'unknown' && typeof runtimeApi()?.connectNative === 'function';
-}
-
 export function connectNativeHost(hostName: string): NativeMessagingPort {
   const name = String(hostName || '').trim();
   if (!name) throw new Error('native host name is required');
