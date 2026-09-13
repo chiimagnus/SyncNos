@@ -17,7 +17,18 @@
     "conversation.list",
     "conversation.get",
     "conversation.search",
-    "conversation.stats"
+    "conversation.stats",
+    "conversation.update-url",
+    "conversation.merge",
+    "conversation.delete",
+    "conversation.images.backfill",
+    "capture.current-page",
+    "comments.list",
+    "comments.add",
+    "comments.reply",
+    "comments.delete",
+    "mention.search",
+    "mention.build-insert-text"
   ],
   "browserRequired": []
 }

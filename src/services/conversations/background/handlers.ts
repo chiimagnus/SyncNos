@@ -11,6 +11,7 @@ import {
   mergeConversationsByIds,
   searchConversations,
   syncConversationMessages,
+  updateConversationUrlById,
   upsertConversation,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
@@ -227,6 +228,36 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       );
     }
     return router.ok(convo);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL, async (msg) => {
+    const conversationId = Number(msg?.conversationId);
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
+    }
+    const url = String(msg?.url || '').trim();
+    if (!url) return invalidArgument('url', 'invalid url', msg?.url);
+    try {
+      const result = await updateConversationUrlById({
+        conversationId,
+        url,
+        mergeExisting: msg?.mergeExisting === true,
+      });
+      if (result.changed) {
+        fireAndForget(
+          deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation),
+        );
+        fireAndForget(deps.onRemoteCleanupPending());
+      }
+      return router.ok(result);
+    } catch (error: any) {
+      const code = String(error?.code || '').trim();
+      if (!code) throw error;
+      return router.err(String(error?.message || code), {
+        code,
+        ...(error?.extra && typeof error.extra === 'object' ? error.extra : null),
+      });
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {

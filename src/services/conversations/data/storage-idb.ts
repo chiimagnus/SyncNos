@@ -7,11 +7,7 @@ import {
   hasReusableImageCachePayload,
   reusableImageCacheByteSize,
 } from '@services/conversations/data/image-cache-record';
-import {
-  buildCanonicalWebArticleIdentity,
-  normalizeWebArticleConversationKey,
-  WEB_ARTICLE_SOURCE,
-} from '@services/conversations/domain/article-identity';
+import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
@@ -266,69 +262,6 @@ function sortFacetItems(items: Array<{ key: string; label: string; count: number
   });
 }
 
-async function findExistingArticleConversationByUrl(
-  conversationsStore: IDBObjectStore,
-  rawUrl: unknown,
-): Promise<any | null> {
-  const identity = buildCanonicalWebArticleIdentity(rawUrl);
-  if (!identity) return null;
-  const normalizedUrl = identity.url;
-  const siteKey = deriveConversationListStoredSiteKeyFromUrl(normalizedUrl);
-  if (siteKey === 'unknown') return null;
-  const canonicalConversationKey = identity.conversationKey;
-
-  const index = conversationsStore.index('by_listSiteKey_lastActivityAt_id');
-  const range = globalThis.IDBKeyRange.bound(
-    [siteKey, -Infinity, -Infinity] as any,
-    [siteKey, Infinity, Infinity] as any,
-  );
-  let best: any | null = null;
-  const cursorReq = index.openCursor(range);
-  await new Promise<void>((resolve, reject) => {
-    cursorReq.onerror = () => reject(cursorReq.error || new Error('article identity cursor failed'));
-    cursorReq.onsuccess = () => {
-      const cursor = cursorReq.result as IDBCursorWithValue | null;
-      if (!cursor) return resolve();
-      const row = cursor.value as any;
-      if (
-        safeString(row?.sourceType).toLowerCase() === 'article' &&
-        canonicalizeArticleUrl(row?.url) === normalizedUrl
-      ) {
-        const rowCanonical =
-          safeString(row?.source) === WEB_ARTICLE_SOURCE &&
-          canonicalConversationKey === safeString(row?.conversationKey);
-        const bestCanonical =
-          !!best &&
-          safeString(best?.source) === WEB_ARTICLE_SOURCE &&
-          canonicalConversationKey === safeString(best?.conversationKey);
-        const rowMapped = !!safeString(row?.notionPageId);
-        const bestMapped = !!safeString(best?.notionPageId);
-        const rowActivityAt = Number(row?.lastActivityAt) || 0;
-        const bestActivityAt = Number(best?.lastActivityAt) || 0;
-        const rowId = Number(row?.id) || 0;
-        const bestId = Number(best?.id) || 0;
-
-        if (
-          !best ||
-          (rowCanonical && !bestCanonical) ||
-          (rowCanonical === bestCanonical && rowMapped && !bestMapped) ||
-          (rowCanonical === bestCanonical && rowMapped === bestMapped && rowActivityAt > bestActivityAt) ||
-          (rowCanonical === bestCanonical &&
-            rowMapped === bestMapped &&
-            rowActivityAt === bestActivityAt &&
-            rowId > bestId)
-        ) {
-          best = row;
-        }
-      }
-      cursor.continue();
-    };
-  });
-
-  // ponytail: 同站点 fallback 仍是 O(site rows)；只有实测成为热点时才值得新增 canonical URL identity index。
-  return best;
-}
-
 async function findExistingConversationForPayload(
   conversationsStore: IDBObjectStore,
   payload: any,
@@ -348,14 +281,12 @@ async function findExistingConversationForPayload(
 
   if (isArticle && source.toLowerCase() === WEB_ARTICLE_SOURCE) {
     const identity = buildCanonicalWebArticleIdentity(payload?.url);
-    if (identity) conversationKey = identity.conversationKey;
-    conversationKey = normalizeWebArticleConversationKey(conversationKey);
+    conversationKey = identity?.conversationKey || '';
   }
 
   if (!conversationKey) return null;
   const idx = conversationsStore.index('by_source_conversationKey');
-  let existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
-  if (!existing && isArticle) existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
+  const existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
   return existing || null;
 }
 
@@ -549,9 +480,11 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
 
       const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
       const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
+      if (isArticleSource && !articleIdentity) {
+        throw Object.assign(new Error('invalid article url'), { code: 'invalid_article_url' });
+      }
       const nextConversationKey = isArticleSource
-        ? articleIdentity?.conversationKey ||
-          normalizeWebArticleConversationKey(payloadConversationKey || existingConversationKey)
+        ? String(articleIdentity?.conversationKey || '')
         : String(payloadConversationKey || existingConversationKey || '').trim();
 
       const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
@@ -668,6 +601,194 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
   return { ...outcome.record, __isNew: outcome.isNew };
 }
 
+type ConversationMutationContext = {
+  stores: Record<string, IDBObjectStore>;
+  markChanged: (scope: any) => void;
+};
+
+type MergeConversationsTransactionOutcome = {
+  result: {
+    keptConversationId: number;
+    removedConversationId: number;
+    movedMessages: number;
+    movedImageCache: number;
+    merged: boolean;
+  };
+  conversationChanged: boolean;
+  keptConversation: any;
+};
+
+function conversationMutationError(code: string, message: string, extra?: Record<string, unknown>) {
+  return Object.assign(new Error(message), { code, ...(extra ? { extra } : null) });
+}
+
+async function mergeConversationsInTransaction(
+  context: ConversationMutationContext,
+  input: { keepConversationId: number; removeConversationId: number; now?: number },
+): Promise<MergeConversationsTransactionOutcome> {
+  const { stores, markChanged } = context;
+  const keepConversationId = Number(input.keepConversationId);
+  const removeConversationId = Number(input.removeConversationId);
+  const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
+  const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
+  if (!keep) throw new Error('keep conversation not found');
+  if (!remove) {
+    return {
+      result: {
+        keptConversationId: keepConversationId,
+        removedConversationId: removeConversationId,
+        movedMessages: 0,
+        movedImageCache: 0,
+        merged: false,
+      },
+      conversationChanged: false,
+      keptConversation: keep,
+    };
+  }
+
+  const now = Number(input.now) || Date.now();
+  const mergedConversation: any = normalizeConversationListRecord({
+    ...keep,
+    sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
+    title: mergeStringFallback(keep.title, remove.title),
+    url: mergeStringFallback(keep.url, remove.url),
+    author: mergeStringFallback(keep.author, remove.author),
+    publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
+    notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
+    feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
+    warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
+    lastActivityAt: Math.max(
+      normalizeStoredActivityTimestamp(keep.lastActivityAt),
+      normalizeStoredActivityTimestamp(remove.lastActivityAt),
+    ),
+  });
+
+  const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
+    legacySource: remove.source,
+    legacyConversationKey: remove.conversationKey,
+    nextSource: keep.source,
+    nextConversationKey: keep.conversationKey,
+    fallbackNotionPageId: mergedConversation.notionPageId,
+    legacyConversation: remove,
+    replacementConversationId: keepConversationId,
+    createdAt: now,
+  });
+  if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
+
+  if (!conversationRecordsEquivalent(keep, mergedConversation)) {
+    await reqToPromise(stores.conversations.put(mergedConversation));
+    markChanged('conversations');
+  }
+
+  const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
+  const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
+  const msgRange = globalThis.IDBKeyRange.bound(
+    [removeConversationId, -Infinity] as any,
+    [removeConversationId, Infinity] as any,
+  );
+  const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
+  let movedMessages = 0;
+  for (const row of Array.isArray(msgRows) ? msgRows : []) {
+    if (!row) continue;
+    const rowId = Number(row.id);
+    const key = safeString(row.messageKey);
+    if (key) {
+      const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
+      if (exists) {
+        if (Number.isFinite(rowId) && rowId > 0) {
+          await reqToPromise(stores.messages.delete(rowId));
+          markChanged('messages');
+        }
+        continue;
+      }
+    }
+    row.conversationId = keepConversationId;
+    await reqToPromise(stores.messages.put(row));
+    markChanged('messages');
+    movedMessages += 1;
+  }
+
+  const imageByConversation = stores.image_cache.index('by_conversationId');
+  const imageByIdentity = stores.image_cache.index('by_conversationId_url');
+  const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
+  const imgRows = (await reqToPromise(imageByConversation.getAll(imgRange) as any)) as any[];
+  let movedImageCache = 0;
+  for (const row of Array.isArray(imgRows) ? imgRows : []) {
+    if (!row) continue;
+    const rowId = Number(row.id);
+    const lookupUrl = typeof row.url === 'string' ? row.url : null;
+    const keepSide =
+      lookupUrl == null
+        ? null
+        : ((await reqToPromise(imageByIdentity.get([keepConversationId, lookupUrl] as any) as any)) as any);
+
+    if (keepSide && Number(keepSide.id) !== rowId) {
+      const keepValid = hasReusableImageCachePayload(keepSide);
+      const removeValid = hasReusableImageCachePayload(row);
+      if (!keepValid && removeValid) {
+        const repaired: any = {
+          ...keepSide,
+          blob: row.blob,
+          byteSize: reusableImageCacheByteSize(row),
+          contentType: safeString(row.contentType) || safeString(row.blob?.type) || safeString(keepSide.contentType),
+          updatedAt: pickMaxFiniteNumber(keepSide.updatedAt, row.updatedAt) || now,
+        };
+        if (Object.prototype.hasOwnProperty.call(row, 'dataUrl')) repaired.dataUrl = row.dataUrl;
+        else delete repaired.dataUrl;
+        await reqToPromise(stores.image_cache.put(repaired));
+        markChanged('image_cache');
+        movedImageCache += 1;
+      }
+      if (Number.isFinite(rowId) && rowId > 0) {
+        await reqToPromise(stores.image_cache.delete(rowId));
+        markChanged('image_cache');
+      }
+      continue;
+    }
+
+    row.conversationId = keepConversationId;
+    await reqToPromise(stores.image_cache.put(row));
+    markChanged('image_cache');
+    movedImageCache += 1;
+  }
+
+  const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
+  const mergedCanonicalUrl = mergedIsArticle ? canonicalizeArticleUrl(mergedConversation.url) : '';
+  const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
+  const commentRange = globalThis.IDBKeyRange.bound(
+    [removeConversationId, -Infinity] as any,
+    [removeConversationId, Infinity] as any,
+  );
+  const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
+  for (const row of Array.isArray(commentRows) ? commentRows : []) {
+    if (!row) continue;
+    await reqToPromise(
+      stores.article_comments.put({
+        ...row,
+        conversationId: keepConversationId,
+        ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
+        updatedAt: now,
+      }),
+    );
+    markChanged('article_comments');
+  }
+
+  await reqToPromise(stores.conversations.delete(removeConversationId));
+  markChanged('conversations');
+
+  return {
+    result: {
+      keptConversationId: keepConversationId,
+      removedConversationId: removeConversationId,
+      movedMessages,
+      movedImageCache,
+      merged: true,
+    },
+    conversationChanged: true,
+    keptConversation: mergedConversation,
+  };
+}
+
 export async function mergeConversationsByIds(input: {
   keepConversationId: number;
   removeConversationId: number;
@@ -707,163 +828,150 @@ export async function mergeConversationsByIds(input: {
       ],
       revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
     },
-    async ({ stores, markChanged }) => {
-      const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
-      const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
-      if (!keep) throw new Error('keep conversation not found');
-      if (!remove) {
+    async (context) => await mergeConversationsInTransaction(context, { keepConversationId, removeConversationId }),
+  );
+
+  if (outcome.conversationChanged) invalidateConversationListStatsCache();
+  return outcome.result;
+}
+
+export async function updateConversationUrlById(input: {
+  conversationId: number;
+  url: string;
+  mergeExisting?: boolean;
+}): Promise<{
+  conversationId: number;
+  url: string;
+  source: string;
+  conversationKey: string;
+  changed: boolean;
+  merged: boolean;
+  removedConversationId: number | null;
+}> {
+  const conversationId = Number(input.conversationId);
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+    throw conversationMutationError('invalid_conversation_id', 'invalid conversation id');
+  }
+  const identity = buildCanonicalWebArticleIdentity(input.url);
+  if (!identity) throw conversationMutationError('invalid_article_url', 'invalid article url');
+
+  const db = await openDb();
+  const now = Date.now();
+  const outcome = await runTrackedTransaction(
+    {
+      db,
+      stores: [
+        'conversations',
+        'messages',
+        'sync_mappings',
+        'image_cache',
+        'article_comments',
+        GITHUB_CLEANUP_OUTBOX_STORE,
+      ],
+      revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+    },
+    async (context) => {
+      const { stores, markChanged } = context;
+      const sourceConversation: any = await reqToPromise(stores.conversations.get(conversationId));
+      if (!sourceConversation) throw conversationMutationError('conversation_not_found', 'conversation not found');
+      if (
+        safeString(sourceConversation.sourceType).toLowerCase() !== 'article' ||
+        safeString(sourceConversation.source).toLowerCase() !== WEB_ARTICLE_SOURCE
+      ) {
+        throw conversationMutationError('conversation_url_not_editable', 'only web article URLs can be edited');
+      }
+
+      const currentCanonicalUrl = canonicalizeArticleUrl(sourceConversation.url);
+      if (
+        safeString(sourceConversation.source) === identity.source &&
+        safeString(sourceConversation.conversationKey) === identity.conversationKey &&
+        currentCanonicalUrl === identity.url
+      ) {
         return {
           result: {
-            keptConversationId: keepConversationId,
-            removedConversationId: removeConversationId,
-            movedMessages: 0,
-            movedImageCache: 0,
+            conversationId,
+            url: identity.url,
+            source: identity.source,
+            conversationKey: identity.conversationKey,
+            changed: false,
             merged: false,
+            removedConversationId: null,
           },
           conversationChanged: false,
         };
       }
 
-      const now = Date.now();
-      const mergedConversation: any = normalizeConversationListRecord({
-        ...keep,
-        sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
-        title: mergeStringFallback(keep.title, remove.title),
-        url: mergeStringFallback(keep.url, remove.url),
-        author: mergeStringFallback(keep.author, remove.author),
-        publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
-        notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
-        feishuDocId: mergeStringFallback(keep.feishuDocId, remove.feishuDocId),
-        warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
-        lastActivityAt: Math.max(
-          normalizeStoredActivityTimestamp(keep.lastActivityAt),
-          normalizeStoredActivityTimestamp(remove.lastActivityAt),
-        ),
-      });
+      const identityIndex = stores.conversations.index('by_source_conversationKey');
+      const conflict: any = await reqToPromise(identityIndex.get([identity.source, identity.conversationKey]) as any);
+      let keptConversation = sourceConversation;
+      let mergeOutcome: MergeConversationsTransactionOutcome | null = null;
+      if (conflict && Number(conflict.id) !== conversationId) {
+        if (input.mergeExisting !== true) {
+          throw conversationMutationError(
+            'conversation_url_conflict',
+            'article URL already belongs to another conversation',
+            {
+              conflictingConversationId: Number(conflict.id),
+            },
+          );
+        }
+        mergeOutcome = await mergeConversationsInTransaction(context, {
+          keepConversationId: conversationId,
+          removeConversationId: Number(conflict.id),
+          now,
+        });
+        keptConversation = mergeOutcome.keptConversation;
+      }
 
+      const legacySource = safeString(keptConversation.source);
+      const legacyConversationKey = safeString(keptConversation.conversationKey);
       const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
-        legacySource: remove.source,
-        legacyConversationKey: remove.conversationKey,
-        nextSource: keep.source,
-        nextConversationKey: keep.conversationKey,
-        fallbackNotionPageId: mergedConversation.notionPageId,
-        legacyConversation: remove,
-        replacementConversationId: keepConversationId,
+        legacySource,
+        legacyConversationKey,
+        nextSource: identity.source,
+        nextConversationKey: identity.conversationKey,
+        fallbackNotionPageId: keptConversation.notionPageId,
+        legacyConversation: keptConversation,
+        replacementConversationId: conversationId,
         createdAt: now,
       });
       if (mappingMutation.syncMappingChanged) markChanged('sync_mappings');
 
-      if (!conversationRecordsEquivalent(keep, mergedConversation)) {
-        await reqToPromise(stores.conversations.put(mergedConversation));
+      const updatedComments = await migrateArticleCommentsForIdentityRewrite(stores.article_comments, {
+        conversationId,
+        fromCanonicalUrl: canonicalizeArticleUrl(keptConversation.url),
+        toCanonicalUrl: identity.url,
+        updatedAt: now,
+      });
+      if (updatedComments > 0) markChanged('article_comments');
+
+      const rewritten: any = normalizeConversationListRecord({
+        ...keptConversation,
+        id: conversationId,
+        source: identity.source,
+        sourceType: 'article',
+        conversationKey: identity.conversationKey,
+        url: identity.url,
+        lastActivityAt: Math.max(normalizeStoredActivityTimestamp(keptConversation.lastActivityAt), now),
+      });
+      const rewriteChanged = !conversationRecordsEquivalent(keptConversation, rewritten);
+      if (rewriteChanged) {
+        await reqToPromise(stores.conversations.put(rewritten));
         markChanged('conversations');
       }
 
-      const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
-      const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
-      const msgRange = globalThis.IDBKeyRange.bound(
-        [removeConversationId, -Infinity] as any,
-        [removeConversationId, Infinity] as any,
-      );
-      const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
-      let movedMessages = 0;
-      for (const row of Array.isArray(msgRows) ? msgRows : []) {
-        if (!row) continue;
-        const rowId = Number(row.id);
-        const key = safeString(row.messageKey);
-        if (key) {
-          const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
-          if (exists) {
-            if (Number.isFinite(rowId) && rowId > 0) {
-              await reqToPromise(stores.messages.delete(rowId));
-              markChanged('messages');
-            }
-            continue;
-          }
-        }
-        row.conversationId = keepConversationId;
-        await reqToPromise(stores.messages.put(row));
-        markChanged('messages');
-        movedMessages += 1;
-      }
-
-      const imageByConversation = stores.image_cache.index('by_conversationId');
-      const imageByIdentity = stores.image_cache.index('by_conversationId_url');
-      const imgRange = globalThis.IDBKeyRange.only(removeConversationId);
-      const imgRows = (await reqToPromise(imageByConversation.getAll(imgRange) as any)) as any[];
-      let movedImageCache = 0;
-      for (const row of Array.isArray(imgRows) ? imgRows : []) {
-        if (!row) continue;
-        const rowId = Number(row.id);
-        const lookupUrl = typeof row.url === 'string' ? row.url : null;
-        const keepSide =
-          lookupUrl == null
-            ? null
-            : ((await reqToPromise(imageByIdentity.get([keepConversationId, lookupUrl] as any) as any)) as any);
-
-        if (keepSide && Number(keepSide.id) !== rowId) {
-          const keepValid = hasReusableImageCachePayload(keepSide);
-          const removeValid = hasReusableImageCachePayload(row);
-          if (!keepValid && removeValid) {
-            const repaired: any = {
-              ...keepSide,
-              blob: row.blob,
-              byteSize: reusableImageCacheByteSize(row),
-              contentType:
-                safeString(row.contentType) || safeString(row.blob?.type) || safeString(keepSide.contentType),
-              updatedAt: pickMaxFiniteNumber(keepSide.updatedAt, row.updatedAt) || now,
-            };
-            if (Object.prototype.hasOwnProperty.call(row, 'dataUrl')) repaired.dataUrl = row.dataUrl;
-            else delete repaired.dataUrl;
-            await reqToPromise(stores.image_cache.put(repaired));
-            markChanged('image_cache');
-            movedImageCache += 1;
-          }
-          if (Number.isFinite(rowId) && rowId > 0) {
-            await reqToPromise(stores.image_cache.delete(rowId));
-            markChanged('image_cache');
-          }
-          continue;
-        }
-
-        row.conversationId = keepConversationId;
-        await reqToPromise(stores.image_cache.put(row));
-        markChanged('image_cache');
-        movedImageCache += 1;
-      }
-
-      const mergedIsArticle = safeString(mergedConversation.sourceType).toLowerCase() === 'article';
-      const mergedCanonicalUrl = mergedIsArticle ? canonicalizeArticleUrl(mergedConversation.url) : '';
-      const commentsIndex = stores.article_comments.index('by_conversationId_createdAt');
-      const commentRange = globalThis.IDBKeyRange.bound(
-        [removeConversationId, -Infinity] as any,
-        [removeConversationId, Infinity] as any,
-      );
-      const commentRows = (await reqToPromise(commentsIndex.getAll(commentRange) as any)) as any[];
-      for (const row of Array.isArray(commentRows) ? commentRows : []) {
-        if (!row) continue;
-        await reqToPromise(
-          stores.article_comments.put({
-            ...row,
-            conversationId: keepConversationId,
-            ...(mergedCanonicalUrl ? { canonicalUrl: mergedCanonicalUrl } : {}),
-            updatedAt: now,
-          }),
-        );
-        markChanged('article_comments');
-      }
-
-      await reqToPromise(stores.conversations.delete(removeConversationId));
-      markChanged('conversations');
-
+      const merged = mergeOutcome?.result.merged === true;
       return {
         result: {
-          keptConversationId: keepConversationId,
-          removedConversationId: removeConversationId,
-          movedMessages,
-          movedImageCache,
-          merged: true,
+          conversationId,
+          url: identity.url,
+          source: identity.source,
+          conversationKey: identity.conversationKey,
+          changed: rewriteChanged || merged,
+          merged,
+          removedConversationId: merged ? (mergeOutcome?.result.removedConversationId ?? null) : null,
         },
-        conversationChanged: true,
+        conversationChanged: rewriteChanged || merged,
       };
     },
   );

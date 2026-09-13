@@ -9,6 +9,7 @@ import type {
   ConversationListSummary,
 } from '@services/conversations/domain/models';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
 import { buildConversationsJsonZipExport } from '@services/sync/local/json-export';
 import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
@@ -21,8 +22,7 @@ import {
   getConversationListBootstrap,
   getConversationListPage,
   getConversationDetail,
-  mergeConversations,
-  upsertConversation,
+  updateConversationUrl,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
@@ -39,7 +39,6 @@ import type { DataRevisionScope } from '@services/data-revisions/client';
 import { storageOnChanged } from '@services/shared/storage';
 import { getEnabledSyncProviders, hasSyncProviderEnabledStorageChange } from '@services/sync/sync-provider-gate';
 import type { SyncProvider } from '@services/sync/models';
-import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 import {
   useConversationSyncFeedback,
@@ -53,10 +52,6 @@ const LIST_BOOTSTRAP_LIMIT = 100;
 const EMPTY_LIST_SUMMARY: ConversationListSummary = { totalCount: 0, todayCount: 0 };
 const EMPTY_LIST_FACETS: ConversationListFacets = { sources: [], sites: [] };
 const LIST_REVISION_SCOPES: readonly DataRevisionScope[] = ['conversations', 'article_comments'];
-
-function canonicalizeHttpUrl(raw: unknown): string {
-  return canonicalizeArticleUrl(raw);
-}
 
 function resolveConversationSourceType(input: {
   sourceType?: unknown;
@@ -73,7 +68,7 @@ function resolveConversationSourceType(input: {
     .toLowerCase();
   if (source !== 'web') return undefined;
 
-  return canonicalizeHttpUrl(input?.url) ? 'article' : undefined;
+  return canonicalizeArticleUrl(input?.url) ? 'article' : undefined;
 }
 
 function ensureConversationUiShape(conversation: Conversation): Conversation {
@@ -797,31 +792,13 @@ export function ConversationsProvider({
       const convo = selectedConversation;
       if (!convo) throw new Error('No conversation selected');
 
-      const nextCanonical = canonicalizeHttpUrl(nextUrl);
-      if (!nextCanonical) throw new Error('URL must be an http(s) page');
+      const conversationId = Number((convo as any)?.id);
+      if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('invalid conversation id');
 
-      const sourceType = String((convo as any)?.sourceType || '')
-        .trim()
-        .toLowerCase();
-      const isArticle = sourceType === 'article';
-
-      const conflict = isArticle
-        ? (Array.isArray(items) ? items : []).find((item) => {
-            if (!item) return false;
-            const id = Number((item as any).id);
-            if (!Number.isFinite(id) || id <= 0) return false;
-            if (id === Number((convo as any).id)) return false;
-            const itemSourceType = String((item as any).sourceType || '')
-              .trim()
-              .toLowerCase();
-            if (itemSourceType !== 'article') return false;
-            const itemCanonical = canonicalizeHttpUrl((item as any).url);
-            if (!itemCanonical) return false;
-            return itemCanonical === nextCanonical;
-          })
-        : undefined;
-
-      if (conflict) {
+      try {
+        await updateConversationUrl(conversationId, nextUrl, false);
+      } catch (error: any) {
+        if (String(error?.code || '') !== 'conversation_url_conflict') throw error;
         const confirmed =
           typeof globalThis.window?.confirm === 'function'
             ? globalThis.window.confirm(
@@ -829,25 +806,16 @@ export function ConversationsProvider({
               )
             : true;
         if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
-
-        await mergeConversations({
-          keepConversationId: Number((convo as any).id),
-          removeConversationId: Number((conflict as any).id),
-        });
+        await updateConversationUrl(conversationId, nextUrl, true);
       }
 
-      const updated = await upsertConversation({
-        id: Number((convo as any)?.id),
-        source: (convo as any)?.source,
-        conversationKey: (convo as any)?.conversationKey,
-        sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
-        url: nextCanonical,
-        lastActivityAt: Date.now(),
-      });
-      if (Number(activeIdRef.current) === Number(updated?.id)) setActiveConversationSnapshot(updated);
+      if (Number(activeIdRef.current) === conversationId) {
+        const updated = await getConversationById(conversationId);
+        if (updated) setActiveConversationSnapshot(updated);
+      }
       await refreshList();
     },
-    [items, refreshList, selectedConversation, setActiveConversationSnapshot],
+    [refreshList, selectedConversation, setActiveConversationSnapshot],
   );
 
   useEffect(() => {

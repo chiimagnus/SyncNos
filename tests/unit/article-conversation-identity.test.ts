@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCanonicalWebArticleConversationKey,
   buildCanonicalWebArticleIdentity,
-  normalizeWebArticleConversationKey,
   WEB_ARTICLE_SOURCE,
 } from '@services/conversations/domain/article-identity';
 
@@ -27,19 +26,9 @@ describe('web article conversation identity', () => {
     });
   });
 
-  it('normalizes article-prefixed keys without changing unrelated keys', () => {
-    expect(normalizeWebArticleConversationKey(' ARTICLE:https://Example.com/post#fragment ')).toBe(
-      'article:https://example.com/post',
-    );
-    expect(normalizeWebArticleConversationKey('legacy-key')).toBe('legacy-key');
-  });
-
   it('never manufactures an article key from an invalid or non-http URL', () => {
     expect(buildCanonicalWebArticleConversationKey('')).toBe('');
     expect(buildCanonicalWebArticleConversationKey('mailto:test@example.com')).toBe('');
     expect(buildCanonicalWebArticleIdentity('not a url')).toBeNull();
-    expect(normalizeWebArticleConversationKey('article:mailto:test@example.com')).toBe(
-      'article:mailto:test@example.com',
-    );
   });
 });

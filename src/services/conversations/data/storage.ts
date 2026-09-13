@@ -81,3 +81,11 @@ export async function deleteConversationsByIds(conversationIds: any[]) {
 export async function mergeConversationsByIds(input: { keepConversationId: number; removeConversationId: number }) {
   return await idb.mergeConversationsByIds(input);
 }
+
+export async function updateConversationUrlById(input: {
+  conversationId: number;
+  url: string;
+  mergeExisting?: boolean;
+}) {
+  return await idb.updateConversationUrlById(input);
+}

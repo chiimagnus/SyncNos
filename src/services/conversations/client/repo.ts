@@ -16,7 +16,13 @@ function unwrap<T>(res: ApiResponse<T>): T {
   if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
   if (res.ok) return res.data as T;
   const message = res.error?.message ?? 'unknown error';
-  throw new Error(message);
+  const error = new Error(message) as Error & { code?: string; extra?: unknown };
+  error.extra = res.error?.extra ?? null;
+  if (res.error?.extra && typeof res.error.extra === 'object') {
+    const code = String((res.error.extra as any).code || '').trim();
+    if (code) error.code = code;
+  }
+  throw error;
 }
 
 export async function getConversationListBootstrap(
@@ -84,6 +90,27 @@ export async function deleteConversations(conversationIds: number[]): Promise<un
     : [];
   if (!ids.length) return null;
   const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, { conversationIds: ids });
+  return unwrap(res);
+}
+
+export async function updateConversationUrl(
+  conversationId: number,
+  url: string,
+  mergeExisting = false,
+): Promise<{
+  conversationId: number;
+  url: string;
+  source: string;
+  conversationKey: string;
+  changed: boolean;
+  merged: boolean;
+  removedConversationId: number | null;
+}> {
+  const res = await send<ApiResponse<any>>(CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL, {
+    conversationId: Number(conversationId),
+    url: String(url || '').trim(),
+    mergeExisting: mergeExisting === true,
+  });
   return unwrap(res);
 }
 

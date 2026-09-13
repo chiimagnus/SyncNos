@@ -277,6 +277,163 @@ describe('CLI Native Messaging bridge', () => {
     harness.controller.stop();
   });
 
+  it('maps conversation mutation RPCs to canonical handlers and preserves mutation error codes', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        if (message.type === CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL && message.url.includes('conflict')) {
+          return {
+            ok: false,
+            data: null,
+            error: { message: 'conflict', extra: { code: 'conversation_url_conflict', conflictingConversationId: 9 } },
+          };
+        }
+        return { ok: true, data: { echoedType: message.type }, error: null };
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    const emit = async (requestId: string, method: string, params: Record<string, unknown>) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    expect(
+      await emit('u1', 'conversation.update-url', {
+        conversationId: 7,
+        url: 'https://example.com/new',
+        mergeExisting: true,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      {
+        type: CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL,
+        conversationId: 7,
+        url: 'https://example.com/new',
+        mergeExisting: true,
+      },
+      null,
+    );
+    expect(
+      await emit('u2', 'conversation.update-url', { conversationId: 7, url: 'https://example.com/conflict' }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'conversation_url_conflict' },
+    });
+    await emit('m1', 'conversation.merge', { keepConversationId: 7, removeConversationId: 9 });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, keepConversationId: 7, removeConversationId: 9 },
+      null,
+    );
+    await emit('d1', 'conversation.delete', { conversationIds: [7, 9] });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, conversationIds: [7, 9] },
+      null,
+    );
+    await emit('b1', 'conversation.images.backfill', { conversationId: 7, conversationUrl: 'https://example.com/new' });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      {
+        type: CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
+        conversationId: 7,
+        conversationUrl: 'https://example.com/new',
+      },
+      null,
+    );
+    harness.controller.stop();
+  });
+
+  it('resolves comment conversation identity without exposing locator input and reuses existing comment handlers', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        if (message.type === CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID) {
+          return {
+            ok: true,
+            data: { id: message.conversationId, sourceType: 'article', url: 'https://example.com/article#fragment' },
+            error: null,
+          };
+        }
+        return { ok: true, data: { type: message.type }, error: null };
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    const emit = async (requestId: string, method: string, params: Record<string, unknown>) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    await emit('c-list', 'comments.list', { conversationId: 7 });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'listArticleComments',
+        conversationId: 7,
+        canonicalUrl: 'https://example.com/article',
+      }),
+      null,
+    );
+
+    await emit('c-add', 'comments.add', { conversationId: 7, text: 'plain root' });
+    const addMessage = router.dispatch.mock.calls.at(-1)?.[0];
+    expect(addMessage).toMatchObject({
+      type: 'addArticleComment',
+      conversationId: 7,
+      canonicalUrl: 'https://example.com/article',
+      commentText: 'plain root',
+    });
+    expect(addMessage).not.toHaveProperty('locator');
+
+    await emit('c-reply', 'comments.reply', { conversationId: 7, parentId: 3, text: 'plain reply' });
+    const replyMessage = router.dispatch.mock.calls.at(-1)?.[0];
+    expect(replyMessage).toMatchObject({
+      type: 'addArticleComment',
+      conversationId: 7,
+      parentId: 3,
+      commentText: 'plain reply',
+    });
+    expect(replyMessage).not.toHaveProperty('locator');
+
+    await emit('c-delete', 'comments.delete', { conversationId: 7, commentId: 9 });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'deleteArticleComment', conversationId: 7, commentId: 9 }),
+      null,
+    );
+    harness.controller.stop();
+  });
+
+  it('maps mention search/build to the existing bounded mention handlers', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => ({ ok: true, data: { type: message.type }, error: null })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'mention-search',
+      method: 'mention.search',
+      params: { query: 'mcp', limit: 20 },
+    });
+    await waitForPosted(harness, 2);
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: 'searchItemMentionCandidates', query: 'mcp', limit: 20 },
+      null,
+    );
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'mention-insert',
+      method: 'mention.build-insert-text',
+      params: { conversationId: 42 },
+    });
+    await waitForPosted(harness, 3);
+    expect(router.dispatch).toHaveBeenCalledWith({ type: 'buildItemMentionInsertText', conversationId: 42 }, null);
+    harness.controller.stop();
+  });
+
   it('maps Background INVALID_ARGUMENT to stable public invalid_argument', async () => {
     const router = {
       dispatch: vi.fn(async () => ({

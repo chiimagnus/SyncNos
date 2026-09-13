@@ -14,6 +14,7 @@ const storageMocks = vi.hoisted(() => ({
   mergeConversationsByIds: vi.fn(),
   searchConversations: vi.fn(),
   syncConversationMessages: vi.fn(),
+  updateConversationUrlById: vi.fn(),
   upsertConversation: vi.fn(),
 }));
 
@@ -28,6 +29,7 @@ vi.mock('@services/conversations/data/storage', () => ({
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
   searchConversations: storageMocks.searchConversations,
   syncConversationMessages: storageMocks.syncConversationMessages,
+  updateConversationUrlById: storageMocks.updateConversationUrlById,
   upsertConversation: storageMocks.upsertConversation,
 }));
 
@@ -58,6 +60,7 @@ afterEach(() => {
   storageMocks.mergeConversationsByIds.mockReset();
   storageMocks.searchConversations.mockReset();
   storageMocks.syncConversationMessages.mockReset();
+  storageMocks.updateConversationUrlById.mockReset();
   storageMocks.upsertConversation.mockReset();
 });
 
@@ -155,6 +158,50 @@ describe('conversations pagination handlers', () => {
       warningFlags: ['partial'],
       notionPageId: 'notion-99',
       feishuDocId: 'feishu-99',
+    });
+  });
+
+  it('routes canonical URL updates and preserves stable storage error codes', async () => {
+    storageMocks.updateConversationUrlById.mockResolvedValueOnce({
+      conversationId: 7,
+      url: 'https://example.com/new',
+      source: 'web',
+      conversationKey: 'article:https://example.com/new',
+      changed: true,
+      merged: false,
+      removedConversationId: null,
+    });
+    const router = createRouter();
+    const ok = await router.dispatch({
+      type: 'updateConversationUrl',
+      conversationId: 7,
+      url: 'https://example.com/new#fragment',
+      mergeExisting: false,
+    });
+    expect(ok).toMatchObject({ ok: true, data: { conversationId: 7, changed: true } });
+    expect(storageMocks.updateConversationUrlById).toHaveBeenCalledWith({
+      conversationId: 7,
+      url: 'https://example.com/new#fragment',
+      mergeExisting: false,
+    });
+
+    storageMocks.updateConversationUrlById.mockRejectedValueOnce(
+      Object.assign(new Error('article URL already belongs to another conversation'), {
+        code: 'conversation_url_conflict',
+        extra: { conflictingConversationId: 9 },
+      }),
+    );
+    const conflict = await router.dispatch({
+      type: 'updateConversationUrl',
+      conversationId: 7,
+      url: 'https://example.com/target',
+    });
+    expect(conflict).toMatchObject({
+      ok: false,
+      error: {
+        message: 'article URL already belongs to another conversation',
+        extra: { code: 'conversation_url_conflict', conflictingConversationId: 9 },
+      },
     });
   });
 

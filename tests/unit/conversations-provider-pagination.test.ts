@@ -11,8 +11,7 @@ const findConversationBySourceAndKey = vi.fn();
 const getConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
-const upsertConversation = vi.fn();
-const mergeConversations = vi.fn();
+const updateConversationUrl = vi.fn();
 const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
 const subscribeDataRevisionChanges = vi.fn();
@@ -27,8 +26,7 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationById: (...args: any[]) => getConversationById(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
-  upsertConversation: (...args: any[]) => upsertConversation(...args),
-  mergeConversations: (...args: any[]) => mergeConversations(...args),
+  updateConversationUrl: (...args: any[]) => updateConversationUrl(...args),
   backfillConversationImages: (...args: any[]) => backfillConversationImages(...args),
 }));
 
@@ -185,8 +183,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
-    upsertConversation.mockReset();
-    mergeConversations.mockReset();
+    updateConversationUrl.mockReset();
     backfillConversationImages.mockReset();
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
@@ -203,13 +200,14 @@ describe('ConversationsProvider pagination state', () => {
     );
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
-    upsertConversation.mockResolvedValue({});
-    mergeConversations.mockResolvedValue({
-      keptConversationId: 0,
-      removedConversationId: 0,
-      movedMessages: 0,
-      movedImageCache: 0,
+    updateConversationUrl.mockResolvedValue({
+      conversationId: 0,
+      url: '',
+      source: 'web',
+      conversationKey: '',
+      changed: false,
       merged: false,
+      removedConversationId: null,
     });
     backfillConversationImages.mockResolvedValue({
       scannedMessages: 0,
@@ -609,20 +607,36 @@ describe('ConversationsProvider pagination state', () => {
     expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(afterProviderChangeCalls);
   });
 
-  it('merges an article URL conflict before rewriting the kept conversation identity', async () => {
+  it('delegates article URL conflict detection and merge to the canonical background mutation', async () => {
     const selected = {
       ...makeConversation(501, 'web', 'article-old'),
       sourceType: 'article',
       url: 'https://example.com/old',
     };
-    const conflict = {
-      ...makeConversation(502, 'web', 'article-target'),
+    const unrelated = {
+      ...makeConversation(503, 'web', 'article-unrelated'),
       sourceType: 'article',
-      url: 'https://example.com/target',
+      url: 'https://example.com/unrelated',
     };
-    getConversationListBootstrap.mockResolvedValue(makePage([selected, conflict]));
+    getConversationListBootstrap.mockResolvedValue(makePage([selected, unrelated]));
     getConversationById.mockResolvedValue(selected);
     getConversationDetail.mockResolvedValue({ conversationId: 501, messages: [] });
+    updateConversationUrl
+      .mockRejectedValueOnce(Object.assign(new Error('conflict'), { code: 'conversation_url_conflict' }))
+      .mockResolvedValueOnce({
+        conversationId: 501,
+        url: 'https://example.com/target',
+        source: 'web',
+        conversationKey: 'article:https://example.com/target',
+        changed: true,
+        merged: true,
+        removedConversationId: 502,
+      });
+    getConversationById.mockResolvedValueOnce(selected).mockResolvedValueOnce({
+      ...selected,
+      conversationKey: 'article:https://example.com/target',
+      url: 'https://example.com/target',
+    });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     try {
@@ -637,18 +651,8 @@ describe('ConversationsProvider pagination state', () => {
       });
 
       expect(confirm).toHaveBeenCalledTimes(1);
-      expect(mergeConversations).toHaveBeenCalledWith({ keepConversationId: 501, removeConversationId: 502 });
-      expect(upsertConversation).toHaveBeenCalledWith({
-        id: 501,
-        source: 'web',
-        conversationKey: 'article-old',
-        sourceType: 'article',
-        url: 'https://example.com/target',
-        lastActivityAt: expect.any(Number),
-      });
-      expect(mergeConversations.mock.invocationCallOrder[0]).toBeLessThan(
-        upsertConversation.mock.invocationCallOrder[0]!,
-      );
+      expect(updateConversationUrl).toHaveBeenNthCalledWith(1, 501, 'https://example.com/target', false);
+      expect(updateConversationUrl).toHaveBeenNthCalledWith(2, 501, 'https://example.com/target', true);
     } finally {
       confirm.mockRestore();
     }

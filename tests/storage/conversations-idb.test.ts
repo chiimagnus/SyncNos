@@ -26,6 +26,7 @@ import {
   setConversationNotionPageId,
   setSyncCursor,
   syncConversationMessages,
+  updateConversationUrlById,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
 
@@ -2667,283 +2668,6 @@ describe('conversations storage-idb', () => {
     await txDone(verifyTx);
   });
 
-  it('reuses and rewrites legacy article conversation rows by normalized url', async () => {
-    const db = await openDb();
-    const t = db.transaction(['conversations', 'sync_mappings'], 'readwrite');
-    const conversations = t.objectStore('conversations');
-    const mappings = t.objectStore('sync_mappings');
-
-    const legacyId = await reqToPromise<number>(
-      conversations.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'article',
-          conversationKey: 'article_https://example.com/post',
-          title: 'Legacy title',
-          url: 'https://example.com/post#frag',
-          notionPageId: 'page_old',
-          warningFlags: [],
-          lastActivityAt: 1,
-        }),
-      ),
-    );
-
-    await reqToPromise(
-      mappings.add({
-        source: 'article',
-        conversationKey: 'article_https://example.com/post',
-        notionPageId: 'page_old',
-        notionPageUrl: 'https://notion.so/page_old',
-        notionWorkspaceSlug: 'legacy-ws',
-        lastSyncedMessageKey: 'article_body',
-        lastSyncedSequence: 1,
-        lastSyncedAt: 10,
-        lastSyncedMessageUpdatedAt: 9,
-        notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
-        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'article_body', lastSyncedSequence: 1 } },
-        notionSectionDigests: { article: { digest: 'd-article', lastSyncedAt: 10 } },
-        feishuDocId: 'doc-old',
-        feishuLastContentHash: 'hash-old',
-        futureMetadata: { keep: true },
-        updatedAt: 1,
-      }),
-    );
-    await txDone(t);
-
-    const conversation = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article:https://example.com/post',
-      title: 'New title',
-      url: 'https://example.com/post',
-      lastActivityAt: 2,
-    });
-
-    expect(Number(conversation.id)).toBe(legacyId);
-    expect(conversation.__isNew).toBe(false);
-    expect(conversation.source).toBe('web');
-    expect(conversation.conversationKey).toBe('article:https://example.com/post');
-    expect(conversation.url).toBe('https://example.com/post');
-
-    const reopened = await openDb();
-    const verifyTx = reopened.transaction(['conversations', 'sync_mappings'], 'readonly');
-    const verifyConversations = await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll());
-    const verifyMappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
-    await txDone(verifyTx);
-
-    expect(verifyConversations).toHaveLength(1);
-    expect(verifyConversations[0]).toMatchObject({
-      id: legacyId,
-      source: 'web',
-      conversationKey: 'article:https://example.com/post',
-      url: 'https://example.com/post',
-      notionPageId: 'page_old',
-      listSourceKey: 'web',
-      listSiteKey: 'domain:example.com',
-    });
-    expect(Object.prototype.hasOwnProperty.call(verifyConversations[0], '__isNew')).toBe(false);
-    expect(verifyMappings).toHaveLength(1);
-    expect(verifyMappings[0]).toMatchObject({
-      source: 'web',
-      conversationKey: 'article:https://example.com/post',
-      notionPageId: 'page_old',
-      notionPageUrl: 'https://notion.so/page_old',
-      notionWorkspaceSlug: 'legacy-ws',
-      lastSyncedMessageKey: 'article_body',
-      notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
-      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'article_body', lastSyncedSequence: 1 } },
-      notionSectionDigests: { article: { digest: 'd-article', lastSyncedAt: 10 } },
-      feishuDocId: 'doc-old',
-      feishuLastContentHash: 'hash-old',
-      futureMetadata: { keep: true },
-    });
-  });
-
-  it('limits legacy article fallback to the target site without materializing the conversation store', async () => {
-    const db = await openDb();
-    const seedTx = db.transaction(['conversations'], 'readwrite');
-    const store = seedTx.objectStore('conversations');
-    const targetId = await reqToPromise<number>(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-web-clipper',
-          conversationKey: 'legacy-target',
-          title: 'Legacy target',
-          url: 'https://example.com/post?legacy=1#frag',
-          lastActivityAt: 10,
-        }),
-      ),
-    );
-    await reqToPromise(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-wrong-url',
-          conversationKey: 'legacy-wrong-url',
-          title: 'Wrong url',
-          url: 'https://example.com/other',
-          lastActivityAt: 11,
-        }),
-      ),
-    );
-    for (const sourceType of ['chat', 'video']) {
-      await reqToPromise(
-        store.add(
-          normalizeConversationListRecord({
-            sourceType,
-            source: `legacy-${sourceType}`,
-            conversationKey: `legacy-${sourceType}`,
-            title: sourceType,
-            url: 'https://example.com/post?legacy=1',
-            lastActivityAt: 12,
-          }),
-        ),
-      );
-    }
-    for (let index = 0; index < 30; index += 1) {
-      await reqToPromise(
-        store.add(
-          normalizeConversationListRecord({
-            sourceType: 'article',
-            source: `other-${index}`,
-            conversationKey: `other-${index}`,
-            title: `Other ${index}`,
-            url: `https://other-${index}.example.net/post`,
-            lastActivityAt: 100 + index,
-          }),
-        ),
-      );
-    }
-    await txDone(seedTx);
-
-    const getAllSpy = vi.spyOn(IDBObjectStore.prototype, 'getAll');
-    const openCursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
-    try {
-      const conversation = await upsertConversation({
-        sourceType: 'article',
-        source: 'web',
-        conversationKey: 'article:https://example.com/post?legacy=1',
-        title: 'Canonical',
-        url: 'https://example.com/post?legacy=1',
-        lastActivityAt: 200,
-      });
-      expect(Number(conversation.id)).toBe(targetId);
-      expect(conversation.__isNew).toBe(false);
-
-      const conversationGetAlls = getAllSpy.mock.contexts.filter(
-        (context) => String((context as IDBObjectStore)?.name || '') === 'conversations',
-      );
-      expect(conversationGetAlls).toHaveLength(0);
-      const siteCursorCalls = openCursorSpy.mock.calls.filter(
-        (_call, index) =>
-          String((openCursorSpy.mock.contexts[index] as IDBIndex)?.name || '') === 'by_listSiteKey_lastActivityAt_id',
-      );
-      expect(siteCursorCalls).toHaveLength(1);
-      const range = siteCursorCalls[0]?.[0] as IDBKeyRange;
-      expect((range.lower as any[])?.[0]).toBe('domain:example.com');
-      expect((range.upper as any[])?.[0]).toBe('domain:example.com');
-    } finally {
-      getAllSpy.mockRestore();
-      openCursorSpy.mockRestore();
-    }
-  });
-
-  it('prefers a notion-mapped legacy article over a newer unmapped same-url fallback candidate', async () => {
-    const db = await openDb();
-    const tx = db.transaction(['conversations'], 'readwrite');
-    const store = tx.objectStore('conversations');
-    const mappedId = await reqToPromise<number>(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-mapped',
-          conversationKey: 'mapped',
-          title: 'Mapped',
-          url: 'https://example.com/preferred',
-          notionPageId: 'page-mapped',
-          lastActivityAt: 10,
-        }),
-      ),
-    );
-    await reqToPromise(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-newer',
-          conversationKey: 'newer',
-          title: 'Newer',
-          url: 'https://example.com/preferred',
-          lastActivityAt: 100,
-        }),
-      ),
-    );
-    await txDone(tx);
-
-    const conversation = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article:https://example.com/preferred',
-      title: 'Canonical',
-      url: 'https://example.com/preferred',
-      lastActivityAt: 200,
-    });
-    expect(Number(conversation.id)).toBe(mappedId);
-  });
-
-  it('prefers recency and then the larger id among unmapped same-url fallback candidates', async () => {
-    const db = await openDb();
-    const tx = db.transaction(['conversations'], 'readwrite');
-    const store = tx.objectStore('conversations');
-    await reqToPromise(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-old',
-          conversationKey: 'old',
-          title: 'Old',
-          url: 'https://example.com/tiebreak',
-          lastActivityAt: 10,
-        }),
-      ),
-    );
-    await reqToPromise(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-new-a',
-          conversationKey: 'new-a',
-          title: 'New A',
-          url: 'https://example.com/tiebreak',
-          lastActivityAt: 100,
-        }),
-      ),
-    );
-    const expectedId = await reqToPromise<number>(
-      store.add(
-        normalizeConversationListRecord({
-          sourceType: 'article',
-          source: 'legacy-new-b',
-          conversationKey: 'new-b',
-          title: 'New B',
-          url: 'https://example.com/tiebreak',
-          lastActivityAt: 100,
-        }),
-      ),
-    );
-    await txDone(tx);
-
-    const conversation = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article:https://example.com/tiebreak',
-      title: 'Canonical',
-      url: 'https://example.com/tiebreak',
-      lastActivityAt: 200,
-    });
-    expect(Number(conversation.id)).toBe(expectedId);
-  });
-
   it('does not run article URL fallback for non-article payloads', async () => {
     const openCursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
     try {
@@ -2963,6 +2687,203 @@ describe('conversations storage-idb', () => {
     } finally {
       openCursorSpy.mockRestore();
     }
+  });
+
+  it('updates a Web Article URL atomically and reports canonical conflicts without changing revisions', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'ignored-keep',
+      title: 'Keep',
+      url: 'https://example.com/keep#old',
+      lastActivityAt: 10,
+    });
+    const conflict = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'ignored-conflict',
+      title: 'Conflict',
+      url: 'https://example.com/target',
+      lastActivityAt: 20,
+    });
+    const baseline = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      image_cache: await readDataRevision('image_cache'),
+      article_comments: await readDataRevision('article_comments'),
+    };
+
+    await expect(
+      updateConversationUrlById({
+        conversationId: Number(keep.id),
+        url: 'HTTPS://Example.com/target#fragment',
+        mergeExisting: false,
+      }),
+    ).rejects.toMatchObject({
+      code: 'conversation_url_conflict',
+      extra: { conflictingConversationId: Number(conflict.id) },
+    });
+    expect(await readDataRevision('conversations')).toBe(baseline.conversations);
+    expect(await readDataRevision('messages')).toBe(baseline.messages);
+    expect(await readDataRevision('sync_mappings')).toBe(baseline.sync_mappings);
+    expect(await readDataRevision('image_cache')).toBe(baseline.image_cache);
+    expect(await readDataRevision('article_comments')).toBe(baseline.article_comments);
+    expect((await getConversationById(Number(keep.id)))?.url).toBe('https://example.com/keep');
+
+    const noOp = await updateConversationUrlById({
+      conversationId: Number(keep.id),
+      url: 'https://example.com/keep#another-fragment',
+    });
+    expect(noOp).toMatchObject({ changed: false, merged: false, url: 'https://example.com/keep' });
+    expect(await readDataRevision('conversations')).toBe(baseline.conversations);
+  });
+
+  it('merges a URL conflict and rewrites mapping/comments/messages in one tracked transaction', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'keep-url-update',
+      title: 'Keep',
+      url: 'https://example.com/old',
+      lastActivityAt: 10,
+    });
+    const remove = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'remove-url-update',
+      title: 'Remove',
+      url: 'https://example.com/target',
+      lastActivityAt: 20,
+    });
+    const keepId = Number(keep.id);
+    const removeId = Number(remove.id);
+    await syncConversationMessages(removeId, [
+      { messageKey: 'm-url', role: 'assistant', contentMarkdown: 'moved', sequence: 1 },
+    ]);
+    await patchSyncMapping(removeId, {
+      notionPageId: 'page-target',
+      githubRemoteKey: 'github.com/owner/repo@main',
+      githubManagedFiles: {
+        [`WebArticles/${buildConversationBasename(remove)}.md`]: {
+          kind: 'markdown',
+          sha: 'a'.repeat(40),
+          contentHash: 'b'.repeat(64),
+        },
+      },
+    });
+    const db = await openDb();
+    const tx = db.transaction(['article_comments'], 'readwrite');
+    const commentId = await reqToPromise<number>(
+      tx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId: removeId,
+        canonicalUrl: 'https://example.com/target',
+        quoteText: '',
+        commentText: 'move me',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await txDone(tx);
+    const baseline = {
+      conversations: await readDataRevision('conversations'),
+      messages: await readDataRevision('messages'),
+      sync_mappings: await readDataRevision('sync_mappings'),
+      article_comments: await readDataRevision('article_comments'),
+    };
+
+    const result = await updateConversationUrlById({
+      conversationId: keepId,
+      url: 'https://example.com/target#fragment',
+      mergeExisting: true,
+    });
+    expect(result).toMatchObject({
+      conversationId: keepId,
+      url: 'https://example.com/target',
+      conversationKey: 'article:https://example.com/target',
+      changed: true,
+      merged: true,
+      removedConversationId: removeId,
+    });
+    expect(await getConversationById(removeId)).toBeNull();
+    expect(await getConversationById(keepId)).toMatchObject({
+      id: keepId,
+      source: 'web',
+      conversationKey: 'article:https://example.com/target',
+      url: 'https://example.com/target',
+      title: 'Keep',
+    });
+    expect((await getMessagesByConversationId(keepId)).map((item) => item.messageKey)).toEqual(['m-url']);
+    const mapping = await getSyncMappingByConversation(keepId);
+    expect(mapping?.mapping).toMatchObject({ notionPageId: 'page-target' });
+    expect(mapping?.mapping?.githubRemoteKey).toBeUndefined();
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['article_comments', 'github_cleanup_outbox'], 'readonly');
+    expect(await reqToPromise<any>(verifyTx.objectStore('article_comments').get(commentId))).toMatchObject({
+      conversationId: keepId,
+      canonicalUrl: 'https://example.com/target',
+    });
+    expect((await reqToPromise<any[]>(verifyTx.objectStore('github_cleanup_outbox').getAll())).length).toBeGreaterThan(
+      0,
+    );
+    await txDone(verifyTx);
+    expect(await readDataRevision('conversations')).toBe(baseline.conversations + 1);
+    expect(await readDataRevision('messages')).toBe(baseline.messages + 1);
+    expect(await readDataRevision('sync_mappings')).toBe(baseline.sync_mappings + 1);
+    expect(await readDataRevision('article_comments')).toBe(baseline.article_comments + 1);
+  });
+
+  it('serializes competing URL rewrites into success plus stable conflict instead of leaking ConstraintError', async () => {
+    const left = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'left',
+      url: 'https://example.com/left',
+      lastActivityAt: 1,
+    });
+    const right = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'right',
+      url: 'https://example.com/right',
+      lastActivityAt: 2,
+    });
+    const target = 'https://example.com/race-target';
+    const settled = await Promise.allSettled([
+      updateConversationUrlById({ conversationId: Number(left.id), url: target }),
+      updateConversationUrlById({ conversationId: Number(right.id), url: target }),
+    ]);
+    expect(settled.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
+    const rejected = settled.find((item): item is PromiseRejectedResult => item.status === 'rejected');
+    expect(rejected?.reason).toMatchObject({ code: 'conversation_url_conflict' });
+    expect(String(rejected?.reason?.name || '')).not.toBe('ConstraintError');
+    const rows = [await getConversationById(Number(left.id)), await getConversationById(Number(right.id))];
+    expect(rows.filter((row) => row?.url === target)).toHaveLength(1);
+  });
+
+  it('rejects invalid or non-Web-Article URL edits with stable errors', async () => {
+    const chat = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'chat-url',
+      lastActivityAt: 1,
+    });
+    await expect(
+      updateConversationUrlById({ conversationId: Number(chat.id), url: 'https://example.com/new' }),
+    ).rejects.toMatchObject({
+      code: 'conversation_url_not_editable',
+    });
+    await expect(
+      updateConversationUrlById({ conversationId: 999999, url: 'https://example.com/new' }),
+    ).rejects.toMatchObject({
+      code: 'conversation_not_found',
+    });
+    await expect(
+      updateConversationUrlById({ conversationId: Number(chat.id), url: 'mailto:test@example.com' }),
+    ).rejects.toMatchObject({
+      code: 'invalid_article_url',
+    });
   });
 
   it('merges conversations by ids and migrates messages + sync mappings', async () => {
@@ -3450,22 +3371,22 @@ describe('conversations storage-idb', () => {
     const keep = await upsertConversation({
       sourceType: 'article',
       source: 'web',
-      conversationKey: 'key_keep',
+      conversationKey: 'article:https://example.org/keep',
       title: 'keep',
-      url: '',
+      url: 'https://example.org/keep',
       lastActivityAt: 1,
     });
     const remove = await upsertConversation({
       sourceType: 'article',
       source: 'web',
-      conversationKey: 'key_remove',
+      conversationKey: 'article:https://example.com/post',
       title: 'remove',
       url: 'https://example.com/post',
       lastActivityAt: 2,
     });
 
     expect(keep.listSourceKey).toBe('web');
-    expect(keep.listSiteKey).toBe('unknown');
+    expect(keep.listSiteKey).toBe('domain:example.org');
     expect(remove.listSourceKey).toBe('web');
     expect(remove.listSiteKey).toBe('domain:example.com');
 
@@ -3476,7 +3397,7 @@ describe('conversations storage-idb', () => {
     const merged = await getConversationById(keepId);
     expect(merged).toBeTruthy();
     expect(merged?.listSourceKey).toBe('web');
-    expect(merged?.listSiteKey).toBe('domain:example.com');
+    expect(merged?.listSiteKey).toBe('domain:example.org');
   });
 });
 

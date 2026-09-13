@@ -449,6 +449,119 @@ describe('syncnos CLI instance selection', () => {
     }
   });
 
+  it('routes mutation commands without mandatory read-back and resolves backfill URL only when needed', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'mutation-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'conversation.update-url') {
+          return {
+            data: {
+              conversationId: request.params.conversationId,
+              changed: true,
+              merged: request.params.mergeExisting,
+            },
+          };
+        }
+        if (request.method === 'conversation.merge') return { data: { merged: true } };
+        if (request.method === 'conversation.delete')
+          return { data: { deleted: request.params.conversationIds.length } };
+        if (request.method === 'conversation.get') {
+          return {
+            data: {
+              conversation: { id: request.params.conversationId, url: 'https://example.com/article' },
+              messages: [],
+            },
+          };
+        }
+        if (request.method === 'conversation.images.backfill') return { data: { fetched: 2 } };
+        return null;
+      },
+    });
+    try {
+      const update = await run(
+        ['update-url', '7', 'https://example.com/new', '--merge-conflict'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(update.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'conversation.update-url',
+        params: { conversationId: 7, url: 'https://example.com/new', mergeExisting: true },
+      });
+
+      const merge = await run(['merge', '7', '9'], runtimeRoot, homeDir);
+      expect(merge.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'conversation.merge',
+        params: { keepConversationId: 7, removeConversationId: 9 },
+      });
+
+      const del = await run(['delete', '7', '9'], runtimeRoot, homeDir);
+      expect(del.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'conversation.delete', params: { conversationIds: [7, 9] } });
+
+      const beforeBackfill = instance.requests.length;
+      const backfill = await run(['backfill-images', '7'], runtimeRoot, homeDir);
+      expect(backfill.exitCode).toBe(0);
+      expect(instance.requests.slice(beforeBackfill).map((request) => request.method)).toEqual([
+        'system.ping',
+        'conversation.get',
+        'conversation.images.backfill',
+      ]);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'conversation.images.backfill',
+        params: { conversationId: 7, conversationUrl: 'https://example.com/article' },
+      });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('routes comment and mention commands without any raw locator surface', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'comment-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method.startsWith('comments.')) return { data: { ok: true } };
+        if (request.method.startsWith('mention.')) return { data: { ok: true } };
+        return null;
+      },
+    });
+    try {
+      const add = await run(['comments', 'add', '7', 'plain', 'root'], runtimeRoot, homeDir);
+      expect(add.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'comments.add',
+        params: { conversationId: 7, text: 'plain root' },
+      });
+      expect(JSON.stringify(instance.requests.at(-1))).not.toContain('locator');
+
+      const reply = await run(['comments', 'reply', '7', '3', 'plain', 'reply'], runtimeRoot, homeDir);
+      expect(reply.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'comments.reply',
+        params: { conversationId: 7, parentId: 3, text: 'plain reply' },
+      });
+      expect(JSON.stringify(instance.requests.at(-1))).not.toContain('locator');
+
+      const del = await run(['comments', 'delete', '7', '9'], runtimeRoot, homeDir);
+      expect(del.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'comments.delete',
+        params: { conversationId: 7, commentId: 9 },
+      });
+
+      const mentionSearch = await run(['mention', 'search', 'mcp', '--limit', '20'], runtimeRoot, homeDir);
+      expect(mentionSearch.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'mention.search', params: { query: 'mcp', limit: 20 } });
+
+      const mentionInsert = await run(['mention', 'insert', '42'], runtimeRoot, homeDir);
+      expect(mentionInsert.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'mention.build-insert-text', params: { conversationId: 42 } });
+    } finally {
+      await instance.stop();
+    }
+  });
+
   it('selection helper encodes the public priority without recent-start heuristics', () => {
     const a = { entry: { cliInstanceId: 'a' } } as any;
     const b = { entry: { cliInstanceId: 'b' } } as any;

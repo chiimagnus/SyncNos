@@ -14,15 +14,6 @@ export function buildCanonicalWebArticleConversationKey(url: unknown): string {
   return canonicalUrl ? `${WEB_ARTICLE_CONVERSATION_KEY_PREFIX}${canonicalUrl}` : '';
 }
 
-export function normalizeWebArticleConversationKey(raw: unknown): string {
-  const key = String(raw ?? '').trim();
-  if (!key) return '';
-  if (!key.toLowerCase().startsWith(WEB_ARTICLE_CONVERSATION_KEY_PREFIX)) return key;
-
-  const canonicalKey = buildCanonicalWebArticleConversationKey(key.slice(WEB_ARTICLE_CONVERSATION_KEY_PREFIX.length));
-  return canonicalKey || key;
-}
-
 export function buildCanonicalWebArticleIdentity(url: unknown): CanonicalWebArticleIdentity | null {
   const canonicalUrl = canonicalizeArticleUrl(url);
   if (!canonicalUrl) return null;
