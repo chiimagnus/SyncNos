@@ -46,6 +46,10 @@ export async function getConversationDetail(conversationId: number) {
   return { conversationId, messages };
 }
 
+export async function searchConversations(input: idb.ConversationSearchInput): Promise<idb.ConversationSearchResult[]> {
+  return await idb.searchConversations(input);
+}
+
 export async function readRecentConversationMentionCandidates(input: { maxScan: number; maxDurationMs: number }) {
   return await idb.readRecentConversationMentionCandidates(input);
 }

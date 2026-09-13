@@ -19,6 +19,7 @@ type FakeInstance = {
   endpoint: string;
   registryPath: string;
   server: Server;
+  requests: any[];
   stop: () => Promise<void>;
 };
 
@@ -26,8 +27,12 @@ async function startFakeInstance(
   runtimeRoot: string,
   id: string,
   browserFamily: 'chromium' | 'firefox',
-  options: { revisionErrorCode?: string } = {},
+  options: {
+    revisionErrorCode?: string;
+    onRequest?: (request: any) => { data?: unknown; errorCode?: string; errorMessage?: string } | null;
+  } = {},
 ): Promise<FakeInstance> {
+  const requests: any[] = [];
   const runtimeDir = await ensureRuntimeDir({ root: runtimeRoot });
   const endpoint = socketPathForInstance(runtimeDir, id);
   const registryPath = registryPathForInstance(runtimeDir, id);
@@ -37,22 +42,28 @@ async function startFakeInstance(
       input += chunk.toString('utf8');
       if (!input.includes('\n')) return;
       const request = JSON.parse(input.trim());
+      requests.push(request);
       const method = String(request.method || '');
+      const custom = options.onRequest?.(request) ?? null;
       const data =
-        method === 'system.ping'
-          ? {
-              alive: true,
-              cliInstanceId: id,
-              protocolVersion: contract.protocolVersion,
-              runtimeId: `${id}-runtime`,
-              extensionVersion: '1.2.3',
-              browserFamily,
-            }
-          : method === 'revision.get' && !options.revisionErrorCode
-            ? { conversations: id === 'helium-main' ? 11 : 22 }
-            : null;
+        custom && Object.prototype.hasOwnProperty.call(custom, 'data')
+          ? custom.data
+          : method === 'system.ping'
+            ? {
+                alive: true,
+                cliInstanceId: id,
+                protocolVersion: contract.protocolVersion,
+                runtimeId: `${id}-runtime`,
+                extensionVersion: '1.2.3',
+                browserFamily,
+              }
+            : method === 'revision.get' && !options.revisionErrorCode
+              ? { conversations: id === 'helium-main' ? 11 : 22 }
+              : null;
       const errorCode =
-        method === 'revision.get' && options.revisionErrorCode ? options.revisionErrorCode : 'rpc_method_not_found';
+        custom?.errorCode ||
+        (method === 'revision.get' && options.revisionErrorCode ? options.revisionErrorCode : 'rpc_method_not_found');
+      const errorMessage = custom?.errorMessage || 'failed';
       socket.end(
         `${JSON.stringify({
           kind: contract.frames.rpcResponse,
@@ -60,7 +71,7 @@ async function startFakeInstance(
           requestId: 'fake',
           ok: data !== null,
           data,
-          error: data !== null ? null : { code: errorCode, message: 'failed' },
+          error: data !== null ? null : { code: errorCode, message: errorMessage },
         })}\n`,
       );
     });
@@ -82,6 +93,7 @@ async function startFakeInstance(
     endpoint,
     registryPath,
     server,
+    requests,
     stop: async () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
@@ -284,6 +296,156 @@ describe('syncnos CLI instance selection', () => {
       expect(result.json.error.code).toBe('revision_unavailable');
     } finally {
       await business.stop();
+    }
+  });
+
+  it('serializes list cursor tokens and sends validated list filters to the selected instance', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'query-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'conversation.list') {
+          return {
+            data: {
+              items: [{ id: 9 }],
+              cursor: { lastActivityAt: 123.5, id: 9 },
+              hasMore: true,
+            },
+          };
+        }
+        return null;
+      },
+    });
+    try {
+      const result = await run(
+        ['list', '--source', 'web', '--site', 'domain:example.com', '--limit', '10', '--cursor', '456,12'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(result.exitCode).toBe(0);
+      expect(result.json.data.cursor).toBe('123.5,9');
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'conversation.list',
+        params: {
+          sourceKey: 'web',
+          siteKey: 'domain:example.com',
+          limit: 10,
+          cursor: { lastActivityAt: 456, id: 12 },
+        },
+      });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects malformed list cursors before any business RPC is sent', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'query-instance', 'chromium');
+    try {
+      for (const cursor of ['bad', '1,0', 'nope,1', '1,1.5']) {
+        const before = instance.requests.length;
+        const result = await run(['list', '--cursor', cursor], runtimeRoot, homeDir);
+        expect(result.exitCode).toBe(2);
+        expect(result.json.error.code).toBe('usage_error');
+        expect(instance.requests.length).toBe(before + 1);
+        expect(instance.requests.at(-1).method).toBe('system.ping');
+      }
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('routes get/search/stats with machine-safe arguments and output', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'query-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'conversation.get') {
+          return { data: { conversation: { id: request.params.conversationId }, messages: [{ messageKey: 'm1' }] } };
+        }
+        if (request.method === 'conversation.search') {
+          return { data: [{ conversation: { id: 7 }, hit: { field: 'message', snippet: 'needle' } }] };
+        }
+        if (request.method === 'conversation.stats') {
+          return {
+            data: {
+              totalCount: 8,
+              todayCount: 2,
+              sources: [{ key: 'chatgpt', count: 5 }],
+              sites: [{ key: 'domain:example.com', count: 3 }],
+            },
+          };
+        }
+        return null;
+      },
+    });
+    try {
+      const get = await run(['get', '42'], runtimeRoot, homeDir);
+      expect(get.exitCode).toBe(0);
+      expect(get.json.data).toEqual({ conversation: { id: 42 }, messages: [{ messageKey: 'm1' }] });
+      expect(instance.requests.at(-1)).toEqual({ method: 'conversation.get', params: { conversationId: 42 } });
+
+      const search = await run(
+        [
+          'search',
+          'needle',
+          'phrase',
+          '--source',
+          'chatgpt',
+          '--site',
+          'domain:example.com',
+          '--after',
+          '2026-09-01T00:00:00Z',
+          '--before',
+          '2026-09-13T00:00:00Z',
+          '--limit',
+          '999',
+        ],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(search.exitCode).toBe(0);
+      expect(search.json.data).toEqual([{ conversation: { id: 7 }, hit: { field: 'message', snippet: 'needle' } }]);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'conversation.search',
+        params: {
+          query: 'needle phrase',
+          sourceKey: 'chatgpt',
+          siteKey: 'domain:example.com',
+          after: Date.parse('2026-09-01T00:00:00Z'),
+          before: Date.parse('2026-09-13T00:00:00Z'),
+          limit: 100,
+        },
+      });
+
+      const stats = await run(['stats'], runtimeRoot, homeDir);
+      expect(stats.exitCode).toBe(0);
+      expect(stats.json.data).toEqual({
+        totalCount: 8,
+        todayCount: 2,
+        sources: [{ key: 'chatgpt', count: 5 }],
+        sites: [{ key: 'domain:example.com', count: 3 }],
+      });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects invalid query arguments before dispatching business RPC', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'query-instance', 'chromium');
+    try {
+      const invalidId = await run(['get', '0'], runtimeRoot, homeDir);
+      expect(invalidId.exitCode).toBe(2);
+      const invalidDate = await run(['search', 'needle', '--after', '2026-09-01'], runtimeRoot, homeDir);
+      expect(invalidDate.exitCode).toBe(2);
+      const invalidRange = await run(
+        ['search', 'needle', '--after', '2026-09-13T00:00:00Z', '--before', '2026-09-01T00:00:00Z'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(invalidRange.exitCode).toBe(2);
+      expect(instance.requests.every((request) => request.method === 'system.ping')).toBe(true);
+    } finally {
+      await instance.stop();
     }
   });
 

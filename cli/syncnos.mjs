@@ -37,32 +37,127 @@ function parseArgs(argv) {
   const args = Array.from(argv || []);
   if (!args.length || args.includes('--help') || args.includes('-h')) return { command: 'help' };
   const command = args.shift();
-  const options = { command, instance: null, human: false, setDefault: null, clearDefault: false };
+  const options = {
+    command,
+    instance: null,
+    human: false,
+    setDefault: null,
+    clearDefault: false,
+    sourceKey: null,
+    siteKey: null,
+    limit: null,
+    cursor: null,
+    after: null,
+    before: null,
+    positionals: [],
+    provided: new Set(),
+  };
+  const readValue = (flag) => {
+    const value = String(args.shift() || '').trim();
+    if (!value) throw codedError('usage_error', `${flag} requires a value`, EXIT.usage);
+    return value;
+  };
   while (args.length) {
     const token = args.shift();
     if (token === '--instance') {
-      const value = String(args.shift() || '').trim();
-      if (!value) throw codedError('usage_error', '--instance requires an id', EXIT.usage);
-      options.instance = value;
+      options.instance = readValue(token);
+      options.provided.add('instance');
       continue;
     }
     if (token === '--human') {
       options.human = true;
+      options.provided.add('human');
       continue;
     }
     if (token === '--set-default') {
-      const value = String(args.shift() || '').trim();
-      if (!value) throw codedError('usage_error', '--set-default requires an id', EXIT.usage);
-      options.setDefault = value;
+      options.setDefault = readValue(token);
+      options.provided.add('setDefault');
       continue;
     }
     if (token === '--clear-default') {
       options.clearDefault = true;
+      options.provided.add('clearDefault');
       continue;
     }
-    throw codedError('usage_error', `Unknown argument: ${token}`, EXIT.usage);
+    if (token === '--source') {
+      options.sourceKey = readValue(token);
+      options.provided.add('sourceKey');
+      continue;
+    }
+    if (token === '--site') {
+      options.siteKey = readValue(token);
+      options.provided.add('siteKey');
+      continue;
+    }
+    if (token === '--limit') {
+      options.limit = readValue(token);
+      options.provided.add('limit');
+      continue;
+    }
+    if (token === '--cursor') {
+      options.cursor = readValue(token);
+      options.provided.add('cursor');
+      continue;
+    }
+    if (token === '--after') {
+      options.after = readValue(token);
+      options.provided.add('after');
+      continue;
+    }
+    if (token === '--before') {
+      options.before = readValue(token);
+      options.provided.add('before');
+      continue;
+    }
+    if (String(token || '').startsWith('--')) throw codedError('usage_error', `Unknown argument: ${token}`, EXIT.usage);
+    options.positionals.push(String(token));
   }
   return options;
+}
+
+function assertAllowedOptions(options, allowed) {
+  for (const key of options.provided || []) {
+    if (!allowed.has(key))
+      throw codedError('usage_error', `Option is not valid for ${options.command}: ${key}`, EXIT.usage);
+  }
+}
+
+function parsePositiveInteger(value, label, { max = Number.MAX_SAFE_INTEGER } = {}) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw codedError('usage_error', `${label} must be a positive integer`, EXIT.usage);
+  }
+  return Math.min(number, max);
+}
+
+export function parseConversationCursorToken(value) {
+  const text = String(value || '').trim();
+  const parts = text.split(',');
+  if (parts.length !== 2) throw codedError('usage_error', 'cursor must be <lastActivityAt>,<id>', EXIT.usage);
+  const lastActivityAt = Number(parts[0]);
+  const id = Number(parts[1]);
+  if (!Number.isFinite(lastActivityAt) || lastActivityAt < 0 || !Number.isSafeInteger(id) || id <= 0) {
+    throw codedError('usage_error', 'cursor must contain a finite timestamp and positive integer id', EXIT.usage);
+  }
+  return { lastActivityAt, id };
+}
+
+function formatConversationCursorToken(cursor) {
+  if (!cursor) return null;
+  const lastActivityAt = Number(cursor.lastActivityAt);
+  const id = Number(cursor.id);
+  if (!Number.isFinite(lastActivityAt) || !Number.isSafeInteger(id) || id <= 0) return null;
+  return `${lastActivityAt},${id}`;
+}
+
+function parseIsoTimestamp(value, label) {
+  if (value == null) return null;
+  const text = String(value || '').trim();
+  const timestamp = Date.parse(text);
+  if (!/^\d{4}-\d{2}-\d{2}T/i.test(text) || !Number.isFinite(timestamp)) {
+    throw codedError('usage_error', `${label} must be an ISO date-time`, EXIT.usage);
+  }
+  return timestamp;
 }
 
 function isConfirmedStaleEndpointError(error) {
@@ -178,6 +273,8 @@ const TRANSPORT_RESPONSE_CODES = new Set([
   'protocol_mismatch',
   'native_host_closed',
   'native_host_not_ready',
+  'native_host_client_disconnected',
+  'native_host_request_cancelled',
   'request_too_large',
   'response_too_large',
   'ipc_error',
@@ -190,7 +287,7 @@ async function requestSelected(selected, method, params = {}) {
   const response = await requestEndpoint(
     selected.entry.endpoint,
     { method, params },
-    { maxResponseBytes: contract.nativeMessaging.extensionToHostMaxBytes },
+    { timeoutMs: 0, maxResponseBytes: contract.nativeMessaging.extensionToHostMaxBytes },
   );
   if (Number(response?.protocolVersion) !== Number(contract.protocolVersion)) {
     throw codedError('protocol_mismatch', 'CLI protocol version mismatch', EXIT.transport);
@@ -236,6 +333,10 @@ function usage() {
     '  instances [--set-default <id> | --clear-default]',
     '  status [--instance <id>]',
     '  revision [--instance <id>]',
+    '  list [--source <key>] [--site <key>] [--limit <n>] [--cursor <lastActivityAt>,<id>]',
+    '  get <conversation-id>',
+    '  search <query> [--source <key>] [--site <key>] [--after <iso>] [--before <iso>] [--limit <n>]',
+    '  stats',
     '  doctor [--human]',
   ].join('\n');
 }
@@ -257,6 +358,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
   const context = { runtimeRoot, homeDir };
   try {
     if (options.command === 'instances') {
+      assertAllowedOptions(options, new Set(['setDefault', 'clearDefault', 'human']));
+      if (options.positionals.length)
+        throw codedError('usage_error', 'instances does not accept positional arguments', EXIT.usage);
       if (options.setDefault && options.clearDefault) {
         throw codedError('usage_error', '--set-default and --clear-default cannot be combined', EXIT.usage);
       }
@@ -281,6 +385,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     }
 
     if (options.command === 'status') {
+      assertAllowedOptions(options, new Set(['instance', 'human']));
+      if (options.positionals.length)
+        throw codedError('usage_error', 'status does not accept positional arguments', EXIT.usage);
       const { selected, config } = await selectedInstance(options, context);
       writeResult(
         stdout,
@@ -294,6 +401,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     }
 
     if (options.command === 'revision') {
+      assertAllowedOptions(options, new Set(['instance', 'human']));
+      if (options.positionals.length)
+        throw codedError('usage_error', 'revision does not accept positional arguments', EXIT.usage);
       const { selected, config } = await selectedInstance(options, context);
       const revision = await requestSelected(selected, 'revision.get');
       writeResult(
@@ -304,7 +414,79 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
       return EXIT.success;
     }
 
+    if (options.command === 'list') {
+      assertAllowedOptions(options, new Set(['instance', 'human', 'sourceKey', 'siteKey', 'limit', 'cursor']));
+      if (options.positionals.length)
+        throw codedError('usage_error', 'list does not accept positional arguments', EXIT.usage);
+      const { selected } = await selectedInstance(options, context);
+      const limit = options.limit == null ? undefined : parsePositiveInteger(options.limit, 'limit', { max: 200 });
+      const cursor = options.cursor == null ? null : parseConversationCursorToken(options.cursor);
+      const page = await requestSelected(selected, 'conversation.list', {
+        sourceKey: options.sourceKey || 'all',
+        siteKey: options.siteKey || 'all',
+        limit,
+        cursor,
+      });
+      writeResult(
+        stdout,
+        envelopeOk({
+          ...page,
+          cursor: formatConversationCursorToken(page?.cursor),
+        }),
+        options.human,
+      );
+      return EXIT.success;
+    }
+
+    if (options.command === 'get') {
+      assertAllowedOptions(options, new Set(['instance', 'human']));
+      if (options.positionals.length !== 1) {
+        throw codedError('usage_error', 'get requires exactly one conversation id', EXIT.usage);
+      }
+      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
+      const { selected } = await selectedInstance(options, context);
+      const detail = await requestSelected(selected, 'conversation.get', { conversationId });
+      writeResult(stdout, envelopeOk(detail), options.human);
+      return EXIT.success;
+    }
+
+    if (options.command === 'search') {
+      assertAllowedOptions(options, new Set(['instance', 'human', 'sourceKey', 'siteKey', 'limit', 'after', 'before']));
+      const query = options.positionals.join(' ').trim();
+      if (!query) throw codedError('usage_error', 'search requires a non-empty query', EXIT.usage);
+      const limit = options.limit == null ? 20 : parsePositiveInteger(options.limit, 'limit', { max: 100 });
+      const after = parseIsoTimestamp(options.after, 'after');
+      const before = parseIsoTimestamp(options.before, 'before');
+      if (after != null && before != null && after >= before) {
+        throw codedError('usage_error', 'after must be earlier than before', EXIT.usage);
+      }
+      const { selected } = await selectedInstance(options, context);
+      const results = await requestSelected(selected, 'conversation.search', {
+        query,
+        sourceKey: options.sourceKey || 'all',
+        siteKey: options.siteKey || 'all',
+        after,
+        before,
+        limit,
+      });
+      writeResult(stdout, envelopeOk(results), options.human);
+      return EXIT.success;
+    }
+
+    if (options.command === 'stats') {
+      assertAllowedOptions(options, new Set(['instance', 'human']));
+      if (options.positionals.length)
+        throw codedError('usage_error', 'stats does not accept positional arguments', EXIT.usage);
+      const { selected } = await selectedInstance(options, context);
+      const stats = await requestSelected(selected, 'conversation.stats');
+      writeResult(stdout, envelopeOk(stats), options.human);
+      return EXIT.success;
+    }
+
     if (options.command === 'doctor') {
+      assertAllowedOptions(options, new Set(['human']));
+      if (options.positionals.length)
+        throw codedError('usage_error', 'doctor does not accept positional arguments', EXIT.usage);
       const [discovery, config] = await Promise.all([
         discoverInstances({ runtimeRoot, cleanupStale: false }),
         readUserConfig({ homeDir }),

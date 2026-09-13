@@ -53,6 +53,40 @@ import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/gi
 let conversationListStatsCacheKey: string | null = null;
 let conversationListStatsCacheValue: { summary: ConversationListSummary; facets: ConversationListFacets } | null = null;
 
+export type ConversationSearchInput = {
+  query: string;
+  sourceKey?: string;
+  siteKey?: string;
+  after?: number | null;
+  before?: number | null;
+  limit?: number;
+};
+
+export type ConversationSearchHit = {
+  field: 'title' | 'url' | 'source' | 'message';
+  snippet: string;
+  messageId?: number;
+  messageKey?: string;
+  sequence?: number;
+};
+
+export type ConversationSearchResult = {
+  conversation: {
+    id: number;
+    source: string;
+    conversationKey: string;
+    sourceType?: string;
+    title?: string;
+    url?: string;
+    lastActivityAt: number;
+  };
+  hit: ConversationSearchHit;
+};
+
+const CONVERSATION_SEARCH_DEFAULT_LIMIT = 20;
+const CONVERSATION_SEARCH_MAX_LIMIT = 100;
+const CONVERSATION_SEARCH_SNIPPET_MAX_CHARS = 240;
+
 export function __resetConversationStorageStateForTests(): void {
   conversationListStatsCacheKey = null;
   conversationListStatsCacheValue = null;
@@ -1602,6 +1636,176 @@ export async function getConversationListPage(
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
   return await readConversationListPage({ queryInput, cursor, limit });
+}
+
+function normalizeConversationSearchLimit(value: unknown): number {
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit <= 0) return CONVERSATION_SEARCH_DEFAULT_LIMIT;
+  return Math.min(Math.floor(limit), CONVERSATION_SEARCH_MAX_LIMIT);
+}
+
+function normalizeConversationSearchBoundary(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : null;
+}
+
+function buildConversationSearchSnippet(text: string, needle: string): string {
+  const normalizedText = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalizedText) return '';
+  if (normalizedText.length <= CONVERSATION_SEARCH_SNIPPET_MAX_CHARS) return normalizedText;
+  const lower = normalizedText.toLowerCase();
+  const hitIndex = Math.max(0, lower.indexOf(needle));
+  const half = Math.floor(CONVERSATION_SEARCH_SNIPPET_MAX_CHARS / 2);
+  let start = Math.max(0, hitIndex - half);
+  let end = Math.min(normalizedText.length, start + CONVERSATION_SEARCH_SNIPPET_MAX_CHARS);
+  if (end - start < CONVERSATION_SEARCH_SNIPPET_MAX_CHARS) {
+    start = Math.max(0, end - CONVERSATION_SEARCH_SNIPPET_MAX_CHARS);
+  }
+  return normalizedText.slice(start, end);
+}
+
+function toConversationSearchSummary(row: Conversation): ConversationSearchResult['conversation'] {
+  return {
+    id: Number(row.id),
+    source: safeString(row.source),
+    conversationKey: safeString(row.conversationKey),
+    ...(safeString(row.sourceType) ? { sourceType: safeString(row.sourceType) } : null),
+    ...(safeString(row.title) ? { title: safeString(row.title) } : null),
+    ...(safeString(row.url) ? { url: safeString(row.url) } : null),
+    lastActivityAt: Number(row.lastActivityAt) || 0,
+  };
+}
+
+function findConversationMetadataSearchHit(row: Conversation, needle: string): ConversationSearchHit | null {
+  const fields: Array<{ field: 'title' | 'url' | 'source'; value: string }> = [
+    { field: 'title', value: safeString(row.title) },
+    { field: 'url', value: safeString(row.url) },
+    { field: 'source', value: safeString(row.source) },
+  ];
+  for (const item of fields) {
+    if (!item.value || !item.value.toLowerCase().includes(needle)) continue;
+    return {
+      field: item.field,
+      snippet: buildConversationSearchSnippet(item.value, needle),
+    };
+  }
+  return null;
+}
+
+export async function searchConversations(input: ConversationSearchInput): Promise<ConversationSearchResult[]> {
+  const rawQuery = safeString(input?.query);
+  if (!rawQuery) return [];
+  const needle = rawQuery.toLowerCase();
+  const limit = normalizeConversationSearchLimit(input?.limit);
+  const after = normalizeConversationSearchBoundary(input?.after);
+  const before = normalizeConversationSearchBoundary(input?.before);
+  if (after != null && before != null && after >= before) return [];
+
+  const query = resolveConversationListQuery(
+    {
+      sourceKey: input?.sourceKey,
+      siteKey: input?.siteKey,
+      limit: 1,
+    },
+    1,
+  );
+  const rangeInput = buildListPageRange(query, null);
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'messages'], 'readonly');
+  const conversationIndex = stores.conversations.index(rangeInput.indexName);
+  const messagesIndex = stores.messages.index('by_conversationId_sequence');
+  const conversationRequest = conversationIndex.openCursor((rangeInput.range || null) as any, 'prev');
+  const results: ConversationSearchResult[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const continueConversation = (cursor: IDBCursorWithValue) => {
+      if (results.length >= limit) {
+        finish();
+        return;
+      }
+      cursor.continue();
+    };
+
+    conversationRequest.onerror = () =>
+      fail(conversationRequest.error || new Error('conversation search cursor failed'));
+    conversationRequest.onsuccess = () => {
+      if (settled) return;
+      const cursor = conversationRequest.result as IDBCursorWithValue | null;
+      if (!cursor) return finish();
+      const row = normalizeConversationListRecord(cursor.value || {}) as Conversation;
+      const lastActivityAt = Number(row.lastActivityAt) || 0;
+
+      if (after != null && lastActivityAt <= after) return finish();
+      if (before != null && lastActivityAt >= before) {
+        cursor.continue();
+        return;
+      }
+
+      const metadataHit = findConversationMetadataSearchHit(row, needle);
+      if (metadataHit) {
+        results.push({ conversation: toConversationSearchSummary(row), hit: metadataHit });
+        continueConversation(cursor);
+        return;
+      }
+
+      const conversationId = Number(row.id);
+      if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+        cursor.continue();
+        return;
+      }
+      const messageRange = globalThis.IDBKeyRange.bound(
+        [conversationId, -Infinity] as any,
+        [conversationId, Infinity] as any,
+      );
+      const messageRequest = messagesIndex.openCursor(messageRange, 'next');
+      messageRequest.onerror = () =>
+        fail(messageRequest.error || new Error('conversation message search cursor failed'));
+      messageRequest.onsuccess = () => {
+        if (settled) return;
+        const messageCursor = messageRequest.result as IDBCursorWithValue | null;
+        if (!messageCursor) {
+          continueConversation(cursor);
+          return;
+        }
+        const message = messageCursor.value as ConversationMessage;
+        const content = String(message?.contentMarkdown || '');
+        if (content && content.toLowerCase().includes(needle)) {
+          results.push({
+            conversation: toConversationSearchSummary(row),
+            hit: {
+              field: 'message',
+              snippet: buildConversationSearchSnippet(content, needle),
+              ...(Number.isSafeInteger(Number(message?.id)) && Number(message?.id) > 0
+                ? { messageId: Number(message.id) }
+                : null),
+              ...(safeString(message?.messageKey) ? { messageKey: safeString(message.messageKey) } : null),
+              ...(Number.isFinite(Number(message?.sequence)) ? { sequence: Number(message.sequence) } : null),
+            },
+          });
+          continueConversation(cursor);
+          return;
+        }
+        messageCursor.continue();
+      };
+    };
+  });
+
+  await txDone(t);
+  return results;
 }
 
 export async function getConversationBySourceConversationKey(

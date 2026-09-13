@@ -12,6 +12,7 @@ const storageMocks = vi.hoisted(() => ({
   getConversationDetail: vi.fn(),
   getConversationTailWindowBySourceAndKey: vi.fn(),
   mergeConversationsByIds: vi.fn(),
+  searchConversations: vi.fn(),
   syncConversationMessages: vi.fn(),
   upsertConversation: vi.fn(),
 }));
@@ -25,6 +26,7 @@ vi.mock('@services/conversations/data/storage', () => ({
   getConversationDetail: storageMocks.getConversationDetail,
   getConversationTailWindowBySourceAndKey: storageMocks.getConversationTailWindowBySourceAndKey,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
+  searchConversations: storageMocks.searchConversations,
   syncConversationMessages: storageMocks.syncConversationMessages,
   upsertConversation: storageMocks.upsertConversation,
 }));
@@ -54,6 +56,7 @@ afterEach(() => {
   storageMocks.getConversationDetail.mockReset();
   storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
+  storageMocks.searchConversations.mockReset();
   storageMocks.syncConversationMessages.mockReset();
   storageMocks.upsertConversation.mockReset();
 });
@@ -153,6 +156,46 @@ describe('conversations pagination handlers', () => {
       notionPageId: 'notion-99',
       feishuDocId: 'feishu-99',
     });
+  });
+
+  it('routes conversation search with normalized filters and bounded limit', async () => {
+    storageMocks.searchConversations.mockResolvedValue([{ conversation: { id: 1 }, hit: { field: 'title' } }]);
+    const router = createRouter();
+    const res = await router.dispatch({
+      type: 'searchConversations',
+      query: '  Needle  ',
+      sourceKey: 'WEB',
+      siteKey: 'DOMAIN:Example.com',
+      after: 10,
+      before: 100,
+      limit: 999,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(storageMocks.searchConversations).toHaveBeenCalledWith({
+      query: 'Needle',
+      sourceKey: 'web',
+      siteKey: 'domain:example.com',
+      after: 10,
+      before: 100,
+      limit: 100,
+    });
+  });
+
+  it.each([
+    [{ query: '' }, 'query', 'invalid query'],
+    [{ query: 'x', limit: 0 }, 'limit', 'invalid limit'],
+    [{ query: 'x', after: 'bad' }, 'after', 'invalid after'],
+    [{ query: 'x', before: -1 }, 'before', 'invalid before'],
+    [{ query: 'x', after: 100, before: 100 }, 'range', 'after must be earlier than before'],
+  ])('rejects invalid conversation search input: %o', async (input, field, message) => {
+    const router = createRouter();
+    const res = await router.dispatch({ type: 'searchConversations', ...input });
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toBe(message);
+    expect((res.error?.extra as any)?.code).toBe('INVALID_ARGUMENT');
+    expect((res.error?.extra as any)?.field).toBe(field);
+    expect(storageMocks.searchConversations).not.toHaveBeenCalled();
   });
 
   it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {

@@ -100,6 +100,18 @@ describe('native host framing', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('supports no-deadline RPC with explicit client cancellation', async () => {
+    const written: any[] = [];
+    const protocol = createNativeHostProtocol({ write: async (frame: unknown) => written.push(frame) });
+    await protocol.handleMessage({ kind: contract.frames.hello, protocolVersion: contract.protocolVersion });
+    const controller = new AbortController();
+    const pending = protocol.request('conversation.search', {}, { timeoutMs: 0, signal: controller.signal });
+    await vi.waitFor(() => expect(written.length).toBe(2));
+    const error = Object.assign(new Error('client disconnected'), { code: 'native_host_client_disconnected' });
+    controller.abort(error);
+    await expect(pending).rejects.toMatchObject({ code: 'native_host_client_disconnected' });
+  });
+
   it('performs hello negotiation and correlates RPC responses', async () => {
     const written: any[] = [];
     const protocol = createNativeHostProtocol({ write: async (frame: unknown) => written.push(frame) });

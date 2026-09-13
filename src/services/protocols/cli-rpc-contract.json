@@ -11,6 +11,13 @@
     "rpcRequest": "rpc-request",
     "rpcResponse": "rpc-response"
   },
-  "publicMethods": ["system.ping", "revision.get"],
+  "publicMethods": [
+    "system.ping",
+    "revision.get",
+    "conversation.list",
+    "conversation.get",
+    "conversation.search",
+    "conversation.stats"
+  ],
   "browserRequired": []
 }

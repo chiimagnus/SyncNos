@@ -1,5 +1,5 @@
 import { lstat, mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
+import { createConnection, createServer } from 'node:net';
 import { endianness } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
@@ -131,6 +131,42 @@ describe('native host local IPC lifecycle', () => {
     await waitForMissing(registryPath);
     await waitForMissing(endpoint);
     expect(error.read()?.toString() || '').toBe('');
+  });
+
+  it('cancels a no-deadline business RPC when the local CLI client disconnects', async () => {
+    const runtimeRoot = await mkdtemp('/tmp/snh-');
+    let capturedSignal: AbortSignal | null = null;
+    const controller = await startNativeHostIpc({
+      hello: {
+        cliInstanceId: 'disconnect-instance',
+        browserFamily: 'chromium',
+        runtimeId: 'runtime-disconnect',
+        extensionVersion: '1.2.3',
+      },
+      runtimeRoot,
+      protocol: {
+        request: vi.fn(
+          async (_method: string, _params: unknown, options: { timeoutMs?: number; signal?: AbortSignal }) => {
+            expect(options.timeoutMs).toBe(0);
+            capturedSignal = options.signal ?? null;
+            return await new Promise((_, reject) => {
+              options.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+            });
+          },
+        ),
+      },
+    });
+    try {
+      const socket = createConnection({ path: controller.endpoint });
+      await new Promise<void>((resolve) => socket.once('connect', resolve));
+      socket.write('{"method":"conversation.search","params":{"query":"slow"}}\n');
+      await vi.waitFor(() => expect(capturedSignal).not.toBeNull());
+      socket.destroy();
+      await vi.waitFor(() => expect(capturedSignal?.aborted).toBe(true));
+      expect((capturedSignal as AbortSignal).reason).toMatchObject({ code: 'native_host_client_disconnected' });
+    } finally {
+      await controller.stop();
+    }
   });
 
   it('does not unlink an endpoint after registry ownership changes to another process nonce', async () => {

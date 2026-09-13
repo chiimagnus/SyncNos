@@ -9,6 +9,7 @@ import {
   getConversationDetail,
   getConversationTailWindowBySourceAndKey,
   mergeConversationsByIds,
+  searchConversations,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage';
@@ -69,6 +70,20 @@ function normalizeTailWindowLimit(value: unknown): number | null {
   const limit = Number(value);
   if (!Number.isFinite(limit) || limit <= 0) return null;
   return Math.min(Math.floor(limit), 200);
+}
+
+function normalizeSearchLimit(value: unknown): number | null {
+  if (value == null || value === '') return 20;
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return Math.min(Math.floor(limit), 100);
+}
+
+function normalizeSearchBoundary(value: unknown): number | null | 'invalid' {
+  if (value == null || value === '') return null;
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp < 0) return 'invalid';
+  return timestamp;
 }
 
 function parseListQueryPayload(msg: any): { query: ListQueryPayload; errorField?: string } {
@@ -154,6 +169,29 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const detail = await getConversationDetail(conversationId);
     return router.ok(detail);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.SEARCH_CONVERSATIONS, async (msg) => {
+    const query = String(msg?.query || '').trim();
+    if (!query) return invalidArgument('query', 'invalid query', msg?.query);
+    const limit = normalizeSearchLimit(msg?.limit);
+    if (limit == null) return invalidArgument('limit', 'invalid limit', msg?.limit);
+    const after = normalizeSearchBoundary(msg?.after);
+    if (after === 'invalid') return invalidArgument('after', 'invalid after', msg?.after);
+    const before = normalizeSearchBoundary(msg?.before);
+    if (before === 'invalid') return invalidArgument('before', 'invalid before', msg?.before);
+    if (after != null && before != null && after >= before) {
+      return invalidArgument('range', 'after must be earlier than before', { after, before });
+    }
+    const results = await searchConversations({
+      query,
+      sourceKey: normalizeListFilterKey(msg?.sourceKey, 'all'),
+      siteKey: normalizeListFilterKey(msg?.siteKey, 'all'),
+      after,
+      before,
+      limit,
+    });
+    return router.ok(results);
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, async (msg) => {

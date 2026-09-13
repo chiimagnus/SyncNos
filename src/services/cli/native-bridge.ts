@@ -1,5 +1,5 @@
 import contract from '@services/protocols/cli-rpc-contract.json';
-import { DATA_REVISION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { CORE_MESSAGE_TYPES, DATA_REVISION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import {
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,
   NATIVE_MESSAGING_PERMISSION,
@@ -146,22 +146,114 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       return;
     }
 
+    const postBackgroundResult = (result: any, transform: (data: any) => unknown = (data) => data) => {
+      if (result?.ok === true) {
+        safePost(currentPort, response(requestId, true, transform(result.data)));
+        return true;
+      }
+      const code =
+        String(result?.error?.extra?.code || '') === 'INVALID_ARGUMENT'
+          ? 'invalid_argument'
+          : 'background_request_failed';
+      safePost(
+        currentPort,
+        response(requestId, false, null, code, String(result?.error?.message || 'Background request failed')),
+      );
+      return false;
+    };
+
     if (method === 'revision.get') {
       const result = await router.dispatch({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT }, null);
-      if (result?.ok === true) {
-        safePost(currentPort, response(requestId, true, result.data));
-      } else {
-        safePost(
-          currentPort,
-          response(
-            requestId,
-            false,
-            null,
-            'background_request_failed',
-            String(result?.error?.message || 'Background request failed'),
-          ),
-        );
+      postBackgroundResult(result);
+      return;
+    }
+
+    const params = frame?.params && typeof frame.params === 'object' ? frame.params : {};
+
+    if (method === 'conversation.list') {
+      const cursor = params.cursor && typeof params.cursor === 'object' ? params.cursor : null;
+      const result = await router.dispatch(
+        cursor
+          ? {
+              type: CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE,
+              query: { sourceKey: params.sourceKey, siteKey: params.siteKey },
+              cursor,
+              limit: params.limit,
+            }
+          : {
+              type: CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP,
+              query: { sourceKey: params.sourceKey, siteKey: params.siteKey },
+              limit: params.limit,
+            },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'conversation.get') {
+      const conversationId = Number(params.conversationId);
+      const conversationResult = await router.dispatch(
+        { type: CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, conversationId },
+        null,
+      );
+      if (conversationResult?.ok !== true) {
+        postBackgroundResult(conversationResult);
+        return;
       }
+      const conversation = conversationResult.data;
+      if (!conversation) {
+        safePost(currentPort, response(requestId, false, null, 'not_found', 'Conversation not found'));
+        return;
+      }
+      const detailResult = await router.dispatch(
+        { type: CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, conversationId },
+        null,
+      );
+      postBackgroundResult(detailResult, (detail) => ({
+        conversation,
+        messages: Array.isArray(detail?.messages) ? detail.messages : [],
+      }));
+      return;
+    }
+
+    if (method === 'conversation.search') {
+      const result = await router.dispatch(
+        {
+          type: CORE_MESSAGE_TYPES.SEARCH_CONVERSATIONS,
+          query: params.query,
+          sourceKey: params.sourceKey,
+          siteKey: params.siteKey,
+          after: params.after,
+          before: params.before,
+          limit: params.limit,
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'conversation.stats') {
+      const result = await router.dispatch(
+        {
+          type: CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP,
+          query: { sourceKey: 'all', siteKey: 'all' },
+          limit: 1,
+        },
+        null,
+      );
+      postBackgroundResult(result, (data) => ({
+        totalCount: Number(data?.summary?.totalCount) || 0,
+        todayCount: Number(data?.summary?.todayCount) || 0,
+        sources: Array.isArray(data?.facets?.sources)
+          ? data.facets.sources.map((item: any) => ({ key: String(item?.key || ''), count: Number(item?.count) || 0 }))
+          : [],
+        sites: Array.isArray(data?.facets?.sites)
+          ? data.facets.sites.map((item: any) => ({ key: String(item?.key || ''), count: Number(item?.count) || 0 }))
+          : [],
+      }));
+      return;
     }
   };
 

@@ -123,12 +123,18 @@ export function createNativeHostProtocol({
   let helloAccepted = false;
   const pending = new Map();
 
+  const cleanupWaiter = (waiter) => {
+    if (!waiter) return;
+    if (waiter.timer) clearTimeout(waiter.timer);
+    if (waiter.signal && waiter.onAbort) waiter.signal.removeEventListener?.('abort', waiter.onAbort);
+  };
+
   const close = (error = new Error('native_host_closed')) => {
     if (closed) return;
     closed = true;
-    for (const { reject, timer } of pending.values()) {
-      if (timer) clearTimeout(timer);
-      reject(error);
+    for (const waiter of pending.values()) {
+      cleanupWaiter(waiter);
+      waiter.reject(error);
     }
     pending.clear();
     try {
@@ -166,30 +172,56 @@ export function createNativeHostProtocol({
       const waiter = pending.get(requestId);
       if (!waiter) return;
       pending.delete(requestId);
-      if (waiter.timer) clearTimeout(waiter.timer);
+      cleanupWaiter(waiter);
       waiter.resolve(message);
     }
   };
 
-  const request = async (method, params = {}) => {
+  const request = async (method, params = {}, options = {}) => {
     if (closed) throw new Error('native_host_closed');
     if (!helloAccepted) throw new Error('native_host_not_ready');
     const requestId = `rpc_${randomUUID()}`;
+    let resolveResponse;
+    let rejectResponse;
     const responsePromise = new Promise((resolve, reject) => {
-      const timeout = Number(requestTimeoutMs);
-      const timer =
-        Number.isFinite(timeout) && timeout > 0
-          ? setTimeout(() => {
-              const waiter = pending.get(requestId);
-              if (!waiter) return;
-              pending.delete(requestId);
-              const error = new Error('Native Messaging RPC timed out');
-              error.code = 'native_host_request_timeout';
-              waiter.reject(error);
-            }, timeout)
-          : null;
-      pending.set(requestId, { resolve, reject, timer });
+      resolveResponse = resolve;
+      rejectResponse = reject;
     });
+    const timeout = Number(options.timeoutMs ?? requestTimeoutMs);
+    const signal = options.signal ?? null;
+    const waiter = {
+      resolve: resolveResponse,
+      reject: rejectResponse,
+      timer: null,
+      signal,
+      onAbort: null,
+    };
+    if (Number.isFinite(timeout) && timeout > 0) {
+      waiter.timer = setTimeout(() => {
+        const current = pending.get(requestId);
+        if (!current) return;
+        pending.delete(requestId);
+        cleanupWaiter(current);
+        const error = new Error('Native Messaging RPC timed out');
+        error.code = 'native_host_request_timeout';
+        current.reject(error);
+      }, timeout);
+    }
+    if (signal) {
+      waiter.onAbort = () => {
+        const current = pending.get(requestId);
+        if (!current) return;
+        pending.delete(requestId);
+        cleanupWaiter(current);
+        const reason = signal.reason instanceof Error ? signal.reason : new Error('Native Messaging RPC cancelled');
+        if (!reason.code) reason.code = 'native_host_request_cancelled';
+        current.reject(reason);
+      };
+    }
+    pending.set(requestId, waiter);
+    signal?.addEventListener?.('abort', waiter.onAbort, { once: true });
+    if (signal?.aborted) waiter.onAbort();
+    if (!pending.has(requestId)) return await responsePromise;
     try {
       await write({
         kind: contract.frames.rpcRequest,
@@ -199,10 +231,10 @@ export function createNativeHostProtocol({
         params,
       });
     } catch (error) {
-      const waiter = pending.get(requestId);
+      const current = pending.get(requestId);
       pending.delete(requestId);
-      if (waiter?.timer) clearTimeout(waiter.timer);
-      waiter?.reject(error);
+      cleanupWaiter(current);
+      current?.reject(error);
     }
     return await responsePromise;
   };
@@ -319,7 +351,16 @@ export async function startNativeHostIpc({
   let stopped = false;
   const server = createServer((socket) => {
     sockets.add(socket);
-    socket.once('close', () => sockets.delete(socket));
+    let requestAbortController = null;
+    let requestSettled = true;
+    socket.once('close', () => {
+      sockets.delete(socket);
+      if (!requestSettled && requestAbortController) {
+        const error = new Error('CLI IPC client disconnected');
+        error.code = 'native_host_client_disconnected';
+        requestAbortController.abort(error);
+      }
+    });
     const reader = createJsonLineReader({
       timeoutMs: 5000,
       onValue(request) {
@@ -328,12 +369,20 @@ export async function startNativeHostIpc({
           socket.end(encodeJsonLine(localErrorResponse('invalid_request', 'CLI IPC request method is required')));
           return;
         }
+        const AbortControllerCtor = globalThis.AbortController;
+        requestAbortController = AbortControllerCtor ? new AbortControllerCtor() : null;
+        requestSettled = false;
         void protocol
-          .request(method, request?.params ?? {})
+          .request(method, request?.params ?? {}, {
+            timeoutMs: 0,
+            signal: requestAbortController?.signal ?? null,
+          })
           .then((result) => {
+            requestSettled = true;
             if (!socket.destroyed) socket.end(encodeJsonLine(result));
           })
           .catch((error) => {
+            requestSettled = true;
             if (!socket.destroyed) {
               socket.end(
                 encodeJsonLine(
