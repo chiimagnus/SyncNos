@@ -33,13 +33,15 @@
 
 可选的 `syncnos` CLI 直接使用运行中的浏览器 Extension 作为数据和业务逻辑真源；它不是第二套数据库，也不是离线 daemon。
 
-从对应 GitHub Release 下载 `syncnos-cli-<version>.tgz`：
+直接从 npm 安装已发布的 CLI：
 
 ```bash
-npm install -g ./syncnos-cli-<version>.tgz
+npm install -g @chiimagnus/syncnos@latest
 syncnos install
 syncnos doctor
 ```
+
+每个 GitHub Release 仍会附带对应的 `chiimagnus-syncnos-<version>.tgz`，用于可复现或手动安装。
 
 在需要使用 CLI 的浏览器 Profile 中开启 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**。业务命令执行时，该浏览器 Profile 需要保持运行。
 
