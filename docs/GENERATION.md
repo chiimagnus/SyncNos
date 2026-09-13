@@ -23,7 +23,6 @@
 | `docs/CONTRIBUTING.md` | 开发、PR 和验证责任 | scripts、CI gate、贡献流程或 manual validation 责任变化 | README、PR template |
 | `docs/troubleshooting.md` | 可复用的维护者诊断 | 故障分类、诊断入口或恢复动作变化 | CONTRIBUTING |
 | `.github/PULL_REQUEST_TEMPLATE.md`, Issue templates | contributor/reviewer 要提交的 scope、风险和验证证据 | CONTRIBUTING 的证据要求变化 | GitHub PR/Issue UI |
-| `.github/scripts/webclipper/STORE_LISTING_COPY.md` | 浏览器商店人工文案 | 用户可见能力或隐私声明变化 | 商店发布维护者 |
 | `docs/GENERATION.md` | 本表与源码核对基线 | owner、职责、trigger/consumer 或全仓 reconciliation 变化 | neat-freak、CONTRIBUTING |
 
 ## Rules
