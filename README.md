@@ -41,7 +41,7 @@ syncnos install
 syncnos doctor
 ```
 
-Discovery checks a finite set of known application/executable locations; it does not crawl the disk or read browser profiles. For portable, development, or non-standard installs, use `syncnos install --browser <id>`. `--extension-id` is only valid with an explicit `--browser`. `syncnos uninstall` removes only SyncNos-owned `app.syncnos.cli` registrations; browsers that share one Native Messaging target share one manifest/Registry key.
+Discovery checks a finite set of known application/executable locations; it does not crawl the disk or read browser profiles. For portable, development, or non-standard installs, use `syncnos install --browser <id>`. `--extension-id` is only valid with an explicit `--browser`. `syncnos uninstall` removes only SyncNos-owned `app.syncnos.cli` registrations; browsers that share one Native Messaging target share one manifest/Registry key. Explicit `--browser` install/uninstall still operates on that physical registration target, so the result reports `sharedByBrowsers` when the same target is shared by other browser products.
 
 In each browser profile that should expose its data to the CLI, open **Settings → General → Local CLI Integration** and enable **SyncNos CLI**. The browser must remain running for business CLI commands. `syncnos doctor` reports `detectedBrowsers`, registration state, package state, and online instances separately; successful registration does not imply that an Extension instance is connected.
 

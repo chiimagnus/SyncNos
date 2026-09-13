@@ -41,7 +41,7 @@ syncnos install
 syncnos doctor
 ```
 
-自动发现只检查有限的已知应用 / 可执行文件位置，不遍历整个磁盘，也不读取浏览器 Profile。需要显式注册 portable、开发版或非标准安装时，可使用 `syncnos install --browser <id>`；`--extension-id` 只允许与显式 `--browser` 同用。`syncnos uninstall` 默认只删除 SyncNos 自己的 `app.syncnos.cli` registration；共享同一个 browser target 的浏览器只写一份 manifest / Registry key。
+自动发现只检查有限的已知应用 / 可执行文件位置，不遍历整个磁盘，也不读取浏览器 Profile。需要显式注册 portable、开发版或非标准安装时，可使用 `syncnos install --browser <id>`；`--extension-id` 只允许与显式 `--browser` 同用。`syncnos uninstall` 默认只删除 SyncNos 自己的 `app.syncnos.cli` registration；共享同一个 browser target 的浏览器只写一份 manifest / Registry key。 显式 `--browser` 安装/卸载仍然作用于这个物理 registration target；若该 target 被其它浏览器共享，结果会通过 `sharedByBrowsers` 明确列出共同受影响的浏览器产品。
 
 在需要使用 CLI 的浏览器 Profile 中打开 **设置 → 通用 → 本地 CLI 集成**，启用 **SyncNos CLI**。业务 CLI 命令依赖浏览器保持运行。`syncnos doctor` 会分别报告 `detectedBrowsers`、registration、package 与在线 instance；registration 写入成功不等于 Extension 已连接。
 
