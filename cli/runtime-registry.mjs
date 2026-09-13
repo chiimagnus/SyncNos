@@ -39,14 +39,15 @@ export function validatePrivateDirectoryStat(stat, expectedUid = process.getuid?
 export async function ensureRuntimeDir({ root = tmpdir(), uid = process.getuid?.() } = {}) {
   const effectiveUid = Number.isInteger(uid) ? uid : 0;
   const path = join(root, `${RUNTIME_DIR_PREFIX}${effectiveUid}`);
+  const isWindows = process.platform === 'win32';
   try {
-    await mkdir(path, { mode: 0o700 });
+    await mkdir(path, isWindows ? {} : { mode: 0o700 });
   } catch (error) {
     if (error?.code !== 'EEXIST') throw error;
   }
   const stat = await lstat(path);
   validatePrivateDirectoryStat(stat, uid);
-  await chmod(path, 0o700);
+  if (!isWindows) await chmod(path, 0o700);
   return path;
 }
 
@@ -87,11 +88,12 @@ export async function readRegistryEntry(path) {
 export async function writeRegistryEntry(path, entry) {
   const payload = `${JSON.stringify(entry)}\n`;
   const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  const isWindows = process.platform === 'win32';
   try {
-    await writeFile(tempPath, payload, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-    await chmod(tempPath, 0o600);
+    await writeFile(tempPath, payload, { encoding: 'utf8', ...(isWindows ? {} : { mode: 0o600 }), flag: 'wx' });
+    if (!isWindows) await chmod(tempPath, 0o600);
     await rename(tempPath, path);
-    await chmod(path, 0o600);
+    if (!isWindows) await chmod(path, 0o600);
   } catch (error) {
     await unlink(tempPath).catch(() => {});
     throw error;
