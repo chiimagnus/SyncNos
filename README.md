@@ -2,9 +2,9 @@
 
 # SyncNos
 
-Never lose an AI conversation, a useful article, or useful context from a video page again.
+Local-first capture for AI conversations, web articles, and useful video-page context.
 
-Capture supported AI conversations, web articles, and useful context from YouTube/Bilibili video pages into local browser storage first, then optionally sync to Notion, Obsidian, Feishu (Lark), or GitHub, export selected content as Markdown or JSON, or create a local Backup ZIP.
+Save to the browser first, then optionally sync to Notion, Obsidian, Feishu (Lark), or GitHub, export selected items as Markdown/JSON, or create a local Backup ZIP.
 
 [SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
 
@@ -16,24 +16,24 @@ Capture supported AI conversations, web articles, and useful context from YouTub
 
 </div>
 
-## What it does
+## Why SyncNos
 
-SyncNos is local-first: captured content is saved locally before any optional sync or export. Notion, Obsidian, Feishu, GitHub, selected Markdown/JSON exports, and Backup ZIP files are derived outputs rather than the source of truth. See [Privacy](PRIVACY.md) for permissions, credentials, and external data flows.
+Captured content is stored locally before optional sync or export. External providers and exported files are derived copies, not the primary record. See [Privacy](PRIVACY.md) for permissions, credentials, and network data flows.
 
-## Download & Install
+## Install
 
-| Channel | Download |
+| Browser | Install |
 | --- | --- |
 | Chrome, Arc, Brave, and other Chromium browsers | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
 | Edge | [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/ijkpghlfmkbjcgafapjcjahaikmnjncl) |
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari (macOS / iOS) | Build from source with Xcode |
 
-### Local CLI (macOS / Windows / Linux)
+### Local CLI
 
-The SyncNos CLI is a local frontend for the data and business logic owned by the running browser Extension. It does not maintain a second database and is not an offline daemon.
+The optional `syncnos` CLI uses the running browser Extension as its data and business-logic owner; it is not a second database or an offline daemon.
 
-Download `syncnos-cli-<version>.tgz` from the matching GitHub Release. By default the CLI discovers supported browsers installed on the current OS and registers each distinct Native Messaging target once:
+Download `syncnos-cli-<version>.tgz` from the matching GitHub Release:
 
 ```bash
 npm install -g ./syncnos-cli-<version>.tgz
@@ -41,91 +41,64 @@ syncnos install
 syncnos doctor
 ```
 
-Discovery checks a finite set of known application/executable locations; it does not crawl the disk or read browser profiles. For portable, development, or non-standard installs, use `syncnos install --browser <id>`. `--extension-id` is only valid with an explicit `--browser`. `syncnos uninstall` removes only SyncNos-owned `app.syncnos.cli` registrations; browsers that share one Native Messaging target share one manifest/Registry key. Explicit `--browser` install/uninstall still operates on that physical registration target, so the result reports `sharedByBrowsers` when the same target is shared by other browser products.
+Enable **Settings → General → Local CLI Integration → SyncNos CLI** in each browser profile you want to expose. Business commands require that browser profile to remain running.
 
-In each browser profile that should expose its data to the CLI, open **Settings → General → Local CLI Integration** and enable **SyncNos CLI**. The browser must remain running for business CLI commands. `syncnos doctor` reports `detectedBrowsers`, registration state, package state, and online instances separately; successful registration does not imply that an Extension instance is connected.
+`syncnos install` checks a finite set of known browser locations and writes user-level Native Messaging registrations; it does not crawl the disk or inspect browser profiles. Use `syncnos install --help` for the browser IDs supported on the current OS, and `syncnos doctor` to distinguish installation health from Extension connectivity. Safari uses a different native bridge and is not handled by this installer.
 
-“Auto registration” below means the installer implements discovery plus the OS manifest/Registry contract. “Real round-trip” is stronger evidence and requires a real Extension → Native Host → CLI path:
-
-| Browser | Auto discovery / registration | Real round-trip evidence |
-| --- | --- | --- |
-| Chrome / Chromium / Edge / Brave / Vivaldi / Iridium / Yandex | macOS / Linux / Windows | Not verified browser-by-browser; the standard Chrome smoke is explicitly deferred. |
-| Opera | macOS / Windows | Not verified. |
-| Slimjet | macOS / Windows | Not verified. |
-| Arc | macOS | Not verified. |
-| Helium | macOS | **Verified** with the current SyncNos 1.13.2 Extension and real Extension data. |
-| Chrome Beta / Chrome Unstable | Linux | Not verified. |
-| Chrome for Testing | macOS auto-discovery; Linux explicit `--browser chrome-for-testing` registration | Not verified. |
-| Firefox | macOS / Linux / Windows | Signed release round-trip not yet verified. |
-| Firefox Developer Edition | macOS / Windows | Not verified. |
-| LibreWolf | macOS / Linux | Not verified. |
-| Waterfox | Linux | Not verified. |
-| Tor Browser | macOS / Linux auto-discovery; Windows explicit `--browser tor` registration only | Not verified. |
-| Zen | macOS | **Transport and real-data path verified** with a same-ID current 1.13.2 build; signed-release packaging and the final real user permission gesture remain separate release evidence. |
-
-Chromium production manifests allow both the Chrome Web Store and Microsoft Edge Add-ons SyncNos IDs. Firefox-family manifests use the stable Gecko ID `syncnos-webclipper@syncnos.app`. Safari uses a different native bridge model and is outside this WebExtension Native Messaging installer.
-
-## Demo Video
+## Demo
 
 [![SyncNos demo video](docs/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
 
-## Supported Sources
+## Capture
 
 ### AI conversations
 
-| Platform | Capture mode |
-| --- | --- |
-| ChatGPT | Manual only¹ |
-| Gemini | Auto-save capable² |
-| Google AI Studio | Manual only¹ |
-| DeepSeek | Auto-save capable² |
-| Kimi | Auto-save capable² |
-| Doubao | Auto-save capable² |
-| Yuanbao | Auto-save capable² |
-| Poe | Auto-save capable² |
-| Notion AI | Auto-save capable² |
-| z.ai | Auto-save capable² |
+Supported: ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai.
 
-¹ ChatGPT and Google AI Studio use virtualized conversation lists and require an explicit manual capture so SyncNos can verify completeness.
-
-² Automatic capture only runs when AI auto-save is enabled. The source-of-truth site list lives in `src/collectors/ai-chat-sites.ts`.
+ChatGPT and Google AI Studio require manual capture because their virtualized conversation lists cannot be treated as complete automatically. Other supported AI chat collectors can auto-save when AI auto-save is enabled.
 
 ### Web articles
 
-Ordinary `http(s)` pages can be captured manually. Supported Video URLs are routed to Video capture instead of being stored as web articles. SyncNos extracts readable article content and relevant metadata, with site-specific fallbacks where needed. Captured articles support comments and highlight-only annotations; on Dedao course articles, personal highlights and notes available on the signed-in page are also imported into the article comment layer.
+Any ordinary `http(s)` page can be captured manually. SyncNos extracts readable content and relevant metadata, with site-specific handling where needed. Captured articles support local comments and highlight-only annotations.
 
-### Video capture
+### Video pages
 
-Video capture supports YouTube `watch` / `youtu.be` pages, Bilibili BV video pages, and Bilibili Watch Later playback pages with a valid `bvid`. Popup, the in-page save button, and the single dynamic SyncNos context-menu action all use the same Video route. SyncNos saves available source context such as title, author, description, duration, and thumbnail; when subtitles are already loaded, their transcript text and precise timestamp ranges are saved too, and Bilibili player chapters/highlights are preserved when the current page has naturally loaded them. Bilibili Watch Later URLs are normalized to the same `https://www.bilibili.com/video/<BV>/` identity (the `oid` parameter is not part of SyncNos identity). A video is still created or updated when no subtitles are available, and it never falls back to Web Article capture; capturing again after subtitles load adds or updates the transcript. SyncNos does not download the audio/video stream, and Bilibili `av` pages, YouTube Shorts, arbitrary `/video/*` paths, statistics/tags, and chapter images are outside this supported contract.
+SyncNos supports YouTube watch/youtu.be pages and Bilibili BV playback pages, including Watch Later playback with a valid `bvid`. It saves available page context and already-loaded subtitles/transcripts; Bilibili chapters/highlights are also kept when the current player provides them. SyncNos does not download the audio/video stream, and a supported video remains a Video even when no subtitles are available yet.
 
-## Output Targets
+## Destinations
 
 | Target | Behavior |
 | --- | --- |
-| **Notion** | Syncs local content through the Notion API after OAuth. Manual sync is always available; optional auto-sync can be enabled. |
-| **Obsidian** | Writes Markdown and local image attachments to your vault through the localhost Local REST API. See [setup](docs/guide/obsidian/LocalRestAPI.en.md). |
-| **Feishu** | Syncs local content to Feishu DocX after OAuth. Manual sync is always available; optional auto-sync can be enabled. See [setup](docs/guide/feishu/DocxSync.en.md). |
-| **GitHub** | Writes the local projection to an authorized repository/branch through the SyncNos GitHub App. Manual sync is always available; optional auto-sync can be enabled. |
-| **Markdown / JSON** | Exports selected content as a ZIP container with one `.md` or `.json` content file per selected item plus referenced cached attachments. |
-| **Backup ZIP** | Creates the separate local recovery package described in [storage and recovery](docs/storage.md). |
+| **Notion** | Sync local content through the Notion API after OAuth. |
+| **Obsidian** | Write Markdown and local image attachments through the Local REST API. [Setup guide](docs/guide/obsidian/LocalRestAPI.en.md) |
+| **Feishu (Lark)** | Sync local content to Feishu DocX after OAuth. [Setup guide](docs/guide/feishu/DocxSync.en.md) |
+| **GitHub** | Write the local projection to an authorized repository/branch through the SyncNos GitHub App. |
+| **Markdown / JSON** | Export selected items and referenced cached attachments locally. |
+| **Backup ZIP** | Create the local recovery package described in [storage and recovery](docs/storage.md). |
+
+Provider sync can be run manually; optional auto-sync is available per provider.
 
 ## Screenshots
 
-WebClipper Popup: save and browse conversations
+WebClipper Popup: save and browse captured content.
+
 ![WebClipper Popup](docs/assets/popup-screenshots.png)
 
-Article discussion sidebar: exact quotes, compact threads, and one active reply composer
+Article discussion sidebar: exact quotes, compact threads, and one active reply composer.
+
 ![Article discussion sidebar](docs/assets/comments-discussion.png)
 
-## Contributing
+## Documentation
 
-Development setup, issue/commit/PR workflow, and validation requirements are maintained in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Architecture and non-negotiable product contracts are maintained in [AGENTS.md](AGENTS.md).
+- [Privacy](PRIVACY.md)
+- [Storage, backup, and recovery](docs/storage.md)
+- [Feishu setup](docs/guide/feishu/DocxSync.en.md)
+- [Obsidian setup](docs/guide/obsidian/LocalRestAPI.en.md)
+- [Contributing](docs/CONTRIBUTING.md)
 
 ## Support
 
-SyncNos is a one-person project.
-
-If you'd like to sponsor the project, please leave a message about why you use SyncNos or what you would like it to become.
+SyncNos is maintained by one person. If you would like to sponsor the project, leave a note about why you use SyncNos or what you hope it will solve next.
 
 <img src="public/icons/buymeacoffee1.jpg" alt="Chii Magnus tip jar QR" width="180" />
 

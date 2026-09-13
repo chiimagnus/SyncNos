@@ -1,23 +1,20 @@
-# 飞书同步配置指南（WebClipper）
+# 飞书同步配置
 
 [English](./DocxSync.en.md) | **中文**
 
-本指南负责 SyncNos WebClipper 同步到飞书 DocX 的用户配置步骤；运行时行为以当前源码为准，不在本指南复制内部模块结构。
-
-## 准备条件
-
-- 一个可以创建或管理应用的飞书账号。
-- 待同步内容已经先保存到 SyncNos WebClipper 本地。
+使用本指南把 SyncNos 连接到飞书企业自建应用，并把本地内容同步到飞书 DocX。
 
 ## 1. 创建飞书应用
 
-在飞书开放平台创建企业自建应用，取得 App ID（Client ID），并精确配置以下 OAuth 重定向地址：
+在飞书开放平台创建企业自建应用，并取得 App ID（Client ID）。
+
+精确配置以下 OAuth 重定向地址：
 
 ```text
 https://chiimagnus.github.io/syncnos-oauth/callback
 ```
 
-当前扩展请求的 scope 为：
+授予以下权限：
 
 ```text
 docx:document
@@ -25,21 +22,15 @@ docx:document.block:convert
 drive:drive
 ```
 
-修改应用权限后，应先在 SyncNos 中 Disconnect，再重新 Connect，使新 token 获得更新后的 scope。
+以后修改 scope 时，应先在 SyncNos 中 Disconnect，再重新 Connect，让飞书签发包含新权限的 token。
 
-## 2. 选择一种 OAuth 模式
+## 2. 选择 OAuth 模式
 
-### Proxy / Cloudflare Worker
+### Proxy
 
-如果不希望把飞书 Client Secret 保存在浏览器扩展本机，使用此模式。扩展把 OAuth code 或 refresh token 发给配置的 Worker，由 Worker 向飞书完成 token 兑换或刷新。
+不希望把飞书 Client Secret 保存在 Extension 本机时，使用 token-exchange Worker。
 
-仓库内 Worker 位于：
-
-```text
-cloudflare-workers/syncnos-feishu-oauth/
-```
-
-使用自己的飞书应用时，先把 `wrangler.toml` 中的 `FEISHU_CLIENT_ID` 设置为对应 App ID，然后写入 secret 并部署：
+仓库自带 Worker：`cloudflare-workers/syncnos-feishu-oauth/`。使用自己的应用时，在 `wrangler.toml` 设置 `FEISHU_CLIENT_ID`，写入 secret 后部署：
 
 ```bash
 cd cloudflare-workers/syncnos-feishu-oauth
@@ -47,38 +38,31 @@ npx wrangler secret put FEISHU_CLIENT_SECRET
 npx wrangler deploy
 ```
 
-WebClipper 中的 Proxy URL 填 exchange endpoint：
+SyncNos 的 **Proxy URL** 填：
 
 ```text
 https://<your-worker-host>/feishu/oauth/exchange
 ```
 
-refresh endpoint 使用同一 Worker 下的 `/feishu/oauth/refresh`。
+Worker 会使用对应的 `/feishu/oauth/refresh` endpoint 处理刷新。
 
 ### Direct
 
-如果使用自己管理的飞书应用，并能接受 Client Secret 保存在扩展本机，可以使用 Direct 模式。SyncNos 会直接向飞书发送 token 兑换与刷新请求。
+只有在你接受 Client Secret 保存在 extension-local storage 时才使用 Direct。SyncNos 会直接向飞书进行 token 兑换和刷新；Client Secret 不会进入 SyncNos Backup ZIP。
 
-Client Secret 属于本机凭据，不会进入 SyncNos 备份。
+## 3. 连接 SyncNos
 
-## 3. 在 WebClipper 中连接
+打开 **设置 → 飞书**，填写 App ID，然后只配置一种凭据路径：
 
-1. 打开 WebClipper → `Settings` → `Feishu`。
-2. 在飞书设置卡片中填写 App ID / Client ID。
-3. 二选一：
-   - Proxy：填写 Worker exchange URL，Client Secret / App Secret 留空。
-   - Direct：填写 Client Secret / App Secret，Proxy URL 留空。
-4. 修改字段后离开输入框或按 Enter 即会保存；当前页面没有单独的 `Advanced` 展开步骤或 `Save` 按钮。
-5. 点击右上角的 `Connect`，在飞书授权页完成授权。
+- **Proxy：**填写 Proxy URL，Client Secret 留空。
+- **Direct：**填写 Client Secret，Proxy URL 留空。
 
-连接成功后始终可以手动同步；如果显式开启 Feishu auto-sync，本地内容变化也可以进入该 provider 的自动同步队列。
+点击 **Connect**，在飞书完成授权。目标文件夹也可以在同一设置页修改。
 
-目标文件夹可以在 SyncNos 设置中调整；当前默认值由 settings service 维护，不在本指南重复手抄。
+连接后可以手动同步，也可以单独开启自动同步。
 
-## 4. 验收与排障
+## 排障
 
-至少验证一条 `chat`、`article`、`video` 均可同步，并确认 token refresh 后仍可继续同步、Disconnect 后本机 OAuth 状态被清理。
+遇到 `401` / `403` 时先检查应用 scope 并重新授权。OAuth 兑换或刷新失败时，检查 App ID、redirect URI、应用发布状态，以及配置的 Client Secret 或 Worker endpoint。
 
-遇到 `401` / `403` 时先检查应用 scope 并重新授权。exchange / refresh 失败时检查 App ID、Client Secret 或 Worker secret、Proxy URL、应用发布状态与 redirect URI。
-
-文档转换或单张图片失败可能产生 warning，但不应让已经保存到本地的源内容丢失。
+飞书转换、上传或图片处理失败时，本地内容仍然是主记录。
