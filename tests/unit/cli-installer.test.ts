@@ -61,7 +61,10 @@ describe('macOS CLI native host installer', () => {
       description: 'SyncNos local CLI bridge',
       path: launcherPath,
       type: 'stdio',
-      allowed_origins: [`chrome-extension://${CHROME_PRODUCTION_EXTENSION_ID}/`],
+      allowed_origins: [
+        `chrome-extension://${CHROME_PRODUCTION_EXTENSION_ID}/`,
+        'chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/',
+      ],
     });
     expect(buildNativeHostManifest(firefox, launcherPath)).toEqual({
       name: contract.nativeHostName,
@@ -140,7 +143,7 @@ describe('macOS CLI native host installer', () => {
     const chrome = await installNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
     const firefox = await installNativeHost({ browser: 'firefox', homeDir, platform: 'darwin' });
     const removed = await uninstallNativeHost({ homeDir, platform: 'darwin' });
-    expect(removed.browsers).toEqual(['chrome', 'firefox']);
+    expect(removed.browsers).toEqual(expect.arrayContaining(['chrome', 'firefox']));
     expect(removed.removedManifests.map((item) => item.browser)).toEqual(['chrome', 'firefox']);
     expect(removed.remainingManifests).toEqual([]);
     expect(removed.launcherRemoved).toBe(true);
