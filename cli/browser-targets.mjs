@@ -326,6 +326,7 @@ const BROWSERS = Object.freeze({
         detect: winPaths(
           ['programFiles', 'Mozilla Firefox\\firefox.exe'],
           ['programFilesX86', 'Mozilla Firefox\\firefox.exe'],
+          ['localAppData', 'Mozilla Firefox\\firefox.exe'],
         ),
         registration: registryRegistration('mozilla', REGISTRY.mozilla),
       }),

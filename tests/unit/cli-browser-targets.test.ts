@@ -142,6 +142,20 @@ describe('CLI browser target catalog', () => {
     expect(linux.map((item) => item.id)).toEqual(['yandex']);
   });
 
+  it('detects a standard per-user Firefox Windows install under LOCALAPPDATA', async () => {
+    const discovered = await discoverInstalledBrowsers({
+      platform: 'win32',
+      homeDir: 'C:\\Users\\example',
+      localAppDataDir: 'C:\\Users\\example\\AppData\\Local',
+      env: {
+        ProgramFiles: 'C:\\Program Files',
+        'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+      },
+      pathExists: async (path) => path === 'C:\\Users\\example\\AppData\\Local\\Mozilla Firefox\\firefox.exe',
+    });
+    expect(discovered.map((item) => item.id)).toEqual(['firefox']);
+  });
+
   it('keeps Tor Windows explicit-registration-only on the Mozilla HKCU target', async () => {
     const options = {
       platform: 'win32' as const,
