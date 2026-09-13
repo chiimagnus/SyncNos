@@ -201,6 +201,73 @@ describe('ChatGPT API snapshot', () => {
     expect(errorCode(() => build(cases[3]))).toBe('unsupported_content');
   });
 
+  it('accepts the current same-turn image-generation tool-call only when an image tool discharges it', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['draw'] }),
+      message({
+        id: 'image-call',
+        role: 'assistant',
+        recipient: 'opaque.image.tool',
+        channel: 'commentary',
+        contentType: 'code',
+        parts: [],
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'image-tool',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_generated_1' }],
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'image-recap',
+        role: 'assistant',
+        contentType: 'reasoning_recap',
+        content: 'Generated the image.',
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'assistant-final',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['Done.'],
+        turnId: 'turn-image',
+      }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-final',
+      role: 'assistant',
+      contentMarkdown: 'Generated the image.\n\nDone.',
+    });
+    expect(result.chatgptProtectedImages?.assets).toEqual([
+      expect.objectContaining({ fileId: 'file_generated_1', targetMessageKey: 'assistant-final' }),
+    ]);
+
+    const missingImage = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['draw'] }),
+      message({
+        id: 'image-call',
+        role: 'assistant',
+        recipient: 'opaque.image.tool',
+        channel: 'commentary',
+        contentType: 'code',
+        parts: [],
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'assistant-final',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['No image.'],
+        turnId: 'turn-image',
+      }),
+    ]);
+    expect(errorCode(() => build(missingImage))).toBe('unsupported_tool_turn');
+  });
+
   it('builds transient sidecars for user uploads and generated images without exposing raw pointers in the snapshot', () => {
     const data = mappingFrom([
       message({

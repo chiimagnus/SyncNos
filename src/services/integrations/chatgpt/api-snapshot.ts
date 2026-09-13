@@ -278,6 +278,7 @@ export function buildChatgptApiSnapshot(input: {
   const seenAssetRefs = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
+  let pendingImageToolCallTurnId = '';
 
   const flushImageOnly = () => {
     if (!pendingImages.length) {
@@ -323,6 +324,7 @@ export function buildChatgptApiSnapshot(input: {
     if (INTERNAL_CONTENT_TYPES.has(type)) continue;
 
     if (role === 'user') {
+      if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
       flushImageOnly();
       if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
       if (!id) throw apiSnapshotError('conversation_identity_invalid');
@@ -345,7 +347,16 @@ export function buildChatgptApiSnapshot(input: {
     }
 
     if (role === 'assistant') {
-      if (message.recipient !== 'all') throw apiSnapshotError('unsupported_tool_turn');
+      if (message.recipient !== 'all') {
+        const isPendingImageToolCall = message.channel === 'commentary' && type === 'code' && !!turnId;
+        if (!isPendingImageToolCall) throw apiSnapshotError('unsupported_tool_turn');
+        if (pendingImageToolCallTurnId && pendingImageToolCallTurnId !== turnId) {
+          throw apiSnapshotError('unsupported_tool_turn');
+        }
+        pendingImageToolCallTurnId = turnId;
+        continue;
+      }
+      if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
       const isStableOwner = message.channel === 'final' && type === 'text';
       if (isStableOwner) {
         if (!id) throw apiSnapshotError('conversation_identity_invalid');
@@ -389,6 +400,10 @@ export function buildChatgptApiSnapshot(input: {
       if (message.recipient !== 'all' || !images.length || hasNonImagePartContent(message)) {
         throw apiSnapshotError('unsupported_tool_turn');
       }
+      if (pendingImageToolCallTurnId && pendingImageToolCallTurnId !== turnId) {
+        throw apiSnapshotError('unsupported_tool_turn');
+      }
+      pendingImageToolCallTurnId = '';
       pendingImages.push(...images);
       continue;
     }
@@ -396,6 +411,7 @@ export function buildChatgptApiSnapshot(input: {
     throw apiSnapshotError('unsupported_content');
   }
 
+  if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
   flushImageOnly();
   if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
