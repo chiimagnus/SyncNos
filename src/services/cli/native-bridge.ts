@@ -1,5 +1,10 @@
 import contract from '@services/protocols/cli-rpc-contract.json';
-import { CORE_MESSAGE_TYPES, DATA_REVISION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  CORE_MESSAGE_TYPES,
+  DATA_REVISION_MESSAGE_TYPES,
+  UI_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,
   NATIVE_MESSAGING_PERMISSION,
@@ -151,10 +156,8 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         safePost(currentPort, response(requestId, true, transform(result.data)));
         return true;
       }
-      const code =
-        String(result?.error?.extra?.code || '') === 'INVALID_ARGUMENT'
-          ? 'invalid_argument'
-          : 'background_request_failed';
+      const extraCode = String(result?.error?.extra?.code || '').trim();
+      const code = extraCode === 'INVALID_ARGUMENT' ? 'invalid_argument' : extraCode || 'background_request_failed';
       safePost(
         currentPort,
         response(requestId, false, null, code, String(result?.error?.message || 'Background request failed')),
@@ -230,6 +233,149 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         },
         null,
       );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'conversation.update-url') {
+      const result = await router.dispatch(
+        {
+          type: CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL,
+          conversationId: Number(params.conversationId),
+          url: params.url,
+          mergeExisting: params.mergeExisting === true,
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'conversation.merge') {
+      const result = await router.dispatch(
+        {
+          type: CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS,
+          keepConversationId: Number(params.keepConversationId),
+          removeConversationId: Number(params.removeConversationId),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'conversation.delete') {
+      const ids = Array.isArray(params.conversationIds)
+        ? params.conversationIds.map((value: unknown) => Number(value))
+        : [];
+      const result = await router.dispatch(
+        { type: CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, conversationIds: ids },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'conversation.images.backfill') {
+      const result = await router.dispatch(
+        {
+          type: CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
+          conversationId: Number(params.conversationId),
+          conversationUrl: String(params.conversationUrl || ''),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    const resolveConversation = async (conversationIdValue: unknown) => {
+      const conversationId = Number(conversationIdValue);
+      const result = await router.dispatch({ type: CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, conversationId }, null);
+      if (result?.ok !== true) {
+        postBackgroundResult(result);
+        return null;
+      }
+      if (!result.data) {
+        safePost(currentPort, response(requestId, false, null, 'not_found', 'Conversation not found'));
+        return null;
+      }
+      return result.data;
+    };
+
+    if (method === 'comments.list' || method === 'comments.add' || method === 'comments.reply') {
+      const conversation = await resolveConversation(params.conversationId);
+      if (!conversation) return;
+      const canonicalUrl = canonicalizeArticleUrl(conversation.url);
+      if (!canonicalUrl) {
+        safePost(
+          currentPort,
+          response(requestId, false, null, 'invalid_conversation_url', 'Conversation has no canonical URL'),
+        );
+        return;
+      }
+      const type = method === 'comments.list' ? 'listArticleComments' : 'addArticleComment';
+      const result = await router.dispatch(
+        {
+          type,
+          conversationId: Number(conversation.id),
+          canonicalUrl,
+          url: canonicalUrl,
+          ...(method === 'comments.list'
+            ? null
+            : {
+                commentText: String(params.text || '').trim(),
+                text: String(params.text || '').trim(),
+                ...(method === 'comments.reply' ? { parentId: Number(params.parentId) } : null),
+              }),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'comments.delete') {
+      const result = await router.dispatch(
+        {
+          type: 'deleteArticleComment',
+          conversationId: Number(params.conversationId),
+          commentId: Number(params.commentId),
+          id: Number(params.commentId),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'mention.search') {
+      const result = await router.dispatch(
+        {
+          type: 'searchItemMentionCandidates',
+          query: String(params.query || ''),
+          limit: params.limit,
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'mention.build-insert-text') {
+      const result = await router.dispatch(
+        {
+          type: 'buildItemMentionInsertText',
+          conversationId: Number(params.conversationId),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'capture.current-page') {
+      const result = await router.dispatch({ type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE }, null);
       postBackgroundResult(result);
       return;
     }
