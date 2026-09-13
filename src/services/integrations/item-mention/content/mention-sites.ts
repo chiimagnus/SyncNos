@@ -1,4 +1,5 @@
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
+import { isCanonicalChatgptHostname } from '@services/shared/chatgpt-route';
 
 function normalizeHostname(hostname: unknown): string {
   const raw = String(hostname || '')
@@ -45,6 +46,10 @@ export function pickMentionSupportedSiteIdByHostname(hostname: string): string |
 
   for (const site of listDollarMentionSites()) {
     const hosts = Array.isArray(site?.hosts) ? site.hosts : [];
+    if (site.id === 'chatgpt') {
+      if (isCanonicalChatgptHostname(host)) return 'chatgpt';
+      continue;
+    }
     for (const siteHost of hosts) {
       if (hostMatches(host, siteHost)) return String(site.id || '').trim() || null;
     }

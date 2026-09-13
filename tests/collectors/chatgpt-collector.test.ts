@@ -28,6 +28,24 @@ async function capturePrepared(def: any, prepareOptions: any = {}) {
 }
 
 describe('chatgpt-collector', () => {
+  it('matches only the canonical ChatGPT hostname', () => {
+    const makeDefinition = (url: string) => {
+      const dom = setupChatgptDom('', url);
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
+      return createChatgptCollectorDef(env);
+    };
+
+    expect(makeDefinition('https://chatgpt.com/c/conv').matches({ hostname: 'chatgpt.com' })).toBe(true);
+    expect(makeDefinition('https://www.chatgpt.com/c/conv').matches({ hostname: 'www.chatgpt.com' })).toBe(false);
+    expect(makeDefinition('https://foo.chatgpt.com/c/conv').matches({ hostname: 'foo.chatgpt.com' })).toBe(false);
+    expect(makeDefinition('https://chat.openai.com/c/conv').matches({ hostname: 'chat.openai.com' })).toBe(false);
+  });
+
   it('uses active conversation title in ChatGPT Projects pages (instead of project name h1)', async () => {
     const html = `
       <h1>Research</h1>
@@ -83,6 +101,31 @@ describe('chatgpt-collector', () => {
     expect(snap.messages.every((message: any) => !String(message.messageKey).startsWith('fallback_'))).toBe(true);
     expect(String(snap.conversation.title || '')).toBe('请帮我整理今天的发布检查清单');
     expect(String(snap.conversation.title || '')).not.toBe('ChatGPT');
+  });
+
+  it('does not treat legacy temporary-chat values as canonical temporary mode', async () => {
+    const html = `
+      <article data-testid="conversation-turn-1" data-turn-id="turn_tmp_legacy_user">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">legacy temporary title</div></div>
+      </article>
+      <article data-testid="conversation-turn-2" data-turn-id="turn_tmp_legacy_assistant">
+        <div data-message-author-role="assistant" data-message-id="m_ai_tmp_legacy">
+          <div class="markdown prose"><p>answer</p></div>
+        </div>
+      </article>
+    `;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=1');
+    dom.window.document.title = 'ChatGPT';
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.conversation.title).toBe('ChatGPT');
   });
 
   it('keeps the temporary conversation key stable across first-user edits and history growth', async () => {

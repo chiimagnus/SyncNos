@@ -14,9 +14,11 @@ describe('item-mention sites', () => {
     expect(hosts).toContain('app.notion.com');
   });
 
-  it('matches subdomains', () => {
-    expect(isMentionSupportedHost('www.chatgpt.com')).toBe(true);
-    expect(isMentionSupportedHost('chat.openai.com')).toBe(true);
+  it('keeps ChatGPT canonical while other site registries can match subdomains', () => {
+    expect(isMentionSupportedHost('chatgpt.com')).toBe(true);
+    expect(isMentionSupportedHost('www.chatgpt.com')).toBe(false);
+    expect(isMentionSupportedHost('foo.chatgpt.com')).toBe(false);
+    expect(isMentionSupportedHost('chat.openai.com')).toBe(false);
     expect(isMentionSupportedHost('www.notion.so')).toBe(true);
     expect(isMentionSupportedHost('foo.notion.so')).toBe(true);
     expect(isMentionSupportedHost('app.notion.com')).toBe(true);

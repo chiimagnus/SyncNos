@@ -1,5 +1,6 @@
 import normalizeApi from '@services/shared/normalize.ts';
 import chatgptMarkdown from '@collectors/chatgpt/chatgpt-markdown.ts';
+import { isCanonicalChatgptOrigin } from '@services/shared/chatgpt-route';
 
 const MESSAGE_TYPES = Object.freeze({
   REQUEST: 'SYNCNOS_DEEP_RESEARCH_REQUEST',
@@ -7,11 +8,7 @@ const MESSAGE_TYPES = Object.freeze({
 });
 
 function isAllowedParentOrigin(origin: string): boolean {
-  const value = String(origin || '')
-    .trim()
-    .toLowerCase();
-  if (!value) return false;
-  return value === 'https://chatgpt.com' || value === 'https://www.chatgpt.com' || value === 'https://chat.openai.com';
+  return isCanonicalChatgptOrigin(origin);
 }
 
 function resolveAllowedParentOrigin(eventOrigin: string): string | null {

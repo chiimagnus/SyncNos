@@ -98,6 +98,14 @@ describe('content bootstrap display mode', () => {
     expect(supported.wrapper.start).toHaveBeenCalledTimes(1);
     supported.bootstrap.stop();
 
+    for (const redirectedAlias of ['www.chatgpt.com', 'foo.chatgpt.com', 'chat.openai.com']) {
+      displayMocks.read.mockResolvedValueOnce('supported');
+      const alias = harness(redirectedAlias);
+      await flush();
+      expect(alias.wrapper.start).not.toHaveBeenCalled();
+      alias.bootstrap.stop();
+    }
+
     displayMocks.read.mockResolvedValueOnce('supported');
     const video = harness('https://www.bilibili.com/video/BV1FwY4zkEef/');
     await flush();

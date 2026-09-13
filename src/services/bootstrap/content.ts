@@ -6,6 +6,7 @@ import {
 } from '@services/shared/inpage-display-mode';
 import { storageOnChanged } from '@services/shared/storage';
 import { detectSupportedVideoPagePlatform, detectVideoPlatformHost } from '@services/url-cleaning/video-url';
+import { isCanonicalChatgptHostname } from '@services/shared/chatgpt-route';
 
 type RuntimeClient = {
   onInvalidated?: (listener: (error: Error) => void) => () => void;
@@ -23,9 +24,6 @@ type StartContentBootstrapInput = {
 };
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
-  'chat.openai.com',
-  'chatgpt.com',
-  'www.chatgpt.com',
   'gemini.google.com',
   'aistudio.google.com',
   'makersuite.google.com',
@@ -43,6 +41,7 @@ const SUPPORTED_HOST_SUFFIXES = Object.freeze([
 function isSupportedHost(hostname: string): boolean {
   const host = String(hostname || '').toLowerCase();
   if (!host) return false;
+  if (isCanonicalChatgptHostname(host)) return true;
   for (const suffix of SUPPORTED_HOST_SUFFIXES) {
     if (host === suffix) return true;
     if (host.endsWith(`.${suffix}`)) return true;
