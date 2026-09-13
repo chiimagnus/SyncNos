@@ -182,6 +182,29 @@ describe('open-in machine targets', () => {
     });
   });
 
+  it('propagates fresh mapping read failures instead of falling back to stale conversation metadata', async () => {
+    const services = createServices({
+      getSyncMappingByConversation: vi.fn(async () => {
+        throw new Error('mapping read failed');
+      }),
+    });
+    await expect(resolveOpenTargets({ conversation: conversation(), targets: ['github'], services })).rejects.toThrow(
+      'mapping read failed',
+    );
+  });
+
+  it('propagates provider-gate read failures instead of treating the provider as enabled', async () => {
+    const services = createServices({
+      isSyncProviderEnabled: vi.fn(async () => {
+        throw new Error('provider gate unavailable');
+      }),
+    });
+    await expect(resolveOpenTargets({ conversation: conversation(), targets: ['github'], services })).rejects.toThrow(
+      'provider gate unavailable',
+    );
+    expect(services.getSyncMappingByConversation).not.toHaveBeenCalled();
+  });
+
   it('returns provider_disabled without mapping/provider REST probes', async () => {
     const services = createServices({
       isSyncProviderEnabled: vi.fn(async (provider: string) => provider !== 'obsidian'),

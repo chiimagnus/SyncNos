@@ -128,23 +128,12 @@ function toObsidianTargetDto(resolved: Awaited<ReturnType<typeof resolveObsidian
   };
 }
 
-function sanitizeSourceUrl(value: unknown): string {
-  const candidate = sanitizeHttpUrl(value);
-  if (!candidate) return '';
-  try {
-    const parsed = new URL(candidate);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? candidate : '';
-  } catch {
-    return '';
-  }
-}
-
 export function isOpenTargetProvider(value: unknown): value is OpenTargetProvider {
   return (OPEN_TARGET_PROVIDERS as readonly string[]).includes(safeString(value));
 }
 
 export function resolveSourceOpenTarget(conversation: Conversation | null | undefined): OpenTargetDto {
-  return externalTarget('source', sanitizeSourceUrl(conversation?.url), 'source_url_unavailable');
+  return externalTarget('source', sanitizeHttpUrl(conversation?.url), 'source_url_unavailable');
 }
 
 function resolveFreshProviderField(conversation: Conversation, mappingRes: SyncMappingResult, field: string): string {
@@ -187,9 +176,7 @@ async function resolveRequestedTargets({
     if (!mappingPromise) {
       const id = Number(conversation.id);
       mappingPromise =
-        Number.isSafeInteger(id) && id > 0
-          ? services.getSyncMappingByConversation(id).catch(() => null)
-          : Promise.resolve(null);
+        Number.isSafeInteger(id) && id > 0 ? services.getSyncMappingByConversation(id) : Promise.resolve(null);
     }
     return mappingPromise;
   };
@@ -201,7 +188,7 @@ async function resolveRequestedTargets({
       continue;
     }
 
-    const enabled = await services.isSyncProviderEnabled(provider).catch(() => true);
+    const enabled = await services.isSyncProviderEnabled(provider);
     if (!enabled) {
       results.push(disabledTarget(provider));
       continue;
@@ -322,7 +309,7 @@ export async function launchOpenTarget({
     throw new OpenTargetError('open_target_invalid_provider', 'Invalid open target provider');
 
   if (target === 'obsidian') {
-    const enabled = await services.isSyncProviderEnabled('obsidian').catch(() => true);
+    const enabled = await services.isSyncProviderEnabled('obsidian');
     if (!enabled) {
       const unavailable = disabledTarget('obsidian');
       return {

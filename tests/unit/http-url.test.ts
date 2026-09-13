@@ -8,9 +8,10 @@ describe('sanitizeHttpUrl', () => {
     expect(sanitizeHttpUrl(' http://example.com/a?b=1#hash ')).toBe('http://example.com/a?b=1#hash');
   });
 
-  it('rejects empty and non-http schemes', () => {
+  it('rejects empty, malformed, and non-http URLs', () => {
     expect(sanitizeHttpUrl('')).toBe('');
     expect(sanitizeHttpUrl('   ')).toBe('');
+    expect(sanitizeHttpUrl('https://exa mple.com')).toBe('');
     expect(sanitizeHttpUrl('javascript:alert(1)')).toBe('');
     expect(sanitizeHttpUrl('obsidian://open?vault=x')).toBe('');
     expect(sanitizeHttpUrl('ftp://example.com')).toBe('');

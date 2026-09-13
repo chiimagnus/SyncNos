@@ -30,14 +30,14 @@ export function hasSyncProviderEnabledStorageChange(changes: unknown, areaName: 
 
 export async function isSyncProviderEnabled(id: SyncProvider): Promise<boolean> {
   const key = syncProviderEnabledStorageKey(id);
-  const res = await storageGet([key]).catch(() => ({}));
+  const res = await storageGet([key]);
   return (res as any)?.[key] !== false;
 }
 
 export async function setSyncProviderEnabled(id: SyncProvider, enabled: boolean): Promise<void> {
   const key = syncProviderEnabledStorageKey(id);
   if (enabled) {
-    await storageRemove([key]).catch(() => {});
+    await storageRemove([key]);
     return;
   }
   await storageSet({ [key]: false });

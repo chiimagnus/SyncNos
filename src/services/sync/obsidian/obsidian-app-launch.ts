@@ -37,15 +37,6 @@ function tryLaunchViaDomAnchor(url: string) {
   }
 }
 
-function tryLaunchViaWindowOpen(url: string) {
-  try {
-    globalThis.window?.open(url, '_self');
-    return true;
-  } catch (_error) {
-    return false;
-  }
-}
-
 export async function launchObsidianApp(url: string = OBSIDIAN_APP_LAUNCH_URL): Promise<boolean> {
   const safeUrl = safeString(url);
   if (!safeUrl) return false;
@@ -56,8 +47,6 @@ export async function launchObsidianApp(url: string = OBSIDIAN_APP_LAUNCH_URL): 
     await tabsCreate({ url: safeUrl, active: true });
     return true;
   } catch (_error) {
-    // Fall through to browser window APIs when tabs.create is unavailable or rejects custom protocols.
+    return false;
   }
-
-  return tryLaunchViaWindowOpen(safeUrl);
 }

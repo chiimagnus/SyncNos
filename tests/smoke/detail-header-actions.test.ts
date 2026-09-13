@@ -627,29 +627,26 @@ describe('detail-header-actions', () => {
     expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/fresh-doc');
   });
 
-  it('falls back to the caller mirrors only when the mapping read fails', async () => {
+  it('fails closed when fresh mapping cannot be read instead of exposing caller mirrors', async () => {
     getSyncMappingByConversationMock.mockRejectedValue(new Error('IDB unavailable'));
 
-    const actions = await resolveDetailHeaderActions({
-      conversation: {
-        id: 626,
-        source: 'chatgpt',
-        conversationKey: 'conv-626',
-        title: 'Conversation',
-        notionPageId: NOTION_PAGE_ID,
-        notionWorkspaceSlug: 'caller-workspace',
-        feishuDocId: 'caller-doc',
-      },
-      port: createPort(),
-    });
-
-    expect(byId(actions, 'open-in-notion')?.href).toBe(
-      'https://app.notion.com/p/caller-workspace/0123456789abcdef0123456789abcdef',
-    );
-    expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/caller-doc');
+    await expect(
+      resolveDetailHeaderActions({
+        conversation: {
+          id: 626,
+          source: 'chatgpt',
+          conversationKey: 'conv-626',
+          title: 'Conversation',
+          notionPageId: NOTION_PAGE_ID,
+          notionWorkspaceSlug: 'caller-workspace',
+          feishuDocId: 'caller-doc',
+        },
+        port: createPort(),
+      }),
+    ).rejects.toThrow('IDB unavailable');
   });
 
-  it('reloads the current conversation before UI launch when mapping revalidation fails', async () => {
+  it('fails closed at action time when fresh mapping revalidation fails', async () => {
     const port = createPort();
     const staleConversation = {
       id: 627,
@@ -664,20 +661,19 @@ describe('detail-header-actions', () => {
       notionPageId: OTHER_NOTION_PAGE_ID,
       notionWorkspaceSlug: 'fresh-workspace',
     } as any;
-    getSyncMappingByConversationMock.mockRejectedValue(new Error('IDB unavailable'));
+    getSyncMappingByConversationMock
+      .mockResolvedValueOnce({ conversation: staleConversation, mapping: { notionPageId: NOTION_PAGE_ID } })
+      .mockRejectedValueOnce(new Error('IDB unavailable'));
 
     const actions = await resolveDetailHeaderActions({ conversation: staleConversation, port });
     const action = byId(actions, 'open-in-notion');
     expect(action?.href).toBe('https://app.notion.com/p/stale-workspace/0123456789abcdef0123456789abcdef');
 
     getConversationByIdMock.mockResolvedValue(freshConversation);
-    await action?.onTrigger();
+    await expect(action?.onTrigger()).rejects.toThrow('IDB unavailable');
 
     expect(getConversationByIdMock).toHaveBeenCalledWith(627);
-    expect(port.openExternalUrl).toHaveBeenCalledWith(
-      'https://app.notion.com/p/fresh-workspace/aaaaaaaabbbbccccddddeeeeeeeeeeee',
-    );
-    expect(port.openExternalUrl).not.toHaveBeenCalledWith(action?.href);
+    expect(port.openExternalUrl).not.toHaveBeenCalled();
   });
 
   it('does not combine Notion metadata from a fresh conversation with a different mapped target', async () => {
