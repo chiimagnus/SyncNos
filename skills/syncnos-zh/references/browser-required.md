@@ -15,4 +15,3 @@ registration 健康但 `doctor` 仍为 `extension_unreachable` 时，在目标�
 ## OAuth / Device Flow
 
 认证从 CLI 开始，浏览器只处理必须的用户批准：Notion/飞书完成授权后回到 `auth status`；GitHub 可向用户展示 CLI 返回的 `verificationUri` 和 `userCode`，批准后按 `poll` / status 继续。不要读取或暴露 access/refresh token、client secret、API key、内部 `deviceCode` 等凭据。
-
