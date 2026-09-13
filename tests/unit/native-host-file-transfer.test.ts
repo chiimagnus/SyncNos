@@ -232,7 +232,7 @@ describe('native host file transfer', () => {
   it('streams one input file to the extension with per-chunk ACKs and returns only metadata/stats', async () => {
     const dir = await mkdtemp('/tmp/snh-file-');
     const inputPath = join(dir, 'input.zip');
-    const bytes = Buffer.alloc(contract.fileTransfer.chunkBytes + 7, 0x5a);
+    const bytes = Buffer.alloc(contract.fileTransfer.chunkBytes * 4 + 7, 0x5a);
     await writeFile(inputPath, bytes);
     const written: any[] = [];
     let protocol: ReturnType<typeof createNativeHostProtocol>;
@@ -272,7 +272,16 @@ describe('native host file transfer', () => {
       data: { conversationsAdded: 2, path: inputPath, byteSize: bytes.length, sha256: sha256(bytes) },
     });
     const chunks = written.filter((frame) => frame.kind === contract.frames.fileChunk);
-    expect(chunks).toHaveLength(2);
+    expect(bytes.length).toBeGreaterThan(1024 * 1024);
+    expect(chunks).toHaveLength(5);
+    expect(chunks.map((frame) => frame.seq)).toEqual([0, 1, 2, 3, 4]);
+    expect(chunks.map((frame) => Buffer.from(frame.data, 'base64').length)).toEqual([
+      contract.fileTransfer.chunkBytes,
+      contract.fileTransfer.chunkBytes,
+      contract.fileTransfer.chunkBytes,
+      contract.fileTransfer.chunkBytes,
+      7,
+    ]);
     expect(Buffer.concat(chunks.map((frame) => Buffer.from(frame.data, 'base64')))).toEqual(bytes);
     expect(written.find((frame) => frame.kind === contract.frames.fileBegin)).toMatchObject({
       direction: 'host-to-extension',

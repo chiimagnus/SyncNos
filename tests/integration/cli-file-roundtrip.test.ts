@@ -23,9 +23,12 @@ function linkedBridge() {
   let extensionMessageListener: ((message: unknown) => void) | null = null;
   let extensionDisconnectListener: (() => void) | null = null;
   let host: ReturnType<typeof createNativeHostProtocol>;
+  const extensionPosted: any[] = [];
+  const hostPosted: any[] = [];
 
   const port = {
     postMessage(message: unknown) {
+      extensionPosted.push(message);
       queueMicrotask(() => {
         void host.handleMessage(message);
       });
@@ -47,6 +50,7 @@ function linkedBridge() {
 
   host = createNativeHostProtocol({
     write: async (frame: unknown) => {
+      hostPosted.push(frame);
       extensionMessageListener?.(frame);
     },
     requestTimeoutMs: 1000,
@@ -69,7 +73,7 @@ function linkedBridge() {
     },
   );
 
-  return { host, controller };
+  return { host, controller, extensionPosted, hostPosted };
 }
 
 beforeEach(() => {
@@ -80,7 +84,7 @@ describe('CLI file transfer host/extension roundtrip', () => {
   it('round-trips extension export bytes to a host file using the canonical frame contract', async () => {
     const dir = await mkdtemp('/tmp/syncnos-roundtrip-');
     const outputPath = join(dir, 'selected.zip');
-    const payload = new TextEncoder().encode('roundtrip-export');
+    const payload = Buffer.alloc(contract.fileTransfer.chunkBytes * 4 + 17, 0x45);
     fileMocks.prepareMarkdownExport.mockResolvedValue({
       blob: new Blob([payload]),
       suggestedFilename: 'selected.zip',
@@ -99,7 +103,11 @@ describe('CLI file transfer host/extension roundtrip', () => {
         ok: true,
         data: { format: 'markdown', conversationCount: 1, path: outputPath, byteSize: payload.length },
       });
-      expect(await readFile(outputPath)).toEqual(Buffer.from(payload));
+      expect(payload.length).toBeGreaterThan(1024 * 1024);
+      expect(await readFile(outputPath)).toEqual(payload);
+      const chunks = linked.extensionPosted.filter((frame) => frame.kind === contract.frames.fileChunk);
+      expect(chunks).toHaveLength(5);
+      expect(chunks.map((frame) => frame.seq)).toEqual([0, 1, 2, 3, 4]);
       expect(fileMocks.prepareMarkdownExport).toHaveBeenCalledWith([7]);
     } finally {
       linked.controller.stop();
@@ -110,7 +118,7 @@ describe('CLI file transfer host/extension roundtrip', () => {
   it('round-trips a host backup file into the extension importer without host-side ZIP interpretation', async () => {
     const dir = await mkdtemp('/tmp/syncnos-roundtrip-');
     const inputPath = join(dir, 'restore.zip');
-    const payload = Buffer.from('opaque-zip-payload');
+    const payload = Buffer.alloc(contract.fileTransfer.chunkBytes * 4 + 23, 0x5a);
     await writeFile(inputPath, payload);
     fileMocks.importBackupBlob.mockImplementation(async (blob: Blob) => {
       expect(Buffer.from(await blob.arrayBuffer())).toEqual(payload);
@@ -125,8 +133,12 @@ describe('CLI file transfer host/extension roundtrip', () => {
         ok: true,
         data: { path: inputPath, byteSize: payload.length, conversationsAdded: 2, messagesAdded: 3 },
       });
+      expect(payload.length).toBeGreaterThan(1024 * 1024);
       expect(fileMocks.importBackupBlob).toHaveBeenCalledTimes(1);
       expect(contract.fileTransfer.chunkBytes).toBe(256 * 1024);
+      const chunks = linked.hostPosted.filter((frame) => frame.kind === contract.frames.fileChunk);
+      expect(chunks).toHaveLength(5);
+      expect(chunks.map((frame) => frame.seq)).toEqual([0, 1, 2, 3, 4]);
     } finally {
       linked.controller.stop();
       linked.host.close();
