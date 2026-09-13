@@ -1,7 +1,9 @@
 import contract from '@services/protocols/cli-rpc-contract.json';
 import {
+  COMMENTS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   DATA_REVISION_MESSAGE_TYPES,
+  ITEM_MENTION_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -50,6 +52,12 @@ const NATIVE_HOST_NAME = contract.nativeHostName;
 const HOST_TO_EXTENSION_MAX_BYTES = contract.nativeMessaging.hostToExtensionMaxBytes;
 const EXTENSION_TO_HOST_MAX_BYTES = contract.nativeMessaging.extensionToHostMaxBytes;
 const PUBLIC_METHODS = new Set<string>(contract.publicMethods);
+const COMMENT_INVARIANT_CODES = new Set([
+  'parent_not_found',
+  'parent_not_root',
+  'parent_context_mismatch',
+  'conversation_not_found',
+]);
 
 function serializedByteLength(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
@@ -184,6 +192,14 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       );
       return false;
     };
+    const postCommentResult = (result: any) => {
+      const invariantCode = String(result?.error?.message || '').trim();
+      if (result?.ok !== true && COMMENT_INVARIANT_CODES.has(invariantCode)) {
+        safePost(currentPort, response(requestId, false, null, invariantCode, invariantCode));
+        return false;
+      }
+      return postBackgroundResult(result);
+    };
 
     if (method === 'revision.get') {
       const result = await router.dispatch({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT }, null);
@@ -309,7 +325,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       return;
     }
 
-    const resolveConversation = async (conversationIdValue: unknown) => {
+    const resolveArticleConversation = async (conversationIdValue: unknown) => {
       const conversationId = Number(conversationIdValue);
       const result = await router.dispatch({ type: CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, conversationId }, null);
       if (result?.ok !== true) {
@@ -320,11 +336,41 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         safePost(currentPort, response(requestId, false, null, 'not_found', 'Conversation not found'));
         return null;
       }
+      if (
+        String(result.data?.sourceType || '')
+          .trim()
+          .toLowerCase() !== 'article'
+      ) {
+        safePost(
+          currentPort,
+          response(requestId, false, null, 'not_article_conversation', 'Conversation is not an article'),
+        );
+        return null;
+      }
       return result.data;
     };
 
-    if (method === 'comments.list' || method === 'comments.add' || method === 'comments.reply') {
-      const conversation = await resolveConversation(params.conversationId);
+    if (method === 'comments.list') {
+      const conversation = await resolveArticleConversation(params.conversationId);
+      if (!conversation) return;
+      const result = await router.dispatch(
+        {
+          type: COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS,
+          conversationId: Number(conversation.id),
+        },
+        null,
+      );
+      postCommentResult(result);
+      return;
+    }
+
+    if (method === 'comments.add' || method === 'comments.reply') {
+      const text = String(params.text || '').trim();
+      if (!text) {
+        safePost(currentPort, response(requestId, false, null, 'invalid_argument', 'Comment text is required'));
+        return;
+      }
+      const conversation = await resolveArticleConversation(params.conversationId);
       if (!conversation) return;
       const canonicalUrl = canonicalizeArticleUrl(conversation.url);
       if (!canonicalUrl) {
@@ -334,45 +380,38 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         );
         return;
       }
-      const type = method === 'comments.list' ? 'listArticleComments' : 'addArticleComment';
       const result = await router.dispatch(
         {
-          type,
+          type: COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT,
           conversationId: Number(conversation.id),
           canonicalUrl,
-          url: canonicalUrl,
-          ...(method === 'comments.list'
-            ? null
-            : {
-                commentText: String(params.text || '').trim(),
-                text: String(params.text || '').trim(),
-                ...(method === 'comments.reply' ? { parentId: Number(params.parentId) } : null),
-              }),
+          quoteText: '',
+          commentText: text,
+          locator: null,
+          ...(method === 'comments.reply' ? { parentId: Number(params.parentId) } : null),
         },
         null,
       );
-      postBackgroundResult(result);
+      postCommentResult(result);
       return;
     }
 
     if (method === 'comments.delete') {
       const result = await router.dispatch(
         {
-          type: 'deleteArticleComment',
-          conversationId: Number(params.conversationId),
-          commentId: Number(params.commentId),
+          type: COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT,
           id: Number(params.commentId),
         },
         null,
       );
-      postBackgroundResult(result);
+      postCommentResult(result);
       return;
     }
 
     if (method === 'mention.search') {
       const result = await router.dispatch(
         {
-          type: 'searchItemMentionCandidates',
+          type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES,
           query: String(params.query || ''),
           limit: params.limit,
         },
@@ -385,7 +424,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     if (method === 'mention.build-insert-text') {
       const result = await router.dispatch(
         {
-          type: 'buildItemMentionInsertText',
+          type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT,
           conversationId: Number(params.conversationId),
         },
         null,

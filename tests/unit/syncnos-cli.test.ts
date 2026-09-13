@@ -566,7 +566,7 @@ describe('syncnos CLI instance selection', () => {
       },
     });
     try {
-      const add = await run(['comments', 'add', '7', 'plain', 'root'], runtimeRoot, homeDir);
+      const add = await run(['comments', 'add', '7', '--text', 'plain root'], runtimeRoot, homeDir);
       expect(add.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({
         method: 'comments.add',
@@ -574,7 +574,7 @@ describe('syncnos CLI instance selection', () => {
       });
       expect(JSON.stringify(instance.requests.at(-1))).not.toContain('locator');
 
-      const reply = await run(['comments', 'reply', '7', '3', 'plain', 'reply'], runtimeRoot, homeDir);
+      const reply = await run(['comments', 'reply', '7', '3', '--text', 'plain reply'], runtimeRoot, homeDir);
       expect(reply.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({
         method: 'comments.reply',
@@ -582,20 +582,31 @@ describe('syncnos CLI instance selection', () => {
       });
       expect(JSON.stringify(instance.requests.at(-1))).not.toContain('locator');
 
-      const del = await run(['comments', 'delete', '7', '9'], runtimeRoot, homeDir);
+      const del = await run(['comments', 'delete', '9'], runtimeRoot, homeDir);
       expect(del.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({
         method: 'comments.delete',
-        params: { conversationId: 7, commentId: 9 },
+        params: { commentId: 9 },
       });
 
-      const mentionSearch = await run(['mention', 'search', 'mcp', '--limit', '20'], runtimeRoot, homeDir);
-      expect(mentionSearch.exitCode).toBe(0);
-      expect(instance.requests.at(-1)).toEqual({ method: 'mention.search', params: { query: 'mcp', limit: 20 } });
+      const mentionRecent = await run(['mention', 'search', '--limit', '20'], runtimeRoot, homeDir);
+      expect(mentionRecent.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'mention.search', params: { query: '', limit: 20 } });
 
-      const mentionInsert = await run(['mention', 'insert', '42'], runtimeRoot, homeDir);
-      expect(mentionInsert.exitCode).toBe(0);
+      const mentionSearch = await run(['mention', 'search', 'mcp', '--limit', '50'], runtimeRoot, homeDir);
+      expect(mentionSearch.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'mention.search', params: { query: 'mcp', limit: 50 } });
+
+      const mentionBuild = await run(['mention', 'build', '42'], runtimeRoot, homeDir);
+      expect(mentionBuild.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({ method: 'mention.build-insert-text', params: { conversationId: 42 } });
+
+      const beforeLegacyForms = instance.requests.length;
+      expect((await run(['comments', 'add', '7', 'legacy', 'text'], runtimeRoot, homeDir)).exitCode).toBe(2);
+      expect((await run(['comments', 'delete', '7', '9'], runtimeRoot, homeDir)).exitCode).toBe(2);
+      expect((await run(['mention', 'insert', '42'], runtimeRoot, homeDir)).exitCode).toBe(2);
+      expect((await run(['comments', 'add', '7', '--locator', '{}'], runtimeRoot, homeDir)).exitCode).toBe(2);
+      expect(instance.requests.length).toBe(beforeLegacyForms);
     } finally {
       await instance.stop();
     }

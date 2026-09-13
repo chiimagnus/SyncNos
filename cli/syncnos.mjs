@@ -50,6 +50,7 @@ function parseArgs(argv) {
     after: null,
     before: null,
     mergeConflict: false,
+    text: null,
     positionals: [],
     provided: new Set(),
   };
@@ -113,6 +114,11 @@ function parseArgs(argv) {
     if (token === '--merge-conflict') {
       options.mergeConflict = true;
       options.provided.add('mergeConflict');
+      continue;
+    }
+    if (token === '--text') {
+      options.text = readValue(token);
+      options.provided.add('text');
       continue;
     }
     if (String(token || '').startsWith('--')) throw codedError('usage_error', `Unknown argument: ${token}`, EXIT.usage);
@@ -349,11 +355,11 @@ function usage() {
     '  backfill-images <conversation-id>',
     '  capture',
     '  comments list <conversation-id>',
-    '  comments add <conversation-id> <text...>',
-    '  comments reply <conversation-id> <parent-id> <text...>',
-    '  comments delete <conversation-id> <comment-id>',
-    '  mention search <query...> [--limit <n>]',
-    '  mention insert <conversation-id>',
+    '  comments add <conversation-id> --text <text>',
+    '  comments reply <conversation-id> <parent-id> --text <text>',
+    '  comments delete <comment-id>',
+    '  mention search [query...] [--limit <n>]',
+    '  mention build <conversation-id>',
     '  doctor [--human]',
   ].join('\n');
 }
@@ -560,9 +566,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     }
 
     if (options.command === 'comments') {
-      assertAllowedOptions(options, new Set(['instance', 'human']));
       const action = String(options.positionals[0] || '');
       if (action === 'list') {
+        assertAllowedOptions(options, new Set(['instance', 'human']));
         if (options.positionals.length !== 2)
           throw codedError('usage_error', 'comments list requires one conversation id', EXIT.usage);
         const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
@@ -572,10 +578,11 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       if (action === 'add') {
-        if (options.positionals.length < 3)
-          throw codedError('usage_error', 'comments add requires a conversation id and text', EXIT.usage);
+        assertAllowedOptions(options, new Set(['instance', 'human', 'text']));
+        if (options.positionals.length !== 2)
+          throw codedError('usage_error', 'comments add requires one conversation id and --text', EXIT.usage);
         const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
-        const text = options.positionals.slice(2).join(' ').trim();
+        const text = String(options.text || '').trim();
         if (!text) throw codedError('usage_error', 'comment text is required', EXIT.usage);
         const { selected } = await selectedInstance(options, context);
         const result = await requestSelected(selected, 'comments.add', { conversationId, text });
@@ -583,12 +590,13 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       if (action === 'reply') {
-        if (options.positionals.length < 4) {
-          throw codedError('usage_error', 'comments reply requires conversation id, parent id, and text', EXIT.usage);
+        assertAllowedOptions(options, new Set(['instance', 'human', 'text']));
+        if (options.positionals.length !== 3) {
+          throw codedError('usage_error', 'comments reply requires conversation id, parent id, and --text', EXIT.usage);
         }
         const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
         const parentId = parsePositiveInteger(options.positionals[2], 'parent comment id');
-        const text = options.positionals.slice(3).join(' ').trim();
+        const text = String(options.text || '').trim();
         if (!text) throw codedError('usage_error', 'reply text is required', EXIT.usage);
         const { selected } = await selectedInstance(options, context);
         const result = await requestSelected(selected, 'comments.reply', { conversationId, parentId, text });
@@ -596,13 +604,13 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       if (action === 'delete') {
-        if (options.positionals.length !== 3) {
-          throw codedError('usage_error', 'comments delete requires conversation id and comment id', EXIT.usage);
+        assertAllowedOptions(options, new Set(['instance', 'human']));
+        if (options.positionals.length !== 2) {
+          throw codedError('usage_error', 'comments delete requires one comment id', EXIT.usage);
         }
-        const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
-        const commentId = parsePositiveInteger(options.positionals[2], 'comment id');
+        const commentId = parsePositiveInteger(options.positionals[1], 'comment id');
         const { selected } = await selectedInstance(options, context);
-        const result = await requestSelected(selected, 'comments.delete', { conversationId, commentId });
+        const result = await requestSelected(selected, 'comments.delete', { commentId });
         writeResult(stdout, envelopeOk(result), options.human);
         return EXIT.success;
       }
@@ -614,24 +622,23 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
       if (action === 'search') {
         assertAllowedOptions(options, new Set(['instance', 'human', 'limit']));
         const query = options.positionals.slice(1).join(' ').trim();
-        if (!query) throw codedError('usage_error', 'mention search requires a query', EXIT.usage);
-        const limit = options.limit == null ? undefined : parsePositiveInteger(options.limit, 'limit', { max: 100 });
+        const limit = options.limit == null ? undefined : parsePositiveInteger(options.limit, 'limit', { max: 50 });
         const { selected } = await selectedInstance(options, context);
         const result = await requestSelected(selected, 'mention.search', { query, limit });
         writeResult(stdout, envelopeOk(result), options.human);
         return EXIT.success;
       }
-      if (action === 'insert') {
+      if (action === 'build') {
         assertAllowedOptions(options, new Set(['instance', 'human']));
         if (options.positionals.length !== 2)
-          throw codedError('usage_error', 'mention insert requires one conversation id', EXIT.usage);
+          throw codedError('usage_error', 'mention build requires one conversation id', EXIT.usage);
         const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
         const { selected } = await selectedInstance(options, context);
         const result = await requestSelected(selected, 'mention.build-insert-text', { conversationId });
         writeResult(stdout, envelopeOk(result), options.human);
         return EXIT.success;
       }
-      throw codedError('usage_error', 'mention action must be search or insert', EXIT.usage);
+      throw codedError('usage_error', 'mention action must be search or build', EXIT.usage);
     }
 
     if (options.command === 'stats') {

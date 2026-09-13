@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { startCliNativeBridge } from '@services/cli/native-bridge';
 import {
+  COMMENTS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   DATA_REVISION_MESSAGE_TYPES,
+  ITEM_MENTION_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 
@@ -420,43 +422,99 @@ describe('CLI Native Messaging bridge', () => {
 
     await emit('c-list', 'comments.list', { conversationId: 7 });
     expect(router.dispatch).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        type: 'listArticleComments',
-        conversationId: 7,
-        canonicalUrl: 'https://example.com/article',
-      }),
+      { type: COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, conversationId: 7 },
       null,
     );
+    expect(router.dispatch.mock.calls.at(-1)?.[0]).not.toHaveProperty('canonicalUrl');
 
     await emit('c-add', 'comments.add', { conversationId: 7, text: 'plain root' });
     const addMessage = router.dispatch.mock.calls.at(-1)?.[0];
-    expect(addMessage).toMatchObject({
-      type: 'addArticleComment',
+    expect(addMessage).toEqual({
+      type: COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT,
       conversationId: 7,
       canonicalUrl: 'https://example.com/article',
+      quoteText: '',
       commentText: 'plain root',
+      locator: null,
     });
-    expect(addMessage).not.toHaveProperty('locator');
 
     await emit('c-reply', 'comments.reply', { conversationId: 7, parentId: 3, text: 'plain reply' });
     const replyMessage = router.dispatch.mock.calls.at(-1)?.[0];
-    expect(replyMessage).toMatchObject({
-      type: 'addArticleComment',
+    expect(replyMessage).toEqual({
+      type: COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT,
       conversationId: 7,
-      parentId: 3,
+      canonicalUrl: 'https://example.com/article',
+      quoteText: '',
       commentText: 'plain reply',
+      locator: null,
+      parentId: 3,
     });
-    expect(replyMessage).not.toHaveProperty('locator');
 
-    await emit('c-delete', 'comments.delete', { conversationId: 7, commentId: 9 });
+    const callsBeforeDelete = router.dispatch.mock.calls.length;
+    await emit('c-delete', 'comments.delete', { commentId: 9 });
+    expect(router.dispatch.mock.calls.length).toBe(callsBeforeDelete + 1);
     expect(router.dispatch).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: 'deleteArticleComment', conversationId: 7, commentId: 9 }),
+      { type: COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, id: 9 },
       null,
     );
     harness.controller.stop();
   });
 
-  it('maps mention search/build to the existing bounded mention handlers', async () => {
+  it('preserves comment domain failures and rejects non-article or invalid comment input before mutation', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        if (message.type === CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID) {
+          if (message.conversationId === 8) {
+            return { ok: true, data: { id: 8, sourceType: 'chat', url: 'https://example.com/chat' }, error: null };
+          }
+          if (message.conversationId === 9) {
+            return { ok: true, data: { id: 9, sourceType: 'article', url: 'not-a-url' }, error: null };
+          }
+          return {
+            ok: true,
+            data: { id: message.conversationId, sourceType: 'article', url: 'https://example.com/article' },
+            error: null,
+          };
+        }
+        if (message.type === COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT && message.parentId === 3) {
+          return { ok: false, data: null, error: { message: 'parent_not_root', extra: null } };
+        }
+        return { ok: true, data: {}, error: null };
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    const emit = async (requestId: string, method: string, params: Record<string, unknown>) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    expect(await emit('empty-comment', 'comments.add', { conversationId: 7, text: '   ' })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument' },
+    });
+    expect(router.dispatch).not.toHaveBeenCalled();
+
+    expect(await emit('not-article', 'comments.add', { conversationId: 8, text: 'hello' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_article_conversation' },
+    });
+    expect(await emit('bad-url', 'comments.add', { conversationId: 9, text: 'hello' })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_conversation_url' },
+    });
+    expect(await emit('bad-parent', 'comments.reply', { conversationId: 7, parentId: 3, text: 'reply' })).toMatchObject(
+      {
+        ok: false,
+        error: { code: 'parent_not_root' },
+      },
+    );
+    harness.controller.stop();
+  });
+
+  it('maps empty/non-empty mention search and build to the existing bounded mention handlers', async () => {
     const router = {
       dispatch: vi.fn(async (message: any) => ({ ok: true, data: { type: message.type }, error: null })),
     };
@@ -471,19 +529,35 @@ describe('CLI Native Messaging bridge', () => {
     });
     await waitForPosted(harness, 2);
     expect(router.dispatch).toHaveBeenCalledWith(
-      { type: 'searchItemMentionCandidates', query: 'mcp', limit: 20 },
+      { type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, query: 'mcp', limit: 20 },
       null,
     );
 
     harness.fakePort.emitMessage({
       kind: 'rpc-request',
       protocolVersion: 1,
-      requestId: 'mention-insert',
+      requestId: 'mention-recent',
+      method: 'mention.search',
+      params: { query: '', limit: 10 },
+    });
+    await waitForPosted(harness, 3);
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, query: '', limit: 10 },
+      null,
+    );
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'mention-build',
       method: 'mention.build-insert-text',
       params: { conversationId: 42 },
     });
-    await waitForPosted(harness, 3);
-    expect(router.dispatch).toHaveBeenCalledWith({ type: 'buildItemMentionInsertText', conversationId: 42 }, null);
+    await waitForPosted(harness, 4);
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, conversationId: 42 },
+      null,
+    );
     harness.controller.stop();
   });
 
