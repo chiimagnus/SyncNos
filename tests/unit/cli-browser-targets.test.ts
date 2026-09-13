@@ -80,27 +80,28 @@ describe('CLI browser target catalog', () => {
   });
 
   it('keeps dedicated macOS and Linux long-tail registration paths', () => {
+    const linux = { platform: 'linux' as const, homeDir: '/home/example', env: {} };
     expect(
       resolveBrowserTarget('chrome-for-testing', { platform: 'darwin', homeDir: '/Users/example' }).manifestPath,
     ).toBe(
       '/Users/example/Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts/app.syncnos.cli.json',
     );
-    expect(
-      resolveBrowserTarget('chrome-for-testing', { platform: 'linux', homeDir: '/home/example' }).manifestPath,
-    ).toBe('/home/example/.config/google-chrome-for-testing/NativeMessagingHosts/app.syncnos.cli.json');
+    expect(resolveBrowserTarget('chrome-for-testing', linux).manifestPath).toBe(
+      '/home/example/.config/google-chrome-for-testing/NativeMessagingHosts/app.syncnos.cli.json',
+    );
     expect(resolveBrowserTarget('arc', { platform: 'darwin', homeDir: '/Users/example' }).manifestPath).toBe(
       '/Users/example/Library/Application Support/Arc/User Data/NativeMessagingHosts/app.syncnos.cli.json',
     );
-    expect(resolveBrowserTarget('brave', { platform: 'linux', homeDir: '/home/example' }).manifestPath).toBe(
+    expect(resolveBrowserTarget('brave', linux).manifestPath).toBe(
       '/home/example/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/app.syncnos.cli.json',
     );
-    expect(resolveBrowserTarget('vivaldi', { platform: 'linux', homeDir: '/home/example' }).manifestPath).toBe(
+    expect(resolveBrowserTarget('vivaldi', linux).manifestPath).toBe(
       '/home/example/.config/vivaldi/NativeMessagingHosts/app.syncnos.cli.json',
     );
-    expect(resolveBrowserTarget('librewolf', { platform: 'linux', homeDir: '/home/example' }).manifestPath).toBe(
+    expect(resolveBrowserTarget('librewolf', linux).manifestPath).toBe(
       '/home/example/.librewolf/native-messaging-hosts/app.syncnos.cli.json',
     );
-    expect(resolveBrowserTarget('waterfox', { platform: 'linux', homeDir: '/home/example' }).manifestPath).toBe(
+    expect(resolveBrowserTarget('waterfox', linux).manifestPath).toBe(
       '/home/example/.waterfox/native-messaging-hosts/app.syncnos.cli.json',
     );
   });
@@ -109,6 +110,7 @@ describe('CLI browser target catalog', () => {
     const target = resolveBrowserTarget('chrome-for-testing', {
       platform: 'linux',
       homeDir: '/home/example',
+      env: {},
     });
     expect(target.manifestPath).toBe(
       '/home/example/.config/google-chrome-for-testing/NativeMessagingHosts/app.syncnos.cli.json',

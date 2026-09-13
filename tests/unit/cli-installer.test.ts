@@ -49,9 +49,9 @@ describe('macOS CLI native host installer', () => {
 
   it('resolves exact Chrome/Firefox production manifests and never mixes allowlist fields', async () => {
     const homeDir = await tempHome();
-    const launcherPath = resolveCliSupportPaths({ homeDir }).launcherPath;
-    const chrome = resolveBrowserTarget('chrome', { homeDir });
-    const firefox = resolveBrowserTarget('firefox', { homeDir });
+    const launcherPath = resolveCliSupportPaths({ platform: 'darwin', homeDir }).launcherPath;
+    const chrome = resolveBrowserTarget('chrome', { platform: 'darwin', homeDir });
+    const firefox = resolveBrowserTarget('firefox', { platform: 'darwin', homeDir });
 
     expect(chrome.manifestPath).toBe(
       join(homeDir, 'Library/Application Support/Google/Chrome/NativeMessagingHosts', NATIVE_HOST_MANIFEST_FILENAME),
@@ -85,7 +85,7 @@ describe('macOS CLI native host installer', () => {
     expect(mode(await lstat(first.manifestPath))).toBe(0o600);
     expect((await readFile(first.launcherPath, 'utf8')).startsWith('#!/bin/sh\nexec ')).toBe(true);
     expect(await readJson(first.manifestPath)).toEqual(
-      buildNativeHostManifest(resolveBrowserTarget('chrome', { homeDir }), first.launcherPath),
+      buildNativeHostManifest(resolveBrowserTarget('chrome', { platform: 'darwin', homeDir }), first.launcherPath),
     );
 
     const fakeDir = await mkdtemp(join(tmpdir(), "syncnos-upgrade-'"));
@@ -165,7 +165,9 @@ describe('macOS CLI native host installer', () => {
     const firefoxRemoved = await uninstallNativeHost({ browser: 'firefox', homeDir, platform: 'darwin' });
     expect(firefoxRemoved.launcherRemoved).toBe(true);
     await expect(lstat(firefox.launcherPath)).rejects.toMatchObject({ code: 'ENOENT' });
-    await expect(lstat(resolveCliSupportPaths({ homeDir }).supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(lstat(resolveCliSupportPaths({ platform: 'darwin', homeDir }).supportDir)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('uninstall without --browser removes every declared browser manifest and then the shared launcher', async () => {
@@ -223,7 +225,7 @@ describe('macOS CLI native host installer', () => {
 
   it('fails closed for relative launcher inputs and reports non-canonical file modes', async () => {
     const homeDir = await tempHome();
-    const chrome = resolveBrowserTarget('chrome', { homeDir });
+    const chrome = resolveBrowserTarget('chrome', { platform: 'darwin', homeDir });
     expect(() => buildNativeHostManifest(chrome, 'relative/native-host')).toThrow(/must be absolute/);
     await expect(
       installNativeHost({ browser: 'chrome', homeDir, platform: 'darwin', nodePath: 'node' }),
