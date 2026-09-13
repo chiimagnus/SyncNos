@@ -72,6 +72,20 @@ describe('local markdown export', () => {
     expect(mocks.createZipBlob).not.toHaveBeenCalled();
   });
 
+  it('uses an explicitly injected detail loader instead of the runtime client', async () => {
+    const c = conversation(1, 'One');
+    const loadConversationDetail = vi.fn(async () => ({
+      conversationId: 1,
+      messages: [{ messageKey: 'article_body', role: 'assistant', contentMarkdown: 'Body' }],
+    }));
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+
+    await buildConversationsMarkdownZipExport({ conversations: [c], loadConversationDetail });
+
+    expect(loadConversationDetail).toHaveBeenCalledWith(1);
+    expect(mocks.getConversationDetail).not.toHaveBeenCalled();
+  });
+
   it('uses one scoped batch read and safely degrades unavailable internal images', async () => {
     const c = conversation(1, 'One');
     const source = [

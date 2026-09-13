@@ -13,7 +13,7 @@ import {
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
-import { buildBackupV2FixtureEntries } from '../helpers/backup-v2-fixture';
+import { buildCurrentBackupFixtureEntries } from '../helpers/backup-current-fixture';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -43,7 +43,7 @@ function legacyArticleConversationForImport() {
     url: LEGACY_ARTICLE_URL,
     notionPageId: 'notion-page-legacy',
     warningFlags: ['legacy'],
-    lastCapturedAt: 10,
+    lastActivityAt: 10,
     __canonicalUrl: 'https://stale.example/private',
     __canonicalKey: 'article:https://stale.example/private',
   };
@@ -71,17 +71,23 @@ function legacyArticleZipEntriesForImport(): Map<string, Uint8Array> {
     [
       'manifest.json',
       encode({
-        backupSchemaVersion: 2,
+        backupSchemaVersion: 3,
         exportedAt: '2026-09-03T00:00:00.000Z',
-        db: { name: 'webclipper', version: 10 },
-        counts: { conversations: 1, messages: 0, sync_mappings: 1 },
+        db: { name: 'webclipper', version: 13 },
+        counts: { conversations: 1, messages: 0, sync_mappings: 1, image_cache: 0, article_comments: 0 },
         config: { storageLocalPath: 'config/storage-local.json' },
         index: { conversationsCsvPath: 'sources/conversations.csv' },
         sources: [{ source: LEGACY_ARTICLE_SOURCE, conversationCount: 1, files: [bundlePath] }],
+        assets: {
+          imageCacheIndexPath: 'assets/image-cache/index.json',
+          articleCommentsIndexPath: 'assets/article-comments/index.json',
+        },
       }),
     ],
     ['config/storage-local.json', encode({ schemaVersion: 1, storageLocal: {} })],
     ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+    ['assets/image-cache/index.json', encode({ schemaVersion: 1, assets: [] })],
+    ['assets/article-comments/index.json', encode({ schemaVersion: 2, comments: [] })],
     [
       bundlePath,
       encode({
@@ -100,17 +106,23 @@ function emptyBackupZipEntries(storageLocal: Record<string, unknown> = {}): Map<
     [
       'manifest.json',
       encode({
-        backupSchemaVersion: 2,
+        backupSchemaVersion: 3,
         exportedAt: '2026-09-03T00:00:00.000Z',
-        db: { name: 'webclipper', version: 12 },
-        counts: { conversations: 0, messages: 0, sync_mappings: 0 },
+        db: { name: 'webclipper', version: 13 },
+        counts: { conversations: 0, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
         config: { storageLocalPath: 'config/storage-local.json' },
         index: { conversationsCsvPath: 'sources/conversations.csv' },
         sources: [],
+        assets: {
+          imageCacheIndexPath: 'assets/image-cache/index.json',
+          articleCommentsIndexPath: 'assets/article-comments/index.json',
+        },
       }),
     ],
     ['config/storage-local.json', encode({ schemaVersion: 1, storageLocal })],
     ['sources/conversations.csv', new TextEncoder().encode('source,conversationKey\n')],
+    ['assets/image-cache/index.json', encode({ schemaVersion: 1, assets: [] })],
+    ['assets/article-comments/index.json', encode({ schemaVersion: 2, comments: [] })],
   ]);
 }
 
@@ -247,25 +259,23 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
-  it('canonicalizes post-v11 ZIP v2 legacy article identity at the import boundary', async () => {
+  it('canonicalizes legacy article identity inside the current ZIP schema at the import boundary', async () => {
     await importBackupZipMerge(legacyArticleZipEntriesForImport());
     await assertLegacyArticleImportUsesCanonicalIdentityImmediately();
   });
 
-  it('does not require the conversations CSV entry for bounded ZIP v2 compatibility', async () => {
+  it('requires the declared conversations CSV entry for the current ZIP schema', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    const { entries, expected } = buildBackupV2FixtureEntries();
+    const { entries, expected } = buildCurrentBackupFixtureEntries();
     entries.delete('sources/conversations.csv');
 
-    const stats = await importBackupZipMerge(entries);
-
-    expect(stats.conversationsAdded).toBe(expected.counts.conversations);
-    expect(stats.messagesAdded).toBe(expected.counts.messages);
+    await expect(importBackupZipMerge(entries)).rejects.toThrow('Missing entry: sources/conversations.csv');
+    expect(expected.counts.conversations).toBeGreaterThan(0);
   });
 
   it('restores canonical ZIP display settings as one logical setting', async () => {
@@ -423,6 +433,26 @@ describe('backup service', () => {
           nextPollAt: 6_000,
         },
       },
+      reader_prefs_v1: {
+        fontFamily: 'mono',
+        fontSize: 26,
+        lineHeight: 1.8,
+        contentWidth: 1200,
+        letterSpacing: 0.02,
+        textAlign: 'justify',
+        tts: {
+          engine: 'ai',
+          rate: 1.3,
+          webVoiceURI: 'voice://portable',
+          aiEndpoint: 'https://tts.example/v1',
+          aiApiKey: 'EXPORT_READER_SECRET',
+          aiModel: 'portable-model',
+          aiVoice: 'portable-voice',
+          aiFormat: 'mp3',
+        },
+      },
+      syncnos_cli_instance_id_v1: 'browser-a-instance',
+      syncnos_cli_integration_enabled_v1: true,
     });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -529,7 +559,16 @@ describe('backup service', () => {
       github_branch: 'main',
     });
     expect(config.storageLocal.github_auth_state_v1).toBeUndefined();
+    expect(config.storageLocal.syncnos_cli_instance_id_v1).toBeUndefined();
+    expect(config.storageLocal.syncnos_cli_integration_enabled_v1).toBeUndefined();
+    expect(config.storageLocal.reader_prefs_v1).toMatchObject({
+      fontFamily: 'mono',
+      fontSize: 26,
+      tts: { engine: 'ai', rate: 1.3, aiModel: 'portable-model', aiVoice: 'portable-voice', aiFormat: 'mp3' },
+    });
+    expect(config.storageLocal.reader_prefs_v1.tts.aiApiKey).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain('DEVICE_SENTINEL_SECRET');
+    expect(JSON.stringify(config)).not.toContain('EXPORT_READER_SECRET');
 
     const bundlePath = manifest.sources[0].files[0];
     const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
@@ -557,6 +596,24 @@ describe('backup service', () => {
     chromeMock.__store.feishu_oauth_client_secret = 'browser-b-feishu-secret';
     chromeMock.__store.feishu_oauth_pending_state = 'browser-b-feishu-pending';
     chromeMock.__store.feishu_oauth_last_error = 'browser-b-feishu-error';
+    chromeMock.__store.reader_prefs_v1 = {
+      fontFamily: 'serif',
+      fontSize: 18,
+      lineHeight: 1.5,
+      contentWidth: 900,
+      letterSpacing: 0,
+      textAlign: 'left',
+      tts: {
+        engine: 'web',
+        rate: 1,
+        webVoiceURI: 'voice://target',
+        aiEndpoint: 'http://localhost:8880/v1',
+        aiApiKey: 'TARGET_READER_SECRET',
+        aiModel: 'target-model',
+        aiVoice: 'target-voice',
+        aiFormat: 'opus',
+      },
+    };
     delete chromeMock.__store.feishu_oauth_client_id;
     delete chromeMock.__store.feishu_oauth_token_exchange_proxy_url;
     delete chromeMock.__store.feishu_chat_folder;
@@ -597,6 +654,19 @@ describe('backup service', () => {
       feishu_chat_folder: 'AIChats',
     });
     expect(chromeMock.__store.feishu_oauth_pending_state).toBe('');
+    expect(chromeMock.__store.reader_prefs_v1).toMatchObject({
+      fontFamily: 'mono',
+      fontSize: 26,
+      contentWidth: 1200,
+      tts: {
+        engine: 'ai',
+        rate: 1.3,
+        aiApiKey: 'TARGET_READER_SECRET',
+        aiModel: 'portable-model',
+        aiVoice: 'portable-voice',
+        aiFormat: 'mp3',
+      },
+    });
     expect(
       chromeMock.__runtimeMessages.some((message: any) => message?.type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG),
     ).toBe(false);
@@ -896,7 +966,7 @@ describe('backup service', () => {
   });
 
   it('merges imported highlights by source identity when legacy and current representations differ', async () => {
-    const { entries: fixtureEntries } = buildBackupV2FixtureEntries();
+    const { entries: fixtureEntries } = buildCurrentBackupFixtureEntries();
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const buildEntries = (
@@ -1543,14 +1613,17 @@ describe('backup service', () => {
     const enc = new TextEncoder();
     const files = ['sources/web/a.json', 'sources/web/b.json'];
     const manifest = {
-      backupSchemaVersion: 2,
+      backupSchemaVersion: 3,
       exportedAt: '2026-07-14T00:00:00.000Z',
-      db: { name: 'webclipper', version: 1 },
-      counts: { conversations: 2, messages: 0, sync_mappings: 0, article_comments: 1 },
+      db: { name: 'webclipper', version: 13 },
+      counts: { conversations: 2, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 1 },
       config: { storageLocalPath: 'config/storage-local.json' },
       index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [{ source: 'web', conversationCount: 2, files }],
-      assets: { articleCommentsIndexPath: 'assets/article-comments/index.json' },
+      assets: {
+        imageCacheIndexPath: 'assets/image-cache/index.json',
+        articleCommentsIndexPath: 'assets/article-comments/index.json',
+      },
     };
     const conversation = (conversationKey: string) => ({
       schemaVersion: 1,
@@ -1567,7 +1640,7 @@ describe('backup service', () => {
       syncMapping: null,
     });
     const comments = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       comments: [
         {
           commentId: 1,
@@ -1585,6 +1658,7 @@ describe('backup service', () => {
       ['manifest.json', enc.encode(JSON.stringify(manifest))],
       ['config/storage-local.json', enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
       ['sources/conversations.csv', enc.encode('source,conversationKey\n')],
+      ['assets/image-cache/index.json', enc.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
       [files[0]!, enc.encode(JSON.stringify(conversation('a')))],
       [files[1]!, enc.encode(JSON.stringify(conversation('b')))],
       ['assets/article-comments/index.json', enc.encode(JSON.stringify(comments))],
@@ -1621,18 +1695,24 @@ describe('backup service', () => {
         'manifest.json',
         encoder.encode(
           JSON.stringify({
-            backupSchemaVersion: 2,
+            backupSchemaVersion: 3,
             exportedAt: '2026-08-29T00:00:00.000Z',
-            db: { name: 'webclipper', version: 10 },
-            counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+            db: { name: 'webclipper', version: 13 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
             config: { storageLocalPath: 'config/storage-local.json' },
             index: { conversationsCsvPath: 'sources/conversations.csv' },
             sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+            assets: {
+              imageCacheIndexPath: 'assets/image-cache/index.json',
+              articleCommentsIndexPath: 'assets/article-comments/index.json',
+            },
           }),
         ),
       ],
       ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
       ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      ['assets/image-cache/index.json', encoder.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
+      ['assets/article-comments/index.json', encoder.encode(JSON.stringify({ schemaVersion: 2, comments: [] }))],
       [
         entryPath,
         encoder.encode(
@@ -1667,7 +1747,7 @@ describe('backup service', () => {
     });
   });
 
-  it('applies newer text-only message bodies from historical ZIP backups to canonical Markdown rows', async () => {
+  it('rejects legacy text-only message bodies without partially importing the conversation', async () => {
     const encoder = new TextEncoder();
     const entryPath = 'sources/chatgpt/legacy-text-only.json';
     const buildEntries = (body: string, updatedAt: number) =>
@@ -1676,18 +1756,24 @@ describe('backup service', () => {
           'manifest.json',
           encoder.encode(
             JSON.stringify({
-              backupSchemaVersion: 2,
+              backupSchemaVersion: 3,
               exportedAt: '2026-08-29T00:00:00.000Z',
-              db: { name: 'webclipper', version: 10 },
-              counts: { conversations: 1, messages: 1, sync_mappings: 0 },
+              db: { name: 'webclipper', version: 13 },
+              counts: { conversations: 1, messages: 1, sync_mappings: 0, image_cache: 0, article_comments: 0 },
               config: { storageLocalPath: 'config/storage-local.json' },
               index: { conversationsCsvPath: 'sources/conversations.csv' },
               sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+              assets: {
+                imageCacheIndexPath: 'assets/image-cache/index.json',
+                articleCommentsIndexPath: 'assets/article-comments/index.json',
+              },
             }),
           ),
         ],
         ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
         ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+        ['assets/image-cache/index.json', encoder.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
+        ['assets/article-comments/index.json', encoder.encode(JSON.stringify({ schemaVersion: 2, comments: [] }))],
         [
           entryPath,
           encoder.encode(
@@ -1717,23 +1803,21 @@ describe('backup service', () => {
         ],
       ]);
 
-    const first = await importBackupZipMerge(buildEntries('stable', 10));
-    expect(first).toMatchObject({ messagesAdded: 1, messagesUpdated: 0 });
-
-    const changed = await importBackupZipMerge(buildEntries('changed', 11));
-    expect(changed).toMatchObject({ messagesAdded: 0, messagesUpdated: 1 });
+    await expect(importBackupZipMerge(buildEntries('stable', 10))).rejects.toThrow(
+      'Legacy message contentText is unsupported',
+    );
 
     const db = await openDb();
-    const tx = db.transaction(['messages'], 'readonly');
+    const tx = db.transaction(['conversations', 'messages'], 'readonly');
+    const conversations = await reqToPromise<any[]>(tx.objectStore('conversations').getAll() as any);
     const messages = await reqToPromise<any[]>(tx.objectStore('messages').getAll() as any);
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error);
     });
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toMatchObject({ messageKey: 'm1', contentMarkdown: 'changed', updatedAt: 11 });
-    expect(messages[0]).not.toHaveProperty('contentText');
+    expect(conversations).toEqual([]);
+    expect(messages).toEqual([]);
   });
 
   it('importBackupZipMerge keeps provider states atomic and mirrors the final targets', async () => {
@@ -1842,19 +1926,25 @@ describe('backup service', () => {
     ];
     const files = bundles.map((item) => `sources/chatgpt/${item.key}.json`);
     const manifest = {
-      backupSchemaVersion: 2,
+      backupSchemaVersion: 3,
       exportedAt: '2026-08-21T00:00:00.000Z',
-      db: { name: 'webclipper', version: 8 },
-      counts: { conversations: 2, messages: 0, sync_mappings: 2 },
+      db: { name: 'webclipper', version: 13 },
+      counts: { conversations: 2, messages: 0, sync_mappings: 2, image_cache: 0, article_comments: 0 },
       config: { storageLocalPath: 'config/storage-local.json' },
       index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [{ source: 'chatgpt', conversationCount: 2, files }],
+      assets: {
+        imageCacheIndexPath: 'assets/image-cache/index.json',
+        articleCommentsIndexPath: 'assets/article-comments/index.json',
+      },
     };
     const enc = new TextEncoder();
     const entries = new Map<string, Uint8Array>([
       ['manifest.json', enc.encode(JSON.stringify(manifest))],
       ['config/storage-local.json', enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
       ['sources/conversations.csv', enc.encode('source,conversationKey\n')],
+      ['assets/image-cache/index.json', enc.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
+      ['assets/article-comments/index.json', enc.encode(JSON.stringify({ schemaVersion: 2, comments: [] }))],
     ]);
     bundles.forEach((item, index) => {
       entries.set(

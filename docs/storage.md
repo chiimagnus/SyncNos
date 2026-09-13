@@ -21,7 +21,7 @@
 
 ## Backup ZIP
 
-Backup ZIP 是本地恢复包，不是浏览器数据库文件的物理副本。当前导出使用 canonical `lastActivityAt`；旧 ZIP v2 的 capture-time 字段只在明确的历史恢复边界转换为 Activity，不进入运行时双时间模型。legacy raw JSON backup 不再是受支持的恢复入口。
+Backup ZIP 是本地恢复包，不是浏览器数据库文件的物理副本。当前导出与导入只支持当前 Backup schema，并使用 canonical `lastActivityAt`；旧 ZIP schema 与 legacy raw JSON backup 不再是受支持的恢复入口。
 
 Backup 可以包含：
 

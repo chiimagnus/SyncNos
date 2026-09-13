@@ -9,7 +9,16 @@
     "hello": "hello",
     "helloAck": "hello-ack",
     "rpcRequest": "rpc-request",
-    "rpcResponse": "rpc-response"
+    "rpcResponse": "rpc-response",
+    "fileBegin": "file-begin",
+    "fileChunk": "file-chunk",
+    "fileAck": "file-ack",
+    "fileEnd": "file-end",
+    "fileAbort": "file-abort"
+  },
+  "fileTransfer": {
+    "chunkBytes": 262144,
+    "ackTimeoutMs": 60000
   },
   "publicMethods": [
     "system.ping",
@@ -58,7 +67,11 @@
     "sync.status",
     "settings.schema",
     "settings.get",
-    "settings.set"
+    "settings.set",
+    "export.markdown",
+    "export.json",
+    "backup.export",
+    "backup.import"
   ],
   "browserRequired": []
 }

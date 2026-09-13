@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { resolve as resolvePath } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
@@ -58,6 +59,8 @@ function parseArgs(argv) {
     provider: null,
     noWait: false,
     timeout: null,
+    output: null,
+    force: false,
     positionals: [],
     provided: new Set(),
   };
@@ -156,6 +159,16 @@ function parseArgs(argv) {
     if (token === '--timeout') {
       options.timeout = readValue(token);
       options.provided.add('timeout');
+      continue;
+    }
+    if (token === '--output') {
+      options.output = readValue(token);
+      options.provided.add('output');
+      continue;
+    }
+    if (token === '--force') {
+      options.force = true;
+      options.provided.add('force');
       continue;
     }
     if (String(token || '').startsWith('--')) throw codedError('usage_error', `Unknown argument: ${token}`, EXIT.usage);
@@ -330,6 +343,13 @@ const TRANSPORT_RESPONSE_CODES = new Set([
   'ipc_timeout',
   'ipc_truncated',
   'ipc_message_too_large',
+  'file_transfer_timeout',
+  'file_transfer_closed',
+  'file_transfer_sequence',
+  'file_transfer_hash_mismatch',
+  'file_transfer_size_mismatch',
+  'file_chunk_invalid_base64',
+  'file_transfer_unavailable',
 ]);
 
 async function requestSelected(selected, method, params = {}) {
@@ -502,6 +522,10 @@ function usage() {
     '  settings schema',
     '  settings get [public-key]',
     '  settings set <public-key> <value>',
+    '  export markdown <conversation-id> [...] --output <path> [--force]',
+    '  export json <conversation-id> [...] --output <path> [--force]',
+    '  backup export --output <path> [--force]',
+    '  backup import <path>',
     '  doctor [--human]',
   ].join('\n');
 }
@@ -845,6 +869,64 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       throw codedError('usage_error', 'settings action must be schema, get, or set', EXIT.usage);
+    }
+
+    if (options.command === 'export') {
+      assertAllowedOptions(options, new Set(['instance', 'human', 'output', 'force']));
+      const format = String(options.positionals[0] || '')
+        .trim()
+        .toLowerCase();
+      if (format !== 'markdown' && format !== 'json') {
+        throw codedError('usage_error', 'export format must be markdown or json', EXIT.usage);
+      }
+      if (options.positionals.length < 2) {
+        throw codedError('usage_error', `export ${format} requires at least one conversation id`, EXIT.usage);
+      }
+      if (!options.output) throw codedError('usage_error', 'export requires --output <path>', EXIT.usage);
+      const conversationIds = options.positionals
+        .slice(1)
+        .map((value) => parsePositiveInteger(value, 'conversation id'));
+      const { selected } = await selectedInstance(options, context);
+      const result = await requestSelected(selected, `export.${format}`, {
+        conversationIds,
+        outputPath: resolvePath(options.output),
+        force: options.force === true,
+      });
+      writeResult(stdout, envelopeOk(result), options.human);
+      return EXIT.success;
+    }
+
+    if (options.command === 'backup') {
+      const action = String(options.positionals[0] || '')
+        .trim()
+        .toLowerCase();
+      if (action === 'export') {
+        assertAllowedOptions(options, new Set(['instance', 'human', 'output', 'force']));
+        if (options.positionals.length !== 1) {
+          throw codedError('usage_error', 'backup export accepts no positional path', EXIT.usage);
+        }
+        if (!options.output) throw codedError('usage_error', 'backup export requires --output <path>', EXIT.usage);
+        const { selected } = await selectedInstance(options, context);
+        const result = await requestSelected(selected, 'backup.export', {
+          outputPath: resolvePath(options.output),
+          force: options.force === true,
+        });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+      if (action === 'import') {
+        assertAllowedOptions(options, new Set(['instance', 'human']));
+        if (options.positionals.length !== 2) {
+          throw codedError('usage_error', 'backup import requires exactly one input path', EXIT.usage);
+        }
+        const { selected } = await selectedInstance(options, context);
+        const result = await requestSelected(selected, 'backup.import', {
+          inputPath: resolvePath(options.positionals[1]),
+        });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+      throw codedError('usage_error', 'backup action must be export or import', EXIT.usage);
     }
 
     if (

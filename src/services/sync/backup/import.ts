@@ -1,7 +1,7 @@
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain/article-identity';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
-import { storageSet } from '@platform/storage/local';
+import { storageGet, storageSet } from '@platform/storage/local';
 import { saveFeishuOAuthConfig } from '@services/sync/feishu/auth/oauth';
 import {
   areBackupValuesEqual,
@@ -29,8 +29,14 @@ import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
   prepareArticleCommentArchiveImport,
-  type PreparedArticleCommentArchiveItem,
 } from '@services/comments/domain/comment-archive';
+import {
+  READER_PREFS_STORAGE_KEY,
+  applyReaderPrefsPatch,
+  buildReaderPrefsStoragePatch,
+  resolveReaderPrefsFromStorage,
+  type ReaderPrefsPatch,
+} from '@services/protocols/reader-prefs';
 
 type AnyRecord = Record<string, any>;
 
@@ -183,6 +189,9 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
   const hasDisplayMode = Object.prototype.hasOwnProperty.call(directSettings, INPAGE_DISPLAY_MODE_STORAGE_KEY);
   const displayMode = directSettings[INPAGE_DISPLAY_MODE_STORAGE_KEY];
   delete directSettings[INPAGE_DISPLAY_MODE_STORAGE_KEY];
+  const hasReaderPrefs = Object.prototype.hasOwnProperty.call(directSettings, READER_PREFS_STORAGE_KEY);
+  const readerPrefsPatch = directSettings[READER_PREFS_STORAGE_KEY];
+  delete directSettings[READER_PREFS_STORAGE_KEY];
   const feishuConfig: Record<string, unknown> = {};
   if (Object.prototype.hasOwnProperty.call(directSettings, FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId)) {
     feishuConfig.clientId = directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.clientId];
@@ -196,6 +205,15 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
   if (Object.keys(directSettings).length) await storageSet(directSettings);
 
   if (hasDisplayMode) await setCanonicalInpageDisplayMode(displayMode);
+
+  if (hasReaderPrefs) {
+    const currentStorage = await storageGet([READER_PREFS_STORAGE_KEY]);
+    const current = resolveReaderPrefsFromStorage(currentStorage);
+    const patch =
+      readerPrefsPatch && typeof readerPrefsPatch === 'object' ? (readerPrefsPatch as ReaderPrefsPatch) : {};
+    const next = applyReaderPrefsPatch(current, patch);
+    await storageSet(buildReaderPrefsStoragePatch(next));
+  }
 
   if (Object.keys(feishuConfig).length) await saveFeishuOAuthConfig(feishuConfig);
 }
@@ -296,13 +314,9 @@ export async function importBackupZipMerge(
   const manifest = readJsonEntry(entries, 'manifest.json');
   const manifestValidation = validateBackupManifest(manifest);
   if (!manifestValidation.ok) throw new Error(manifestValidation.error || 'Invalid manifest.json');
-  const backupSchemaVersion = Number((manifest as any).backupSchemaVersion);
-  const isCurrentBackup = backupSchemaVersion === 3;
   const conversationsCsvPath =
     manifest && (manifest as any).index ? String((manifest as any).index.conversationsCsvPath || '').trim() : '';
-  if (isCurrentBackup && !entries.has(conversationsCsvPath)) {
-    throw new Error(`Missing entry: ${conversationsCsvPath}`);
-  }
+  if (!entries.has(conversationsCsvPath)) throw new Error(`Missing entry: ${conversationsCsvPath}`);
 
   const configPath = manifest && manifest.config ? String(manifest.config.storageLocalPath || '') : '';
   const configDoc = configPath ? readJsonEntry(entries, configPath) : null;
@@ -320,28 +334,19 @@ export async function importBackupZipMerge(
     for (const p of files) convoFiles.push(String(p || '').trim());
   }
 
-  const imageCacheIndexPath =
-    manifest && (manifest as any).assets ? String((manifest as any).assets.imageCacheIndexPath || '').trim() : '';
-  if (imageCacheIndexPath && !entries.has(imageCacheIndexPath)) {
-    throw new Error(`Missing entry: ${imageCacheIndexPath}`);
-  }
-  const imageCacheIndexDoc = imageCacheIndexPath ? readJsonEntry(entries, imageCacheIndexPath) : null;
-  if (imageCacheIndexDoc) {
-    const imageValidation = validateImageCacheIndexDocument(imageCacheIndexDoc);
-    if (!imageValidation.ok) throw new Error(imageValidation.error || 'Invalid image cache index');
-  }
-  const imageCacheAssets: AnyRecord[] =
-    imageCacheIndexDoc && Array.isArray((imageCacheIndexDoc as any).assets) ? (imageCacheIndexDoc as any).assets : [];
+  const imageCacheIndexPath = String((manifest as any).assets.imageCacheIndexPath || '').trim();
+  if (!entries.has(imageCacheIndexPath)) throw new Error(`Missing entry: ${imageCacheIndexPath}`);
+  const imageCacheIndexDoc = readJsonEntry(entries, imageCacheIndexPath);
+  const imageValidation = validateImageCacheIndexDocument(imageCacheIndexDoc);
+  if (!imageValidation.ok) throw new Error(imageValidation.error || 'Invalid image cache index');
+  const imageCacheAssets: AnyRecord[] = Array.isArray((imageCacheIndexDoc as any).assets)
+    ? (imageCacheIndexDoc as any).assets
+    : [];
 
-  const articleCommentsIndexPath =
-    manifest && (manifest as any).assets ? String((manifest as any).assets.articleCommentsIndexPath || '').trim() : '';
-  if (articleCommentsIndexPath && !entries.has(articleCommentsIndexPath)) {
-    throw new Error(`Missing entry: ${articleCommentsIndexPath}`);
-  }
-  const articleCommentsIndexDoc = articleCommentsIndexPath ? readJsonEntry(entries, articleCommentsIndexPath) : null;
-  const preparedArticleComments = articleCommentsIndexDoc
-    ? prepareArticleCommentArchiveImport(articleCommentsIndexDoc)
-    : { items: [] as PreparedArticleCommentArchiveItem[], warnings: [] };
+  const articleCommentsIndexPath = String((manifest as any).assets.articleCommentsIndexPath || '').trim();
+  if (!entries.has(articleCommentsIndexPath)) throw new Error(`Missing entry: ${articleCommentsIndexPath}`);
+  const articleCommentsIndexDoc = readJsonEntry(entries, articleCommentsIndexPath);
+  const preparedArticleComments = prepareArticleCommentArchiveImport(articleCommentsIndexDoc);
   const articleCommentItems = preparedArticleComments.items;
 
   const incomingConversations: AnyRecord[] = [];
@@ -383,18 +388,16 @@ export async function importBackupZipMerge(
     }
   }
 
-  if (isCurrentBackup) {
-    const expectedCounts = (manifest as any).counts || {};
-    const actualCounts: Record<string, number> = {
-      conversations: incomingConversations.length,
-      messages: totalMessages,
-      sync_mappings: incomingMappings.length,
-      image_cache: imageCacheAssets.length,
-      article_comments: articleCommentItems.length,
-    };
-    for (const [key, actual] of Object.entries(actualCounts)) {
-      if (Number(expectedCounts[key]) !== actual) throw new Error(`Backup count mismatch: ${key}`);
-    }
+  const expectedCounts = (manifest as any).counts || {};
+  const actualCounts: Record<string, number> = {
+    conversations: incomingConversations.length,
+    messages: totalMessages,
+    sync_mappings: incomingMappings.length,
+    image_cache: imageCacheAssets.length,
+    article_comments: articleCommentItems.length,
+  };
+  for (const [key, actual] of Object.entries(actualCounts)) {
+    if (Number(expectedCounts[key]) !== actual) throw new Error(`Backup count mismatch: ${key}`);
   }
 
   const stats = makeStats();
@@ -443,9 +446,7 @@ export async function importBackupZipMerge(
           if (!source || !conversationKey || !importUniqueKey) continue;
 
           const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-          const normalizedMerged = normalizeConversationListRecord(
-            mergeConversationRecord(existing, incoming, { allowLegacyLastCapturedAt: backupSchemaVersion === 2 }),
-          );
+          const normalizedMerged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
           normalizedMerged.source = source;
           normalizedMerged.conversationKey = conversationKey;
           const rememberLocalId = (localId: number) => {

@@ -1,4 +1,11 @@
 import contract from '@services/protocols/cli-rpc-contract.json';
+import { createExtensionFileTransferController } from '@services/cli/file-transfer';
+import {
+  importBackupBlob,
+  prepareBackupExport,
+  prepareJsonExport,
+  prepareMarkdownExport,
+} from '@services/cli/file-operations';
 import {
   COMMENTS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
@@ -151,7 +158,12 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     }
   };
 
-  const handleRpcRequest = async (currentPort: NativeMessagingPort, frame: any, seenRequestIds: Set<string>) => {
+  const handleRpcRequest = async (
+    currentPort: NativeMessagingPort,
+    frame: any,
+    seenRequestIds: Set<string>,
+    fileTransfer: ReturnType<typeof createExtensionFileTransferController>,
+  ) => {
     if (serializedByteLength(frame) > HOST_TO_EXTENSION_MAX_BYTES) {
       safePost(
         currentPort,
@@ -255,6 +267,44 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     if (method === 'settings.set') {
       postBackgroundResult(
         await router.dispatch({ type: SETTINGS_MESSAGE_TYPES.SET, key: params.key, value: params.value }, null),
+      );
+      return;
+    }
+
+    if (method === 'export.markdown' || method === 'export.json' || method === 'backup.export') {
+      const prepared =
+        method === 'export.markdown'
+          ? await prepareMarkdownExport(params.conversationIds)
+          : method === 'export.json'
+            ? await prepareJsonExport(params.conversationIds)
+            : await prepareBackupExport();
+      const transfer = await fileTransfer.sendBlob(requestId, {
+        blob: prepared.blob,
+        suggestedFilename: prepared.suggestedFilename,
+        metadata: prepared.metadata,
+      });
+      safePost(
+        currentPort,
+        response(requestId, true, {
+          ...prepared.metadata,
+          suggestedFilename: prepared.suggestedFilename,
+          byteSize: transfer.byteSize,
+          sha256: transfer.sha256,
+        }),
+      );
+      return;
+    }
+
+    if (method === 'backup.import') {
+      const received = await fileTransfer.receiveBlob(requestId);
+      const stats = await importBackupBlob(received.blob);
+      safePost(
+        currentPort,
+        response(requestId, true, {
+          ...stats,
+          byteSize: received.totalBytes,
+          sha256: received.sha256,
+        }),
       );
       return;
     }
@@ -738,16 +788,34 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
 
   const attachPort = async (nextPort: NativeMessagingPort, generation: number) => {
     const seenRequestIds = new Set<string>();
+    const fileTransfer = createExtensionFileTransferController({
+      frames: FRAMES,
+      protocolVersion: PROTOCOL_VERSION,
+      chunkBytes: contract.fileTransfer.chunkBytes,
+      ackTimeoutMs: contract.fileTransfer.ackTimeoutMs,
+      postFrame: (frame) => safePost(nextPort, frame),
+    });
     const onMessage = (message: unknown) => {
       if (stopped || port !== nextPort) return;
       const frame = message as any;
-      if (frame?.kind !== FRAMES.rpcRequest) return;
-      void handleRpcRequest(nextPort, frame, seenRequestIds).catch((error) => {
+      if (frame?.kind !== FRAMES.rpcRequest) {
+        void fileTransfer.handleFrame(frame).catch(() => disconnectCurrentPort());
+        return;
+      }
+      void handleRpcRequest(nextPort, frame, seenRequestIds, fileTransfer).catch((error) => {
         const requestId = validRequestId(frame?.requestId) ? frame.requestId : '';
+        const code = String(error?.code || 'rpc_internal_error').trim() || 'rpc_internal_error';
         try {
           safePost(
             nextPort,
-            response(requestId, false, null, 'rpc_internal_error', String(error?.message || error || 'RPC failed')),
+            response(
+              requestId,
+              false,
+              null,
+              code,
+              String(error?.message || error || 'RPC failed'),
+              error?.extra ?? null,
+            ),
           );
         } catch (_postError) {
           disconnectCurrentPort();
@@ -755,6 +823,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       });
     };
     const onDisconnect = () => {
+      fileTransfer.abortAll(new Error('native_host_disconnected'));
       if (port === nextPort) {
         port = null;
         connectGeneration += 1;

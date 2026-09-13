@@ -133,6 +133,58 @@ describe('native host local IPC lifecycle', () => {
     expect(error.read()?.toString() || '').toBe('');
   });
 
+  it('keeps local file paths on the host side and strips them from Extension RPC params', async () => {
+    const runtimeRoot = await mkdtemp('/tmp/snh-');
+    const request = vi.fn();
+    const requestFileExport = vi.fn(async (_method: string, _params: unknown, options: any) => ({
+      protocolVersion: contract.protocolVersion,
+      ok: true,
+      data: { path: options.outputPath, byteSize: 10 },
+      error: null,
+    }));
+    const requestFileImport = vi.fn(async (_method: string, _params: unknown, options: any) => ({
+      protocolVersion: contract.protocolVersion,
+      ok: true,
+      data: { path: options.inputPath, conversationsAdded: 1 },
+      error: null,
+    }));
+    const controller = await startNativeHostIpc({
+      hello: {
+        cliInstanceId: 'file-routing-instance',
+        browserFamily: 'chromium',
+        runtimeId: 'runtime-files',
+        extensionVersion: '1.2.3',
+      },
+      runtimeRoot,
+      protocol: { request, requestFileExport, requestFileImport },
+    });
+    try {
+      const outputPath = '/tmp/export.zip';
+      await expect(
+        requestEndpoint(controller.endpoint, {
+          method: 'export.markdown',
+          params: { conversationIds: [7, 9], outputPath, force: true },
+        }),
+      ).resolves.toMatchObject({ ok: true, data: { path: outputPath } });
+      expect(requestFileExport).toHaveBeenCalledTimes(1);
+      expect(requestFileExport.mock.calls[0]?.[0]).toBe('export.markdown');
+      expect(requestFileExport.mock.calls[0]?.[1]).toEqual({ conversationIds: [7, 9] });
+      expect(requestFileExport.mock.calls[0]?.[2]).toMatchObject({ outputPath, force: true, timeoutMs: 0 });
+
+      const inputPath = '/tmp/import.zip';
+      await expect(
+        requestEndpoint(controller.endpoint, { method: 'backup.import', params: { inputPath } }),
+      ).resolves.toMatchObject({ ok: true, data: { path: inputPath, conversationsAdded: 1 } });
+      expect(requestFileImport).toHaveBeenCalledTimes(1);
+      expect(requestFileImport.mock.calls[0]?.[0]).toBe('backup.import');
+      expect(requestFileImport.mock.calls[0]?.[1]).toEqual({});
+      expect(requestFileImport.mock.calls[0]?.[2]).toMatchObject({ inputPath, timeoutMs: 0 });
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      await controller.stop();
+    }
+  });
+
   it('cancels a no-deadline business RPC when the local CLI client disconnects', async () => {
     const runtimeRoot = await mkdtemp('/tmp/snh-');
     let capturedSignal: AbortSignal | null = null;

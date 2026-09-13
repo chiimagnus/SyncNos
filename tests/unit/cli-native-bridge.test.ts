@@ -1,4 +1,19 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+
+const fileMocks = vi.hoisted(() => ({
+  prepareMarkdownExport: vi.fn(),
+  prepareJsonExport: vi.fn(),
+  prepareBackupExport: vi.fn(),
+  importBackupBlob: vi.fn(),
+}));
+
+vi.mock('@services/cli/file-operations', () => ({
+  prepareMarkdownExport: (...args: unknown[]) => fileMocks.prepareMarkdownExport(...args),
+  prepareJsonExport: (...args: unknown[]) => fileMocks.prepareJsonExport(...args),
+  prepareBackupExport: (...args: unknown[]) => fileMocks.prepareBackupExport(...args),
+  importBackupBlob: (...args: unknown[]) => fileMocks.importBackupBlob(...args),
+}));
 
 import { startCliNativeBridge } from '@services/cli/native-bridge';
 import {
@@ -553,6 +568,150 @@ describe('CLI Native Messaging bridge', () => {
       null,
     );
 
+    harness.controller.stop();
+  });
+
+  it('streams export RPC bytes only through file frames and returns metadata after the final ACK', async () => {
+    fileMocks.prepareMarkdownExport.mockReset();
+    fileMocks.prepareMarkdownExport.mockResolvedValue({
+      blob: new Blob(['abcdef']),
+      suggestedFilename: 'selected.zip',
+      metadata: { format: 'markdown', conversationCount: 2 },
+    });
+    const router = { dispatch: vi.fn() };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      method: 'export.markdown',
+      params: { conversationIds: [7, 9] },
+    });
+    await waitForPosted(harness, 2);
+    const begin = harness.fakePort.posted[1];
+    expect(begin).toMatchObject({
+      kind: 'file-begin',
+      requestId: 'file-export',
+      direction: 'extension-to-host',
+      totalBytes: 6,
+      suggestedFilename: 'selected.zip',
+    });
+    expect(fileMocks.prepareMarkdownExport).toHaveBeenCalledWith([7, 9]);
+    expect(router.dispatch).not.toHaveBeenCalled();
+
+    harness.fakePort.emitMessage({
+      kind: 'file-ack',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      transferId: begin.transferId,
+      seq: -1,
+    });
+    await waitForPosted(harness, 3);
+    const chunk = harness.fakePort.posted[2];
+    expect(chunk).toMatchObject({ kind: 'file-chunk', requestId: 'file-export', seq: 0 });
+    expect(Buffer.from(chunk.data, 'base64').toString('utf8')).toBe('abcdef');
+    harness.fakePort.emitMessage({
+      kind: 'file-ack',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      transferId: begin.transferId,
+      seq: 0,
+    });
+    await waitForPosted(harness, 4);
+    const end = harness.fakePort.posted[3];
+    expect(end).toMatchObject({
+      kind: 'file-end',
+      requestId: 'file-export',
+      seq: 1,
+      totalBytes: 6,
+      sha256: createHash('sha256').update('abcdef').digest('hex'),
+    });
+    harness.fakePort.emitMessage({
+      kind: 'file-ack',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      transferId: begin.transferId,
+      seq: 1,
+    });
+    await waitForPosted(harness, 5);
+    const response = harness.fakePort.posted[4];
+    expect(response).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'file-export',
+      ok: true,
+      data: {
+        format: 'markdown',
+        conversationCount: 2,
+        suggestedFilename: 'selected.zip',
+        byteSize: 6,
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain('YWJjZGVm');
+    harness.controller.stop();
+  });
+
+  it('receives a verified backup Blob before invoking the canonical importer', async () => {
+    fileMocks.importBackupBlob.mockReset();
+    fileMocks.importBackupBlob.mockResolvedValue({ conversationsAdded: 1, messagesAdded: 2 });
+    const router = { dispatch: vi.fn() };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      method: 'backup.import',
+      params: {},
+    });
+    const bytes = Buffer.from('zip-bytes');
+    const transferId = 'host-upload';
+    harness.fakePort.emitMessage({
+      kind: 'file-begin',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      transferId,
+      direction: 'host-to-extension',
+      totalBytes: bytes.length,
+      suggestedFilename: 'restore.zip',
+      metadata: {},
+    });
+    await waitForPosted(harness, 2);
+    expect(harness.fakePort.posted[1]).toMatchObject({ kind: 'file-ack', requestId: 'file-import', seq: -1 });
+    expect(fileMocks.importBackupBlob).not.toHaveBeenCalled();
+
+    harness.fakePort.emitMessage({
+      kind: 'file-chunk',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      transferId,
+      seq: 0,
+      data: bytes.toString('base64'),
+    });
+    await waitForPosted(harness, 3);
+    expect(fileMocks.importBackupBlob).not.toHaveBeenCalled();
+    harness.fakePort.emitMessage({
+      kind: 'file-end',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      transferId,
+      seq: 1,
+      totalBytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+    await waitForPosted(harness, 5);
+    expect(harness.fakePort.posted[3]).toMatchObject({ kind: 'file-ack', requestId: 'file-import', seq: 1 });
+    expect(fileMocks.importBackupBlob).toHaveBeenCalledTimes(1);
+    const importedBlob = fileMocks.importBackupBlob.mock.calls[0]?.[0] as Blob;
+    expect(Buffer.from(await importedBlob.arrayBuffer())).toEqual(bytes);
+    expect(harness.fakePort.posted[4]).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'file-import',
+      ok: true,
+      data: { conversationsAdded: 1, messagesAdded: 2, byteSize: bytes.length },
+    });
     harness.controller.stop();
   });
 

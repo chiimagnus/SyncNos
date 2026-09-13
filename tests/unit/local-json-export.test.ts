@@ -70,6 +70,19 @@ beforeEach(() => {
 });
 
 describe('local JSON v2 export', () => {
+  it('uses an explicitly injected detail loader instead of the runtime client', async () => {
+    const c = conversation(1);
+    const loadConversationDetail = vi.fn(async () => ({
+      conversationId: 1,
+      messages: [message('m-1', { contentMarkdown: 'Body' })],
+    }));
+
+    await buildConversationsJsonZipExport({ conversations: [c], loadConversationDetail });
+
+    expect(loadConversationDetail).toHaveBeenCalledWith(1);
+    expect(mocks.getConversationDetail).not.toHaveBeenCalled();
+  });
+
   it('exports a chat with the public v2 allowlist and canonical message order', async () => {
     const c = conversation(1, {
       source: ' chatgpt ',

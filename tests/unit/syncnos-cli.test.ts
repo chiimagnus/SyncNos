@@ -778,6 +778,87 @@ describe('syncnos CLI instance selection', () => {
     expect(result.json.error.code).toBe('usage_error');
   });
 
+  it('routes export/backup file commands with explicit absolute host paths and metadata-only stdout', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const outputPath = join(homeDir, 'selected.zip');
+    const inputPath = join(homeDir, 'restore.zip');
+    const instance = await startFakeInstance(runtimeRoot, 'file-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'export.markdown') {
+          return {
+            data: { format: 'markdown', path: request.params.outputPath, byteSize: 12, sha256: 'a'.repeat(64) },
+          };
+        }
+        if (request.method === 'export.json') {
+          return { data: { format: 'json', path: request.params.outputPath, byteSize: 13, sha256: 'b'.repeat(64) } };
+        }
+        if (request.method === 'backup.export') {
+          return { data: { format: 'backup', path: request.params.outputPath, byteSize: 14, sha256: 'c'.repeat(64) } };
+        }
+        if (request.method === 'backup.import') {
+          return {
+            data: { path: request.params.inputPath, byteSize: 15, sha256: 'd'.repeat(64), conversationsAdded: 2 },
+          };
+        }
+        return null;
+      },
+    });
+    try {
+      const markdown = await run(
+        ['export', 'markdown', '7', '9', '--output', outputPath, '--force'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(markdown.exitCode).toBe(0);
+      expect(markdown.json.data).toEqual({
+        format: 'markdown',
+        path: outputPath,
+        byteSize: 12,
+        sha256: 'a'.repeat(64),
+      });
+      expect(JSON.stringify(markdown.json)).not.toMatch(/base64|file-chunk/i);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'export.markdown',
+        params: { conversationIds: [7, 9], outputPath, force: true },
+      });
+
+      const json = await run(['export', 'json', '7', '--output', outputPath], runtimeRoot, homeDir);
+      expect(json.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'export.json',
+        params: { conversationIds: [7], outputPath, force: false },
+      });
+
+      const backupExport = await run(['backup', 'export', '--output', outputPath], runtimeRoot, homeDir);
+      expect(backupExport.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'backup.export',
+        params: { outputPath, force: false },
+      });
+
+      const backupImport = await run(['backup', 'import', inputPath], runtimeRoot, homeDir);
+      expect(backupImport.exitCode).toBe(0);
+      expect(backupImport.json.data).toMatchObject({ path: inputPath, conversationsAdded: 2 });
+      expect(instance.requests.at(-1)).toEqual({ method: 'backup.import', params: { inputPath } });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects incomplete file command syntax before browser instance discovery', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    for (const argv of [
+      ['export', 'markdown', '1'],
+      ['export', 'json', '--output', 'out.zip'],
+      ['backup', 'export'],
+      ['backup', 'import'],
+    ]) {
+      const result = await run(argv, runtimeRoot, homeDir);
+      expect(result.exitCode).toBe(2);
+      expect(result.json.error.code).toBe('usage_error');
+    }
+  });
+
   it('routes provider auth/config commands through safe public RPCs', async () => {
     const { runtimeRoot, homeDir } = await roots();
     const instance = await startFakeInstance(runtimeRoot, 'provider-instance', 'chromium', {
