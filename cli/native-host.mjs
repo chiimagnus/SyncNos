@@ -6,6 +6,7 @@ import { chmod } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { endianness } from 'node:os';
 import process from 'node:process';
+import { clearTimeout, setTimeout } from 'node:timers';
 import { TextDecoder } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
@@ -116,6 +117,7 @@ export function createNativeHostProtocol({
   write = (frame) => writeNativeMessage(process.stdout, frame),
   onHello = async () => {},
   onClose = () => {},
+  requestTimeoutMs = 60_000,
 } = {}) {
   let closed = false;
   let helloAccepted = false;
@@ -124,7 +126,10 @@ export function createNativeHostProtocol({
   const close = (error = new Error('native_host_closed')) => {
     if (closed) return;
     closed = true;
-    for (const { reject } of pending.values()) reject(error);
+    for (const { reject, timer } of pending.values()) {
+      if (timer) clearTimeout(timer);
+      reject(error);
+    }
     pending.clear();
     try {
       void onClose(error);
@@ -161,6 +166,7 @@ export function createNativeHostProtocol({
       const waiter = pending.get(requestId);
       if (!waiter) return;
       pending.delete(requestId);
+      if (waiter.timer) clearTimeout(waiter.timer);
       waiter.resolve(message);
     }
   };
@@ -169,7 +175,21 @@ export function createNativeHostProtocol({
     if (closed) throw new Error('native_host_closed');
     if (!helloAccepted) throw new Error('native_host_not_ready');
     const requestId = `rpc_${randomUUID()}`;
-    const responsePromise = new Promise((resolve, reject) => pending.set(requestId, { resolve, reject }));
+    const responsePromise = new Promise((resolve, reject) => {
+      const timeout = Number(requestTimeoutMs);
+      const timer =
+        Number.isFinite(timeout) && timeout > 0
+          ? setTimeout(() => {
+              const waiter = pending.get(requestId);
+              if (!waiter) return;
+              pending.delete(requestId);
+              const error = new Error('Native Messaging RPC timed out');
+              error.code = 'native_host_request_timeout';
+              waiter.reject(error);
+            }, timeout)
+          : null;
+      pending.set(requestId, { resolve, reject, timer });
+    });
     try {
       await write({
         kind: contract.frames.rpcRequest,
@@ -179,8 +199,10 @@ export function createNativeHostProtocol({
         params,
       });
     } catch (error) {
+      const waiter = pending.get(requestId);
       pending.delete(requestId);
-      throw error;
+      if (waiter?.timer) clearTimeout(waiter.timer);
+      waiter?.reject(error);
     }
     return await responsePromise;
   };
@@ -231,6 +253,21 @@ function isConfirmedStaleEndpointError(error) {
   return ['ENOENT', 'ECONNREFUSED'].includes(String(error?.code || ''));
 }
 
+async function confirmCanonicalEndpointIsStale(endpoint, timeoutMs) {
+  try {
+    await requestEndpoint(
+      endpoint,
+      { method: 'system.ping', params: {} },
+      { timeoutMs, maxResponseBytes: contract.nativeMessaging.extensionToHostMaxBytes },
+    );
+    throw new Error('cli_instance_already_online');
+  } catch (error) {
+    if (error?.message === 'cli_instance_already_online') throw error;
+    if (!isConfirmedStaleEndpointError(error)) throw error;
+    return String(error.code || '');
+  }
+}
+
 export async function startNativeHostIpc({
   hello,
   protocol,
@@ -266,16 +303,16 @@ export async function startNativeHostIpc({
     if (!removed) throw new Error('cli_instance_registration_changed');
     if (String(existing.endpoint || '') === endpoint) await removeFileIfExists(endpoint);
   } catch (error) {
-    if (
-      error?.code !== 'ENOENT' &&
-      error?.code !== 'registry_invalid' &&
-      error?.message !== 'Unexpected end of JSON input' &&
-      !(error instanceof SyntaxError)
-    ) {
-      throw error;
-    }
+    const registryMissingOrInvalid =
+      error?.code === 'ENOENT' ||
+      error?.code === 'registry_invalid' ||
+      error?.message === 'Unexpected end of JSON input' ||
+      error instanceof SyntaxError;
+    if (!registryMissingOrInvalid) throw error;
+
+    const staleCode = await confirmCanonicalEndpointIsStale(endpoint, existingPingTimeoutMs);
     await removeFileIfExists(registryPath).catch(() => {});
-    await removeFileIfExists(endpoint).catch(() => {});
+    if (staleCode === 'ECONNREFUSED') await removeFileIfExists(endpoint).catch(() => {});
   }
 
   const sockets = new Set();

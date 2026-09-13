@@ -77,6 +77,29 @@ describe('native host framing', () => {
     expect(() => encodeNativeMessage(oversized)).toThrow('native_message_too_large');
   });
 
+  it('rejects an unanswered RPC after the host-side request timeout and ignores a late response', async () => {
+    const written: any[] = [];
+    const protocol = createNativeHostProtocol({
+      write: async (frame: unknown) => written.push(frame),
+      requestTimeoutMs: 20,
+    });
+    await protocol.handleMessage({ kind: contract.frames.hello, protocolVersion: contract.protocolVersion });
+    const pending = protocol.request('system.ping');
+    await vi.waitFor(() => expect(written.length).toBe(2));
+    const request = written[1];
+    await expect(pending).rejects.toMatchObject({ code: 'native_host_request_timeout' });
+    await expect(
+      protocol.handleMessage({
+        kind: contract.frames.rpcResponse,
+        protocolVersion: contract.protocolVersion,
+        requestId: request.requestId,
+        ok: true,
+        data: { alive: true },
+        error: null,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('performs hello negotiation and correlates RPC responses', async () => {
     const written: any[] = [];
     const protocol = createNativeHostProtocol({ write: async (frame: unknown) => written.push(frame) });

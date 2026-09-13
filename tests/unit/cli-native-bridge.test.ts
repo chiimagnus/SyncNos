@@ -153,6 +153,54 @@ describe('CLI Native Messaging bridge', () => {
     harness.controller.stop();
   });
 
+  it('scopes duplicate request ids to one Native Port lifecycle', async () => {
+    const first = createPort();
+    const second = createPort();
+    let storageListener: ((changes: any, areaName: string) => void) | null = null;
+    const connectNativeHost = vi.fn().mockReturnValueOnce(first.port).mockReturnValueOnce(second.port);
+    const router = { dispatch: vi.fn(async () => ({ ok: true, data: {}, error: null })) };
+    const controller = startCliNativeBridge(router, {
+      connectNativeHost,
+      readExtensionRuntimeMetadata: () => ({
+        runtimeId: 'runtime-id',
+        extensionVersion: '1.2.3',
+        browserFamily: 'chromium',
+      }),
+      readCliIntegrationStatus: vi.fn(async () => ({ available: true, enabled: true, permissionGranted: true })),
+      getCliInstanceId: vi.fn(async () => 'instance-1'),
+      disableCliIntegrationAfterPermissionRemoval: vi.fn(async () => {}),
+      storageOnChanged(listener) {
+        storageListener = listener;
+        return () => {
+          storageListener = null;
+        };
+      },
+      permissionsOnRemoved: () => () => {},
+    });
+    await vi.waitFor(() => expect(first.posted.length).toBeGreaterThanOrEqual(1));
+
+    const request = {
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'reused-after-reconnect',
+      method: 'system.ping',
+    };
+    first.emitMessage(request);
+    await vi.waitFor(() => expect(first.posted.length).toBeGreaterThanOrEqual(2));
+    expect(first.posted[1]).toMatchObject({ ok: true, requestId: request.requestId });
+    first.emitMessage(request);
+    await vi.waitFor(() => expect(first.posted.length).toBeGreaterThanOrEqual(3));
+    expect(first.posted[2]).toMatchObject({ ok: false, error: { code: 'duplicate_request_id' } });
+
+    first.emitDisconnect();
+    storageListener?.({ syncnos_cli_integration_enabled_v1: { newValue: true } }, 'local');
+    await vi.waitFor(() => expect(second.posted.length).toBeGreaterThanOrEqual(1));
+    second.emitMessage(request);
+    await vi.waitFor(() => expect(second.posted.length).toBeGreaterThanOrEqual(2));
+    expect(second.posted[1]).toMatchObject({ ok: true, requestId: request.requestId });
+    controller.stop();
+  });
+
   it('converges enabled-without-permission to disabled without connecting', async () => {
     const harness = createHarness({ available: true, enabled: true, permissionGranted: false });
     await vi.waitFor(() => expect(harness.disableAfterPermissionRemoval).toHaveBeenCalledTimes(1));

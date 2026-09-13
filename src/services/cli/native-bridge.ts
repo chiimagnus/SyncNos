@@ -86,7 +86,6 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
   let stopped = false;
   let port: NativeMessagingPort | null = null;
   let connectGeneration = 0;
-  const seenRequestIds = new Set<string>();
 
   const disconnectCurrentPort = () => {
     const current = port;
@@ -99,7 +98,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     }
   };
 
-  const handleRpcRequest = async (currentPort: NativeMessagingPort, frame: any) => {
+  const handleRpcRequest = async (currentPort: NativeMessagingPort, frame: any, seenRequestIds: Set<string>) => {
     if (serializedByteLength(frame) > HOST_TO_EXTENSION_MAX_BYTES) {
       safePost(
         currentPort,
@@ -167,11 +166,12 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
   };
 
   const attachPort = async (nextPort: NativeMessagingPort, generation: number) => {
+    const seenRequestIds = new Set<string>();
     const onMessage = (message: unknown) => {
       if (stopped || port !== nextPort) return;
       const frame = message as any;
       if (frame?.kind !== FRAMES.rpcRequest) return;
-      void handleRpcRequest(nextPort, frame).catch((error) => {
+      void handleRpcRequest(nextPort, frame, seenRequestIds).catch((error) => {
         const requestId = validRequestId(frame?.requestId) ? frame.requestId : '';
         try {
           safePost(

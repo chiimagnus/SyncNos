@@ -1,4 +1,4 @@
-import { lstat, mkdtemp } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { endianness } from 'node:os';
 import { PassThrough } from 'node:stream';
@@ -158,6 +158,39 @@ describe('native host local IPC lifecycle', () => {
     await expect(readRegistryEntry(controller.registryPath)).resolves.toMatchObject({ processNonce: 'new-owner' });
     await removeFileIfExists(controller.registryPath);
     await removeFileIfExists(controller.endpoint);
+  });
+
+  it('does not replace a malformed registry while the canonical endpoint is still live', async () => {
+    const runtimeRoot = await mkdtemp('/tmp/snh-');
+    const runtimeDir = await ensureRuntimeDir({ root: runtimeRoot });
+    const cliInstanceId = 'malformed-registry-live';
+    const endpoint = socketPathForInstance(runtimeDir, cliInstanceId);
+    const registryPath = registryPathForInstance(runtimeDir, cliInstanceId);
+    const server = createServer((socket) => {
+      socket.once('data', () => socket.end('{"ok":false,"error":{"code":"still_live"}}\n'));
+    });
+    await new Promise<void>((resolve) => server.listen(endpoint, resolve));
+    await writeFile(registryPath, '{broken-json\n', 'utf8');
+    try {
+      await expect(
+        startNativeHostIpc({
+          hello: {
+            cliInstanceId,
+            browserFamily: 'chromium',
+            runtimeId: 'runtime-new',
+            extensionVersion: '1.2.3',
+          },
+          runtimeRoot,
+          protocol: { request: vi.fn() },
+        }),
+      ).rejects.toThrow('cli_instance_already_online');
+      expect(await readFile(registryPath, 'utf8')).toBe('{broken-json\n');
+      await expect(lstat(endpoint)).resolves.toBeTruthy();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await removeFileIfExists(registryPath);
+      await removeFileIfExists(endpoint);
+    }
   });
 
   it('does not replace a registry when an endpoint is reachable but returns malformed data', async () => {
