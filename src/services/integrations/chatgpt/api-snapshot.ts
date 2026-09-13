@@ -38,6 +38,7 @@ type PendingAuxiliary = {
   turnId: string;
   kind: 'thoughts' | 'reasoning_recap' | 'commentary';
   markdown: string;
+  finished: boolean;
 };
 
 const INTERNAL_CONTENT_TYPES = new Set(['model_editable_context']);
@@ -321,7 +322,7 @@ export function buildChatgptApiSnapshot(input: {
   const seenAssetBindings = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
-  let pendingImageToolCallTurnId = '';
+  let omittedUnownedAuxiliary = false;
 
   const flushImageOnly = () => {
     if (!pendingImages.length) {
@@ -370,7 +371,12 @@ export function buildChatgptApiSnapshot(input: {
     if (INTERNAL_CONTENT_TYPES.has(type)) continue;
 
     if (role === 'user') {
-      if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
+      // Reasoning/commentary that reaches the next user without a stable assistant owner cannot
+      // be assigned a durable API/DOM-shared message identity. Omit it and downgrade the capture below.
+      if (!pendingImages.length && pendingAuxiliary.length) {
+        omittedUnownedAuxiliary = true;
+        pendingAuxiliary = [];
+      }
       flushImageOnly();
       if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
       if (!id) throw apiSnapshotError('conversation_identity_invalid');
@@ -396,14 +402,10 @@ export function buildChatgptApiSnapshot(input: {
     }
 
     if (role === 'assistant') {
-      if (message.recipient !== 'all') {
-        const isPendingImageToolCall = message.channel === 'commentary' && type === 'code' && !!turnId;
-        if (!isPendingImageToolCall) throw apiSnapshotError('unsupported_tool_turn');
-        if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
-        pendingImageToolCallTurnId = turnId;
-        continue;
-      }
-      if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
+      // Tool-call messages are execution-pipeline nodes, not standalone conversation messages.
+      // ChatGPT may emit thousands of these in long agentic conversations; the visible output
+      // remains owned by recipient=all assistant messages and image-bearing tool results below.
+      if (message.recipient !== 'all') continue;
       const isStableOwner = message.channel === 'final' && type === 'text';
       if (isStableOwner) {
         if (!id) throw apiSnapshotError('conversation_identity_invalid');
@@ -441,25 +443,27 @@ export function buildChatgptApiSnapshot(input: {
           turnId,
           kind: type === 'thoughts' ? 'thoughts' : type === 'reasoning_recap' ? 'reasoning_recap' : 'commentary',
           markdown,
+          finished: message.status === 'finished_successfully',
         });
       }
       continue;
     }
 
     if (role === 'tool') {
+      // Ordinary tool results are execution-pipeline data. Only tool results that contain the
+      // current visible image_asset_pointer schema become conversation content.
+      const rawParts = message?.content?.parts;
+      if (!Array.isArray(rawParts) || !rawParts.some(isImagePart)) continue;
       const images = collectMessageImages(message);
       if (
         message.recipient !== 'all' ||
         type !== 'multimodal_text' ||
         !images.length ||
         hasNonImagePartContent(message) ||
-        hasUnsupportedAttachmentMetadata(message, images) ||
-        !pendingImageToolCallTurnId ||
-        pendingImageToolCallTurnId !== turnId
+        hasUnsupportedAttachmentMetadata(message, images)
       ) {
-        throw apiSnapshotError('unsupported_tool_turn');
+        throw apiSnapshotError('unsupported_content');
       }
-      pendingImageToolCallTurnId = '';
       pendingImages.push(...images);
       continue;
     }
@@ -467,7 +471,10 @@ export function buildChatgptApiSnapshot(input: {
     throw apiSnapshotError('unsupported_content');
   }
 
-  if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
+  if (!pendingImages.length && pendingAuxiliary.length && pendingAuxiliary.every((item) => item.finished)) {
+    omittedUnownedAuxiliary = true;
+    pendingAuxiliary = [];
+  }
   flushImageOnly();
   if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
@@ -484,8 +491,9 @@ export function buildChatgptApiSnapshot(input: {
     },
     messages,
     captureMeta: {
-      completeness: 'complete' as const,
+      completeness: omittedUnownedAuxiliary ? ('partial' as const) : ('complete' as const),
       identityVerified: true,
+      ...(omittedUnownedAuxiliary ? { reasons: ['chatgpt_api_unowned_auxiliary_omitted'] } : null),
     },
   };
 
