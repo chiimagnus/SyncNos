@@ -109,7 +109,7 @@ describe('background-router obsidian sync routes', () => {
     });
 
     store['webclipper_sync_provider_obsidian_enabled'] = false;
-    const disabledRes = await router.__handleMessageForTests({
+    const disabledRes = await router.dispatch({
       type: 'obsidianSyncConversations',
       conversationIds: [1],
     });
@@ -120,12 +120,12 @@ describe('background-router obsidian sync routes', () => {
     expect(calls.syncConversations).toBe(null);
     delete store['webclipper_sync_provider_obsidian_enabled'];
 
-    const getRes = await router.__handleMessageForTests({ type: 'obsidianGetSettings' });
+    const getRes = await router.dispatch({ type: 'obsidianGetSettings' });
     expect(getRes.ok).toBe(true);
     expect(getRes.data?.apiBaseUrl).toContain('http://127.0.0.1:27123');
     expect(getRes.data?.apiKeyPresent).toBe(false);
 
-    const saveRes = await router.__handleMessageForTests({
+    const saveRes = await router.dispatch({
       type: 'obsidianSaveSettings',
       apiBaseUrl: 'http://127.0.0.1:27123',
       apiKey: 'k',
@@ -135,17 +135,17 @@ describe('background-router obsidian sync routes', () => {
     expect(saveRes.data?.apiKeyPresent).toBe(true);
     expect(saveRes.data?.apiKeyMasked).toBe('********************************');
 
-    const testRes = await router.__handleMessageForTests({ type: 'obsidianTestConnection' });
+    const testRes = await router.dispatch({ type: 'obsidianTestConnection' });
     expect(testRes.ok).toBe(true);
     expect(calls.testConnection).toBe(1);
     expect(typeof testRes.data?.instanceId).toBe('string');
 
-    const statusRes = await router.__handleMessageForTests({ type: 'obsidianGetSyncStatus' });
+    const statusRes = await router.dispatch({ type: 'obsidianGetSyncStatus' });
     expect(statusRes.ok).toBe(true);
     expect(calls.getSyncStatus).toBe(1);
     expect(statusRes.data?.active).toBe(false);
 
-    const syncRes = await router.__handleMessageForTests({
+    const syncRes = await router.dispatch({
       type: 'obsidianSyncConversations',
       conversationIds: [1, 2],
       forceFullConversationIds: [2],
@@ -159,7 +159,7 @@ describe('background-router obsidian sync routes', () => {
 
     calls.syncConversations = null;
     calls.syncPreflightMode = 'network_error';
-    const preflightFailRes = await router.__handleMessageForTests({
+    const preflightFailRes = await router.dispatch({
       type: 'obsidianSyncConversations',
       conversationIds: [3],
     });
@@ -173,13 +173,13 @@ describe('background-router obsidian sync routes', () => {
     calls.syncPreflightMode = 'ok';
 
     calls.syncMode = 'long-running';
-    const firstRun = router.__handleMessageForTests({
+    const firstRun = router.dispatch({
       type: 'obsidianSyncConversations',
       conversationIds: [1],
     });
     expect((await firstRun).ok).toBe(true);
 
-    const conflictRes = await router.__handleMessageForTests({
+    const conflictRes = await router.dispatch({
       type: 'obsidianSyncConversations',
       conversationIds: [1],
     });

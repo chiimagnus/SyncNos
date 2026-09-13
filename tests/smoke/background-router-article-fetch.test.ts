@@ -27,7 +27,7 @@ describe('background-router article fetch', () => {
     });
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle', tabId: 42 });
+    const res = await router.dispatch({ type: 'fetchActiveTabArticle', tabId: 42 });
 
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({ conversationId: 7, tabId: 42 });
@@ -39,7 +39,7 @@ describe('background-router article fetch', () => {
     articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error('extract failed'));
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle' });
+    const res = await router.dispatch({ type: 'fetchActiveTabArticle' });
 
     expect(res.ok).toBe(false);
     expect(String(res.error?.message || '')).toContain('extract failed');
@@ -49,7 +49,7 @@ describe('background-router article fetch', () => {
     articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error('Discourse OP not found'));
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle' });
+    const res = await router.dispatch({ type: 'fetchActiveTabArticle' });
 
     expect(res.ok).toBe(false);
     expect(String(res.error?.message || '')).toContain('Discourse OP not found');
@@ -62,7 +62,7 @@ describe('background-router article fetch', () => {
     });
 
     const router = createTestBackgroundRouter({ onArticleConversationChanged });
-    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle' });
+    const res = await router.dispatch({ type: 'fetchActiveTabArticle' });
     await Promise.resolve();
 
     expect(res.ok).toBe(true);
@@ -73,7 +73,7 @@ describe('background-router article fetch', () => {
     articleFetchMocks.resolveOrCaptureActiveTabArticle.mockRejectedValue(new Error(' discourse op not found '));
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'resolveOrCaptureActiveTabArticle' });
+    const res = await router.dispatch({ type: 'resolveOrCaptureActiveTabArticle' });
 
     expect(res.ok).toBe(false);
     expect(String(res.error?.message || '')).toContain('Discourse OP not found');
@@ -87,7 +87,7 @@ describe('background-router article fetch', () => {
     });
 
     const router = createTestBackgroundRouter({ onArticleConversationChanged });
-    const res = await router.__handleMessageForTests({ type: 'resolveOrCaptureActiveTabArticle' });
+    const res = await router.dispatch({ type: 'resolveOrCaptureActiveTabArticle' });
     await Promise.resolve();
 
     expect(res.ok).toBe(true);
@@ -102,7 +102,7 @@ describe('background-router article fetch', () => {
     });
 
     const router = createTestBackgroundRouter({ onArticleConversationChanged });
-    const res = await router.__handleMessageForTests({ type: 'resolveOrCaptureActiveTabArticle' });
+    const res = await router.dispatch({ type: 'resolveOrCaptureActiveTabArticle' });
     await Promise.resolve();
 
     expect(res.ok).toBe(true);

@@ -126,7 +126,7 @@ describe('background-router conversations', () => {
     });
     const router = createRouter({ onConversationChanged });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'upsertConversation',
       payload: { source: 'chatgpt', conversationKey: 'k-321', title: 'Title', lastActivityAt: 100 },
     });
@@ -155,7 +155,7 @@ describe('background-router conversations', () => {
     });
     const router = createRouter({ onConversationChanged });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'upsertConversation',
       payload: { source: 'chatgpt', conversationKey: 'k-321', lastActivityAt: 0 },
     });
@@ -170,7 +170,7 @@ describe('background-router conversations', () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     const router = createRouter({ onConversationChanged });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 123,
       messages: [],
@@ -189,7 +189,7 @@ describe('background-router conversations', () => {
 
   it('rejects invalid explicit activity before message persistence', async () => {
     const router = createRouter();
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 123,
       messages: [],
@@ -205,7 +205,7 @@ describe('background-router conversations', () => {
 
     const router = createRouter({ onConversationChanged });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 123,
       messages: [],
@@ -223,7 +223,7 @@ describe('background-router conversations', () => {
   it('rejects an unknown non-empty persistence mode before image or storage work', async () => {
     const router = createRouter();
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 123,
       mode: 'snapshop',
@@ -249,7 +249,7 @@ describe('background-router conversations', () => {
 
     const router = createRouter();
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2001,
       conversationSourceType: 'chat',
@@ -280,7 +280,7 @@ describe('background-router conversations', () => {
       },
     ];
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2004,
       conversationSourceType: 'video',
@@ -309,7 +309,7 @@ describe('background-router conversations', () => {
     );
     const router = createRouter();
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2003,
       conversationSourceType: 'chat',
@@ -357,7 +357,7 @@ describe('background-router conversations', () => {
 
     const router = createRouter();
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2002,
       conversationSourceType: 'article',
@@ -390,7 +390,7 @@ describe('background-router conversations', () => {
     });
 
     const router = createRouter({ onConversationChanged });
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 888,
       conversationUrl: 'https://example.com/a',
@@ -419,7 +419,7 @@ describe('background-router conversations', () => {
     });
 
     const router = createRouter({ onConversationChanged });
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 889,
       conversationUrl: 'https://example.com/b',
@@ -435,7 +435,7 @@ describe('background-router conversations', () => {
     backfillJobMocks.backfillConversationImages.mockRejectedValue(new Error('conditional patch failed'));
 
     const router = createRouter({ onConversationChanged });
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 890,
       conversationUrl: 'https://example.com/c',
@@ -458,7 +458,7 @@ describe('background-router conversations', () => {
     });
     const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'mergeConversations',
       keepConversationId: 10,
       removeConversationId: 11,
@@ -483,7 +483,7 @@ describe('background-router conversations', () => {
     });
     const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'mergeConversations',
       keepConversationId: 10,
       removeConversationId: 11,
@@ -506,7 +506,7 @@ describe('background-router conversations', () => {
 
     const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'deleteConversations',
       conversationIds: [1, '2', 'bad', -1],
     });
@@ -527,7 +527,7 @@ describe('background-router conversations', () => {
     });
     const router = createRouter({ onRemoteCleanupPending });
 
-    const res = await router.__handleMessageForTests({ type: 'deleteConversations', conversationIds: [999] });
+    const res = await router.dispatch({ type: 'deleteConversations', conversationIds: [999] });
     await Promise.resolve();
 
     expect(res.ok).toBe(true);

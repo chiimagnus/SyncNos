@@ -69,7 +69,7 @@ describe('conversations pagination handlers', () => {
     });
     const router = createRouter();
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'getConversationListBootstrap',
       query: { sourceKey: 'WEB', siteKey: 'DOMAIN:example.com' },
       limit: 25,
@@ -89,7 +89,7 @@ describe('conversations pagination handlers', () => {
     [{ lastActivityAt: 0, id: 0 }, 'non-positive id'],
   ])('rejects page requests with invalid cursor shape: %s', async (cursor) => {
     const router = createRouter();
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'getConversationListPage',
       query: { sourceKey: 'all', siteKey: 'all', limit: 20 },
       cursor,
@@ -104,7 +104,7 @@ describe('conversations pagination handlers', () => {
 
   it('rejects by-loc lookup when source/conversationKey is invalid', async () => {
     const router = createRouter();
-    const noSource = await router.__handleMessageForTests({
+    const noSource = await router.dispatch({
       type: 'findConversationBySourceAndKey',
       source: '',
       conversationKey: 'abc',
@@ -113,7 +113,7 @@ describe('conversations pagination handlers', () => {
     expect(noSource.error?.message).toBe('invalid source');
     expect((noSource.error?.extra as any)?.field).toBe('source');
 
-    const noKey = await router.__handleMessageForTests({
+    const noKey = await router.dispatch({
       type: 'findConversationBySourceAndKey',
       source: 'chatgpt',
       conversationKey: '',
@@ -137,7 +137,7 @@ describe('conversations pagination handlers', () => {
     });
     const router = createRouter();
 
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: 'findConversationById',
       conversationId: 99,
     });
@@ -158,7 +158,7 @@ describe('conversations pagination handlers', () => {
   it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {
     const router = createRouter();
 
-    const noSource = await router.__handleMessageForTests({
+    const noSource = await router.dispatch({
       type: 'getConversationTailWindowBySourceAndKey',
       source: '',
       conversationKey: 'abc',
@@ -167,7 +167,7 @@ describe('conversations pagination handlers', () => {
     expect(noSource.error?.message).toBe('invalid source');
     expect((noSource.error?.extra as any)?.field).toBe('source');
 
-    const noKey = await router.__handleMessageForTests({
+    const noKey = await router.dispatch({
       type: 'getConversationTailWindowBySourceAndKey',
       source: 'chatgpt',
       conversationKey: '',
@@ -176,7 +176,7 @@ describe('conversations pagination handlers', () => {
     expect(noKey.error?.message).toBe('invalid conversationKey');
     expect((noKey.error?.extra as any)?.field).toBe('conversationKey');
 
-    const invalidLimit = await router.__handleMessageForTests({
+    const invalidLimit = await router.dispatch({
       type: 'getConversationTailWindowBySourceAndKey',
       source: 'chatgpt',
       conversationKey: 'abc',
@@ -199,7 +199,7 @@ describe('conversations pagination handlers', () => {
     });
     const router = createRouter();
 
-    const withLimit = await router.__handleMessageForTests({
+    const withLimit = await router.dispatch({
       type: 'getConversationTailWindowBySourceAndKey',
       source: 'chatgpt',
       conversationKey: 'k1',
@@ -212,7 +212,7 @@ describe('conversations pagination handlers', () => {
     });
     expect(storageMocks.getConversationTailWindowBySourceAndKey).toHaveBeenNthCalledWith(1, 'chatgpt', 'k1', 200);
 
-    const withoutLimit = await router.__handleMessageForTests({
+    const withoutLimit = await router.dispatch({
       type: 'getConversationTailWindowBySourceAndKey',
       source: 'chatgpt',
       conversationKey: 'k2',

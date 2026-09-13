@@ -450,7 +450,7 @@ async function seedImageAsset(id: number, conversationId: number, url: string, b
 
 async function waitForGithubSyncTerminalStatus(router: ReturnType<typeof createBackgroundRouter>) {
   for (let attempt = 0; attempt < 1_000; attempt += 1) {
-    const status = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const status = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
     const phase = String(status?.data?.job?.status || '');
     if (phase && phase !== 'running') return status;
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -552,14 +552,14 @@ afterAll(async () => {
 
 describe('GitHub Markdown production-chain integration', () => {
   it('runs Device Flow through repository preflight and durable Markdown reconciliation', async () => {
-    const startedAuth = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW });
+    const startedAuth = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW });
     expect(startedAuth).toMatchObject({
       ok: true,
       data: { auth: { state: 'pending', userCode: USER_CODE, verificationUri: 'https://github.com/login/device' } },
     });
     assertSecretFree(startedAuth);
 
-    const restoredPending = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS });
+    const restoredPending = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS });
     expect(restoredPending).toMatchObject({
       ok: true,
       data: {
@@ -575,19 +575,19 @@ describe('GitHub Markdown production-chain integration', () => {
 
     const pending = restoredPending.data.auth;
     fakeGithub.now = pending.nextPollAt;
-    const polled = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW });
+    const polled = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW });
     expect(polled).toMatchObject({ ok: true, data: { auth: { state: 'connected' } } });
     expect(fakeGithub.devicePollCalls).toBe(1);
     assertSecretFree(polled);
 
-    const repositories = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
+    const repositories = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
     expect(repositories).toMatchObject({
       ok: true,
       data: { status: 'ready', repositories: [{ fullName: REPOSITORY, contentWriteCapable: true }] },
     });
     assertSecretFree(repositories);
 
-    const saved = await router.__handleMessageForTests({
+    const saved = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
       repository: REPOSITORY,
       branch: BRANCH,
@@ -597,7 +597,7 @@ describe('GitHub Markdown production-chain integration', () => {
 
     const commitsBeforeTest = fakeGithub.syncCommitPosts;
     const refsBeforeTest = fakeGithub.syncRefUpdates;
-    const tested = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
+    const tested = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
     expect(tested).toMatchObject({
       ok: true,
       data: { ok: true, target: { repository: REPOSITORY, branch: BRANCH, remoteKey: REMOTE_KEY, installationId: 7 } },
@@ -673,7 +673,7 @@ describe('GitHub Markdown production-chain integration', () => {
     expect((await backgroundStorage.getConversationById(Number(article.id)))?.lastActivityAt).toBe(30);
 
     const refUpdatesBeforeFirstSync = fakeGithub.syncRefUpdates;
-    const manualStart = await router.__handleMessageForTests({
+    const manualStart = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [chat.id, article.id],
     });
@@ -891,7 +891,7 @@ describe('GitHub Markdown production-chain integration', () => {
 
     const settingsBeforeRemoval = await getGithubSettings();
     fakeGithub.repositoryAccessible = false;
-    const unavailable = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
+    const unavailable = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
     expect(unavailable).toMatchObject({
       ok: false,
       error: { message: 'github_no_accessible_repositories', extra: { code: 'github_no_accessible_repositories' } },
@@ -903,7 +903,7 @@ describe('GitHub Markdown production-chain integration', () => {
     assertSecretFree(unavailable);
 
     fakeGithub.repositoryAccessible = true;
-    const restored = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
+    const restored = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
     expect(restored).toMatchObject({
       ok: true,
       data: { ok: true, target: { repository: REPOSITORY, branch: BRANCH } },

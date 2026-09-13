@@ -27,7 +27,7 @@ describe('background-router current page capture relay', () => {
     });
 
     const router = createTestBackgroundRouter();
-    const response = await router.__handleMessageForTests({ type: 'getActiveTabCaptureState' });
+    const response = await router.dispatch({ type: 'getActiveTabCaptureState' });
 
     expect(response.ok).toBe(true);
     expect(response.data).toEqual({
@@ -43,7 +43,7 @@ describe('background-router current page capture relay', () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 9, url: 'chrome://extensions/' }] as any);
 
     const router = createTestBackgroundRouter();
-    const response = await router.__handleMessageForTests({ type: 'getActiveTabCaptureState' });
+    const response = await router.dispatch({ type: 'getActiveTabCaptureState' });
 
     expect(response.ok).toBe(true);
     expect(response.data?.available).toBe(false);

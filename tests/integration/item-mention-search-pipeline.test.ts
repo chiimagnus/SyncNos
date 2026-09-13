@@ -62,7 +62,7 @@ describe('item mention search pipeline', () => {
     });
     registerItemMentionHandlers(router as any);
 
-    const response = await router.__handleMessageForTests({
+    const response = await router.dispatch({
       type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES,
       query: 'openai',
       limit: 20,

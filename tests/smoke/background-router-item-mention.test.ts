@@ -71,7 +71,7 @@ function createRouter() {
 }
 
 async function search(router: ReturnType<typeof createRouter>, query: string, limit = 20) {
-  return router.__handleMessageForTests({
+  return router.dispatch({
     type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES,
     query,
     limit,
@@ -142,7 +142,7 @@ describe('background-router item mention', () => {
     storageMocks.readRecentConversationMentionCandidates.mockResolvedValue([candidate(1, 'Recent')]);
     const router = createRouter();
 
-    const response = await router.__handleMessageForTests({
+    const response = await router.dispatch({
       type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES,
       text: 'openai',
       limit: 2,
@@ -279,7 +279,7 @@ describe('background-router item mention', () => {
     externalMarkdownMocks.formatConversationMarkdownForExternalOutput.mockResolvedValue('MARKDOWN');
 
     const router = createRouter();
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT,
       conversationId: 123,
     });
@@ -291,7 +291,7 @@ describe('background-router item mention', () => {
 
   it('rejects invalid conversationId', async () => {
     const router = createRouter();
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT,
       conversationId: 'bad',
     });
@@ -303,7 +303,7 @@ describe('background-router item mention', () => {
     storageMocks.getConversationById.mockResolvedValue(null);
 
     const router = createRouter();
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT,
       conversationId: 999,
     });
@@ -324,7 +324,7 @@ describe('background-router item mention', () => {
     storageMocks.getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
 
     const router = createRouter();
-    const res = await router.__handleMessageForTests({
+    const res = await router.dispatch({
       type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT,
       conversationId: 1,
     });

@@ -17,7 +17,7 @@ describe('background-router open inpage comments sidebar', () => {
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: null, error: null } as any);
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests(
+    const res = await router.dispatch(
       {
         type: 'openCurrentTabInpageCommentsPanel',
         source: 'popup',
@@ -37,7 +37,7 @@ describe('background-router open inpage comments sidebar', () => {
 
   it('returns error when sender tab id is unavailable and does not relay', async () => {
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests(
+    const res = await router.dispatch(
       {
         type: 'openCurrentTabInpageCommentsPanel',
       },

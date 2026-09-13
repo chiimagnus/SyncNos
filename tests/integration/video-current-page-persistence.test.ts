@@ -130,7 +130,7 @@ describe('Video Current Page persistence pipeline', () => {
         ) {
           throw new Error(`Article route must not be used for Video: ${type}`);
         }
-        return await router.__handleMessageForTests({ type, ...payload });
+        return await router.dispatch({ type, ...payload });
       },
     };
     const webCollector = { capture: vi.fn(() => null) };
@@ -314,7 +314,7 @@ describe('Video Current Page persistence pipeline', () => {
         ) {
           throw new Error(`Article route must not be used for Video: ${type}`);
         }
-        return await router.__handleMessageForTests({ type, ...payload });
+        return await router.dispatch({ type, ...payload });
       },
     };
     const videoCapture = createVideoTranscriptCaptureService({ runtime });

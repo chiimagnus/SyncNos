@@ -157,7 +157,7 @@ describe('background sync ownership admission', () => {
   it.each(syncCases)('$provider rejects an existing run before provider preflight', async ({ provider, type }) => {
     const harness = createHarness(provider, null);
 
-    const response = await harness.router.__handleMessageForTests({ type, conversationIds: [1] });
+    const response = await harness.router.dispatch({ type, conversationIds: [1] });
 
     expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
     expect(harness.sync[provider]).not.toHaveBeenCalled();
@@ -174,13 +174,13 @@ describe('background sync ownership admission', () => {
     const preflight = deferred<any>();
     harness.obsidianPreflight.mockImplementationOnce(() => preflight.promise);
 
-    const startResponse = harness.router.__handleMessageForTests({
+    const startResponse = harness.router.dispatch({
       type: OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [1],
     });
     await Promise.resolve();
 
-    const duringPreflight = await harness.router.__handleMessageForTests({
+    const duringPreflight = await harness.router.dispatch({
       type: OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS,
     });
     expect(duringPreflight).toMatchObject({
@@ -193,7 +193,7 @@ describe('background sync ownership admission', () => {
     const failed = await startResponse;
     expect(failed).toMatchObject({ ok: false, error: { extra: { code: 'network_error', stage: 'preflight' } } });
 
-    const afterFailure = await harness.router.__handleMessageForTests({ type: OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const afterFailure = await harness.router.dispatch({ type: OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS });
     expect(afterFailure).toMatchObject({ ok: true, data: { provider: 'obsidian', active: false, job: null } });
   });
 
@@ -212,13 +212,13 @@ describe('background sync ownership admission', () => {
     };
     const harness = createHarness('github', null, { github: oldRunning });
 
-    const status = await harness.router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const status = await harness.router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
     expect(status).toMatchObject({
       ok: true,
       data: { active: true, job: { id: 'old-visible-run', status: 'running' } },
     });
 
-    const conflict = await harness.router.__handleMessageForTests({
+    const conflict = await harness.router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [1],
     });
@@ -241,10 +241,10 @@ describe('background sync ownership admission', () => {
     };
     const harness = createHarness(null, null, { github: residue });
 
-    const status = await harness.router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const status = await harness.router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
     expect(status).toMatchObject({ ok: true, data: { active: false, job: { id: 'residue', status: 'running' } } });
 
-    const started = await harness.router.__handleMessageForTests({
+    const started = await harness.router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [1],
     });
@@ -257,7 +257,7 @@ describe('background sync ownership admission', () => {
     async ({ provider, type }) => {
       const harness = createHarness(null, provider);
 
-      const response = await harness.router.__handleMessageForTests({ type, conversationIds: [1] });
+      const response = await harness.router.dispatch({ type, conversationIds: [1] });
 
       expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
       expect(harness.sync[provider]).toHaveBeenCalledTimes(1);
@@ -323,11 +323,11 @@ describe('Feishu destructive settings ownership', () => {
       createdAt: 1,
     });
 
-    const status = await harness.router.__handleMessageForTests({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS });
+    const status = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS });
     expect(status).toEqual({ ok: true, data: { connected: true }, error: null });
     expect(JSON.stringify(status)).not.toMatch(/ACCESS_SECRET|REFRESH_SECRET/);
 
-    const start = await harness.router.__handleMessageForTests({
+    const start = await harness.router.dispatch({
       type: FEISHU_MESSAGE_TYPES.START_AUTH,
       clientId: 'app-id',
       clientSecret: 'secret',
@@ -340,7 +340,7 @@ describe('Feishu destructive settings ownership', () => {
       tokenExchangeProxyUrl: '',
     });
 
-    const saved = await harness.router.__handleMessageForTests({
+    const saved = await harness.router.dispatch({
       type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
       clientId: 'app-id',
       clientSecret: 'secret',
@@ -353,7 +353,7 @@ describe('Feishu destructive settings ownership', () => {
       tokenExchangeProxyUrl: '',
     });
 
-    await harness.router.__handleMessageForTests({
+    await harness.router.dispatch({
       type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
       clientId: 'portable-app-id',
       tokenExchangeProxyUrl: 'https://worker.example.com/exchange',
@@ -370,7 +370,7 @@ describe('Feishu destructive settings ownership', () => {
   it('rejects active disconnect before deleting Feishu credentials or config', async () => {
     const harness = createFeishuSettingsHarness({ active: true, initialJob: { status: 'running' } });
 
-    const response = await harness.router.__handleMessageForTests({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
+    const response = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
 
     expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
     expect(mocks.clearFeishuOAuthAttemptAndToken).not.toHaveBeenCalled();
@@ -385,7 +385,7 @@ describe('Feishu destructive settings ownership', () => {
   ])('clears Feishu %s state without directly removing the SyncJob key', async (_label, initialJob) => {
     const harness = createFeishuSettingsHarness({ initialJob });
 
-    const response = await harness.router.__handleMessageForTests({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
+    const response = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
 
     expect(response.ok).toBe(true);
     expect(harness.getJob()).toBeNull();
@@ -399,7 +399,7 @@ describe('Feishu destructive settings ownership', () => {
       clearSucceeds: false,
     });
 
-    const response = await harness.router.__handleMessageForTests({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
+    const response = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.DISCONNECT });
 
     expect(response).toMatchObject({
       ok: false,
@@ -418,7 +418,7 @@ describe('background clear ownership errors', () => {
       Object.assign(new Error('github sync job persistence failed'), { code: 'github_sync_job_persist_failed' }),
     );
 
-    const response = await harness.router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
+    const response = await harness.router.dispatch({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
 
     expect(response).toMatchObject({
       ok: false,
@@ -432,7 +432,7 @@ describe('background clear ownership errors', () => {
       throw createSyncAlreadyRunningError();
     });
 
-    const response = await harness.router.__handleMessageForTests({ type });
+    const response = await harness.router.dispatch({ type });
 
     expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
   });

@@ -19,7 +19,7 @@ describe('background-router open extension popup', () => {
     };
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'openExtensionPopup' });
+    const res = await router.dispatch({ type: 'openExtensionPopup' });
 
     expect(res.ok).toBe(true);
     expect(res.data?.opened).toBe(true);
@@ -38,7 +38,7 @@ describe('background-router open extension popup', () => {
     };
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'openExtensionPopup' });
+    const res = await router.dispatch({ type: 'openExtensionPopup' });
 
     expect(res.ok).toBe(true);
     expect(calls).toEqual(['open']);
@@ -49,7 +49,7 @@ describe('background-router open extension popup', () => {
     globalThis.chrome = {};
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'openExtensionPopup' });
+    const res = await router.dispatch({ type: 'openExtensionPopup' });
 
     expect(res.ok).toBe(false);
     expect(res.error?.extra?.code).toBe('OPEN_POPUP_UNSUPPORTED');
@@ -66,7 +66,7 @@ describe('background-router open extension popup', () => {
     };
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: 'openExtensionPopup' });
+    const res = await router.dispatch({ type: 'openExtensionPopup' });
 
     expect(res.ok).toBe(false);
     expect(res.error?.extra?.code).toBe('OPEN_POPUP_FAILED');

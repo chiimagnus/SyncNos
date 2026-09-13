@@ -22,7 +22,7 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     handlers.set(type, handler);
   }
 
-  async function handleMessage(msg: Message, sender: any) {
+  async function dispatch(msg: Message, sender: any = null) {
     if (!msg || typeof msg.type !== 'string') return err('invalid message');
 
     const handler = handlers.get(msg.type);
@@ -45,7 +45,7 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     // Prefer callback-style listener for maximum compatibility across browsers/polyfills.
     onMessage.addListener((msg: any, sender: any, sendResponse: any) => {
       Promise.resolve()
-        .then(() => handleMessage(msg, sender))
+        .then(() => dispatch(msg, sender))
         .then((res) => {
           try {
             sendResponse?.(res);
@@ -64,9 +64,5 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     });
   }
 
-  async function __handleMessageForTests(msg: Message, sender?: any) {
-    return handleMessage(msg, sender ?? null);
-  }
-
-  return { ok, err, register, start, __handleMessageForTests };
+  return { ok, err, register, start, dispatch };
 }

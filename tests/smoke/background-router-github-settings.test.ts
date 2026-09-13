@@ -93,7 +93,7 @@ describe('background-router GitHub settings routes', () => {
       discoverRepositories,
     });
 
-    const response = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS });
+    const response = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS });
 
     expect(response).toMatchObject({
       ok: true,
@@ -144,12 +144,12 @@ describe('background-router GitHub settings routes', () => {
       GITHUB_MESSAGE_TYPES.CANCEL_DEVICE_FLOW,
       GITHUB_MESSAGE_TYPES.DISCONNECT,
     ]) {
-      const response = await router.__handleMessageForTests({ type });
+      const response = await router.dispatch({ type });
       expect(response.ok).toBe(true);
       expectSecretFree(response);
     }
     expect(clearAuthState).toHaveBeenCalledTimes(1);
-    const disconnected = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.DISCONNECT });
+    const disconnected = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.DISCONNECT });
     expect(disconnected.data).toMatchObject({ auth: { state: 'disconnected' }, disconnectedLocal: true });
   });
 
@@ -163,7 +163,7 @@ describe('background-router GitHub settings routes', () => {
       runExclusiveMaintenance: runExclusiveMaintenance as any,
     });
 
-    const response = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.DISCONNECT });
+    const response = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.DISCONNECT });
 
     expect(response).toMatchObject({
       ok: false,
@@ -212,7 +212,7 @@ describe('background-router GitHub settings routes', () => {
       })) as any,
     });
 
-    const repositories = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
+    const repositories = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
     expect(repositories).toMatchObject({
       ok: true,
       data: {
@@ -225,7 +225,7 @@ describe('background-router GitHub settings routes', () => {
     });
     expectSecretFree(repositories);
 
-    const saved = await router.__handleMessageForTests({
+    const saved = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
       repository: 'owner/repo',
       branch: 'main',
@@ -234,7 +234,7 @@ describe('background-router GitHub settings routes', () => {
     expect(saveSettings).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main' });
     expectSecretFree(saved);
 
-    const unexpectedFieldRejected = await router.__handleMessageForTests({
+    const unexpectedFieldRejected = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
       repository: 'owner/repo',
       unexpectedField: 'not-supported',
@@ -245,7 +245,7 @@ describe('background-router GitHub settings routes', () => {
     });
     expectSecretFree(unexpectedFieldRejected);
 
-    const rejected = await router.__handleMessageForTests({
+    const rejected = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS,
       repository: 'owner/repo',
       accessToken: ACCESS_TOKEN,
@@ -257,7 +257,7 @@ describe('background-router GitHub settings routes', () => {
     expect(saveSettings).toHaveBeenCalledTimes(1);
     expectSecretFree(rejected);
 
-    const tested = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
+    const tested = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION });
     expect(preflightRepository).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main' });
     expect(saveSettings).toHaveBeenCalledTimes(1);
     expect(tested).toMatchObject({
@@ -274,7 +274,7 @@ describe('background-router GitHub settings routes', () => {
     });
     expectSecretFree(tested);
 
-    const initialized = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY });
+    const initialized = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY });
     expect(deps.initializeRepository).toHaveBeenCalledWith({ repository: 'owner/repo', branch: 'main' });
     expect(saveSettings).toHaveBeenCalledTimes(1);
     expect(initialized).toMatchObject({
@@ -309,7 +309,7 @@ describe('background-router GitHub settings routes', () => {
       }),
     });
 
-    const listResponse = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
+    const listResponse = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES });
     expect(listResponse).toMatchObject({
       ok: false,
       error: {
@@ -319,7 +319,7 @@ describe('background-router GitHub settings routes', () => {
     });
     expectSecretFree(listResponse);
 
-    const startResponse = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW });
+    const startResponse = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW });
     expect(startResponse).toMatchObject({
       ok: false,
       error: { message: 'github_device_start_failed', extra: { code: 'github_device_start_failed' } },

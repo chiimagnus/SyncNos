@@ -187,7 +187,7 @@ function createRouter({
 }
 
 async function startNotionSync(router: any, jobStore: { __getJob: () => any }, conversationIds: number[]) {
-  const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds });
+  const res = await router.dispatch({ type: 'notionSyncConversations', conversationIds });
   expect(res.ok).toBe(true);
   expect(res.data?.started).toBe(true);
   return await waitForJobDone(jobStore);
@@ -253,7 +253,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'getNotionAuthStatus' });
+    const res = await router.dispatch({ type: 'getNotionAuthStatus' });
     expect(res).toMatchObject({ ok: true, data: { connected: true, workspaceName: 'ws' } });
     expect(res.data).not.toHaveProperty('token');
     expect(JSON.stringify(res.data)).not.toContain('accessToken');
@@ -272,7 +272,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionStartAuth' });
+    const res = await router.dispatch({ type: 'notionStartAuth' });
     expect(res.ok).toBe(true);
     expect(String(res.data?.state || '')).toMatch(/^[0-9a-f]{32}$/);
     expect(chromeMock.__store.notion_oauth_pending_state).toBe(res.data?.state);
@@ -305,7 +305,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+    const res = await router.dispatch({ type: 'notionDisconnect' });
     expect(res.ok).toBe(true);
 
     const removedFlatten = chromeMock.__removed.flat();
@@ -339,7 +339,7 @@ describe('background-router notion sync', () => {
       runExclusiveMaintenance: async (mutation) => await mutation(),
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+    const res = await router.dispatch({ type: 'notionDisconnect' });
 
     expect(res).toMatchObject({ ok: false, error: { message: 'canonical registry unavailable' } });
     expect(chromeMock.__store.notion_oauth_token_v1).toBeTruthy();
@@ -369,11 +369,11 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const started = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const started = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(started).toMatchObject({ ok: true, data: { started: true, provider: 'notion' } });
     await waitFor(() => jobStore.__getJob()?.status === 'running', 'notion running claim');
 
-    const disconnected = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+    const disconnected = await router.dispatch({ type: 'notionDisconnect' });
     expect(disconnected).toMatchObject({
       ok: false,
       error: { extra: { code: 'sync_already_running' } },
@@ -414,7 +414,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const disconnected = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+    const disconnected = await router.dispatch({ type: 'notionDisconnect' });
 
     expect(disconnected.ok).toBe(true);
     expect(jobStore.__getJob()).toBeNull();
@@ -457,7 +457,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const disconnected = await router.__handleMessageForTests({ type: 'notionDisconnect' });
+    const disconnected = await router.dispatch({ type: 'notionDisconnect' });
 
     expect(disconnected).toMatchObject({
       ok: false,
@@ -507,7 +507,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const res = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data?.started).toBe(true);
 
@@ -1301,7 +1301,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const startRes = await router.__handleMessageForTests({
+    const startRes = await router.dispatch({
       type: 'notionSyncConversations',
       conversationIds: [1, 2, 3],
     });
@@ -1489,19 +1489,19 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const syncRes = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const syncRes = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(syncRes.ok).toBe(true);
     expect(syncRes.data?.started).toBe(true);
 
     await waitFor(() => !!jobStore.__getJob(), 'job to appear');
 
-    const jobRes = await router.__handleMessageForTests({ type: 'getNotionSyncJobStatus' });
+    const jobRes = await router.dispatch({ type: 'getNotionSyncJobStatus' });
     expect(jobRes.ok).toBe(true);
     expect(jobRes.data.job).toBeTruthy();
     const jobId = jobRes.data.job.id;
     expect(jobId).toBeTruthy();
     await waitForJobDone(jobStore);
-    const doneRes = await router.__handleMessageForTests({ type: 'getNotionSyncJobStatus' });
+    const doneRes = await router.dispatch({ type: 'getNotionSyncJobStatus' });
     expect(doneRes.ok).toBe(true);
     expect(doneRes.data.job.status).toBe('done');
     expect(doneRes.data.job.id).toBe(jobId);
@@ -1897,9 +1897,9 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const first = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const first = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(first).toMatchObject({ ok: true, data: { started: true, provider: 'notion' } });
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [2] });
+    const res = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [2] });
     expect(res.ok).toBe(false);
     expect(res.error?.message).toBe('sync already in progress');
     expect(res.error?.extra?.code).toBe('sync_already_running');
@@ -1953,7 +1953,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const res = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(res.ok).toBe(false);
     expect(res.error?.message).toBe('sync provider disabled');
     expect(res.error?.extra?.code).toBe('sync_provider_disabled');

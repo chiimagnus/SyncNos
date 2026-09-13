@@ -82,7 +82,7 @@ describe('background-router github sync routes', () => {
     };
     const router = createRouter(githubSyncOrchestrator);
 
-    const disabled = await router.__handleMessageForTests({
+    const disabled = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [1],
     });
@@ -92,7 +92,7 @@ describe('background-router github sync routes', () => {
     expect(githubSyncOrchestrator.sync).not.toHaveBeenCalled();
 
     delete store.webclipper_sync_provider_github_enabled;
-    const started = await router.__handleMessageForTests({
+    const started = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [1, '2', 2, 0],
     });
@@ -104,7 +104,7 @@ describe('background-router github sync routes', () => {
       instanceId: 'github-background-instance',
     });
 
-    const concurrent = await router.__handleMessageForTests({
+    const concurrent = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [3],
     });
@@ -117,7 +117,7 @@ describe('background-router github sync routes', () => {
     await Promise.resolve();
 
     job = { status: 'running', id: 'persisted-running' };
-    const residueRun = await router.__handleMessageForTests({
+    const residueRun = await router.dispatch({
       type: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS,
       conversationIds: [4],
     });
@@ -139,13 +139,13 @@ describe('background-router github sync routes', () => {
     };
     const router = createRouter(githubSyncOrchestrator, 'instance-status');
 
-    const status = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
+    const status = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS });
     expect(status).toMatchObject({
       ok: true,
       data: { provider: 'github', active: false, job: { status: 'done' } },
     });
 
-    const cleared = await router.__handleMessageForTests({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
+    const cleared = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.CLEAR_SYNC_STATUS });
     expect(cleared).toMatchObject({
       ok: true,
       data: { provider: 'github', active: false, job: null },
