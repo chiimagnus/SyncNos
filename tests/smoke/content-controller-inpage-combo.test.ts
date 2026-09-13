@@ -3,6 +3,10 @@ import { JSDOM } from 'jsdom';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 
+vi.mock('@services/integrations/chatgpt/api-capture-settings', () => ({
+  readChatgptApiCaptureEnabled: vi.fn(async () => false),
+}));
+
 type TickFn = (() => void | Promise<void>) | null;
 
 function setupDom(url = 'https://app.notion.com/chat?t=0123456789abcdef0123456789abcdef&wfv=chat') {
