@@ -19,6 +19,7 @@ describe('CLI browser target catalog', () => {
     expect(ids).toEqual(
       expect.arrayContaining([
         'chrome',
+        'chrome-for-testing',
         'chromium',
         'edge',
         'brave',
@@ -72,6 +73,14 @@ describe('CLI browser target catalog', () => {
   });
 
   it('keeps dedicated macOS and Linux long-tail registration paths', () => {
+    expect(
+      resolveBrowserTarget('chrome-for-testing', { platform: 'darwin', homeDir: '/Users/example' }).manifestPath,
+    ).toBe(
+      '/Users/example/Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts/app.syncnos.cli.json',
+    );
+    expect(
+      resolveBrowserTarget('chrome-for-testing', { platform: 'linux', homeDir: '/home/example' }).manifestPath,
+    ).toBe('/home/example/.config/google-chrome-for-testing/NativeMessagingHosts/app.syncnos.cli.json');
     expect(resolveBrowserTarget('arc', { platform: 'darwin', homeDir: '/Users/example' }).manifestPath).toBe(
       '/Users/example/Library/Application Support/Arc/User Data/NativeMessagingHosts/app.syncnos.cli.json',
     );
@@ -99,11 +108,11 @@ describe('CLI browser target catalog', () => {
         'ProgramFiles(x86)': 'C:\\Program Files (x86)',
       },
     };
-    const targets = resolveRegistrationTargets(['chrome', 'brave', 'vivaldi', 'edge', 'firefox', 'librewolf'], options);
+    const targets = resolveRegistrationTargets(['chrome', 'brave', 'vivaldi', 'edge', 'firefox'], options);
     expect(targets.map((item) => [item.registrationId, item.browsers])).toEqual([
       ['chrome', ['chrome', 'brave', 'vivaldi']],
       ['edge', ['edge']],
-      ['mozilla', ['firefox', 'librewolf']],
+      ['mozilla', ['firefox']],
     ]);
     expect(targets.map((item) => item.registryKey)).toEqual([
       `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${contract.nativeHostName}`,

@@ -442,10 +442,6 @@ const BROWSERS = Object.freeze({
         detect: linuxPaths('/usr/bin/librewolf'),
         registration: fileRegistration('librewolf', 'firefox', 'home', '.librewolf/native-messaging-hosts'),
       }),
-      win32: Object.freeze({
-        detect: winPaths(['programFiles', 'LibreWolf\\librewolf.exe'], ['programFilesX86', 'LibreWolf\\librewolf.exe']),
-        registration: registryRegistration('mozilla', 'firefox', REGISTRY.mozilla),
-      }),
     }),
   }),
   waterfox: Object.freeze({
@@ -486,10 +482,6 @@ const BROWSERS = Object.freeze({
           'home',
           '.local/share/torbrowser/tbb/x86_64/tor-browser/Browser/TorBrowser/Data/Browser/.mozilla/native-messaging-hosts',
         ),
-      }),
-      win32: Object.freeze({
-        detect: [],
-        registration: registryRegistration('mozilla', 'firefox', REGISTRY.mozilla),
       }),
     }),
   }),
