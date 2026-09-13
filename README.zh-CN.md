@@ -74,7 +74,7 @@ CLI Native Messaging 与“扩展可安装在哪些浏览器”是两套独立�
 | Notion AI | 可自动保存² |
 | z.ai | 可自动保存² |
 
-¹ ChatGPT 与 Google AI Studio 使用虚拟列表，必须显式手动抓取，确保完整性后才能保存。
+¹ ChatGPT 与 Google AI Studio 仍然只支持手动采集，因为虚拟列表需要显式抓取。ChatGPT 默认使用 DOM 采集；你也可以在 **设置 → AI 对话** 中显式开启仅针对当前会话的 **高级 API** 路径。它仍然只会在你手动保存时运行，并可能在 ChatGPT 调整未公开后端 API 后失效。
 
 ² 只有启用 AI 自动保存后才会后台采集。支持站点的事实真源是 `src/collectors/ai-chat-sites.ts`。
 

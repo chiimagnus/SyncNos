@@ -65,6 +65,10 @@ import {
   type CliIntegrationCapability,
 } from '@services/cli/cli-integration';
 import {
+  CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY,
+  writeChatgptApiCaptureEnabled,
+} from '@services/integrations/chatgpt/api-capture-settings';
+import {
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
   normalizeInpageDisplayMode,
   readEffectiveInpageDisplayMode,
@@ -335,6 +339,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const inpageDisplayObservationRevisionRef = useRef(0);
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const aiChatAutoSaveObservationRevisionRef = useRef(0);
+  const [chatgptApiCaptureEnabled, setChatgptApiCaptureEnabled] = useState<boolean>(false);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
   const [xiaohongshuCommentsCaptureEnabled, setXiaohongshuCommentsCaptureEnabled] = useState<boolean>(false);
@@ -713,6 +718,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
         GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
         'ai_chat_auto_save_enabled',
+        CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY,
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
         'xiaohongshu_comments_capture_enabled',
@@ -780,6 +786,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (aiChatAutoSaveObservationRevisionRef.current === aiChatAutoSaveObservationAtStart) {
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     }
+    setChatgptApiCaptureEnabled(local?.[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY] === true);
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
     setXiaohongshuCommentsCaptureEnabled(local?.xiaohongshu_comments_capture_enabled === true);
@@ -882,6 +889,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_auto_save_enabled')) {
         aiChatAutoSaveObservationRevisionRef.current += 1;
         setAiChatAutoSaveEnabled(changes.ai_chat_auto_save_enabled?.newValue !== false);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY)) {
+        setChatgptApiCaptureEnabled(changes[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY]?.newValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_dollar_mention_enabled')) {
         aiChatDollarMentionObservationRevisionRef.current += 1;
@@ -1728,6 +1738,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleChatgptApiCaptureEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        const enabled = await writeChatgptApiCaptureEnabled(next === true);
+        setChatgptApiCaptureEnabled(enabled);
+      });
+    },
+    [runTask],
+  );
+
   const onToggleAiChatCacheImagesEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
@@ -2273,6 +2293,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    chatgptApiCaptureEnabled,
+    onToggleChatgptApiCaptureEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,

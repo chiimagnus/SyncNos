@@ -282,6 +282,8 @@ describe('Settings scoped refresh', () => {
     expect(storageMocks.get).toHaveBeenCalledTimes(2);
     const storageReads = storageMocks.get.mock.calls.map(([keys]) => keys as string[]);
     const bulkRead = storageReads.find((keys) => keys.includes('ai_chat_auto_save_enabled'))!;
+    expect(bulkRead).toContain('chatgpt_api_capture_enabled');
+    expect(latestSnapshot!.chatgptApiCaptureEnabled).toBe(false);
     const displayRead = storageReads.find((keys) => keys.includes('inpage_display_mode'))!;
     expect(bulkRead).not.toContain('inpage_display_mode');
     expect(bulkRead).not.toContain('anti_hotlink_rules_v1');
@@ -356,6 +358,36 @@ describe('Settings scoped refresh', () => {
     await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
     expect(latestSnapshot!.inpageDisplayMode).toBe('all');
     expect(latestSnapshot!.error).toBe('display write failed');
+  });
+
+  it('ChatGPT Advanced API setting defaults off and its storage wake updates only local Settings state', async () => {
+    storageState = { chatgpt_api_capture_enabled: true };
+    await renderController();
+    expect(latestSnapshot!.chatgptApiCaptureEnabled).toBe(true);
+    const baselineRuntime = runtimeMocks.send.mock.calls.length;
+    const baselineStorageReads = storageMocks.get.mock.calls.length;
+
+    dispatchStorage({ chatgpt_api_capture_enabled: { oldValue: true, newValue: false } });
+    await flushReact();
+
+    expect(latestSnapshot!.chatgptApiCaptureEnabled).toBe(false);
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(baselineRuntime);
+    expect(storageMocks.get).toHaveBeenCalledTimes(baselineStorageReads);
+  });
+
+  it('ChatGPT Advanced API action writes the canonical key and keeps last-good state on failure', async () => {
+    storageState = { chatgpt_api_capture_enabled: false };
+    await renderController();
+    expect(latestSnapshot!.chatgptApiCaptureEnabled).toBe(false);
+
+    await invoke(() => latestSnapshot!.onToggleChatgptApiCaptureEnabled(true));
+    expect(storageMocks.set).toHaveBeenCalledWith({ chatgpt_api_capture_enabled: true });
+    expect(latestSnapshot!.chatgptApiCaptureEnabled).toBe(true);
+
+    storageMocks.set.mockRejectedValueOnce(new Error('advanced write failed'));
+    await invoke(() => latestSnapshot!.onToggleChatgptApiCaptureEnabled(false));
+    expect(latestSnapshot!.chatgptApiCaptureEnabled).toBe(true);
+    expect(latestSnapshot!.error).toBe('advanced write failed');
   });
 
   it('autosave and dollar wakes update only their own Settings state without a full refresh', async () => {

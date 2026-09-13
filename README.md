@@ -74,7 +74,7 @@ CLI Native Messaging has a separate support boundary from Extension installation
 | Notion AI | Auto-save capable² |
 | z.ai | Auto-save capable² |
 
-¹ ChatGPT and Google AI Studio use virtualized conversation lists and require an explicit manual capture so SyncNos can verify completeness.
+¹ ChatGPT and Google AI Studio remain manual-only because their virtualized conversation lists require an explicit capture. ChatGPT uses the DOM capture path by default. In **Settings → AI Chats**, you can explicitly enable the current-conversation **Advanced API** path; it still runs only when you manually save, and it may stop working when ChatGPT changes its non-public backend API.
 
 ² Automatic capture only runs when AI auto-save is enabled. The source-of-truth site list lives in `src/collectors/ai-chat-sites.ts`.
 

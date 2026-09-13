@@ -171,6 +171,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    chatgptApiCaptureEnabled,
+    onToggleChatgptApiCaptureEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
@@ -511,7 +513,15 @@ export function SettingsScene(props: SettingsSceneProps) {
 
       {activeSection === 'articles' ? <WebArticlesSection /> : null}
 
-      {activeSection === 'ai_chats' ? <AiChatsSection /> : null}
+      {activeSection === 'ai_chats' ? (
+        <AiChatsSection
+          busy={busy}
+          chatgptApiCaptureEnabled={chatgptApiCaptureEnabled}
+          onToggleChatgptApiCaptureEnabled={(next) => {
+            void onToggleChatgptApiCaptureEnabled(next);
+          }}
+        />
+      ) : null}
 
       {activeSection === 'videos' ? <VideosSection /> : null}
 

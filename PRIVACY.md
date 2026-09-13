@@ -21,7 +21,7 @@ Depending on the feature you invoke or enable, the Extension may read data that 
 - image URLs embedded in captured content;
 - text selections and locator metadata used for local article comments.
 
-Supported non-virtualized AI sites can be captured automatically when AI auto-save is enabled. ChatGPT and Google AI Studio require explicit manual capture because their virtualized lists cannot be treated as complete automatically. Article and Video capture are manually initiated.
+Supported non-virtualized AI sites can be captured automatically when AI auto-save is enabled. ChatGPT and Google AI Studio require explicit manual capture because their virtualized lists cannot be treated as complete automatically. ChatGPT uses DOM capture by default. Its optional Advanced API mode is off by default and is used only after you explicitly enable it and manually save the current canonical ChatGPT conversation. Article and Video capture are manually initiated.
 
 For Bilibili chapters/highlights, SyncNos consumes the player response that the current page naturally loads; this feature does not add a separate Bilibili WBI/API request.
 
@@ -48,6 +48,12 @@ The local CLI instance identifier and the **Local CLI Integration enabled** stat
 ## 4. External Sync and Network Requests
 
 External sync is optional. Connected providers can be synchronized manually, and each provider also has an optional auto-sync setting. When auto-sync is enabled, local content changes can be queued and sent to that provider without another manual sync click.
+
+### ChatGPT Advanced capture
+
+When you explicitly enable ChatGPT Advanced capture and manually save the current conversation, SyncNos uses your current signed-in ChatGPT session to request that conversation from ChatGPT's non-public current-conversation backend API. If the conversation contains protected images, SyncNos also requests ChatGPT's file-resolution and image-content endpoints so those images can be cached locally. This mode does not add background polling or automatic ChatGPT capture.
+
+ChatGPT session cookies and the access token obtained for these requests are used only at runtime. SyncNos does not write those authentication values, signed image download URLs, or raw backend responses to captured messages, browser local storage, or Backup ZIP files. Successfully downloaded protected-image blobs are stored in the existing local image cache. If an image cannot be downloaded or cached, SyncNos can still save the captured text and reports that capture as incomplete.
 
 ### Notion
 

@@ -13,6 +13,7 @@ import {
   coerceSettingsSectionKey,
   readStoredSettingsSection,
 } from '../../src/viewmodels/settings/types';
+import { AiChatsSection } from '../../src/ui/settings/sections/AiChatsSection';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 import { VideosSection } from '../../src/ui/settings/sections/VideosSection';
@@ -62,6 +63,42 @@ describe('settings section definitions', () => {
       ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
+  });
+
+  it('shows the ChatGPT Advanced API toggle only as an explicit default-off capable AI Chats control', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+    const onToggle = vi.fn();
+
+    act(() => {
+      root.render(
+        createElement(AiChatsSection, {
+          busy: false,
+          chatgptApiCaptureEnabled: false,
+          onToggleChatgptApiCaptureEnabled: onToggle,
+        }),
+      );
+    });
+
+    const toggle = document.querySelector(
+      'input[aria-label="Use the ChatGPT API for the current conversation"]',
+    ) as HTMLInputElement | null;
+    expect(toggle).toBeTruthy();
+    expect(toggle?.checked).toBe(false);
+    const text = document.body.textContent || '';
+    expect(text).toContain('ChatGPT Advanced capture');
+    expect(text).toContain('Off by default');
+    expect(text).toContain('non-public backend API');
+    expect(text).toContain('Tool, Agent, Deep Research');
+    expect(text).toContain('does not silently fall back');
+    expect(text).toContain('Protected images');
+    expect(text).toContain('reported as incomplete');
+
+    act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onToggle).toHaveBeenCalledWith(true);
+
+    act(() => root.unmount());
+    cleanupDom();
   });
 
   it('shows the exact supported video URL forms and bounded Bilibili chapter capability', () => {
