@@ -525,7 +525,7 @@ async function inspectLauncher({ launcherPath, expectedLauncher, platform }) {
 
 async function inspectRegistration(target, support, registryRunner) {
   const manifestPath = targetManifestPath(target, support);
-  const sharedByBrowsers = Array.isArray(target.browsers) ? [...target.browsers] : [target.id];
+  const sharedByBrowsers = Array.isArray(target.browsers) ? [...target.browsers] : [target.browserId];
   const state = await pathState(manifestPath);
   let registry = null;
   if (target.registrationKind === 'registry') {

@@ -597,9 +597,7 @@ export function resolveBrowserTarget(
 
   const registrationKey = registration.kind === 'file' ? `file:${manifestPath}` : `registry:${registryKey}`;
   return {
-    id,
     browserId: id,
-    name: definition.name,
     family: definition.family,
     platform,
     registrationId: registration.id,
@@ -607,9 +605,7 @@ export function resolveBrowserTarget(
     registrationKey,
     allowlistField: definition.family === 'chromium' ? 'allowed_origins' : 'allowed_extensions',
     extensionIds,
-    productionExtensionIds: productionIdsForFamily(definition.family),
     productionIdentity: JSON.stringify(allowlist) === JSON.stringify(productionAllowlist),
-    manifestDir,
     manifestPath,
     registryKey,
     allowlist,
