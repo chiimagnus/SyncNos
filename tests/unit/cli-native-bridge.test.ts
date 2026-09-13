@@ -358,12 +358,11 @@ describe('CLI Native Messaging bridge', () => {
       { type: CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, conversationIds: [7, 9] },
       null,
     );
-    await emit('b1', 'conversation.images.backfill', { conversationId: 7, conversationUrl: 'https://example.com/new' });
+    await emit('b1', 'conversation.images.backfill', { conversationId: 7 });
     expect(router.dispatch).toHaveBeenCalledWith(
       {
         type: CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
         conversationId: 7,
-        conversationUrl: 'https://example.com/new',
       },
       null,
     );

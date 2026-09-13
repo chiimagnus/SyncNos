@@ -269,6 +269,73 @@ describe('background-router conversations', () => {
     );
   });
 
+  it('forwards ChatGPT protected-image sidecars through the existing image-inline owner regardless of the generic cache toggle', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
+      if (keys.includes('ai_chat_cache_images_enabled')) throw new Error('generic image setting unavailable');
+      return {};
+    });
+    const protectedImages = {
+      conversationKey: 'conversation-1',
+      assets: [{ ref: 'file_1', fileId: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'm1' }],
+    };
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementationOnce(async (input: any) => ({
+      ...makeInlineResult(input.messages),
+      warningFlags: ['protected_images_incomplete'],
+    }));
+
+    const router = createRouter();
+    const res = await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 2002,
+      conversationSourceType: 'chat',
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body' }],
+      chatgptProtectedImages: protectedImages,
+    });
+
+    expect(res).toMatchObject({
+      ok: true,
+      data: { upserted: 1, deleted: 0, imageWarningFlags: ['protected_images_incomplete'] },
+    });
+    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 2002,
+        enableHttpImages: false,
+        protectedImages,
+        downloadProtectedImages: expect.any(Function),
+      }),
+    );
+    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith([
+      'ai_chat_cache_images_enabled',
+      'web_article_cache_images_enabled',
+    ]);
+    const [, storedMessages, storageOptions] = storageMocks.syncConversationMessages.mock.calls.at(-1)!;
+    expect(JSON.stringify({ storedMessages, storageOptions })).not.toContain('chatgptProtectedImages');
+    expect(JSON.stringify({ storedMessages, storageOptions })).not.toContain('file_1');
+  });
+
+  it('does not swallow protected-image sidecar validation failures before message storage', async () => {
+    imageInlineMocks.inlineChatImagesInMessages.mockRejectedValueOnce(
+      new Error('protected image target message is missing'),
+    );
+    const router = createRouter();
+
+    const res = await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 2003,
+      conversationSourceType: 'chat',
+      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body' }],
+      chatgptProtectedImages: {
+        conversationKey: 'conversation-1',
+        assets: [{ ref: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'missing' }],
+      },
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toBe('protected image target message is missing');
+    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
+  });
+
   it('skips chat/article image inlining for Video transcript messages', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     const router = createRouter();
@@ -284,7 +351,6 @@ describe('background-router conversations', () => {
       type: 'syncConversationMessages',
       conversationId: 2004,
       conversationSourceType: 'video',
-      conversationUrl: 'https://www.bilibili.com/video/BV1TEST12345/',
       messages,
     });
 
@@ -313,7 +379,6 @@ describe('background-router conversations', () => {
       type: 'syncConversationMessages',
       conversationId: 2003,
       conversationSourceType: 'chat',
-      conversationUrl: 'https://aistudio.google.com/app/1',
       mode: 'append',
       diff: { added: [], updated: ['m1'], removed: [] },
       messages: [
@@ -393,14 +458,10 @@ describe('background-router conversations', () => {
     const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 888,
-      conversationUrl: 'https://example.com/a',
     });
 
     expect(res.ok).toBe(true);
-    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({
-      conversationId: 888,
-      conversationUrl: 'https://example.com/a',
-    });
+    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({ conversationId: 888 });
     await Promise.resolve();
     expect(onConversationChanged).toHaveBeenCalledTimes(1);
     expect(onConversationChanged).toHaveBeenCalledWith(888, 'backfillImages');
@@ -422,7 +483,6 @@ describe('background-router conversations', () => {
     const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 889,
-      conversationUrl: 'https://example.com/b',
     });
 
     expect(res.ok).toBe(true);
@@ -438,7 +498,6 @@ describe('background-router conversations', () => {
     const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 890,
-      conversationUrl: 'https://example.com/c',
     });
 
     expect(res).toMatchObject({ ok: false, error: { message: 'conditional patch failed' } });

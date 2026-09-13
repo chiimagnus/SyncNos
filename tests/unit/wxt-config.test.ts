@@ -47,6 +47,14 @@ describe('WXT browser-scoped Vite config', () => {
     }
   });
 
+  it('keeps only the canonical explicit ChatGPT web-accessible-resource match', async () => {
+    const manifest = await resolveManifest('chrome');
+    const matches = manifest.web_accessible_resources?.flatMap((entry: any) => entry.matches || []) || [];
+    expect(matches).toContain('https://chatgpt.com/*');
+    expect(matches).not.toContain('https://www.chatgpt.com/*');
+    expect(matches).not.toContain('https://chat.openai.com/*');
+  });
+
   it('declares nativeMessaging as optional only for Chrome and Firefox builds', async () => {
     const chrome = await resolveManifest('chrome');
     const firefox = await resolveManifest('firefox');

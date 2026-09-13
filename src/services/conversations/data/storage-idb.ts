@@ -180,6 +180,30 @@ function resolveMessageTimestamp(
   return { present: true, value: Date.now() };
 }
 
+function resolveMessageContentMerge(
+  existing: any,
+  message: any,
+): {
+  contentMarkdown: string;
+  preserveExistingTimestamp: boolean;
+} {
+  const policy =
+    message?.captureMergePolicy === 'preserve-existing-markdown' ||
+    message?.captureMergePolicy === 'preserve-existing-content'
+      ? message.captureMergePolicy
+      : null;
+  const incomingMarkdown = String(message?.contentMarkdown ?? '');
+  const existingMarkdown = String(existing?.contentMarkdown ?? '');
+  const preserveExistingMarkdown =
+    !!existing &&
+    (policy === 'preserve-existing-content' || policy === 'preserve-existing-markdown') &&
+    !!existingMarkdown.trim();
+  return {
+    contentMarkdown: preserveExistingMarkdown ? existingMarkdown : incomingMarkdown,
+    preserveExistingTimestamp: policy === 'preserve-existing-content' && !!existing,
+  };
+}
+
 function messageRecordsEquivalent(left: unknown, right: unknown): boolean {
   const leftRecord = { ...((left && typeof left === 'object' ? left : {}) as Record<string, unknown>) };
   const rightRecord = { ...((right && typeof right === 'object' ? right : {}) as Record<string, unknown>) };
@@ -1287,25 +1311,14 @@ export async function syncConversationMessages(
                 : Number.isFinite(m.sequence)
                   ? m.sequence
                   : 0;
-          const mergePolicy =
-            m.captureMergePolicy === 'preserve-existing-markdown' ||
-            m.captureMergePolicy === 'preserve-existing-content'
-              ? m.captureMergePolicy
-              : null;
-          const incomingMarkdown = String(m.contentMarkdown ?? '');
+          const merge = resolveMessageContentMerge(existing, m);
           const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-          const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
-          const existingMarkdown = String(existing?.contentMarkdown ?? '');
-          const preserveExistingMarkdown =
-            !!existing &&
-            (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
-            !!existingMarkdown.trim();
-          const timestamp = resolveMessageTimestamp(existing, m.updatedAt, preserveExistingContent);
+          const timestamp = resolveMessageTimestamp(existing, m.updatedAt, merge.preserveExistingTimestamp);
           const record: any = buildConversationMessageRecord({
             conversationId,
             message: { ...m, messageKey: key },
             existing,
-            contentMarkdown: preserveExistingMarkdown ? existingMarkdown : incomingMarkdown,
+            contentMarkdown: merge.contentMarkdown,
             authorName: incomingAuthorName,
             sequence,
             timestamp,
@@ -1355,14 +1368,14 @@ export async function syncConversationMessages(
         presentKeys.add(String(m.messageKey));
 
         const existing: any = existingByKey.get(m.messageKey);
-        const incomingMarkdown = String(m.contentMarkdown ?? '');
+        const merge = resolveMessageContentMerge(existing, m);
         const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-        const timestamp = resolveMessageTimestamp(existing, m.updatedAt, false);
+        const timestamp = resolveMessageTimestamp(existing, m.updatedAt, merge.preserveExistingTimestamp);
         const record: any = buildConversationMessageRecord({
           conversationId,
           message: m,
           existing,
-          contentMarkdown: incomingMarkdown,
+          contentMarkdown: merge.contentMarkdown,
           authorName: incomingAuthorName,
           sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
           timestamp,

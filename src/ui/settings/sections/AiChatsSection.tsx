@@ -1,11 +1,16 @@
 import { t } from '@i18n';
-import { cardClassName } from '@ui/settings/ui';
+import { cardClassName, checkboxClassName } from '@ui/settings/ui';
 
 function Mono(props: { children: string }) {
   return <span className="tw-font-mono tw-text-[0.92em]">{props.children}</span>;
 }
 
-export function AiChatsSection() {
+export function AiChatsSection(props: {
+  busy: boolean;
+  chatgptApiCaptureEnabled: boolean;
+  onToggleChatgptApiCaptureEnabled: (next: boolean) => void;
+}) {
+  const { busy, chatgptApiCaptureEnabled, onToggleChatgptApiCaptureEnabled } = props;
   return (
     <div className="tw-grid tw-gap-4">
       <section className={cardClassName} aria-label={t('aiChatsSectionHeading')}>
@@ -29,6 +34,31 @@ export function AiChatsSection() {
             {t('aiChatsSectionSupportedListSuffix')}
           </li>
           <li>{t('aiChatsSectionSupportedNote')}</li>
+        </ul>
+      </section>
+
+      <section className={cardClassName} aria-label={t('chatgptApiCaptureAdvancedHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('chatgptApiCaptureAdvancedHeading')}
+        </h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={chatgptApiCaptureEnabled}
+            disabled={busy}
+            onChange={(event) => onToggleChatgptApiCaptureEnabled(event.target.checked)}
+            className={checkboxClassName}
+            aria-label={t('chatgptApiCaptureAdvancedLabel')}
+          />
+          {t('chatgptApiCaptureAdvancedLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('chatgptApiCaptureAdvancedHint')}
+        </div>
+        <ul className="tw-mt-2.5 tw-list-disc tw-pl-5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          <li>{t('chatgptApiCaptureAdvancedSupport')}</li>
+          <li>{t('chatgptApiCaptureAdvancedFallback')}</li>
+          <li>{t('chatgptApiCaptureAdvancedImages')}</li>
         </ul>
       </section>
 

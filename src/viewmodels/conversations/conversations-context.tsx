@@ -1136,7 +1136,6 @@ export function ConversationsProvider({
         const safeActions = Array.isArray(actions) ? actions : [];
 
         const conversationId = Number((selectedConversation as any)?.id);
-        const conversationUrl = String((selectedConversation as any)?.url || '');
 
         const cacheImagesAction: DetailHeaderAction | null =
           Number.isFinite(conversationId) && conversationId > 0
@@ -1147,7 +1146,7 @@ export function ConversationsProvider({
                 provider: 'local',
                 slot: 'tools',
                 onTrigger: async () => {
-                  await backfillConversationImages(conversationId, conversationUrl);
+                  await backfillConversationImages(conversationId);
                   await refreshActiveDetail();
                 },
               }

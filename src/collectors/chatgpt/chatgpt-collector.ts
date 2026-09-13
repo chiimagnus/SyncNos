@@ -2,7 +2,12 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
 import chatgptMarkdown, { isChatgptNonContentImageUrl } from '@collectors/chatgpt/chatgpt-markdown.ts';
+import {
+  buildChatgptGeneratedImageMessageKey,
+  chatgptFileIdFromEstuaryUrl,
+} from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
+import { isCanonicalChatgptHostname, parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -80,13 +85,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
-    return /(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname);
+    return isCanonicalChatgptHostname(hostname);
   }
 
   function findConversationIdFromUrl(): any {
-    const m =
-      env.location.pathname.match(/^\/c\/([^/?#]+)/) || env.location.pathname.match(/^\/g\/[^/]+\/c\/([^/?#]+)/);
-    return m && m[1] ? m[1] : '';
+    return parseChatgptDurableConversationRoute(env.location.href)?.conversationId || '';
   }
 
   function findShareIdFromUrl(): string {
@@ -119,7 +122,17 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return String(turn?.getAttribute?.('data-turn-id') || '').trim();
   }
 
-  function stableManualMessageKey(element: any, role: string, turnKey: string, withinTurn: number): string {
+  function stableManualMessageKey(
+    element: any,
+    role: string,
+    turnKey: string,
+    withinTurn: number,
+    imageUrls: string[] = [],
+  ): string {
+    if (role === 'assistant') {
+      const imageKey = buildChatgptGeneratedImageMessageKey(imageUrls.map(chatgptFileIdFromEstuaryUrl));
+      if (imageKey) return imageKey;
+    }
     const messageId = directMessageId(element);
     if (messageId) return messageId;
     if (!turnKey || (role !== 'user' && role !== 'assistant')) return '';
@@ -150,7 +163,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const turnId = explicitTurnId(wrapper);
       const withinTurn = perTurn.get(turnId) || 0;
       perTurn.set(turnId, withinTurn + 1);
-      push(stableManualMessageKey(wrapper, roleFromWrapper(wrapper), turnId, withinTurn));
+      push(
+        stableManualMessageKey(wrapper, roleFromWrapper(wrapper), turnId, withinTurn, extractChatgptImageUrls(wrapper)),
+      );
     }
     const topAnchor = anchors[0] || '';
     return { route: normalizedRoute(), durableId, anchors, topAnchor };
@@ -212,7 +227,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const value = String(params.get('temporary-chat') || '')
         .trim()
         .toLowerCase();
-      return value === 'true' || value === '1' || value === 'yes' || value === 'on';
+      return value === 'true';
     } catch (_e) {
       return false;
     }
@@ -635,11 +650,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const turnKey = turnKeyOf(wrapper);
       const withinTurn = perTurn.get(turnKey) || 0;
       perTurn.set(turnKey, withinTurn + 1);
-      const key = stableManualMessageKey(wrapper, role, turnKey, withinTurn);
+      const imageUrls = extractChatgptImageUrls(wrapper);
+      const key = stableManualMessageKey(wrapper, role, turnKey, withinTurn, imageUrls);
       if (!key) continue;
       const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
       const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
-      const imageUrls = extractChatgptImageUrls(wrapper);
       const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
       const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
       const cot = role === 'assistant' && !iframe ? cotByOwner.get(wrapper) || null : null;

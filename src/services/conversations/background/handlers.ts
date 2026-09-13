@@ -17,6 +17,11 @@ import {
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 import {
+  downloadChatgptProtectedImages,
+  type ChatgptProtectedImageDownloadResult,
+} from '@services/integrations/chatgpt/api-protected-images';
+import type { ChatgptProtectedImages } from '@services/integrations/chatgpt/api-snapshot';
+import {
   ABOUT_YOU_USER_NAME_STORAGE_KEY,
   DEFAULT_ABOUT_YOU_USER_NAME,
   normalizeUserName,
@@ -339,11 +344,19 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         // ignore: authorName is optional and will fallback during rendering
       }
     }
+    const chatgptProtectedImages =
+      msg?.chatgptProtectedImages && typeof msg.chatgptProtectedImages === 'object'
+        ? (msg.chatgptProtectedImages as ChatgptProtectedImages)
+        : null;
+    let imageWarningFlags: string[] = [];
     if (sourceType !== 'video') {
       try {
-        const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
-        const enabled =
-          sourceType === 'article'
+        const local = chatgptProtectedImages
+          ? null
+          : await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+        const enabled = chatgptProtectedImages
+          ? false
+          : sourceType === 'article'
             ? local?.web_article_cache_images_enabled === true
             : local?.ai_chat_cache_images_enabled === true;
         const keys =
@@ -356,12 +369,19 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
             : null;
         const inlined = await inlineChatImagesInMessages({
           conversationId,
-          conversationUrl: String(msg?.conversationUrl || ''),
           messages,
           onlyMessageKeys: keys,
           enableHttpImages: enabled,
+          protectedImages: chatgptProtectedImages,
+          downloadProtectedImages: chatgptProtectedImages
+            ? async (bundle) =>
+                (await downloadChatgptProtectedImages(
+                  bundle as ChatgptProtectedImages,
+                )) as ChatgptProtectedImageDownloadResult[]
+            : undefined,
         });
         messages = inlined.messages;
+        imageWarningFlags = Array.isArray(inlined.warningFlags) ? inlined.warningFlags.slice() : [];
         if (
           inlined.inlinedCount > 0 ||
           inlined.downloadedCount > 0 ||
@@ -379,6 +399,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           });
         }
       } catch (error) {
+        if (chatgptProtectedImages) throw error;
         console.warn('[ImageInline] failed but capture continues', {
           conversationId,
           mode,
@@ -395,14 +416,13 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     fireAndForget(
       deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
     );
-    return router.ok(res);
+    return router.ok(imageWarningFlags.length ? { ...res, imageWarningFlags } : res);
   });
 
   router.register(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, async (msg) => {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const conversationUrl = String(msg?.conversationUrl || '').trim();
-    const res = await backfillConversationImages({ conversationId, conversationUrl });
+    const res = await backfillConversationImages({ conversationId });
     if (Number(res?.updatedMessages) > 0) {
       fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages));
     }
