@@ -87,6 +87,8 @@ describe('settings section definitions', () => {
     expect(toggle?.checked).toBe(false);
     const text = document.body.textContent || '';
     expect(text).toContain('ChatGPT Advanced capture');
+    expect(text).toContain('Default page capture uses content that is already loaded/visible');
+    expect(text).toContain('full current conversation branch');
     expect(text).toContain('Off by default');
     expect(text).toContain('non-public backend API');
     expect(text).toContain('Tool, Agent, Deep Research');

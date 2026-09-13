@@ -77,7 +77,8 @@ export const zh: { [K in TranslationKey]: string } = {
   aiChatsSectionSupportedHeading: '支持范围',
   aiChatsSectionSupportedListPrefix: '当前内置支持：',
   aiChatsSectionSupportedListSuffix: ' 等页面。',
-  aiChatsSectionSupportedNote: '抓取结果以页面已加载/可见的对话内容为准。',
+  aiChatsSectionSupportedNote:
+    '默认页面采集以已加载/可见内容为准；如果开启 ChatGPT 高级采集，手动保存时可以改为从 ChatGPT 后端读取当前会话的完整分支。',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT 高级采集',
   chatgptApiCaptureAdvancedLabel: '使用 ChatGPT API 采集当前会话',
   chatgptApiCaptureAdvancedHint:

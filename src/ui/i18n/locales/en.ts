@@ -76,7 +76,8 @@ export const en = {
   aiChatsSectionSupportedHeading: 'Supported',
   aiChatsSectionSupportedListPrefix: 'Built-in support for:',
   aiChatsSectionSupportedListSuffix: '.',
-  aiChatsSectionSupportedNote: 'Only content that is already loaded/visible on the page can be captured.',
+  aiChatsSectionSupportedNote:
+    'Default page capture uses content that is already loaded/visible. If ChatGPT Advanced capture is enabled, manual save can read the full current conversation branch from ChatGPT’s backend instead.',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT Advanced capture',
   chatgptApiCaptureAdvancedLabel: 'Use the ChatGPT API for the current conversation',
   chatgptApiCaptureAdvancedHint:
