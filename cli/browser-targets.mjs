@@ -329,7 +329,11 @@ const BROWSERS = Object.freeze({
         ),
       }),
       linux: Object.freeze({
-        detect: linuxPaths('/usr/bin/yandex-browser', '/opt/yandex/browser/yandex-browser'),
+        detect: linuxPaths(
+          '/usr/bin/yandex-browser',
+          '/usr/bin/yandex-browser-stable',
+          '/opt/yandex/browser/yandex-browser',
+        ),
         registration: fileRegistration('yandex', 'chromium', 'xdgConfig', 'yandex-browser/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
@@ -344,7 +348,7 @@ const BROWSERS = Object.freeze({
     family: 'chromium',
     platforms: Object.freeze({
       darwin: Object.freeze({
-        detect: macApps('Slimjet'),
+        detect: macApps('FlashPeak Slimjet', 'Slimjet'),
         registration: fileRegistration(
           'slimjet',
           'chromium',
@@ -482,6 +486,10 @@ const BROWSERS = Object.freeze({
           'home',
           '.local/share/torbrowser/tbb/x86_64/tor-browser/Browser/TorBrowser/Data/Browser/.mozilla/native-messaging-hosts',
         ),
+      }),
+      win32: Object.freeze({
+        detect: [],
+        registration: registryRegistration('mozilla', 'firefox', REGISTRY.mozilla),
       }),
     }),
   }),

@@ -121,6 +121,43 @@ describe('CLI browser target catalog', () => {
     ]);
   });
 
+  it('discovers the standard Slimjet macOS app and Yandex Linux stable executable', async () => {
+    const mac = await discoverInstalledBrowsers({
+      platform: 'darwin',
+      homeDir: '/Users/example',
+      pathExists: async (path) => path === '/Applications/FlashPeak Slimjet.app',
+    });
+    expect(mac.map((item) => item.id)).toEqual(['slimjet']);
+
+    const linux = await discoverInstalledBrowsers({
+      platform: 'linux',
+      homeDir: '/home/example',
+      pathExists: async (path) => path === '/usr/bin/yandex-browser-stable',
+    });
+    expect(linux.map((item) => item.id)).toEqual(['yandex']);
+  });
+
+  it('keeps Tor Windows explicit-registration-only on the Mozilla HKCU target', async () => {
+    const options = {
+      platform: 'win32' as const,
+      homeDir: 'C:\\Users\\example',
+      localAppDataDir: 'C:\\Users\\example\\AppData\\Local',
+      env: {
+        ProgramFiles: 'C:\\Program Files',
+        'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+      },
+    };
+    const target = resolveBrowserTarget('tor', options);
+    expect(target).toMatchObject({
+      registrationId: 'mozilla',
+      registrationKind: 'registry',
+      registryKey: `HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${contract.nativeHostName}`,
+    });
+
+    const discovered = await discoverInstalledBrowsers({ ...options, pathExists: async () => true });
+    expect(discovered.map((item) => item.id)).not.toContain('tor');
+  });
+
   it('allows both public Chromium store identities while Firefox keeps its Gecko id', () => {
     const chrome = resolveBrowserTarget('chrome', { platform: 'darwin', homeDir: '/Users/example' });
     expect(chrome.extensionIds).toEqual([CHROME_PRODUCTION_EXTENSION_ID, EDGE_PRODUCTION_EXTENSION_ID]);

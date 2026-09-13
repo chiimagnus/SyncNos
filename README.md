@@ -57,7 +57,7 @@ In each browser profile that should expose its data to the CLI, open **Settings 
 | Chrome for Testing | macOS / Linux | Not verified. |
 | Firefox | macOS / Linux / Windows | Signed release round-trip not yet verified. |
 | Firefox Developer Edition | macOS / Windows | Not verified. |
-| LibreWolf | macOS / Linux / Windows | Not verified. |
+| LibreWolf | macOS / Linux | Not verified. |
 | Waterfox | Linux | Not verified. |
 | Tor Browser | macOS / Linux auto-discovery; Windows explicit `--browser tor` registration only | Not verified. |
 | Zen | macOS | **Transport and real-data path verified** with a same-ID current 1.13.2 build; signed-release packaging and the final real user permission gesture remain separate release evidence. |

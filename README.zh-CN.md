@@ -57,7 +57,7 @@ syncnos doctor
 | Chrome for Testing | macOS / Linux | 尚未验证。 |
 | Firefox | macOS / Linux / Windows | 尚未验证正式 release round-trip。 |
 | Firefox Developer Edition | macOS / Windows | 尚未验证。 |
-| LibreWolf | macOS / Linux / Windows | 尚未验证。 |
+| LibreWolf | macOS / Linux | 尚未验证。 |
 | Waterfox | Linux | 尚未验证。 |
 | Tor Browser | macOS / Linux 自动发现；Windows 仅显式 `--browser tor` 注册 | 尚未验证。 |
 | Zen | macOS | **传输与真实数据链已验证**：current 1.13.2 same-ID build 可经 Native Messaging/CLI 读取原 Profile 数据；签名 release 与最终用户 permission gesture 仍是独立发布证据。 |
