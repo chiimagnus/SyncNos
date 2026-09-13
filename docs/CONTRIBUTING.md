@@ -70,6 +70,10 @@ PR 应让不掌握作者本地上下文的人也能判断改动是否正确：
 
 触及 [`AGENTS.md`](../AGENTS.md) 中的不变量时，在 PR 中附上对应的定向测试或架构扫描证据。
 
+## 发布
+
+CLI 与 Extension 共用同一个 release tag/version。正常 release 由 Git tag 触发 `.github/workflows/release.yml`：完成 preflight、canonical gate、CLI tarball install smoke 后，通过 npm Trusted Publishing/OIDC 自动发布 `@chiimagnus/syncnos`，read-back exact version + dist-tag 成功后才创建 GitHub Release。完整 version/channel、恢复与 publication ordering 契约见 [`release.md`](release.md)。
+
 ## 数据、权限与隐私
 
 修改 IndexedDB、Backup、sync mapping、OAuth、图片缓存、权限、Native Messaging 或迁移时，必须说明失败/重试后本地数据如何保持可恢复，以及是否新增本地到外部的数据流。

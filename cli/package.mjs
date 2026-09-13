@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = resolve(MODULE_DIR, '..');
 const DEV_VERSION = '0.0.0-dev';
-const PACKAGE_NAME = 'syncnos-cli';
+const PACKAGE_NAME = '@chiimagnus/syncnos';
 
 export const CLI_PACKAGE_RUNTIME_FILES = Object.freeze([
   'browser-targets.mjs',
@@ -87,7 +87,12 @@ async function readSourcePackageJson(repoRoot) {
   if (value?.version !== DEV_VERSION) {
     throw packageError('dev_version_invalid', `cli/package.json must keep dev placeholder ${DEV_VERSION}`);
   }
-  if (value?.private !== true) throw packageError('package_private_required', 'CLI package must remain private:true');
+  if (value?.private !== true)
+    throw packageError('package_private_required', 'CLI source package must remain private:true');
+  if (value?.repository?.url !== 'https://github.com/chiimagnus/SyncNos.git')
+    throw packageError('package_repository_invalid', 'CLI package repository must match the GitHub repository');
+  if (value?.publishConfig?.access !== 'public')
+    throw packageError('package_publish_config_invalid', 'CLI package publishConfig.access must be public');
   if (value?.bin?.syncnos !== './syncnos.mjs')
     throw packageError('package_bin_invalid', 'CLI package bin.syncnos is invalid');
   const dependencies = value?.dependencies && typeof value.dependencies === 'object' ? value.dependencies : {};
@@ -106,10 +111,14 @@ export async function prepareCliPackage({ repoRoot = DEFAULT_REPO_ROOT, stagingD
   await mkdir(stage, { recursive: true });
 
   const stagedPackage = { ...sourcePackage, version: packageVersion };
+  delete stagedPackage.private;
   await writeFile(join(stage, 'package.json'), `${JSON.stringify(stagedPackage, null, 2)}\n`, 'utf8');
   for (const file of CLI_PACKAGE_RUNTIME_FILES) {
     await cp(join(root, 'cli', file), join(stage, file));
   }
+  await cp(join(root, 'README.md'), join(stage, 'README.md'));
+  await cp(join(root, 'README.zh-CN.md'), join(stage, 'README.zh-CN.md'));
+  await cp(join(root, 'LICENSE.APGLv3'), join(stage, 'LICENSE'));
 
   const canonicalContractPath = join(root, 'src', 'services', 'protocols', 'cli-rpc-contract.json');
   const canonicalContract = await readFile(canonicalContractPath);
@@ -152,7 +161,7 @@ export async function packageCli({
     .filter(Boolean)
     .at(-1);
   if (!filename) throw packageError('npm_pack_failed', 'npm pack did not return a tarball name');
-  const expected = `${PACKAGE_NAME}-${prepared.packageVersion}.tgz`;
+  const expected = `${PACKAGE_NAME.slice(1).replace('/', '-')}-${prepared.packageVersion}.tgz`;
   if (filename !== expected) {
     throw packageError('npm_pack_name_mismatch', `Unexpected npm pack output: ${filename}`, { expected });
   }

@@ -1,8 +1,20 @@
 {
-  "name": "syncnos-cli",
+  "name": "@chiimagnus/syncnos",
   "version": "0.0.0-dev",
   "private": true,
-  "description": "Local CLI bridge for SyncNos browser extension",
+  "description": "Local CLI bridge for the SyncNos browser extension",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chiimagnus/SyncNos.git"
+  },
+  "homepage": "https://github.com/chiimagnus/SyncNos",
+  "bugs": {
+    "url": "https://github.com/chiimagnus/SyncNos/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "syncnos": "./syncnos.mjs"

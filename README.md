@@ -33,13 +33,15 @@ Captured content is stored locally before optional sync or export. External prov
 
 The optional `syncnos` CLI uses the running browser Extension as its data and business-logic owner; it is not a second database or an offline daemon.
 
-Download `syncnos-cli-<version>.tgz` from the matching GitHub Release:
+Install the published CLI from npm:
 
 ```bash
-npm install -g ./syncnos-cli-<version>.tgz
+npm install -g @chiimagnus/syncnos@latest
 syncnos install
 syncnos doctor
 ```
+
+The matching `chiimagnus-syncnos-<version>.tgz` remains attached to each GitHub Release for reproducible/manual installation.
 
 Enable **Settings → General → Local CLI Integration → SyncNos CLI** in each browser profile you want to expose. Business commands require that browser profile to remain running.
 

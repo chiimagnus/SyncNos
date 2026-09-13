@@ -202,7 +202,7 @@ describe('macOS CLI native host installer', () => {
     });
     expect(inspection.platformSupported).toBe(true);
     expect(inspection.package).toMatchObject({
-      name: 'syncnos-cli',
+      name: '@chiimagnus/syncnos',
       nodePresent: true,
       nodeExecutable: true,
       nativeHostPresent: true,
