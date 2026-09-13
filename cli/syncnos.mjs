@@ -8,7 +8,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { discoverInstalledBrowsers, listBrowserTargets } from './browser-targets.mjs';
 import { contract } from './contract.mjs';
-import { inspectCliInstallation, installNativeHost, installNativeHosts, uninstallNativeHost } from './install.mjs';
+import {
+  inspectCliInstallation,
+  installNativeHost,
+  installNativeHosts,
+  isCliInstallPlatformSupported,
+  uninstallNativeHost,
+} from './install.mjs';
 import { requestEndpoint } from './ipc.mjs';
 import {
   isRegistryPathForInstance,
@@ -728,6 +734,9 @@ export async function runCli(
         return EXIT.success;
       }
 
+      if (!isCliInstallPlatformSupported(platform)) {
+        throw codedError('unsupported_platform', `SyncNos CLI install does not support ${platform}`, EXIT.transport);
+      }
       const detectedBrowsers = await discoverInstalledBrowsers({
         platform,
         homeDir,

@@ -43,8 +43,12 @@ function resolveHomeDir(homeDir, { platform = process.platform, env = process.en
   return pathApi(platform).resolve(input);
 }
 
+export function isCliInstallPlatformSupported(platform = process.platform) {
+  return SUPPORTED_PLATFORMS.has(platform);
+}
+
 function assertSupportedPlatform(platform) {
-  if (!SUPPORTED_PLATFORMS.has(platform)) {
+  if (!isCliInstallPlatformSupported(platform)) {
     throw installError('unsupported_platform', `SyncNos CLI install does not support ${platform}`);
   }
 }
@@ -589,7 +593,7 @@ export async function inspectCliInstallation({
   registryRunner,
   browserPathExists,
 } = {}) {
-  const platformSupported = SUPPORTED_PLATFORMS.has(platform);
+  const platformSupported = isCliInstallPlatformSupported(platform);
   if (!platformSupported) {
     return {
       platform,

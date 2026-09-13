@@ -386,6 +386,16 @@ describe('syncnos CLI instance selection', () => {
 
   it('rejects install/uninstall/doctor-only syntax before touching instance discovery', async () => {
     const { runtimeRoot, homeDir } = await roots();
+    const unsupportedAuto = await run(['install'], runtimeRoot, homeDir, { platform: 'freebsd' });
+    expect(unsupportedAuto.exitCode).toBe(4);
+    expect(unsupportedAuto.json.error.code).toBe('unsupported_platform');
+
+    const unsupportedExplicit = await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, {
+      platform: 'freebsd',
+    });
+    expect(unsupportedExplicit.exitCode).toBe(4);
+    expect(unsupportedExplicit.json.error.code).toBe('unsupported_platform');
+
     const missingBrowser = await run(['install'], runtimeRoot, homeDir, {
       platform: 'darwin',
       browserPathExists: async () => false,
