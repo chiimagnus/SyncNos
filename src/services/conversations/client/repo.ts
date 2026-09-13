@@ -93,11 +93,8 @@ export async function deleteConversations(conversationIds: number[]): Promise<un
   return unwrap(res);
 }
 
-export async function updateConversationUrl(
-  conversationId: number,
-  url: string,
-  mergeExisting = false,
-): Promise<{
+export type UpdateConversationUrlResponse = {
+  status: 'updated' | 'conflict';
   conversationId: number;
   url: string;
   source: string;
@@ -105,7 +102,21 @@ export async function updateConversationUrl(
   changed: boolean;
   merged: boolean;
   removedConversationId: number | null;
-}> {
+  conflictConversationId: number | null;
+  mergeSummary: {
+    keptConversationId: number;
+    removedConversationId: number;
+    movedMessages: number;
+    movedImageCache: number;
+    merged: boolean;
+  } | null;
+};
+
+export async function updateConversationUrl(
+  conversationId: number,
+  url: string,
+  mergeExisting = false,
+): Promise<UpdateConversationUrlResponse> {
   const res = await send<ApiResponse<any>>(CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL, {
     conversationId: Number(conversationId),
     url: String(url || '').trim(),

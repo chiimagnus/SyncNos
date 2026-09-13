@@ -49,7 +49,9 @@ function parseArgs(argv) {
     cursor: null,
     after: null,
     before: null,
-    mergeConflict: false,
+    mergeExisting: false,
+    keep: null,
+    remove: null,
     text: null,
     positionals: [],
     provided: new Set(),
@@ -111,9 +113,19 @@ function parseArgs(argv) {
       options.provided.add('before');
       continue;
     }
-    if (token === '--merge-conflict') {
-      options.mergeConflict = true;
-      options.provided.add('mergeConflict');
+    if (token === '--merge-existing') {
+      options.mergeExisting = true;
+      options.provided.add('mergeExisting');
+      continue;
+    }
+    if (token === '--keep') {
+      options.keep = readValue(token);
+      options.provided.add('keep');
+      continue;
+    }
+    if (token === '--remove') {
+      options.remove = readValue(token);
+      options.provided.add('remove');
       continue;
     }
     if (token === '--text') {
@@ -310,6 +322,7 @@ async function requestSelected(selected, method, params = {}) {
       code,
       String(response?.error?.message || 'SyncNos request failed'),
       TRANSPORT_RESPONSE_CODES.has(code) ? EXIT.transport : EXIT.business,
+      response?.error?.extra ?? null,
     );
   }
   return response.data;
@@ -349,10 +362,10 @@ function usage() {
     '  get <conversation-id>',
     '  search <query> [--source <key>] [--site <key>] [--after <iso>] [--before <iso>] [--limit <n>]',
     '  stats',
-    '  update-url <conversation-id> <url> [--merge-conflict]',
-    '  merge <keep-id> <remove-id>',
-    '  delete <conversation-id> [...]',
-    '  backfill-images <conversation-id>',
+    '  conversation update-url <conversation-id> <url> [--merge-existing]',
+    '  conversation merge --keep <conversation-id> --remove <conversation-id>',
+    '  conversation delete <conversation-id> [...]',
+    '  conversation backfill-images <conversation-id>',
     '  capture',
     '  comments list <conversation-id>',
     '  comments add <conversation-id> --text <text>',
@@ -496,63 +509,75 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
       return EXIT.success;
     }
 
-    if (options.command === 'update-url') {
-      assertAllowedOptions(options, new Set(['instance', 'human', 'mergeConflict']));
-      if (options.positionals.length !== 2) {
-        throw codedError('usage_error', 'update-url requires a conversation id and URL', EXIT.usage);
+    if (options.command === 'conversation') {
+      const action = String(options.positionals[0] || '');
+      if (action === 'update-url') {
+        assertAllowedOptions(options, new Set(['instance', 'human', 'mergeExisting']));
+        if (options.positionals.length !== 3) {
+          throw codedError('usage_error', 'conversation update-url requires a conversation id and URL', EXIT.usage);
+        }
+        const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
+        const url = String(options.positionals[2] || '').trim();
+        if (!url) throw codedError('usage_error', 'conversation update-url requires a URL', EXIT.usage);
+        const { selected } = await selectedInstance(options, context);
+        const result = await requestSelected(selected, 'conversation.update-url', {
+          conversationId,
+          url,
+          mergeExisting: options.mergeExisting === true,
+        });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
       }
-      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
-      const url = String(options.positionals[1] || '').trim();
-      if (!url) throw codedError('usage_error', 'update-url requires a URL', EXIT.usage);
-      const { selected } = await selectedInstance(options, context);
-      const result = await requestSelected(selected, 'conversation.update-url', {
-        conversationId,
-        url,
-        mergeExisting: options.mergeConflict === true,
-      });
-      writeResult(stdout, envelopeOk(result), options.human);
-      return EXIT.success;
-    }
 
-    if (options.command === 'merge') {
-      assertAllowedOptions(options, new Set(['instance', 'human']));
-      if (options.positionals.length !== 2)
-        throw codedError('usage_error', 'merge requires keep-id and remove-id', EXIT.usage);
-      const keepConversationId = parsePositiveInteger(options.positionals[0], 'keep id');
-      const removeConversationId = parsePositiveInteger(options.positionals[1], 'remove id');
-      const { selected } = await selectedInstance(options, context);
-      const result = await requestSelected(selected, 'conversation.merge', {
-        keepConversationId,
-        removeConversationId,
-      });
-      writeResult(stdout, envelopeOk(result), options.human);
-      return EXIT.success;
-    }
+      if (action === 'merge') {
+        assertAllowedOptions(options, new Set(['instance', 'human', 'keep', 'remove']));
+        if (options.positionals.length !== 1 || options.keep == null || options.remove == null) {
+          throw codedError('usage_error', 'conversation merge requires --keep and --remove', EXIT.usage);
+        }
+        const keepConversationId = parsePositiveInteger(options.keep, 'keep id');
+        const removeConversationId = parsePositiveInteger(options.remove, 'remove id');
+        const { selected } = await selectedInstance(options, context);
+        const result = await requestSelected(selected, 'conversation.merge', {
+          keepConversationId,
+          removeConversationId,
+        });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
 
-    if (options.command === 'delete') {
-      assertAllowedOptions(options, new Set(['instance', 'human']));
-      if (!options.positionals.length)
-        throw codedError('usage_error', 'delete requires at least one conversation id', EXIT.usage);
-      const conversationIds = options.positionals.map((value) => parsePositiveInteger(value, 'conversation id'));
-      const { selected } = await selectedInstance(options, context);
-      const result = await requestSelected(selected, 'conversation.delete', { conversationIds });
-      writeResult(stdout, envelopeOk(result), options.human);
-      return EXIT.success;
-    }
+      if (action === 'delete') {
+        assertAllowedOptions(options, new Set(['instance', 'human']));
+        if (options.positionals.length < 2)
+          throw codedError('usage_error', 'conversation delete requires at least one conversation id', EXIT.usage);
+        const conversationIds = options.positionals
+          .slice(1)
+          .map((value) => parsePositiveInteger(value, 'conversation id'));
+        const { selected } = await selectedInstance(options, context);
+        const result = await requestSelected(selected, 'conversation.delete', { conversationIds });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
 
-    if (options.command === 'backfill-images') {
-      assertAllowedOptions(options, new Set(['instance', 'human']));
-      if (options.positionals.length !== 1)
-        throw codedError('usage_error', 'backfill-images requires one conversation id', EXIT.usage);
-      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
-      const { selected } = await selectedInstance(options, context);
-      const detail = await requestSelected(selected, 'conversation.get', { conversationId });
-      const result = await requestSelected(selected, 'conversation.images.backfill', {
-        conversationId,
-        conversationUrl: String(detail?.conversation?.url || ''),
-      });
-      writeResult(stdout, envelopeOk(result), options.human);
-      return EXIT.success;
+      if (action === 'backfill-images') {
+        assertAllowedOptions(options, new Set(['instance', 'human']));
+        if (options.positionals.length !== 2)
+          throw codedError('usage_error', 'conversation backfill-images requires one conversation id', EXIT.usage);
+        const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
+        const { selected } = await selectedInstance(options, context);
+        const detail = await requestSelected(selected, 'conversation.get', { conversationId });
+        const result = await requestSelected(selected, 'conversation.images.backfill', {
+          conversationId,
+          conversationUrl: String(detail?.conversation?.url || ''),
+        });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      throw codedError(
+        'usage_error',
+        'conversation action must be update-url, merge, delete, or backfill-images',
+        EXIT.usage,
+      );
     }
 
     if (options.command === 'capture') {

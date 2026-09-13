@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBIndex, IDBKeyRange, IDBObjectStore, indexedDB } from 'fake-indexeddb';
-import { closeDbForTests } from '@platform/idb/schema';
+import { closeDbForTests, openDb } from '@platform/idb/schema';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 
 import {
   __resetConversationStorageStateForTests,
@@ -352,14 +353,24 @@ describe('insight stats', () => {
     ]);
   });
 
-  it('maps invalid article urls to the unknown domain bucket', async () => {
-    await seedConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'article-invalid',
-      title: 'Broken',
-      url: 'notaurl',
-      lastActivityAt: 1,
+  it('maps historical invalid article urls to the unknown domain bucket without using the current writer', async () => {
+    const db = await openDb();
+    const tx = db.transaction(['conversations'], 'readwrite');
+    await new Promise<void>((resolve, reject) => {
+      const request = tx.objectStore('conversations').add(
+        normalizeConversationListRecord({
+          sourceType: 'article',
+          source: 'web',
+          conversationKey: 'article-invalid',
+          title: 'Broken',
+          url: 'notaurl',
+          lastActivityAt: 1,
+        }) as any,
+      );
+      request.onerror = () => reject(request.error || new Error('legacy fixture insert failed'));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('legacy fixture transaction failed'));
+      tx.onabort = () => reject(tx.error || new Error('legacy fixture transaction aborted'));
     });
 
     const stats = await readInsightStats();

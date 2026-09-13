@@ -114,7 +114,7 @@ function emptyBackupZipEntries(storageLocal: Record<string, unknown> = {}): Map<
   ]);
 }
 
-async function assertLegacyArticleImportConvergesToCanonicalIdentity(): Promise<void> {
+async function assertLegacyArticleImportUsesCanonicalIdentityImmediately(): Promise<void> {
   const importedDb = await openDb();
   const beforeTx = importedDb.transaction(['conversations', 'sync_mappings'], 'readonly');
   const beforeConversations = await reqToPromise<any[]>(beforeTx.objectStore('conversations').getAll() as any);
@@ -129,14 +129,21 @@ async function assertLegacyArticleImportConvergesToCanonicalIdentity(): Promise<
   const localId = Number(beforeConversations[0]?.id);
   expect(localId).toBeGreaterThan(0);
   expect(beforeConversations[0]).toMatchObject({
-    source: LEGACY_ARTICLE_SOURCE,
-    conversationKey: LEGACY_ARTICLE_KEY,
-    listSourceKey: LEGACY_ARTICLE_SOURCE,
+    source: 'web',
+    conversationKey: CANONICAL_ARTICLE_KEY,
+    url: CANONICAL_ARTICLE_URL,
+    listSourceKey: 'web',
     listSiteKey: 'domain:example.com',
   });
   expect(Object.prototype.hasOwnProperty.call(beforeConversations[0], '__canonicalUrl')).toBe(false);
   expect(Object.prototype.hasOwnProperty.call(beforeConversations[0], '__canonicalKey')).toBe(false);
   expect(beforeMappings).toHaveLength(1);
+  expect(beforeMappings[0]).toMatchObject({
+    source: 'web',
+    conversationKey: CANONICAL_ARTICLE_KEY,
+    notionPageId: 'notion-page-legacy',
+    feishuDocId: 'feishu-doc-legacy',
+  });
 
   const converged = await upsertConversation({
     sourceType: 'article',
@@ -275,9 +282,9 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
-  it('keeps post-v11 ZIP v2 legacy article identity reachable until canonical runtime convergence', async () => {
+  it('canonicalizes post-v11 ZIP v2 legacy article identity at the import boundary', async () => {
     await importBackupZipMerge(legacyArticleZipEntriesForImport());
-    await assertLegacyArticleImportConvergesToCanonicalIdentity();
+    await assertLegacyArticleImportUsesCanonicalIdentityImmediately();
   });
 
   it('does not require the conversations CSV entry for bounded ZIP v2 compatibility', async () => {
@@ -1562,7 +1569,7 @@ describe('backup service', () => {
     await expect(importBackupZipMerge(entries)).rejects.toThrow(`Missing entry: ${declaredPath}`);
   });
 
-  it('keeps legacy comments orphaned when the same canonical URL maps to multiple conversations', async () => {
+  it('coalesces legacy duplicate article bundles before attaching URL-only legacy comments', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -1622,10 +1629,24 @@ describe('backup service', () => {
     const stats = await importBackupZipMerge(entries);
     expect(stats.commentsAdded).toBe(1);
     const db = await openDb();
-    const tx = db.transaction(['article_comments'], 'readonly');
+    const tx = db.transaction(['conversations', 'article_comments'], 'readonly');
+    const conversations = await reqToPromise<any[]>(tx.objectStore('conversations').getAll());
     const rows = await reqToPromise<any[]>(tx.objectStore('article_comments').getAll());
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0]).toMatchObject({
+      source: 'web',
+      conversationKey: 'article:https://example.com/shared',
+      url: 'https://example.com/shared',
+    });
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.conversationId ?? null).toBeNull();
+    expect(rows[0]?.conversationId).toBe(conversations[0]?.id);
+
+    const repeated = await importBackupZipMerge(entries);
+    expect(repeated.commentsAdded).toBe(0);
+    const verifyDb = await openDb();
+    const verifyTx = verifyDb.transaction(['conversations', 'article_comments'], 'readonly');
+    expect(await reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll())).toHaveLength(1);
+    expect(await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll())).toHaveLength(1);
   });
 
   it('keeps committed ZIP conversations when progress listeners fail', async () => {

@@ -201,6 +201,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     updateConversationUrl.mockResolvedValue({
+      status: 'updated',
       conversationId: 0,
       url: '',
       source: 'web',
@@ -208,6 +209,8 @@ describe('ConversationsProvider pagination state', () => {
       changed: false,
       merged: false,
       removedConversationId: null,
+      conflictConversationId: null,
+      mergeSummary: null,
     });
     backfillConversationImages.mockResolvedValue({
       scannedMessages: 0,
@@ -622,8 +625,20 @@ describe('ConversationsProvider pagination state', () => {
     getConversationById.mockResolvedValue(selected);
     getConversationDetail.mockResolvedValue({ conversationId: 501, messages: [] });
     updateConversationUrl
-      .mockRejectedValueOnce(Object.assign(new Error('conflict'), { code: 'conversation_url_conflict' }))
       .mockResolvedValueOnce({
+        status: 'conflict',
+        conversationId: 501,
+        url: 'https://example.com/target',
+        source: 'web',
+        conversationKey: 'article:https://example.com/target',
+        changed: false,
+        merged: false,
+        removedConversationId: null,
+        conflictConversationId: 502,
+        mergeSummary: null,
+      })
+      .mockResolvedValueOnce({
+        status: 'updated',
         conversationId: 501,
         url: 'https://example.com/target',
         source: 'web',
@@ -631,6 +646,14 @@ describe('ConversationsProvider pagination state', () => {
         changed: true,
         merged: true,
         removedConversationId: 502,
+        conflictConversationId: null,
+        mergeSummary: {
+          keptConversationId: 501,
+          removedConversationId: 502,
+          movedMessages: 0,
+          movedImageCache: 0,
+          merged: true,
+        },
       });
     getConversationById.mockResolvedValueOnce(selected).mockResolvedValueOnce({
       ...selected,

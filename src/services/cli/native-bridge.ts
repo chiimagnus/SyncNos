@@ -67,14 +67,14 @@ function validRequestId(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 256 && value.trim() === value;
 }
 
-function response(requestId: string, ok: boolean, data: unknown, code = '', message = '') {
+function response(requestId: string, ok: boolean, data: unknown, code = '', message = '', extra: unknown = null) {
   return {
     kind: FRAMES.rpcResponse,
     protocolVersion: PROTOCOL_VERSION,
     requestId,
     ok,
     data: ok ? data : null,
-    error: ok ? null : { code, message },
+    error: ok ? null : { code, message, ...(extra == null ? null : { extra }) },
   };
 }
 
@@ -278,11 +278,28 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         {
           type: CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL,
           conversationId: Number(params.conversationId),
-          url: params.url,
+          url: String(params.url || ''),
           mergeExisting: params.mergeExisting === true,
         },
         null,
       );
+      if (result?.ok === true && result?.data?.status === 'conflict') {
+        const conflictConversationId = Number(result.data.conflictConversationId);
+        safePost(
+          currentPort,
+          response(
+            requestId,
+            false,
+            null,
+            'url_conflict',
+            'URL already belongs to another conversation',
+            Number.isSafeInteger(conflictConversationId) && conflictConversationId > 0
+              ? { conflictConversationId }
+              : null,
+          ),
+        );
+        return;
+      }
       postBackgroundResult(result);
       return;
     }

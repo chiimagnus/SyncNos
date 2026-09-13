@@ -29,7 +29,12 @@ async function startFakeInstance(
   browserFamily: 'chromium' | 'firefox',
   options: {
     revisionErrorCode?: string;
-    onRequest?: (request: any) => { data?: unknown; errorCode?: string; errorMessage?: string } | null;
+    onRequest?: (request: any) => {
+      data?: unknown;
+      errorCode?: string;
+      errorMessage?: string;
+      errorExtra?: unknown;
+    } | null;
   } = {},
 ): Promise<FakeInstance> {
   const requests: any[] = [];
@@ -71,7 +76,14 @@ async function startFakeInstance(
           requestId: 'fake',
           ok: data !== null,
           data,
-          error: data !== null ? null : { code: errorCode, message: errorMessage },
+          error:
+            data !== null
+              ? null
+              : {
+                  code: errorCode,
+                  message: errorMessage,
+                  ...(custom?.errorExtra == null ? null : { extra: custom.errorExtra }),
+                },
         })}\n`,
       );
     });
@@ -454,11 +466,20 @@ describe('syncnos CLI instance selection', () => {
     const instance = await startFakeInstance(runtimeRoot, 'mutation-instance', 'chromium', {
       onRequest(request) {
         if (request.method === 'conversation.update-url') {
+          if (String(request.params.url || '').includes('/target') && request.params.mergeExisting !== true) {
+            return {
+              errorCode: 'url_conflict',
+              errorMessage: 'URL already belongs to another conversation',
+              errorExtra: { conflictConversationId: 9 },
+            };
+          }
           return {
             data: {
+              status: 'updated',
               conversationId: request.params.conversationId,
               changed: true,
               merged: request.params.mergeExisting,
+              conflictConversationId: null,
             },
           };
         }
@@ -479,7 +500,7 @@ describe('syncnos CLI instance selection', () => {
     });
     try {
       const update = await run(
-        ['update-url', '7', 'https://example.com/new', '--merge-conflict'],
+        ['conversation', 'update-url', '7', 'https://example.com/new', '--merge-existing'],
         runtimeRoot,
         homeDir,
       );
@@ -489,19 +510,41 @@ describe('syncnos CLI instance selection', () => {
         params: { conversationId: 7, url: 'https://example.com/new', mergeExisting: true },
       });
 
-      const merge = await run(['merge', '7', '9'], runtimeRoot, homeDir);
+      const merge = await run(['conversation', 'merge', '--keep', '7', '--remove', '9'], runtimeRoot, homeDir);
       expect(merge.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({
         method: 'conversation.merge',
         params: { keepConversationId: 7, removeConversationId: 9 },
       });
 
-      const del = await run(['delete', '7', '9'], runtimeRoot, homeDir);
+      const del = await run(['conversation', 'delete', '7', '9'], runtimeRoot, homeDir);
       expect(del.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({ method: 'conversation.delete', params: { conversationIds: [7, 9] } });
 
+      const conflict = await run(
+        ['conversation', 'update-url', '7', 'https://example.com/target'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(conflict.exitCode).toBe(5);
+      expect(conflict.json).toMatchObject({
+        ok: false,
+        error: { code: 'url_conflict', extra: { conflictConversationId: 9 } },
+      });
+
+      const mergedConflict = await run(
+        ['conversation', 'update-url', '7', 'https://example.com/target', '--merge-existing'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(mergedConflict.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'conversation.update-url',
+        params: { conversationId: 7, url: 'https://example.com/target', mergeExisting: true },
+      });
+
       const beforeBackfill = instance.requests.length;
-      const backfill = await run(['backfill-images', '7'], runtimeRoot, homeDir);
+      const backfill = await run(['conversation', 'backfill-images', '7'], runtimeRoot, homeDir);
       expect(backfill.exitCode).toBe(0);
       expect(instance.requests.slice(beforeBackfill).map((request) => request.method)).toEqual([
         'system.ping',
@@ -512,6 +555,17 @@ describe('syncnos CLI instance selection', () => {
         method: 'conversation.images.backfill',
         params: { conversationId: 7, conversationUrl: 'https://example.com/article' },
       });
+
+      const beforeLegacyForms = instance.requests.length;
+      const legacyResults = await Promise.all([
+        run(['update-url', '7', 'https://example.com/new'], runtimeRoot, homeDir),
+        run(['merge', '7', '9'], runtimeRoot, homeDir),
+        run(['delete', '7'], runtimeRoot, homeDir),
+        run(['backfill-images', '7'], runtimeRoot, homeDir),
+        run(['conversation', 'update-url', '7', 'https://example.com/new', '--merge-conflict'], runtimeRoot, homeDir),
+      ]);
+      expect(legacyResults.map((result) => result.exitCode)).toEqual([2, 2, 2, 2, 2]);
+      expect(instance.requests.length).toBe(beforeLegacyForms);
     } finally {
       await instance.stop();
     }

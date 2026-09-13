@@ -243,9 +243,14 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         url,
         mergeExisting: msg?.mergeExisting === true,
       });
-      if (result.changed) {
+      if (result.status === 'updated' && result.changed) {
         fireAndForget(
-          deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation),
+          deps.onConversationChanged(
+            result.conversationId,
+            result.merged
+              ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.mergeConversation
+              : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+          ),
         );
         fireAndForget(deps.onRemoteCleanupPending());
       }

@@ -2689,6 +2689,29 @@ describe('conversations storage-idb', () => {
     }
   });
 
+  it('rejects new Web Article writes that only provide a legacy key or an invalid URL', async () => {
+    await expect(
+      upsertConversation({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'legacy_article_https://example.com/legacy-only',
+        title: 'Legacy key only',
+        lastActivityAt: 1,
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_article_url' });
+
+    await expect(
+      upsertConversation({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/ignored',
+        title: 'Invalid URL',
+        url: 'mailto:test@example.com',
+        lastActivityAt: 1,
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_article_url' });
+  });
+
   it('updates a Web Article URL atomically and reports canonical conflicts without changing revisions', async () => {
     const keep = await upsertConversation({
       sourceType: 'article',
@@ -2714,15 +2737,19 @@ describe('conversations storage-idb', () => {
       article_comments: await readDataRevision('article_comments'),
     };
 
-    await expect(
-      updateConversationUrlById({
-        conversationId: Number(keep.id),
-        url: 'HTTPS://Example.com/target#fragment',
-        mergeExisting: false,
-      }),
-    ).rejects.toMatchObject({
-      code: 'conversation_url_conflict',
-      extra: { conflictingConversationId: Number(conflict.id) },
+    const conflictResult = await updateConversationUrlById({
+      conversationId: Number(keep.id),
+      url: 'HTTPS://Example.com/target#fragment',
+      mergeExisting: false,
+    });
+    expect(conflictResult).toMatchObject({
+      status: 'conflict',
+      conversationId: Number(keep.id),
+      url: 'https://example.com/target',
+      changed: false,
+      merged: false,
+      conflictConversationId: Number(conflict.id),
+      mergeSummary: null,
     });
     expect(await readDataRevision('conversations')).toBe(baseline.conversations);
     expect(await readDataRevision('messages')).toBe(baseline.messages);
@@ -2735,7 +2762,7 @@ describe('conversations storage-idb', () => {
       conversationId: Number(keep.id),
       url: 'https://example.com/keep#another-fragment',
     });
-    expect(noOp).toMatchObject({ changed: false, merged: false, url: 'https://example.com/keep' });
+    expect(noOp).toMatchObject({ status: 'updated', changed: false, merged: false, url: 'https://example.com/keep' });
     expect(await readDataRevision('conversations')).toBe(baseline.conversations);
   });
 
@@ -2799,12 +2826,19 @@ describe('conversations storage-idb', () => {
       mergeExisting: true,
     });
     expect(result).toMatchObject({
+      status: 'updated',
       conversationId: keepId,
       url: 'https://example.com/target',
       conversationKey: 'article:https://example.com/target',
       changed: true,
       merged: true,
       removedConversationId: removeId,
+      conflictConversationId: null,
+      mergeSummary: {
+        keptConversationId: keepId,
+        removedConversationId: removeId,
+        merged: true,
+      },
     });
     expect(await getConversationById(removeId)).toBeNull();
     expect(await getConversationById(keepId)).toMatchObject({
@@ -2850,30 +2884,48 @@ describe('conversations storage-idb', () => {
       lastActivityAt: 2,
     });
     const target = 'https://example.com/race-target';
-    const settled = await Promise.allSettled([
+    const settled = await Promise.all([
       updateConversationUrlById({ conversationId: Number(left.id), url: target }),
       updateConversationUrlById({ conversationId: Number(right.id), url: target }),
     ]);
-    expect(settled.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
-    const rejected = settled.find((item): item is PromiseRejectedResult => item.status === 'rejected');
-    expect(rejected?.reason).toMatchObject({ code: 'conversation_url_conflict' });
-    expect(String(rejected?.reason?.name || '')).not.toBe('ConstraintError');
+    expect(settled.filter((item) => item.status === 'updated')).toHaveLength(1);
+    expect(settled.filter((item) => item.status === 'conflict')).toHaveLength(1);
+    expect(settled.find((item) => item.status === 'conflict')?.conflictConversationId).toBe(
+      settled.find((item) => item.status === 'updated')?.conversationId,
+    );
     const rows = [await getConversationById(Number(left.id)), await getConversationById(Number(right.id))];
     expect(rows.filter((row) => row?.url === target)).toHaveLength(1);
   });
 
-  it('rejects invalid or non-Web-Article URL edits with stable errors', async () => {
+  it('updates non-Web-Article URLs without changing identity and keeps invalid URL errors stable', async () => {
     const chat = await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'chat-url',
+      url: 'https://chatgpt.com/c/old',
       lastActivityAt: 1,
     });
-    await expect(
-      updateConversationUrlById({ conversationId: Number(chat.id), url: 'https://example.com/new' }),
-    ).rejects.toMatchObject({
-      code: 'conversation_url_not_editable',
+    const beforeRevision = await readDataRevision('conversations');
+    const updated = await updateConversationUrlById({
+      conversationId: Number(chat.id),
+      url: 'HTTPS://Example.com/new#fragment',
     });
+    expect(updated).toMatchObject({
+      status: 'updated',
+      conversationId: Number(chat.id),
+      url: 'https://example.com/new',
+      source: 'chatgpt',
+      conversationKey: 'chat-url',
+      changed: true,
+      merged: false,
+    });
+    expect(await getConversationById(Number(chat.id))).toMatchObject({
+      source: 'chatgpt',
+      conversationKey: 'chat-url',
+      url: 'https://example.com/new',
+    });
+    expect(await readDataRevision('conversations')).toBe(beforeRevision + 1);
+
     await expect(
       updateConversationUrlById({ conversationId: 999999, url: 'https://example.com/new' }),
     ).rejects.toMatchObject({
@@ -2881,6 +2933,19 @@ describe('conversations storage-idb', () => {
     });
     await expect(
       updateConversationUrlById({ conversationId: Number(chat.id), url: 'mailto:test@example.com' }),
+    ).rejects.toMatchObject({
+      code: 'invalid_url',
+    });
+
+    const article = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'ignored-invalid-url',
+      url: 'https://example.com/article',
+      lastActivityAt: 1,
+    });
+    await expect(
+      updateConversationUrlById({ conversationId: Number(article.id), url: 'mailto:test@example.com' }),
     ).rejects.toMatchObject({
       code: 'invalid_article_url',
     });

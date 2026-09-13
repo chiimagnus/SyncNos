@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { closeDbForTests } from '@platform/idb/schema';
+import { closeDbForTests, openDb } from '@platform/idb/schema';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import {
   __resetConversationStorageStateForTests,
   findConversationBySourceAndKey,
@@ -219,6 +220,14 @@ describe('conversations pagination storage-idb', () => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    const legacyUnknownArticle = {
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:no-url',
+      title: 'unknown today',
+      url: '',
+      lastActivityAt: today.getTime(),
+    };
     const rows = [
       {
         sourceType: 'article',
@@ -247,14 +256,6 @@ describe('conversations pagination storage-idb', () => {
       {
         sourceType: 'article',
         source: 'web',
-        conversationKey: 'article:no-url',
-        title: 'unknown today',
-        url: '',
-        lastActivityAt: today.getTime(),
-      },
-      {
-        sourceType: 'article',
-        source: 'web',
         conversationKey: 'article:https://future.example/tomorrow',
         title: 'future',
         url: 'https://future.example/tomorrow',
@@ -278,6 +279,16 @@ describe('conversations pagination storage-idb', () => {
       },
     ];
     for (const row of rows) await upsertConversation(row);
+    const db = await openDb();
+    const legacyTx = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise(
+      legacyTx.objectStore('conversations').add(normalizeConversationListRecord(legacyUnknownArticle) as any),
+    );
+    await new Promise<void>((resolve, reject) => {
+      legacyTx.oncomplete = () => resolve();
+      legacyTx.onerror = () => reject(legacyTx.error || new Error('legacy fixture transaction failed'));
+      legacyTx.onabort = () => reject(legacyTx.error || new Error('legacy fixture transaction aborted'));
+    });
 
     const all = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 20 });
     expect(all.summary).toEqual({ totalCount: 7, todayCount: 4 });

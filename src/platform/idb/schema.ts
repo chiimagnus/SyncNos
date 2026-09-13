@@ -54,7 +54,9 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
-function normalizeHttpUrl(raw: unknown): string {
+const LEGACY_ARTICLE_DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/([^/]+))?\/?$/i;
+
+function canonicalizeLegacyArticleUrlForMigration(raw: unknown): string {
   const text = safeString(raw);
   if (!text) return '';
   try {
@@ -62,6 +64,12 @@ function normalizeHttpUrl(raw: unknown): string {
     const protocol = safeString(url.protocol).toLowerCase();
     if (protocol !== 'http:' && protocol !== 'https:') return '';
     url.hash = '';
+
+    const discourseTopic = url.pathname.match(LEGACY_ARTICLE_DISCOURSE_TOPIC_PATH_RE);
+    if (discourseTopic) {
+      url.pathname = `/t/${discourseTopic[1]}/${discourseTopic[2]}`;
+      url.search = '';
+    }
     return url.toString();
   } catch (_e) {
     return '';
@@ -433,7 +441,7 @@ function migrateLegacyArticleConversations({ tx }: MigrationContext, onDone: () 
     if (cursor) {
       const row = cursor.value as Record<string, unknown> | undefined;
       if (safeString(row?.sourceType).toLowerCase() === 'article') {
-        const canonicalUrl = normalizeHttpUrl(row?.url);
+        const canonicalUrl = canonicalizeLegacyArticleUrlForMigration(row?.url);
         if (canonicalUrl) {
           const canonicalKey = `article:${canonicalUrl}`;
           const list = groups.get(canonicalKey) || [];

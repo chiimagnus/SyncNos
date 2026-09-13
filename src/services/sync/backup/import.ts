@@ -1,4 +1,5 @@
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain/article-identity';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
 import { FEISHU_MESSAGE_TYPES, INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
@@ -152,6 +153,25 @@ function makeStats(): ImportStats {
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
+}
+
+function canonicalizeImportedConversationIdentity(conversation: AnyRecord): {
+  conversation: AnyRecord;
+  canonicalizedArticleIdentity: boolean;
+} {
+  const next = { ...(conversation || {}) };
+  if (safeString(next.sourceType).toLowerCase() !== 'article') {
+    return { conversation: next, canonicalizedArticleIdentity: false };
+  }
+
+  const identity = buildCanonicalWebArticleIdentity(next.url);
+  if (!identity) return { conversation: next, canonicalizedArticleIdentity: false };
+  next.source = identity.source;
+  next.conversationKey = identity.conversationKey;
+  next.url = identity.url;
+  delete next.__canonicalUrl;
+  delete next.__canonicalKey;
+  return { conversation: next, canonicalizedArticleIdentity: true };
 }
 
 const FEISHU_PORTABLE_AUTH_CONFIG_KEYS = {
@@ -351,7 +371,7 @@ export async function importBackupZipMerge(
       throw new Error(bundleValidation.error || `Invalid conversation bundle: ${filePath}`);
     }
 
-    const convo = (bundle as any).conversation;
+    const convo = (bundle as any).conversation as AnyRecord;
     const uk = uniqueConversationKey(convo);
     if (!uk) throw new Error(`Invalid conversation key: ${filePath}`);
     if (seenUnique.has(uk)) throw new Error('Duplicate conversation key in zip');
@@ -362,7 +382,16 @@ export async function importBackupZipMerge(
     totalMessages += msgs.length;
 
     incomingConversations.push(convo);
-    if ((bundle as any).syncMapping) incomingMappings.push((bundle as any).syncMapping);
+    if ((bundle as any).syncMapping) {
+      const mapping = { ...((bundle as any).syncMapping as AnyRecord) };
+      const { conversation: canonicalConversation, canonicalizedArticleIdentity } =
+        canonicalizeImportedConversationIdentity(convo);
+      if (canonicalizedArticleIdentity) {
+        mapping.source = canonicalConversation.source;
+        mapping.conversationKey = canonicalConversation.conversationKey;
+      }
+      incomingMappings.push(mapping);
+    }
   }
 
   if (isCurrentBackup) {
@@ -417,10 +446,12 @@ export async function importBackupZipMerge(
         const idx = s.conversations.index('by_source_conversationKey');
         let stageChanged = false;
 
-        for (const incoming of incomingConversations) {
+        for (const rawIncoming of incomingConversations) {
+          const importUniqueKey = uniqueConversationKey(rawIncoming);
+          const { conversation: incoming } = canonicalizeImportedConversationIdentity(rawIncoming);
           const source = incoming?.source ? String(incoming.source) : '';
           const conversationKey = incoming?.conversationKey ? String(incoming.conversationKey) : '';
-          if (!source || !conversationKey) continue;
+          if (!source || !conversationKey || !importUniqueKey) continue;
 
           const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
           const normalizedMerged = normalizeConversationListRecord(
@@ -428,12 +459,14 @@ export async function importBackupZipMerge(
           );
           normalizedMerged.source = source;
           normalizedMerged.conversationKey = conversationKey;
-          const uk = uniqueConversationKey(normalizedMerged);
+          const rememberLocalId = (localId: number) => {
+            uniqueToLocalId.set(importUniqueKey, localId);
+          };
 
           if (existing?.id) {
             const localId = Number(existing.id);
             normalizedMerged.id = localId;
-            uniqueToLocalId.set(uk, localId);
+            rememberLocalId(localId);
             if (areBackupValuesEqual(normalizedMerged, existing)) continue;
 
             await reqToPromise(s.conversations.put(normalizedMerged as any));
@@ -444,7 +477,7 @@ export async function importBackupZipMerge(
 
           delete normalizedMerged.id;
           const localId = Number(await reqToPromise(s.conversations.add(normalizedMerged as any) as any));
-          uniqueToLocalId.set(uk, localId);
+          rememberLocalId(localId);
           stats.conversationsAdded += 1;
           stageChanged = true;
         }
@@ -459,9 +492,12 @@ export async function importBackupZipMerge(
   if (articleCommentItems.length) {
     const canonicalUrls = new Set(articleCommentItems.map((item) => item.canonicalUrl));
     const localConversationIdByCanonicalUrl = new Map<string, number | null>();
-    const uniqueKeyByLocalConversationId = new Map<number, string>(
-      Array.from(uniqueToLocalId, ([uniqueKey, localId]) => [localId, uniqueKey]),
-    );
+    const uniqueKeysByLocalConversationId = new Map<number, Set<string>>();
+    for (const [uniqueKey, localId] of uniqueToLocalId) {
+      const keys = uniqueKeysByLocalConversationId.get(localId) ?? new Set<string>();
+      keys.add(uniqueKey);
+      uniqueKeysByLocalConversationId.set(localId, keys);
+    }
     for (const convo of incomingConversations) {
       const uk = uniqueConversationKey(convo);
       const localId = uk ? uniqueToLocalId.get(uk) : null;
@@ -492,7 +528,7 @@ export async function importBackupZipMerge(
         const index = store.index('by_canonicalUrl_createdAt');
         const existingByFingerprint = new Map<string, AnyRecord>();
         const existingByImportIdentity = new Map<string, AnyRecord>();
-        const existingBaseKeyById = new Map<number, string>();
+        const existingBaseKeysById = new Map<number, Map<string, string>>();
         const existingRows: AnyRecord[] = [];
 
         for (const canonicalUrl of canonicalUrls) {
@@ -518,15 +554,22 @@ export async function importBackupZipMerge(
               })
             )
               continue;
-            const uniqueKey = uniqueKeyByLocalConversationId.get(Number(row?.conversationId)) ?? '';
-            const baseKey = buildArticleCommentArchiveBaseKey({
-              uniqueKey,
-              canonicalUrl,
-              createdAt: Number(row?.createdAt) || 0,
-              quoteText,
-              commentText,
-            });
-            existingBaseKeyById.set(id, baseKey);
+            const uniqueKeys = new Set<string>(uniqueKeysByLocalConversationId.get(Number(row?.conversationId)) ?? []);
+            uniqueKeys.add('');
+            const baseKeys = new Map<string, string>();
+            for (const uniqueKey of uniqueKeys) {
+              baseKeys.set(
+                uniqueKey,
+                buildArticleCommentArchiveBaseKey({
+                  uniqueKey,
+                  canonicalUrl,
+                  createdAt: Number(row?.createdAt) || 0,
+                  quoteText,
+                  commentText,
+                }),
+              );
+            }
+            existingBaseKeysById.set(id, baseKeys);
             const importedMergeKey = buildImportedArticleCommentMergeKey({
               canonicalUrl,
               importSource: row?.importSource,
@@ -541,12 +584,17 @@ export async function importBackupZipMerge(
         for (const row of existingRows) {
           if (safeString(row.importSource) && safeString(row.importKey)) continue;
           const id = Number(row.id);
-          const baseKey = existingBaseKeyById.get(id) ?? '';
+          const baseKeys = existingBaseKeysById.get(id) ?? new Map<string, string>();
           const parentId = Number(row.parentId);
-          const parentBaseKey =
-            Number.isSafeInteger(parentId) && parentId > 0 ? (existingBaseKeyById.get(parentId) ?? '') : '';
-          const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
-          if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
+          const parentBaseKeys =
+            Number.isSafeInteger(parentId) && parentId > 0
+              ? (existingBaseKeysById.get(parentId) ?? new Map<string, string>())
+              : null;
+          for (const [uniqueKey, baseKey] of baseKeys) {
+            const parentBaseKey = parentBaseKeys?.get(uniqueKey) ?? '';
+            const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
+            if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
+          }
         }
 
         const incomingIdToLocalId = new Map<number, number>();

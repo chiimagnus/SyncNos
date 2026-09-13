@@ -1129,7 +1129,7 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     });
   });
 
-  it('keeps weakly normalized Discourse migration rows reachable for runtime topic-level convergence', async () => {
+  it('fully canonicalizes legacy Discourse article identity during migration before runtime upsert', async () => {
     const db1 = await openV1Db();
     const t1 = db1.transaction(['conversations', 'sync_mappings'], 'readwrite');
     const legacyId = await reqToPromise<number>(
@@ -1166,15 +1166,15 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     expect(beforeConversation).toMatchObject({
       id: legacyId,
       source: 'web',
-      conversationKey: 'article:https://linux.do/t/topic/1870532/820?u=abc',
-      url: 'https://linux.do/t/topic/1870532/820?u=abc',
+      conversationKey: 'article:https://linux.do/t/topic/1870532',
+      url: 'https://linux.do/t/topic/1870532',
       listSourceKey: 'web',
       listSiteKey: 'domain:linux.do',
     });
     expect(beforeMappings).toMatchObject([
       {
         source: 'web',
-        conversationKey: 'article:https://linux.do/t/topic/1870532/820?u=abc',
+        conversationKey: 'article:https://linux.do/t/topic/1870532',
         notionPageId: 'page-discourse',
         feishuDocId: 'doc-discourse',
         futureMetadata: { keep: true },

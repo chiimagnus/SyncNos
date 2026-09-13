@@ -288,9 +288,9 @@ describe('CLI Native Messaging bridge', () => {
       dispatch: vi.fn(async (message: any) => {
         if (message.type === CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL && message.url.includes('conflict')) {
           return {
-            ok: false,
-            data: null,
-            error: { message: 'conflict', extra: { code: 'conversation_url_conflict', conflictingConversationId: 9 } },
+            ok: true,
+            data: { status: 'conflict', conflictConversationId: 9, changed: false },
+            error: null,
           };
         }
         return { ok: true, data: { echoedType: message.type }, error: null };
@@ -325,7 +325,7 @@ describe('CLI Native Messaging bridge', () => {
       await emit('u2', 'conversation.update-url', { conversationId: 7, url: 'https://example.com/conflict' }),
     ).toMatchObject({
       ok: false,
-      error: { code: 'conversation_url_conflict' },
+      error: { code: 'url_conflict', extra: { conflictConversationId: 9 } },
     });
     await emit('m1', 'conversation.merge', { keepConversationId: 7, removeConversationId: 9 });
     expect(router.dispatch).toHaveBeenCalledWith(
