@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   READER_PREFS_STORAGE_KEY,
+  applyReaderPrefsPatch,
   buildReaderPrefsStoragePatch,
   normalizeReaderPrefs,
   resolveReaderPrefsFromStorage,
@@ -22,14 +23,6 @@ function mergePatch(left: ReaderPrefsPatch, right: ReaderPrefsPatch): ReaderPref
     ...right,
     ...(left.tts || right.tts ? { tts: { ...(left.tts ?? {}), ...(right.tts ?? {}) } } : {}),
   };
-}
-
-function applyPatch(base: ReaderPrefs, patch: ReaderPrefsPatch): ReaderPrefs {
-  return normalizeReaderPrefs({
-    ...base,
-    ...patch,
-    tts: { ...base.tts, ...(patch.tts ?? {}) },
-  });
 }
 
 function hasPatch(patch: ReaderPrefsPatch): boolean {
@@ -64,7 +57,7 @@ export function useReaderPrefs(): UseReaderPrefsResult {
   }, []);
 
   const publishMergedDisplay = useCallback(() => {
-    publishDisplay(applyPatch(durablePrefsRef.current, dirtyPatchRef.current));
+    publishDisplay(applyReaderPrefsPatch(durablePrefsRef.current, dirtyPatchRef.current));
   }, [publishDisplay]);
 
   const applyDurableObservation = useCallback(
@@ -98,7 +91,7 @@ export function useReaderPrefs(): UseReaderPrefsResult {
 
     while (hasPatch(dirtyPatchRef.current)) {
       const generationAtStart = previewGenerationRef.current;
-      const next = applyPatch(durablePrefsRef.current, dirtyPatchRef.current);
+      const next = applyReaderPrefsPatch(durablePrefsRef.current, dirtyPatchRef.current);
 
       if (prefsEqual(next, durablePrefsRef.current)) {
         if (previewGenerationRef.current === generationAtStart) {

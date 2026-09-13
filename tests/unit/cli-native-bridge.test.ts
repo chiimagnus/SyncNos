@@ -10,6 +10,7 @@ import {
   ITEM_MENTION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
+  SETTINGS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 
@@ -520,6 +521,38 @@ describe('CLI Native Messaging bridge', () => {
         error: { code: 'parent_not_root' },
       },
     );
+    harness.controller.stop();
+  });
+
+  it('maps settings schema/get/set to the public settings handlers without adding a second key registry', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => ({ ok: true, data: { echoed: message }, error: null })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    const emit = async (requestId: string, method: string, params: Record<string, unknown> = {}) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    await emit('settings-schema', 'settings.schema');
+    expect(router.dispatch).toHaveBeenLastCalledWith({ type: SETTINGS_MESSAGE_TYPES.SCHEMA }, null);
+
+    await emit('settings-get-all', 'settings.get');
+    expect(router.dispatch).toHaveBeenLastCalledWith({ type: SETTINGS_MESSAGE_TYPES.GET }, null);
+
+    await emit('settings-get-one', 'settings.get', { key: 'theme.mode' });
+    expect(router.dispatch).toHaveBeenLastCalledWith({ type: SETTINGS_MESSAGE_TYPES.GET, key: 'theme.mode' }, null);
+
+    await emit('settings-set', 'settings.set', { key: 'capture.ai-chat-auto-save', value: false });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: SETTINGS_MESSAGE_TYPES.SET, key: 'capture.ai-chat-auto-save', value: false },
+      null,
+    );
+
     harness.controller.stop();
   });
 

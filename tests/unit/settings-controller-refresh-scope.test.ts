@@ -3,11 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  FEISHU_MESSAGE_TYPES,
-  INPAGE_MESSAGE_TYPES,
-  NOTION_MESSAGE_TYPES,
-} from '@services/protocols/message-contracts';
+import { FEISHU_MESSAGE_TYPES, NOTION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 
 const runtimeMocks = vi.hoisted(() => ({ send: vi.fn() }));
@@ -95,7 +91,7 @@ let notionGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let notionStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
-let displaySetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
+let displaySetQueue: Array<Promise<void> | Error> = [];
 
 function ControllerHarness() {
   const snapshot = useSettingsSceneController({ activeSection: 'notion' });
@@ -188,6 +184,11 @@ beforeEach(() => {
     return out;
   });
   storageMocks.set.mockImplementation(async (payload: Record<string, unknown>) => {
+    if (Object.prototype.hasOwnProperty.call(payload || {}, 'inpage_display_mode') && displaySetQueue.length) {
+      const queued = displaySetQueue.shift()!;
+      if (queued instanceof Error) throw queued;
+      await queued;
+    }
     Object.assign(storageState, payload || {});
   });
   storageMocks.remove.mockImplementation(async (keys: string[]) => {
@@ -200,7 +201,7 @@ beforeEach(() => {
     };
   });
 
-  runtimeMocks.send.mockImplementation(async (type: string, payload?: Record<string, unknown>) => {
+  runtimeMocks.send.mockImplementation(async (type: string, _payload?: Record<string, unknown>) => {
     if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS) {
       return await takeQueued(notionGetQueue, ok(notionStatus));
     }
@@ -230,9 +231,6 @@ beforeEach(() => {
     }
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
       return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
-    }
-    if (type === INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE) {
-      return await takeQueued(displaySetQueue, ok({ mode: String(payload?.mode || '') }));
     }
     if (type === 'obsidianGetSettings') {
       return ok({
@@ -334,30 +332,27 @@ describe('Settings scoped refresh', () => {
     expect(latestSnapshot!.inpageDisplayMode).toBe('off');
   });
 
-  it('display action uses the background route, supports same-value-no-wake fallback, and rejects stale responses', async () => {
+  it('display action uses the canonical service and rejects stale responses', async () => {
     storageState = { inpage_display_mode: 'all' };
     await renderController();
     await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
-    expect(callsOf(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE)).toHaveLength(1);
-    expect(storageMocks.set).not.toHaveBeenCalledWith(
-      expect.objectContaining({ inpage_display_mode: expect.anything() }),
-    );
+    expect(storageMocks.set).toHaveBeenCalledWith({ inpage_display_mode: 'off' });
     expect(latestSnapshot!.inpageDisplayMode).toBe('off');
 
-    const late = deferred<ApiResponse>();
+    const late = deferred<void>();
     displaySetQueue.push(late.promise);
     const action = begin(() => latestSnapshot!.onChangeInpageDisplayMode('all'));
     await flushReact();
     dispatchStorage({ inpage_display_mode: { oldValue: 'off', newValue: 'supported' } });
-    late.resolve(ok({ mode: 'all' }));
+    late.resolve();
     await act(async () => action);
     expect(latestSnapshot!.inpageDisplayMode).toBe('supported');
   });
 
-  it('display route failure does not report a successful UI state', async () => {
+  it('display storage failure does not report a successful UI state', async () => {
     storageState = { inpage_display_mode: 'all' };
     await renderController();
-    displaySetQueue.push({ ok: false, data: null, error: { message: 'display write failed' } });
+    displaySetQueue.push(new Error('display write failed'));
     await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
     expect(latestSnapshot!.inpageDisplayMode).toBe('all');
     expect(latestSnapshot!.error).toBe('display write failed');

@@ -27,7 +27,6 @@ const currentState = {
 
 const currentReaderPrefs = {
   ...DEFAULT_READER_PREFS,
-  theme: 'system' as const,
   tts: {
     ...DEFAULT_READER_TTS_PREFS,
     engine: 'ai' as const,
@@ -178,7 +177,6 @@ function resetState() {
     notionPageId: '01234567-89ab-cdef-0123-456789abcdef',
   };
   currentState.detailHeaderActions = [];
-  currentReaderPrefs.theme = 'system';
   currentReaderPrefs.tts = {
     ...DEFAULT_READER_TTS_PREFS,
     engine: 'ai',

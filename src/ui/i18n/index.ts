@@ -1,11 +1,16 @@
 import { en, type TranslationKey } from './locales/en';
 import { zh } from './locales/zh';
 import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
+import {
+  LOCALE_PREFERENCE_STORAGE_KEY,
+  buildLocalePreferenceStoragePatch,
+  normalizeLocalePreference,
+  type Locale,
+  type LocalePreference,
+} from '@services/protocols/locale-preference';
 
-export type Locale = 'en' | 'zh';
-export type LocalePreference = Locale | 'system';
-
-export const LOCALE_PREFERENCE_STORAGE_KEY = 'ui_locale_preference_v1';
+export { LOCALE_PREFERENCE_STORAGE_KEY, normalizeLocalePreference } from '@services/protocols/locale-preference';
+export type { Locale, LocalePreference } from '@services/protocols/locale-preference';
 
 function detectLocale(): Locale {
   try {
@@ -23,13 +28,6 @@ const translations: Record<Locale, { [K in TranslationKey]: string }> = { en, zh
 let currentLocalePreference: LocalePreference = 'system';
 let currentLocale: Locale = detectLocale();
 let initialization: Promise<Locale> | null = null;
-
-export function normalizeLocalePreference(value: unknown): LocalePreference {
-  const preference = String(value || '')
-    .trim()
-    .toLowerCase();
-  return preference === 'en' || preference === 'zh' || preference === 'system' ? preference : 'system';
-}
 
 function applyLocalePreference(value: unknown): Locale {
   currentLocalePreference = normalizeLocalePreference(value);
@@ -61,7 +59,7 @@ export async function initializeLocale(): Promise<Locale> {
 
 export async function saveLocalePreference(value: unknown): Promise<LocalePreference> {
   const preference = normalizeLocalePreference(value);
-  await storageSet({ [LOCALE_PREFERENCE_STORAGE_KEY]: preference });
+  await storageSet(buildLocalePreferenceStoragePatch(preference));
   applyLocalePreference(preference);
   return preference;
 }

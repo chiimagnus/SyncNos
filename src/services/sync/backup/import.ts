@@ -2,8 +2,6 @@ import { normalizeConversationListRecord } from '@platform/idb/conversation-list
 import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain/article-identity';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
-import { INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
-import { send } from '@services/shared/runtime';
 import { saveFeishuOAuthConfig } from '@services/sync/feishu/auth/oauth';
 import {
   areBackupValuesEqual,
@@ -19,7 +17,7 @@ import {
 import { openDb } from '@platform/idb/schema';
 import { reqToPromise } from '@services/sync/backup/idb';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
-import { INPAGE_DISPLAY_MODE_STORAGE_KEY } from '@services/shared/inpage-display-mode';
+import { INPAGE_DISPLAY_MODE_STORAGE_KEY, setCanonicalInpageDisplayMode } from '@services/shared/inpage-display-mode';
 import {
   collectMarkdownImageReferences,
   replaceMarkdownImageReferences,
@@ -197,12 +195,7 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
 
   if (Object.keys(directSettings).length) await storageSet(directSettings);
 
-  if (hasDisplayMode) {
-    const response = await send<any>(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, { mode: displayMode });
-    if (!response?.ok) {
-      throw new Error(String(response?.error?.message || 'restore inpage display mode failed'));
-    }
-  }
+  if (hasDisplayMode) await setCanonicalInpageDisplayMode(displayMode);
 
   if (Object.keys(feishuConfig).length) await saveFeishuOAuthConfig(feishuConfig);
 }

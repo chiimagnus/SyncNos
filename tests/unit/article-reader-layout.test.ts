@@ -21,7 +21,6 @@ vi.mock('../../src/viewmodels/reader/useReaderPrefs', () => ({
     prefs: {
       ...DEFAULT_READER_PREFS,
       contentWidth: 2000,
-      theme: 'system',
     },
     update: mocks.update,
   }),

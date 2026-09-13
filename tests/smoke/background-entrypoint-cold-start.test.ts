@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   registerObsidianSettingsHandlers: vi.fn(),
   registerFeishuSettingsHandlers: vi.fn(),
   registerGithubSettingsHandlers: vi.fn(),
+  registerPublicSettingsHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
   ensureDefaultFeishuOAuthConfig: vi.fn(),
@@ -64,6 +65,9 @@ vi.mock('@services/sync/feishu/settings-background-handlers', () => ({
 vi.mock('@services/sync/github/settings-background-handlers', () => ({
   registerGithubSettingsHandlers: mocks.registerGithubSettingsHandlers,
 }));
+vi.mock('@services/settings/background-handlers', () => ({
+  registerPublicSettingsHandlers: mocks.registerPublicSettingsHandlers,
+}));
 vi.mock('@services/sync/notion/auth/oauth', () => ({
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
 }));
@@ -84,8 +88,6 @@ vi.mock('@services/shared/inpage-display-mode', () => ({
   setCanonicalInpageDisplayMode: mocks.setDisplayMode,
 }));
 vi.mock('@services/cli/native-bridge', () => ({ startCliNativeBridge: mocks.startCliNativeBridge }));
-
-import { INPAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -221,6 +223,7 @@ describe('background entrypoint cold start', () => {
     expect(menuOptions.setDisplayMode).toBe(mocks.setDisplayMode);
     expect(menuOptions.ready).toBeInstanceOf(Promise);
     expect(mocks.registerGithubSettingsHandlers).toHaveBeenCalledTimes(1);
+    expect(mocks.registerPublicSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerSyncHandlers.mock.calls[0]?.[1]?.githubSyncOrchestrator).toBe(
       mocks.createBackgroundServices.mock.results[0]?.value.githubSyncOrchestrator,
     );
@@ -231,28 +234,7 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
 
-    const displayResponse = vi.fn();
     expect(runtimeMessageListener).not.toBeNull();
-    expect(
-      runtimeMessageListener?.({ type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'off' }, null, displayResponse),
-    ).toBe(true);
-    await flushMicrotasks();
-    expect(displayResponse).toHaveBeenCalledWith({ ok: true, data: { mode: 'off' }, error: null });
-    expect(mocks.setDisplayMode).toHaveBeenCalledWith('off');
-
-    const invalidDisplayResponse = vi.fn();
-    runtimeMessageListener?.(
-      { type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'bad' },
-      null,
-      invalidDisplayResponse,
-    );
-    await flushMicrotasks();
-    expect(invalidDisplayResponse).toHaveBeenCalledWith({
-      ok: false,
-      data: null,
-      error: { message: 'invalid inpage display mode', extra: null },
-    });
-
     const sendResponse = vi.fn();
     expect(runtimeMessageListener?.({ type: 'cold-start-probe' }, null, sendResponse)).toBe(true);
     await flushMicrotasks();

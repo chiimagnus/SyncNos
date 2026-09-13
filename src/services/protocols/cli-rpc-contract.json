@@ -55,7 +55,10 @@
     "github.test",
     "github.init",
     "sync.start",
-    "sync.status"
+    "sync.status",
+    "settings.schema",
+    "settings.get",
+    "settings.set"
   ],
   "browserRequired": []
 }

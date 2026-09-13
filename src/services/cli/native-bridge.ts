@@ -8,6 +8,7 @@ import {
   ITEM_MENTION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
+  SETTINGS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -234,6 +235,29 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     }
 
     const params = frame?.params && typeof frame.params === 'object' ? frame.params : {};
+
+    if (method === 'settings.schema') {
+      postBackgroundResult(await router.dispatch({ type: SETTINGS_MESSAGE_TYPES.SCHEMA }, null));
+      return;
+    }
+    if (method === 'settings.get') {
+      postBackgroundResult(
+        await router.dispatch(
+          {
+            type: SETTINGS_MESSAGE_TYPES.GET,
+            ...(params.key == null ? {} : { key: params.key }),
+          },
+          null,
+        ),
+      );
+      return;
+    }
+    if (method === 'settings.set') {
+      postBackgroundResult(
+        await router.dispatch({ type: SETTINGS_MESSAGE_TYPES.SET, key: params.key, value: params.value }, null),
+      );
+      return;
+    }
 
     if (method === 'notion.auth.status') {
       postBackgroundResult(await router.dispatch({ type: NOTION_MESSAGE_TYPES.GET_AUTH_STATUS }, null));

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
-import { FEISHU_MESSAGE_TYPES, INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { FEISHU_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { exportBackupZip } from '@services/sync/backup/export';
 import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
@@ -200,16 +200,6 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
       lastError: null as any,
       sendMessage(message: any, callback: (response: any) => void) {
         runtimeMessages.push(structuredClone(message));
-        if (message?.type === INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE) {
-          const mode = String(message?.mode || '');
-          if (mode !== 'supported' && mode !== 'all' && mode !== 'off') {
-            callback({ ok: false, data: null, error: { message: 'invalid inpage display mode', extra: null } });
-            return;
-          }
-          store.inpage_display_mode = mode;
-          callback({ ok: true, data: { mode }, error: null });
-          return;
-        }
         callback({ ok: false, data: null, error: { message: `unexpected message: ${message?.type}`, extra: null } });
       },
     },
@@ -287,15 +277,16 @@ describe('backup service', () => {
     const entries = emptyBackupZipEntries({ inpage_display_mode: 'all' });
     const stats = await importBackupZipMerge(entries);
     expect(stats.settingsApplied).toBe(1);
-    expect(chromeMock.__runtimeMessages).toContainEqual({ type: INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, mode: 'all' });
+    expect(chromeMock.__runtimeMessages).toHaveLength(0);
     expect(chromeMock.__store.inpage_display_mode).toBe('all');
   });
 
-  it('rejects restore when the canonical display owner route rejects', async () => {
+  it('rejects restore when canonical display storage fails', async () => {
     const chromeMock = mockChromeStorage();
-    chromeMock.runtime.sendMessage = (message: any, callback: (response: any) => void) => {
-      chromeMock.__runtimeMessages.push(structuredClone(message));
-      callback({ ok: false, data: null, error: { message: 'display owner failed', extra: null } });
+    chromeMock.storage.local.set = (_payload: Record<string, unknown>, callback: () => void) => {
+      chromeMock.runtime.lastError = { message: 'display owner failed' };
+      callback();
+      chromeMock.runtime.lastError = null;
     };
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;

@@ -499,6 +499,9 @@ function usage() {
     '  github test|init',
     '  sync <conversation-id> [...] --to notion|obsidian|feishu|github [--no-wait] [--timeout <seconds>]',
     '  sync status --provider notion|obsidian|feishu|github',
+    '  settings schema',
+    '  settings get [public-key]',
+    '  settings set <public-key> <value>',
     '  doctor [--human]',
   ].join('\n');
 }
@@ -790,6 +793,58 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       throw codedError('usage_error', 'mention action must be search or build', EXIT.usage);
+    }
+
+    if (options.command === 'settings') {
+      assertAllowedOptions(options, new Set(['instance', 'human']));
+      const action = String(options.positionals[0] || '');
+      if (action === 'schema') {
+        if (options.positionals.length !== 1) {
+          throw codedError('usage_error', 'settings schema accepts no key', EXIT.usage);
+        }
+        const { selected } = await selectedInstance(options, context);
+        const schema = await requestSelected(selected, 'settings.schema');
+        writeResult(stdout, envelopeOk(schema), options.human);
+        return EXIT.success;
+      }
+      if (action === 'get') {
+        if (options.positionals.length > 2) {
+          throw codedError('usage_error', 'settings get accepts at most one key', EXIT.usage);
+        }
+        const { selected } = await selectedInstance(options, context);
+        const key = String(options.positionals[1] || '').trim();
+        const value = await requestSelected(selected, 'settings.get', key ? { key } : {});
+        writeResult(stdout, envelopeOk(value), options.human);
+        return EXIT.success;
+      }
+      if (action === 'set') {
+        if (options.positionals.length < 3) {
+          throw codedError('usage_error', 'settings set requires a public key and value', EXIT.usage);
+        }
+        const key = String(options.positionals[1] || '').trim();
+        const raw = options.positionals.slice(2).join(' ');
+        const { selected } = await selectedInstance(options, context);
+        const schema = await requestSelected(selected, 'settings.schema');
+        const entry = Array.isArray(schema) ? schema.find((item) => String(item?.key || '') === key) : null;
+        if (!entry) throw codedError('settings_unknown_key', `Unknown public setting: ${key}`, EXIT.business);
+        let value = raw;
+        if (entry.type === 'boolean') {
+          if (raw !== 'true' && raw !== 'false') {
+            throw codedError('usage_error', `${key} requires true or false`, EXIT.usage);
+          }
+          value = raw === 'true';
+        } else if (entry.type === 'object') {
+          try {
+            value = JSON.parse(raw);
+          } catch {
+            throw codedError('usage_error', `${key} requires valid JSON`, EXIT.usage);
+          }
+        }
+        const result = await requestSelected(selected, 'settings.set', { key, value });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+      throw codedError('usage_error', 'settings action must be schema, get, or set', EXIT.usage);
     }
 
     if (

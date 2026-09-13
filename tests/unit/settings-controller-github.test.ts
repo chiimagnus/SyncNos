@@ -23,6 +23,9 @@ const gateMocks = vi.hoisted(() => ({
   setSyncProviderEnabled: vi.fn(),
   syncProviderEnabledStorageKey: vi.fn((id: string) => `webclipper_sync_provider_${id}_enabled`),
 }));
+const autoSyncMocks = vi.hoisted(() => ({
+  setAutoSyncEnabled: vi.fn(),
+}));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
 vi.mock('@services/shared/storage', () => ({
@@ -34,6 +37,10 @@ vi.mock('@services/shared/storage', () => ({
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: gateMocks.setSyncProviderEnabled,
   syncProviderEnabledStorageKey: gateMocks.syncProviderEnabledStorageKey,
+}));
+vi.mock('@services/sync/auto-sync/auto-sync-settings', () => ({
+  autoSyncEnabledStorageKey: (id: string) => `${id}_auto_sync_enabled_v1`,
+  setAutoSyncEnabled: autoSyncMocks.setAutoSyncEnabled,
 }));
 vi.mock('@services/integrations/anti-hotlink/anti-hotlink-settings', () => ({
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY: 'anti_hotlink_rules_v1',
@@ -930,7 +937,7 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubSyncEnabled).toBe(true);
 
     await invoke(() => latestSnapshot!.onToggleGithubAutoSyncEnabled(true));
-    expect(storageMocks.set).toHaveBeenCalledWith({ [GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]: true });
+    expect(autoSyncMocks.setAutoSyncEnabled).toHaveBeenCalledWith('github', true);
     expect(latestSnapshot?.githubAutoSyncEnabled).toBe(true);
 
     await invoke(() => latestSnapshot!.onChangeGithubRepository('owner/other'));

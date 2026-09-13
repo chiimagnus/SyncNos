@@ -677,6 +677,107 @@ describe('syncnos CLI instance selection', () => {
     expect(invalidKey.json.error.code).toBe('usage_error');
   });
 
+  it('routes settings through schema-driven public RPCs and rejects raw/invalid values before settings.set', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const schema = [
+      { key: 'capture.ai-chat-auto-save', type: 'boolean', default: true },
+      { key: 'reader.prefs', type: 'object', clamp: true },
+      { key: 'reader.tts.ai-api-key', type: 'secret', writeOnly: true, present: false },
+    ];
+    const instance = await startFakeInstance(runtimeRoot, 'settings-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'settings.schema') return { data: schema };
+        if (request.method === 'settings.get') {
+          return { data: request.params.key ? { key: request.params.key, value: true } : { all: true } };
+        }
+        if (request.method === 'settings.set') {
+          if (request.params.key === 'reader.tts.ai-api-key')
+            return { data: { key: request.params.key, value: { present: true } } };
+          return { data: { key: request.params.key, value: request.params.value } };
+        }
+        return null;
+      },
+    });
+    try {
+      const schemaResult = await run(['settings', 'schema'], runtimeRoot, homeDir);
+      expect(schemaResult.exitCode).toBe(0);
+      expect(schemaResult.json.data).toEqual(schema);
+      expect(instance.requests.at(-1)).toEqual({ method: 'settings.schema', params: {} });
+
+      const getAll = await run(['settings', 'get'], runtimeRoot, homeDir);
+      expect(getAll.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'settings.get', params: {} });
+
+      const getOne = await run(['settings', 'get', 'capture.ai-chat-auto-save'], runtimeRoot, homeDir);
+      expect(getOne.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'settings.get',
+        params: { key: 'capture.ai-chat-auto-save' },
+      });
+
+      const booleanWrite = await run(['settings', 'set', 'capture.ai-chat-auto-save', 'false'], runtimeRoot, homeDir);
+      expect(booleanWrite.exitCode).toBe(0);
+      expect(instance.requests.slice(-2)).toEqual([
+        { method: 'settings.schema', params: {} },
+        { method: 'settings.set', params: { key: 'capture.ai-chat-auto-save', value: false } },
+      ]);
+
+      const objectWrite = await run(
+        ['settings', 'set', 'reader.prefs', '{"fontSize":24,"tts":{"rate":1.25}}'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(objectWrite.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'settings.set',
+        params: { key: 'reader.prefs', value: { fontSize: 24, tts: { rate: 1.25 } } },
+      });
+
+      const secretWrite = await run(
+        ['settings', 'set', 'reader.tts.ai-api-key', 'secret-sentinel'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(secretWrite.exitCode).toBe(0);
+      expect(secretWrite.json.data).toEqual({ key: 'reader.tts.ai-api-key', value: { present: true } });
+      expect(JSON.stringify(secretWrite.json)).not.toContain('secret-sentinel');
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'settings.set',
+        params: { key: 'reader.tts.ai-api-key', value: 'secret-sentinel' },
+      });
+
+      const beforeUnknown = instance.requests.length;
+      const unknown = await run(['settings', 'set', 'cli-integration-enabled', 'true'], runtimeRoot, homeDir);
+      expect(unknown.exitCode).toBe(5);
+      expect(unknown.json.error.code).toBe('settings_unknown_key');
+      expect(instance.requests.length).toBe(beforeUnknown + 2);
+      expect(instance.requests.slice(-2).map((request) => request.method)).toEqual(['system.ping', 'settings.schema']);
+
+      const beforeInvalidBoolean = instance.requests.length;
+      const invalidBoolean = await run(['settings', 'set', 'capture.ai-chat-auto-save', 'yes'], runtimeRoot, homeDir);
+      expect(invalidBoolean.exitCode).toBe(2);
+      expect(invalidBoolean.json.error.code).toBe('usage_error');
+      expect(instance.requests.length).toBe(beforeInvalidBoolean + 2);
+      expect(instance.requests.slice(-2).map((request) => request.method)).toEqual(['system.ping', 'settings.schema']);
+
+      const beforeInvalidJson = instance.requests.length;
+      const invalidJson = await run(['settings', 'set', 'reader.prefs', '{bad'], runtimeRoot, homeDir);
+      expect(invalidJson.exitCode).toBe(2);
+      expect(invalidJson.json.error.code).toBe('usage_error');
+      expect(instance.requests.length).toBe(beforeInvalidJson + 2);
+      expect(instance.requests.slice(-2).map((request) => request.method)).toEqual(['system.ping', 'settings.schema']);
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects incomplete settings syntax before attempting browser instance discovery', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const result = await run(['settings', 'set', 'theme.mode'], runtimeRoot, homeDir);
+    expect(result.exitCode).toBe(2);
+    expect(result.json.error.code).toBe('usage_error');
+  });
+
   it('routes provider auth/config commands through safe public RPCs', async () => {
     const { runtimeRoot, homeDir } = await roots();
     const instance = await startFakeInstance(runtimeRoot, 'provider-instance', 'chromium', {

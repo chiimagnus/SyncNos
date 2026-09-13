@@ -22,13 +22,13 @@ import { initializeLocale } from '@i18n';
 import { storageOnChanged } from '@platform/storage/local';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import { INPAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import {
   ensureCanonicalInpageDisplayMode,
   readEffectiveInpageDisplayMode,
   setCanonicalInpageDisplayMode,
 } from '@services/shared/inpage-display-mode';
 import { startCliNativeBridge } from '@services/cli/native-bridge';
+import { registerPublicSettingsHandlers } from '@services/settings/background-handlers';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -93,10 +93,7 @@ export default defineBackground(() => {
     // GitHub Settings is optional during startup; a registration failure must not block the core router.
   }
   registerUiMessageHandlers(router, { localeReady });
-  router.register(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, async (msg) => {
-    const mode = await setCanonicalInpageDisplayMode(msg?.mode);
-    return router.ok({ mode });
-  });
+  registerPublicSettingsHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,

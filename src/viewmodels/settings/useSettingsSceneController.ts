@@ -14,7 +14,6 @@ import {
 import {
   FEISHU_MESSAGE_TYPES,
   GITHUB_MESSAGE_TYPES,
-  INPAGE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
@@ -25,12 +24,7 @@ import { storageGet, storageOnChanged, storageSet } from '@services/shared/stora
 import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
-import {
-  NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
-  OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
-  FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
-  GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
-} from '@services/sync/auto-sync/auto-sync-keys';
+import { autoSyncEnabledStorageKey, setAutoSyncEnabled } from '@services/sync/auto-sync/auto-sync-settings';
 import {
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
   getDefaultAntiHotlinkRulesForSettings,
@@ -74,6 +68,7 @@ import {
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
   normalizeInpageDisplayMode,
   readEffectiveInpageDisplayMode,
+  setCanonicalInpageDisplayMode,
   type InpageDisplayMode,
 } from '@services/shared/inpage-display-mode';
 
@@ -81,6 +76,10 @@ const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion')
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
 const FEISHU_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('feishu');
 const GITHUB_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('github');
+const NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('notion');
+const OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('obsidian');
+const FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('feishu');
+const GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('github');
 function getKindDbTitle(kindId: string) {
   const title = String(conversationKinds.getNotionDbSpecByKindId(kindId)?.title || '').trim();
   if (!title) throw new Error(`missing Notion database spec for kind: ${kindId}`);
@@ -1089,7 +1088,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (enabled: boolean) => {
       await runTask(
         async () => {
-          await storageSet({ [NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY]: enabled });
+          await setAutoSyncEnabled('notion', enabled);
           setNotionAutoSyncEnabled(enabled);
         },
         { fallbackMessage: 'save notion auto sync enabled failed' },
@@ -1115,7 +1114,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (enabled: boolean) => {
       await runTask(
         async () => {
-          await storageSet({ [OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY]: enabled });
+          await setAutoSyncEnabled('obsidian', enabled);
           setObsidianAutoSyncEnabled(enabled);
         },
         { fallbackMessage: 'save obsidian auto sync enabled failed' },
@@ -1141,7 +1140,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (enabled: boolean) => {
       await runTask(
         async () => {
-          await storageSet({ [FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY]: enabled });
+          await setAutoSyncEnabled('feishu', enabled);
           setFeishuAutoSyncEnabled(enabled);
         },
         { fallbackMessage: 'save feishu auto sync enabled failed' },
@@ -1167,7 +1166,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (enabled: boolean) => {
       await runTask(
         async () => {
-          await storageSet({ [GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]: enabled });
+          await setAutoSyncEnabled('github', enabled);
           setGithubAutoSyncEnabled(enabled);
         },
         { fallbackMessage: 'save github auto sync enabled failed' },
@@ -1663,11 +1662,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (next: InpageDisplayMode) => {
       await runTask(async () => {
         const revision = inpageDisplayObservationRevisionRef.current;
-        const response = unwrap(
-          await send<ApiResponse<{ mode: InpageDisplayMode }>>(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE, { mode: next }),
-        );
-        const mode = normalizeInpageDisplayMode(response?.mode);
-        if (!mode) throw new Error('invalid inpage display mode response');
+        const mode = await setCanonicalInpageDisplayMode(next);
         if (inpageDisplayObservationRevisionRef.current !== revision) return;
         inpageDisplayObservationRevisionRef.current += 1;
         setInpageDisplayMode(mode);

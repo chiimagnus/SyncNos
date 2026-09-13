@@ -73,8 +73,10 @@ export const ARTICLE_MESSAGE_TYPES = {
   RESOLVE_OR_CAPTURE_ACTIVE_TAB: 'resolveOrCaptureActiveTabArticle',
 } as const;
 
-export const INPAGE_MESSAGE_TYPES = {
-  SET_DISPLAY_MODE: 'setInpageDisplayMode',
+export const SETTINGS_MESSAGE_TYPES = {
+  GET: 'getPublicSetting',
+  SET: 'setPublicSetting',
+  SCHEMA: 'getPublicSettingsSchema',
 } as const;
 
 export const CHATGPT_MESSAGE_TYPES = {
@@ -120,7 +122,7 @@ export const messageContracts = {
   FEISHU_MESSAGE_TYPES,
   GITHUB_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
-  INPAGE_MESSAGE_TYPES,
+  SETTINGS_MESSAGE_TYPES,
   CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
@@ -135,7 +137,7 @@ export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof O
 export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISHU_MESSAGE_TYPES];
 export type GithubMessageType = (typeof GITHUB_MESSAGE_TYPES)[keyof typeof GITHUB_MESSAGE_TYPES];
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
-export type InpageMessageType = (typeof INPAGE_MESSAGE_TYPES)[keyof typeof INPAGE_MESSAGE_TYPES];
+export type SettingsMessageType = (typeof SETTINGS_MESSAGE_TYPES)[keyof typeof SETTINGS_MESSAGE_TYPES];
 export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
 export type ItemMentionMessageType = (typeof ITEM_MENTION_MESSAGE_TYPES)[keyof typeof ITEM_MENTION_MESSAGE_TYPES];
@@ -150,7 +152,7 @@ export type MessageType =
   | FeishuMessageType
   | GithubMessageType
   | ArticleMessageType
-  | InpageMessageType
+  | SettingsMessageType
   | ChatgptMessageType
   | CurrentPageMessageType
   | ItemMentionMessageType
