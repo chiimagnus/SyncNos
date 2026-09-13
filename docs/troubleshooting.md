@@ -1,6 +1,6 @@
 # 排障
 
-本页面向维护者，只记录可复用的开发/运行故障诊断，不拥有产品契约或验证门槛。通用环境与提交前验证见 [CONTRIBUTING.md](CONTRIBUTING.md)；仅检查默认浏览器产物时可运行 `npm run check`。当消息生命周期、OAuth/发布、provider 同步失败/恢复诊断或 Zen 流程发生变化时同步更新本页。
+本页面向维护者，只记录可复用的诊断路径。产品契约见 [`AGENTS.md`](../AGENTS.md) 和 [`storage.md`](storage.md)；验证门槛见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 ## 常见问题
 
@@ -8,46 +8,37 @@
 | --- | --- |
 | `npm ci` 失败 | Node/npm 版本与 lockfile 是否匹配。 |
 | Vitest 不退出 | 未释放的 timer、listener 或 React root；超时不是 PASS。 |
-| manifest/version 发布失败 | `wxt.config.ts`、tag 和 workflow 的版本校验；CLI release 还必须通过 `cli/package.mjs --require-wxt-core-match`，不能让 tag core version 与 Extension manifest version 分叉。 |
-| OAuth Connect 无响应 | client id、redirect URI、pending state、Worker endpoint 和浏览器日志。 |
-| Notion 同步报 `notion database schema incompatible` | 先确认目标仍是 SyncNos 管理的数据库 schema。旧 `Date: date` 会自动重命名为 `Last Activity`；`Date` 或 `Last Activity` 类型不符属于真实不兼容状态。不要通过新增第二个 Activity 字段或放宽类型检查绕过迁移。 |
-| Notion 在托管 section 扫描/恢复时遇到 5xx 或 block retrieve 失败 | 按远端失败处理并重试；不要把 list/retrieve 失败转成“未找到”，否则会在已有 heading 旁创建重复 section。服务恢复后应重新扫描并复用原 heading。 |
-| GitHub 手动同步选中了多条，但 commit 的 changed files 更少 | 这是可能的正常结果：手动同步使用 `reconcile`，未变化的受管路径也可能参与声明，但 GitHub 最终 tree diff 只显示真正变化的文件。SyncNos commit message 固定为 `SyncNos GitHub sync`，不再用选中数或 staged 数冒充 changed-file 数。 |
-| article 只有文本没有图片 | 图片设置、anti-hotlink rule、referer 与下载 warning；文本成功仍是成功。 |
-| 视频提示没有字幕 | 这次没有可信字幕时仍会保存可用的视频信息，不会降级成 Article；如需补充字幕，等字幕加载后再次保存即可更新 transcript。 |
-| Bilibili 视频已保存但没有章节/看点 | 章节取自当前页播放器自然加载的章节 response；当前视频没有章节或该 response 尚未被页面加载时，Video 仍会保存其它可用信息。 |
-| Bilibili 稍后再看页被当成网页文章或重复 Video | 仅 `/list/watchlater` 且带合法 `bvid` 的播放页属于 Video；SyncNos 会把它归一到 `/video/<BV>/`，忽略 `oid` 等列表参数。其它 `/list/*` 不会仅凭 `bvid` query 被提升为 Video。旧版本已经误存成 Article 的历史条目不会被自动删除，可按需手动清理。 |
-| `Could not establish connection` / `Receiving end does not exist` | 先按发送方向和生命周期分类：content → background 冷启动、background → content 尚未注入、port 已建立后关闭、旧 context 失效是不同问题。不要用通用 retry 掩盖 background cold-start，也不要把 `message port closed` 或 `Extension context invalidated` 当成 missing receiver。 |
-| `syncnos install` → `browser_not_found` | 自动发现没有命中当前 OS 的任何已知 browser candidate。先确认浏览器确实安装在该产品的标准位置；portable/自定义路径不要靠全盘扫描兜底，可用 `syncnos install --browser <id>` 显式注册已知 target。 |
-| `syncnos doctor` → `native_host_not_installed` | 当前检测到的浏览器没有可用 SyncNos Native Messaging registration，且没有残留 registration。先运行 `syncnos install`；需要单目标诊断时再用 `--browser <id>`。 |
-| `syncnos doctor` → `native_host_install_invalid` | launcher/manifest/Windows Registry registration 存在但 path、schema、allowlist、read-back 或 POSIX 固定权限不符合当前 package；重新运行 installer 收敛固定 target，不要扫描或手改 browser Profile。 |
-| `syncnos doctor` → `extension_unreachable` | Native Host 安装可用，但没有在线 SyncNos instance。依次检查浏览器是否运行、General → Local CLI Integration 是否开启、`nativeMessaging` optional permission 是否已授权/被撤销；doctor 不能证明具体是哪一个原因。 |
-| `syncnos doctor` → `protocol_mismatch` | CLI/native host 与在线 Extension 使用不同 CLI protocol；更新为同一 release 的 Extension 与 CLI asset，不加兼容 tunnel。 |
-| `syncnos doctor` → `instance_ambiguous` | 有多个在线 browser instance 且没有可确定的默认实例；运行 `syncnos instances`，用 `syncnos instances --set-default <id>` 固定主实例，或对单次命令传 `--instance <id>`。 |
+| release/version 校验失败 | tag、`wxt.config.ts` 与 release workflow；CLI release 还要求 npm semver 与 WXT core version 对齐。 |
+| OAuth Connect 无响应 | client ID、redirect URI、pending state、Worker/proxy endpoint 与浏览器日志。 |
+| Notion `database schema incompatible` | 目标是否仍符合 SyncNos 管理 schema；不要靠新增第二个 Activity 字段或放宽类型检查绕过真实不兼容。 |
+| Notion managed section 扫描遇到 5xx/retrieve 失败 | 按远端失败处理并重试；不要把读取失败当成“未找到”后创建重复 section。 |
+| GitHub 选中多条但 changed files 更少 | 未变化的受管路径可以参与 reconcile，但最终 tree diff 只包含真正变化的文件。 |
+| Article 只有文本没有图片 | 图片设置、anti-hotlink rule、Referer 和下载 warning；文本保存成功仍是成功。 |
+| Video 没有字幕 | 当前页没有可信字幕时仍保存 Video；字幕加载后再次保存即可补充 transcript。 |
+| Bilibili Watch Later 产生重复身份 | 只有带合法 `bvid` 的播放页按 BV identity 归一；旧版本误存的历史 Article 不会自动删除。 |
+| `syncnos install` → `browser_not_found` | 自动发现未命中已知标准位置；portable/自定义安装使用显式 `--browser <id>`，不要全盘扫描。 |
+| `syncnos doctor` → `native_host_not_installed` | 运行 `syncnos install`；需要单目标诊断时再指定 `--browser`。 |
+| `syncnos doctor` → `native_host_install_invalid` | launcher / manifest / Registry 的 path、schema、allowlist、read-back 或权限与当前 package 不一致；重新运行 installer。 |
+| `syncnos doctor` → `extension_unreachable` | 浏览器是否运行、Local CLI Integration 是否开启、`nativeMessaging` 权限是否仍存在。doctor 不会猜具体原因。 |
+| `syncnos doctor` → `protocol_mismatch` | CLI/host 与在线 Extension 版本不匹配；更新到同一 release，不增加兼容 tunnel。 |
+| `syncnos doctor` → `instance_ambiguous` | 用 `syncnos instances` 查看在线实例，并设置默认实例或传 `--instance`。 |
 
-### CLI 自动发现与 registration
+## 消息生命周期
 
-`syncnos doctor` 的 `detectedBrowsers` 只来自有限的标准安装候选；`registrations` 只显示当前检测到的 browser 所需 target，或机器上实际存在的 SyncNos registration。不要把“未检测到 portable browser”解释成浏览器不存在，也不要为了找它递归扫描 Profile/磁盘。
+先区分方向和生命周期，不要用统一 retry 掩盖根因：
 
-- macOS/Linux：registration 是 user-level Native Messaging manifest；Chrome-family、Firefox-family 与部分长尾浏览器可能有各自目录，也可能共享 target，以 `doctor` 返回的 `path` 为准。
-- Windows：manifest 保存在当前用户的 SyncNos support dir，`HKCU\\Software\\<vendor>\\...\\NativeMessagingHosts\\app.syncnos.cli` 的默认值指向该 manifest；不写 HKLM。Chrome-compatible 浏览器可共享 Chrome key，Edge 与 Mozilla family 使用各自 key。
-- Windows Extension → host → CLI 的本地 IPC 使用 named pipe；macOS/Linux 使用 Unix domain socket。两者都不是远程网络服务。
-- 同一 registration target 被多个浏览器共享时，显式卸载其中一个 browser target 会影响共享该 target 的其它浏览器；普通用户优先使用无参数 `syncnos install` / `syncnos uninstall` 管理整套 SyncNos registration。
+- **content → background 冷启动**：background receiver 必须在异步初始化前注册。
+- **background → content 初始化**：content receiver 先注册，需要 locale 的 handler 自己等待 readiness。
+- **content 尚未注入**：导航窗口期确实可能没有 receiver；retry 只能属于明确需要它的 caller。
+- **message port closed**：已经建立的 port 因导航/reload/teardown 关闭，不等于 missing receiver。
+- **Extension context invalidated**：旧页面脚本属于旧 Extension 生命周期，应走 invalidated-context 处理。
 
-### 连接错误的五类生命周期
+## 评论定位
 
-- **content → background / background cold-start**：In Page 按钮已经存在、worker 冷启动后第一次点击失败而第二次立即成功，优先检查 background `runtime.onMessage` 是否在任何 `await` 之后才注册。background receiver 应 listener-first，不能靠 retry、keep-alive 或扩大 timeout 修复。
-- **background → content / 初始化顺序**：content receiver 必须先注册，再等待 locale 等异步初始化；需要语言的 Current Page / comments 在 handler 内等待，Video capture 复用 Current Page handler，不再有独立 Video receiver；article extract 不依赖 locale readiness。
-- **background → content / 尚未注入**：页面刚导航、content script 根本还没注入时，仍可能没有 receiver。这是真实平台窗口，不等价于 background cold-start；现有 article navigation 的一次 missing-receiver retry 只属于该 caller。
-- **message port closed**：listener/port 已经建立后又因导航、reload 或 teardown 关闭。这不是“从未有 receiver”，不得借用 missing-receiver retry 隐藏。
-- **`Extension context invalidated`**：extension reload/update 后旧页面脚本属于旧 context 生命周期，继续走现有 invalidated-context 处理；不要归入 receiving-end retry。content → background 不增加 retry。
-
-## 评论精确定位
-
-评论定位以 `resolveCommentAnchor()` 的返回结果为准。复现失败时在调用处检查 `reason`，并依次确认候选 surface root、root evidence、exact quote/context 与当前 generation。失败必须保留明确 reason；不要用模糊匹配或滚动兜底。
+定位失败时检查 `resolveCommentAnchor()` 的 `reason`、候选 surface root、root evidence、exact quote/context 和当前 generation。失败必须保留明确 reason，不增加模糊匹配或滚动兜底。
 
 ## Zen
 
-使用 `npm run build:zen` 生成本地测试 XPI；可用 `FIREFOX_EXTENSION_ID` 覆盖 gecko id。运行 `npm run dev:zen` 时，可用 `WXT_ZEN_BINARY` 指定 Zen 浏览器可执行文件。仅本地测试 profile 才可关闭 unsigned XPI 的签名要求，不能作为发行方案。
+`npm run build:zen` 生成本地测试 XPI；`FIREFOX_EXTENSION_ID` 可覆盖 Gecko ID。`npm run dev:zen` 可用 `WXT_ZEN_BINARY` 指定 Zen 可执行文件。
 
-macOS Zen 的 installer discovery 与 Mozilla-compatible Native Messaging registration 已纳入 `syncnos install`。真实 Zen Profile 上已经用同 Gecko ID 的 current 1.13.2 临时 build 验证 `Native Messaging → CLI → status/revision/stats/list/get` 数据链；这证明 transport/data path，而不是已签名 release XPI 的完整产品 Gate。Firefox 对 optional `nativeMessaging` 的最终授权仍要求真实用户 gesture，不能用 BiDi/WebDriver 合成输入冒充用户授权。不要用 `about:debugging`、Profile 文件修改或其它绕过方式把签名/permission 证据写成 PASS。
+unsigned XPI 只允许在本地测试 Profile 中使用。真实 `nativeMessaging` 授权仍需要用户 gesture；不要用 WebDriver、Profile 修改或 `about:debugging` 绕过签名/权限后把结果当成 release evidence。

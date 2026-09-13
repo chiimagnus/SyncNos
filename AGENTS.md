@@ -37,10 +37,11 @@ collectors -> services/shared
 - 评论定位只接受全局唯一 exact Range，不新增模糊匹配、比例滚动或父元素高亮回退。
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
-- `anti_hotlink_rules_v1` 命中后补 referer 并尝试缓存图片，但图片失败不得阻断正文采集。
-- Provider 的手动同步与自动同步必须收敛到同一 orchestrator / SyncJob 生命周期；scheduler、handler 或 UI 不得另写第二套 progress / terminal job 状态。某 conversation 的非空标题一旦已知，后续空 progress/error payload 不得把它降级回仅 ID；provider 自己的事务、并发和远端写入语义不能被共享 lifecycle 改写。
-- Notion 中由 SyncNos 创建的受管数据库字段与 section 不支持用户自定义其 schema/结构。旧库存在 `Date: date` 且缺少 `Last Activity` 时必须直接把 `Date` 重命名为 `Last Activity`，不能保留 `Date` 再新增第二个 Activity 字段；托管 section 的 list/retrieve 失败必须按远端失败传播或重试，不能降级成“未找到”后创建重复 section。
-- IndexedDB 业务层统一借用 `src/platform/idb/schema.ts` 的 canonical connection；受 revision 跟踪的 writer 必须让业务变更与 revision 同事务提交，consumer 以 durable revision + canonical reread 为正确性真源，禁止重新引入自定义 event/Port 总线作为第二套数据一致性协议。恢复/失败语义见 [`docs/storage.md`](docs/storage.md)。
+- `anti_hotlink_rules_v1` 命中后补 Referer 并尝试缓存图片，但图片失败不得阻断正文采集。
+- Provider 手动/自动同步必须复用同一 orchestrator / SyncJob 生命周期；不得另写第二套 progress/terminal state，也不得让共享 lifecycle 改写 Provider 原有事务、并发或远端写入语义。
+- Local CLI / Native Messaging 只是 Extension 的本机入口：Extension/IndexedDB 仍是唯一业务真源，不创建第二套业务数据库；installer 只操作有限、声明过的当前用户 registration target，machine-safe response 不泄露 Provider/Reader secret。
+- Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。旧 `Date: date` 且缺少 `Last Activity` 时直接重命名；managed section list/retrieve 失败必须传播或重试，不能当作“未找到”后创建重复 section。
+- IndexedDB 业务层统一借用 canonical connection；受 revision 跟踪的业务变更与 revision 必须同 transaction 提交，consumer 以 durable revision + canonical reread 为事实真源。恢复/失败语义见 [`docs/storage.md`](docs/storage.md)。
 
 ## Agent 实现约束
 
