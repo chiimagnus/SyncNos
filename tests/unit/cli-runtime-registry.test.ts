@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DARWIN_UNIX_SOCKET_PATH_MAX_BYTES,
+  LINUX_UNIX_SOCKET_PATH_MAX_BYTES,
   ensureRuntimeDir,
+  isWindowsNamedPipeEndpoint,
   readRegistryEntry,
   registryPathForInstance,
   removeRegistryEntryIfOwned,
@@ -33,6 +35,19 @@ describe('CLI runtime registry', () => {
     const realTmpRuntime = join(tmpdir(), `sn-${process.getuid?.() ?? 0}`);
     const realTmpSocket = socketPathForInstance(realTmpRuntime, '22222222-2222-4222-8222-222222222222');
     expect(Buffer.byteLength(realTmpSocket)).toBeLessThanOrEqual(DARWIN_UNIX_SOCKET_PATH_MAX_BYTES);
+  });
+
+  it('uses Unix sockets on POSIX and deterministic named pipes on Windows', () => {
+    const runtimeDir = '/tmp/sn-501';
+    const id = '33333333-3333-4333-8333-333333333333';
+    const linux = socketPathForInstance(runtimeDir, id, { platform: 'linux' });
+    const windows = socketPathForInstance('C:\\Temp\\sn-501', id, { platform: 'win32' });
+    expect(linux).toMatch(/\.sock$/);
+    expect(Buffer.byteLength(linux)).toBeLessThanOrEqual(LINUX_UNIX_SOCKET_PATH_MAX_BYTES);
+    expect(windows).toMatch(/^\\\\\.\\pipe\\syncnos-cli-[0-9a-f]{16}$/);
+    expect(isWindowsNamedPipeEndpoint(windows)).toBe(true);
+    expect(isWindowsNamedPipeEndpoint(linux)).toBe(false);
+    expect(socketPathForInstance('C:\\different', id, { platform: 'win32' })).toBe(windows);
   });
 
   it('fails closed for symlink and non-directory runtime paths', async () => {

@@ -11,6 +11,7 @@ import { inspectCliInstallation, installNativeHost, uninstallNativeHost } from '
 import { requestEndpoint } from './ipc.mjs';
 import {
   isRegistryPathForInstance,
+  isWindowsNamedPipeEndpoint,
   listRegistryRecords,
   removeFileIfExists,
   removeRegistryEntryIfOwned,
@@ -263,8 +264,9 @@ async function cleanupStaleRecord(record, runtimeDir) {
   if (!removed) return;
   try {
     const expectedEndpoint = socketPathForInstance(runtimeDir, entry.cliInstanceId);
-    if (String(entry.endpoint || '') === expectedEndpoint)
+    if (String(entry.endpoint || '') === expectedEndpoint && !isWindowsNamedPipeEndpoint(expectedEndpoint)) {
       await removeFileIfExists(expectedEndpoint).catch(() => false);
+    }
   } catch {
     // Registry is already removed; never unlink an unverified endpoint path.
   }

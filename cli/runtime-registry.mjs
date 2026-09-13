@@ -6,9 +6,11 @@ import { basename, join } from 'node:path';
 import process from 'node:process';
 
 export const DARWIN_UNIX_SOCKET_PATH_MAX_BYTES = 103;
+export const LINUX_UNIX_SOCKET_PATH_MAX_BYTES = 107;
 const RUNTIME_DIR_PREFIX = 'sn-';
 const REGISTRY_SUFFIX = '.json';
 const SOCKET_SUFFIX = '.sock';
+const WINDOWS_PIPE_PREFIX = '\\\\.\\pipe\\syncnos-cli-';
 
 function errorWithCode(code, message) {
   const error = new Error(message || code);
@@ -48,12 +50,20 @@ export async function ensureRuntimeDir({ root = tmpdir(), uid = process.getuid?.
   return path;
 }
 
-export function socketPathForInstance(runtimeDir, cliInstanceId) {
-  const path = join(runtimeDir, `${runtimeInstanceHash(cliInstanceId)}${SOCKET_SUFFIX}`);
-  if (Buffer.byteLength(path, 'utf8') > DARWIN_UNIX_SOCKET_PATH_MAX_BYTES) {
-    throw errorWithCode('socket_path_too_long', 'CLI Unix socket path exceeds the macOS limit');
+export function socketPathForInstance(runtimeDir, cliInstanceId, { platform = process.platform } = {}) {
+  const hash = runtimeInstanceHash(cliInstanceId);
+  if (platform === 'win32') return `${WINDOWS_PIPE_PREFIX}${hash}`;
+  const path = join(runtimeDir, `${hash}${SOCKET_SUFFIX}`);
+  const maxBytes = platform === 'darwin' ? DARWIN_UNIX_SOCKET_PATH_MAX_BYTES : LINUX_UNIX_SOCKET_PATH_MAX_BYTES;
+  if (Buffer.byteLength(path, 'utf8') > maxBytes) {
+    throw errorWithCode('socket_path_too_long', 'CLI Unix socket path exceeds the platform limit');
   }
   return path;
+}
+
+export function isWindowsNamedPipeEndpoint(endpoint) {
+  const value = String(endpoint || '');
+  return value.startsWith('\\\\.\\pipe\\') || value.startsWith('\\\\?\\pipe\\');
 }
 
 export function registryPathForInstance(runtimeDir, cliInstanceId) {

@@ -13,11 +13,14 @@ import {
 } from '../../cli/browser-targets.mjs';
 import {
   buildNativeHostLauncher,
+  deleteWindowsRegistryValue,
   inspectCliInstallation,
   installNativeHost,
+  queryWindowsRegistryValue,
   resolveCliSupportPaths,
   shellQuote,
   uninstallNativeHost,
+  writeWindowsRegistryValue,
 } from '../../cli/install.mjs';
 import { NativeMessageParser, contract, encodeNativeMessage } from '../../cli/native-host.mjs';
 
@@ -127,7 +130,9 @@ describe('macOS CLI native host installer', () => {
     const firefox = await installNativeHost({ browser: 'firefox', homeDir, platform: 'darwin' });
 
     const chromeRemoved = await uninstallNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
-    expect(chromeRemoved.removedManifests).toEqual([{ browser: 'chrome', path: chrome.manifestPath }]);
+    expect(chromeRemoved.removedManifests).toEqual([
+      expect.objectContaining({ browser: 'chrome', registrationId: 'chrome', path: chrome.manifestPath }),
+    ]);
     expect(chromeRemoved.launcherRemoved).toBe(false);
     await expect(lstat(chrome.launcherPath)).resolves.toBeTruthy();
     await expect(lstat(firefox.manifestPath)).resolves.toBeTruthy();
@@ -199,6 +204,128 @@ describe('macOS CLI native host installer', () => {
       valid: false,
       mode: 0o644,
       issues: expect.arrayContaining(['manifest_mode']),
+    });
+  });
+
+  it('installs and uninstalls a Linux user-level manifest under XDG config/data roots', async () => {
+    const homeDir = await tempHome();
+    const xdgDataHome = join(homeDir, 'xdg-data');
+    const env = { HOME: homeDir, XDG_CONFIG_HOME: join(homeDir, 'xdg-config') };
+    const installed = await installNativeHost({
+      browser: 'brave',
+      homeDir,
+      xdgDataHome,
+      env,
+      platform: 'linux',
+    });
+    expect(installed.manifestPath).toBe(
+      join(homeDir, 'xdg-config/BraveSoftware/Brave-Browser/NativeMessagingHosts', NATIVE_HOST_MANIFEST_FILENAME),
+    );
+    expect(installed.launcherPath).toBe(join(xdgDataHome, 'SyncNos/cli/native-host'));
+    expect(mode(await lstat(installed.launcherPath))).toBe(0o700);
+    expect(mode(await lstat(installed.manifestPath))).toBe(0o600);
+    expect(await readJson(installed.manifestPath)).toEqual(
+      buildNativeHostManifest(
+        resolveBrowserTarget('brave', { platform: 'linux', homeDir, env }),
+        installed.launcherPath,
+      ),
+    );
+
+    const inspection = await inspectCliInstallation({ homeDir, xdgDataHome, env, platform: 'linux' });
+    expect(inspection.platformSupported).toBe(true);
+    expect(inspection.browsers.find((item) => item.browser === 'brave')).toMatchObject({
+      present: true,
+      valid: true,
+      registrationId: 'brave',
+    });
+
+    const removed = await uninstallNativeHost({ browser: 'brave', homeDir, xdgDataHome, env, platform: 'linux' });
+    expect(removed.launcherRemoved).toBe(true);
+    await expect(lstat(installed.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(lstat(installed.launcherPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('builds a Windows batch launcher with absolute paths and escapes percent expansion', () => {
+    const support = resolveCliSupportPaths({
+      platform: 'win32',
+      homeDir: 'C:\\Users\\example',
+      localAppDataDir: 'C:\\Users\\example\\AppData\\Local',
+    });
+    expect(support).toMatchObject({
+      supportDir: 'C:\\Users\\example\\AppData\\Local\\SyncNos\\cli',
+      launcherPath: 'C:\\Users\\example\\AppData\\Local\\SyncNos\\cli\\native-host.bat',
+      manifestDir: 'C:\\Users\\example\\AppData\\Local\\SyncNos\\cli\\manifests',
+    });
+    const launcher = buildNativeHostLauncher({
+      platform: 'win32',
+      nodePath: 'C:\\Program Files\\Node 100%\\node.exe',
+      nativeHostPath: 'C:\\Users\\example\\SyncNos\\native-host.mjs',
+    });
+    expect(launcher).toContain('setlocal DisableDelayedExpansion');
+    expect(launcher).toContain('"C:\\Program Files\\Node 100%%\\node.exe"');
+    expect(launcher).toContain('"C:\\Users\\example\\SyncNos\\native-host.mjs" %*');
+    expect(launcher).toContain('exit /b %errorlevel%');
+  });
+
+  it('writes, queries and deletes only the exact Windows HKCU registration key', async () => {
+    const values = new Map<string, string>();
+    const calls: Array<{ executable: string; args: string[] }> = [];
+    const registryRunner = async (executable: string, args: string[]) => {
+      calls.push({ executable, args: [...args] });
+      const operation = args[0];
+      const key = args[1];
+      if (operation === 'QUERY') {
+        const value = values.get(key);
+        return value
+          ? { status: 0, stdout: `HKEY_CURRENT_USER\\...\r\n    (Default)    REG_SZ    ${value}\r\n`, stderr: '' }
+          : { status: 1, stdout: '', stderr: 'not found' };
+      }
+      if (operation === 'ADD') {
+        const valueIndex = args.indexOf('/d');
+        values.set(key, args[valueIndex + 1]);
+        return { status: 0, stdout: 'ok', stderr: '' };
+      }
+      if (operation === 'DELETE') {
+        values.delete(key);
+        return { status: 0, stdout: 'ok', stderr: '' };
+      }
+      return { status: 2, stdout: '', stderr: 'unexpected' };
+    };
+    const key = 'HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\app.syncnos.cli';
+    const manifestPath = 'C:\\Users\\example\\AppData\\Local\\SyncNos\\cli\\manifests\\edge.json';
+
+    await expect(writeWindowsRegistryValue(key, manifestPath, { registryRunner })).resolves.toEqual({
+      present: true,
+      value: manifestPath,
+    });
+    await expect(queryWindowsRegistryValue(key, { registryRunner })).resolves.toEqual({
+      present: true,
+      value: manifestPath,
+    });
+    await expect(deleteWindowsRegistryValue(key, { registryRunner })).resolves.toBe(true);
+    await expect(queryWindowsRegistryValue(key, { registryRunner })).resolves.toEqual({ present: false, value: null });
+    expect(calls.filter((call) => call.args[0] === 'ADD')).toEqual([
+      {
+        executable: 'reg.exe',
+        args: ['ADD', key, '/ve', '/t', 'REG_SZ', '/d', manifestPath, '/f'],
+      },
+    ]);
+    expect(calls.filter((call) => call.args[0] === 'DELETE')).toEqual([
+      { executable: 'reg.exe', args: ['DELETE', key, '/f'] },
+    ]);
+  });
+
+  it('decodes UTF-16LE Windows Registry read-back without corrupting Unicode manifest paths', async () => {
+    const key = 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\app.syncnos.cli';
+    const manifestPath = 'C:\\Users\\测试用户\\AppData\\Local\\SyncNos\\cli\\manifests\\mozilla.json';
+    const registryRunner = async () => ({
+      status: 0,
+      stdout: Buffer.from(`HKEY_CURRENT_USER\\...\r\n    (Default)    REG_SZ    ${manifestPath}\r\n`, 'utf16le'),
+      stderr: Buffer.alloc(0),
+    });
+    await expect(queryWindowsRegistryValue(key, { registryRunner })).resolves.toEqual({
+      present: true,
+      value: manifestPath,
     });
   });
 

@@ -1,7 +1,8 @@
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { access, chmod, lstat, mkdir, readFile, rename, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { access, chmod, lstat, mkdir, readFile, rename, rmdir, unlink, writeFile } from 'node:fs/promises';
+import { dirname, join, posix, win32 } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
@@ -9,11 +10,12 @@ import {
   buildNativeHostManifest,
   listBrowserTargets,
   resolveBrowserTarget,
+  resolveRegistrationTargets,
   validateNativeHostManifest,
 } from './browser-targets.mjs';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
-const LAUNCHER_RELATIVE_PATH = 'Library/Application Support/SyncNos/cli/native-host';
+const SUPPORTED_PLATFORMS = new Set(['darwin', 'linux', 'win32']);
 
 function installError(code, message, extra = null) {
   const error = new Error(message || code);
@@ -22,10 +24,28 @@ function installError(code, message, extra = null) {
   return error;
 }
 
-function resolveHomeDir(homeDir) {
-  const input = String(homeDir || process.env.HOME || '').trim();
+function pathApi(platform) {
+  return platform === 'win32' ? win32 : posix;
+}
+
+function envValue(env, ...names) {
+  for (const name of names) {
+    const value = String(env?.[name] || '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function resolveHomeDir(homeDir, { platform = process.platform, env = process.env } = {}) {
+  const input = String(homeDir || envValue(env, 'HOME', 'USERPROFILE') || '').trim();
   if (!input) throw installError('home_unavailable', 'Home directory is unavailable');
-  return resolve(input);
+  return pathApi(platform).resolve(input);
+}
+
+function assertSupportedPlatform(platform) {
+  if (!SUPPORTED_PLATFORMS.has(platform)) {
+    throw installError('unsupported_platform', `SyncNos CLI install does not support ${platform}`);
+  }
 }
 
 export function currentCliPackagePaths() {
@@ -36,21 +56,68 @@ export function currentCliPackagePaths() {
   };
 }
 
-export function resolveCliSupportPaths({ homeDir } = {}) {
-  const home = resolveHomeDir(homeDir);
-  const launcherPath = resolve(home, LAUNCHER_RELATIVE_PATH);
-  return { homeDir: home, supportDir: dirname(launcherPath), launcherPath };
+export function resolveCliSupportPaths({
+  platform = process.platform,
+  homeDir,
+  localAppDataDir,
+  xdgDataHome,
+  env = process.env,
+} = {}) {
+  assertSupportedPlatform(platform);
+  const path = pathApi(platform);
+  if (platform === 'win32') {
+    const localAppData = String(localAppDataDir || envValue(env, 'LOCALAPPDATA') || '').trim();
+    if (!localAppData) throw installError('local_app_data_unavailable', 'LOCALAPPDATA is unavailable');
+    const supportDir = path.resolve(localAppData, 'SyncNos', 'cli');
+    return {
+      homeDir: String(homeDir || envValue(env, 'USERPROFILE') || '').trim() || null,
+      supportDir,
+      launcherPath: path.resolve(supportDir, 'native-host.bat'),
+      manifestDir: path.resolve(supportDir, 'manifests'),
+    };
+  }
+
+  const home = resolveHomeDir(homeDir, { platform, env });
+  const supportDir =
+    platform === 'darwin'
+      ? path.resolve(home, 'Library/Application Support/SyncNos/cli')
+      : path.resolve(
+          String(xdgDataHome || envValue(env, 'XDG_DATA_HOME') || path.join(home, '.local/share')),
+          'SyncNos/cli',
+        );
+  return {
+    homeDir: home,
+    supportDir,
+    launcherPath: path.resolve(supportDir, 'native-host'),
+    manifestDir: path.resolve(supportDir, 'manifests'),
+  };
 }
 
 export function shellQuote(value) {
   return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
-export function buildNativeHostLauncher({ nodePath, nativeHostPath }) {
+function batchQuote(value) {
+  const text = String(value || '');
+  if (!text || /[\r\n"]/.test(text)) throw installError('launcher_path_invalid', 'Windows launcher path is invalid');
+  return `"${text.replaceAll('%', '%%')}"`;
+}
+
+export function buildNativeHostLauncher({ nodePath, nativeHostPath, platform = process.platform }) {
+  const path = pathApi(platform);
   const node = String(nodePath || '').trim();
   const host = String(nativeHostPath || '').trim();
-  if (!isAbsolute(node) || !isAbsolute(host)) {
+  if (!path.isAbsolute(node) || !path.isAbsolute(host)) {
     throw installError('launcher_path_invalid', 'Native host launcher requires absolute Node and host paths');
+  }
+  if (platform === 'win32') {
+    return [
+      '@echo off',
+      'setlocal DisableDelayedExpansion',
+      `${batchQuote(node)} ${batchQuote(host)} %*`,
+      'exit /b %errorlevel%',
+      '',
+    ].join('\r\n');
   }
   return `#!/bin/sh\nexec ${shellQuote(node)} ${shellQuote(host)} "$@"\n`;
 }
@@ -73,22 +140,27 @@ async function pathState(path) {
   }
 }
 
-async function atomicWrite(path, content, mode) {
-  await mkdir(dirname(path), { recursive: true });
+async function atomicWrite(path, content, mode, { platform = process.platform } = {}) {
+  await mkdir(pathApi(platform).dirname(path), { recursive: true, ...(platform === 'win32' ? {} : { mode: 0o700 }) });
   const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    await writeFile(tempPath, content, { encoding: 'utf8', mode, flag: 'wx' });
-    await chmod(tempPath, mode);
+    await writeFile(tempPath, content, {
+      encoding: 'utf8',
+      ...(platform === 'win32' ? {} : { mode }),
+      flag: 'wx',
+    });
+    if (platform !== 'win32') await chmod(tempPath, mode);
     await rename(tempPath, path);
-    await chmod(path, mode);
+    if (platform !== 'win32') await chmod(path, mode);
   } catch (error) {
     await unlink(tempPath).catch(() => {});
     throw error;
   }
 }
 
-async function assertExecutableNode(nodePath) {
-  if (!isAbsolute(nodePath)) throw installError('node_path_invalid', 'Node executable path must be absolute');
+async function assertExecutableNode(nodePath, platform) {
+  if (!pathApi(platform).isAbsolute(nodePath))
+    throw installError('node_path_invalid', 'Node executable path must be absolute');
   try {
     await access(nodePath, fsConstants.X_OK);
   } catch (error) {
@@ -98,8 +170,9 @@ async function assertExecutableNode(nodePath) {
   }
 }
 
-async function assertNativeHostScript(nativeHostPath) {
-  if (!isAbsolute(nativeHostPath)) throw installError('native_host_path_invalid', 'Native host path must be absolute');
+async function assertNativeHostScript(nativeHostPath, platform) {
+  if (!pathApi(platform).isAbsolute(nativeHostPath))
+    throw installError('native_host_path_invalid', 'Native host path must be absolute');
   const state = await pathState(nativeHostPath);
   if (!state.present || !state.regularFile || state.symbolicLink) {
     throw installError('native_host_unavailable', `Native host script is unavailable: ${nativeHostPath}`);
@@ -125,38 +198,121 @@ async function readJsonFile(path) {
   }
 }
 
-export async function installNativeHost({
-  browser,
-  extensionId,
-  homeDir,
-  platform = process.platform,
-  nodePath = process.execPath,
-  nativeHostPath = currentCliPackagePaths().nativeHostPath,
-} = {}) {
-  if (platform !== 'darwin')
-    throw installError('unsupported_platform', 'SyncNos CLI install currently supports macOS only');
-  const target = resolveBrowserTarget(browser, { homeDir: resolveHomeDir(homeDir), extensionId });
-  const support = resolveCliSupportPaths({ homeDir });
-  const node = String(nodePath || '').trim();
-  const host = String(nativeHostPath || '').trim();
-  await assertExecutableNode(node);
-  await assertNativeHostScript(host);
+function decodeWindowsOutput(value) {
+  if (typeof value === 'string') return value;
+  const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value || []);
+  if (!buffer.length) return '';
+  const hasUtf16Bom = buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe;
+  let zeroHighBytes = 0;
+  for (let index = 1; index < buffer.length; index += 2) if (buffer[index] === 0) zeroHighBytes += 1;
+  if (hasUtf16Bom || zeroHighBytes > buffer.length / 8) return buffer.toString('utf16le').replace(/^\uFEFF/, '');
+  return buffer.toString('utf8');
+}
 
-  await mkdir(support.supportDir, { recursive: true, mode: 0o700 });
-  await chmod(support.supportDir, 0o700);
-  const launcher = buildNativeHostLauncher({ nodePath: node, nativeHostPath: host });
-  await atomicWrite(support.launcherPath, launcher, 0o700);
+async function defaultWindowsRegistryRunner(executable, args) {
+  return await new Promise((resolve) => {
+    execFile(executable, args, { windowsHide: true, encoding: null }, (error, stdout, stderr) => {
+      resolve({
+        status: error ? (Number.isInteger(error.code) ? error.code : 1) : 0,
+        errorCode: error && !Number.isInteger(error.code) ? String(error.code || '') : null,
+        stdout: stdout || Buffer.alloc(0),
+        stderr: stderr || Buffer.alloc(0),
+      });
+    });
+  });
+}
 
-  const manifest = buildNativeHostManifest(target, support.launcherPath);
-  const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
-  await atomicWrite(target.manifestPath, manifestText, 0o600);
+function normalizeRegistryResult(result) {
+  return {
+    status: Number.isInteger(result?.status) ? result.status : 0,
+    errorCode: result?.errorCode ? String(result.errorCode) : null,
+    stdout: decodeWindowsOutput(result?.stdout),
+    stderr: decodeWindowsOutput(result?.stderr),
+  };
+}
 
-  const [launcherReadback, manifestReadback] = await Promise.all([
-    readFile(support.launcherPath, 'utf8'),
-    readJsonFile(target.manifestPath),
-  ]);
-  if (launcherReadback !== launcher)
+async function runRegistry(args, registryRunner) {
+  const result = normalizeRegistryResult(await (registryRunner || defaultWindowsRegistryRunner)('reg.exe', args));
+  if (result.errorCode) {
+    throw installError('registry_unavailable', `Windows Registry command failed: ${result.errorCode}`);
+  }
+  return result;
+}
+
+export async function queryWindowsRegistryValue(registryKey, { registryRunner } = {}) {
+  const key = String(registryKey || '').trim();
+  if (!key) throw installError('registry_key_invalid', 'Windows Registry key is required');
+  const result = await runRegistry(['QUERY', key, '/ve'], registryRunner);
+  if (result.status === 1) return { present: false, value: null };
+  if (result.status !== 0) {
+    throw installError('registry_query_failed', `Windows Registry query failed for ${key}`, { stderr: result.stderr });
+  }
+  for (const line of result.stdout.split(/\r?\n/)) {
+    const match = /\sREG_SZ\s+/.exec(line);
+    if (!match) continue;
+    const value = line.slice(match.index + match[0].length).trim();
+    if (value) return { present: true, value };
+  }
+  throw installError('registry_readback_invalid', `Windows Registry value is invalid for ${key}`);
+}
+
+export async function writeWindowsRegistryValue(registryKey, manifestPath, { registryRunner } = {}) {
+  const key = String(registryKey || '').trim();
+  const path = String(manifestPath || '').trim();
+  if (!key || !path)
+    throw installError('registry_write_invalid', 'Windows Registry key and manifest path are required');
+  const result = await runRegistry(['ADD', key, '/ve', '/t', 'REG_SZ', '/d', path, '/f'], registryRunner);
+  if (result.status !== 0) {
+    throw installError('registry_write_failed', `Windows Registry write failed for ${key}`, { stderr: result.stderr });
+  }
+  const readback = await queryWindowsRegistryValue(key, { registryRunner });
+  if (!readback.present || readback.value !== path) {
+    throw installError('registry_readback_mismatch', `Windows Registry read-back mismatch for ${key}`, {
+      expected: path,
+      actual: readback.value,
+    });
+  }
+  return readback;
+}
+
+export async function deleteWindowsRegistryValue(registryKey, { registryRunner } = {}) {
+  const key = String(registryKey || '').trim();
+  if (!key) throw installError('registry_key_invalid', 'Windows Registry key is required');
+  const before = await queryWindowsRegistryValue(key, { registryRunner });
+  if (!before.present) return false;
+  const result = await runRegistry(['DELETE', key, '/f'], registryRunner);
+  if (result.status !== 0) {
+    throw installError('registry_delete_failed', `Windows Registry delete failed for ${key}`, {
+      stderr: result.stderr,
+    });
+  }
+  const readback = await queryWindowsRegistryValue(key, { registryRunner });
+  if (readback.present)
+    throw installError('registry_delete_readback_failed', `Windows Registry key still exists: ${key}`);
+  return true;
+}
+
+function targetManifestPath(target, support) {
+  if (target.registrationKind === 'file') return target.manifestPath;
+  return pathApi(target.platform).resolve(support.manifestDir, `${target.registrationId}.json`);
+}
+
+async function prepareLauncher({ support, platform, nodePath, nativeHostPath }) {
+  const launcher = buildNativeHostLauncher({ nodePath, nativeHostPath, platform });
+  await mkdir(support.supportDir, { recursive: true, ...(platform === 'win32' ? {} : { mode: 0o700 }) });
+  if (platform !== 'win32') await chmod(support.supportDir, 0o700);
+  await atomicWrite(support.launcherPath, launcher, 0o700, { platform });
+  const readback = await readFile(support.launcherPath, 'utf8');
+  if (readback !== launcher)
     throw installError('launcher_readback_mismatch', 'Native host launcher read-back mismatch');
+  return launcher;
+}
+
+async function installRegistration({ target, support, platform, registryRunner }) {
+  const manifestPath = targetManifestPath(target, support);
+  const manifest = buildNativeHostManifest(target, support.launcherPath);
+  await atomicWrite(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 0o600, { platform });
+  const manifestReadback = await readJsonFile(manifestPath);
   if (!manifestReadback.value) throw installError('manifest_readback_failed', 'Native host manifest read-back failed');
   const validation = validateNativeHostManifest(target, manifestReadback.value, support.launcherPath);
   if (!validation.valid) {
@@ -164,41 +320,112 @@ export async function installNativeHost({
       issues: validation.issues,
     });
   }
+  if (target.registrationKind === 'registry') {
+    await writeWindowsRegistryValue(target.registryKey, manifestPath, { registryRunner });
+  }
+  return { manifestPath, validation };
+}
 
+export async function installNativeHost({
+  browser,
+  extensionId,
+  homeDir,
+  localAppDataDir,
+  xdgDataHome,
+  env = process.env,
+  platform = process.platform,
+  nodePath = process.execPath,
+  nativeHostPath = currentCliPackagePaths().nativeHostPath,
+  registryRunner,
+} = {}) {
+  assertSupportedPlatform(platform);
+  const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
+  const target = resolveBrowserTarget(browser, { platform, homeDir, localAppDataDir, env, extensionId });
+  const node = String(nodePath || '').trim();
+  const host = String(nativeHostPath || '').trim();
+  await assertExecutableNode(node, platform);
+  await assertNativeHostScript(host, platform);
+  await prepareLauncher({ support, platform, nodePath: node, nativeHostPath: host });
+  const installed = await installRegistration({ target, support, platform, registryRunner });
   return {
     browser: target.id,
+    registrationId: target.registrationId,
+    registrationKind: target.registrationKind,
     extensionId: target.extensionId,
+    extensionIds: [...target.extensionIds],
     productionIdentity: target.productionIdentity,
     launcherPath: support.launcherPath,
-    manifestPath: target.manifestPath,
+    manifestPath: installed.manifestPath,
+    registryKey: target.registryKey,
     nativeHostPath: host,
     nodePath: node,
   };
 }
 
-export async function uninstallNativeHost({ browser, homeDir, platform = process.platform } = {}) {
-  if (platform !== 'darwin')
-    throw installError('unsupported_platform', 'SyncNos CLI uninstall currently supports macOS only');
-  const home = resolveHomeDir(homeDir);
-  const browsers = browser ? [String(browser).trim().toLowerCase()] : listBrowserTargets();
+async function registrationPresence(target, support, registryRunner) {
+  const manifestPath = targetManifestPath(target, support);
+  const manifestPresent = (await pathState(manifestPath)).present;
+  if (target.registrationKind === 'file') return { present: manifestPresent, manifestPath };
+  const registry = await queryWindowsRegistryValue(target.registryKey, { registryRunner });
+  return { present: registry.present, manifestPresent, manifestPath, registryValue: registry.value };
+}
+
+export async function uninstallNativeHost({
+  browser,
+  homeDir,
+  localAppDataDir,
+  xdgDataHome,
+  env = process.env,
+  platform = process.platform,
+  registryRunner,
+} = {}) {
+  assertSupportedPlatform(platform);
+  const browsers = browser ? [String(browser).trim().toLowerCase()] : listBrowserTargets({ platform });
+  const options = { platform, homeDir, localAppDataDir, env };
+  const targets = resolveRegistrationTargets(browsers, options);
+  const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
   const removedManifests = [];
-  for (const browserId of browsers) {
-    const target = resolveBrowserTarget(browserId, { homeDir: home });
-    if (await removeExactFile(target.manifestPath))
-      removedManifests.push({ browser: target.id, path: target.manifestPath });
+  for (const target of targets) {
+    const manifestPath = targetManifestPath(target, support);
+    let registrationRemoved = false;
+    if (target.registrationKind === 'registry') {
+      registrationRemoved = await deleteWindowsRegistryValue(target.registryKey, { registryRunner });
+    }
+    const manifestRemoved = await removeExactFile(manifestPath);
+    if (registrationRemoved || manifestRemoved) {
+      removedManifests.push({
+        browser: target.browsers[0],
+        browsers: [...target.browsers],
+        registrationId: target.registrationId,
+        path: manifestPath,
+        registryKey: target.registryKey,
+      });
+    }
   }
 
+  const allTargets = resolveRegistrationTargets(listBrowserTargets({ platform }), options);
   const remaining = [];
-  for (const browserId of listBrowserTargets()) {
-    const target = resolveBrowserTarget(browserId, { homeDir: home });
-    if ((await pathState(target.manifestPath)).present)
-      remaining.push({ browser: target.id, path: target.manifestPath });
+  for (const target of allTargets) {
+    const state = await registrationPresence(target, support, registryRunner);
+    if (state.present) {
+      remaining.push({
+        browser: target.browsers[0],
+        browsers: [...target.browsers],
+        registrationId: target.registrationId,
+        path: state.manifestPath,
+        registryKey: target.registryKey,
+      });
+    }
   }
 
-  const support = resolveCliSupportPaths({ homeDir: home });
   let launcherRemoved = false;
   if (remaining.length === 0) {
     launcherRemoved = await removeExactFile(support.launcherPath);
+    try {
+      await rmdir(support.manifestDir);
+    } catch (error) {
+      if (!['ENOENT', 'ENOTEMPTY'].includes(String(error?.code || ''))) throw error;
+    }
     try {
       await rmdir(support.supportDir);
     } catch (error) {
@@ -215,49 +442,69 @@ export async function uninstallNativeHost({ browser, homeDir, platform = process
   };
 }
 
-async function inspectLauncher({ launcherPath, expectedLauncher }) {
+async function inspectLauncher({ launcherPath, expectedLauncher, platform }) {
   const state = await pathState(launcherPath);
-  if (!state.present)
+  if (!state.present) {
     return { path: launcherPath, ...state, executable: false, modeValid: false, matchesCurrentPackage: false };
+  }
   let contents = '';
   try {
     contents = await readFile(launcherPath, 'utf8');
   } catch {
     // state below reports the mismatch
   }
+  const isWindows = platform === 'win32';
   return {
     path: launcherPath,
     ...state,
-    executable: (state.mode & 0o111) !== 0,
-    modeValid: state.mode === 0o700,
+    executable: isWindows ? state.regularFile && !state.symbolicLink : (state.mode & 0o111) !== 0,
+    modeValid: isWindows ? state.regularFile && !state.symbolicLink : state.mode === 0o700,
     matchesCurrentPackage: state.regularFile && !state.symbolicLink && contents === expectedLauncher,
   };
 }
 
-async function inspectManifest(target, launcherPath) {
-  const state = await pathState(target.manifestPath);
+async function inspectRegistration(target, support, registryRunner) {
+  const manifestPath = targetManifestPath(target, support);
+  const state = await pathState(manifestPath);
+  let registry = null;
+  if (target.registrationKind === 'registry') {
+    registry = await queryWindowsRegistryValue(target.registryKey, { registryRunner });
+  }
   if (!state.present) {
     return {
       browser: target.id,
-      path: target.manifestPath,
-      present: false,
+      registrationId: target.registrationId,
+      registrationKind: target.registrationKind,
+      path: manifestPath,
+      registryKey: target.registryKey,
+      present: registry?.present === true,
       valid: false,
-      issues: ['manifest_missing'],
+      issues:
+        registry?.present === true
+          ? ['manifest_missing']
+          : ['manifest_missing', ...(registry ? ['registry_missing'] : [])],
       productionIdentity: false,
       mode: null,
     };
   }
-  const parsed = await readJsonFile(target.manifestPath);
+  const parsed = await readJsonFile(manifestPath);
   const validation = parsed.value
-    ? validateNativeHostManifest(target, parsed.value, launcherPath)
+    ? validateNativeHostManifest(target, parsed.value, support.launcherPath)
     : { valid: false, issues: ['manifest_invalid_json'], productionIdentity: false };
   const issues = parsed.error ? ['manifest_invalid_json'] : [...validation.issues];
-  if (state.mode !== 0o600) issues.push('manifest_mode');
+  if (target.platform !== 'win32' && state.mode !== 0o600) issues.push('manifest_mode');
+  if (registry) {
+    if (!registry.present) issues.push('registry_missing');
+    else if (registry.value !== manifestPath) issues.push('registry_manifest_path');
+  }
   return {
     browser: target.id,
-    path: target.manifestPath,
-    present: true,
-    valid: validation.valid && state.mode === 0o600,
+    registrationId: target.registrationId,
+    registrationKind: target.registrationKind,
+    path: manifestPath,
+    registryKey: target.registryKey,
+    present: target.registrationKind === 'registry' ? registry?.present === true : true,
+    valid: validation.valid && (target.platform === 'win32' || state.mode === 0o600) && issues.length === 0,
     issues,
     productionIdentity: validation.productionIdentity,
     mode: state.mode,
@@ -267,29 +514,53 @@ async function inspectManifest(target, launcherPath) {
 
 export async function inspectCliInstallation({
   homeDir,
+  localAppDataDir,
+  xdgDataHome,
+  env = process.env,
   platform = process.platform,
   nodePath = process.execPath,
   nativeHostPath = currentCliPackagePaths().nativeHostPath,
+  registryRunner,
 } = {}) {
-  const home = resolveHomeDir(homeDir);
-  const support = resolveCliSupportPaths({ homeDir: home });
+  const platformSupported = SUPPORTED_PLATFORMS.has(platform);
+  if (!platformSupported) {
+    return {
+      platform,
+      platformSupported: false,
+      package: {
+        packageDir: currentCliPackagePaths().packageDir,
+        packageJsonPath: currentCliPackagePaths().packageJsonPath,
+        packagePresent: false,
+        name: null,
+        version: null,
+        nodePath: String(nodePath || ''),
+        nodePresent: false,
+        nodeExecutable: false,
+        nativeHostPath: String(nativeHostPath || ''),
+        nativeHostPresent: false,
+      },
+      launcher: { path: null, present: false, executable: false, modeValid: false, matchesCurrentPackage: false },
+      browsers: [],
+    };
+  }
+  const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
   const node = String(nodePath || '').trim();
   const host = String(nativeHostPath || '').trim();
-  const expectedLauncher = buildNativeHostLauncher({ nodePath: node, nativeHostPath: host });
+  const expectedLauncher = buildNativeHostLauncher({ nodePath: node, nativeHostPath: host, platform });
   const [nodeState, hostState, launcher, packageJson] = await Promise.all([
     pathState(node),
     pathState(host),
-    inspectLauncher({ launcherPath: support.launcherPath, expectedLauncher }),
+    inspectLauncher({ launcherPath: support.launcherPath, expectedLauncher, platform }),
     readJsonFile(currentCliPackagePaths().packageJsonPath),
   ]);
   const browsers = [];
-  for (const browser of listBrowserTargets()) {
-    const target = resolveBrowserTarget(browser, { homeDir: home });
-    browsers.push(await inspectManifest(target, support.launcherPath));
+  for (const browser of listBrowserTargets({ platform })) {
+    const target = resolveBrowserTarget(browser, { platform, homeDir, localAppDataDir, env });
+    browsers.push(await inspectRegistration(target, support, registryRunner));
   }
   return {
     platform,
-    platformSupported: platform === 'darwin',
+    platformSupported: true,
     package: {
       packageDir: currentCliPackagePaths().packageDir,
       packageJsonPath: currentCliPackagePaths().packageJsonPath,

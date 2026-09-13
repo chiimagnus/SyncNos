@@ -17,6 +17,7 @@ import { createJsonLineReader, encodeJsonLine, requestEndpoint } from './ipc.mjs
 import {
   createProcessNonce,
   ensureRuntimeDir,
+  isWindowsNamedPipeEndpoint,
   readRegistryEntry,
   registryPathForInstance,
   removeFileIfExists,
@@ -733,6 +734,7 @@ export async function startNativeHostIpc({
   hello,
   protocol,
   runtimeRoot,
+  platform = process.platform,
   uid = process.getuid?.(),
   pid = process.pid,
   processNonce = createProcessNonce(),
@@ -744,7 +746,8 @@ export async function startNativeHostIpc({
   if (!protocol?.request) throw new Error('native_host_protocol_required');
 
   const runtimeDir = await ensureRuntimeDir({ root: runtimeRoot, uid });
-  const endpoint = socketPathForInstance(runtimeDir, cliInstanceId);
+  const endpoint = socketPathForInstance(runtimeDir, cliInstanceId, { platform });
+  const endpointIsFilesystemSocket = !isWindowsNamedPipeEndpoint(endpoint);
   const registryPath = registryPathForInstance(runtimeDir, cliInstanceId);
 
   try {
@@ -762,7 +765,7 @@ export async function startNativeHostIpc({
     }
     const removed = await removeRegistryEntryIfOwned(registryPath, existing.processNonce).catch(() => false);
     if (!removed) throw new Error('cli_instance_registration_changed');
-    if (String(existing.endpoint || '') === endpoint) await removeFileIfExists(endpoint);
+    if (String(existing.endpoint || '') === endpoint && endpointIsFilesystemSocket) await removeFileIfExists(endpoint);
   } catch (error) {
     const registryMissingOrInvalid =
       error?.code === 'ENOENT' ||
@@ -773,7 +776,7 @@ export async function startNativeHostIpc({
 
     const staleCode = await confirmCanonicalEndpointIsStale(endpoint, existingPingTimeoutMs);
     await removeFileIfExists(registryPath).catch(() => {});
-    if (staleCode === 'ECONNREFUSED') await removeFileIfExists(endpoint).catch(() => {});
+    if (staleCode === 'ECONNREFUSED' && endpointIsFilesystemSocket) await removeFileIfExists(endpoint).catch(() => {});
   }
 
   const sockets = new Set();
@@ -866,7 +869,7 @@ export async function startNativeHostIpc({
 
   try {
     await listenServer(server, endpoint);
-    await chmod(endpoint, 0o600);
+    if (endpointIsFilesystemSocket) await chmod(endpoint, 0o600);
     await writeRegistryEntry(registryPath, {
       cliInstanceId,
       endpoint,
@@ -881,7 +884,7 @@ export async function startNativeHostIpc({
   } catch (error) {
     for (const socket of sockets) socket.destroy();
     await closeServer(server);
-    await removeFileIfExists(endpoint).catch(() => {});
+    if (endpointIsFilesystemSocket) await removeFileIfExists(endpoint).catch(() => {});
     throw error;
   }
 
@@ -896,7 +899,7 @@ export async function startNativeHostIpc({
       for (const socket of sockets) socket.destroy();
       await closeServer(server);
       const removed = await removeRegistryEntryIfOwned(registryPath, processNonce).catch(() => false);
-      if (removed) await removeFileIfExists(endpoint).catch(() => false);
+      if (removed && endpointIsFilesystemSocket) await removeFileIfExists(endpoint).catch(() => false);
     },
   };
 }

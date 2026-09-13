@@ -261,7 +261,10 @@ describe('syncnos CLI instance selection', () => {
     expect(installed.exitCode).toBe(0);
     expect(installed.json.data).toMatchObject({ browser: 'chrome', productionIdentity: true });
     const manifest = JSON.parse(await readFile(installed.json.data.manifestPath, 'utf8'));
-    expect(manifest.allowed_origins).toEqual(['chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/']);
+    expect(manifest.allowed_origins).toEqual([
+      'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/',
+      'chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/',
+    ]);
 
     const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
     expect(doctor.exitCode).toBe(0);
