@@ -94,7 +94,7 @@ const BROWSERS = Object.freeze({
         ),
       }),
       linux: Object.freeze({
-        detect: linuxPaths('/usr/bin/google-chrome-for-testing', '/opt/google/chrome-for-testing/chrome'),
+        detect: [],
         registration: fileRegistration(
           'chrome-for-testing',
           'xdgConfig',

@@ -55,7 +55,7 @@ In each browser profile that should expose its data to the CLI, open **Settings 
 | Arc | macOS | Not verified. |
 | Helium | macOS | **Verified** with the current SyncNos 1.13.2 Extension and real Extension data. |
 | Chrome Beta / Chrome Unstable | Linux | Not verified. |
-| Chrome for Testing | macOS / Linux | Not verified. |
+| Chrome for Testing | macOS auto-discovery; Linux explicit `--browser chrome-for-testing` registration | Not verified. |
 | Firefox | macOS / Linux / Windows | Signed release round-trip not yet verified. |
 | Firefox Developer Edition | macOS / Windows | Not verified. |
 | LibreWolf | macOS / Linux | Not verified. |

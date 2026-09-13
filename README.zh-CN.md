@@ -55,7 +55,7 @@ syncnos doctor
 | Arc | macOS | 尚未验证。 |
 | Helium | macOS | **已验证**：当前 SyncNos 1.13.2 可经 CLI 读取真实 Extension 数据。 |
 | Chrome Beta / Chrome Unstable | Linux | 尚未验证。 |
-| Chrome for Testing | macOS / Linux | 尚未验证。 |
+| Chrome for Testing | macOS 自动发现；Linux 仅显式 `--browser chrome-for-testing` 注册 | 尚未验证。 |
 | Firefox | macOS / Linux / Windows | 尚未验证正式 release round-trip。 |
 | Firefox Developer Edition | macOS / Windows | 尚未验证。 |
 | LibreWolf | macOS / Linux | 尚未验证。 |

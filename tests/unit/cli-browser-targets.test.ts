@@ -105,6 +105,23 @@ describe('CLI browser target catalog', () => {
     );
   });
 
+  it('keeps Chrome for Testing Linux explicit-registration-only instead of guessing an install path', async () => {
+    const target = resolveBrowserTarget('chrome-for-testing', {
+      platform: 'linux',
+      homeDir: '/home/example',
+    });
+    expect(target.manifestPath).toBe(
+      '/home/example/.config/google-chrome-for-testing/NativeMessagingHosts/app.syncnos.cli.json',
+    );
+
+    const discovered = await discoverInstalledBrowsers({
+      platform: 'linux',
+      homeDir: '/home/example',
+      pathExists: async () => true,
+    });
+    expect(discovered.map((item) => item.id)).not.toContain('chrome-for-testing');
+  });
+
   it('deduplicates Windows products onto exact HKCU registration targets', () => {
     const options = {
       platform: 'win32' as const,
