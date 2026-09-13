@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { buildChatgptApiSnapshot } from '@services/integrations/chatgpt/api-snapshot';
+import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import {
   CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY,
   readChatgptApiCaptureEnabled,
@@ -237,13 +238,14 @@ describe('ChatGPT API snapshot', () => {
     ]);
 
     const result = build(data);
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_generated_1']);
     expect(result.snapshot.messages.at(-1)).toMatchObject({
-      messageKey: 'assistant-final',
+      messageKey: imageKey,
       role: 'assistant',
       contentMarkdown: 'Generated the image.\n\nDone.',
     });
     expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ fileId: 'file_generated_1', targetMessageKey: 'assistant-final' }),
+      expect.objectContaining({ fileId: 'file_generated_1', targetMessageKey: imageKey }),
     ]);
 
     const missingImage = mappingFrom([
@@ -307,7 +309,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         fileId: 'file_generated_1',
         cacheKey: 'chatgpt-file://file_generated_1',
-        targetMessageKey: 'assistant-final',
+        targetMessageKey: buildChatgptGeneratedImageMessageKey(['file_generated_1']),
         alt: 'generated cube',
       }),
     ]);
@@ -353,17 +355,18 @@ describe('ChatGPT API snapshot', () => {
     ]);
 
     const result = build(data);
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_only_1']);
     expect(result.snapshot.messages.at(-1)).toMatchObject({
-      messageKey: 'image-tool-only:assistant:0',
+      messageKey: imageKey,
       role: 'assistant',
       contentMarkdown: '',
     });
     expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ fileId: 'file_only_1', targetMessageKey: 'image-tool-only:assistant:0' }),
+      expect.objectContaining({ fileId: 'file_only_1', targetMessageKey: imageKey }),
       expect.objectContaining({
         fileId: '',
         failureReason: 'unsupported_pointer',
-        targetMessageKey: 'image-tool-only:assistant:0',
+        targetMessageKey: imageKey,
       }),
     ]);
   });

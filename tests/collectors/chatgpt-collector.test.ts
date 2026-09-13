@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
+import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
@@ -660,6 +661,32 @@ describe('chatgpt expanded COT manual capture', () => {
       }),
     ) as any;
   }
+
+  it('uses the shared protected-image identity instead of transient ChatGPT turn ids', async () => {
+    const fileId = 'file_shared_generated_1';
+    const imageUrl = `https://chatgpt.com/backend-api/estuary/content?id=${fileId}&ts=1&sig=temporary`;
+    const expectedKey = buildChatgptGeneratedImageMessageKey([fileId]);
+
+    const captureKey = async (turnId: string, messageId = '') => {
+      const messageIdAttr = messageId ? ` data-message-id="${messageId}"` : '';
+      const dom = setupChatgptDom(
+        `
+          <article data-testid="conversation-turn-1" data-turn-id="${turnId}">
+            <div data-message-author-role="assistant"${messageIdAttr}>
+              <div class="markdown prose"><img src="${imageUrl}" alt="generated cube" /></div>
+            </div>
+          </article>
+        `,
+        'https://chatgpt.com/c/conv_generated_image_identity',
+      );
+      const snapshot = (await capturePrepared(buildCotDef(dom))) as any;
+      return snapshot.messages[0]?.messageKey;
+    };
+
+    expect(await captureKey('request-WEB:first-0')).toBe(expectedKey);
+    expect(await captureKey('request-WEB:second-0', 'backend-final-id-not-visible-to-api-identity')).toBe(expectedKey);
+    expect(expectedKey).not.toContain(fileId);
+  });
 
   it('associates an expanded modern-turn COT only with the following assistant and keeps ordered visible blocks', async () => {
     const dom = modernCotDom(true);

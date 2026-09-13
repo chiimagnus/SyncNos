@@ -1,3 +1,8 @@
+import {
+  buildChatgptGeneratedImageMessageKey,
+  chatgptFileIdFromAssetPointer,
+} from '@services/shared/chatgpt-image-identity';
+
 type ChatgptMappingNode = {
   id?: unknown;
   parent?: unknown;
@@ -37,7 +42,6 @@ type PendingAuxiliary = {
 };
 
 const INTERNAL_CONTENT_TYPES = new Set(['model_editable_context']);
-const CURRENT_FILE_POINTER_RE = /^sediment:\/\/(file_[A-Za-z0-9_-]+)(?:[/?#]|$)/;
 
 function apiSnapshotError(code: string): Error & { code: string } {
   return Object.assign(new Error(code), { code });
@@ -142,11 +146,6 @@ function renderAuxiliary(message: any): string {
   throw apiSnapshotError('unsupported_content');
 }
 
-function pointerFileId(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  return CURRENT_FILE_POINTER_RE.exec(value.trim())?.[1] || '';
-}
-
 function matchingAttachment(message: any, fileId: string): any | null {
   if (!fileId) return null;
   const attachments = Array.isArray(message?.metadata?.attachments) ? message.metadata.attachments : [];
@@ -184,7 +183,7 @@ function collectMessageImages(message: any): PendingImage[] {
   for (let index = 0; index < parts.length; index += 1) {
     const part = parts[index];
     if (!isImagePart(part)) continue;
-    const fileId = pointerFileId(part.asset_pointer);
+    const fileId = chatgptFileIdFromAssetPointer(part.asset_pointer);
     const attachment = matchingAttachment(message, fileId);
     const mimeType = stableString(part.mime_type) || stableString(attachment?.mime_type);
     const sizeValue = Number(part.size_bytes ?? attachment?.size);
@@ -291,7 +290,9 @@ export function buildChatgptApiSnapshot(input: {
     pendingAuxiliary = [];
     const sourceMessageId = stableString(pendingImages[0]?.sourceMessageId);
     if (!sourceMessageId) throw apiSnapshotError('unsupported_content');
-    const key = `${sourceMessageId}:assistant:0`;
+    const key =
+      buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId)) ||
+      `${sourceMessageId}:assistant:0`;
     if (seenMessageKeys.has(key)) throw apiSnapshotError('duplicate_message_key');
     seenMessageKeys.add(key);
     messages.push({
@@ -366,16 +367,17 @@ export function buildChatgptApiSnapshot(input: {
           pendingAuxiliary = [];
           continue;
         }
-        if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
-        seenMessageKeys.add(id);
+        const ownerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId)) || id;
+        if (seenMessageKeys.has(ownerKey)) throw apiSnapshotError('duplicate_message_key');
+        seenMessageKeys.add(ownerKey);
         messages.push({
-          messageKey: id,
+          messageKey: ownerKey,
           role: 'assistant',
           contentMarkdown: markdown,
           sequence: messages.length,
           updatedAt: capturedAt,
         });
-        assignAssets(id, pendingImages, protectedAssets, seenAssetRefs);
+        assignAssets(ownerKey, pendingImages, protectedAssets, seenAssetRefs);
         pendingAuxiliary = [];
         pendingImages = [];
         continue;
