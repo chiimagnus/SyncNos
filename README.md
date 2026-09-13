@@ -49,7 +49,8 @@ In each browser profile that should expose its data to the CLI, open **Settings 
 
 | Browser | Auto discovery / registration | Real round-trip evidence |
 | --- | --- | --- |
-| Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Iridium / Yandex | macOS / Linux / Windows | Not verified browser-by-browser; the standard Chrome smoke is explicitly deferred. |
+| Chrome / Chromium / Edge / Brave / Vivaldi / Iridium / Yandex | macOS / Linux / Windows | Not verified browser-by-browser; the standard Chrome smoke is explicitly deferred. |
+| Opera | macOS / Windows | Not verified. |
 | Slimjet | macOS / Windows | Not verified. |
 | Arc | macOS | Not verified. |
 | Helium | macOS | **Verified** with the current SyncNos 1.13.2 Extension and real Extension data. |

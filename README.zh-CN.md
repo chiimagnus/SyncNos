@@ -49,7 +49,8 @@ syncnos doctor
 
 | 浏览器 | 自动发现 / 注册覆盖 | 实机 round-trip 证据 |
 | --- | --- | --- |
-| Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Iridium / Yandex | macOS / Linux / Windows | 尚未逐浏览器验证；标准 Chrome smoke 已按产品决定 Deferred。 |
+| Chrome / Chromium / Edge / Brave / Vivaldi / Iridium / Yandex | macOS / Linux / Windows | 尚未逐浏览器验证；标准 Chrome smoke 已按产品决定 Deferred。 |
+| Opera | macOS / Windows | 尚未验证。 |
 | Slimjet | macOS / Windows | 尚未验证。 |
 | Arc | macOS | 尚未验证。 |
 | Helium | macOS | **已验证**：当前 SyncNos 1.13.2 可经 CLI 读取真实 Extension 数据。 |
