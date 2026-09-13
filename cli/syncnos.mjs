@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { contract } from './contract.mjs';
+import { inspectCliInstallation, installNativeHost, uninstallNativeHost } from './install.mjs';
 import { requestEndpoint } from './ipc.mjs';
 import {
   isRegistryPathForInstance,
@@ -63,6 +65,8 @@ function parseArgs(argv) {
     timeout: null,
     output: null,
     force: false,
+    browser: null,
+    extensionId: null,
     positionals: [],
     provided: new Set(),
   };
@@ -181,6 +185,16 @@ function parseArgs(argv) {
     if (token === '--force') {
       options.force = true;
       options.provided.add('force');
+      continue;
+    }
+    if (token === '--browser') {
+      options.browser = readValue(token);
+      options.provided.add('browser');
+      continue;
+    }
+    if (token === '--extension-id') {
+      options.extensionId = readValue(token);
+      options.provided.add('extensionId');
       continue;
     }
     if (String(token || '').startsWith('--')) throw codedError('usage_error', `Unknown argument: ${token}`, EXIT.usage);
@@ -500,6 +514,81 @@ function publicInstance(item, preferredId) {
   };
 }
 
+export function diagnoseDoctorState({ installation, discovery, selection, selectionError }) {
+  if (selection) {
+    return { code: 'ok', message: 'A SyncNos browser instance is online.', candidateReasons: [] };
+  }
+  if (selectionError?.code === 'instance_ambiguous') {
+    return {
+      code: 'instance_ambiguous',
+      message: 'Multiple SyncNos instances are online; choose one or set a default.',
+      candidateReasons: [],
+    };
+  }
+  const protocolMismatch = discovery?.offline?.find((item) => item?.reason === 'protocol_mismatch');
+  if (protocolMismatch) {
+    return {
+      code: 'protocol_mismatch',
+      message: 'A SyncNos endpoint is present but uses a different CLI protocol version.',
+      candidateReasons: [],
+    };
+  }
+  if (!installation?.platformSupported) {
+    return {
+      code: 'unsupported_platform',
+      message: 'SyncNos CLI Native Messaging installation is currently supported on macOS only.',
+      candidateReasons: [],
+    };
+  }
+  const packageReady =
+    installation?.package?.packagePresent === true &&
+    installation?.package?.nodeExecutable === true &&
+    installation?.package?.nativeHostPresent === true;
+  if (!packageReady) {
+    return {
+      code: 'package_invalid',
+      message: 'The installed SyncNos CLI package or Node/native-host runtime is incomplete.',
+      candidateReasons: [],
+    };
+  }
+  const validManifests = (installation?.browsers || []).filter((item) => item.present && item.valid);
+  const anyManifestPresent = (installation?.browsers || []).some((item) => item.present);
+  if (validManifests.length === 0) {
+    if (anyManifestPresent || installation?.launcher?.present) {
+      return {
+        code: 'native_host_install_invalid',
+        message: 'SyncNos Native Messaging launcher or manifest is present but invalid or stale.',
+        candidateReasons: [],
+      };
+    }
+    return {
+      code: 'native_host_not_installed',
+      message: 'SyncNos Native Messaging host is not installed for any supported browser.',
+      candidateReasons: [],
+    };
+  }
+  if (
+    !installation?.launcher?.matchesCurrentPackage ||
+    installation?.launcher?.executable !== true ||
+    installation?.launcher?.modeValid !== true
+  ) {
+    return {
+      code: 'native_host_install_invalid',
+      message: 'SyncNos Native Messaging launcher is stale or not executable.',
+      candidateReasons: [],
+    };
+  }
+  return {
+    code: 'extension_unreachable',
+    message: 'Native Messaging is installed, but no SyncNos browser instance is currently reachable.',
+    candidateReasons: [
+      'browser_not_running',
+      'local_cli_integration_disabled',
+      'native_messaging_permission_not_granted_or_revoked',
+    ],
+  };
+}
+
 function formatHuman(result) {
   if (!result?.ok) return `ERROR ${result?.error?.code || 'unknown'}: ${result?.error?.message || 'failed'}\n`;
   return `${JSON.stringify(result.data, null, 2)}\n`;
@@ -514,6 +603,8 @@ function usage() {
     'Usage: syncnos <command> [options]',
     '',
     'Commands:',
+    '  install --browser chrome|firefox [--extension-id <id>]',
+    '  uninstall [--browser chrome|firefox]',
     '  instances [--set-default <id> | --clear-default]',
     '  status [--instance <id>]',
     '  revision [--instance <id>]',
@@ -558,7 +649,18 @@ function usage() {
   ].join('\n');
 }
 
-export async function runCli(argv, { stdout = process.stdout, stderr = process.stderr, runtimeRoot, homeDir } = {}) {
+export async function runCli(
+  argv,
+  {
+    stdout = process.stdout,
+    stderr = process.stderr,
+    runtimeRoot,
+    homeDir,
+    platform = process.platform,
+    nodePath = process.execPath,
+    nativeHostPath,
+  } = {},
+) {
   void stderr;
   let options;
   try {
@@ -572,7 +674,7 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     return EXIT.success;
   }
 
-  const context = { runtimeRoot, homeDir };
+  const context = { runtimeRoot, homeDir, platform, nodePath, nativeHostPath };
   try {
     if (options.command === 'capabilities') {
       assertAllowedOptions(options, new Set(['human']));
@@ -588,6 +690,34 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         }),
         options.human,
       );
+      return EXIT.success;
+    }
+
+    if (options.command === 'install') {
+      assertAllowedOptions(options, new Set(['browser', 'extensionId', 'human']));
+      if (options.positionals.length) {
+        throw codedError('usage_error', 'install does not accept positional arguments', EXIT.usage);
+      }
+      if (!options.browser) throw codedError('usage_error', 'install requires --browser chrome|firefox', EXIT.usage);
+      const installed = await installNativeHost({
+        browser: options.browser,
+        extensionId: options.extensionId,
+        homeDir,
+        platform,
+        nodePath,
+        ...(nativeHostPath ? { nativeHostPath } : null),
+      });
+      writeResult(stdout, envelopeOk(installed), options.human);
+      return EXIT.success;
+    }
+
+    if (options.command === 'uninstall') {
+      assertAllowedOptions(options, new Set(['browser', 'human']));
+      if (options.positionals.length) {
+        throw codedError('usage_error', 'uninstall does not accept positional arguments', EXIT.usage);
+      }
+      const removed = await uninstallNativeHost({ browser: options.browser, homeDir, platform });
+      writeResult(stdout, envelopeOk(removed), options.human);
       return EXIT.success;
     }
 
@@ -1128,9 +1258,15 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
       assertAllowedOptions(options, new Set(['human']));
       if (options.positionals.length)
         throw codedError('usage_error', 'doctor does not accept positional arguments', EXIT.usage);
-      const [discovery, config] = await Promise.all([
+      const [discovery, config, installation] = await Promise.all([
         discoverInstances({ runtimeRoot, cleanupStale: false }),
         readUserConfig({ homeDir }),
+        inspectCliInstallation({
+          homeDir,
+          platform,
+          nodePath,
+          ...(nativeHostPath ? { nativeHostPath } : null),
+        }),
       ]);
       let selection = null;
       let selectionError = null;
@@ -1142,10 +1278,23 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
       const preferredOnline = config.preferredCliInstanceId
         ? discovery.online.some((item) => item.entry.cliInstanceId === config.preferredCliInstanceId)
         : null;
+      const diagnosis = diagnoseDoctorState({ installation, discovery, selection, selectionError });
+      const installationHealthy =
+        installation.platformSupported &&
+        installation.package.packagePresent &&
+        installation.package.nodeExecutable &&
+        installation.package.nativeHostPresent &&
+        installation.launcher.matchesCurrentPackage &&
+        installation.launcher.executable &&
+        installation.launcher.modeValid &&
+        installation.browsers.some((item) => item.present && item.valid);
       writeResult(
         stdout,
         envelopeOk({
-          healthy: !!selection,
+          healthy: diagnosis.code === 'ok',
+          diagnosis,
+          installationHealthy,
+          installation,
           preferredCliInstanceId: config.preferredCliInstanceId,
           preferredOnline,
           selectedCliInstanceId: selection?.entry?.cliInstanceId || null,
@@ -1178,8 +1327,16 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
   }
 }
 
-const isMain = !!process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
-if (isMain) {
+function isMainModule(metaUrl) {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(metaUrl));
+  } catch {
+    return pathToFileURL(process.argv[1]).href === metaUrl;
+  }
+}
+
+if (isMainModule(import.meta.url)) {
   const exitCode = await runCli(process.argv.slice(2));
   process.exitCode = exitCode;
 }

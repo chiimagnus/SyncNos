@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:net';
-import { lstat, mkdtemp } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -29,6 +29,7 @@ async function startFakeInstance(
   browserFamily: 'chromium' | 'firefox',
   options: {
     revisionErrorCode?: string;
+    responseProtocolVersion?: number;
     onRequest?: (request: any) => {
       data?: unknown;
       errorCode?: string;
@@ -57,7 +58,7 @@ async function startFakeInstance(
             ? {
                 alive: true,
                 cliInstanceId: id,
-                protocolVersion: contract.protocolVersion,
+                protocolVersion: options.responseProtocolVersion ?? contract.protocolVersion,
                 runtimeId: `${id}-runtime`,
                 extensionVersion: '1.2.3',
                 browserFamily,
@@ -72,7 +73,7 @@ async function startFakeInstance(
       socket.end(
         `${JSON.stringify({
           kind: contract.frames.rpcResponse,
-          protocolVersion: contract.protocolVersion,
+          protocolVersion: options.responseProtocolVersion ?? contract.protocolVersion,
           requestId: 'fake',
           ok: data !== null,
           data,
@@ -112,7 +113,7 @@ async function startFakeInstance(
   };
 }
 
-async function run(argv: string[], runtimeRoot: string, homeDir: string) {
+async function run(argv: string[], runtimeRoot: string, homeDir: string, extra: Record<string, unknown> = {}) {
   let text = '';
   const stdout = {
     write(value: string) {
@@ -125,7 +126,7 @@ async function run(argv: string[], runtimeRoot: string, homeDir: string) {
       return true;
     },
   } as any;
-  const exitCode = await runCli(argv, { stdout, stderr, runtimeRoot, homeDir });
+  const exitCode = await runCli(argv, { stdout, stderr, runtimeRoot, homeDir, ...extra });
   return { exitCode, text, json: text.trim().startsWith('{') ? JSON.parse(text) : null };
 }
 
@@ -252,6 +253,110 @@ describe('syncnos CLI instance selection', () => {
     await expect(import('node:fs/promises').then(({ lstat }) => lstat(registryPath))).rejects.toMatchObject({
       code: 'ENOENT',
     });
+  });
+
+  it('installs/uninstalls a selected browser in temp HOME and doctor reports only provable reachability state', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const installed = await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(installed.exitCode).toBe(0);
+    expect(installed.json.data).toMatchObject({ browser: 'chrome', productionIdentity: true });
+    const manifest = JSON.parse(await readFile(installed.json.data.manifestPath, 'utf8'));
+    expect(manifest.allowed_origins).toEqual(['chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/']);
+
+    const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(doctor.exitCode).toBe(0);
+    expect(doctor.json.data.healthy).toBe(false);
+    expect(doctor.json.data.installationHealthy).toBe(true);
+    expect(doctor.json.data.diagnosis).toEqual({
+      code: 'extension_unreachable',
+      message: 'Native Messaging is installed, but no SyncNos browser instance is currently reachable.',
+      candidateReasons: [
+        'browser_not_running',
+        'local_cli_integration_disabled',
+        'native_messaging_permission_not_granted_or_revoked',
+      ],
+    });
+    expect(doctor.json.data.installation.browsers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ browser: 'chrome', present: true, valid: true }),
+        expect.objectContaining({ browser: 'firefox', present: false, valid: false }),
+      ]),
+    );
+
+    const removed = await run(['uninstall', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(removed.exitCode).toBe(0);
+    expect(removed.json.data.launcherRemoved).toBe(true);
+    await expect(lstat(installed.json.data.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(lstat(installed.json.data.launcherPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps doctor healthy with one online instance even when another supported browser manifest is absent', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
+    const instance = await startFakeInstance(runtimeRoot, 'doctor-online', 'chromium');
+    try {
+      const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+      expect(doctor.exitCode).toBe(0);
+      expect(doctor.json.data.healthy).toBe(true);
+      expect(doctor.json.data.diagnosis.code).toBe('ok');
+      expect(doctor.json.data.selectedCliInstanceId).toBe('doctor-online');
+      expect(doctor.json.data.installation.browsers.find((item: any) => item.browser === 'firefox')).toMatchObject({
+        present: false,
+      });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('diagnoses protocol mismatch ahead of generic extension_unreachable', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
+    const instance = await startFakeInstance(runtimeRoot, 'protocol-old', 'chromium', {
+      responseProtocolVersion: contract.protocolVersion + 1,
+    });
+    try {
+      const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+      expect(doctor.exitCode).toBe(0);
+      expect(doctor.json.data.healthy).toBe(false);
+      expect(doctor.json.data.diagnosis.code).toBe('protocol_mismatch');
+      expect(doctor.json.data.offline).toEqual([{ cliInstanceId: 'protocol-old', reason: 'protocol_mismatch' }]);
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('diagnoses stale manifest permissions as an invalid native-host install', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const installed = await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
+    await chmod(installed.json.data.manifestPath, 0o644);
+    const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(doctor.exitCode).toBe(0);
+    expect(doctor.json.data.installationHealthy).toBe(false);
+    expect(doctor.json.data.diagnosis.code).toBe('native_host_install_invalid');
+    expect(doctor.json.data.installation.browsers.find((item: any) => item.browser === 'chrome')).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining(['manifest_mode']),
+    });
+  });
+
+  it('rejects install/uninstall/doctor-only syntax before touching instance discovery', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const missingBrowser = await run(['install'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(missingBrowser.exitCode).toBe(2);
+    expect(missingBrowser.json.error.code).toBe('usage_error');
+
+    const uninstallExtensionId = await run(
+      ['uninstall', '--extension-id', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+      runtimeRoot,
+      homeDir,
+      { platform: 'darwin' },
+    );
+    expect(uninstallExtensionId.exitCode).toBe(2);
+    expect(uninstallExtensionId.json.error.code).toBe('usage_error');
+
+    const doctorBrowser = await run(['doctor', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(doctorBrowser.exitCode).toBe(2);
+    expect(doctorBrowser.json.error.code).toBe('usage_error');
   });
 
   it('does not delete a reachable registry whose endpoint returns malformed data', async () => {

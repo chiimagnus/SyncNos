@@ -2,13 +2,14 @@
 
 import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { chmod } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { endianness } from 'node:os';
 import process from 'node:process';
 import { clearTimeout, setTimeout } from 'node:timers';
 import { TextDecoder } from 'node:util';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { contract } from './contract.mjs';
 import { createOutputFileReceiver, decodeBase64Chunk, openInputFile, readInputFileChunks } from './file-transfer.mjs';
@@ -962,5 +963,13 @@ export function runNativeHost({
   return protocol;
 }
 
-const isMain = !!process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
-if (isMain) runNativeHost();
+function isMainModule(metaUrl) {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(metaUrl));
+  } catch {
+    return pathToFileURL(process.argv[1]).href === metaUrl;
+  }
+}
+
+if (isMainModule(import.meta.url)) runNativeHost();

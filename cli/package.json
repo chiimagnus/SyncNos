@@ -1,0 +1,14 @@
+{
+  "name": "syncnos-cli",
+  "version": "0.0.0-dev",
+  "private": true,
+  "description": "Local CLI bridge for SyncNos browser extension",
+  "type": "module",
+  "bin": {
+    "syncnos": "./syncnos.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {}
+}
