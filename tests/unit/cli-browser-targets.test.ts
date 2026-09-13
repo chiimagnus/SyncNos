@@ -7,16 +7,20 @@ import {
   FIREFOX_PRODUCTION_EXTENSION_ID,
   buildNativeHostManifest,
   discoverInstalledBrowsers,
-  listBrowserDefinitions,
+  listBrowserTargets,
   resolveBrowserTarget,
   resolveRegistrationTargets,
 } from '../../cli/browser-targets.mjs';
 import { contract } from '../../cli/native-host.mjs';
 
 describe('CLI browser target catalog', () => {
-  it('covers mainstream and long-tail browser products', () => {
-    const ids = listBrowserDefinitions().map((item) => item.id);
-    expect(ids).toEqual(
+  it('covers mainstream and long-tail browser products through production platform target lists', () => {
+    const ids = new Set([
+      ...listBrowserTargets({ platform: 'darwin' }),
+      ...listBrowserTargets({ platform: 'linux' }),
+      ...listBrowserTargets({ platform: 'win32' }),
+    ]);
+    expect([...ids]).toEqual(
       expect.arrayContaining([
         'chrome',
         'chrome-for-testing',

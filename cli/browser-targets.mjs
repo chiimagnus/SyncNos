@@ -503,16 +503,7 @@ export function listBrowserTargets({ platform = process.platform } = {}) {
   return Object.keys(BROWSERS).filter((id) => !!BROWSERS[id].platforms?.[platform]);
 }
 
-export function listBrowserDefinitions() {
-  return Object.values(BROWSERS).map((definition) => ({
-    id: definition.id,
-    name: definition.name,
-    family: definition.family,
-    platforms: Object.keys(definition.platforms || {}),
-  }));
-}
-
-export function resolveBrowserDetectionCandidates(
+function resolveBrowserDetectionCandidates(
   browser,
   { platform = process.platform, homeDir, localAppDataDir, env = process.env } = {},
 ) {
