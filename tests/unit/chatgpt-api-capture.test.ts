@@ -29,6 +29,7 @@ type MessageInput = {
   hidden?: boolean;
   attachments?: any[];
   imageTitle?: string;
+  status?: string;
 };
 
 function message(input: MessageInput) {
@@ -43,6 +44,7 @@ function message(input: MessageInput) {
       ...(input.content != null ? { content: input.content } : null),
       ...(input.thoughts ? { thoughts: input.thoughts } : null),
     },
+    ...(input.status ? { status: input.status } : null),
     metadata: {
       ...(input.turnId ? { turn_id: input.turnId } : null),
       ...(input.hidden ? { is_visually_hidden_from_conversation: true } : null),
@@ -267,45 +269,172 @@ describe('ChatGPT API snapshot', () => {
     expect(errorCode(() => build(finalAttachment))).toBe('unsupported_content');
   });
 
-  it('fails fast for visible tool calls, ordinary tool turns, unknown assistant content, and unowned auxiliary output', () => {
-    const cases = [
-      mappingFrom([
-        message({ id: 'user-1', role: 'user', parts: ['q'] }),
+  it('ignores opaque tool execution nodes while preserving visible assistant output', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'tool-call-1',
+        role: 'assistant',
+        recipient: 'api_tool.call_tool',
+        channel: 'commentary',
+        contentType: 'code',
+        parts: ['{}'],
+        turnId: 'turn-a',
+      }),
+      message({ id: 'tool-result-1', role: 'tool', contentType: 'code', parts: [], turnId: 'turn-a' }),
+      message({
+        id: 'tool-call-2',
+        role: 'assistant',
+        recipient: 'web.run',
+        contentType: 'text',
+        parts: ['opaque request'],
+        turnId: 'turn-a',
+      }),
+      message({
+        id: 'tool-result-2',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: ['opaque', 'tool', 'result'],
+        turnId: 'turn-a',
+      }),
+      message({
+        id: 'commentary',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['Working'],
+        turnId: 'turn-a',
+      }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
+    ]);
+    data.mapping.n3.message.content.parts = { opaque: true };
+
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
+      expect.objectContaining({ messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'Working\n\nanswer' }),
+    ]);
+  });
+
+  it('handles long agentic tool pipelines without materializing internal tool nodes', () => {
+    const messages: Array<ReturnType<typeof message>> = [message({ id: 'user-long', role: 'user', parts: ['q'] })];
+    for (let index = 0; index < 300; index += 1) {
+      messages.push(
         message({
-          id: 'tool-call',
+          id: `tool-call-${index}`,
           role: 'assistant',
           recipient: 'api_tool.call_tool',
           contentType: 'code',
           parts: ['{}'],
+          turnId: 'turn-long',
         }),
-      ]),
-      mappingFrom([
-        message({ id: 'user-1', role: 'user', parts: ['q'] }),
-        message({ id: 'tool-result', role: 'tool', contentType: 'text', parts: ['tool summary'] }),
-      ]),
-      mappingFrom([
-        message({ id: 'user-1', role: 'user', parts: ['q'] }),
-        message({ id: 'assistant-unknown', role: 'assistant', contentType: 'audio', parts: [] }),
-      ]),
-      mappingFrom([
-        message({ id: 'user-1', role: 'user', parts: ['q'] }),
         message({
-          id: 'commentary',
-          role: 'assistant',
-          channel: 'commentary',
-          parts: ['unfinished'],
-          turnId: 'turn-a',
+          id: `tool-result-${index}`,
+          role: 'tool',
+          contentType: index % 2 === 0 ? 'code' : 'multimodal_text',
+          parts: index % 2 === 0 ? [] : ['opaque', 'tool', 'result'],
+          turnId: 'turn-long',
         }),
-      ]),
-    ];
+      );
+    }
+    messages.push(
+      message({ id: 'assistant-long', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-long' }),
+    );
 
-    expect(errorCode(() => build(cases[0]))).toBe('unsupported_tool_turn');
-    expect(errorCode(() => build(cases[1]))).toBe('unsupported_tool_turn');
-    expect(errorCode(() => build(cases[2]))).toBe('unsupported_content');
-    expect(errorCode(() => build(cases[3]))).toBe('unsupported_content');
+    const result = build(mappingFrom(messages));
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-long', role: 'user', contentMarkdown: 'q' }),
+      expect.objectContaining({ messageKey: 'assistant-long', role: 'assistant', contentMarkdown: 'answer' }),
+    ]);
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
-  it('accepts the current same-turn image-generation tool-call only when an image tool discharges it', () => {
+  it('drops unowned auxiliary execution state at the next user boundary', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['first'] }),
+      message({
+        id: 'thoughts-orphan',
+        role: 'assistant',
+        contentType: 'thoughts',
+        thoughts: [{ summary: 'internal', content: 'not owned by a visible assistant message' }],
+        turnId: 'turn-orphan',
+      }),
+      message({
+        id: 'commentary-orphan',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['progress only'],
+        turnId: 'turn-orphan',
+      }),
+      message({ id: 'user-2', role: 'user', parts: ['second'] }),
+      message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-2' }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'first' }),
+      expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'second' }),
+      expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'answer' }),
+    ]);
+    expect(result.snapshot.captureMeta).toEqual({
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
+    });
+  });
+
+  it('drops a completed auxiliary-only turn at branch end when every node is explicitly finished', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'thoughts-finished',
+        role: 'assistant',
+        contentType: 'thoughts',
+        thoughts: [{ summary: 'done', content: 'completed execution-only turn' }],
+        turnId: 'turn-a',
+        status: 'finished_successfully',
+      }),
+      message({
+        id: 'commentary-finished',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['completed progress'],
+        turnId: 'turn-a',
+        status: 'finished_successfully',
+      }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
+    ]);
+    expect(result.snapshot.captureMeta).toEqual({
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
+    });
+  });
+
+  it('still fails fast for unknown visible assistant content and unfinished auxiliary output at branch end', () => {
+    const unknownAssistant = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({ id: 'assistant-unknown', role: 'assistant', contentType: 'audio', parts: [] }),
+    ]);
+    const unfinishedAuxiliary = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'commentary',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['unfinished'],
+        turnId: 'turn-a',
+      }),
+    ]);
+
+    expect(errorCode(() => build(unknownAssistant))).toBe('unsupported_content');
+    expect(errorCode(() => build(unfinishedAuxiliary))).toBe('unsupported_content');
+  });
+
+  it('materializes generated images independently of opaque tool-call nodes', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
@@ -370,7 +499,11 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(missingImage))).toBe('unsupported_tool_turn');
+    expect(build(missingImage).snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-final',
+      role: 'assistant',
+      contentMarkdown: 'No image.',
+    });
   });
 
   it('builds transient sidecars for user uploads and generated images without exposing raw pointers in the snapshot', () => {
@@ -547,7 +680,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
   });
 
-  it('rejects multiple pending image tool-calls even when they share the same turn id', () => {
+  it('ignores repeated opaque tool-call nodes before a visible generated-image result', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
@@ -576,10 +709,11 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(data))).toBe('unsupported_tool_turn');
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_image_1']);
+    expect(build(data).snapshot.messages.at(-1)).toMatchObject({ messageKey: imageKey, role: 'assistant' });
   });
 
-  it('rejects direct image tools that do not complete the current same-turn image tool-call handshake', () => {
+  it('accepts a visible generated-image tool result without requiring its opaque call node', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
@@ -590,7 +724,8 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(data))).toBe('unsupported_tool_turn');
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_image_1']);
+    expect(build(data).snapshot.messages.at(-1)).toMatchObject({ messageKey: imageKey, role: 'assistant' });
   });
 
   it('fails when an image tool also contains any non-image part or attachment instead of silently dropping it', () => {
@@ -616,7 +751,7 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(data))).toBe('unsupported_tool_turn');
+    expect(errorCode(() => build(data))).toBe('unsupported_content');
 
     const attachmentData = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
@@ -638,7 +773,7 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(attachmentData))).toBe('unsupported_tool_turn');
+    expect(errorCode(() => build(attachmentData))).toBe('unsupported_content');
   });
 
   it('requires current multimodal_text schema for user and tool image messages', () => {
@@ -671,7 +806,7 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(toolTextImage))).toBe('unsupported_tool_turn');
+    expect(errorCode(() => build(toolTextImage))).toBe('unsupported_content');
   });
 
   it('accepts only the current exact image part schema and exact sediment file pointer', () => {
@@ -729,7 +864,9 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(toolData))).toBe('unsupported_tool_turn');
+    expect(build(toolData).snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw' }),
+    ]);
   });
 
   it('fails generated-image capture when no current file identity can produce a DOM-compatible owner key', () => {
