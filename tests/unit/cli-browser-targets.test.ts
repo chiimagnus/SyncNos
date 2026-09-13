@@ -142,6 +142,20 @@ describe('CLI browser target catalog', () => {
     expect(linux.map((item) => item.id)).toEqual(['yandex']);
   });
 
+  it('detects an all-users Opera Windows install under Program Files', async () => {
+    const discovered = await discoverInstalledBrowsers({
+      platform: 'win32',
+      homeDir: 'C:\\Users\\example',
+      localAppDataDir: 'C:\\Users\\example\\AppData\\Local',
+      env: {
+        ProgramFiles: 'C:\\Program Files',
+        'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+      },
+      pathExists: async (path) => path === 'C:\\Program Files\\Opera\\launcher.exe',
+    });
+    expect(discovered.map((item) => item.id)).toEqual(['opera']);
+  });
+
   it('detects a standard per-user Firefox Windows install under LOCALAPPDATA', async () => {
     const discovered = await discoverInstalledBrowsers({
       platform: 'win32',

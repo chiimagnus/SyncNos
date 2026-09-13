@@ -247,7 +247,11 @@ const BROWSERS = Object.freeze({
         registration: fileRegistration('chrome', 'xdgConfig', 'google-chrome/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
-        detect: winPaths(['localAppData', 'Programs\\Opera\\launcher.exe']),
+        detect: winPaths(
+          ['localAppData', 'Programs\\Opera\\launcher.exe'],
+          ['programFiles', 'Opera\\launcher.exe'],
+          ['programFilesX86', 'Opera\\launcher.exe'],
+        ),
         registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
