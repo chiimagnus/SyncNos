@@ -181,10 +181,10 @@ const BROWSERS = Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Brave Browser'),
         registration: fileRegistration(
-          'brave',
+          'chrome',
           'chromium',
           'home',
-          'Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts',
+          'Library/Application Support/Google/Chrome/NativeMessagingHosts',
         ),
       }),
       linux: Object.freeze({

@@ -43,6 +43,7 @@ describe('CLI browser target catalog', () => {
   it('detects only known macOS application candidates and deduplicates shared registrations', async () => {
     const present = new Set([
       '/Applications/Google Chrome.app',
+      '/Applications/Brave Browser.app',
       '/Applications/Helium.app',
       '/Applications/Firefox.app',
       '/Applications/Zen.app',
@@ -52,7 +53,7 @@ describe('CLI browser target catalog', () => {
       homeDir: '/Users/example',
       pathExists: async (path) => present.has(path),
     });
-    expect(discovered.map((item) => item.id)).toEqual(['chrome', 'helium', 'firefox', 'zen']);
+    expect(discovered.map((item) => item.id)).toEqual(['chrome', 'brave', 'helium', 'firefox', 'zen']);
 
     const targets = resolveRegistrationTargets(discovered, {
       platform: 'darwin',
@@ -61,7 +62,7 @@ describe('CLI browser target catalog', () => {
     expect(targets).toHaveLength(2);
     expect(targets[0]).toMatchObject({
       registrationId: 'chrome',
-      browsers: ['chrome', 'helium'],
+      browsers: ['chrome', 'brave', 'helium'],
       manifestPath:
         '/Users/example/Library/Application Support/Google/Chrome/NativeMessagingHosts/app.syncnos.cli.json',
     });
