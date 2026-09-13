@@ -160,7 +160,11 @@ describe('macOS CLI native host installer', () => {
   it('inspects schema/allowlist/package state without requiring an online extension endpoint', async () => {
     const homeDir = await tempHome();
     await installNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
-    const inspection = await inspectCliInstallation({ homeDir, platform: 'darwin' });
+    const inspection = await inspectCliInstallation({
+      homeDir,
+      platform: 'darwin',
+      browserPathExists: async () => false,
+    });
     expect(inspection.platformSupported).toBe(true);
     expect(inspection.package).toMatchObject({
       name: 'syncnos-cli',
@@ -175,16 +179,13 @@ describe('macOS CLI native host installer', () => {
       matchesCurrentPackage: true,
       mode: 0o700,
     });
-    expect(inspection.browsers.find((item) => item.browser === 'chrome')).toMatchObject({
+    expect(inspection.registrations.find((item) => item.registrationId === 'chrome')).toMatchObject({
       present: true,
       valid: true,
       productionIdentity: true,
       mode: 0o600,
     });
-    expect(inspection.browsers.find((item) => item.browser === 'firefox')).toMatchObject({
-      present: false,
-      valid: false,
-    });
+    expect(inspection.registrations.map((item) => item.registrationId)).toEqual(['chrome']);
   });
 
   it('fails closed for relative launcher inputs and reports non-canonical file modes', async () => {
@@ -198,9 +199,13 @@ describe('macOS CLI native host installer', () => {
     const installed = await installNativeHost({ browser: 'chrome', homeDir, platform: 'darwin' });
     await chmod(installed.launcherPath, 0o755);
     await chmod(installed.manifestPath, 0o644);
-    const inspection = await inspectCliInstallation({ homeDir, platform: 'darwin' });
+    const inspection = await inspectCliInstallation({
+      homeDir,
+      platform: 'darwin',
+      browserPathExists: async () => false,
+    });
     expect(inspection.launcher).toMatchObject({ mode: 0o755, modeValid: false });
-    expect(inspection.browsers.find((item) => item.browser === 'chrome')).toMatchObject({
+    expect(inspection.registrations.find((item) => item.registrationId === 'chrome')).toMatchObject({
       valid: false,
       mode: 0o644,
       issues: expect.arrayContaining(['manifest_mode']),
@@ -233,7 +238,7 @@ describe('macOS CLI native host installer', () => {
 
     const inspection = await inspectCliInstallation({ homeDir, xdgDataHome, env, platform: 'linux' });
     expect(inspection.platformSupported).toBe(true);
-    expect(inspection.browsers.find((item) => item.browser === 'brave')).toMatchObject({
+    expect(inspection.registrations.find((item) => item.registrationId === 'brave')).toMatchObject({
       present: true,
       valid: true,
       registrationId: 'brave',

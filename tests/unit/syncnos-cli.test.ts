@@ -255,6 +255,39 @@ describe('syncnos CLI instance selection', () => {
     });
   });
 
+  it('auto-discovers installed browsers, deduplicates registrations, and reports the split evidence', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const browserPathExists = async (path: string) =>
+      path === '/Applications/Helium.app' || path === '/Applications/Zen.app';
+
+    const installed = await run(['install'], runtimeRoot, homeDir, { platform: 'darwin', browserPathExists });
+    expect(installed.exitCode).toBe(0);
+    expect(installed.json.data.detectedBrowsers.map((item: any) => item.id)).toEqual(['helium', 'zen']);
+    expect(installed.json.data.registeredTargets).toEqual([
+      expect.objectContaining({ registrationId: 'chrome', sharedByBrowsers: ['helium'] }),
+      expect.objectContaining({ registrationId: 'mozilla', sharedByBrowsers: ['zen'] }),
+    ]);
+    expect(installed.json.data.notDetected).toEqual(expect.arrayContaining(['chrome', 'firefox']));
+
+    const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin', browserPathExists });
+    expect(doctor.exitCode).toBe(0);
+    expect(doctor.json.data.installation.detectedBrowsers.map((item: any) => item.id)).toEqual(['helium', 'zen']);
+    expect(doctor.json.data.installation.registrations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ registrationId: 'chrome', present: true, valid: true }),
+        expect.objectContaining({ registrationId: 'mozilla', present: true, valid: true }),
+      ]),
+    );
+    expect(doctor.json.data.installationHealthy).toBe(true);
+
+    const removed = await run(['uninstall'], runtimeRoot, homeDir, { platform: 'darwin' });
+    expect(removed.exitCode).toBe(0);
+    expect(removed.json.data.launcherRemoved).toBe(true);
+    for (const target of installed.json.data.registeredTargets) {
+      await expect(lstat(target.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+  });
+
   it('installs/uninstalls a selected browser in temp HOME and doctor reports only provable reachability state', async () => {
     const { runtimeRoot, homeDir } = await roots();
     const installed = await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
@@ -266,7 +299,10 @@ describe('syncnos CLI instance selection', () => {
       'chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/',
     ]);
 
-    const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+    const doctor = await run(['doctor'], runtimeRoot, homeDir, {
+      platform: 'darwin',
+      browserPathExists: async () => false,
+    });
     expect(doctor.exitCode).toBe(0);
     expect(doctor.json.data.healthy).toBe(false);
     expect(doctor.json.data.installationHealthy).toBe(true);
@@ -279,12 +315,9 @@ describe('syncnos CLI instance selection', () => {
         'native_messaging_permission_not_granted_or_revoked',
       ],
     });
-    expect(doctor.json.data.installation.browsers).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ browser: 'chrome', present: true, valid: true }),
-        expect.objectContaining({ browser: 'firefox', present: false, valid: false }),
-      ]),
-    );
+    expect(doctor.json.data.installation.registrations).toEqual([
+      expect.objectContaining({ registrationId: 'chrome', present: true, valid: true }),
+    ]);
 
     const removed = await run(['uninstall', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
     expect(removed.exitCode).toBe(0);
@@ -298,14 +331,18 @@ describe('syncnos CLI instance selection', () => {
     await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
     const instance = await startFakeInstance(runtimeRoot, 'doctor-online', 'chromium');
     try {
-      const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+      const doctor = await run(['doctor'], runtimeRoot, homeDir, {
+        platform: 'darwin',
+        browserPathExists: async (path: string) =>
+          path === '/Applications/Helium.app' || path === '/Applications/Zen.app',
+      });
       expect(doctor.exitCode).toBe(0);
       expect(doctor.json.data.healthy).toBe(true);
       expect(doctor.json.data.diagnosis.code).toBe('ok');
       expect(doctor.json.data.selectedCliInstanceId).toBe('doctor-online');
-      expect(doctor.json.data.installation.browsers.find((item: any) => item.browser === 'firefox')).toMatchObject({
-        present: false,
-      });
+      expect(
+        doctor.json.data.installation.registrations.find((item: any) => item.registrationId === 'mozilla'),
+      ).toMatchObject({ present: false });
     } finally {
       await instance.stop();
     }
@@ -332,11 +369,16 @@ describe('syncnos CLI instance selection', () => {
     const { runtimeRoot, homeDir } = await roots();
     const installed = await run(['install', '--browser', 'chrome'], runtimeRoot, homeDir, { platform: 'darwin' });
     await chmod(installed.json.data.manifestPath, 0o644);
-    const doctor = await run(['doctor'], runtimeRoot, homeDir, { platform: 'darwin' });
+    const doctor = await run(['doctor'], runtimeRoot, homeDir, {
+      platform: 'darwin',
+      browserPathExists: async () => false,
+    });
     expect(doctor.exitCode).toBe(0);
     expect(doctor.json.data.installationHealthy).toBe(false);
     expect(doctor.json.data.diagnosis.code).toBe('native_host_install_invalid');
-    expect(doctor.json.data.installation.browsers.find((item: any) => item.browser === 'chrome')).toMatchObject({
+    expect(
+      doctor.json.data.installation.registrations.find((item: any) => item.registrationId === 'chrome'),
+    ).toMatchObject({
       valid: false,
       issues: expect.arrayContaining(['manifest_mode']),
     });
@@ -344,9 +386,21 @@ describe('syncnos CLI instance selection', () => {
 
   it('rejects install/uninstall/doctor-only syntax before touching instance discovery', async () => {
     const { runtimeRoot, homeDir } = await roots();
-    const missingBrowser = await run(['install'], runtimeRoot, homeDir, { platform: 'darwin' });
-    expect(missingBrowser.exitCode).toBe(2);
-    expect(missingBrowser.json.error.code).toBe('usage_error');
+    const missingBrowser = await run(['install'], runtimeRoot, homeDir, {
+      platform: 'darwin',
+      browserPathExists: async () => false,
+    });
+    expect(missingBrowser.exitCode).toBe(5);
+    expect(missingBrowser.json.error.code).toBe('browser_not_found');
+
+    const autoExtensionId = await run(
+      ['install', '--extension-id', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+      runtimeRoot,
+      homeDir,
+      { platform: 'darwin', browserPathExists: async () => false },
+    );
+    expect(autoExtensionId.exitCode).toBe(2);
+    expect(autoExtensionId.json.error.code).toBe('usage_error');
 
     const uninstallExtensionId = await run(
       ['uninstall', '--extension-id', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],

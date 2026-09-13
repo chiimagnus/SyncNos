@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildNativeHostManifest,
+  discoverInstalledBrowsers,
   listBrowserTargets,
   resolveBrowserTarget,
   resolveRegistrationTargets,
@@ -326,6 +327,60 @@ async function installRegistration({ target, support, platform, registryRunner }
   return { manifestPath, validation };
 }
 
+export async function installNativeHosts({
+  browsers,
+  extensionId,
+  homeDir,
+  localAppDataDir,
+  xdgDataHome,
+  env = process.env,
+  platform = process.platform,
+  nodePath = process.execPath,
+  nativeHostPath = currentCliPackagePaths().nativeHostPath,
+  registryRunner,
+} = {}) {
+  assertSupportedPlatform(platform);
+  const requestedBrowsers = Array.isArray(browsers) ? browsers.filter(Boolean) : [];
+  if (!requestedBrowsers.length)
+    throw installError('browser_not_found', 'No supported browser was selected for installation');
+  if (extensionId != null && requestedBrowsers.length !== 1) {
+    throw installError('extension_id_requires_single_browser', 'Extension id override requires exactly one browser');
+  }
+  const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
+  const targets = resolveRegistrationTargets(requestedBrowsers, {
+    platform,
+    homeDir,
+    localAppDataDir,
+    env,
+    extensionId,
+  });
+  const node = String(nodePath || '').trim();
+  const host = String(nativeHostPath || '').trim();
+  await assertExecutableNode(node, platform);
+  await assertNativeHostScript(host, platform);
+  await prepareLauncher({ support, platform, nodePath: node, nativeHostPath: host });
+
+  const registrations = [];
+  for (const target of targets) {
+    const installed = await installRegistration({ target, support, platform, registryRunner });
+    registrations.push({
+      registrationId: target.registrationId,
+      registrationKind: target.registrationKind,
+      sharedByBrowsers: [...target.browsers],
+      productionIdentity: target.productionIdentity,
+      extensionIds: [...target.extensionIds],
+      manifestPath: installed.manifestPath,
+      registryKey: target.registryKey,
+    });
+  }
+  return {
+    launcherPath: support.launcherPath,
+    nativeHostPath: host,
+    nodePath: node,
+    registrations,
+  };
+}
+
 export async function installNativeHost({
   browser,
   extensionId,
@@ -338,27 +393,33 @@ export async function installNativeHost({
   nativeHostPath = currentCliPackagePaths().nativeHostPath,
   registryRunner,
 } = {}) {
-  assertSupportedPlatform(platform);
-  const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
-  const target = resolveBrowserTarget(browser, { platform, homeDir, localAppDataDir, env, extensionId });
-  const node = String(nodePath || '').trim();
-  const host = String(nativeHostPath || '').trim();
-  await assertExecutableNode(node, platform);
-  await assertNativeHostScript(host, platform);
-  await prepareLauncher({ support, platform, nodePath: node, nativeHostPath: host });
-  const installed = await installRegistration({ target, support, platform, registryRunner });
+  const installed = await installNativeHosts({
+    browsers: [browser],
+    extensionId,
+    homeDir,
+    localAppDataDir,
+    xdgDataHome,
+    env,
+    platform,
+    nodePath,
+    nativeHostPath,
+    registryRunner,
+  });
+  const registration = installed.registrations[0];
   return {
-    browser: target.id,
-    registrationId: target.registrationId,
-    registrationKind: target.registrationKind,
-    extensionId: target.extensionId,
-    extensionIds: [...target.extensionIds],
-    productionIdentity: target.productionIdentity,
-    launcherPath: support.launcherPath,
-    manifestPath: installed.manifestPath,
-    registryKey: target.registryKey,
-    nativeHostPath: host,
-    nodePath: node,
+    browser: String(browser || '')
+      .trim()
+      .toLowerCase(),
+    registrationId: registration.registrationId,
+    registrationKind: registration.registrationKind,
+    extensionId: registration.extensionIds[0],
+    extensionIds: registration.extensionIds,
+    productionIdentity: registration.productionIdentity,
+    launcherPath: installed.launcherPath,
+    manifestPath: registration.manifestPath,
+    registryKey: registration.registryKey,
+    nativeHostPath: installed.nativeHostPath,
+    nodePath: installed.nodePath,
   };
 }
 
@@ -465,6 +526,7 @@ async function inspectLauncher({ launcherPath, expectedLauncher, platform }) {
 
 async function inspectRegistration(target, support, registryRunner) {
   const manifestPath = targetManifestPath(target, support);
+  const sharedByBrowsers = Array.isArray(target.browsers) ? [...target.browsers] : [target.id];
   const state = await pathState(manifestPath);
   let registry = null;
   if (target.registrationKind === 'registry') {
@@ -472,8 +534,8 @@ async function inspectRegistration(target, support, registryRunner) {
   }
   if (!state.present) {
     return {
-      browser: target.id,
       registrationId: target.registrationId,
+      sharedByBrowsers,
       registrationKind: target.registrationKind,
       path: manifestPath,
       registryKey: target.registryKey,
@@ -498,8 +560,8 @@ async function inspectRegistration(target, support, registryRunner) {
     else if (registry.value !== manifestPath) issues.push('registry_manifest_path');
   }
   return {
-    browser: target.id,
     registrationId: target.registrationId,
+    sharedByBrowsers,
     registrationKind: target.registrationKind,
     path: manifestPath,
     registryKey: target.registryKey,
@@ -521,6 +583,7 @@ export async function inspectCliInstallation({
   nodePath = process.execPath,
   nativeHostPath = currentCliPackagePaths().nativeHostPath,
   registryRunner,
+  browserPathExists,
 } = {}) {
   const platformSupported = SUPPORTED_PLATFORMS.has(platform);
   if (!platformSupported) {
@@ -540,7 +603,8 @@ export async function inspectCliInstallation({
         nativeHostPresent: false,
       },
       launcher: { path: null, present: false, executable: false, modeValid: false, matchesCurrentPackage: false },
-      browsers: [],
+      detectedBrowsers: [],
+      registrations: [],
     };
   }
   const support = resolveCliSupportPaths({ platform, homeDir, localAppDataDir, xdgDataHome, env });
@@ -553,10 +617,25 @@ export async function inspectCliInstallation({
     inspectLauncher({ launcherPath: support.launcherPath, expectedLauncher, platform }),
     readJsonFile(currentCliPackagePaths().packageJsonPath),
   ]);
-  const browsers = [];
-  for (const browser of listBrowserTargets({ platform })) {
-    const target = resolveBrowserTarget(browser, { platform, homeDir, localAppDataDir, env });
-    browsers.push(await inspectRegistration(target, support, registryRunner));
+  const detectedBrowsers = await discoverInstalledBrowsers({
+    platform,
+    homeDir,
+    localAppDataDir,
+    env,
+    ...(browserPathExists ? { pathExists: browserPathExists } : null),
+  });
+  const registrationTargets = resolveRegistrationTargets(listBrowserTargets({ platform }), {
+    platform,
+    homeDir,
+    localAppDataDir,
+    env,
+  });
+  const detectedIds = new Set(detectedBrowsers.map((item) => item.id));
+  const registrations = [];
+  for (const target of registrationTargets) {
+    const inspected = await inspectRegistration(target, support, registryRunner);
+    const requiredByDetectedBrowser = target.browsers.some((browserId) => detectedIds.has(browserId));
+    if (inspected.present || requiredByDetectedBrowser) registrations.push(inspected);
   }
   return {
     platform,
@@ -578,6 +657,7 @@ export async function inspectCliInstallation({
       nativeHostPresent: hostState.present && hostState.regularFile && !hostState.symbolicLink,
     },
     launcher,
-    browsers,
+    detectedBrowsers,
+    registrations,
   };
 }

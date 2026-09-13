@@ -6,8 +6,9 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { discoverInstalledBrowsers, listBrowserTargets } from './browser-targets.mjs';
 import { contract } from './contract.mjs';
-import { inspectCliInstallation, installNativeHost, uninstallNativeHost } from './install.mjs';
+import { inspectCliInstallation, installNativeHost, installNativeHosts, uninstallNativeHost } from './install.mjs';
 import { requestEndpoint } from './ipc.mjs';
 import {
   isRegistryPathForInstance,
@@ -349,7 +350,7 @@ export function selectInstance(online, { explicitId = null, preferredId = null }
 async function selectedInstance(options, context) {
   const [discovery, config] = await Promise.all([
     discoverInstances({ runtimeRoot: context.runtimeRoot, cleanupStale: true }),
-    readUserConfig({ homeDir: context.homeDir }),
+    readUserConfig(context.configOptions),
   ]);
   const selected = selectInstance(discovery.online, {
     explicitId: options.instance,
@@ -538,7 +539,7 @@ export function diagnoseDoctorState({ installation, discovery, selection, select
   if (!installation?.platformSupported) {
     return {
       code: 'unsupported_platform',
-      message: 'SyncNos CLI Native Messaging installation is currently supported on macOS only.',
+      message: 'SyncNos CLI Native Messaging installation is supported on macOS, Windows, and Linux.',
       candidateReasons: [],
     };
   }
@@ -553,13 +554,13 @@ export function diagnoseDoctorState({ installation, discovery, selection, select
       candidateReasons: [],
     };
   }
-  const validManifests = (installation?.browsers || []).filter((item) => item.present && item.valid);
-  const anyManifestPresent = (installation?.browsers || []).some((item) => item.present);
-  if (validManifests.length === 0) {
-    if (anyManifestPresent || installation?.launcher?.present) {
+  const validRegistrations = (installation?.registrations || []).filter((item) => item.present && item.valid);
+  const anyRegistrationPresent = (installation?.registrations || []).some((item) => item.present);
+  if (validRegistrations.length === 0) {
+    if (anyRegistrationPresent || installation?.launcher?.present) {
       return {
         code: 'native_host_install_invalid',
-        message: 'SyncNos Native Messaging launcher or manifest is present but invalid or stale.',
+        message: 'SyncNos Native Messaging launcher or registration is present but invalid or stale.',
         candidateReasons: [],
       };
     }
@@ -600,13 +601,14 @@ function writeResult(stream, result, human = false) {
   stream.write(human ? formatHuman(result) : `${JSON.stringify(result)}\n`);
 }
 
-function usage() {
+function usage(platform = process.platform) {
+  const browserIds = listBrowserTargets({ platform }).join('|') || '<browser-id>';
   return [
     'Usage: syncnos <command> [options]',
     '',
     'Commands:',
-    '  install --browser chrome|firefox [--extension-id <id>]',
-    '  uninstall [--browser chrome|firefox]',
+    `  install [--browser ${browserIds}] [--extension-id <id>]`,
+    `  uninstall [--browser ${browserIds}]`,
     '  instances [--set-default <id> | --clear-default]',
     '  status [--instance <id>]',
     '  revision [--instance <id>]',
@@ -658,9 +660,14 @@ export async function runCli(
     stderr = process.stderr,
     runtimeRoot,
     homeDir,
+    localAppDataDir,
+    xdgDataHome,
+    env = process.env,
     platform = process.platform,
     nodePath = process.execPath,
     nativeHostPath,
+    registryRunner,
+    browserPathExists,
   } = {},
 ) {
   void stderr;
@@ -672,11 +679,12 @@ export async function runCli(
     return error.exitCode || EXIT.usage;
   }
   if (options.command === 'help') {
-    stdout.write(`${usage()}\n`);
+    stdout.write(`${usage(platform)}\n`);
     return EXIT.success;
   }
 
-  const context = { runtimeRoot, homeDir, platform, nodePath, nativeHostPath };
+  const configOptions = { homeDir, localAppDataDir, xdgDataHome, env, platform };
+  const context = { runtimeRoot, homeDir, platform, nodePath, nativeHostPath, configOptions };
   try {
     if (options.command === 'capabilities') {
       assertAllowedOptions(options, new Set(['human']));
@@ -700,16 +708,60 @@ export async function runCli(
       if (options.positionals.length) {
         throw codedError('usage_error', 'install does not accept positional arguments', EXIT.usage);
       }
-      if (!options.browser) throw codedError('usage_error', 'install requires --browser chrome|firefox', EXIT.usage);
-      const installed = await installNativeHost({
-        browser: options.browser,
-        extensionId: options.extensionId,
+      if (options.extensionId && !options.browser) {
+        throw codedError('usage_error', '--extension-id requires an explicit --browser', EXIT.usage);
+      }
+      if (options.browser) {
+        const installed = await installNativeHost({
+          browser: options.browser,
+          extensionId: options.extensionId,
+          homeDir,
+          localAppDataDir,
+          xdgDataHome,
+          env,
+          platform,
+          nodePath,
+          registryRunner,
+          ...(nativeHostPath ? { nativeHostPath } : null),
+        });
+        writeResult(stdout, envelopeOk(installed), options.human);
+        return EXIT.success;
+      }
+
+      const detectedBrowsers = await discoverInstalledBrowsers({
+        platform,
         homeDir,
+        localAppDataDir,
+        env,
+        ...(browserPathExists ? { pathExists: browserPathExists } : null),
+      });
+      if (!detectedBrowsers.length) {
+        throw codedError('browser_not_found', 'No supported browser installation was detected', EXIT.business);
+      }
+      const installed = await installNativeHosts({
+        browsers: detectedBrowsers,
+        homeDir,
+        localAppDataDir,
+        xdgDataHome,
+        env,
         platform,
         nodePath,
+        registryRunner,
         ...(nativeHostPath ? { nativeHostPath } : null),
       });
-      writeResult(stdout, envelopeOk(installed), options.human);
+      const detectedIds = new Set(detectedBrowsers.map((item) => item.id));
+      writeResult(
+        stdout,
+        envelopeOk({
+          detectedBrowsers,
+          registeredTargets: installed.registrations,
+          notDetected: listBrowserTargets({ platform }).filter((id) => !detectedIds.has(id)),
+          launcherPath: installed.launcherPath,
+          nativeHostPath: installed.nativeHostPath,
+          nodePath: installed.nodePath,
+        }),
+        options.human,
+      );
       return EXIT.success;
     }
 
@@ -718,7 +770,15 @@ export async function runCli(
       if (options.positionals.length) {
         throw codedError('usage_error', 'uninstall does not accept positional arguments', EXIT.usage);
       }
-      const removed = await uninstallNativeHost({ browser: options.browser, homeDir, platform });
+      const removed = await uninstallNativeHost({
+        browser: options.browser,
+        homeDir,
+        localAppDataDir,
+        xdgDataHome,
+        env,
+        platform,
+        registryRunner,
+      });
       writeResult(stdout, envelopeOk(removed), options.human);
       return EXIT.success;
     }
@@ -731,13 +791,13 @@ export async function runCli(
         throw codedError('usage_error', '--set-default and --clear-default cannot be combined', EXIT.usage);
       }
       const discovery = await discoverInstances({ runtimeRoot, cleanupStale: true });
-      let config = await readUserConfig({ homeDir });
+      let config = await readUserConfig(configOptions);
       if (options.setDefault) {
         const match = discovery.online.find((item) => item.entry.cliInstanceId === options.setDefault);
         if (!match) throw codedError('instance_offline', 'Default instance must be online', EXIT.instance);
-        config = await setPreferredInstance(options.setDefault, { homeDir });
+        config = await setPreferredInstance(options.setDefault, configOptions);
       } else if (options.clearDefault) {
-        config = await clearPreferredInstance({ homeDir });
+        config = await clearPreferredInstance(configOptions);
       }
       writeResult(
         stdout,
@@ -1262,11 +1322,16 @@ export async function runCli(
         throw codedError('usage_error', 'doctor does not accept positional arguments', EXIT.usage);
       const [discovery, config, installation] = await Promise.all([
         discoverInstances({ runtimeRoot, cleanupStale: false }),
-        readUserConfig({ homeDir }),
+        readUserConfig(configOptions),
         inspectCliInstallation({
           homeDir,
+          localAppDataDir,
+          xdgDataHome,
+          env,
           platform,
           nodePath,
+          registryRunner,
+          browserPathExists,
           ...(nativeHostPath ? { nativeHostPath } : null),
         }),
       ]);
@@ -1289,7 +1354,7 @@ export async function runCli(
         installation.launcher.matchesCurrentPackage &&
         installation.launcher.executable &&
         installation.launcher.modeValid &&
-        installation.browsers.some((item) => item.present && item.valid);
+        installation.registrations.some((item) => item.present && item.valid);
       writeResult(
         stdout,
         envelopeOk({
