@@ -348,7 +348,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     if (shouldCacheImages) {
       const inlined = await inlineChatImagesInMessages({
         conversationId,
-        conversationUrl: canonicalUrl,
         messages: messagesToSave,
         enableHttpImages: true,
       });

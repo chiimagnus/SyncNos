@@ -163,18 +163,12 @@ export type BackfillConversationImagesResult = {
   warningFlags: string[];
 };
 
-export async function backfillConversationImages(
-  conversationId: number,
-  conversationUrl?: string,
-): Promise<BackfillConversationImagesResult> {
+export async function backfillConversationImages(conversationId: number): Promise<BackfillConversationImagesResult> {
   const id = Number(conversationId);
   if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
   const res = await send<ApiResponse<BackfillConversationImagesResult>>(
     CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
-    {
-      conversationId: id,
-      conversationUrl: String(conversationUrl || ''),
-    },
+    { conversationId: id },
   );
   return unwrap(res);
 }

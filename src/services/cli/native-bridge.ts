@@ -642,7 +642,6 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         {
           type: CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
           conversationId: Number(params.conversationId),
-          conversationUrl: String(params.conversationUrl || ''),
         },
         null,
       );

@@ -1472,6 +1472,86 @@ describe('conversations storage-idb', () => {
     expect(stored).not.toHaveProperty('captureSequencePolicy');
   });
 
+  it('applies protective markdown merge in snapshot mode while still deleting stale rows', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'snapshot_preserve_markdown',
+      title: 'Snapshot merge',
+      lastActivityAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: 'rich existing image', sequence: 0, updatedAt: 10 },
+      {
+        messageKey: 'stale',
+        role: 'assistant',
+        contentMarkdown: 'stale regenerated branch',
+        sequence: 1,
+        updatedAt: 10,
+      },
+    ]);
+
+    const result = await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentMarkdown: 'fallback\n\n[image]',
+          sequence: 0,
+          updatedAt: 20,
+          captureMergePolicy: 'preserve-existing-markdown',
+        },
+        { messageKey: 'm2', role: 'user', contentMarkdown: 'new current branch row', sequence: 1, updatedAt: 20 },
+      ],
+      { mode: 'snapshot', diff: null },
+    );
+
+    expect(result).toEqual({ upserted: 2, deleted: 1 });
+    const stored = await getMessagesByConversationId(id);
+    expect(stored.map((message) => message.messageKey)).toEqual(['m1', 'm2']);
+    expect(stored[0]).toMatchObject({
+      contentMarkdown: 'rich existing image',
+      sequence: 0,
+      updatedAt: 20,
+    });
+    expect(stored[0]).not.toHaveProperty('captureMergePolicy');
+  });
+
+  it('preserves existing markdown and timestamp for preserve-existing-content in snapshot mode', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'snapshot_preserve_content',
+      title: 'Snapshot content merge',
+      lastActivityAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: 'existing', sequence: 0, updatedAt: 10 },
+    ]);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentMarkdown: 'fallback',
+          sequence: 0,
+          updatedAt: 20,
+          captureMergePolicy: 'preserve-existing-content',
+        },
+      ],
+      { mode: 'snapshot', diff: null },
+    );
+
+    const [stored] = await getMessagesByConversationId(id);
+    expect(stored).toMatchObject({ contentMarkdown: 'existing', updatedAt: 10 });
+    expect(stored).not.toHaveProperty('captureMergePolicy');
+  });
+
   it('allows a later complete AI image snapshot to replace an earlier protected fallback', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

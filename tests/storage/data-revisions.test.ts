@@ -379,6 +379,30 @@ describe('data revision storage', () => {
     expect(await readDataRevision('messages')).toBe(3);
   });
 
+  it('does not bump messages revision for a snapshot whose protective merge resolves to the existing durable row', async () => {
+    const { syncConversationMessages } = await import('@services/conversations/data/storage-idb');
+    await syncConversationMessages(43, [
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: 'rich', sequence: 0, updatedAt: 10 },
+    ]);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    await syncConversationMessages(
+      43,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentMarkdown: 'fallback',
+          sequence: 0,
+          captureMergePolicy: 'preserve-existing-markdown',
+        },
+      ],
+      { mode: 'snapshot', diff: null },
+    );
+
+    expect(await readDataRevision('messages')).toBe(1);
+  });
+
   it('advances article_comments once per successful mutator and stays stable on clean no-ops', async () => {
     const {
       addArticleComment,

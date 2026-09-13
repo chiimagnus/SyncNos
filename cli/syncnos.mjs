@@ -892,11 +892,7 @@ export async function runCli(
           throw codedError('usage_error', 'conversation backfill-images requires one conversation id', EXIT.usage);
         const conversationId = parsePositiveInteger(options.positionals[1], 'conversation id');
         const { selected } = await selectedInstance(options, context);
-        const detail = await requestSelected(selected, 'conversation.get', { conversationId });
-        const result = await requestSelected(selected, 'conversation.images.backfill', {
-          conversationId,
-          conversationUrl: String(detail?.conversation?.url || ''),
-        });
+        const result = await requestSelected(selected, 'conversation.images.backfill', { conversationId });
         writeResult(stdout, envelopeOk(result), options.human);
         return EXIT.success;
       }

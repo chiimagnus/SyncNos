@@ -43,14 +43,10 @@ describe('image-backfill-job', () => {
     );
     storageMocks.patchConversationMessageMarkdownBatch.mockResolvedValue({ updated: 1, conflicts: 1 });
 
-    const result = await backfillConversationImages({
-      conversationId: 42,
-      conversationUrl: 'https://example.com/conversation',
-    });
+    const result = await backfillConversationImages({ conversationId: 42 });
 
     expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith({
       conversationId: 42,
-      conversationUrl: 'https://example.com/conversation',
       messages: expect.any(Array),
     });
     expect(storageMocks.patchConversationMessageMarkdownBatch).toHaveBeenCalledTimes(1);

@@ -17,7 +17,6 @@ export type BackfillConversationImagesResult = {
 
 export async function backfillConversationImages(input: {
   conversationId: number;
-  conversationUrl?: string;
 }): Promise<BackfillConversationImagesResult> {
   const conversationId = Number(input.conversationId);
   if (!Number.isFinite(conversationId) || conversationId <= 0) {
@@ -34,7 +33,6 @@ export async function backfillConversationImages(input: {
 
   const inlined = await inlineChatImagesInMessages({
     conversationId,
-    conversationUrl: input.conversationUrl,
     messages: messages as any,
   });
 
