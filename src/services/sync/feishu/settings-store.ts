@@ -1,5 +1,5 @@
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
-import { storageGet, storageSet } from '@services/shared/storage';
+import { storageGet, storageSet } from '@platform/storage/local';
 
 export const FEISHU_STORAGE_KEYS = Object.freeze({
   chatFolder: 'feishu_chat_folder',

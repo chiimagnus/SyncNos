@@ -133,21 +133,6 @@ function createClient({
       contentType?: string;
     } = {},
   ) {
-    if (typeof fetch !== 'function') {
-      return {
-        ok: false,
-        status: 0,
-        data: null,
-        error: {
-          code: 'network_error',
-          status: 0,
-          errorCode: null,
-          message: 'fetch unavailable',
-          body: null,
-        },
-      };
-    }
-
     const h = new Headers(headers || {});
     if (accept) h.set('Accept', String(accept));
     if (contentType) h.set('Content-Type', String(contentType));
@@ -193,7 +178,7 @@ function createClient({
   }
 
   function normalizeBinaryBody(bytes: unknown): Blob | Uint8Array | null {
-    if (typeof Blob !== 'undefined' && bytes instanceof Blob) return bytes;
+    if (bytes instanceof Blob) return bytes;
     if (bytes instanceof Uint8Array) return bytes;
     if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
     if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);

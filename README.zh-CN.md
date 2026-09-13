@@ -2,9 +2,9 @@
 
 # SyncNos
 
-把 AI 对话、网页文章和视频内容先保存到浏览器本地，再决定是否同步或导出。
+本地优先地保存 AI 对话、网页文章和视频页面内容。
 
-支持采集的 AI 对话、网页文章与 YouTube/Bilibili 视频页面内容会先进入本地存储；Video 会保留可用的简介、章节与字幕等内容。之后可选择同步到 Notion / Obsidian / 飞书 / GitHub，把已选内容导出为 Markdown / JSON，或创建本地 Backup ZIP。
+内容先进入浏览器本地，再按需同步到 Notion、Obsidian、飞书或 GitHub，导出选中的 Markdown / JSON，或创建本地 Backup ZIP。
 
 [SyncNos 天使赞助者们😍](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
 
@@ -16,80 +16,89 @@
 
 </div>
 
-## 产品原则
+## 为什么使用 SyncNos
 
-SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派生到 Notion、Obsidian、飞书、GitHub 或导出文件。外部目标失败不应让已经保存的本地内容消失。权限、凭据与外部数据流见 [隐私政策](PRIVACY.md)。
+采集内容先保存在本地，再进行可选的同步或导出。外部 Provider 和导出文件都是派生副本，不是主数据。权限、凭据和网络数据流见[隐私政策](PRIVACY.md)。
 
-## 下载与安装
+## 安装
 
-| 渠道 | 下载入口 |
+| 浏览器 | 安装入口 |
 | --- | --- |
 | Chrome、Arc、Brave 等 Chromium 浏览器 | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
 | Edge | [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/ijkpghlfmkbjcgafapjcjahaikmnjncl) |
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari（macOS / iOS） | 使用 Xcode 从源码构建 |
 
-## 操作演示视频
+### 本机 CLI
+
+可选的 `syncnos` CLI 直接使用运行中的浏览器 Extension 作为数据和业务逻辑真源；它不是第二套数据库，也不是离线 daemon。
+
+从对应 GitHub Release 下载 `syncnos-cli-<version>.tgz`：
+
+```bash
+npm install -g ./syncnos-cli-<version>.tgz
+syncnos install
+syncnos doctor
+```
+
+在需要使用 CLI 的浏览器 Profile 中开启 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**。业务命令执行时，该浏览器 Profile 需要保持运行。
+
+`syncnos install` 只检查有限的已知浏览器位置并写入当前用户的 Native Messaging registration，不遍历磁盘，也不读取浏览器 Profile。当前系统支持的 browser ID 以 `syncnos install --help` 为准；`syncnos doctor` 用于区分安装状态和 Extension 连接状态。Safari 使用另一套原生桥，不由这个 installer 管理。
+
+## 演示
 
 [![SyncNos 操作演示视频](docs/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
 
-## 支持采集的来源
+## 采集
 
 ### AI 对话
 
-| 平台 | 采集方式 |
-| --- | --- |
-| ChatGPT | 仅手动¹ |
-| Gemini | 可自动保存² |
-| Google AI Studio | 仅手动¹ |
-| DeepSeek | 可自动保存² |
-| Kimi | 可自动保存² |
-| 豆包 | 可自动保存² |
-| 元宝 | 可自动保存² |
-| Poe | 可自动保存² |
-| Notion AI | 可自动保存² |
-| z.ai | 可自动保存² |
+支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 和 z.ai。
 
-¹ ChatGPT 与 Google AI Studio 使用虚拟列表，必须显式手动抓取，确保完整性后才能保存。
-
-² 只有启用 AI 自动保存后才会后台采集。支持站点的事实真源是 `src/collectors/ai-chat-sites.ts`。
+ChatGPT 与 Google AI Studio 使用虚拟列表，只支持手动抓取；其它受支持的 AI 对话在开启 AI 自动保存后可自动采集。
 
 ### 网页文章
 
-普通 `http(s)` 页面都可以手动抓取；受支持的视频 URL 会直接进入 Video 采集，不会再保存成网页文章。SyncNos 提取可读正文和必要元数据，并在需要时使用站点特定的降级逻辑。抓取后的文章支持评论与仅划线注释；在已登录的得到课程文章页面中，页面可用的个人划线与笔记也会导入文章评论层。
+普通 `http(s)` 页面都可以手动抓取。SyncNos 会提取可读正文和必要元数据，并在需要时使用站点特定处理。抓取后的文章支持本地评论和仅划线注释。
 
-### 视频采集
+### 视频页面
 
-Video 采集支持 YouTube `watch` / `youtu.be` 页面、Bilibili BV 视频页，以及带合法 `bvid` 的 Bilibili 稍后再看播放页。Popup、页面内保存按钮和右键 SyncNos 的单一动态保存项都走同一套 Video 路由。SyncNos 会保存标题、作者、完整简介、时长、缩略图等可用来源上下文；页面已加载字幕时同时保存字幕/转录文本与精确时间范围，Bilibili 当前播放器已经自然加载章节/看点时也会一并保存。Bilibili 稍后再看 URL 会按 `bvid` 归一为同一个 `https://www.bilibili.com/video/<BV>/` identity（`oid` 不参与 SyncNos identity）。没有字幕时仍会创建或更新 Video，不会降级成网页文章；字幕稍后加载后再次保存即可补充或更新 transcript。SyncNos 不下载音视频流；Bilibili `av`、YouTube Shorts、任意 `/video/*`、播放统计/tags 与章节图片不属于当前支持契约。
+SyncNos 支持 YouTube watch / youtu.be 页面和 Bilibili BV 播放页，也支持带合法 `bvid` 的稍后再看播放页。它会保存可用的页面上下文和页面已经加载的字幕 / transcript；当前 Bilibili 播放器提供章节 / 看点时也会一并保存。SyncNos 不下载音视频流；即使当前没有字幕，受支持的视频仍会按 Video 保存。
 
 ## 输出目标
 
 | 目标 | 行为 |
 | --- | --- |
-| **Notion** | OAuth 后通过 Notion API 同步本地内容；始终可手动同步，也可显式开启自动同步。 |
-| **Obsidian** | 通过本机 Local REST API 把 Markdown 和本地图片附件写入 vault。参见[配置指南](docs/guide/obsidian/LocalRestAPI.zh.md)。 |
-| **飞书** | OAuth 后同步本地内容到飞书 DocX；始终可手动同步，也可显式开启自动同步。参见[配置指南](docs/guide/feishu/DocxSync.zh.md)。 |
-| **GitHub** | 通过 SyncNos GitHub App 把本地 projection 写入已授权的 repository/branch；始终可手动同步，也可显式开启自动同步。 |
-| **Markdown / JSON** | 把已选内容打包为一个 ZIP；每条 item 对应一个独立 `.md` 或 `.json` 内容文件，并附带实际引用的本地缓存附件。 |
-| **Backup ZIP** | 创建独立的本地恢复包；恢复边界见[本地数据、备份与恢复](docs/storage.md)。 |
+| **Notion** | OAuth 后通过 Notion API 同步本地内容。 |
+| **Obsidian** | 通过 Local REST API 写入 Markdown 和本地图片附件。[配置指南](docs/guide/obsidian/LocalRestAPI.zh.md) |
+| **飞书** | OAuth 后同步到飞书 DocX。[配置指南](docs/guide/feishu/DocxSync.zh.md) |
+| **GitHub** | 通过 SyncNos GitHub App 写入已授权的 repository / branch。 |
+| **Markdown / JSON** | 在本机导出选中的条目和实际引用的缓存附件。 |
+| **Backup ZIP** | 创建[本地数据、备份与恢复](docs/storage.md)中定义的恢复包。 |
+
+每个 Provider 都可以手动同步，并可单独启用自动同步。
 
 ## 界面预览
 
-WebClipper Popup：保存与浏览对话
+WebClipper Popup：保存并浏览已采集内容。
+
 ![WebClipper Popup](docs/assets/popup-screenshots.png)
 
-文章讨论侧栏：精确引用、紧凑线程与单 active reply composer
+文章讨论侧栏：精确引用、紧凑线程和单 active reply composer。
+
 ![文章讨论侧栏](docs/assets/comments-discussion.png)
 
-## 参与贡献
+## 文档
 
-开发环境、Issue / commit / PR 流程与验证要求统一见 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)；代码分层和不可破坏的产品契约见 [AGENTS.md](AGENTS.md)。
+- [隐私政策](PRIVACY.md)
+- [本地数据、备份与恢复](docs/storage.md)
+- [飞书配置](docs/guide/feishu/DocxSync.zh.md)
+- [Obsidian 配置](docs/guide/obsidian/LocalRestAPI.zh.md)
+- [参与贡献](docs/CONTRIBUTING.md)
 
 ## 支持
 
-SyncNos 是一个人维护的项目。
-
-如果你愿意赞助，也欢迎留一句你为什么使用 SyncNos，或者希望它接下来解决什么问题。
+SyncNos 由一人维护。如果你愿意赞助，也欢迎留一句你为什么使用 SyncNos，或希望它接下来解决什么问题。
 
 <img src="public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="180" />
 

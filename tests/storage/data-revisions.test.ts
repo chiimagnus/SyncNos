@@ -637,18 +637,24 @@ describe('data revision storage', () => {
         'manifest.json',
         encoder.encode(
           JSON.stringify({
-            backupSchemaVersion: 2,
+            backupSchemaVersion: 3,
             exportedAt: '2026-08-29T00:00:00.000Z',
-            db: { name: 'webclipper', version: 10 },
-            counts: { conversations: 1, messages: 0, sync_mappings: 1 },
+            db: { name: 'webclipper', version: 13 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 1, image_cache: 0, article_comments: 0 },
             config: { storageLocalPath: 'config/storage-local.json' },
             index: { conversationsCsvPath: 'sources/conversations.csv' },
             sources: [{ source, conversationCount: 1, files: [entryPath] }],
+            assets: {
+              imageCacheIndexPath: 'assets/image-cache/index.json',
+              articleCommentsIndexPath: 'assets/article-comments/index.json',
+            },
           }),
         ),
       ],
       ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
       ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      ['assets/image-cache/index.json', encoder.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
+      ['assets/article-comments/index.json', encoder.encode(JSON.stringify({ schemaVersion: 2, comments: [] }))],
       [
         entryPath,
         encoder.encode(
@@ -729,18 +735,24 @@ describe('data revision storage', () => {
         'manifest.json',
         encoder.encode(
           JSON.stringify({
-            backupSchemaVersion: 2,
+            backupSchemaVersion: 3,
             exportedAt: '2026-08-29T00:00:00.000Z',
-            db: { name: 'webclipper', version: 10 },
-            counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+            db: { name: 'webclipper', version: 13 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
             config: { storageLocalPath: 'config/storage-local.json' },
             index: { conversationsCsvPath: 'sources/conversations.csv' },
             sources: [{ source: 'chatgpt', conversationCount: 1, files: [entryPath] }],
+            assets: {
+              imageCacheIndexPath: 'assets/image-cache/index.json',
+              articleCommentsIndexPath: 'assets/article-comments/index.json',
+            },
           }),
         ),
       ],
       ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
       ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      ['assets/image-cache/index.json', encoder.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
+      ['assets/article-comments/index.json', encoder.encode(JSON.stringify({ schemaVersion: 2, comments: [] }))],
       [
         entryPath,
         encoder.encode(
@@ -753,7 +765,7 @@ describe('data revision storage', () => {
               conversationKey: 'zip-conversation-revision',
               title: 'ZIP',
               url: 'https://chatgpt.com/c/zip-conversation-revision',
-              lastCapturedAt: 10,
+              lastActivityAt: 10,
             },
             messages: [],
             syncMapping: null,
@@ -780,19 +792,23 @@ describe('data revision storage', () => {
         'manifest.json',
         encoder.encode(
           JSON.stringify({
-            backupSchemaVersion: 2,
+            backupSchemaVersion: 3,
             exportedAt: '2026-08-29T00:00:00.000Z',
-            db: { name: 'webclipper', version: 10 },
-            counts: { conversations: 1, messages: 0, sync_mappings: 0, article_comments: 1 },
+            db: { name: 'webclipper', version: 13 },
+            counts: { conversations: 1, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 1 },
             config: { storageLocalPath: 'config/storage-local.json' },
             index: { conversationsCsvPath: 'sources/conversations.csv' },
             sources: [{ source: 'web', conversationCount: 1, files: [entryPath] }],
-            assets: { articleCommentsIndexPath: 'assets/article-comments/index.json' },
+            assets: {
+              imageCacheIndexPath: 'assets/image-cache/index.json',
+              articleCommentsIndexPath: 'assets/article-comments/index.json',
+            },
           }),
         ),
       ],
       ['config/storage-local.json', encoder.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} }))],
       ['sources/conversations.csv', encoder.encode('source,conversationKey\n')],
+      ['assets/image-cache/index.json', encoder.encode(JSON.stringify({ schemaVersion: 1, assets: [] }))],
       [
         entryPath,
         encoder.encode(
@@ -805,7 +821,7 @@ describe('data revision storage', () => {
               conversationKey: 'zip-comment-revision',
               title: 'ZIP',
               url: 'https://example.com/zip-comment-revision',
-              lastCapturedAt: 10,
+              lastActivityAt: 10,
             },
             messages: [],
             syncMapping: null,
@@ -816,7 +832,7 @@ describe('data revision storage', () => {
         'assets/article-comments/index.json',
         encoder.encode(
           JSON.stringify({
-            schemaVersion: 1,
+            schemaVersion: 2,
             comments: [
               {
                 commentId: 1,
@@ -855,9 +871,9 @@ describe('data revision storage', () => {
         'manifest.json',
         encoder.encode(
           JSON.stringify({
-            backupSchemaVersion: 2,
+            backupSchemaVersion: 3,
             exportedAt: '2026-08-29T00:00:00.000Z',
-            db: { name: 'webclipper', version: 10 },
+            db: { name: 'webclipper', version: 13 },
             counts: { conversations: 1, messages: 1, sync_mappings: 1, image_cache: 1, article_comments: 1 },
             config: { storageLocalPath: 'config/storage-local.json' },
             index: { conversationsCsvPath: 'sources/conversations.csv' },
@@ -883,7 +899,7 @@ describe('data revision storage', () => {
               conversationKey: 'all-scopes',
               title: 'All scopes',
               url: 'https://example.com/all-scopes',
-              lastCapturedAt: 10,
+              lastActivityAt: 10,
             },
             messages: [
               {
@@ -929,7 +945,7 @@ describe('data revision storage', () => {
         'assets/article-comments/index.json',
         encoder.encode(
           JSON.stringify({
-            schemaVersion: 1,
+            schemaVersion: 2,
             comments: [
               {
                 commentId: 1,

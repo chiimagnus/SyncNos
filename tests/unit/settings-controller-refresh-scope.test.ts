@@ -3,11 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  FEISHU_MESSAGE_TYPES,
-  INPAGE_MESSAGE_TYPES,
-  NOTION_MESSAGE_TYPES,
-} from '@services/protocols/message-contracts';
+import { FEISHU_MESSAGE_TYPES, NOTION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 
 const runtimeMocks = vi.hoisted(() => ({ send: vi.fn() }));
@@ -85,13 +81,17 @@ let root: ReactDOM.Root | null = null;
 let dom: JSDOM | null = null;
 let storageState: Record<string, unknown> = {};
 let storageListener: StorageListener | null = null;
-let notionStatus = { connected: false, workspaceName: '' };
-let feishuStatus = { connected: false };
+let notionStatus: { connected: boolean; workspaceName: string } = { connected: false, workspaceName: '' };
+let feishuStatus: { connected: boolean; pending?: boolean; errorPresent?: boolean } = {
+  connected: false,
+  pending: false,
+  errorPresent: false,
+};
 let notionGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let notionStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
-let displaySetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
+let displaySetQueue: Array<Promise<void> | Error> = [];
 
 function ControllerHarness() {
   const snapshot = useSettingsSceneController({ activeSection: 'notion' });
@@ -164,7 +164,7 @@ beforeEach(() => {
   storageState = {};
   storageListener = null;
   notionStatus = { connected: false, workspaceName: '' };
-  feishuStatus = { connected: false };
+  feishuStatus = { connected: false, pending: false, errorPresent: false };
   notionGetQueue = [];
   feishuGetQueue = [];
   notionStartQueue = [];
@@ -184,6 +184,11 @@ beforeEach(() => {
     return out;
   });
   storageMocks.set.mockImplementation(async (payload: Record<string, unknown>) => {
+    if (Object.prototype.hasOwnProperty.call(payload || {}, 'inpage_display_mode') && displaySetQueue.length) {
+      const queued = displaySetQueue.shift()!;
+      if (queued instanceof Error) throw queued;
+      await queued;
+    }
     Object.assign(storageState, payload || {});
   });
   storageMocks.remove.mockImplementation(async (keys: string[]) => {
@@ -196,7 +201,7 @@ beforeEach(() => {
     };
   });
 
-  runtimeMocks.send.mockImplementation(async (type: string, payload?: Record<string, unknown>) => {
+  runtimeMocks.send.mockImplementation(async (type: string, _payload?: Record<string, unknown>) => {
     if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS) {
       return await takeQueued(notionGetQueue, ok(notionStatus));
     }
@@ -208,8 +213,14 @@ beforeEach(() => {
       return ok({ disconnected: true });
     }
     if (type === NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES) return ok({ pages: [], resolvedSaved: null });
+    if (type === NOTION_MESSAGE_TYPES.GET_CONFIG) {
+      return ok({ parentPageId: '', parentPageTitle: '', databaseIds: { chat: '', article: '', video: '' } });
+    }
     if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) {
       return await takeQueued(feishuGetQueue, ok(feishuStatus));
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG) {
+      return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
     }
     if (type === FEISHU_MESSAGE_TYPES.START_AUTH) {
       return await takeQueued(feishuStartQueue, ok({ state: 'feishu-state' }));
@@ -220,9 +231,6 @@ beforeEach(() => {
     }
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
       return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
-    }
-    if (type === INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE) {
-      return await takeQueued(displaySetQueue, ok({ mode: String(payload?.mode || '') }));
     }
     if (type === 'obsidianGetSettings') {
       return ok({
@@ -273,7 +281,7 @@ describe('Settings scoped refresh', () => {
     expect(callsOf('githubGetSettings')).toHaveLength(1);
     expect(storageMocks.get).toHaveBeenCalledTimes(2);
     const storageReads = storageMocks.get.mock.calls.map(([keys]) => keys as string[]);
-    const bulkRead = storageReads.find((keys) => keys.includes('notion_parent_page_id'))!;
+    const bulkRead = storageReads.find((keys) => keys.includes('ai_chat_auto_save_enabled'))!;
     const displayRead = storageReads.find((keys) => keys.includes('inpage_display_mode'))!;
     expect(bulkRead).not.toContain('inpage_display_mode');
     expect(bulkRead).not.toContain('anti_hotlink_rules_v1');
@@ -324,30 +332,27 @@ describe('Settings scoped refresh', () => {
     expect(latestSnapshot!.inpageDisplayMode).toBe('off');
   });
 
-  it('display action uses the background route, supports same-value-no-wake fallback, and rejects stale responses', async () => {
+  it('display action uses the canonical service and rejects stale responses', async () => {
     storageState = { inpage_display_mode: 'all' };
     await renderController();
     await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
-    expect(callsOf(INPAGE_MESSAGE_TYPES.SET_DISPLAY_MODE)).toHaveLength(1);
-    expect(storageMocks.set).not.toHaveBeenCalledWith(
-      expect.objectContaining({ inpage_display_mode: expect.anything() }),
-    );
+    expect(storageMocks.set).toHaveBeenCalledWith({ inpage_display_mode: 'off' });
     expect(latestSnapshot!.inpageDisplayMode).toBe('off');
 
-    const late = deferred<ApiResponse>();
+    const late = deferred<void>();
     displaySetQueue.push(late.promise);
     const action = begin(() => latestSnapshot!.onChangeInpageDisplayMode('all'));
     await flushReact();
     dispatchStorage({ inpage_display_mode: { oldValue: 'off', newValue: 'supported' } });
-    late.resolve(ok({ mode: 'all' }));
+    late.resolve();
     await act(async () => action);
     expect(latestSnapshot!.inpageDisplayMode).toBe('supported');
   });
 
-  it('display route failure does not report a successful UI state', async () => {
+  it('display storage failure does not report a successful UI state', async () => {
     storageState = { inpage_display_mode: 'all' };
     await renderController();
-    displaySetQueue.push({ ok: false, data: null, error: { message: 'display write failed' } });
+    displaySetQueue.push(new Error('display write failed'));
     await invoke(() => latestSnapshot!.onChangeInpageDisplayMode('off'));
     expect(latestSnapshot!.inpageDisplayMode).toBe('all');
     expect(latestSnapshot!.error).toBe('display write failed');
@@ -378,7 +383,7 @@ describe('Settings scoped refresh', () => {
     const bulkRead = deferred<Record<string, unknown>>();
     const defaultGet = storageMocks.get.getMockImplementation()!;
     storageMocks.get.mockImplementation(async (keys: string[]) => {
-      if ((keys || []).includes('notion_parent_page_id')) return await bulkRead.promise;
+      if ((keys || []).includes('ai_chat_auto_save_enabled')) return await bulkRead.promise;
       return await defaultGet(keys);
     });
 
@@ -398,7 +403,7 @@ describe('Settings scoped refresh', () => {
     const bulkRead = deferred<Record<string, unknown>>();
     const defaultGet = storageMocks.get.getMockImplementation()!;
     storageMocks.get.mockImplementation(async (keys: string[]) => {
-      if ((keys || []).includes('notion_parent_page_id')) return await bulkRead.promise;
+      if ((keys || []).includes('ai_chat_auto_save_enabled')) return await bulkRead.promise;
       return await defaultGet(keys);
     });
 
@@ -499,7 +504,7 @@ describe('Settings scoped refresh', () => {
 
     await invoke(() => {
       latestSnapshot!.setFeishuClientId('feishu-app');
-      latestSnapshot!.setFeishuClientSecret('secret');
+      latestSnapshot!.onChangeFeishuClientSecret('secret');
     });
     await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
     expect(latestSnapshot!.pollingFeishu).toBe(true);
@@ -561,10 +566,8 @@ describe('Settings scoped refresh', () => {
   });
 
   it('mount with durable historical pending shows Waiting without starting a polling timer', async () => {
-    storageState = {
-      notion_oauth_pending_state: 'historical-notion',
-      feishu_oauth_pending_state: 'historical-feishu',
-    };
+    storageState = { notion_oauth_pending_state: 'historical-notion' };
+    feishuStatus = { connected: false, pending: true, errorPresent: false };
     vi.useFakeTimers();
     await renderController();
 
@@ -593,10 +596,10 @@ describe('Settings scoped refresh', () => {
     await act(async () => sameStateAction);
     expect(latestSnapshot!.pollingNotion).toBe(true);
 
-    storageState = {
-      feishu_oauth_client_id: 'feishu-app',
-      feishu_oauth_client_secret: 'secret',
-    };
+    await invoke(() => {
+      latestSnapshot!.setFeishuClientId('feishu-app');
+      latestSnapshot!.onChangeFeishuClientSecret('secret');
+    });
     const newerPending = deferred<ApiResponse>();
     feishuStartQueue.push(newerPending.promise);
     const staleAction = begin(() => latestSnapshot!.onFeishuConnectOrDisconnect());
@@ -631,10 +634,10 @@ describe('Settings scoped refresh', () => {
     expect(latestSnapshot!.pollingNotion).toBe(false);
     expect(latestSnapshot!.notionStatusText).toBe('statusNotConnected');
 
-    storageState = {
-      feishu_oauth_client_id: 'feishu-app',
-      feishu_oauth_client_secret: 'secret',
-    };
+    await invoke(() => {
+      latestSnapshot!.setFeishuClientId('feishu-app');
+      latestSnapshot!.onChangeFeishuClientSecret('secret');
+    });
     const tokenTerminal = deferred<ApiResponse>();
     feishuStartQueue.push(tokenTerminal.promise);
     const feishuAction = begin(() => latestSnapshot!.onFeishuConnectOrDisconnect());

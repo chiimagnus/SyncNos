@@ -18,7 +18,6 @@ export const OBSIDIAN_DEFAULTS = Object.freeze({
 });
 
 type SaveSettingsInput = {
-  enabled?: boolean;
   apiBaseUrl?: unknown;
   apiKey?: unknown;
   authHeaderName?: unknown;
@@ -76,7 +75,6 @@ export async function getObsidianSettings() {
   return {
     apiBaseUrl,
     authHeaderName,
-    apiKey,
     apiKeyPresent: !!apiKey,
     chatFolder,
     articleFolder,

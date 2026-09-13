@@ -70,7 +70,7 @@ type SyncMaintenanceSurface = {
 
 export type NotionSyncOrchestrator = SyncOwnershipSurface &
   SyncMaintenanceSurface & {
-    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
+    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string; jobId?: string }) => Promise<unknown>;
     getSyncJobStatus: () => Promise<unknown>;
     clearSyncJobStatus: () => Promise<unknown>;
   };
@@ -80,6 +80,7 @@ export type ObsidianSyncOrchestrator = SyncOwnershipSurface & {
     conversationIds?: unknown[];
     forceFullConversationIds?: unknown[];
     instanceId: string;
+    jobId?: string;
   }) => Promise<unknown>;
   getSyncStatus: () => Promise<unknown>;
   clearSyncStatus: () => Promise<unknown>;
@@ -88,7 +89,7 @@ export type ObsidianSyncOrchestrator = SyncOwnershipSurface & {
 
 export type FeishuSyncOrchestrator = SyncOwnershipSurface &
   SyncMaintenanceSurface & {
-    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
+    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string; jobId?: string }) => Promise<unknown>;
     getSyncStatus: () => Promise<unknown>;
     clearSyncStatus: () => Promise<unknown>;
   };

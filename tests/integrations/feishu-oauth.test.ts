@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearFeishuOAuthAttemptAndToken,
+  getFeishuOAuthAttemptSummary,
+  getFeishuOAuthConfigSummary,
   getFeishuOAuthDefaults,
   handleFeishuOAuthCallbackNavigation,
   refreshFeishuOAuthToken,
@@ -128,6 +130,15 @@ function authConfig(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function seedAuthConfig(overrides: Record<string, unknown> = {}) {
+  const config = authConfig(overrides);
+  Object.assign(chromeMock.__store, {
+    [CLIENT_ID_KEY]: config.clientId,
+    [CLIENT_SECRET_KEY]: config.clientSecret,
+    [PROXY_KEY]: config.tokenExchangeProxyUrl,
+  });
+}
+
 function token(accessToken: string, refreshToken = `${accessToken}-refresh`): FeishuOAuthTokenV1 {
   return { accessToken, refreshToken, expiresAt: 1, createdAt: 1 };
 }
@@ -144,11 +155,12 @@ beforeEach(() => {
 });
 
 describe('Feishu OAuth owner', () => {
-  it('starts with secure state after persisting immutable config and pending state', async () => {
+  it('starts from durable config and persists only the pending attempt state', async () => {
+    seedAuthConfig();
     const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
-    const started = await startFeishuOAuthAttempt(authConfig());
+    const started = await startFeishuOAuthAttempt();
 
-    expect(getSpy).not.toHaveBeenCalled();
+    expect(getSpy).toHaveBeenCalledTimes(1);
     expect(started.state).toMatch(/^[0-9a-f]{32}$/);
     expect(chromeMock.__store).toMatchObject({
       [CLIENT_ID_KEY]: 'app-id',
@@ -170,8 +182,29 @@ describe('Feishu OAuth owner', () => {
     expect(opened.searchParams.get('state')).toBe(started.state);
   });
 
+  it('exposes safe config/attempt summaries without raw secret, state, or error text', async () => {
+    seedAuthConfig();
+    chromeMock.__store[PENDING_KEY] = 'raw-state';
+    chromeMock.__store[ERROR_KEY] = 'raw-error';
+
+    const config = await getFeishuOAuthConfigSummary();
+    const attempt = await getFeishuOAuthAttemptSummary();
+
+    expect(config).toEqual({
+      clientId: 'app-id',
+      clientSecretPresent: true,
+      tokenExchangeProxyUrl: '',
+    });
+    expect(config).not.toHaveProperty('clientSecret');
+    expect(attempt).toEqual({ pending: true, errorPresent: true });
+    expect(JSON.stringify({ config, attempt })).not.toContain('raw-state');
+    expect(JSON.stringify({ config, attempt })).not.toContain('raw-error');
+    expect(JSON.stringify({ config, attempt })).not.toContain('app-secret');
+  });
+
   it('requires the exact redirect and current state even for OAuth errors', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
     const { redirectUri } = getFeishuOAuthDefaults();
 
     expect(
@@ -186,7 +219,8 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('atomically records a current OAuth error and terminates only that attempt', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
 
     expect(
       await handleFeishuOAuthCallbackNavigation({
@@ -201,7 +235,8 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('does not clear a current attempt when its terminal OAuth error snapshot cannot be persisted', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
     chromeMock.failNextStorageSet();
 
     await expect(
@@ -217,7 +252,8 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('atomically commits a current token, terminates the attempt, and closes the callback tab', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
 
     expect(
       await handleFeishuOAuthCallbackNavigation(
@@ -243,7 +279,8 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('does not persist a token or close the callback tab when the terminal success snapshot fails', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
     chromeMock.failNextStorageSet();
 
     await expect(
@@ -265,7 +302,8 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('keeps pending on a config no-op and invalidates it before a real config change', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
 
     await saveFeishuOAuthConfig(authConfig());
     expect(chromeMock.__store[PENDING_KEY]).toBe(state);
@@ -298,7 +336,8 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('uses the callback precheck config snapshot and rejects its result after config changes', async () => {
-    const { state } = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const { state } = await startFeishuOAuthAttempt();
     const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body || '{}'));
       expect(body).toMatchObject({ client_id: 'app-id', client_secret: 'app-secret', code: 'code-1' });
@@ -317,10 +356,11 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('does not let stale success or stale failure mutate a newer attempt', async () => {
-    const first = await startFeishuOAuthAttempt(authConfig());
+    seedAuthConfig();
+    const first = await startFeishuOAuthAttempt();
     let newerState = '';
     const successFetch = vi.fn(async () => {
-      newerState = (await startFeishuOAuthAttempt(authConfig())).state;
+      newerState = (await startFeishuOAuthAttempt()).state;
       return jsonResponse({ access_token: 'old-success', refresh_token: 'old-refresh', expires_in: 60 });
     });
     await handleFeishuOAuthCallbackNavigation(
@@ -333,7 +373,7 @@ describe('Feishu OAuth owner', () => {
     const second = newerState;
     let latestState = '';
     const failureFetch = vi.fn(async () => {
-      latestState = (await startFeishuOAuthAttempt(authConfig())).state;
+      latestState = (await startFeishuOAuthAttempt()).state;
       throw new Error('old exchange failed');
     });
     await handleFeishuOAuthCallbackNavigation(
@@ -395,13 +435,14 @@ describe('Feishu OAuth owner', () => {
   });
 
   it('rolls back pending state when tab creation fails and the queue remains usable', async () => {
+    seedAuthConfig();
     chromeMock.failNextTabCreate();
-    await expect(startFeishuOAuthAttempt(authConfig())).rejects.toThrow('tabs create failed');
+    await expect(startFeishuOAuthAttempt()).rejects.toThrow('tabs create failed');
     expect(chromeMock.__store[PENDING_KEY]).toBeUndefined();
 
     const saved = await saveFeishuOAuthConfig(authConfig({ clientId: 'after-failure' }));
     expect(saved.clientId).toBe('after-failure');
-    const next = await startFeishuOAuthAttempt(authConfig({ clientId: 'after-failure' }));
+    const next = await startFeishuOAuthAttempt();
     expect(chromeMock.__store[PENDING_KEY]).toBe(next.state);
   });
 });

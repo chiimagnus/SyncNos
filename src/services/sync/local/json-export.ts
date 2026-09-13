@@ -1,5 +1,5 @@
-import { getConversationDetail } from '@services/conversations/client/repo';
-import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import { getConversationDetail as getConversationDetailFromClient } from '@services/conversations/client/repo';
+import type { Conversation, ConversationDetail, ConversationMessage } from '@services/conversations/domain/models';
 import {
   ARTICLE_KIND_ID,
   CHAT_KIND_ID,
@@ -251,10 +251,14 @@ async function buildJsonItem(input: {
   throw new Error(`Unsupported conversation kind: ${String(kindId || 'unknown')}`);
 }
 
+export type JsonConversationDetailLoader = (conversationId: number) => Promise<ConversationDetail>;
+
 export async function buildConversationsJsonZipExport({
   conversations,
+  loadConversationDetail = getConversationDetailFromClient,
 }: {
   conversations: Conversation[];
+  loadConversationDetail?: JsonConversationDetailLoader;
 }): Promise<{ zipBlob: Blob; filename: string }> {
   if (!conversations.length) throw new Error('No conversations selected');
 
@@ -266,7 +270,7 @@ export async function buildConversationsJsonZipExport({
   for (const conversation of conversations) {
     const conversationId = conversation.id;
     if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('Invalid conversation id');
-    const detail = await getConversationDetail(conversationId);
+    const detail = await loadConversationDetail(conversationId);
     if (detail.conversationId !== conversationId) throw new Error('conversation detail returned a mismatched id');
     const basename = claimUniqueConversationExportBasename(conversation, usedBasenames);
     const built = await buildJsonItem({ conversation, messages: detail.messages, basename, nextAttachmentIndex });

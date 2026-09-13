@@ -1,6 +1,12 @@
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncRunSummary } from '@services/sync/models';
 import { normalizeSyncConversationId, normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
+export function createSyncJobId(now: number | (() => number) = Date.now): string {
+  const rawStartedAt = typeof now === 'function' ? now() : now;
+  const startedAt = Number.isFinite(rawStartedAt) ? Math.trunc(rawStartedAt) : Date.now();
+  return `${startedAt}_${Math.random().toString(16).slice(2)}`;
+}
+
 type SyncJobResultInput = Record<string, any> & {
   conversationId: number;
   conversationTitle?: unknown;

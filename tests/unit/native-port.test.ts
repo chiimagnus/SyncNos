@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  canConnectNativeHost,
   detectNativeMessagingBrowserFamily,
   readExtensionRuntimeMetadata,
 } from '@platform/native-messaging/native-port';
@@ -38,13 +37,6 @@ describe('Native Messaging browser metadata', () => {
     expect(detectNativeMessagingBrowserFamily()).toBe(expected);
   });
 
-  it('keeps the CLI bridge unavailable for unsupported browser families even if connectNative exists', () => {
-    setUserAgent('Mozilla/5.0 Version/18.6 Safari/605.1.15');
-    (globalThis as any).browser = undefined;
-    (globalThis as any).chrome = { runtime: { connectNative() {} } };
-    expect(canConnectNativeHost()).toBe(false);
-  });
-
   it('returns extension metadata for a supported Chromium runtime', () => {
     setUserAgent('Mozilla/5.0 Chrome/152.0 Safari/537.36');
     (globalThis as any).browser = undefined;
@@ -60,5 +52,19 @@ describe('Native Messaging browser metadata', () => {
       extensionVersion: '1.2.3',
       browserFamily: 'chromium',
     });
+  });
+
+  it('does not hide a broken runtime manifest read behind empty metadata', () => {
+    setUserAgent('Mozilla/5.0 Chrome/152.0 Safari/537.36');
+    (globalThis as any).browser = undefined;
+    (globalThis as any).chrome = {
+      runtime: {
+        id: 'extension-id',
+        getManifest: () => {
+          throw new Error('extension context invalidated');
+        },
+      },
+    };
+    expect(() => readExtensionRuntimeMetadata()).toThrow('extension context invalidated');
   });
 });

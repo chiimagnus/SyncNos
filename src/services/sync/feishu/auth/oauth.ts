@@ -109,6 +109,18 @@ async function readAuthConfig(): Promise<FeishuOAuthConfig> {
   };
 }
 
+export async function getFeishuOAuthConfigSummary(): Promise<FeishuOAuthConfigSummary> {
+  return toSafeConfigSummary(await readAuthConfig());
+}
+
+export async function getFeishuOAuthAttemptSummary(): Promise<{ pending: boolean; errorPresent: boolean }> {
+  const values = await storageGet([KEY_PENDING_STATE, KEY_LAST_ERROR]);
+  return {
+    pending: !!safeString(values?.[KEY_PENDING_STATE]),
+    errorPresent: !!safeString(values?.[KEY_LAST_ERROR]),
+  };
+}
+
 function configEquals(left: FeishuOAuthConfig, right: FeishuOAuthConfig): boolean {
   return (
     left.clientId === right.clientId &&
@@ -178,15 +190,14 @@ export async function saveFeishuOAuthConfig(input: FeishuOAuthConfigInput): Prom
   });
 }
 
-export async function startFeishuOAuthAttempt(input: FeishuOAuthConfigInput): Promise<{ state: string }> {
-  const config = normalizeAuthConfigInput(input);
-  validateStartConfig(config);
-
+export async function startFeishuOAuthAttempt(): Promise<{ state: string }> {
   return enqueueAuthMutation(async () => {
+    const config = await readAuthConfig();
+    validateStartConfig(config);
     const state = createSecureOAuthState();
     const authorizationUrl = buildAuthorizationUrl(config, state);
 
-    await storageSet({ ...authConfigStoragePatch(config), [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
+    await storageSet({ [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
     try {
       await tabsCreate({ url: authorizationUrl, active: true });
     } catch (error) {

@@ -1,21 +1,16 @@
 import { buildAiOptions } from '@services/sync/notion/notion-ai.ts';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
 import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract.ts';
-import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
+import {
+  cacheNotionManagedDatabaseId,
+  getNotionDatabaseId,
+  resetNotionDatabaseId,
+} from '@services/sync/notion/settings-store';
 
 const SEARCH_PAGE_SIZE = 100;
 
-async function getCachedDatabaseId(storageKey: string) {
-  const res = await storageGet([storageKey]);
-  return String((res as any)?.[storageKey] || '');
-}
-
-async function setCachedDatabaseId(storageKey: string, databaseId: string) {
-  await storageSet({ [storageKey]: databaseId });
-}
-
-async function clearCachedDatabaseId(storageKey: string) {
-  await storageRemove([storageKey]);
+async function clearCachedDatabaseId(kindId: string) {
+  await resetNotionDatabaseId(kindId);
 }
 
 function isUsableDatabase(database: any): boolean {
@@ -189,27 +184,29 @@ async function ensureDatabaseSchema({
 async function ensureDatabase({
   accessToken,
   parentPageId,
+  kindId,
   dbSpec,
 }: {
   accessToken: string;
   parentPageId: string;
+  kindId: string;
   dbSpec: ConversationKindDbSpec;
 }) {
-  const cached = await getCachedDatabaseId(dbSpec.storageKey);
+  const cached = await getNotionDatabaseId(kindId);
   if (cached) {
     try {
       const db = await getDatabase(accessToken, cached);
       if (!isUsableDatabase(db)) {
-        await clearCachedDatabaseId(dbSpec.storageKey);
+        await clearCachedDatabaseId(kindId);
       } else if (!matchesParentPage(db, parentPageId)) {
-        await clearCachedDatabaseId(dbSpec.storageKey);
+        await clearCachedDatabaseId(kindId);
       } else {
         await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec });
         return { databaseId: cached, title: dbSpec.title, reused: true, database: db };
       }
     } catch (error) {
       if (isMissingDatabaseError(error)) {
-        await clearCachedDatabaseId(dbSpec.storageKey);
+        await clearCachedDatabaseId(kindId);
       } else {
         throw error;
       }
@@ -225,14 +222,14 @@ async function ensureDatabase({
     return normalizeTitle(title) === wantedTitle;
   });
   if (exact && exact.id) {
-    await setCachedDatabaseId(dbSpec.storageKey, exact.id);
+    await cacheNotionManagedDatabaseId(kindId, exact.id);
     await ensureDatabaseSchema({ accessToken, databaseId: exact.id, dbSpec });
     return { databaseId: exact.id, title: dbSpec.title, reused: true, database: exact };
   }
 
   const created = await createDatabase(accessToken, { parentPageId, dbSpec });
   if (!created || !created.id) throw new Error('create database failed');
-  await setCachedDatabaseId(dbSpec.storageKey, created.id);
+  await cacheNotionManagedDatabaseId(kindId, created.id);
   return { databaseId: created.id, title: dbSpec.title, reused: false, database: created };
 }
 

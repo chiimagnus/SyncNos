@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { AUTO_SYNC_CONVERSATION_CHANGED_REASONS } from '@services/sync/auto-sync/auto-sync-keys';
 
 const storageMocks = vi.hoisted(() => ({
   deleteConversationsByIds: vi.fn(),
@@ -33,7 +34,12 @@ vi.mock('@services/conversations/data/storage', () => ({
   upsertConversation: storageMocks.upsertConversation,
 }));
 
-function createRouter() {
+function createRouter(
+  deps: {
+    onConversationChanged?: ReturnType<typeof vi.fn>;
+    onRemoteCleanupPending?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
       ok: false,
@@ -42,8 +48,8 @@ function createRouter() {
     }),
   });
   registerConversationHandlers(router as any, {
-    onConversationChanged: async () => {},
-    onRemoteCleanupPending: async () => {},
+    onConversationChanged: deps.onConversationChanged || (async () => {}),
+    onRemoteCleanupPending: deps.onRemoteCleanupPending || (async () => {}),
   });
   return router;
 }
@@ -163,6 +169,7 @@ describe('conversations pagination handlers', () => {
 
   it('routes canonical URL updates and preserves stable storage error codes', async () => {
     storageMocks.updateConversationUrlById.mockResolvedValueOnce({
+      status: 'updated',
       conversationId: 7,
       url: 'https://example.com/new',
       source: 'web',
@@ -170,8 +177,12 @@ describe('conversations pagination handlers', () => {
       changed: true,
       merged: false,
       removedConversationId: null,
+      conflictConversationId: null,
+      mergeSummary: null,
     });
-    const router = createRouter();
+    const onConversationChanged = vi.fn(async () => {});
+    const onRemoteCleanupPending = vi.fn(async () => {});
+    const router = createRouter({ onConversationChanged, onRemoteCleanupPending });
     const ok = await router.dispatch({
       type: 'updateConversationUrl',
       conversationId: 7,
@@ -184,25 +195,66 @@ describe('conversations pagination handlers', () => {
       url: 'https://example.com/new#fragment',
       mergeExisting: false,
     });
-
-    storageMocks.updateConversationUrlById.mockRejectedValueOnce(
-      Object.assign(new Error('article URL already belongs to another conversation'), {
-        code: 'conversation_url_conflict',
-        extra: { conflictingConversationId: 9 },
-      }),
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenLastCalledWith(
+      7,
+      AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
     );
+    expect(onRemoteCleanupPending).toHaveBeenCalledTimes(1);
+
+    storageMocks.updateConversationUrlById.mockResolvedValueOnce({
+      status: 'conflict',
+      conversationId: 7,
+      url: 'https://example.com/target',
+      source: 'web',
+      conversationKey: 'article:https://example.com/target',
+      changed: false,
+      merged: false,
+      removedConversationId: null,
+      conflictConversationId: 9,
+      mergeSummary: null,
+    });
     const conflict = await router.dispatch({
       type: 'updateConversationUrl',
       conversationId: 7,
       url: 'https://example.com/target',
     });
     expect(conflict).toMatchObject({
-      ok: false,
-      error: {
-        message: 'article URL already belongs to another conversation',
-        extra: { code: 'conversation_url_conflict', conflictingConversationId: 9 },
+      ok: true,
+      data: { status: 'conflict', conflictConversationId: 9, changed: false },
+    });
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenCalledTimes(1);
+    expect(onRemoteCleanupPending).toHaveBeenCalledTimes(1);
+
+    storageMocks.updateConversationUrlById.mockResolvedValueOnce({
+      status: 'updated',
+      conversationId: 7,
+      url: 'https://example.com/target',
+      source: 'web',
+      conversationKey: 'article:https://example.com/target',
+      changed: true,
+      merged: true,
+      removedConversationId: 9,
+      conflictConversationId: null,
+      mergeSummary: {
+        keptConversationId: 7,
+        removedConversationId: 9,
+        movedMessages: 2,
+        movedImageCache: 1,
+        merged: true,
       },
     });
+    const merged = await router.dispatch({
+      type: 'updateConversationUrl',
+      conversationId: 7,
+      url: 'https://example.com/target',
+      mergeExisting: true,
+    });
+    expect(merged).toMatchObject({ ok: true, data: { status: 'updated', merged: true } });
+    await Promise.resolve();
+    expect(onConversationChanged).toHaveBeenLastCalledWith(7, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.mergeConversation);
+    expect(onRemoteCleanupPending).toHaveBeenCalledTimes(2);
   });
 
   it('routes conversation search with normalized filters and bounded limit', async () => {

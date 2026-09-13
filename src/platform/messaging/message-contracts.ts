@@ -22,6 +22,9 @@ export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
   START_AUTH: 'notionStartAuth',
   DISCONNECT: 'notionDisconnect',
+  GET_CONFIG: 'notionGetConfig',
+  SAVE_CONFIG: 'notionSaveConfig',
+  RESET_DATABASE_ID: 'notionResetDatabaseId',
   LIST_PARENT_PAGES: 'listNotionParentPages',
   SYNC_CONVERSATIONS: 'notionSyncConversations',
   GET_SYNC_JOB_STATUS: 'getNotionSyncJobStatus',
@@ -39,8 +42,11 @@ export const OBSIDIAN_MESSAGE_TYPES = {
 
 export const FEISHU_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getFeishuAuthStatus',
+  GET_AUTH_CONFIG: 'feishuGetAuthConfig',
   START_AUTH: 'feishuStartAuth',
   SAVE_AUTH_CONFIG: 'feishuSaveAuthConfig',
+  GET_PATH_CONFIG: 'feishuGetPathConfig',
+  SAVE_PATH_CONFIG: 'feishuSavePathConfig',
   DISCONNECT: 'feishuDisconnect',
   SYNC_CONVERSATIONS: 'feishuSyncConversations',
   GET_SYNC_STATUS: 'getFeishuSyncStatus',
@@ -67,8 +73,15 @@ export const ARTICLE_MESSAGE_TYPES = {
   RESOLVE_OR_CAPTURE_ACTIVE_TAB: 'resolveOrCaptureActiveTabArticle',
 } as const;
 
-export const INPAGE_MESSAGE_TYPES = {
-  SET_DISPLAY_MODE: 'setInpageDisplayMode',
+export const SETTINGS_MESSAGE_TYPES = {
+  GET: 'getPublicSetting',
+  SET: 'setPublicSetting',
+  SCHEMA: 'getPublicSettingsSchema',
+} as const;
+
+export const OPEN_TARGET_MESSAGE_TYPES = {
+  RESOLVE: 'resolveOpenTarget',
+  LAUNCH: 'launchOpenTarget',
 } as const;
 
 export const CHATGPT_MESSAGE_TYPES = {
@@ -114,7 +127,8 @@ export const messageContracts = {
   FEISHU_MESSAGE_TYPES,
   GITHUB_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
-  INPAGE_MESSAGE_TYPES,
+  SETTINGS_MESSAGE_TYPES,
+  OPEN_TARGET_MESSAGE_TYPES,
   CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
@@ -129,7 +143,8 @@ export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof O
 export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISHU_MESSAGE_TYPES];
 export type GithubMessageType = (typeof GITHUB_MESSAGE_TYPES)[keyof typeof GITHUB_MESSAGE_TYPES];
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
-export type InpageMessageType = (typeof INPAGE_MESSAGE_TYPES)[keyof typeof INPAGE_MESSAGE_TYPES];
+export type SettingsMessageType = (typeof SETTINGS_MESSAGE_TYPES)[keyof typeof SETTINGS_MESSAGE_TYPES];
+export type OpenTargetMessageType = (typeof OPEN_TARGET_MESSAGE_TYPES)[keyof typeof OPEN_TARGET_MESSAGE_TYPES];
 export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
 export type ItemMentionMessageType = (typeof ITEM_MENTION_MESSAGE_TYPES)[keyof typeof ITEM_MENTION_MESSAGE_TYPES];
@@ -144,7 +159,8 @@ export type MessageType =
   | FeishuMessageType
   | GithubMessageType
   | ArticleMessageType
-  | InpageMessageType
+  | SettingsMessageType
+  | OpenTargetMessageType
   | ChatgptMessageType
   | CurrentPageMessageType
   | ItemMentionMessageType

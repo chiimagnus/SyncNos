@@ -1,6 +1,7 @@
 import { GITHUB_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
+import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { describe, expect, it, vi } from 'vitest';
 
 function deferred<T>() {
@@ -69,16 +70,17 @@ function createRouter(githubSyncOrchestrator: any, instanceId = 'github-backgrou
 }
 
 describe('background-router github sync routes', () => {
-  it('uses gate, live-owner fast reject and ignores durable running residue for admission', async () => {
+  it('uses gate, canonical owner rejection and ignores durable running residue for admission', async () => {
     const store: Record<string, unknown> = { webclipper_sync_provider_github_enabled: false };
     installStorage(store);
     const blocker = deferred<unknown>();
+    const ownership = createSyncRunOwnership();
     let job: any = null;
     const githubSyncOrchestrator = {
       getSyncStatus: vi.fn(async () => ({ provider: 'github', job })),
       clearSyncStatus: vi.fn(async () => ({ provider: 'github', job: null })),
-      sync: vi.fn(async () => await blocker.promise),
-      isRunActive: vi.fn(() => false),
+      sync: vi.fn(() => ownership.startRun(async () => await blocker.promise)),
+      isRunActive: ownership.isRunActive,
     };
     const router = createRouter(githubSyncOrchestrator);
 
@@ -98,10 +100,13 @@ describe('background-router github sync routes', () => {
     });
     expect(started).toMatchObject({ ok: true, data: { started: true, provider: 'github' } });
     expect(githubSyncOrchestrator.getSyncStatus).not.toHaveBeenCalled();
+    const startedJobId = String(started.data?.jobId || '');
+    expect(startedJobId).toMatch(/^\d+_[0-9a-f]+$/);
     expect(githubSyncOrchestrator.sync).toHaveBeenCalledWith({
       conversationIds: [1, 2],
       mode: 'reconcile',
       instanceId: 'github-background-instance',
+      jobId: startedJobId,
     });
 
     const concurrent = await router.dispatch({
@@ -110,7 +115,7 @@ describe('background-router github sync routes', () => {
     });
     expect(concurrent.ok).toBe(false);
     expect(concurrent.error?.extra?.code).toBe('sync_already_running');
-    expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(1);
+    expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(2);
 
     blocker.resolve({ summary: { syncedCount: 2, failedCount: 0 } });
     await blocker.promise;
@@ -123,7 +128,7 @@ describe('background-router github sync routes', () => {
     });
     expect(residueRun).toMatchObject({ ok: true, data: { started: true, provider: 'github' } });
     expect(githubSyncOrchestrator.getSyncStatus).not.toHaveBeenCalled();
-    expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(2);
+    expect(githubSyncOrchestrator.sync).toHaveBeenCalledTimes(3);
   });
 
   it('delegates status and clear through the production sync contract', async () => {

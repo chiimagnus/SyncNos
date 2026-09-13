@@ -1,7 +1,34 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
+const fileMocks = vi.hoisted(() => ({
+  prepareMarkdownExport: vi.fn(),
+  prepareJsonExport: vi.fn(),
+  prepareBackupExport: vi.fn(),
+  importBackupBlob: vi.fn(),
+}));
+
+vi.mock('@services/cli/file-operations', () => ({
+  prepareMarkdownExport: (...args: unknown[]) => fileMocks.prepareMarkdownExport(...args),
+  prepareJsonExport: (...args: unknown[]) => fileMocks.prepareJsonExport(...args),
+  prepareBackupExport: (...args: unknown[]) => fileMocks.prepareBackupExport(...args),
+  importBackupBlob: (...args: unknown[]) => fileMocks.importBackupBlob(...args),
+}));
+
 import { startCliNativeBridge } from '@services/cli/native-bridge';
-import { CORE_MESSAGE_TYPES, DATA_REVISION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  COMMENTS_MESSAGE_TYPES,
+  CORE_MESSAGE_TYPES,
+  DATA_REVISION_MESSAGE_TYPES,
+  FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
+  ITEM_MENTION_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+  OBSIDIAN_MESSAGE_TYPES,
+  OPEN_TARGET_MESSAGE_TYPES,
+  SETTINGS_MESSAGE_TYPES,
+  UI_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 
 function createPort() {
   const posted: any[] = [];
@@ -282,9 +309,9 @@ describe('CLI Native Messaging bridge', () => {
       dispatch: vi.fn(async (message: any) => {
         if (message.type === CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_URL && message.url.includes('conflict')) {
           return {
-            ok: false,
-            data: null,
-            error: { message: 'conflict', extra: { code: 'conversation_url_conflict', conflictingConversationId: 9 } },
+            ok: true,
+            data: { status: 'conflict', conflictConversationId: 9, changed: false },
+            error: null,
           };
         }
         return { ok: true, data: { echoedType: message.type }, error: null };
@@ -319,7 +346,7 @@ describe('CLI Native Messaging bridge', () => {
       await emit('u2', 'conversation.update-url', { conversationId: 7, url: 'https://example.com/conflict' }),
     ).toMatchObject({
       ok: false,
-      error: { code: 'conversation_url_conflict' },
+      error: { code: 'url_conflict', extra: { conflictConversationId: 9 } },
     });
     await emit('m1', 'conversation.merge', { keepConversationId: 7, removeConversationId: 9 });
     expect(router.dispatch).toHaveBeenCalledWith(
@@ -340,6 +367,55 @@ describe('CLI Native Messaging bridge', () => {
       },
       null,
     );
+    harness.controller.stop();
+  });
+
+  it('maps capture.current-page only to the unified active-tab capture handler and exposes the stable result shape', async () => {
+    const router = {
+      dispatch: vi.fn(async () => ({
+        ok: true,
+        data: {
+          kind: 'video',
+          label: 'Video',
+          collectorId: 'video:bilibili',
+          conversationId: 77,
+          isNew: true,
+          title: 'Example',
+          subtitleStatus: 'ok',
+          url: 'https://example.com/should-not-leak',
+          debugTranscript: 'should-not-leak',
+        },
+        error: null,
+      })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'capture-1',
+      method: 'capture.current-page',
+      params: {},
+    });
+    await waitForPosted(harness, 2);
+
+    expect(router.dispatch).toHaveBeenCalledWith({ type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE }, null);
+    expect(harness.fakePort.posted[1]).toEqual({
+      kind: 'rpc-response',
+      protocolVersion: 1,
+      requestId: 'capture-1',
+      ok: true,
+      data: {
+        kind: 'video',
+        label: 'Video',
+        collectorId: 'video:bilibili',
+        conversationId: 77,
+        isNew: true,
+        title: 'Example',
+        subtitleStatus: 'ok',
+      },
+      error: null,
+    });
     harness.controller.stop();
   });
 
@@ -367,43 +443,324 @@ describe('CLI Native Messaging bridge', () => {
 
     await emit('c-list', 'comments.list', { conversationId: 7 });
     expect(router.dispatch).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        type: 'listArticleComments',
-        conversationId: 7,
-        canonicalUrl: 'https://example.com/article',
-      }),
+      { type: COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, conversationId: 7 },
       null,
     );
+    expect(router.dispatch.mock.calls.at(-1)?.[0]).not.toHaveProperty('canonicalUrl');
 
-    await emit('c-add', 'comments.add', { conversationId: 7, text: 'plain root' });
+    await emit('c-add', 'comments.add', {
+      conversationId: 7,
+      text: 'plain root',
+      authorName: 'spoofed-cli-author',
+    });
     const addMessage = router.dispatch.mock.calls.at(-1)?.[0];
-    expect(addMessage).toMatchObject({
-      type: 'addArticleComment',
+    expect(addMessage).toEqual({
+      type: COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT,
       conversationId: 7,
       canonicalUrl: 'https://example.com/article',
+      quoteText: '',
       commentText: 'plain root',
+      locator: null,
     });
-    expect(addMessage).not.toHaveProperty('locator');
+    expect(addMessage).not.toHaveProperty('authorName');
 
     await emit('c-reply', 'comments.reply', { conversationId: 7, parentId: 3, text: 'plain reply' });
     const replyMessage = router.dispatch.mock.calls.at(-1)?.[0];
-    expect(replyMessage).toMatchObject({
-      type: 'addArticleComment',
+    expect(replyMessage).toEqual({
+      type: COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT,
       conversationId: 7,
-      parentId: 3,
+      canonicalUrl: 'https://example.com/article',
+      quoteText: '',
       commentText: 'plain reply',
+      locator: null,
+      parentId: 3,
     });
-    expect(replyMessage).not.toHaveProperty('locator');
 
-    await emit('c-delete', 'comments.delete', { conversationId: 7, commentId: 9 });
+    const callsBeforeDelete = router.dispatch.mock.calls.length;
+    await emit('c-delete', 'comments.delete', { commentId: 9 });
+    expect(router.dispatch.mock.calls.length).toBe(callsBeforeDelete + 1);
     expect(router.dispatch).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: 'deleteArticleComment', conversationId: 7, commentId: 9 }),
+      { type: COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, id: 9 },
       null,
     );
     harness.controller.stop();
   });
 
-  it('maps mention search/build to the existing bounded mention handlers', async () => {
+  it('preserves comment domain failures and rejects non-article or invalid comment input before mutation', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        if (message.type === CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID) {
+          if (message.conversationId === 8) {
+            return { ok: true, data: { id: 8, sourceType: 'chat', url: 'https://example.com/chat' }, error: null };
+          }
+          if (message.conversationId === 9) {
+            return { ok: true, data: { id: 9, sourceType: 'article', url: 'not-a-url' }, error: null };
+          }
+          return {
+            ok: true,
+            data: { id: message.conversationId, sourceType: 'article', url: 'https://example.com/article' },
+            error: null,
+          };
+        }
+        if (message.type === COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT && message.parentId === 3) {
+          return { ok: false, data: null, error: { message: 'parent_not_root', extra: null } };
+        }
+        return { ok: true, data: {}, error: null };
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    const emit = async (requestId: string, method: string, params: Record<string, unknown>) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    expect(await emit('empty-comment', 'comments.add', { conversationId: 7, text: '   ' })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument' },
+    });
+    expect(router.dispatch).not.toHaveBeenCalled();
+
+    expect(await emit('not-article', 'comments.add', { conversationId: 8, text: 'hello' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_article_conversation' },
+    });
+    expect(await emit('bad-url', 'comments.add', { conversationId: 9, text: 'hello' })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_conversation_url' },
+    });
+    expect(await emit('bad-parent', 'comments.reply', { conversationId: 7, parentId: 3, text: 'reply' })).toMatchObject(
+      {
+        ok: false,
+        error: { code: 'parent_not_root' },
+      },
+    );
+    harness.controller.stop();
+  });
+
+  it('maps open resolve/launch only by conversation id and provider without forwarding arbitrary URLs', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => ({ ok: true, data: { echoed: message }, error: null })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    const emit = async (requestId: string, method: string, params: Record<string, unknown> = {}) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    await emit('open-resolve-all', 'open.resolve', { conversationId: 7, url: 'javascript:alert(1)' });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: OPEN_TARGET_MESSAGE_TYPES.RESOLVE, conversationId: 7 },
+      null,
+    );
+
+    await emit('open-resolve-one', 'open.resolve', {
+      conversationId: 7,
+      target: 'github',
+      url: 'https://attacker.example/',
+    });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: OPEN_TARGET_MESSAGE_TYPES.RESOLVE, conversationId: 7, target: 'github' },
+      null,
+    );
+
+    await emit('open-launch', 'open.launch', {
+      conversationId: 9,
+      target: 'notion',
+      url: 'https://attacker.example/',
+      resolvedNotePath: '/tmp/attacker.md',
+    });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: OPEN_TARGET_MESSAGE_TYPES.LAUNCH, conversationId: 9, target: 'notion' },
+      null,
+    );
+
+    harness.controller.stop();
+  });
+
+  it('maps settings schema/get/set to the public settings handlers without adding a second key registry', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => ({ ok: true, data: { echoed: message }, error: null })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    const emit = async (requestId: string, method: string, params: Record<string, unknown> = {}) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    await emit('settings-schema', 'settings.schema');
+    expect(router.dispatch).toHaveBeenLastCalledWith({ type: SETTINGS_MESSAGE_TYPES.SCHEMA }, null);
+
+    await emit('settings-get-all', 'settings.get');
+    expect(router.dispatch).toHaveBeenLastCalledWith({ type: SETTINGS_MESSAGE_TYPES.GET }, null);
+
+    await emit('settings-get-one', 'settings.get', { key: 'theme.mode' });
+    expect(router.dispatch).toHaveBeenLastCalledWith({ type: SETTINGS_MESSAGE_TYPES.GET, key: 'theme.mode' }, null);
+
+    await emit('settings-set', 'settings.set', { key: 'capture.ai-chat-auto-save', value: false });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: SETTINGS_MESSAGE_TYPES.SET, key: 'capture.ai-chat-auto-save', value: false },
+      null,
+    );
+
+    harness.controller.stop();
+  });
+
+  it('streams export RPC bytes only through file frames and returns metadata after the final ACK', async () => {
+    fileMocks.prepareMarkdownExport.mockReset();
+    fileMocks.prepareMarkdownExport.mockResolvedValue({
+      blob: new Blob(['abcdef']),
+      suggestedFilename: 'selected.zip',
+      metadata: { format: 'markdown', conversationCount: 2 },
+    });
+    const router = { dispatch: vi.fn() };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      method: 'export.markdown',
+      params: { conversationIds: [7, 9] },
+    });
+    await waitForPosted(harness, 2);
+    const begin = harness.fakePort.posted[1];
+    expect(begin).toMatchObject({
+      kind: 'file-begin',
+      requestId: 'file-export',
+      direction: 'extension-to-host',
+      totalBytes: 6,
+      suggestedFilename: 'selected.zip',
+    });
+    expect(fileMocks.prepareMarkdownExport).toHaveBeenCalledWith([7, 9]);
+    expect(router.dispatch).not.toHaveBeenCalled();
+
+    harness.fakePort.emitMessage({
+      kind: 'file-ack',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      transferId: begin.transferId,
+      seq: -1,
+    });
+    await waitForPosted(harness, 3);
+    const chunk = harness.fakePort.posted[2];
+    expect(chunk).toMatchObject({ kind: 'file-chunk', requestId: 'file-export', seq: 0 });
+    expect(Buffer.from(chunk.data, 'base64').toString('utf8')).toBe('abcdef');
+    harness.fakePort.emitMessage({
+      kind: 'file-ack',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      transferId: begin.transferId,
+      seq: 0,
+    });
+    await waitForPosted(harness, 4);
+    const end = harness.fakePort.posted[3];
+    expect(end).toMatchObject({
+      kind: 'file-end',
+      requestId: 'file-export',
+      seq: 1,
+      totalBytes: 6,
+      sha256: createHash('sha256').update('abcdef').digest('hex'),
+    });
+    harness.fakePort.emitMessage({
+      kind: 'file-ack',
+      protocolVersion: 1,
+      requestId: 'file-export',
+      transferId: begin.transferId,
+      seq: 1,
+    });
+    await waitForPosted(harness, 5);
+    const response = harness.fakePort.posted[4];
+    expect(response).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'file-export',
+      ok: true,
+      data: {
+        format: 'markdown',
+        conversationCount: 2,
+        suggestedFilename: 'selected.zip',
+        byteSize: 6,
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain('YWJjZGVm');
+    harness.controller.stop();
+  });
+
+  it('receives a verified backup Blob before invoking the canonical importer', async () => {
+    fileMocks.importBackupBlob.mockReset();
+    fileMocks.importBackupBlob.mockResolvedValue({ conversationsAdded: 1, messagesAdded: 2 });
+    const router = { dispatch: vi.fn() };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      method: 'backup.import',
+      params: {},
+    });
+    const bytes = Buffer.from('zip-bytes');
+    const transferId = 'host-upload';
+    harness.fakePort.emitMessage({
+      kind: 'file-begin',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      transferId,
+      direction: 'host-to-extension',
+      totalBytes: bytes.length,
+      suggestedFilename: 'restore.zip',
+      metadata: {},
+    });
+    await waitForPosted(harness, 2);
+    expect(harness.fakePort.posted[1]).toMatchObject({ kind: 'file-ack', requestId: 'file-import', seq: -1 });
+    expect(fileMocks.importBackupBlob).not.toHaveBeenCalled();
+
+    harness.fakePort.emitMessage({
+      kind: 'file-chunk',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      transferId,
+      seq: 0,
+      data: bytes.toString('base64'),
+    });
+    await waitForPosted(harness, 3);
+    expect(fileMocks.importBackupBlob).not.toHaveBeenCalled();
+    harness.fakePort.emitMessage({
+      kind: 'file-end',
+      protocolVersion: 1,
+      requestId: 'file-import',
+      transferId,
+      seq: 1,
+      totalBytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+    await waitForPosted(harness, 5);
+    expect(harness.fakePort.posted[3]).toMatchObject({ kind: 'file-ack', requestId: 'file-import', seq: 1 });
+    expect(fileMocks.importBackupBlob).toHaveBeenCalledTimes(1);
+    const importedBlob = fileMocks.importBackupBlob.mock.calls[0]?.[0] as Blob;
+    expect(Buffer.from(await importedBlob.arrayBuffer())).toEqual(bytes);
+    expect(harness.fakePort.posted[4]).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'file-import',
+      ok: true,
+      data: { conversationsAdded: 1, messagesAdded: 2, byteSize: bytes.length },
+    });
+    harness.controller.stop();
+  });
+
+  it('maps empty/non-empty mention search and build to the existing bounded mention handlers', async () => {
     const router = {
       dispatch: vi.fn(async (message: any) => ({ ok: true, data: { type: message.type }, error: null })),
     };
@@ -418,19 +775,216 @@ describe('CLI Native Messaging bridge', () => {
     });
     await waitForPosted(harness, 2);
     expect(router.dispatch).toHaveBeenCalledWith(
-      { type: 'searchItemMentionCandidates', query: 'mcp', limit: 20 },
+      { type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, query: 'mcp', limit: 20 },
       null,
     );
 
     harness.fakePort.emitMessage({
       kind: 'rpc-request',
       protocolVersion: 1,
-      requestId: 'mention-insert',
+      requestId: 'mention-recent',
+      method: 'mention.search',
+      params: { query: '', limit: 10 },
+    });
+    await waitForPosted(harness, 3);
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES, query: '', limit: 10 },
+      null,
+    );
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'mention-build',
       method: 'mention.build-insert-text',
       params: { conversationId: 42 },
     });
+    await waitForPosted(harness, 4);
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, conversationId: 42 },
+      null,
+    );
+    harness.controller.stop();
+  });
+
+  it('maps provider-safe config/auth RPCs and generic sync RPCs without leaking OAuth state', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        switch (message.type) {
+          case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS:
+            return {
+              ok: true,
+              data: { connected: false, workspaceName: '', pending: true, errorPresent: false },
+              error: null,
+            };
+          case NOTION_MESSAGE_TYPES.START_AUTH:
+            return { ok: true, data: { state: 'raw-notion-oauth-state' }, error: null };
+          case FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG:
+            return {
+              ok: true,
+              data: { clientId: 'app-id', clientSecretPresent: true, tokenExchangeProxyUrl: '' },
+              error: null,
+            };
+          case FEISHU_MESSAGE_TYPES.GET_PATH_CONFIG:
+            return {
+              ok: true,
+              data: { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' },
+              error: null,
+            };
+          case FEISHU_MESSAGE_TYPES.START_AUTH:
+            return { ok: true, data: { state: 'raw-feishu-oauth-state' }, error: null };
+          case OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS:
+            return {
+              ok: true,
+              data: {
+                apiBaseUrl: 'http://127.0.0.1:27123',
+                authHeaderName: 'Authorization',
+                apiKeyPresent: true,
+                apiKeyMasked: '********************************',
+                chatFolder: 'Chats',
+                articleFolder: 'Articles',
+                videoFolder: 'Videos',
+              },
+              error: null,
+            };
+          case GITHUB_MESSAGE_TYPES.GET_SETTINGS:
+            return {
+              ok: true,
+              data: {
+                auth: { state: 'pending', userCode: 'ABCD-EFGH', verificationUri: 'https://github.com/login/device' },
+                settings: { repository: 'owner/repo', branch: 'main' },
+              },
+              error: null,
+            };
+          case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS:
+            return { ok: true, data: { started: true, provider: 'notion', jobId: 'job-1' }, error: null };
+          case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS:
+            return {
+              ok: true,
+              data: { provider: 'notion', active: true, job: { id: 'job-1', status: 'running' } },
+              error: null,
+            };
+          default:
+            return { ok: false, data: null, error: { message: 'unexpected message', extra: null } };
+        }
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    const emit = async (requestId: string, method: string, params: Record<string, unknown> = {}) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      expect(harness.fakePort.posted.length).toBe(before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    expect(await emit('notion-status', 'notion.auth.status')).toMatchObject({
+      ok: true,
+      data: { connected: false, pending: true, errorPresent: false },
+    });
+    const notionStart = await emit('notion-start', 'notion.auth.start');
+    expect(notionStart).toMatchObject({ ok: true, data: { started: true, browserOpened: true } });
+    expect(JSON.stringify(notionStart)).not.toContain('raw-notion-oauth-state');
+
+    const feishuConfig = await emit('feishu-config', 'feishu.config.get');
+    expect(feishuConfig).toMatchObject({
+      ok: true,
+      data: {
+        auth: { clientId: 'app-id', clientSecretPresent: true, tokenExchangeProxyUrl: '' },
+        paths: { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' },
+      },
+    });
+    expect(JSON.stringify(feishuConfig)).not.toContain('clientSecret"');
+    const feishuStart = await emit('feishu-start', 'feishu.auth.start');
+    expect(JSON.stringify(feishuStart)).not.toContain('raw-feishu-oauth-state');
+
+    const obsidianConfig = await emit('obsidian-config', 'obsidian.config.get');
+    expect(obsidianConfig).toMatchObject({ ok: true, data: { apiKeyPresent: true } });
+    expect(obsidianConfig.data).not.toHaveProperty('apiKey');
+
+    expect(await emit('github-auth', 'github.auth.status')).toMatchObject({
+      ok: true,
+      data: { state: 'pending', userCode: 'ABCD-EFGH' },
+    });
+
+    expect(await emit('sync-start', 'sync.start', { provider: 'notion', conversationIds: [7, 9] })).toMatchObject({
+      ok: true,
+      data: { started: true, provider: 'notion', jobId: 'job-1' },
+    });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, conversationIds: [7, 9] },
+      null,
+    );
+    expect(await emit('sync-status', 'sync.status', { provider: 'notion' })).toMatchObject({
+      ok: true,
+      data: { provider: 'notion', active: true, job: { id: 'job-1', status: 'running' } },
+    });
+    expect(await emit('sync-invalid', 'sync.status', { provider: 'dropbox' })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument' },
+    });
+    harness.controller.stop();
+  });
+
+  it('returns response_too_large for an oversized conversation.get and keeps the same Native Port usable', async () => {
+    const oversizedBody = 'x'.repeat(64 * 1024 * 1024);
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        if (message.type === CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID) {
+          return {
+            ok: true,
+            data: { id: 77, source: 'chatgpt', conversationKey: 'oversized', lastActivityAt: 1 },
+            error: null,
+          };
+        }
+        if (message.type === CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL) {
+          return {
+            ok: true,
+            data: {
+              conversationId: 77,
+              messages: [{ messageKey: 'huge', role: 'assistant', contentMarkdown: oversizedBody, sequence: 1 }],
+            },
+            error: null,
+          };
+        }
+        return { ok: false, data: null, error: { message: 'unexpected message', extra: null } };
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'oversized-get',
+      method: 'conversation.get',
+      params: { conversationId: 77 },
+    });
+    await waitForPosted(harness, 2);
+    expect(harness.fakePort.posted[1]).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'oversized-get',
+      ok: false,
+      error: { code: 'response_too_large' },
+    });
+    expect(harness.fakePort.disconnect).not.toHaveBeenCalled();
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'after-oversized-get',
+      method: 'system.ping',
+      params: {},
+    });
     await waitForPosted(harness, 3);
-    expect(router.dispatch).toHaveBeenCalledWith({ type: 'buildItemMentionInsertText', conversationId: 42 }, null);
+    expect(harness.fakePort.posted[2]).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'after-oversized-get',
+      ok: true,
+      data: { alive: true },
+    });
+    expect(harness.fakePort.disconnect).not.toHaveBeenCalled();
     harness.controller.stop();
   });
 
@@ -452,7 +1006,10 @@ describe('CLI Native Messaging bridge', () => {
       params: { query: '' },
     });
     await waitForPosted(harness, 2);
-    expect(harness.fakePort.posted[1]).toMatchObject({ ok: false, error: { code: 'invalid_argument' } });
+    expect(harness.fakePort.posted[1]).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument', extra: { code: 'INVALID_ARGUMENT', field: 'query' } },
+    });
     harness.controller.stop();
   });
 

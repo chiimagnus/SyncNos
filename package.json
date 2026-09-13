@@ -16,6 +16,8 @@
     "check": "npm run build && node .github/scripts/webclipper/check-dist.mjs --root=.output/chrome-mv3",
     "test": "vitest run",
     "cli:dev": "node cli/syncnos.mjs",
+    "cli:pack": "node cli/package.mjs",
+    "cli:check": "node cli/package.mjs --check",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",

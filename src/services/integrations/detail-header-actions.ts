@@ -15,7 +15,11 @@ import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integ
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import { reportObsidianOpenError, waitForDelay } from '@services/integrations/openin/obsidian-open-target';
 import { resolveOpenInDetailHeaderActions } from '@services/integrations/openin/openin-detail-header-actions';
-import { normalizeHttpUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
+import {
+  launchOpenTargetByConversationId,
+  resolveSourceOpenTarget,
+} from '@services/integrations/openin/openin-targets';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 
 export { DETAIL_HEADER_ACTION_LABELS } from '@services/integrations/openin/openin-detail-header-actions';
 export type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
@@ -66,7 +70,8 @@ function buildDetailUtilityActions({
 }): DetailHeaderAction[] {
   const matchingDetail =
     conversation && detail && Number(detail.conversationId) === Number(conversation.id) ? detail : null;
-  const safeOriginalUrl = sanitizeHttpUrl(conversation?.url);
+  const sourceTarget = resolveSourceOpenTarget(conversation);
+  const safeOriginalUrl = sourceTarget.available ? String(sourceTarget.target || '') : '';
 
   return [
     {
@@ -92,9 +97,16 @@ function buildDetailUtilityActions({
       disabled: !safeOriginalUrl,
       ...(safeOriginalUrl ? { href: safeOriginalUrl } : null),
       onTrigger: async () => {
-        if (!safeOriginalUrl) throw new Error(t('actionFailedFallback'));
-        const opened = await port.openExternalUrl(safeOriginalUrl);
-        if (!opened) throw new Error(t('actionFailedFallback'));
+        const conversationId = Number(conversation?.id);
+        if (!safeOriginalUrl || !Number.isSafeInteger(conversationId) || conversationId <= 0) {
+          throw new Error(t('actionFailedFallback'));
+        }
+        const result = await launchOpenTargetByConversationId({
+          conversationId,
+          target: 'source',
+          port: { openExternalUrl: port.openExternalUrl },
+        });
+        if (!result.ok) throw new Error(t('actionFailedFallback'));
       },
     },
   ];

@@ -5,7 +5,7 @@ import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { exportBackupZip } from '@services/sync/backup/export';
 import * as backupUtils from '@services/sync/backup/backup-utils.ts';
 
-describe('backup zip v2 schema', () => {
+describe('backup zip schema', () => {
   it('validateStorageLocalDocument rejects invalid shapes', () => {
     expect(backupUtils.validateStorageLocalDocument(null).ok).toBe(false);
     expect(backupUtils.validateStorageLocalDocument({ schemaVersion: 2, storageLocal: {} }).ok).toBe(false);
@@ -18,17 +18,21 @@ describe('backup zip v2 schema', () => {
   it('validateBackupManifest rejects unknown version and duplicate files', () => {
     const base = {
       exportedAt: new Date().toISOString(),
-      db: { name: 'webclipper', version: 3 },
-      counts: { conversations: 1, messages: 1, sync_mappings: 0 },
+      db: { name: 'webclipper', version: 13 },
+      counts: { conversations: 2, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
       config: { storageLocalPath: 'config/storage-local.json' },
       index: { conversationsCsvPath: 'sources/conversations.csv' },
+      assets: {
+        imageCacheIndexPath: 'assets/image-cache/index.json',
+        articleCommentsIndexPath: 'assets/article-comments/index.json',
+      },
     };
 
     expect(backupUtils.validateBackupManifest({ ...base, backupSchemaVersion: 999, sources: [] }).ok).toBe(false);
 
     const dup = backupUtils.validateBackupManifest({
       ...base,
-      backupSchemaVersion: 2,
+      backupSchemaVersion: 3,
       sources: [
         { source: 'chatgpt', conversationCount: 2, files: ['sources/chatgpt/a.json', 'sources/chatgpt/a.json'] },
       ],
@@ -38,13 +42,17 @@ describe('backup zip v2 schema', () => {
 
   it('validateBackupManifest rejects unsafe file paths', () => {
     const res = backupUtils.validateBackupManifest({
-      backupSchemaVersion: 2,
+      backupSchemaVersion: 3,
       exportedAt: new Date().toISOString(),
-      db: { name: 'webclipper', version: 3 },
-      counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+      db: { name: 'webclipper', version: 13 },
+      counts: { conversations: 1, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
       config: { storageLocalPath: 'config/storage-local.json' },
       index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [{ source: 'chatgpt', conversationCount: 1, files: ['../sources/chatgpt/a.json'] }],
+      assets: {
+        imageCacheIndexPath: 'assets/image-cache/index.json',
+        articleCommentsIndexPath: 'assets/article-comments/index.json',
+      },
     });
     expect(res.ok).toBe(false);
   });

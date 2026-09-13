@@ -795,10 +795,8 @@ export function ConversationsProvider({
       const conversationId = Number((convo as any)?.id);
       if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('invalid conversation id');
 
-      try {
-        await updateConversationUrl(conversationId, nextUrl, false);
-      } catch (error: any) {
-        if (String(error?.code || '') !== 'conversation_url_conflict') throw error;
+      const first = await updateConversationUrl(conversationId, nextUrl, false);
+      if (first.status === 'conflict') {
         const confirmed =
           typeof globalThis.window?.confirm === 'function'
             ? globalThis.window.confirm(
@@ -806,7 +804,8 @@ export function ConversationsProvider({
               )
             : true;
         if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
-        await updateConversationUrl(conversationId, nextUrl, true);
+        const merged = await updateConversationUrl(conversationId, nextUrl, true);
+        if (merged.status !== 'updated') throw new Error('URL merge did not complete');
       }
 
       if (Number(activeIdRef.current) === conversationId) {

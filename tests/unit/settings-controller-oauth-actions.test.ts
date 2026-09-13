@@ -63,6 +63,7 @@ let root: ReactDOM.Root | null = null;
 let dom: JSDOM | null = null;
 let notionConnected = false;
 let feishuConnected = false;
+let feishuSafeConfig = { clientId: '', clientSecretPresent: false, tokenExchangeProxyUrl: '' };
 let storageState: Record<string, unknown> = {};
 
 const ok = (data: any): ApiResponse => ({ ok: true, data, error: null });
@@ -119,6 +120,7 @@ beforeEach(() => {
   latestSnapshot = null;
   notionConnected = false;
   feishuConnected = false;
+  feishuSafeConfig = { clientId: '', clientSecretPresent: false, tokenExchangeProxyUrl: '' };
   storageState = {};
   uiUtilsMocks.openHttpUrl.mockReturnValue(true);
 
@@ -135,17 +137,35 @@ beforeEach(() => {
   });
   storageMocks.onChanged.mockImplementation(() => () => {});
 
-  runtimeMocks.send.mockImplementation(async (type: string) => {
+  runtimeMocks.send.mockImplementation(async (type: string, payload?: Record<string, unknown>) => {
     if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS) {
       return ok({ connected: notionConnected, workspaceName: notionConnected ? 'Workspace' : '' });
     }
     if (type === NOTION_MESSAGE_TYPES.START_AUTH) return ok({ state: 'background-state' });
     if (type === NOTION_MESSAGE_TYPES.DISCONNECT) return ok({ disconnected: true });
-    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) return ok({ connected: feishuConnected });
+    if (type === NOTION_MESSAGE_TYPES.GET_CONFIG) {
+      return ok({ parentPageId: '', parentPageTitle: '', databaseIds: { chat: '', article: '', video: '' } });
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) {
+      return ok({ connected: feishuConnected, pending: false, errorPresent: false });
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG) return ok(feishuSafeConfig);
     if (type === FEISHU_MESSAGE_TYPES.START_AUTH) return ok({ state: 'feishu-background-state' });
     if (type === FEISHU_MESSAGE_TYPES.DISCONNECT) return ok({ disconnected: true });
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
-      return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
+      const input = payload || {};
+      feishuSafeConfig = {
+        clientId: Object.prototype.hasOwnProperty.call(input, 'clientId')
+          ? String(input.clientId || '')
+          : feishuSafeConfig.clientId,
+        clientSecretPresent: Object.prototype.hasOwnProperty.call(input, 'clientSecret')
+          ? !!String(input.clientSecret || '')
+          : feishuSafeConfig.clientSecretPresent,
+        tokenExchangeProxyUrl: Object.prototype.hasOwnProperty.call(input, 'tokenExchangeProxyUrl')
+          ? String(input.tokenExchangeProxyUrl || '')
+          : feishuSafeConfig.tokenExchangeProxyUrl,
+      };
+      return ok(feishuSafeConfig);
     }
     if (type === 'obsidianGetSettings') {
       return ok({
@@ -239,24 +259,21 @@ describe('Settings OAuth actions', () => {
     expect(latestSnapshot!.pollingNotion).toBe(false);
   });
 
-  it('Feishu Connect delegates START_AUTH to background without direct auth storage writes or URL opening', async () => {
-    storageState = {
-      feishu_oauth_client_id: 'feishu-app',
-      feishu_oauth_client_secret: 'feishu-secret',
-      feishu_oauth_token_exchange_proxy_url: '',
-    };
+  it('Feishu Connect persists only safe config fields then starts auth from durable config', async () => {
+    feishuSafeConfig = { clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' };
     await renderController();
     storageMocks.set.mockClear();
     uiUtilsMocks.openHttpUrl.mockClear();
 
     await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
 
-    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(1);
-    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)[0]?.[1]).toEqual({
+    expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)).toHaveLength(1);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)[0]?.[1]).toEqual({
       clientId: 'feishu-app',
-      clientSecret: 'feishu-secret',
       tokenExchangeProxyUrl: '',
     });
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(1);
+    expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)[0]?.[1]).toEqual({});
     expect(storageMocks.set).not.toHaveBeenCalledWith(
       expect.objectContaining({ feishu_oauth_pending_state: expect.anything() }),
     );
@@ -264,6 +281,8 @@ describe('Settings OAuth actions', () => {
       expect.objectContaining({ feishu_oauth_client_id: expect.anything() }),
     );
     expect(uiUtilsMocks.openHttpUrl).not.toHaveBeenCalled();
+    expect(latestSnapshot!.feishuClientSecret).toBe('');
+    expect(latestSnapshot!.feishuClientSecretPresent).toBe(true);
     expect(latestSnapshot!.feishuPendingState).toBe('feishu-background-state');
     expect(latestSnapshot!.pollingFeishu).toBe(true);
     expect(latestSnapshot!.feishuStatusText).toBe('statusWaiting');
@@ -271,11 +290,7 @@ describe('Settings OAuth actions', () => {
 
   it('rejects duplicate Feishu START while waiting and allows retry after the 60s UI timeout', async () => {
     vi.useFakeTimers();
-    storageState = {
-      feishu_oauth_client_id: 'feishu-app',
-      feishu_oauth_client_secret: 'feishu-secret',
-      feishu_oauth_token_exchange_proxy_url: '',
-    };
+    feishuSafeConfig = { clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' };
     await renderController();
 
     await invoke(() => latestSnapshot!.onFeishuConnectOrDisconnect());
@@ -292,12 +307,8 @@ describe('Settings OAuth actions', () => {
     expect(callsOf(FEISHU_MESSAGE_TYPES.START_AUTH)).toHaveLength(2);
   });
 
-  it('Feishu Advanced Save delegates SAVE_AUTH_CONFIG without direct auth config writes', async () => {
-    storageState = {
-      feishu_oauth_client_id: 'feishu-app',
-      feishu_oauth_client_secret: 'feishu-secret',
-      feishu_oauth_token_exchange_proxy_url: '',
-    };
+  it('Feishu Advanced Save preserves an existing secret when the write-only draft was not edited', async () => {
+    feishuSafeConfig = { clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' };
     await renderController();
     storageMocks.set.mockClear();
 
@@ -306,7 +317,6 @@ describe('Settings OAuth actions', () => {
     expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)).toHaveLength(1);
     expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)[0]?.[1]).toEqual({
       clientId: 'feishu-app',
-      clientSecret: 'feishu-secret',
       tokenExchangeProxyUrl: '',
     });
     expect(storageMocks.set).not.toHaveBeenCalledWith(
@@ -316,6 +326,30 @@ describe('Settings OAuth actions', () => {
       expect.objectContaining({ feishu_oauth_client_secret: expect.anything() }),
     );
     expect(latestSnapshot!.feishuClientId).toBe('feishu-app');
+    expect(latestSnapshot!.feishuClientSecret).toBe('');
+    expect(latestSnapshot!.feishuClientSecretPresent).toBe(true);
+  });
+
+  it('Feishu sends a client secret only after the user edits the write-only draft, and reset explicitly clears it', async () => {
+    feishuSafeConfig = { clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' };
+    await renderController();
+    runtimeMocks.send.mockClear();
+
+    await invoke(() => latestSnapshot!.onChangeFeishuClientSecret('replacement-secret'));
+    await invoke(() => latestSnapshot!.onSaveFeishuAdvancedSettings());
+
+    expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)[0]?.[1]).toEqual({
+      clientId: 'feishu-app',
+      clientSecret: 'replacement-secret',
+      tokenExchangeProxyUrl: '',
+    });
+    expect(latestSnapshot!.feishuClientSecret).toBe('');
+    expect(latestSnapshot!.feishuClientSecretPresent).toBe(true);
+
+    runtimeMocks.send.mockClear();
+    await invoke(() => latestSnapshot!.onResetFeishuClientSecret());
+    expect(callsOf(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG)[0]?.[1]).toEqual({ clientSecret: '' });
+    expect(latestSnapshot!.feishuClientSecretPresent).toBe(false);
   });
 
   it('Feishu Disconnect resets local state without triggering a full Settings refresh', async () => {

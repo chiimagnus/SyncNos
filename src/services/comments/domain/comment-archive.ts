@@ -4,7 +4,6 @@ import { parseArticleCommentDto, type ArticleCommentDto } from '@services/commen
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
-export const ARTICLE_COMMENT_ARCHIVE_SCHEMA_V1 = 1;
 export const ARTICLE_COMMENT_ARCHIVE_SCHEMA_V2 = 2;
 export const ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA = ARTICLE_COMMENT_ARCHIVE_SCHEMA_V2;
 
@@ -35,7 +34,7 @@ export type ArticleCommentArchiveItem = {
 };
 
 export type ArticleCommentsArchiveDocument = {
-  schemaVersion: 1 | 2;
+  schemaVersion: typeof ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA;
   comments: ArticleCommentArchiveItem[];
 };
 
@@ -56,17 +55,13 @@ export type ArticleCommentArchiveSerialization = {
 };
 
 export type CommentArchiveWarning = {
-  code: 'v1_missing_author' | 'v1_missing_locator' | 'orphan_parent' | 'duplicate_comment_id';
+  code: 'duplicate_comment_id';
   commentId?: number;
 };
 
 export type ArticleCommentArchiveValidation =
   | { ok: true; error: ''; document: ArticleCommentsArchiveDocument; warnings: CommentArchiveWarning[] }
   | { ok: false; error: string; document: null; warnings: CommentArchiveWarning[] };
-
-function own(object: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(object, key);
-}
 
 function positiveInt(value: unknown): number | null {
   const number = Number(value);
@@ -93,7 +88,7 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
     return fail('Article comments index is not an object', warnings);
   const input = value as Record<string, unknown>;
   const schemaVersion = Number(input.schemaVersion);
-  if (schemaVersion !== ARTICLE_COMMENT_ARCHIVE_SCHEMA_V1 && schemaVersion !== ARTICLE_COMMENT_ARCHIVE_SCHEMA_V2) {
+  if (schemaVersion !== ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA) {
     return fail('Unsupported article comments schemaVersion', warnings);
   }
   if (!Array.isArray(input.comments)) return fail('Missing article comments list', warnings);
@@ -134,9 +129,7 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
     if (updatedAt == null) return fail('Invalid article comment updatedAt', warnings);
 
     let authorName: string | null = null;
-    if (schemaVersion === ARTICLE_COMMENT_ARCHIVE_SCHEMA_V1 && !own(row, 'authorName')) {
-      warnings.push({ code: 'v1_missing_author', commentId });
-    } else if (row.authorName != null) {
+    if (row.authorName != null) {
       const author = boundedString(row.authorName, COMMENT_ARCHIVE_BUDGET.author);
       if (author == null) return fail('Invalid article comment authorName', warnings);
       authorName = author.trim() || null;
@@ -151,9 +144,7 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
     if (Boolean(importSource) !== Boolean(importKey)) return fail('Invalid article comment import identity', warnings);
 
     let locator: ArticleCommentLocator | null = null;
-    if (schemaVersion === ARTICLE_COMMENT_ARCHIVE_SCHEMA_V1 && !own(row, 'locator')) {
-      warnings.push({ code: 'v1_missing_locator', commentId });
-    } else if (row.locator != null) {
+    if (row.locator != null) {
       const parsed = parseArticleCommentLocator(row.locator);
       if (!parsed.ok) return fail(`Invalid article comment locator: ${parsed.reason}`, warnings);
       locator = parsed.value;
@@ -192,10 +183,7 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
   for (const item of comments) {
     if (item.parentCommentId == null) continue;
     const parent = byId.get(item.parentCommentId);
-    if (!parent) {
-      warnings.push({ code: 'orphan_parent', commentId: item.commentId });
-      continue;
-    }
+    if (!parent) return fail('Article comment parent missing', warnings);
     if (parent.parentCommentId != null) return fail('Article comment parent must be a root', warnings);
     if (parent.canonicalUrl !== item.canonicalUrl || parent.uniqueKey !== item.uniqueKey) {
       return fail('Article comment parent context mismatch', warnings);
@@ -221,7 +209,7 @@ export function validateArticleCommentArchiveDocument(value: unknown): ArticleCo
   return {
     ok: true,
     error: '',
-    document: { schemaVersion: schemaVersion as 1 | 2, comments },
+    document: { schemaVersion: ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA, comments },
     warnings,
   };
 }
@@ -327,11 +315,12 @@ export function prepareArticleCommentArchiveImport(value: unknown): PreparedArti
   const repliesByRoot = new Map<number, ArticleCommentArchiveItem[]>();
 
   for (const item of validation.document.comments) {
-    const parent = item.parentCommentId == null ? null : (byId.get(item.parentCommentId) ?? null);
-    if (!parent) {
-      roots.push({ ...item, parentCommentId: null });
+    if (item.parentCommentId == null) {
+      roots.push(item);
       continue;
     }
+    const parent = byId.get(item.parentCommentId);
+    if (!parent) throw new Error('Article comment parent missing');
     const replies = repliesByRoot.get(parent.commentId) ?? [];
     replies.push(item);
     repliesByRoot.set(parent.commentId, replies);

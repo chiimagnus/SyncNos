@@ -1,6 +1,6 @@
-import { getConversationDetail } from '@services/conversations/client/repo';
+import { getConversationDetail as getConversationDetailFromClient } from '@services/conversations/client/repo';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
-import type { Conversation } from '@services/conversations/domain/models';
+import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import {
@@ -8,10 +8,14 @@ import {
   materializeConversationMarkdownAssets,
 } from '@services/sync/local/export-shared';
 
+export type ConversationDetailLoader = (conversationId: number) => Promise<ConversationDetail>;
+
 export async function buildConversationsMarkdownZipExport({
   conversations,
+  loadConversationDetail = getConversationDetailFromClient,
 }: {
   conversations: Conversation[];
+  loadConversationDetail?: ConversationDetailLoader;
 }): Promise<{ zipBlob: Blob; filename: string }> {
   if (!conversations.length) throw new Error('No conversations selected');
 
@@ -23,7 +27,7 @@ export async function buildConversationsMarkdownZipExport({
   for (const conversation of conversations) {
     const conversationId = conversation.id;
     if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('Invalid conversation id');
-    const detail = await getConversationDetail(conversationId);
+    const detail = await loadConversationDetail(conversationId);
     if (detail.conversationId !== conversationId) throw new Error('conversation detail returned a mismatched id');
     const basename = claimUniqueConversationExportBasename(conversation, usedBasenames);
     const result = await materializeConversationMarkdownAssets({

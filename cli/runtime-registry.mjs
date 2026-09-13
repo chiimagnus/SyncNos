@@ -6,9 +6,11 @@ import { basename, join } from 'node:path';
 import process from 'node:process';
 
 export const DARWIN_UNIX_SOCKET_PATH_MAX_BYTES = 103;
+export const LINUX_UNIX_SOCKET_PATH_MAX_BYTES = 107;
 const RUNTIME_DIR_PREFIX = 'sn-';
 const REGISTRY_SUFFIX = '.json';
 const SOCKET_SUFFIX = '.sock';
+const WINDOWS_PIPE_PREFIX = '\\\\.\\pipe\\syncnos-cli-';
 
 function errorWithCode(code, message) {
   const error = new Error(message || code);
@@ -37,23 +39,32 @@ export function validatePrivateDirectoryStat(stat, expectedUid = process.getuid?
 export async function ensureRuntimeDir({ root = tmpdir(), uid = process.getuid?.() } = {}) {
   const effectiveUid = Number.isInteger(uid) ? uid : 0;
   const path = join(root, `${RUNTIME_DIR_PREFIX}${effectiveUid}`);
+  const isWindows = process.platform === 'win32';
   try {
-    await mkdir(path, { mode: 0o700 });
+    await mkdir(path, isWindows ? {} : { mode: 0o700 });
   } catch (error) {
     if (error?.code !== 'EEXIST') throw error;
   }
   const stat = await lstat(path);
   validatePrivateDirectoryStat(stat, uid);
-  await chmod(path, 0o700);
+  if (!isWindows) await chmod(path, 0o700);
   return path;
 }
 
-export function socketPathForInstance(runtimeDir, cliInstanceId) {
-  const path = join(runtimeDir, `${runtimeInstanceHash(cliInstanceId)}${SOCKET_SUFFIX}`);
-  if (Buffer.byteLength(path, 'utf8') > DARWIN_UNIX_SOCKET_PATH_MAX_BYTES) {
-    throw errorWithCode('socket_path_too_long', 'CLI Unix socket path exceeds the macOS limit');
+export function socketPathForInstance(runtimeDir, cliInstanceId, { platform = process.platform } = {}) {
+  const hash = runtimeInstanceHash(cliInstanceId);
+  if (platform === 'win32') return `${WINDOWS_PIPE_PREFIX}${hash}`;
+  const path = join(runtimeDir, `${hash}${SOCKET_SUFFIX}`);
+  const maxBytes = platform === 'darwin' ? DARWIN_UNIX_SOCKET_PATH_MAX_BYTES : LINUX_UNIX_SOCKET_PATH_MAX_BYTES;
+  if (Buffer.byteLength(path, 'utf8') > maxBytes) {
+    throw errorWithCode('socket_path_too_long', 'CLI Unix socket path exceeds the platform limit');
   }
   return path;
+}
+
+export function isWindowsNamedPipeEndpoint(endpoint) {
+  const value = String(endpoint || '');
+  return value.startsWith('\\\\.\\pipe\\') || value.startsWith('\\\\?\\pipe\\');
 }
 
 export function registryPathForInstance(runtimeDir, cliInstanceId) {
@@ -77,11 +88,12 @@ export async function readRegistryEntry(path) {
 export async function writeRegistryEntry(path, entry) {
   const payload = `${JSON.stringify(entry)}\n`;
   const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  const isWindows = process.platform === 'win32';
   try {
-    await writeFile(tempPath, payload, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-    await chmod(tempPath, 0o600);
+    await writeFile(tempPath, payload, { encoding: 'utf8', ...(isWindows ? {} : { mode: 0o600 }), flag: 'wx' });
+    if (!isWindows) await chmod(tempPath, 0o600);
     await rename(tempPath, path);
-    await chmod(path, 0o600);
+    if (!isWindows) await chmod(path, 0o600);
   } catch (error) {
     await unlink(tempPath).catch(() => {});
     throw error;

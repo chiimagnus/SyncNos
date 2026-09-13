@@ -1,23 +1,20 @@
-# Feishu Sync Setup (WebClipper)
+# Feishu Sync Setup
 
 **English** | [中文](./DocxSync.zh.md)
 
-This guide covers the user-facing setup for syncing SyncNos WebClipper content to Feishu DocX. Runtime behavior is defined by the current source code rather than duplicated as internal module structure here.
+Use this guide to connect SyncNos to a Feishu self-built/internal app and sync local content to Feishu DocX.
 
-## Prerequisites
+## 1. Create the Feishu app
 
-- A Feishu account that can create or administer an app.
-- Content already saved locally in SyncNos WebClipper.
+Create a self-built/internal app in the Feishu Open Platform and note its App ID (Client ID).
 
-## 1. Create a Feishu app
-
-Create a self-built/internal app in the Feishu Open Platform and obtain its App ID (Client ID). Configure this OAuth redirect URL exactly:
+Set this OAuth redirect URL exactly:
 
 ```text
 https://chiimagnus.github.io/syncnos-oauth/callback
 ```
 
-The current extension requests these scopes:
+Grant these scopes:
 
 ```text
 docx:document
@@ -25,21 +22,15 @@ docx:document.block:convert
 drive:drive
 ```
 
-After changing app permissions, disconnect and reconnect SyncNos so the new token receives the updated scopes.
+If you change scopes later, disconnect and reconnect SyncNos so Feishu issues a token with the new permissions.
 
-## 2. Choose one OAuth mode
+## 2. Choose an OAuth mode
 
-### Proxy / Cloudflare Worker
+### Proxy
 
-Use this when you do not want the Feishu Client Secret stored in the browser extension. The extension sends the OAuth code or refresh token to the configured Worker; the Worker performs the token exchange with Feishu.
+Use a token-exchange Worker when you do not want the Feishu Client Secret stored in the Extension.
 
-The Worker is in:
-
-```text
-cloudflare-workers/syncnos-feishu-oauth/
-```
-
-For your own Feishu app, set `FEISHU_CLIENT_ID` in `wrangler.toml`, then store the secret and deploy:
+The repository includes a Worker in `cloudflare-workers/syncnos-feishu-oauth/`. For your own app, set `FEISHU_CLIENT_ID` in `wrangler.toml`, store the secret, and deploy:
 
 ```bash
 cd cloudflare-workers/syncnos-feishu-oauth
@@ -47,38 +38,31 @@ npx wrangler secret put FEISHU_CLIENT_SECRET
 npx wrangler deploy
 ```
 
-Use the Worker exchange endpoint as the Proxy URL:
+Set SyncNos **Proxy URL** to:
 
 ```text
 https://<your-worker-host>/feishu/oauth/exchange
 ```
 
-The refresh endpoint is the same Worker path ending in `/feishu/oauth/refresh`.
+The Worker derives refresh handling from the corresponding `/feishu/oauth/refresh` endpoint.
 
 ### Direct
 
-Use this for a self-managed app when you accept storing the Client Secret in extension-local storage. SyncNos sends token exchange/refresh requests directly to Feishu.
+Use Direct mode only when you accept storing your Feishu Client Secret in extension-local storage. SyncNos then performs token exchange/refresh directly with Feishu. The secret is excluded from SyncNos Backup ZIP files.
 
-The Client Secret is local credential data and is excluded from SyncNos backups.
+## 3. Connect SyncNos
 
-## 3. Connect WebClipper
+Open **Settings → Feishu**, enter the App ID, then configure exactly one credential path:
 
-1. Open WebClipper → `Settings` → `Feishu`.
-2. Enter the App ID / Client ID in the Feishu settings card.
-3. Choose one mode:
-   - Proxy: enter the Worker exchange URL and leave Client Secret / App Secret empty.
-   - Direct: enter Client Secret / App Secret and leave Proxy URL empty.
-4. Changes are saved when you leave the field or press Enter; the current page has no separate `Advanced` expansion step or `Save` button.
-5. Click `Connect` in the top-right corner and finish authorization in Feishu.
+- **Proxy:** Proxy URL set, Client Secret empty.
+- **Direct:** Client Secret set, Proxy URL empty.
 
-After connection, manual sync is available. If Feishu auto-sync is explicitly enabled, local content changes can also enter the provider's automatic sync queue.
+Click **Connect** and finish authorization in Feishu. Destination folders can be changed in the same settings section.
 
-Destination folders are configurable in SyncNos settings. Their current defaults are owned by the settings service rather than duplicated here.
+Manual sync is available after connection; auto-sync can be enabled separately.
 
-## 4. Validation and troubleshooting
+## Troubleshooting
 
-Verify at least one `chat`, `article`, and `video` item can sync. Also verify token refresh still works and that disconnect clears the local OAuth state.
+For `401` / `403`, verify the app scopes and reconnect. For OAuth exchange/refresh failures, check the App ID, redirect URI, app publication state, and the configured Client Secret or Worker endpoint.
 
-For `401` / `403`, check the app scopes and reconnect. For exchange or refresh failures, check the App ID, Client Secret or Worker secret, Proxy URL, app publication state, and redirect URI.
-
-Document conversion or individual image failures may produce warnings; they should not silently replace the locally saved source content.
+Local content remains the primary record when Feishu conversion, upload, or image handling fails.

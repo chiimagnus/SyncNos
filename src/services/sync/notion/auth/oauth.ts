@@ -108,6 +108,14 @@ async function readPendingState(): Promise<string> {
   return String(values?.[KEY_PENDING_STATE] || '');
 }
 
+export async function getNotionOAuthAttemptSummary(): Promise<{ pending: boolean; errorPresent: boolean }> {
+  const values = await storageGet([KEY_PENDING_STATE, KEY_LAST_ERROR]);
+  return {
+    pending: !!String(values?.[KEY_PENDING_STATE] || '').trim(),
+    errorPresent: !!String(values?.[KEY_LAST_ERROR] || '').trim(),
+  };
+}
+
 async function removeTab(tabId: number) {
   try {
     await tabsRemove(Number(tabId));

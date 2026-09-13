@@ -8,7 +8,7 @@ import {
   reusableImageCacheByteSize,
 } from '@services/conversations/data/image-cache-record';
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
-import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
   LIST_SOURCE_KEY_ALL,
@@ -26,10 +26,7 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
-import {
-  deriveConversationListStoredSiteKeyFromUrl,
-  normalizeConversationListRecord,
-} from '@platform/idb/conversation-list-record';
+import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
 import {
   DATA_REVISION_RECORD_KEY,
@@ -606,14 +603,16 @@ type ConversationMutationContext = {
   markChanged: (scope: any) => void;
 };
 
+export type MergeConversationsResult = {
+  keptConversationId: number;
+  removedConversationId: number;
+  movedMessages: number;
+  movedImageCache: number;
+  merged: boolean;
+};
+
 type MergeConversationsTransactionOutcome = {
-  result: {
-    keptConversationId: number;
-    removedConversationId: number;
-    movedMessages: number;
-    movedImageCache: number;
-    merged: boolean;
-  };
+  result: MergeConversationsResult;
   conversationChanged: boolean;
   keptConversation: any;
 };
@@ -835,11 +834,8 @@ export async function mergeConversationsByIds(input: {
   return outcome.result;
 }
 
-export async function updateConversationUrlById(input: {
-  conversationId: number;
-  url: string;
-  mergeExisting?: boolean;
-}): Promise<{
+export type UpdateConversationUrlResult = {
+  status: 'updated' | 'conflict';
   conversationId: number;
   url: string;
   source: string;
@@ -847,13 +843,19 @@ export async function updateConversationUrlById(input: {
   changed: boolean;
   merged: boolean;
   removedConversationId: number | null;
-}> {
+  conflictConversationId: number | null;
+  mergeSummary: MergeConversationsResult | null;
+};
+
+export async function updateConversationUrlById(input: {
+  conversationId: number;
+  url: string;
+  mergeExisting?: boolean;
+}): Promise<UpdateConversationUrlResult> {
   const conversationId = Number(input.conversationId);
   if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
     throw conversationMutationError('invalid_conversation_id', 'invalid conversation id');
   }
-  const identity = buildCanonicalWebArticleIdentity(input.url);
-  if (!identity) throw conversationMutationError('invalid_article_url', 'invalid article url');
 
   const db = await openDb();
   const now = Date.now();
@@ -874,21 +876,49 @@ export async function updateConversationUrlById(input: {
       const { stores, markChanged } = context;
       const sourceConversation: any = await reqToPromise(stores.conversations.get(conversationId));
       if (!sourceConversation) throw conversationMutationError('conversation_not_found', 'conversation not found');
-      if (
-        safeString(sourceConversation.sourceType).toLowerCase() !== 'article' ||
-        safeString(sourceConversation.source).toLowerCase() !== WEB_ARTICLE_SOURCE
-      ) {
-        throw conversationMutationError('conversation_url_not_editable', 'only web article URLs can be edited');
+
+      const source = safeString(sourceConversation.source);
+      const conversationKey = safeString(sourceConversation.conversationKey);
+      const isWebArticle =
+        safeString(sourceConversation.sourceType).toLowerCase() === 'article' &&
+        source.toLowerCase() === WEB_ARTICLE_SOURCE;
+
+      if (!isWebArticle) {
+        const normalizedUrl = normalizeHttpUrl(input.url);
+        if (!normalizedUrl) throw conversationMutationError('invalid_url', 'invalid http(s) url');
+        const rewritten: any = normalizeConversationListRecord({ ...sourceConversation, url: normalizedUrl });
+        const changed = !conversationRecordsEquivalent(sourceConversation, rewritten);
+        if (changed) {
+          await reqToPromise(stores.conversations.put(rewritten));
+          markChanged('conversations');
+        }
+        return {
+          result: {
+            status: 'updated' as const,
+            conversationId,
+            url: normalizedUrl,
+            source,
+            conversationKey,
+            changed,
+            merged: false,
+            removedConversationId: null,
+            conflictConversationId: null,
+            mergeSummary: null,
+          },
+          conversationChanged: changed,
+        };
       }
 
-      const currentCanonicalUrl = canonicalizeArticleUrl(sourceConversation.url);
+      const identity = buildCanonicalWebArticleIdentity(input.url);
+      if (!identity) throw conversationMutationError('invalid_article_url', 'invalid article url');
       if (
-        safeString(sourceConversation.source) === identity.source &&
-        safeString(sourceConversation.conversationKey) === identity.conversationKey &&
-        currentCanonicalUrl === identity.url
+        source === identity.source &&
+        conversationKey === identity.conversationKey &&
+        safeString(sourceConversation.url) === identity.url
       ) {
         return {
           result: {
+            status: 'updated' as const,
             conversationId,
             url: identity.url,
             source: identity.source,
@@ -896,6 +926,8 @@ export async function updateConversationUrlById(input: {
             changed: false,
             merged: false,
             removedConversationId: null,
+            conflictConversationId: null,
+            mergeSummary: null,
           },
           conversationChanged: false,
         };
@@ -903,18 +935,27 @@ export async function updateConversationUrlById(input: {
 
       const identityIndex = stores.conversations.index('by_source_conversationKey');
       const conflict: any = await reqToPromise(identityIndex.get([identity.source, identity.conversationKey]) as any);
+      if (conflict && Number(conflict.id) !== conversationId && input.mergeExisting !== true) {
+        return {
+          result: {
+            status: 'conflict' as const,
+            conversationId,
+            url: identity.url,
+            source: identity.source,
+            conversationKey: identity.conversationKey,
+            changed: false,
+            merged: false,
+            removedConversationId: null,
+            conflictConversationId: Number(conflict.id),
+            mergeSummary: null,
+          },
+          conversationChanged: false,
+        };
+      }
+
       let keptConversation = sourceConversation;
       let mergeOutcome: MergeConversationsTransactionOutcome | null = null;
       if (conflict && Number(conflict.id) !== conversationId) {
-        if (input.mergeExisting !== true) {
-          throw conversationMutationError(
-            'conversation_url_conflict',
-            'article URL already belongs to another conversation',
-            {
-              conflictingConversationId: Number(conflict.id),
-            },
-          );
-        }
         mergeOutcome = await mergeConversationsInTransaction(context, {
           keepConversationId: conversationId,
           removeConversationId: Number(conflict.id),
@@ -963,6 +1004,7 @@ export async function updateConversationUrlById(input: {
       const merged = mergeOutcome?.result.merged === true;
       return {
         result: {
+          status: 'updated' as const,
           conversationId,
           url: identity.url,
           source: identity.source,
@@ -970,6 +1012,8 @@ export async function updateConversationUrlById(input: {
           changed: rewriteChanged || merged,
           merged,
           removedConversationId: merged ? (mergeOutcome?.result.removedConversationId ?? null) : null,
+          conflictConversationId: null,
+          mergeSummary: mergeOutcome?.result ?? null,
         },
         conversationChanged: rewriteChanged || merged,
       };

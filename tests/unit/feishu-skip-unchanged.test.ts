@@ -119,11 +119,16 @@ describe('feishu skip unchanged', () => {
     });
 
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
-    const firstRun = orch.syncConversations({ conversationIds: [1], instanceId: 'first' });
+    const firstRun = orch.syncConversations({
+      conversationIds: [1],
+      instanceId: 'first',
+      jobId: 'feishu-accepted-job',
+    });
     await vi.waitFor(() => expect(fetchFeishuJsonMock).toHaveBeenCalledTimes(1));
 
     expect(orch.isRunActive()).toBe(true);
     expect(jobStoreMocks.setJob.mock.calls[0]?.[0]).toMatchObject({
+      id: 'feishu-accepted-job',
       provider: 'feishu',
       status: 'running',
       totalCount: 1,

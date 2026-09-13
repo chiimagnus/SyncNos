@@ -22,34 +22,20 @@ function normalizeFolderPath(input: unknown) {
     .join('/');
 }
 
-function getConversationKinds() {
-  if (builtInConversationKinds && typeof builtInConversationKinds.pick === 'function') {
-    return builtInConversationKinds;
-  }
-  return null;
-}
-
 function folderForConversation(
   conversation: any,
   { folderByKindId, defaultFolder }: { folderByKindId?: Record<string, unknown>; defaultFolder?: string } = {},
 ) {
-  const conversationKinds = getConversationKinds();
-  if (conversationKinds && typeof conversationKinds.pick === 'function') {
-    try {
-      const kind = conversationKinds.pick(conversation);
-      const kindId = kind && kind.id ? safeString(kind.id) : '';
-      const overrideFolderRaw =
-        kindId && folderByKindId && typeof folderByKindId === 'object' ? safeString(folderByKindId[kindId]) : '';
-      const overrideFolder = normalizeFolderPath(overrideFolderRaw);
-      if (overrideFolder) return overrideFolder;
+  const kind = builtInConversationKinds.pick(conversation);
+  const kindId = kind?.id ? safeString(kind.id) : '';
+  const overrideFolderRaw =
+    kindId && folderByKindId && typeof folderByKindId === 'object' ? safeString(folderByKindId[kindId]) : '';
+  const overrideFolder = normalizeFolderPath(overrideFolderRaw);
+  if (overrideFolder) return overrideFolder;
 
-      const folder = kind && kind.obsidian && kind.obsidian.folder ? safeString(kind.obsidian.folder) : '';
-      const normalized = normalizeFolderPath(folder);
-      if (normalized) return normalized;
-    } catch (_e) {
-      // ignore
-    }
-  }
+  const folder = kind?.obsidian?.folder ? safeString(kind.obsidian.folder) : '';
+  const normalized = normalizeFolderPath(folder);
+  if (normalized) return normalized;
   const fallback = normalizeFolderPath(defaultFolder);
   return fallback || DEFAULT_OBSIDIAN_FOLDER;
 }

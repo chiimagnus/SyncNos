@@ -21,11 +21,11 @@ import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 
 import {
-  BACKUP_V2_FIXTURE_CAPTURED_AT,
-  buildBackupV2FixtureEntries,
-  createBackupV2FixtureZip,
-  writeBackupV2FixtureZip,
-} from '../helpers/backup-v2-fixture';
+  BACKUP_CURRENT_FIXTURE_ACTIVITY_AT,
+  buildCurrentBackupFixtureEntries,
+  createCurrentBackupFixtureZip,
+  writeCurrentBackupFixtureZip,
+} from '../helpers/backup-current-fixture';
 
 function mockChromeStorage() {
   const store: Record<string, unknown> = {};
@@ -215,7 +215,7 @@ beforeEach(() => {
   // @ts-expect-error test global
   globalThis.browser = undefined;
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(BACKUP_V2_FIXTURE_CAPTURED_AT + 60_000);
+  vi.setSystemTime(BACKUP_CURRENT_FIXTURE_ACTIVITY_AT + 60_000);
 });
 
 afterEach(() => {
@@ -228,20 +228,20 @@ afterEach(() => {
 
 describe('reload-free data consistency production chain', () => {
   it('builds a deterministic full-scope ZIP and imports canonical List/Detail/Header-input/Comments/Asset data once', async () => {
-    const zipA = new Uint8Array(await (await createBackupV2FixtureZip()).arrayBuffer());
-    const zipB = new Uint8Array(await (await createBackupV2FixtureZip()).arrayBuffer());
+    const zipA = new Uint8Array(await (await createCurrentBackupFixtureZip()).arrayBuffer());
+    const zipB = new Uint8Array(await (await createCurrentBackupFixtureZip()).arrayBuffer());
     expect(zipB).toEqual(zipA);
 
-    const written = await writeBackupV2FixtureZip();
+    const written = await writeCurrentBackupFixtureZip();
     try {
       const diskBytes = new Uint8Array(await readFile(written.path));
       const diskEntries = await extractZipEntries(new Blob([diskBytes], { type: 'application/zip' }));
-      expect([...diskEntries.keys()].sort()).toEqual([...buildBackupV2FixtureEntries().entries.keys()].sort());
+      expect([...diskEntries.keys()].sort()).toEqual([...buildCurrentBackupFixtureEntries().entries.keys()].sort());
     } finally {
       await rm(dirname(written.path), { recursive: true, force: true });
     }
 
-    const fixture = buildBackupV2FixtureEntries();
+    const fixture = buildCurrentBackupFixtureEntries();
     const first = await importBackupZipMerge(fixture.entries);
     expect(first).toMatchObject({
       conversationsAdded: 3,
@@ -321,7 +321,7 @@ describe('reload-free data consistency production chain', () => {
   });
 
   it('remaps only real message asset refs when a repeated ZIP import recreates a missing local cache row', async () => {
-    const fixture = buildBackupV2FixtureEntries();
+    const fixture = buildCurrentBackupFixtureEntries();
     const chatPath = 'sources/chatgpt/reload-free-chat.json';
     const chatBundle = JSON.parse(new TextDecoder().decode(fixture.entries.get(chatPath)!));
     const backupAssetId = fixture.expected.chat.assetId;
@@ -392,7 +392,7 @@ describe('reload-free data consistency production chain', () => {
   });
 
   it('replays a failed mounted List canonical read against an unchanged revision vector and preserves the last-good bundle', async () => {
-    const base = buildBackupV2FixtureEntries();
+    const base = buildCurrentBackupFixtureEntries();
     await importBackupZipMerge(base.entries);
 
     const observer = createRealRevisionObserver();
@@ -404,7 +404,7 @@ describe('reload-free data consistency production chain', () => {
     const vectorBeforeMutation = await readDataRevisionSnapshot();
 
     listConsumer.failNext();
-    const changed = buildBackupV2FixtureEntries({ extraChatWarning: 'fixture-warning-updated' });
+    const changed = buildCurrentBackupFixtureEntries({ extraChatWarning: 'fixture-warning-updated' });
     const stats = await importBackupZipMerge(changed.entries);
     expect(stats).toMatchObject({
       conversationsAdded: 0,
@@ -439,7 +439,7 @@ describe('reload-free data consistency production chain', () => {
   });
 
   it('distinguishes a Comments canonical-read rejection from authoritative empty and converges by same-vector replay', async () => {
-    const fixture = buildBackupV2FixtureEntries();
+    const fixture = buildCurrentBackupFixtureEntries();
     await importBackupZipMerge(fixture.entries);
     const article = await getConversationBySourceConversationKey(
       fixture.expected.article.source,

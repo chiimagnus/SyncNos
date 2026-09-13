@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GITHUB_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
@@ -19,6 +23,9 @@ const gateMocks = vi.hoisted(() => ({
   setSyncProviderEnabled: vi.fn(),
   syncProviderEnabledStorageKey: vi.fn((id: string) => `webclipper_sync_provider_${id}_enabled`),
 }));
+const autoSyncMocks = vi.hoisted(() => ({
+  setAutoSyncEnabled: vi.fn(),
+}));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
 vi.mock('@services/shared/storage', () => ({
@@ -30,6 +37,10 @@ vi.mock('@services/shared/storage', () => ({
 vi.mock('@services/sync/sync-provider-gate', () => ({
   setSyncProviderEnabled: gateMocks.setSyncProviderEnabled,
   syncProviderEnabledStorageKey: gateMocks.syncProviderEnabledStorageKey,
+}));
+vi.mock('@services/sync/auto-sync/auto-sync-settings', () => ({
+  autoSyncEnabledStorageKey: (id: string) => `${id}_auto_sync_enabled_v1`,
+  setAutoSyncEnabled: autoSyncMocks.setAutoSyncEnabled,
 }));
 vi.mock('@services/integrations/anti-hotlink/anti-hotlink-settings', () => ({
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY: 'anti_hotlink_rules_v1',
@@ -275,8 +286,16 @@ beforeEach(() => {
   gateMocks.setSyncProviderEnabled.mockResolvedValue(undefined);
 
   runtimeMocks.send.mockImplementation(async (type: string, payload: Record<string, unknown> = {}) => {
-    if (type === 'getNotionAuthStatus') return ok({ connected: false });
-    if (type === 'getFeishuAuthStatus') return ok({ connected: false });
+    if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS) return ok({ connected: false, workspaceName: '' });
+    if (type === NOTION_MESSAGE_TYPES.GET_CONFIG) {
+      return ok({ parentPageId: '', parentPageTitle: '', databaseIds: { chat: '', article: '', video: '' } });
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) {
+      return ok({ connected: false, pending: false, errorPresent: false });
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG) {
+      return ok({ clientId: '', clientSecretPresent: false, tokenExchangeProxyUrl: '' });
+    }
     if (type === 'obsidianGetSettings') {
       return ok({
         apiBaseUrl: '',
@@ -918,7 +937,7 @@ describe('Settings controller GitHub Device Flow', () => {
     expect(latestSnapshot?.githubSyncEnabled).toBe(true);
 
     await invoke(() => latestSnapshot!.onToggleGithubAutoSyncEnabled(true));
-    expect(storageMocks.set).toHaveBeenCalledWith({ [GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY]: true });
+    expect(autoSyncMocks.setAutoSyncEnabled).toHaveBeenCalledWith('github', true);
     expect(latestSnapshot?.githubAutoSyncEnabled).toBe(true);
 
     await invoke(() => latestSnapshot!.onChangeGithubRepository('owner/other'));

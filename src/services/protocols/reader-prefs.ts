@@ -9,9 +9,6 @@ export type ReaderFontFamily = (typeof READER_FONT_FAMILIES)[number];
 export const READER_TEXT_ALIGNS = ['left', 'justify'] as const;
 export type ReaderTextAlign = (typeof READER_TEXT_ALIGNS)[number];
 
-export const READER_THEMES = ['system', 'light', 'sepia', 'dark', 'black'] as const;
-export type ReaderTheme = (typeof READER_THEMES)[number];
-
 export const READER_TTS_ENGINES = ['web', 'ai'] as const;
 export type ReaderTtsEngineId = (typeof READER_TTS_ENGINES)[number];
 
@@ -36,7 +33,6 @@ export type ReaderPrefs = {
   contentWidth: number;
   letterSpacing: number;
   textAlign: ReaderTextAlign;
-  theme: ReaderTheme;
   tts: ReaderTtsPrefs;
 };
 
@@ -82,7 +78,6 @@ export const DEFAULT_READER_TYPOGRAPHY_PRESET: ReaderTypographyPreset = {
 
 export const DEFAULT_READER_PREFS: ReaderPrefs = {
   ...DEFAULT_READER_TYPOGRAPHY_PRESET,
-  theme: 'system',
   tts: DEFAULT_READER_TTS_PREFS,
 };
 
@@ -135,7 +130,6 @@ export function normalizeReaderPrefs(raw: unknown): ReaderPrefs {
     contentWidth: clampNumber(obj.contentWidth, L.contentWidth.min, L.contentWidth.max, d.contentWidth),
     letterSpacing: clampNumber(obj.letterSpacing, L.letterSpacing.min, L.letterSpacing.max, d.letterSpacing),
     textAlign: resolveEnum(obj.textAlign, READER_TEXT_ALIGNS, d.textAlign),
-    theme: resolveEnum(obj.theme, READER_THEMES, d.theme),
     tts: normalizeReaderTtsPrefs(obj.tts),
   };
 }
@@ -155,8 +149,15 @@ export function buildReaderPrefsStoragePatch(prefs: unknown): { [READER_PREFS_ST
   return { [READER_PREFS_STORAGE_KEY]: normalizeReaderPrefs(prefs) };
 }
 
-// Typography-only CSS variables. Intentionally excludes the legacy reader theme:
-// the article theme button now writes the global app theme mode instead.
+export function applyReaderPrefsPatch(base: ReaderPrefs, patch: ReaderPrefsPatch): ReaderPrefs {
+  return normalizeReaderPrefs({
+    ...base,
+    ...patch,
+    tts: { ...base.tts, ...(patch.tts ?? {}) },
+  });
+}
+
+// Typography-only CSS variables. Visual theme is owned by the global app theme protocol.
 export function readerPrefsToCssVars(prefs: unknown): Record<string, string> {
   const p = normalizeReaderPrefs(prefs);
   return {

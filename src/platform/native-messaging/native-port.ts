@@ -1,13 +1,11 @@
 export type NativeMessagingPort = {
   postMessage: (message: unknown) => void;
-  disconnect?: () => void;
-  onMessage?: {
-    addListener?: (listener: (message: unknown) => void) => void;
-    removeListener?: (listener: (message: unknown) => void) => void;
+  disconnect: () => void;
+  onMessage: {
+    addListener: (listener: (message: unknown) => void) => void;
   };
-  onDisconnect?: {
-    addListener?: (listener: () => void) => void;
-    removeListener?: (listener: () => void) => void;
+  onDisconnect: {
+    addListener: (listener: () => void) => void;
   };
 };
 
@@ -23,27 +21,18 @@ function runtimeApi(): any {
 }
 
 export function detectNativeMessagingBrowserFamily(): ExtensionRuntimeMetadata['browserFamily'] {
-  try {
-    const userAgent = String(globalThis.navigator?.userAgent || '').toLowerCase();
-    if (!userAgent) return 'unknown';
-    if (userAgent.includes('firefox') || userAgent.includes('librewolf') || userAgent.includes('zen')) return 'firefox';
-    if (
-      userAgent.includes('chrome') ||
-      userAgent.includes('chromium') ||
-      userAgent.includes('crios') ||
-      userAgent.includes('edg/') ||
-      userAgent.includes('helium')
-    ) {
-      return 'chromium';
-    }
-    return 'unknown';
-  } catch {
-    return 'unknown';
+  const userAgent = String(globalThis.navigator?.userAgent || '').toLowerCase();
+  if (!userAgent) return 'unknown';
+  if (userAgent.includes('firefox') || userAgent.includes('librewolf') || userAgent.includes('zen')) return 'firefox';
+  if (
+    userAgent.includes('chrome') ||
+    userAgent.includes('chromium') ||
+    userAgent.includes('edg/') ||
+    userAgent.includes('helium')
+  ) {
+    return 'chromium';
   }
-}
-
-export function canConnectNativeHost(): boolean {
-  return detectNativeMessagingBrowserFamily() !== 'unknown' && typeof runtimeApi()?.connectNative === 'function';
+  return 'unknown';
 }
 
 export function connectNativeHost(hostName: string): NativeMessagingPort {
@@ -56,16 +45,9 @@ export function connectNativeHost(hostName: string): NativeMessagingPort {
 
 export function readExtensionRuntimeMetadata(): ExtensionRuntimeMetadata {
   const runtime = runtimeApi();
-  let extensionVersion = '';
-  try {
-    extensionVersion = String(runtime?.getManifest?.()?.version || '');
-  } catch (_error) {
-    extensionVersion = '';
-  }
-
   return {
-    runtimeId: String(runtime?.id || ''),
-    extensionVersion,
+    runtimeId: String(runtime.id || ''),
+    extensionVersion: String(runtime.getManifest().version || ''),
     browserFamily: detectNativeMessagingBrowserFamily(),
   };
 }

@@ -1,38 +1,33 @@
 # Documentation Ownership
 
-本页定义 SyncNos 长期文档的职责、更新触发条件与证据入口。它不是产品指南，也不复制源码结构。`.github/features/**` 属于实施计划/审计历史，不是长期产品文档。
+本页只回答三件事：长期事实由哪份文档拥有、什么变化会触发更新、谁会消费它。`.github/features/**` 是实施/审计历史，不是长期产品文档。
 
 ## Source baseline
 
 | Field | Value |
 | --- | --- |
-| Repository | `SyncNos` WebClipper (`chiimagnus/SyncNos`) |
-| Commit hash | `cefb5ea0af9932d9d927b460dc00131bde2faf5a` |
-| Reconciled at | `2026-09-08` |
+| Commit hash | `0ae2fc22959f9dc74296840d7d9186641ec4b861` |
+| Reconciled at | `2026-09-13` |
 
-该 commit 是本轮长期文档核对的源码基线；本轮后续仅文档提交不改变这条“已核对源码”的证据含义。会漂移的版本号、权限、schema、provider 默认值继续由源码/配置/测试拥有，不在本页复制。
+该 commit 是本轮文档核对的源码基线。会频繁变化的版本号、权限列表、schema、默认路径和 browser target 继续由源码、配置和测试拥有。
 
 ## Long-term owners
 
-| Owner | Audience / job | Edit trigger & evidence | Consumer / enforcement |
+| Owner | Owns | Update when | Consumer |
 | --- | --- | --- | --- |
-| `README.md`, `README.zh-CN.md` | 用户入口：产品定位、支持来源/输出、安装与导航 | 用户可见来源、输出目标、安装渠道或顶层能力变化；来源列表以 `src/collectors/ai-chat-sites.ts` 和真实 provider/export 入口核对 | GitHub 项目首页；链接到 provider guide、Privacy、storage、CONTRIBUTING |
-| `AGENTS.md`, `src/ui/AGENTS.md` | agent/维护者在改代码前必须看到的分层与不可破坏不变量 | 分层、跨层依赖、高风险产品 invariant、UI token/交互 guardrail 变化；由源码、架构扫描和 enforcing tests 证明 | agent rule loader；README/CONTRIBUTING 导航 |
-| `PRIVACY.md` | 用户：权限、凭据、本地/外部数据流与第三方边界 | manifest/host permission、OAuth 模式、secret storage/backup exclusion、外部网络目标或本地→远端数据范围变化；核对 `wxt.config.ts`、provider auth/network、backup filtering | README；发布/商店隐私声明 |
-| `docs/storage.md` | 维护者：local-first、一致性、备份/恢复、失败语义 | IDB/revision、canonical read、backup/import、asset remap、continuity/恢复边界变化；核对 storage/backup 源码与 migration/revision/backup tests | `AGENTS.md`、README Backup 入口、PRIVACY、CONTRIBUTING 的数据审查要求 |
-| `docs/CONTRIBUTING.md` | 贡献者：开发工作流、提交/PR 和验证责任 | package scripts、CI gate、贡献流程、manual validation 或文档治理责任变化；以 `package.json`、workflows、PR/Issue templates 为证据 | README、AGENTS、PR template、issue flow |
-| `docs/troubleshooting.md` | 维护者：可复用故障诊断，不拥有产品契约 | 消息生命周期、OAuth/发布、provider 同步失败/恢复诊断、Zen 流程变化；以对应源码、脚本和 regression tests 为证据 | CONTRIBUTING |
-| Feishu EN/ZH setup guides | 用户：配置飞书 OAuth/DocX 同步 | OAuth redirect/scope、Direct/Proxy 模式、Settings 字段或必要用户步骤变化；以 Feishu auth/Settings 源码与 tests 为证据 | README；Settings 的 “Open Setup Guide” |
-| Obsidian EN/ZH setup guides | 用户：配置 Local REST API | transport 支持、默认 endpoint/header、Settings 字段或必要插件步骤变化；以 Obsidian settings/client 源码与 tests 为证据 | README；Settings 的 “Open Setup Guide” |
-| `.github/scripts/webclipper/STORE_LISTING_COPY.md` | 发布维护者：浏览器商店长/短文案的人工 source copy | 用户可见来源/输出能力、隐私声明或商店文案变化；与 README/Privacy 对照。localized manifest 描述另由 `public/_locales/*/messages.json` 拥有，长度由仓库脚本校验 | 人工商店发布流程；不是 workflow 自动上传输入 |
-| `.github/PULL_REQUEST_TEMPLATE.md`, Issue templates | contributor/reviewer：收集 scope、风险与验证证据 | CONTRIBUTING 的提交证据要求变化时同步 | GitHub PR/Issue UI |
-| `docs/GENERATION.md` | 维护者：本表自身与源码核对基线 | 长期 owner 增删/合并、职责/edit trigger/consumer 变化，或执行一次新的全仓文档 reconciliation | neat-freak 基线读取；CONTRIBUTING 文档维护入口 |
+| `README.md`, `README.zh-CN.md` | 用户入口：定位、安装、采集来源、输出目标和文档导航 | 用户可见能力、安装渠道或顶层支持范围变化 | GitHub 项目首页 |
+| `PRIVACY.md` | 用户数据、权限、凭据、本地/外部网络边界 | manifest 权限、secret storage/backup exclusion、OAuth 或外部数据流变化 | README、商店隐私审查 |
+| Feishu / Obsidian setup guides | 对应 Provider 的用户配置步骤 | OAuth/Local REST API、必要权限、设置字段或用户操作变化 | README、Extension Settings |
+| `AGENTS.md`, `src/ui/AGENTS.md` | 维护者/agent 必须提前看到的架构与高风险不变量 | 分层、依赖方向或不可破坏产品/UI 契约变化 | agent rule loader、CONTRIBUTING |
+| `docs/storage.md` | local-first、一致性、Backup/restore 和失败恢复边界 | IDB/revision、backup/import、asset remap 或 continuity 语义变化 | AGENTS、Privacy、CONTRIBUTING |
+| `docs/CONTRIBUTING.md` | 开发、PR 和验证责任 | scripts、CI gate、贡献流程或 manual validation 责任变化 | README、PR template |
+| `docs/troubleshooting.md` | 可复用的维护者诊断 | 故障分类、诊断入口或恢复动作变化 | CONTRIBUTING |
+| `.github/PULL_REQUEST_TEMPLATE.md`, Issue templates | contributor/reviewer 要提交的 scope、风险和验证证据 | CONTRIBUTING 的证据要求变化 | GitHub PR/Issue UI |
+| `docs/GENERATION.md` | 本表与源码核对基线 | owner、职责、trigger/consumer 或全仓 reconciliation 变化 | neat-freak、CONTRIBUTING |
 
-## Governance rules
+## Rules
 
-- 同一受众的同一长期事实只保留一个详细 owner；其它页面导航或保留必要的一句 guardrail，不复制第二套实现清单。
-- Runtime 结构、符号、caller、storage key、schema/index 名、provider 默认目录等由源码/CodeGraph/测试回答，不长期镜像到 Markdown。
-- provider 用户配置属于对应 guide；内部同步生命周期与数据恢复边界分别由源码/测试和 `docs/storage.md` 负责。
-- README 只做五分钟入口，不承担 provider 详细配置、迁移历史或内部协议。
-- 新页面是最后选项：只有现有 owner 无法承载一个长期、有消费者、有明确 edit trigger 的契约时才新增，并在同一改动接入真实导航。
-- 删除/替代 owner 时同次清理旧链接和重复说明；Git 历史与 `.github/features/**` 保存实施过程，不把 rejected idea 或一次性验证结果搬进长期 docs。
+- 同一受众的同一长期事实只保留一个详细 owner；其它页面只导航或保留必要的一句高风险 guardrail。
+- Runtime 结构、符号、storage key、schema/index、默认目录和 browser 路径由源码/配置/测试回答，不镜像进长期 Markdown。
+- README 只做快速用户入口；Provider 配置归 guide，恢复边界归 storage，数据流归 Privacy，验证责任归 CONTRIBUTING。
+- 新页面是最后选项；新增时必须同时有长期消费者、明确 edit trigger 和真实导航入口。

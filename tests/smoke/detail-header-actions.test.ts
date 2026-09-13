@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const resolveObsidianOpenTargetMock = vi.fn();
 const openObsidianTargetMock = vi.fn();
+const getConversationByIdMock = vi.fn();
 const getSyncMappingByConversationMock = vi.fn();
+const isSyncProviderEnabledMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const formatConversationMarkdownMock = vi.fn();
 const { storageGetMock, storageSetMock } = vi.hoisted(() => ({
@@ -13,12 +15,29 @@ const { storageGetMock, storageSetMock } = vi.hoisted(() => ({
 vi.mock('@services/integrations/openin/obsidian-open-target', () => ({
   resolveObsidianOpenTarget: (...args: any[]) => resolveObsidianOpenTargetMock(...args),
   openObsidianTarget: (...args: any[]) => openObsidianTargetMock(...args),
+  defaultObsidianDetailHeaderServices: {},
+  defaultObsidianTargetActionPort: {
+    launchProtocolUrl: vi.fn(async () => true),
+    wait: vi.fn(async () => {}),
+    reportError: vi.fn(),
+  },
   waitForDelay: vi.fn(async () => {}),
   reportObsidianOpenError: vi.fn(),
 }));
 
 vi.mock('@services/conversations/data/storage-idb', () => ({
+  getConversationById: (...args: any[]) => getConversationByIdMock(...args),
   getSyncMappingByConversation: (...args: any[]) => getSyncMappingByConversationMock(...args),
+}));
+
+vi.mock('@services/sync/sync-provider-gate', () => ({
+  isSyncProviderEnabled: (...args: any[]) => isSyncProviderEnabledMock(...args),
+  getSyncProviderEnabledStorageKeys: () => [
+    'webclipper_sync_provider_obsidian_enabled',
+    'webclipper_sync_provider_notion_enabled',
+    'webclipper_sync_provider_feishu_enabled',
+    'webclipper_sync_provider_github_enabled',
+  ],
 }));
 
 vi.mock('@services/shared/clipboard', () => ({
@@ -121,8 +140,12 @@ describe('detail-header-actions', () => {
     resolveObsidianOpenTargetMock.mockResolvedValue(unavailableObsidian());
     openObsidianTargetMock.mockReset();
     openObsidianTargetMock.mockResolvedValue({ ok: true });
+    getConversationByIdMock.mockReset();
+    getConversationByIdMock.mockResolvedValue(null);
     getSyncMappingByConversationMock.mockReset();
     getSyncMappingByConversationMock.mockResolvedValue(null);
+    isSyncProviderEnabledMock.mockReset();
+    isSyncProviderEnabledMock.mockResolvedValue(true);
     writeTextToClipboardMock.mockReset();
     writeTextToClipboardMock.mockResolvedValue(true);
     formatConversationMarkdownMock.mockReset();
@@ -155,6 +178,25 @@ describe('detail-header-actions', () => {
     ).toBe(true);
     expect(hasDetailHeaderActionStorageDependencyChange({ unrelated: {} }, 'local')).toBe(false);
     expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.apiKey]: {} }, 'sync')).toBe(false);
+  });
+
+  it('keeps provider-disabled machine targets hidden from UI open/copy actions', async () => {
+    isSyncProviderEnabledMock.mockImplementation(async (provider: string) => provider !== 'notion');
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 7,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        conversationKey: 'conv-7',
+        title: 'Conversation',
+        url: 'https://chatgpt.com/c/7',
+        notionPageId: NOTION_PAGE_ID,
+      } as any,
+      port: createPort(),
+    });
+
+    expect(bySlot(actions, 'open').map((action) => action.provider)).not.toContain('notion');
+    expect(bySlot(actions, 'copy').map((action) => action.provider)).not.toContain('notion');
   });
 
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
@@ -192,17 +234,16 @@ describe('detail-header-actions', () => {
 
   it('keeps Open in Notion and derives a copy action with the exact same href', async () => {
     const port = createPort();
-    const actions = await resolveDetailHeaderActions({
-      conversation: {
-        id: 2,
-        source: 'chatgpt',
-        conversationKey: 'conv-2',
-        title: 'Conversation',
-        notionPageId: NOTION_PAGE_ID,
-        notionWorkspaceSlug: 'chiimagnus',
-      },
-      port,
-    });
+    const conversation = {
+      id: 2,
+      source: 'chatgpt',
+      conversationKey: 'conv-2',
+      title: 'Conversation',
+      notionPageId: NOTION_PAGE_ID,
+      notionWorkspaceSlug: 'chiimagnus',
+    } as any;
+    getConversationByIdMock.mockResolvedValue(conversation);
+    const actions = await resolveDetailHeaderActions({ conversation, port });
 
     const openAction = byId(actions, 'open-in-notion');
     const copyAction = byId(actions, 'copy-notion-link');
@@ -249,6 +290,7 @@ describe('detail-header-actions', () => {
       title: 'GitHub 链接 test',
     };
     const { mapping, markdownPath } = githubMapping(conversation);
+    getConversationByIdMock.mockResolvedValue(conversation);
     getSyncMappingByConversationMock.mockResolvedValue({ conversation, mapping });
     const port = createPort();
 
@@ -585,26 +627,53 @@ describe('detail-header-actions', () => {
     expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/fresh-doc');
   });
 
-  it('falls back to the caller mirrors only when the mapping read fails', async () => {
+  it('fails closed when fresh mapping cannot be read instead of exposing caller mirrors', async () => {
     getSyncMappingByConversationMock.mockRejectedValue(new Error('IDB unavailable'));
 
-    const actions = await resolveDetailHeaderActions({
-      conversation: {
-        id: 626,
-        source: 'chatgpt',
-        conversationKey: 'conv-626',
-        title: 'Conversation',
-        notionPageId: NOTION_PAGE_ID,
-        notionWorkspaceSlug: 'caller-workspace',
-        feishuDocId: 'caller-doc',
-      },
-      port: createPort(),
-    });
+    await expect(
+      resolveDetailHeaderActions({
+        conversation: {
+          id: 626,
+          source: 'chatgpt',
+          conversationKey: 'conv-626',
+          title: 'Conversation',
+          notionPageId: NOTION_PAGE_ID,
+          notionWorkspaceSlug: 'caller-workspace',
+          feishuDocId: 'caller-doc',
+        },
+        port: createPort(),
+      }),
+    ).rejects.toThrow('IDB unavailable');
+  });
 
-    expect(byId(actions, 'open-in-notion')?.href).toBe(
-      'https://app.notion.com/p/caller-workspace/0123456789abcdef0123456789abcdef',
-    );
-    expect(byId(actions, 'open-in-feishu')?.href).toBe('https://www.feishu.cn/docx/caller-doc');
+  it('fails closed at action time when fresh mapping revalidation fails', async () => {
+    const port = createPort();
+    const staleConversation = {
+      id: 627,
+      source: 'chatgpt',
+      conversationKey: 'conv-627',
+      title: 'Conversation',
+      notionPageId: NOTION_PAGE_ID,
+      notionWorkspaceSlug: 'stale-workspace',
+    } as any;
+    const freshConversation = {
+      ...staleConversation,
+      notionPageId: OTHER_NOTION_PAGE_ID,
+      notionWorkspaceSlug: 'fresh-workspace',
+    } as any;
+    getSyncMappingByConversationMock
+      .mockResolvedValueOnce({ conversation: staleConversation, mapping: { notionPageId: NOTION_PAGE_ID } })
+      .mockRejectedValueOnce(new Error('IDB unavailable'));
+
+    const actions = await resolveDetailHeaderActions({ conversation: staleConversation, port });
+    const action = byId(actions, 'open-in-notion');
+    expect(action?.href).toBe('https://app.notion.com/p/stale-workspace/0123456789abcdef0123456789abcdef');
+
+    getConversationByIdMock.mockResolvedValue(freshConversation);
+    await expect(action?.onTrigger()).rejects.toThrow('IDB unavailable');
+
+    expect(getConversationByIdMock).toHaveBeenCalledWith(627);
+    expect(port.openExternalUrl).not.toHaveBeenCalled();
   });
 
   it('does not combine Notion metadata from a fresh conversation with a different mapped target', async () => {
@@ -718,7 +787,12 @@ describe('detail-header-actions', () => {
       port: createPort(),
     });
 
-    expect(bySlot(actions, 'open').map((action) => action.provider)).toEqual(['notion']);
+    expect(bySlot(actions, 'open').map((action) => action.provider)).toEqual(['notion', 'obsidian']);
+    expect(byId(actions, 'open-in-obsidian-unavailable')).toMatchObject({
+      provider: 'obsidian',
+      label: 'Obsidian API not connected',
+      disabled: true,
+    });
     expect(bySlot(actions, 'copy').map((action) => action.provider)).toEqual(['notion']);
   });
 
@@ -788,22 +862,44 @@ describe('detail-header-actions', () => {
 
   it('opens the exact trimmed original HTTP(S) URL without removing query or hash', async () => {
     const port = createPort();
-    const actions = await resolveDetailHeaderActions({
-      conversation: {
-        id: 22,
-        source: 'chatgpt',
-        conversationKey: 'conv-22',
-        title: 'Conversation',
-        url: '  https://example.com/path?x=1#section  ',
-      },
-      port,
-    });
+    const conversation = {
+      id: 22,
+      source: 'chatgpt',
+      conversationKey: 'conv-22',
+      title: 'Conversation',
+      url: '  https://example.com/path?x=1#section  ',
+    } as any;
+    getConversationByIdMock.mockResolvedValue(conversation);
+    const actions = await resolveDetailHeaderActions({ conversation, port });
     const action = byId(actions, 'open-original');
 
     expect(action?.disabled).toBe(false);
     expect(action?.href).toBe('https://example.com/path?x=1#section');
     await action?.onTrigger();
     expect(port.openExternalUrl).toHaveBeenCalledWith('https://example.com/path?x=1#section');
+  });
+
+  it('reloads the current source URL before Open original launch', async () => {
+    const port = createPort();
+    const staleConversation = {
+      id: 225,
+      source: 'chatgpt',
+      conversationKey: 'conv-225',
+      title: 'Conversation',
+      url: 'https://example.com/old',
+    } as any;
+    const freshConversation = { ...staleConversation, url: 'https://example.com/current?x=1#now' } as any;
+    getConversationByIdMock.mockResolvedValue(freshConversation);
+
+    const actions = await resolveDetailHeaderActions({ conversation: staleConversation, port });
+    const action = byId(actions, 'open-original');
+    expect(action?.href).toBe('https://example.com/old');
+
+    await action?.onTrigger();
+
+    expect(getConversationByIdMock).toHaveBeenCalledWith(225);
+    expect(port.openExternalUrl).toHaveBeenCalledWith('https://example.com/current?x=1#now');
+    expect(port.openExternalUrl).not.toHaveBeenCalledWith('https://example.com/old');
   });
 
   it.each(['', 'javascript:alert(1)', 'obsidian://open?vault=x'])('disables Open original for %s', async (url) => {
@@ -824,14 +920,16 @@ describe('detail-header-actions', () => {
     const port = createPort();
     port.openExternalUrl.mockResolvedValue(false);
     writeTextToClipboardMock.mockResolvedValue(false);
+    const conversation = {
+      id: 24,
+      source: 'chatgpt',
+      conversationKey: 'conv-24',
+      title: 'Conversation',
+      url: 'https://example.com/chat/24',
+    } as any;
+    getConversationByIdMock.mockResolvedValue(conversation);
     const actions = await resolveDetailHeaderActions({
-      conversation: {
-        id: 24,
-        source: 'chatgpt',
-        conversationKey: 'conv-24',
-        title: 'Conversation',
-        url: 'https://example.com/chat/24',
-      },
+      conversation,
       detail: { conversationId: 24, messages: [] } as any,
       port,
     });

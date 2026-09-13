@@ -1,10 +1,10 @@
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import { CLI_INSTANCE_ID_STORAGE_KEY, CLI_INTEGRATION_ENABLED_STORAGE_KEY } from '@services/cli/cli-integration';
-import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 import {
   normalizeCanonicalVideoChapters,
   normalizeCanonicalVideoTranscriptCues,
 } from '@services/conversations/domain/video-content';
+import { READER_PREFS_STORAGE_KEY, normalizeReaderPrefs } from '@services/protocols/reader-prefs';
 import {
   canonicalizeInpageDisplayModeStorageRecord,
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
@@ -109,11 +109,7 @@ function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
   return Array.from(set);
 }
 
-export function mergeConversationRecord(
-  existing: UnknownRecord,
-  incoming: UnknownRecord,
-  options: { allowLegacyLastCapturedAt?: boolean } = {},
-): UnknownRecord {
+export function mergeConversationRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
   const a = existing && typeof existing === 'object' ? existing : {};
   const b = incoming && typeof incoming === 'object' ? incoming : {};
 
@@ -179,11 +175,7 @@ export function mergeConversationRecord(
   if (notionPageId || hasExplicitEmptyNotionPageId) next.notionPageId = notionPageId;
   else delete next.notionPageId;
 
-  next.lastActivityAt = Math.max(
-    validTimestamp(a.lastActivityAt) ?? 0,
-    validTimestamp(b.lastActivityAt) ?? 0,
-    options.allowLegacyLastCapturedAt ? (validTimestamp(b.lastCapturedAt) ?? 0) : 0,
-  );
+  next.lastActivityAt = Math.max(validTimestamp(a.lastActivityAt) ?? 0, validTimestamp(b.lastActivityAt) ?? 0);
   delete next.lastCapturedAt;
 
   return next;
@@ -197,12 +189,13 @@ function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownR
 
 export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
   const hasExisting = !!existing && typeof existing === 'object';
-  const a = hasExisting ? normalizeLegacyMessageRecord(existing) : {};
-  const b = normalizeLegacyMessageRecord(incoming);
+  const a = hasExisting ? { ...existing } : {};
+  const b = incoming && typeof incoming === 'object' ? { ...incoming } : {};
 
   const preferIncoming = !hasExisting || shouldPreferIncomingMessage(a, b);
   const winner = preferIncoming ? b : a;
   const next = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+  delete next.contentText;
   next.role = pickStringPreferExisting(next.role, 'assistant') || 'assistant';
 
   const aUpdated = validTimestamp(a.updatedAt);
@@ -236,12 +229,18 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
   return next;
 }
 
+function sanitizeReaderPrefsForBackup(value: unknown): Record<string, unknown> {
+  const prefs = normalizeReaderPrefs(value);
+  const { aiApiKey: _secret, ...portableTts } = prefs.tts;
+  return { ...prefs, tts: portableTts };
+}
+
 export function filterStorageForBackup(storageLocal: unknown): Record<string, unknown> {
   const input = storageLocal && typeof storageLocal === 'object' ? (storageLocal as any) : {};
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
     if (!shouldIncludeStorageKeyInBackup(key)) continue;
-    out[key] = value;
+    out[key] = key === READER_PREFS_STORAGE_KEY ? sanitizeReaderPrefsForBackup(value) : value;
   }
   return canonicalizeInpageDisplayModeStorageRecord(out);
 }
@@ -302,26 +301,17 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
   const d: any = doc;
   if (!d || typeof d !== 'object') return { ok: false, error: 'Manifest is not an object' };
   const backupSchemaVersion = Number(d.backupSchemaVersion);
-  if (backupSchemaVersion !== 2 && backupSchemaVersion !== BACKUP_ZIP_SCHEMA_VERSION) {
+  if (backupSchemaVersion !== BACKUP_ZIP_SCHEMA_VERSION) {
     return { ok: false, error: 'Unsupported backupSchemaVersion' };
   }
-  const isCurrent = backupSchemaVersion === BACKUP_ZIP_SCHEMA_VERSION;
   if (!isNonEmptyString(d.exportedAt)) return { ok: false, error: 'Missing exportedAt' };
   if (!d.db || typeof d.db !== 'object') return { ok: false, error: 'Missing db' };
   if (!isNonEmptyString(d.db.name)) return { ok: false, error: 'Missing db.name' };
   if (!Number.isFinite(Number(d.db.version))) return { ok: false, error: 'Missing db.version' };
 
   if (!d.counts || typeof d.counts !== 'object') return { ok: false, error: 'Missing counts' };
-  const requiredCounts = isCurrent
-    ? ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments']
-    : ['conversations', 'messages', 'sync_mappings'];
-  for (const k of requiredCounts) {
+  for (const k of ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments']) {
     if (!Number.isFinite(Number(d.counts[k])) || Number(d.counts[k]) < 0) {
-      return { ok: false, error: `Invalid counts.${k}` };
-    }
-  }
-  for (const k of ['image_cache', 'article_comments']) {
-    if (!isCurrent && d.counts[k] != null && (!Number.isFinite(Number(d.counts[k])) || Number(d.counts[k]) < 0)) {
       return { ok: false, error: `Invalid counts.${k}` };
     }
   }
@@ -368,25 +358,18 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
     }
   }
 
-  if (isCurrent && (!d.assets || typeof d.assets !== 'object')) {
-    return { ok: false, error: 'Missing assets' };
-  }
-  if (d.assets != null) {
-    if (!d.assets || typeof d.assets !== 'object') return { ok: false, error: 'Invalid assets' };
-    for (const [key, label] of [
-      ['imageCacheIndexPath', 'assets.imageCacheIndexPath'],
-      ['articleCommentsIndexPath', 'assets.articleCommentsIndexPath'],
-    ] as const) {
-      const pathValue = (d.assets as any)[key];
-      if (isCurrent && pathValue == null) return { ok: false, error: `Missing ${label}` };
-      if (pathValue != null) {
-        if (!isNonEmptyString(pathValue) || !isSafeZipPath(pathValue)) {
-          return { ok: false, error: `Invalid ${label}` };
-        }
-        if (!String(pathValue).endsWith('.json')) {
-          return { ok: false, error: `Invalid ${label} extension` };
-        }
-      }
+  if (!d.assets || typeof d.assets !== 'object') return { ok: false, error: 'Missing assets' };
+  for (const [key, label] of [
+    ['imageCacheIndexPath', 'assets.imageCacheIndexPath'],
+    ['articleCommentsIndexPath', 'assets.articleCommentsIndexPath'],
+  ] as const) {
+    const pathValue = (d.assets as any)[key];
+    if (pathValue == null) return { ok: false, error: `Missing ${label}` };
+    if (!isNonEmptyString(pathValue) || !isSafeZipPath(pathValue)) {
+      return { ok: false, error: `Invalid ${label}` };
+    }
+    if (!String(pathValue).endsWith('.json')) {
+      return { ok: false, error: `Invalid ${label} extension` };
     }
   }
 
@@ -412,6 +395,11 @@ export function validateConversationBundle(doc: unknown): { ok: boolean; error: 
   for (const m of messages) {
     if (!m || typeof m !== 'object') return { ok: false, error: 'Invalid message item' };
     if (!isNonEmptyString(m.messageKey)) return { ok: false, error: 'Message missing messageKey' };
+    if (Object.prototype.hasOwnProperty.call(m, 'contentText'))
+      return { ok: false, error: 'Legacy message contentText is unsupported' };
+    if (m.contentMarkdown != null && typeof m.contentMarkdown !== 'string') {
+      return { ok: false, error: 'Invalid message contentMarkdown' };
+    }
   }
 
   if (d.syncMapping != null) {

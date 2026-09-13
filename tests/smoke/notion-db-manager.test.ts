@@ -23,6 +23,7 @@ function ensureChatDatabase(input: { accessToken?: string; parentPageId?: string
   return notionDbManager.ensureDatabase({
     accessToken: input.accessToken ?? 't',
     parentPageId: input.parentPageId ?? 'p',
+    kindId: 'chat',
     dbSpec: CHAT_DB_SPEC,
   });
 }
@@ -67,7 +68,7 @@ describe('notion-db-manager', () => {
     notionFetchImpl = async (req: any) => {
       calls.push(req);
       if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_created' };
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '11111111111111111111111111111111' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
@@ -75,7 +76,7 @@ describe('notion-db-manager', () => {
     globalThis.chrome = mockChromeStorage();
 
     const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('db_created');
+    expect(res.databaseId).toBe('11111111111111111111111111111111');
     expect(res.title).toBe('SyncNos-AI Chats');
 
     const create = calls.find((c) => c.method === 'POST' && c.path === '/v1/databases');
@@ -91,7 +92,7 @@ describe('notion-db-manager', () => {
     notionFetchImpl = async (req: any) => {
       calls.push(req);
       if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_articles' };
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '22222222222222222222222222222222' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
@@ -101,10 +102,15 @@ describe('notion-db-manager', () => {
 
     const dbSpec = ARTICLE_DB_SPEC;
 
-    const res = await notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p', dbSpec });
-    expect(res.databaseId).toBe('db_articles');
+    const res = await notionDbManager.ensureDatabase({
+      accessToken: 't',
+      parentPageId: 'p',
+      kindId: 'article',
+      dbSpec,
+    });
+    expect(res.databaseId).toBe('22222222222222222222222222222222');
     expect(res.title).toBe('SyncNos-Web Articles');
-    expect(chromeMock.__store.notion_db_id_syncnos_web_articles).toBe('db_articles');
+    expect(chromeMock.__store.notion_db_id_syncnos_web_articles).toBe('22222222222222222222222222222222');
 
     const create = calls.find((c) => c.method === 'POST' && c.path === '/v1/databases');
     expect(create.body.title?.[0]?.text?.content).toBe('SyncNos-Web Articles');
@@ -118,9 +124,9 @@ describe('notion-db-manager', () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+      if (req.method === 'GET' && req.path === '/v1/databases/33333333333333333333333333333333') {
         return {
-          id: 'db1',
+          id: '33333333333333333333333333333333',
           parent: { type: 'page_id', page_id: 'p' },
           properties: {
             Name: { type: 'title' },
@@ -134,7 +140,7 @@ describe('notion-db-manager', () => {
     };
 
     // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '33333333333333333333333333333333' } });
 
     await expect(ensureChatDatabase()).rejects.toThrow('AI must be multi_select');
     expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
@@ -144,25 +150,27 @@ describe('notion-db-manager', () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+      if (req.method === 'GET' && req.path === '/v1/databases/33333333333333333333333333333333') {
         return {
-          id: 'db1',
+          id: '33333333333333333333333333333333',
           parent: { type: 'page_id', page_id: 'p' },
           properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' } },
         };
       }
-      if (req.method === 'PATCH' && req.path === '/v1/databases/db1') return { ok: true };
+      if (req.method === 'PATCH' && req.path === '/v1/databases/33333333333333333333333333333333') return { ok: true };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
     // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '33333333333333333333333333333333' } });
 
     const res = await ensureChatDatabase();
     expect(res.reused).toBe(true);
-    expect(res.databaseId).toBe('db1');
+    expect(res.databaseId).toBe('33333333333333333333333333333333');
 
-    const patches = calls.filter((c) => c.method === 'PATCH' && c.path === '/v1/databases/db1');
+    const patches = calls.filter(
+      (c) => c.method === 'PATCH' && c.path === '/v1/databases/33333333333333333333333333333333',
+    );
     expect(patches).toHaveLength(2);
     expect(patches[0]?.body?.properties).toEqual({ Date: { name: 'Last Activity' } });
     expect(patches[1]?.body?.properties?.AI?.multi_select).toBeTruthy();
@@ -178,10 +186,14 @@ describe('notion-db-manager', () => {
     };
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
-        return { id: 'db1', parent: { type: 'page_id', page_id: 'p' }, properties: { ...properties } };
+      if (req.method === 'GET' && req.path === '/v1/databases/33333333333333333333333333333333') {
+        return {
+          id: '33333333333333333333333333333333',
+          parent: { type: 'page_id', page_id: 'p' },
+          properties: { ...properties },
+        };
       }
-      if (req.method === 'PATCH' && req.path === '/v1/databases/db1') {
+      if (req.method === 'PATCH' && req.path === '/v1/databases/33333333333333333333333333333333') {
         if (req.body?.properties?.Date?.name === 'Last Activity') {
           properties = {
             ...properties,
@@ -195,7 +207,7 @@ describe('notion-db-manager', () => {
     };
 
     // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '33333333333333333333333333333333' } });
 
     await ensureChatDatabase();
     await ensureChatDatabase();
@@ -209,9 +221,9 @@ describe('notion-db-manager', () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+      if (req.method === 'GET' && req.path === '/v1/databases/33333333333333333333333333333333') {
         return {
-          id: 'db1',
+          id: '33333333333333333333333333333333',
           parent: { type: 'page_id', page_id: 'p' },
           properties: {
             Name: { type: 'title' },
@@ -225,7 +237,7 @@ describe('notion-db-manager', () => {
     };
 
     // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '33333333333333333333333333333333' } });
 
     await expect(ensureChatDatabase()).rejects.toThrow(`${propertyName} must be date`);
     expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
@@ -233,9 +245,9 @@ describe('notion-db-manager', () => {
 
   it('propagates schema PATCH failures instead of continuing sync', async () => {
     notionFetchImpl = async (req: any) => {
-      if (req.method === 'GET' && req.path === '/v1/databases/db1') {
+      if (req.method === 'GET' && req.path === '/v1/databases/33333333333333333333333333333333') {
         return {
-          id: 'db1',
+          id: '33333333333333333333333333333333',
           parent: { type: 'page_id', page_id: 'p' },
           properties: {
             Name: { type: 'title' },
@@ -245,12 +257,13 @@ describe('notion-db-manager', () => {
           },
         };
       }
-      if (req.method === 'PATCH' && req.path === '/v1/databases/db1') throw new Error('schema patch failed');
+      if (req.method === 'PATCH' && req.path === '/v1/databases/33333333333333333333333333333333')
+        throw new Error('schema patch failed');
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
     // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db1' } });
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '33333333333333333333333333333333' } });
 
     await expect(ensureChatDatabase()).rejects.toThrow('schema patch failed');
   });
@@ -259,34 +272,36 @@ describe('notion-db-manager', () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db_old') {
+      if (req.method === 'GET' && req.path === '/v1/databases/77777777777777777777777777777777') {
         const error: any = new Error('database missing');
         error.status = 404;
         error.code = 'object_not_found';
         throw error;
       }
       if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_new' };
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '55555555555555555555555555555555' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
-    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db_old' } });
+    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '77777777777777777777777777777777' } });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
 
     const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('db_new');
+    expect(res.databaseId).toBe('55555555555555555555555555555555');
     expect(chromeMock.__removed.some((keys) => keys.includes(CHAT_DB_STORAGE_KEY))).toBe(true);
-    expect(calls.some((c) => c.method === 'GET' && c.path === '/v1/databases/db_old')).toBe(true);
+    expect(calls.some((c) => c.method === 'GET' && c.path === '/v1/databases/77777777777777777777777777777777')).toBe(
+      true,
+    );
   });
 
   it('does not reuse cached databases that are already in trash', async () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db_trashed') {
+      if (req.method === 'GET' && req.path === '/v1/databases/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') {
         return {
-          id: 'db_trashed',
+          id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           object: 'database',
           archived: false,
           in_trash: true,
@@ -294,16 +309,16 @@ describe('notion-db-manager', () => {
         };
       }
       if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_new' };
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '55555555555555555555555555555555' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
-    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db_trashed' } });
+    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
 
     const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('db_new');
+    expect(res.databaseId).toBe('55555555555555555555555555555555');
     expect(chromeMock.__removed.some((keys) => keys.includes(CHAT_DB_STORAGE_KEY))).toBe(true);
     expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
   });
@@ -316,7 +331,7 @@ describe('notion-db-manager', () => {
         return {
           results: [
             {
-              id: 'db_trashed',
+              id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
               object: 'database',
               archived: false,
               in_trash: true,
@@ -325,7 +340,7 @@ describe('notion-db-manager', () => {
           ],
         };
       }
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_new' };
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '55555555555555555555555555555555' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 
@@ -333,18 +348,18 @@ describe('notion-db-manager', () => {
     globalThis.chrome = mockChromeStorage();
 
     const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('db_new');
+    expect(res.databaseId).toBe('55555555555555555555555555555555');
     expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
   });
 
   it('does not reuse cached database when parent page changed', async () => {
     const calls: any[] = [];
-    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'db_cached' } });
+    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '44444444444444444444444444444444' } });
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/db_cached') {
+      if (req.method === 'GET' && req.path === '/v1/databases/44444444444444444444444444444444') {
         return {
-          id: 'db_cached',
+          id: '44444444444444444444444444444444',
           object: 'database',
           archived: false,
           in_trash: false,
@@ -361,7 +376,7 @@ describe('notion-db-manager', () => {
         return {
           results: [
             {
-              id: 'db_new_parent',
+              id: '66666666666666666666666666666666',
               object: 'database',
               archived: false,
               in_trash: false,
@@ -373,9 +388,9 @@ describe('notion-db-manager', () => {
           next_cursor: null,
         };
       }
-      if (req.method === 'GET' && req.path === '/v1/databases/db_new_parent') {
+      if (req.method === 'GET' && req.path === '/v1/databases/66666666666666666666666666666666') {
         return {
-          id: 'db_new_parent',
+          id: '66666666666666666666666666666666',
           object: 'database',
           archived: false,
           in_trash: false,
@@ -395,7 +410,7 @@ describe('notion-db-manager', () => {
     globalThis.chrome = chromeMock;
 
     const res = await ensureChatDatabase({ parentPageId: 'p_new' });
-    expect(res.databaseId).toBe('db_new_parent');
+    expect(res.databaseId).toBe('66666666666666666666666666666666');
     expect(res.reused).toBe(true);
     expect(chromeMock.__removed.some((keys) => keys.includes(CHAT_DB_STORAGE_KEY))).toBe(true);
     expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(false);
@@ -411,7 +426,7 @@ describe('notion-db-manager', () => {
           return {
             results: [
               {
-                id: 'db_other_parent',
+                id: '88888888888888888888888888888888',
                 object: 'database',
                 archived: false,
                 in_trash: false,
@@ -427,7 +442,7 @@ describe('notion-db-manager', () => {
           return {
             results: [
               {
-                id: 'db_target',
+                id: '99999999999999999999999999999999',
                 object: 'database',
                 archived: false,
                 in_trash: false,
@@ -440,9 +455,9 @@ describe('notion-db-manager', () => {
           };
         }
       }
-      if (req.method === 'GET' && req.path === '/v1/databases/db_target') {
+      if (req.method === 'GET' && req.path === '/v1/databases/99999999999999999999999999999999') {
         return {
-          id: 'db_target',
+          id: '99999999999999999999999999999999',
           object: 'database',
           archived: false,
           in_trash: false,
@@ -462,7 +477,7 @@ describe('notion-db-manager', () => {
     globalThis.chrome = mockChromeStorage();
 
     const res = await ensureChatDatabase({ parentPageId: 'p_target' });
-    expect(res.databaseId).toBe('db_target');
+    expect(res.databaseId).toBe('99999999999999999999999999999999');
     expect(res.reused).toBe(true);
     expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(false);
     expect(calls.filter((c) => c.method === 'POST' && c.path === '/v1/search').length).toBe(2);

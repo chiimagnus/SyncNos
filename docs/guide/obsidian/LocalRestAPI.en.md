@@ -1,58 +1,45 @@
-# Obsidian Local REST API Setup (WebClipper)
+# Obsidian Local REST API Setup
 
 **English** | [中文](./LocalRestAPI.zh.md)
 
-This guide covers the user-facing setup for syncing SyncNos WebClipper content to an Obsidian vault through the Local REST API plugin. Runtime behavior is defined by the current source code rather than duplicated as internal module structure here.
-
-## Prerequisites
-
-- Obsidian Desktop is installed and a vault is open.
-- Community plugins are enabled.
+SyncNos writes Markdown and local image attachments to an Obsidian vault through the **Local REST API** community plugin.
 
 ## 1. Install Local REST API
 
-In Obsidian, open `Settings` → `Community plugins`, search for **Local REST API** by Adam Coddington, install it, and enable it.
+In Obsidian Desktop, open **Settings → Community plugins**, install **Local REST API** by Adam Coddington, and enable it.
 
 ![Install Obsidian Local REST API plugin](./assets/obsidian-install-plugin.png)
 
-## 2. Enable local HTTP
+## 2. Enable the local HTTP server
 
-The current SyncNos client accepts HTTP for this integration. In the Local REST API plugin settings, enable **Insecure HTTP**.
+SyncNos currently uses the plugin's local HTTP endpoint, not its HTTPS endpoint. Enable the plugin's non-encrypted/insecure HTTP server.
 
-The default SyncNos endpoint is:
+The default SyncNos URL is:
 
 ```text
 http://127.0.0.1:27123
 ```
 
-Keep the service bound to `127.0.0.1` / `localhost`. Do not bind it to `0.0.0.0` unless you intentionally want to expose the API to the local network.
+Keep the service bound to `127.0.0.1` / `localhost`. Do not expose it on `0.0.0.0` unless you intentionally want the API reachable from the local network.
 
-![Enable insecure HTTP mode](./assets/obsidian-enable-insecure-http.png)
+![Enable the local HTTP server](./assets/obsidian-enable-insecure-http.png)
 
-## 3. Copy the API Key
+## 3. Configure SyncNos
 
-Copy the API Key from the Local REST API plugin settings.
+Copy the API Key from the Local REST API plugin, then open **SyncNos → Settings → Obsidian** and set:
 
-![Copy API key](./assets/obsidian-copy-api-key.png)
+- **Base URL:** normally `http://127.0.0.1:27123`
+- **API Key:** the key from Obsidian
+- **Auth Header:** normally `Authorization`
 
-Then open WebClipper → `Settings` → `Obsidian` and configure:
+Click **Test** to verify the connection.
 
-- Base URL: normally `http://127.0.0.1:27123`.
-- API Key: the key copied from Obsidian.
-- Auth Header: normally `Authorization`.
+![Configure the API key in SyncNos](./assets/obsidian-copy-api-key.png)
 
-Changes are saved when you leave the field or press Enter; then click `Test` to verify the connection. The API Key is stored locally by the extension and is excluded from SyncNos backups.
+The API Key stays in extension-local storage and is excluded from SyncNos Backup ZIP files. Manual sync is available after setup; auto-sync can be enabled separately.
 
-## 4. Sync behavior
+## Troubleshooting
 
-Obsidian is a local derived target. SyncNos writes Markdown and required local image attachments to the vault through the localhost REST API; this path does not require a SyncNos cloud service.
+For `Failed to fetch` or another network error, verify that Obsidian is running, Local REST API is enabled, the local HTTP server is enabled, and the Base URL is correct.
 
-Manual sync is always available. If Obsidian auto-sync is explicitly enabled, local content changes can also enter the provider's automatic sync queue.
-
-Destination folders and note naming are owned by the current Obsidian service and settings code rather than duplicated in this guide.
-
-## 5. Troubleshooting
-
-For `Failed to fetch` or another network error, check that Obsidian Desktop is running, Local REST API is enabled, Insecure HTTP is enabled, and the Base URL points to the local service.
-
-For `401` / `403` or `authenticated false`, copy the API Key again and verify the configured Auth Header. Remove accidental leading/trailing whitespace before testing again.
+For `401` / `403` or `authenticated false`, copy the API Key again and verify the Auth Header.

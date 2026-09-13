@@ -53,7 +53,7 @@ describe('backup-utils', () => {
     expect(backupUtils.filterStorageForBackup({ inpage_retired_setting: true, keep: 1 })).toEqual({ keep: 1 });
   });
 
-  it('validateBackupManifest accepts a minimal zip v2 manifest', () => {
+  it('validateBackupManifest rejects legacy zip v2 manifests', () => {
     const res = backupUtils.validateBackupManifest({
       backupSchemaVersion: 2,
       exportedAt: new Date().toISOString(),
@@ -63,7 +63,7 @@ describe('backup-utils', () => {
       index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [{ source: 'chatgpt', conversationCount: 1, files: ['sources/chatgpt/c1.json'] }],
     });
-    expect(res.ok).toBe(true);
+    expect(res).toEqual({ ok: false, error: 'Unsupported backupSchemaVersion' });
   });
 
   it('validateBackupManifest requires current v3 asset counts and index paths', () => {
@@ -92,13 +92,17 @@ describe('backup-utils', () => {
 
   it('validateBackupManifest rejects unsafe paths', () => {
     const res = backupUtils.validateBackupManifest({
-      backupSchemaVersion: 2,
+      backupSchemaVersion: 3,
       exportedAt: new Date().toISOString(),
-      db: { name: 'webclipper', version: 3 },
-      counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+      db: { name: 'webclipper', version: 13 },
+      counts: { conversations: 0, messages: 0, sync_mappings: 0, image_cache: 0, article_comments: 0 },
       config: { storageLocalPath: '../config/storage-local.json' },
       index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [],
+      assets: {
+        imageCacheIndexPath: 'assets/image-cache/index.json',
+        articleCommentsIndexPath: 'assets/article-comments/index.json',
+      },
     });
     expect(res.ok).toBe(false);
   });

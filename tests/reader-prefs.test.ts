@@ -67,12 +67,10 @@ describe('normalizeReaderPrefs', () => {
     const p = normalizeReaderPrefs({
       fontFamily: 'comic',
       textAlign: 'center',
-      theme: 'neon',
       tts: { engine: 'magic', aiFormat: 'midi', rate: 99 },
     });
     expect(p.fontFamily).toBe(DEFAULT_READER_PREFS.fontFamily);
     expect(p.textAlign).toBe(DEFAULT_READER_PREFS.textAlign);
-    expect(p.theme).toBe(DEFAULT_READER_PREFS.theme);
     expect(p.tts.engine).toBe(DEFAULT_READER_TTS_PREFS.engine);
     expect(p.tts.aiFormat).toBe(DEFAULT_READER_TTS_PREFS.aiFormat);
     expect(p.tts.rate).toBe(READER_PREFS_LIMITS.tts.rate.max);
@@ -86,12 +84,10 @@ describe('normalizeReaderPrefs', () => {
       contentWidth: 800,
       letterSpacing: 0.05,
       textAlign: 'justify',
-      theme: 'sepia',
       tts: { engine: 'ai', rate: 1.5, aiFormat: 'mp3', aiModel: 'kokoro', aiVoice: 'af_sky' },
     });
     expect(p.fontFamily).toBe('mono');
     expect(p.fontSize).toBe(22);
-    expect(p.theme).toBe('sepia');
     expect(p.tts.engine).toBe('ai');
     expect(p.tts.rate).toBe(1.5);
     expect(p.tts.aiFormat).toBe('mp3');
@@ -101,10 +97,9 @@ describe('normalizeReaderPrefs', () => {
 describe('resolveReaderPrefsFromStorage', () => {
   it('uses reader_prefs_v1 when present', () => {
     const p = resolveReaderPrefsFromStorage({
-      [READER_PREFS_STORAGE_KEY]: { fontSize: 30, theme: 'black' },
+      [READER_PREFS_STORAGE_KEY]: { fontSize: 30 },
     });
     expect(p.fontSize).toBe(30);
-    expect(p.theme).toBe('black');
   });
 
   it('returns defaults for empty storage', () => {
@@ -122,15 +117,12 @@ describe('buildReaderPrefsStoragePatch', () => {
 });
 
 describe('readerPrefsToCssVars', () => {
-  it('emits reader CSS vars and never includes theme', () => {
-    const vars = readerPrefsToCssVars({ fontSize: 20, lineHeight: 1.6, theme: 'sepia' });
+  it('emits typography-only reader CSS vars', () => {
+    const vars = readerPrefsToCssVars({ fontSize: 20, lineHeight: 1.6 });
     expect(vars['--reader-font-size']).toBe('20px');
     expect(vars['--reader-line-height']).toBe('1.6');
     expect(readerPrefsToCssVars({ letterSpacing: -0.02 })['--reader-letter-spacing']).toBe('0em');
     expect(vars['--reader-text-align']).toBe(DEFAULT_READER_PREFS.textAlign);
-    // P3 boundary: theme must NOT leak into CSS vars
-    const keys = Object.keys(vars);
-    expect(keys.some((k) => k.toLowerCase().includes('theme'))).toBe(false);
-    expect(JSON.stringify(vars).toLowerCase().includes('sepia')).toBe(false);
+    expect(Object.keys(vars).some((key) => key.toLowerCase().includes('theme'))).toBe(false);
   });
 });

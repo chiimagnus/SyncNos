@@ -26,7 +26,7 @@ const root = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('backup article comments', () => {
-  it('accepts V1 archives and reports missing optional fields', () => {
+  it('rejects V1 archives', () => {
     const doc = {
       schemaVersion: 1,
       comments: [
@@ -43,8 +43,7 @@ describe('backup article comments', () => {
       ],
     };
     const result = validateArticleCommentArchiveDocument(doc);
-    expect(result.ok).toBe(true);
-    expect(result.warnings.map((warning) => warning.code)).toEqual(['v1_missing_author', 'v1_missing_locator']);
+    expect(result).toMatchObject({ ok: false, error: 'Unsupported article comments schemaVersion' });
   });
 
   it('strictly validates V2 locator and field budgets', () => {
@@ -109,13 +108,12 @@ describe('backup article comments', () => {
     ).toBe(false);
   });
 
-  it('accepts orphan rows with an auditable warning for historical compatibility', () => {
+  it('rejects current-schema replies whose parent is missing', () => {
     const result = validateArticleCommentArchiveDocument({
       schemaVersion: 2,
       comments: [root({ parentCommentId: 999 })],
     });
-    expect(result.ok).toBe(true);
-    expect(result.warnings).toEqual([{ code: 'orphan_parent', commentId: 1 }]);
+    expect(result).toMatchObject({ ok: false, error: 'Article comment parent missing' });
   });
 
   it('serializes a canonical V2 graph and preserves author/locator fields', () => {
@@ -187,22 +185,17 @@ describe('backup article comments', () => {
     ).toBe(false);
   });
 
-  it('prepares roots before replies and promotes compatible V1 orphans', () => {
+  it('prepares current-schema roots before replies without import-time graph repair', () => {
     const prepared = prepareArticleCommentArchiveImport({
-      schemaVersion: 1,
-      comments: [
-        root({ commentId: 2, parentCommentId: 1, commentText: 'reply', createdAt: 2, updatedAt: 2 }),
-        root(),
-        root({ commentId: 3, parentCommentId: 999, commentText: 'orphan', createdAt: 3, updatedAt: 3 }),
-      ],
+      schemaVersion: 2,
+      comments: [root({ commentId: 2, parentCommentId: 1, commentText: 'reply', createdAt: 2, updatedAt: 2 }), root()],
     });
     expect(prepared.items.map((item) => [item.commentId, item.parentCommentId])).toEqual([
-      [3, null],
       [1, null],
       [2, 1],
     ]);
     expect(prepared.items.every((item) => Boolean(item.fingerprint))).toBe(true);
-    expect(prepared.warnings).toContainEqual({ code: 'orphan_parent', commentId: 3 });
+    expect(prepared.warnings).toEqual([]);
   });
 
   it('keeps archive fingerprints distinct across conversations sharing the same URL and text', () => {
