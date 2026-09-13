@@ -1,8 +1,8 @@
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
-import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
@@ -51,7 +51,6 @@ export function createTestBackgroundRouter(
     onConversationChanged: options.onArticleConversationChanged ?? (async () => {}),
   });
   registerNotionSettingsHandlers(router, {
-    conversationKinds,
     runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
   });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });

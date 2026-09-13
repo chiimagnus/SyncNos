@@ -2,8 +2,9 @@ import { normalizeConversationListRecord } from '@platform/idb/conversation-list
 import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain/article-identity';
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageSet } from '@platform/storage/local';
-import { FEISHU_MESSAGE_TYPES, INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { INPAGE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
+import { saveFeishuOAuthConfig } from '@services/sync/feishu/auth/oauth';
 import {
   areBackupValuesEqual,
   filterStorageForBackup,
@@ -203,12 +204,7 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
     }
   }
 
-  if (Object.keys(feishuConfig).length) {
-    const response = await send<any>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, feishuConfig);
-    if (!response?.ok) {
-      throw new Error(String(response?.error?.message || 'restore feishu oauth config failed'));
-    }
-  }
+  if (Object.keys(feishuConfig).length) await saveFeishuOAuthConfig(feishuConfig);
 }
 
 function normalizeHttpUrl(raw: unknown): string {

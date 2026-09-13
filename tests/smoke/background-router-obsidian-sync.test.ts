@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
+import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 
 function deferred<T>() {
@@ -26,6 +27,7 @@ describe('background-router obsidian sync routes', () => {
 
     const store: Record<string, unknown> = {};
     const syncBlocker = deferred<any>();
+    const obsidianOwnership = createSyncRunOwnership();
 
     // @ts-expect-error test global
     globalThis.chrome = {
@@ -85,13 +87,13 @@ describe('background-router obsidian sync routes', () => {
         async clearSyncStatus() {
           return { provider: 'obsidian', job: null };
         },
-        isRunActive: () => false,
-        async syncConversations(payload: any) {
+        isRunActive: obsidianOwnership.isRunActive,
+        syncConversations(payload: any) {
           calls.syncConversations = payload;
-          if (calls.syncMode === 'long-running') {
-            return await syncBlocker.promise;
-          }
-          return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
+          return obsidianOwnership.startRun(async () => {
+            if (calls.syncMode === 'long-running') return await syncBlocker.promise;
+            return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
+          });
         },
       },
       feishuSyncOrchestrator: {
@@ -124,6 +126,7 @@ describe('background-router obsidian sync routes', () => {
     expect(getRes.ok).toBe(true);
     expect(getRes.data?.apiBaseUrl).toContain('http://127.0.0.1:27123');
     expect(getRes.data?.apiKeyPresent).toBe(false);
+    expect(getRes.data).not.toHaveProperty('apiKey');
 
     const saveRes = await router.dispatch({
       type: 'obsidianSaveSettings',
@@ -134,6 +137,8 @@ describe('background-router obsidian sync routes', () => {
     expect(saveRes.ok).toBe(true);
     expect(saveRes.data?.apiKeyPresent).toBe(true);
     expect(saveRes.data?.apiKeyMasked).toBe('********************************');
+    expect(saveRes.data).not.toHaveProperty('apiKey');
+    expect(JSON.stringify(saveRes.data)).not.toContain('"apiKey":"k"');
 
     const testRes = await router.dispatch({ type: 'obsidianTestConnection' });
     expect(testRes.ok).toBe(true);
@@ -156,6 +161,7 @@ describe('background-router obsidian sync routes', () => {
     expect(calls.syncConversations?.conversationIds).toEqual([1, 2]);
     expect(calls.syncConversations?.forceFullConversationIds).toEqual([2]);
     expect(typeof calls.syncConversations?.instanceId).toBe('string');
+    expect(calls.syncConversations?.jobId).toBe(syncRes.data?.jobId);
 
     calls.syncConversations = null;
     calls.syncPreflightMode = 'network_error';

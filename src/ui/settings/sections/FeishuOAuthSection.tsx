@@ -14,6 +14,7 @@ export function FeishuOAuthSection(props: {
   feishuLastError: string;
   feishuClientId: string;
   feishuClientSecret: string;
+  feishuClientSecretPresent: boolean;
   feishuTokenExchangeProxyUrl: string;
   feishuChatFolder: string;
   feishuArticleFolder: string;
@@ -25,6 +26,7 @@ export function FeishuOAuthSection(props: {
   onConnectOrDisconnect: () => void;
   onChangeClientId: (value: string) => void;
   onChangeClientSecret: (value: string) => void;
+  onResetClientSecret: () => void;
   onChangeTokenExchangeProxyUrl: (value: string) => void;
   onChangeChatFolder: (value: string) => void;
   onChangeArticleFolder: (value: string) => void;
@@ -44,6 +46,7 @@ export function FeishuOAuthSection(props: {
     feishuLastError,
     feishuClientId,
     feishuClientSecret,
+    feishuClientSecretPresent,
     feishuTokenExchangeProxyUrl,
     feishuChatFolder,
     feishuArticleFolder,
@@ -55,6 +58,7 @@ export function FeishuOAuthSection(props: {
     onConnectOrDisconnect,
     onChangeClientId,
     onChangeClientSecret,
+    onResetClientSecret,
     onChangeTokenExchangeProxyUrl,
     onChangeChatFolder,
     onChangeArticleFolder,
@@ -154,18 +158,30 @@ export function FeishuOAuthSection(props: {
           </SettingsFormRow>
 
           <SettingsFormRow label={t('feishuOAuthClientSecretLabel')}>
-            <input
-              value={feishuClientSecret}
-              onChange={(e) => onChangeClientSecret(e.target.value)}
-              onBlur={onSaveAdvanced}
-              onKeyDown={onEnterToSaveAdvanced}
-              disabled={busy || pollingFeishu}
-              spellCheck={false}
-              type="password"
-              placeholder="••••••••"
-              aria-label={t('feishuOAuthClientSecretLabel')}
-              className={`${textInputClassName} tw-w-full`}
-            />
+            <div className="tw-flex tw-w-full tw-gap-2">
+              <input
+                value={feishuClientSecret}
+                onChange={(e) => onChangeClientSecret(e.target.value)}
+                onBlur={onSaveAdvanced}
+                onKeyDown={onEnterToSaveAdvanced}
+                disabled={busy || pollingFeishu}
+                spellCheck={false}
+                type="password"
+                placeholder={feishuClientSecretPresent ? '••••••••' : ''}
+                aria-label={t('feishuOAuthClientSecretLabel')}
+                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+              />
+              {feishuClientSecretPresent ? (
+                <button
+                  type="button"
+                  className={buttonClassName}
+                  disabled={busy || pollingFeishu}
+                  onClick={onResetClientSecret}
+                >
+                  {t('reset')}
+                </button>
+              ) : null}
+            </div>
           </SettingsFormRow>
 
           <SettingsFormRow label={t('feishuTokenExchangeProxyUrlLabel')}>

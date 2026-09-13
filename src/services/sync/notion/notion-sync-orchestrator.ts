@@ -1,7 +1,7 @@
 import type { NotionServices } from '@services/sync/notion/notion-services.ts';
 import { extractNotionWorkspaceSlugFromUrl } from '@services/sync/notion/notion-url-utils';
 import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
-import { storageGet } from '@platform/storage/local';
+import { getNotionParentPage } from '@services/sync/notion/settings-store';
 import {
   buildNotionCommentsBlocks,
   computeNotionCommentsDigest,
@@ -20,7 +20,7 @@ import {
 } from '@services/sync/notion/notion-managed-sections.ts';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 import { formatVideoContentMarkdown } from '@services/conversations/domain/markdown';
-import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncJobId, createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import type { SyncJobSnapshot } from '@services/sync/models';
@@ -298,8 +298,7 @@ async function buildNonArticleBlocksForSync({
 }
 
 async function getNotionParentPageId() {
-  const res = await storageGet(['notion_parent_page_id']);
-  return String((res as any)?.notion_parent_page_id || '');
+  return (await getNotionParentPage()).id;
 }
 
 export function createNotionSyncOrchestrator(services: NotionServices) {
@@ -341,8 +340,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     const ids = normalizeSyncConversationIds(input?.conversationIds);
     if (!ids.length) throw new Error('no conversationIds');
 
-    const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const jobStartedAt = Date.now();
+    const requestedJobId = String(input?.jobId ?? '').trim();
+    const jobId = requestedJobId || createSyncJobId(jobStartedAt);
     const initialJob: SyncJobSnapshot = {
       id: jobId,
       provider: SYNC_PROVIDER,
@@ -377,8 +377,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
       const dbIdByKindId = new Map();
       const dbIdPromiseByKindId = new Map();
-      const recoveredMissingDbByStorageKey = new Set();
-      const dbRecoveryPromiseByStorageKey = new Map();
+      const recoveredMissingDbByKindId = new Set();
+      const dbRecoveryPromiseByKindId = new Map();
 
       async function ensureDbForKind(kind: ConversationKindDefinition) {
         const existing = dbIdByKindId.get(kind.id);
@@ -390,6 +390,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           const db = await notionDbManager.ensureDatabase({
             accessToken: accessToken,
             parentPageId,
+            kindId: kind.id,
             dbSpec,
           });
           const dbId = db.databaseId;
@@ -404,27 +405,27 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       }
 
-      async function recoverDbForStorageKey(kind: ConversationKindDefinition, dbSpec: ConversationKindDbSpec) {
-        const storageKey = dbSpec.storageKey;
-        const pending = dbRecoveryPromiseByStorageKey.get(storageKey);
+      async function recoverDbForKind(kind: ConversationKindDefinition, dbSpec: ConversationKindDbSpec) {
+        const pending = dbRecoveryPromiseByKindId.get(kind.id);
         if (pending) return pending;
         const recoveryPromise = (async () => {
-          await notionDbManager.clearCachedDatabaseId(storageKey);
+          await notionDbManager.clearCachedDatabaseId(kind.id);
           const rebuiltDb = await notionDbManager.ensureDatabase({
             accessToken: accessToken,
             parentPageId,
+            kindId: kind.id,
             dbSpec,
           });
           const rebuiltDbId = rebuiltDb.databaseId;
           dbIdByKindId.set(kind.id, rebuiltDbId);
-          recoveredMissingDbByStorageKey.add(storageKey);
+          recoveredMissingDbByKindId.add(kind.id);
           return rebuiltDbId;
         })();
-        dbRecoveryPromiseByStorageKey.set(storageKey, recoveryPromise);
+        dbRecoveryPromiseByKindId.set(kind.id, recoveryPromise);
         try {
           return await recoveryPromise;
         } finally {
-          dbRecoveryPromiseByStorageKey.delete(storageKey);
+          dbRecoveryPromiseByKindId.delete(kind.id);
         }
       }
 
@@ -548,13 +549,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             } catch (createErr) {
               const shouldRecoverDb = isMissingDatabaseError(createErr);
               if (!shouldRecoverDb) throw createErr;
-              const recoveredStorageKey = dbSpec.storageKey;
-              // Rebuild once per storage key and share the recovery across concurrent conversations.
-
+              // Rebuild once per kind and share the recovery across concurrent conversations.
               dbId =
-                recoveredMissingDbByStorageKey.has(recoveredStorageKey) && dbIdByKindId.get(kind.id)
+                recoveredMissingDbByKindId.has(kind.id) && dbIdByKindId.get(kind.id)
                   ? String(dbIdByKindId.get(kind.id) || '')
-                  : await recoverDbForStorageKey(kind, dbSpec);
+                  : await recoverDbForKind(kind, dbSpec);
 
               created = await notionSyncService.createPageInDatabase(accessToken, {
                 databaseId: dbId,

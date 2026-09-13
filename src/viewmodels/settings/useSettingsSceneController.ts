@@ -11,7 +11,6 @@ import {
   normalizeFeishuFolderPath,
   saveFeishuPathConfig,
 } from '@services/sync/feishu/settings-store';
-import { normalizeNotionDatabaseIdInput } from '@services/sync/notion/notion-id-utils';
 import {
   FEISHU_MESSAGE_TYPES,
   GITHUB_MESSAGE_TYPES,
@@ -22,7 +21,7 @@ import {
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
 import { send } from '@services/shared/runtime';
-import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
+import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
 import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
@@ -82,25 +81,10 @@ const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion')
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
 const FEISHU_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('feishu');
 const GITHUB_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('github');
-function getKindDbSpec(kindId: string) {
-  const spec = conversationKinds.getNotionDbSpecByKindId(kindId);
-  const storageKey = String(spec?.storageKey || '').trim();
-  const title = String(spec?.title || '').trim();
-  if (!storageKey || !title) throw new Error(`missing Notion database spec for kind: ${kindId}`);
-  return { storageKey, title };
-}
-
-function getNotionDbStorageKeys() {
-  const keys = Array.from(
-    new Set(
-      conversationKinds
-        .getNotionStorageKeys()
-        .map((key) => String(key || '').trim())
-        .filter(Boolean),
-    ),
-  );
-  if (!keys.length) throw new Error('missing Notion database storage keys');
-  return keys;
+function getKindDbTitle(kindId: string) {
+  const title = String(conversationKinds.getNotionDbSpecByKindId(kindId)?.title || '').trim();
+  if (!title) throw new Error(`missing Notion database spec for kind: ${kindId}`);
+  return title;
 }
 
 function isFirefoxFamilyBrowser() {
@@ -276,6 +260,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [feishuLastError, setFeishuLastError] = useState<string>('');
   const [feishuClientId, setFeishuClientId] = useState<string>('');
   const [feishuClientSecret, setFeishuClientSecret] = useState<string>('');
+  const [feishuClientSecretPresent, setFeishuClientSecretPresent] = useState(false);
+  const [feishuClientSecretDirty, setFeishuClientSecretDirty] = useState(false);
   const [feishuTokenExchangeProxyUrl, setFeishuTokenExchangeProxyUrl] = useState<string>('');
   const [pollingFeishu, setPollingFeishu] = useState(false);
   const feishuConnectedRef = useRef<boolean | null>(null);
@@ -337,9 +323,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
-  const chatDbSpec = useMemo(() => getKindDbSpec('chat'), []);
-  const articleDbSpec = useMemo(() => getKindDbSpec('article'), []);
-  const videoDbSpec = useMemo(() => getKindDbSpec('video'), []);
+  const chatDbTitle = useMemo(() => getKindDbTitle('chat'), []);
+  const articleDbTitle = useMemo(() => getKindDbTitle('article'), []);
+  const videoDbTitle = useMemo(() => getKindDbTitle('video'), []);
   const [notionAdvancedOpen, setNotionAdvancedOpen] = useState(false);
   const [notionChatDatabaseId, setNotionChatDatabaseId] = useState<string>('');
   const [notionArticleDatabaseId, setNotionArticleDatabaseId] = useState<string>('');
@@ -702,7 +688,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const aiChatDollarMentionObservationAtStart = aiChatDollarMentionObservationRevisionRef.current;
     const [
       ,
-      ,
+      feishuAuthStatus,
+      notionConfigRes,
+      feishuConfigRes,
       local,
       obsidianRes,
       githubRes,
@@ -712,19 +700,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     ] = await Promise.all([
       readNotionAuthStatus(),
       readFeishuAuthStatus(),
+      send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_CONFIG, {}),
+      send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG, {}),
       storageGet([
         'notion_oauth_pending_state',
         'notion_oauth_last_error',
-        'notion_parent_page_id',
-        'notion_parent_page_title',
-        'feishu_oauth_client_id',
-        'feishu_oauth_client_secret',
-        'feishu_oauth_pending_state',
-        'feishu_oauth_last_error',
-        'feishu_oauth_token_exchange_proxy_url',
-        chatDbSpec.storageKey,
-        articleDbSpec.storageKey,
-        videoDbSpec.storageKey,
         NOTION_SYNC_PROVIDER_ENABLED_KEY,
         FEISHU_SYNC_PROVIDER_ENABLED_KEY,
         OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
@@ -759,11 +739,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setNotionLastError(lastError);
       if (notionConnectedRef.current === true || lastError || !pending) setNotionPollingState(false);
     }
-    setNotionParentPageId(String(local?.notion_parent_page_id || ''));
-    setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
-    setNotionChatDatabaseId(String(local?.[chatDbSpec.storageKey] || ''));
-    setNotionArticleDatabaseId(String(local?.[articleDbSpec.storageKey] || ''));
-    setNotionVideoDatabaseId(String(local?.[videoDbSpec.storageKey] || ''));
+    const notionConfig = unwrap(notionConfigRes);
+    setNotionParentPageId(String(notionConfig?.parentPageId || ''));
+    setNotionParentPageTitle(String(notionConfig?.parentPageTitle || ''));
+    setNotionChatDatabaseId(String(notionConfig?.databaseIds?.chat || ''));
+    setNotionArticleDatabaseId(String(notionConfig?.databaseIds?.article || ''));
+    setNotionVideoDatabaseId(String(notionConfig?.databaseIds?.video || ''));
     setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
     setNotionAutoSyncEnabled(local?.[NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
     setFeishuSyncEnabled(local?.[FEISHU_SYNC_PROVIDER_ENABLED_KEY] !== false);
@@ -774,18 +755,21 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setGithubAutoSyncEnabled(local?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
     applyCliIntegrationStatus(local?.[CLI_INTEGRATION_ENABLED_STORAGE_KEY] === true, cliIntegrationCapability);
 
-    setFeishuClientId(String(local?.feishu_oauth_client_id || ''));
-    setFeishuClientSecret(String(local?.feishu_oauth_client_secret || ''));
+    const feishuConfig = unwrap(feishuConfigRes);
+    setFeishuClientId(String(feishuConfig?.clientId || ''));
+    setFeishuClientSecret('');
+    setFeishuClientSecretPresent(feishuConfig?.clientSecretPresent === true);
+    setFeishuClientSecretDirty(false);
     if (feishuAuthObservationRevisionRef.current === feishuAuthObservationAtStart) {
-      const pending = String(local?.feishu_oauth_pending_state || '');
-      const lastError = String(local?.feishu_oauth_last_error || '');
+      const pending = feishuAuthStatus?.pending === true ? 'pending' : '';
+      const lastError = feishuAuthStatus?.errorPresent === true ? 'error' : '';
       feishuPendingStateRef.current = pending;
       feishuLastErrorRef.current = lastError;
       setFeishuPendingState(pending);
       setFeishuLastError(lastError);
       if (feishuConnectedRef.current === true || lastError || !pending) setFeishuPollingState(false);
     }
-    setFeishuTokenExchangeProxyUrl(String(local?.feishu_oauth_token_exchange_proxy_url || ''));
+    setFeishuTokenExchangeProxyUrl(String(feishuConfig?.tokenExchangeProxyUrl || ''));
     const feishuPathConfig = await getFeishuPathConfig().catch(() => null);
     setFeishuChatFolder(String(feishuPathConfig?.chatFolder || FEISHU_DEFAULTS.chatFolder));
     setFeishuArticleFolder(String(feishuPathConfig?.articleFolder || FEISHU_DEFAULTS.articleFolder));
@@ -824,13 +808,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [
     applyCliIntegrationStatus,
     applyGithubSettingsResponse,
-    articleDbSpec.storageKey,
-    chatDbSpec.storageKey,
     readFeishuAuthStatus,
     readNotionAuthStatus,
     setFeishuPollingState,
     setNotionPollingState,
-    videoDbSpec.storageKey,
   ]);
 
   useEffect(() => {
@@ -1059,6 +1040,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setNotionPages([]);
         setNotionParentPageId('');
         setNotionParentPageTitle('');
+        setNotionChatDatabaseId('');
+        setNotionArticleDatabaseId('');
+        setNotionVideoDatabaseId('');
         setNotionPollingState(false);
         setLoadingNotionPages(false);
         return;
@@ -1388,23 +1372,45 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     return !target?.contentWriteCapable;
   }, [githubAuth.state, githubRepositories, githubRepository, githubRepositoryStatus]);
 
-  const onSaveFeishuAdvancedSettings = useCallback(async () => {
+  const persistFeishuAuthConfig = useCallback(async () => {
+    const payload: Record<string, unknown> = {
+      clientId: feishuClientId,
+      tokenExchangeProxyUrl: feishuTokenExchangeProxyUrl,
+    };
+    if (feishuClientSecretDirty) payload.clientSecret = feishuClientSecret;
+    const saved = unwrap(await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, payload));
+    setFeishuTokenExchangeProxyUrl(String(saved?.tokenExchangeProxyUrl || ''));
+    setFeishuClientId(String(saved?.clientId || ''));
+    setFeishuClientSecretPresent(saved?.clientSecretPresent === true);
+    setFeishuClientSecret('');
+    setFeishuClientSecretDirty(false);
+    return saved;
+  }, [feishuClientId, feishuClientSecret, feishuClientSecretDirty, feishuTokenExchangeProxyUrl]);
+
+  const onChangeFeishuClientSecret = useCallback((value: string) => {
+    setFeishuClientSecret(value);
+    setFeishuClientSecretDirty(true);
+  }, []);
+
+  const onResetFeishuClientSecret = useCallback(async () => {
     await runTask(
       async () => {
         const saved = unwrap(
           await send<ApiResponse<any>>(FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG, {
-            clientId: feishuClientId,
-            clientSecret: feishuClientSecret,
-            tokenExchangeProxyUrl: feishuTokenExchangeProxyUrl,
+            clientSecret: '',
           }),
         );
-        setFeishuTokenExchangeProxyUrl(String(saved?.tokenExchangeProxyUrl || ''));
-        setFeishuClientId(String(saved?.clientId || ''));
-        setFeishuClientSecret(String(feishuClientSecret || '').trim());
+        setFeishuClientSecret('');
+        setFeishuClientSecretDirty(false);
+        setFeishuClientSecretPresent(saved?.clientSecretPresent === true);
       },
-      { fallbackMessage: 'save feishu settings failed' },
+      { fallbackMessage: 'reset feishu client secret failed' },
     );
-  }, [feishuClientId, feishuClientSecret, feishuTokenExchangeProxyUrl, runTask]);
+  }, [runTask]);
+
+  const onSaveFeishuAdvancedSettings = useCallback(async () => {
+    await runTask(persistFeishuAuthConfig, { fallbackMessage: 'save feishu settings failed' });
+  }, [persistFeishuAuthConfig, runTask]);
 
   const onFeishuConnectOrDisconnect = useCallback(async () => {
     if (feishuConnectedRef.current !== true && feishuPollingRef.current) return;
@@ -1431,13 +1437,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const requestGeneration = feishuStartGenerationRef.current + 1;
       feishuStartGenerationRef.current = requestGeneration;
       const pendingObservationRevisionAtStart = feishuPendingObservationRevisionRef.current;
-      const started = unwrap(
-        await send<ApiResponse<{ state: string }>>(FEISHU_MESSAGE_TYPES.START_AUTH, {
-          clientId: feishuClientId,
-          clientSecret: feishuClientSecret,
-          tokenExchangeProxyUrl: feishuTokenExchangeProxyUrl,
-        }),
-      );
+      await persistFeishuAuthConfig();
+      const started = unwrap(await send<ApiResponse<{ state: string }>>(FEISHU_MESSAGE_TYPES.START_AUTH, {}));
       const state = String(started?.state || '').trim();
       if (!state) throw new Error('feishu oauth start returned invalid state');
       if (feishuStartGenerationRef.current !== requestGeneration) return;
@@ -1455,15 +1456,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setFeishuLastError('');
       setFeishuPollingState(true);
     });
-  }, [
-    applyFeishuAuthStatus,
-    feishuClientId,
-    feishuClientSecret,
-    feishuTokenExchangeProxyUrl,
-    readFeishuAuthStatus,
-    runTask,
-    setFeishuPollingState,
-  ]);
+  }, [applyFeishuAuthStatus, persistFeishuAuthConfig, readFeishuAuthStatus, runTask, setFeishuPollingState]);
 
   const feishuStatusText = useMemo(() => {
     if (feishuConnected == null) return t('statusUnknown');
@@ -1472,6 +1465,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (feishuPendingState) return t('statusWaiting');
     return t('statusNotConnected');
   }, [feishuConnected, feishuLastError, feishuPendingState]);
+
+  const applyNotionConfig = useCallback((config: any) => {
+    setNotionParentPageId(String(config?.parentPageId || ''));
+    setNotionParentPageTitle(String(config?.parentPageTitle || ''));
+    setNotionChatDatabaseId(String(config?.databaseIds?.chat || ''));
+    setNotionArticleDatabaseId(String(config?.databaseIds?.article || ''));
+    setNotionVideoDatabaseId(String(config?.databaseIds?.video || ''));
+  }, []);
 
   const onLoadNotionPages = useCallback(async () => {
     setLoadingNotionPages(true);
@@ -1492,19 +1493,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         if (nextId) setNotionParentPageId(nextId);
         if (nextTitle) setNotionParentPageTitle(nextTitle);
 
-        if (savedId && nextId && nextId !== savedId) {
-          await storageRemove(getNotionDbStorageKeys());
+        if (nextId && (nextId !== savedId || nextTitle !== savedTitle)) {
+          const config = unwrap(
+            await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
+              parentPageId: nextId,
+              parentPageTitle: nextTitle,
+            }),
+          );
+          applyNotionConfig(config);
         }
-
-        const payload: Record<string, unknown> = {};
-        if (nextId && nextId !== savedId) payload.notion_parent_page_id = nextId;
-        if (nextTitle && nextTitle !== savedTitle) payload.notion_parent_page_title = nextTitle;
-        if (Object.keys(payload).length) await storageSet(payload);
       },
       { useBusy: false, fallbackMessage: 'failed to load pages' },
     );
     setLoadingNotionPages(false);
-  }, [notionParentPageId, notionParentPageTitle, runTask]);
+  }, [applyNotionConfig, notionParentPageId, notionParentPageTitle, runTask]);
 
   useEffect(() => {
     if (!notionConnected) {
@@ -1526,23 +1528,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (id: string) => {
       const next = String(id || '').trim();
       if (!next) return;
-      const savedId = String(notionParentPageId || '').trim();
-
       await runTask(async () => {
-        if (savedId && next !== savedId) {
-          await storageRemove(getNotionDbStorageKeys());
-        }
-
-        setNotionParentPageId(next);
         const match = notionPages.find((page) => page && String(page.id || '').trim() === next) ?? null;
-        if (match && match.title) setNotionParentPageTitle(String(match.title || '').trim());
-
-        const payload: Record<string, unknown> = { notion_parent_page_id: next };
-        if (match && match.title) payload.notion_parent_page_title = String(match.title || '').trim();
-        await storageSet(payload);
+        const title = String(match?.title || '').trim();
+        const config = unwrap(
+          await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
+            parentPageId: next,
+            parentPageTitle: title,
+          }),
+        );
+        applyNotionConfig(config);
       });
     },
-    [notionPages, notionParentPageId, runTask],
+    [applyNotionConfig, notionPages, runTask],
   );
 
   const onToggleNotionAdvancedOpen = useCallback(() => {
@@ -1551,47 +1549,39 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   const onSaveNotionDatabaseId = useCallback(
     async (kind: 'chat' | 'article' | 'video') => {
-      const spec = kind === 'chat' ? chatDbSpec : kind === 'article' ? articleDbSpec : videoDbSpec;
       const raw =
         kind === 'chat' ? notionChatDatabaseId : kind === 'article' ? notionArticleDatabaseId : notionVideoDatabaseId;
-      const next = normalizeNotionDatabaseIdInput(String(raw || ''));
 
       await runTask(
         async () => {
-          await storageSet({ [spec.storageKey]: next });
-          if (kind === 'chat') setNotionChatDatabaseId(next);
-          else if (kind === 'article') setNotionArticleDatabaseId(next);
-          else setNotionVideoDatabaseId(next);
+          const config = unwrap(
+            await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
+              databaseIds: { [kind]: String(raw || '') },
+            }),
+          );
+          applyNotionConfig(config);
         },
         { fallbackMessage: 'save notion database id failed' },
       );
     },
-    [
-      articleDbSpec,
-      chatDbSpec,
-      notionArticleDatabaseId,
-      notionChatDatabaseId,
-      notionVideoDatabaseId,
-      runTask,
-      videoDbSpec,
-    ],
+    [applyNotionConfig, notionArticleDatabaseId, notionChatDatabaseId, notionVideoDatabaseId, runTask],
   );
 
   const onResetNotionDatabaseId = useCallback(
     async (kind: 'chat' | 'article' | 'video') => {
-      const spec = kind === 'chat' ? chatDbSpec : kind === 'article' ? articleDbSpec : videoDbSpec;
-
       await runTask(
         async () => {
-          await storageRemove([spec.storageKey]);
-          if (kind === 'chat') setNotionChatDatabaseId('');
-          else if (kind === 'article') setNotionArticleDatabaseId('');
-          else setNotionVideoDatabaseId('');
+          const config = unwrap(
+            await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.RESET_DATABASE_ID, {
+              kindId: kind,
+            }),
+          );
+          applyNotionConfig(config);
         },
         { fallbackMessage: 'reset notion database id failed' },
       );
     },
-    [articleDbSpec, chatDbSpec, runTask, videoDbSpec],
+    [applyNotionConfig, runTask],
   );
 
   const onSaveObsidianSettings = useCallback(
@@ -2174,9 +2164,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionArticleDatabaseId,
     notionVideoDatabaseId,
     setNotionVideoDatabaseId,
-    notionChatDatabaseLabel: chatDbSpec.title,
-    notionArticleDatabaseLabel: articleDbSpec.title,
-    notionVideoDatabaseLabel: videoDbSpec.title,
+    notionChatDatabaseLabel: chatDbTitle,
+    notionArticleDatabaseLabel: articleDbTitle,
+    notionVideoDatabaseLabel: videoDbTitle,
     onSaveNotionDatabaseId,
     onResetNotionDatabaseId,
     notionParentPageId,
@@ -2198,7 +2188,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     feishuClientId,
     setFeishuClientId,
     feishuClientSecret,
-    setFeishuClientSecret,
+    feishuClientSecretPresent,
+    onChangeFeishuClientSecret,
+    onResetFeishuClientSecret,
     feishuTokenExchangeProxyUrl,
     setFeishuTokenExchangeProxyUrl,
     feishuChatFolder,

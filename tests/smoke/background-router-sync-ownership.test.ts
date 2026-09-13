@@ -16,9 +16,12 @@ const mocks = vi.hoisted(() => ({
   getNotionOAuthToken: vi.fn(),
   getFeishuOAuthToken: vi.fn(),
   startFeishuOAuthAttempt: vi.fn(),
+  getFeishuOAuthAttemptSummary: vi.fn(),
+  getFeishuOAuthConfigSummary: vi.fn(),
   saveFeishuOAuthConfig: vi.fn(),
   clearFeishuOAuthAttemptAndToken: vi.fn(),
   storageGet: vi.fn(),
+  storageSet: vi.fn(),
   storageRemove: vi.fn(),
 }));
 
@@ -33,11 +36,14 @@ vi.mock('@services/sync/feishu/auth/token-store', () => ({
 }));
 vi.mock('@services/sync/feishu/auth/oauth', () => ({
   startFeishuOAuthAttempt: mocks.startFeishuOAuthAttempt,
+  getFeishuOAuthAttemptSummary: mocks.getFeishuOAuthAttemptSummary,
+  getFeishuOAuthConfigSummary: mocks.getFeishuOAuthConfigSummary,
   saveFeishuOAuthConfig: mocks.saveFeishuOAuthConfig,
   clearFeishuOAuthAttemptAndToken: mocks.clearFeishuOAuthAttemptAndToken,
 }));
 vi.mock('@platform/storage/local', () => ({
   storageGet: mocks.storageGet,
+  storageSet: mocks.storageSet,
   storageRemove: mocks.storageRemove,
 }));
 
@@ -49,19 +55,19 @@ function createHarness(
   jobs: Partial<Record<Provider, unknown>> = {},
 ) {
   const notionSync = vi.fn(() => {
-    if (throwOnSyncProvider === 'notion') throw createSyncAlreadyRunningError();
+    if (throwOnSyncProvider === 'notion' || activeProvider === 'notion') throw createSyncAlreadyRunningError();
     return Promise.resolve({});
   });
   const obsidianSync = vi.fn(() => {
-    if (throwOnSyncProvider === 'obsidian') throw createSyncAlreadyRunningError();
+    if (throwOnSyncProvider === 'obsidian' || activeProvider === 'obsidian') throw createSyncAlreadyRunningError();
     return Promise.resolve({});
   });
   const feishuSync = vi.fn(() => {
-    if (throwOnSyncProvider === 'feishu') throw createSyncAlreadyRunningError();
+    if (throwOnSyncProvider === 'feishu' || activeProvider === 'feishu') throw createSyncAlreadyRunningError();
     return Promise.resolve({});
   });
   const githubSync = vi.fn(() => {
-    if (throwOnSyncProvider === 'github') throw createSyncAlreadyRunningError();
+    if (throwOnSyncProvider === 'github' || activeProvider === 'github') throw createSyncAlreadyRunningError();
     return Promise.resolve({});
   });
 
@@ -143,6 +149,12 @@ beforeEach(() => {
   mocks.getNotionOAuthToken.mockResolvedValue({ accessToken: 'notion-token' });
   mocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 'feishu-token' });
   mocks.startFeishuOAuthAttempt.mockResolvedValue({ state: 'feishu-state' });
+  mocks.getFeishuOAuthAttemptSummary.mockResolvedValue({ pending: false, errorPresent: false });
+  mocks.getFeishuOAuthConfigSummary.mockResolvedValue({
+    clientId: 'app-id',
+    clientSecretPresent: true,
+    tokenExchangeProxyUrl: '',
+  });
   mocks.saveFeishuOAuthConfig.mockResolvedValue({
     clientId: 'app-id',
     clientSecretPresent: true,
@@ -150,26 +162,30 @@ beforeEach(() => {
   });
   mocks.clearFeishuOAuthAttemptAndToken.mockResolvedValue(undefined);
   mocks.storageGet.mockResolvedValue({ notion_parent_page_id: 'parent-page' });
+  mocks.storageSet.mockResolvedValue(undefined);
   mocks.storageRemove.mockResolvedValue(undefined);
 });
 
 describe('background sync ownership admission', () => {
-  it.each(syncCases)('$provider rejects an existing run before provider preflight', async ({ provider, type }) => {
-    const harness = createHarness(provider, null);
+  it.each(syncCases)(
+    '$provider lets the canonical orchestrator reject an existing run after provider preflight',
+    async ({ provider, type }) => {
+      const harness = createHarness(provider, null);
 
-    const response = await harness.router.dispatch({ type, conversationIds: [1] });
+      const response = await harness.router.dispatch({ type, conversationIds: [1] });
 
-    expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
-    expect(harness.sync[provider]).not.toHaveBeenCalled();
-    if (provider === 'notion') {
-      expect(mocks.getNotionOAuthToken).not.toHaveBeenCalled();
-      expect(mocks.storageGet).not.toHaveBeenCalled();
-    }
-    if (provider === 'obsidian') expect(harness.obsidianPreflight).not.toHaveBeenCalled();
-    if (provider === 'feishu') expect(mocks.getFeishuOAuthToken).not.toHaveBeenCalled();
-  });
+      expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
+      expect(harness.sync[provider]).toHaveBeenCalledTimes(1);
+      if (provider === 'notion') {
+        expect(mocks.getNotionOAuthToken).toHaveBeenCalledTimes(1);
+        expect(mocks.storageGet).toHaveBeenCalledTimes(1);
+      }
+      if (provider === 'obsidian') expect(harness.obsidianPreflight).toHaveBeenCalledTimes(1);
+      if (provider === 'feishu') expect(mocks.getFeishuOAuthToken).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it('reports a detached Obsidian preflight as active even with no durable job and clears it after preflight failure', async () => {
+  it('does not report async Obsidian preflight as an active sync run', async () => {
     const harness = createHarness(null, null);
     const preflight = deferred<any>();
     harness.obsidianPreflight.mockImplementationOnce(() => preflight.promise);
@@ -185,7 +201,7 @@ describe('background sync ownership admission', () => {
     });
     expect(duringPreflight).toMatchObject({
       ok: true,
-      data: { provider: 'obsidian', active: true, job: null },
+      data: { provider: 'obsidian', active: false, job: null },
     });
     expect(harness.sync.obsidian).not.toHaveBeenCalled();
 
@@ -223,7 +239,7 @@ describe('background sync ownership admission', () => {
       conversationIds: [1],
     });
     expect(conflict).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
-    expect(harness.sync.github).not.toHaveBeenCalled();
+    expect(harness.sync.github).toHaveBeenCalledTimes(1);
   });
 
   it('treats a durable running snapshot with no live owner as residue instead of admission evidence', async () => {
@@ -253,7 +269,7 @@ describe('background sync ownership admission', () => {
   });
 
   it.each(syncCases)(
-    '$provider catches the final synchronous ownership guard before ACK',
+    '$provider catches a synchronous ownership race at the orchestrator before ACK',
     async ({ provider, type }) => {
       const harness = createHarness(null, provider);
 
@@ -269,6 +285,17 @@ describe('background sync ownership admission', () => {
       if (provider === 'feishu') expect(mocks.getFeishuOAuthToken).toHaveBeenCalledTimes(1);
     },
   );
+
+  it.each(syncCases)('$provider ACKs the exact jobId passed into the orchestrator', async ({ provider, type }) => {
+    const harness = createHarness(null, null);
+    const response = await harness.router.dispatch({ type, conversationIds: [1] });
+
+    expect(response).toMatchObject({ ok: true, data: { started: true, provider } });
+    const jobId = String(response.data?.jobId || '');
+    expect(jobId).toMatch(/^\d+_[0-9a-f]+$/);
+    expect(harness.sync[provider]).toHaveBeenCalledTimes(1);
+    expect(harness.sync[provider].mock.calls[0]?.[0]).toMatchObject({ jobId });
+  });
 });
 
 describe('Feishu destructive settings ownership', () => {
@@ -324,21 +351,24 @@ describe('Feishu destructive settings ownership', () => {
     });
 
     const status = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS });
-    expect(status).toEqual({ ok: true, data: { connected: true }, error: null });
+    expect(status).toEqual({
+      ok: true,
+      data: { connected: true, pending: false, errorPresent: false },
+      error: null,
+    });
     expect(JSON.stringify(status)).not.toMatch(/ACCESS_SECRET|REFRESH_SECRET/);
 
-    const start = await harness.router.dispatch({
-      type: FEISHU_MESSAGE_TYPES.START_AUTH,
-      clientId: 'app-id',
-      clientSecret: 'secret',
-      tokenExchangeProxyUrl: '',
+    const config = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG });
+    expect(config).toEqual({
+      ok: true,
+      data: { clientId: 'app-id', clientSecretPresent: true, tokenExchangeProxyUrl: '' },
+      error: null,
     });
+    expect(JSON.stringify(config)).not.toContain('secret');
+
+    const start = await harness.router.dispatch({ type: FEISHU_MESSAGE_TYPES.START_AUTH });
     expect(start).toMatchObject({ ok: true, data: { state: 'feishu-state' } });
-    expect(mocks.startFeishuOAuthAttempt).toHaveBeenCalledWith({
-      clientId: 'app-id',
-      clientSecret: 'secret',
-      tokenExchangeProxyUrl: '',
-    });
+    expect(mocks.startFeishuOAuthAttempt).toHaveBeenCalledWith();
 
     const saved = await harness.router.dispatch({
       type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,

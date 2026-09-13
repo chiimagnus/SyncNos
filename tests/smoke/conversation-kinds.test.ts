@@ -79,11 +79,4 @@ describe('conversation-kinds', () => {
     const kind = kinds.pick({ sourceType: 'article' });
     expect((kind.notion.pageSpec as any).shouldRebuild).toBeUndefined();
   });
-
-  it('exposes notion storage keys from registry (used by infra like disconnect/backup)', () => {
-    const kinds = loadConversationKinds();
-    const keys = kinds.getNotionStorageKeys();
-    expect(keys).toContain('notion_db_id_syncnos_ai_chats');
-    expect(keys).toContain('notion_db_id_syncnos_web_articles');
-  });
 });

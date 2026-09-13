@@ -5,7 +5,11 @@ import {
   COMMENTS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   DATA_REVISION_MESSAGE_TYPES,
+  FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+  OBSIDIAN_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 
@@ -566,6 +570,126 @@ describe('CLI Native Messaging bridge', () => {
     harness.controller.stop();
   });
 
+  it('maps provider-safe config/auth RPCs and generic sync RPCs without leaking OAuth state', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        switch (message.type) {
+          case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS:
+            return {
+              ok: true,
+              data: { connected: false, workspaceName: '', pending: true, errorPresent: false },
+              error: null,
+            };
+          case NOTION_MESSAGE_TYPES.START_AUTH:
+            return { ok: true, data: { state: 'raw-notion-oauth-state' }, error: null };
+          case FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG:
+            return {
+              ok: true,
+              data: { clientId: 'app-id', clientSecretPresent: true, tokenExchangeProxyUrl: '' },
+              error: null,
+            };
+          case FEISHU_MESSAGE_TYPES.GET_PATH_CONFIG:
+            return {
+              ok: true,
+              data: { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' },
+              error: null,
+            };
+          case FEISHU_MESSAGE_TYPES.START_AUTH:
+            return { ok: true, data: { state: 'raw-feishu-oauth-state' }, error: null };
+          case OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS:
+            return {
+              ok: true,
+              data: {
+                apiBaseUrl: 'http://127.0.0.1:27123',
+                authHeaderName: 'Authorization',
+                apiKeyPresent: true,
+                apiKeyMasked: '********************************',
+                chatFolder: 'Chats',
+                articleFolder: 'Articles',
+                videoFolder: 'Videos',
+              },
+              error: null,
+            };
+          case GITHUB_MESSAGE_TYPES.GET_SETTINGS:
+            return {
+              ok: true,
+              data: {
+                auth: { state: 'pending', userCode: 'ABCD-EFGH', verificationUri: 'https://github.com/login/device' },
+                settings: { repository: 'owner/repo', branch: 'main' },
+              },
+              error: null,
+            };
+          case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS:
+            return { ok: true, data: { started: true, provider: 'notion', jobId: 'job-1' }, error: null };
+          case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS:
+            return {
+              ok: true,
+              data: { provider: 'notion', active: true, job: { id: 'job-1', status: 'running' } },
+              error: null,
+            };
+          default:
+            return { ok: false, data: null, error: { message: 'unexpected message', extra: null } };
+        }
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    const emit = async (requestId: string, method: string, params: Record<string, unknown> = {}) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      expect(harness.fakePort.posted.length).toBe(before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    expect(await emit('notion-status', 'notion.auth.status')).toMatchObject({
+      ok: true,
+      data: { connected: false, pending: true, errorPresent: false },
+    });
+    const notionStart = await emit('notion-start', 'notion.auth.start');
+    expect(notionStart).toMatchObject({ ok: true, data: { started: true, browserOpened: true } });
+    expect(JSON.stringify(notionStart)).not.toContain('raw-notion-oauth-state');
+
+    const feishuConfig = await emit('feishu-config', 'feishu.config.get');
+    expect(feishuConfig).toMatchObject({
+      ok: true,
+      data: {
+        auth: { clientId: 'app-id', clientSecretPresent: true, tokenExchangeProxyUrl: '' },
+        paths: { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' },
+      },
+    });
+    expect(JSON.stringify(feishuConfig)).not.toContain('clientSecret"');
+    const feishuStart = await emit('feishu-start', 'feishu.auth.start');
+    expect(JSON.stringify(feishuStart)).not.toContain('raw-feishu-oauth-state');
+
+    const obsidianConfig = await emit('obsidian-config', 'obsidian.config.get');
+    expect(obsidianConfig).toMatchObject({ ok: true, data: { apiKeyPresent: true } });
+    expect(obsidianConfig.data).not.toHaveProperty('apiKey');
+
+    expect(await emit('github-auth', 'github.auth.status')).toMatchObject({
+      ok: true,
+      data: { state: 'pending', userCode: 'ABCD-EFGH' },
+    });
+
+    expect(await emit('sync-start', 'sync.start', { provider: 'notion', conversationIds: [7, 9] })).toMatchObject({
+      ok: true,
+      data: { started: true, provider: 'notion', jobId: 'job-1' },
+    });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, conversationIds: [7, 9] },
+      null,
+    );
+    expect(await emit('sync-status', 'sync.status', { provider: 'notion' })).toMatchObject({
+      ok: true,
+      data: { provider: 'notion', active: true, job: { id: 'job-1', status: 'running' } },
+    });
+    expect(await emit('sync-invalid', 'sync.status', { provider: 'dropbox' })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument' },
+    });
+    harness.controller.stop();
+  });
+
   it('returns response_too_large for an oversized conversation.get and keeps the same Native Port usable', async () => {
     const oversizedBody = 'x'.repeat(64 * 1024 * 1024);
     const router = {
@@ -645,7 +769,10 @@ describe('CLI Native Messaging bridge', () => {
       params: { query: '' },
     });
     await waitForPosted(harness, 2);
-    expect(harness.fakePort.posted[1]).toMatchObject({ ok: false, error: { code: 'invalid_argument' } });
+    expect(harness.fakePort.posted[1]).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument', extra: { code: 'INVALID_ARGUMENT', field: 'query' } },
+    });
     harness.controller.stop();
   });
 

@@ -18,7 +18,7 @@ import {
   type GithubSyncContinuityDraft,
   type GithubSyncPlannerMode,
 } from '@services/sync/github/github-sync-planner';
-import { createSyncJobLifecycle, type SyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncJobId, createSyncJobLifecycle, type SyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import type { SyncJobSnapshot, SyncPerConversationResult, SyncWarning } from '@services/sync/models';
 
@@ -306,10 +306,12 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     conversationIds?: readonly number[];
     mode?: GithubSyncPlannerMode;
     instanceId?: string;
+    jobId?: string;
   }): Promise<GithubSyncRunResult> {
     const ids = input.conversationIds ?? [];
     const mode: GithubSyncPlannerMode = input.mode === 'reconcile' ? 'reconcile' : 'incremental';
     const instanceId = safeString(input.instanceId);
+    const requestedJobId = safeString(input.jobId);
     const runNow = services.now();
     const deferredReplacementIds = new Set<number>();
     let cleanupHasMoreDue = false;
@@ -319,7 +321,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     const claimJob = async (currentStage: string): Promise<SyncJobLifecycle> => {
       const startedAt = services.now();
       const candidate: SyncJobSnapshot = {
-        id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+        id: requestedJobId || createSyncJobId(startedAt),
         provider: 'github',
         instanceId,
         status: 'running',
@@ -552,6 +554,7 @@ export function createGithubSyncOrchestrator(services: GithubOrchestratorService
     conversationIds?: readonly number[];
     mode?: GithubSyncPlannerMode;
     instanceId?: string;
+    jobId?: string;
   }): Promise<GithubSyncRunResult> {
     return ownership.startRun(() => runSync(input));
   }

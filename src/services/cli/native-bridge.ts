@@ -3,7 +3,11 @@ import {
   COMMENTS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   DATA_REVISION_MESSAGE_TYPES,
+  FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+  OBSIDIAN_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -58,6 +62,21 @@ const COMMENT_INVARIANT_CODES = new Set([
   'parent_context_mismatch',
   'conversation_not_found',
 ]);
+const SYNC_PROVIDER_MESSAGES = Object.freeze({
+  notion: { start: NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, status: NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS },
+  obsidian: { start: OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, status: OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS },
+  feishu: { start: FEISHU_MESSAGE_TYPES.SYNC_CONVERSATIONS, status: FEISHU_MESSAGE_TYPES.GET_SYNC_STATUS },
+  github: { start: GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, status: GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS },
+});
+
+type SyncProviderName = keyof typeof SYNC_PROVIDER_MESSAGES;
+
+function normalizeSyncProvider(value: unknown): SyncProviderName | null {
+  const provider = String(value || '')
+    .trim()
+    .toLowerCase();
+  return Object.prototype.hasOwnProperty.call(SYNC_PROVIDER_MESSAGES, provider) ? (provider as SyncProviderName) : null;
+}
 
 function serializedByteLength(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
@@ -188,7 +207,14 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       const code = extraCode === 'INVALID_ARGUMENT' ? 'invalid_argument' : extraCode || 'background_request_failed';
       safePost(
         currentPort,
-        response(requestId, false, null, code, String(result?.error?.message || 'Background request failed')),
+        response(
+          requestId,
+          false,
+          null,
+          code,
+          String(result?.error?.message || 'Background request failed'),
+          result?.error?.extra ?? null,
+        ),
       );
       return false;
     };
@@ -208,6 +234,213 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     }
 
     const params = frame?.params && typeof frame.params === 'object' ? frame.params : {};
+
+    if (method === 'notion.auth.status') {
+      postBackgroundResult(await router.dispatch({ type: NOTION_MESSAGE_TYPES.GET_AUTH_STATUS }, null));
+      return;
+    }
+    if (method === 'notion.auth.start') {
+      const result = await router.dispatch({ type: NOTION_MESSAGE_TYPES.START_AUTH }, null);
+      postBackgroundResult(result, () => ({ started: true, browserOpened: true }));
+      return;
+    }
+    if (method === 'notion.auth.disconnect') {
+      postBackgroundResult(await router.dispatch({ type: NOTION_MESSAGE_TYPES.DISCONNECT }, null));
+      return;
+    }
+    if (method === 'notion.pages.list') {
+      postBackgroundResult(await router.dispatch({ type: NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES }, null));
+      return;
+    }
+    if (method === 'notion.config.get') {
+      postBackgroundResult(await router.dispatch({ type: NOTION_MESSAGE_TYPES.GET_CONFIG }, null));
+      return;
+    }
+    if (method === 'notion.config.set') {
+      postBackgroundResult(
+        await router.dispatch(
+          {
+            type: NOTION_MESSAGE_TYPES.SAVE_CONFIG,
+            ...(Object.prototype.hasOwnProperty.call(params, 'parentPageId')
+              ? { parentPageId: params.parentPageId }
+              : {}),
+            ...(Object.prototype.hasOwnProperty.call(params, 'parentPageTitle')
+              ? { parentPageTitle: params.parentPageTitle }
+              : {}),
+            ...(params.databaseIds && typeof params.databaseIds === 'object'
+              ? { databaseIds: params.databaseIds }
+              : {}),
+          },
+          null,
+        ),
+      );
+      return;
+    }
+    if (method === 'notion.config.reset-database') {
+      postBackgroundResult(
+        await router.dispatch({ type: NOTION_MESSAGE_TYPES.RESET_DATABASE_ID, kindId: params.kindId }, null),
+      );
+      return;
+    }
+
+    if (method === 'feishu.auth.status') {
+      postBackgroundResult(await router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS }, null));
+      return;
+    }
+    if (method === 'feishu.auth.start') {
+      const result = await router.dispatch({ type: FEISHU_MESSAGE_TYPES.START_AUTH }, null);
+      postBackgroundResult(result, () => ({ started: true, browserOpened: true }));
+      return;
+    }
+    if (method === 'feishu.auth.disconnect') {
+      postBackgroundResult(await router.dispatch({ type: FEISHU_MESSAGE_TYPES.DISCONNECT }, null));
+      return;
+    }
+    if (method === 'feishu.config.get') {
+      const [auth, paths] = await Promise.all([
+        router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG }, null),
+        router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_PATH_CONFIG }, null),
+      ]);
+      if (auth?.ok !== true) {
+        postBackgroundResult(auth);
+        return;
+      }
+      postBackgroundResult(paths, (pathData) => ({ auth: auth.data, paths: pathData }));
+      return;
+    }
+    if (method === 'feishu.config.set') {
+      const authPayload: Record<string, unknown> = { type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG };
+      for (const key of ['clientId', 'clientSecret', 'tokenExchangeProxyUrl'] as const) {
+        if (Object.prototype.hasOwnProperty.call(params, key)) authPayload[key] = params[key];
+      }
+      const pathPayload: Record<string, unknown> = { type: FEISHU_MESSAGE_TYPES.SAVE_PATH_CONFIG };
+      for (const key of ['chatFolder', 'articleFolder', 'videoFolder'] as const) {
+        if (Object.prototype.hasOwnProperty.call(params, key)) pathPayload[key] = params[key];
+      }
+      if (Object.keys(authPayload).length > 1) {
+        const authSave = await router.dispatch(authPayload, null);
+        if (authSave?.ok !== true) {
+          postBackgroundResult(authSave);
+          return;
+        }
+      }
+      if (Object.keys(pathPayload).length > 1) {
+        const pathSave = await router.dispatch(pathPayload, null);
+        if (pathSave?.ok !== true) {
+          postBackgroundResult(pathSave);
+          return;
+        }
+      }
+      const [auth, paths] = await Promise.all([
+        router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG }, null),
+        router.dispatch({ type: FEISHU_MESSAGE_TYPES.GET_PATH_CONFIG }, null),
+      ]);
+      if (auth?.ok !== true) {
+        postBackgroundResult(auth);
+        return;
+      }
+      postBackgroundResult(paths, (pathData) => ({ auth: auth.data, paths: pathData }));
+      return;
+    }
+
+    if (method === 'obsidian.config.get') {
+      postBackgroundResult(await router.dispatch({ type: OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS }, null));
+      return;
+    }
+    if (method === 'obsidian.config.set') {
+      const message: Record<string, unknown> = { type: OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS };
+      for (const key of [
+        'apiBaseUrl',
+        'apiKey',
+        'authHeaderName',
+        'chatFolder',
+        'articleFolder',
+        'videoFolder',
+      ] as const) {
+        if (Object.prototype.hasOwnProperty.call(params, key)) message[key] = params[key];
+      }
+      postBackgroundResult(await router.dispatch(message, null));
+      return;
+    }
+    if (method === 'obsidian.test') {
+      postBackgroundResult(await router.dispatch({ type: OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION }, null));
+      return;
+    }
+
+    if (method === 'github.auth.status') {
+      const result = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS }, null);
+      postBackgroundResult(result, (data) => data?.auth ?? { state: 'disconnected' });
+      return;
+    }
+    if (method === 'github.auth.start') {
+      postBackgroundResult(
+        await router.dispatch({ type: GITHUB_MESSAGE_TYPES.START_DEVICE_FLOW }, null),
+        (data) => data?.auth,
+      );
+      return;
+    }
+    if (method === 'github.auth.poll') {
+      postBackgroundResult(
+        await router.dispatch({ type: GITHUB_MESSAGE_TYPES.POLL_DEVICE_FLOW }, null),
+        (data) => data?.auth,
+      );
+      return;
+    }
+    if (method === 'github.auth.cancel') {
+      postBackgroundResult(
+        await router.dispatch({ type: GITHUB_MESSAGE_TYPES.CANCEL_DEVICE_FLOW }, null),
+        (data) => data?.auth,
+      );
+      return;
+    }
+    if (method === 'github.auth.disconnect') {
+      postBackgroundResult(await router.dispatch({ type: GITHUB_MESSAGE_TYPES.DISCONNECT }, null));
+      return;
+    }
+    if (method === 'github.repos.list') {
+      postBackgroundResult(await router.dispatch({ type: GITHUB_MESSAGE_TYPES.LIST_REPOSITORIES }, null));
+      return;
+    }
+    if (method === 'github.config.get') {
+      const result = await router.dispatch({ type: GITHUB_MESSAGE_TYPES.GET_SETTINGS }, null);
+      postBackgroundResult(result, (data) => data?.settings ?? {});
+      return;
+    }
+    if (method === 'github.config.set') {
+      const message: Record<string, unknown> = { type: GITHUB_MESSAGE_TYPES.SAVE_SETTINGS };
+      if (Object.prototype.hasOwnProperty.call(params, 'repository')) message.repository = params.repository;
+      if (Object.prototype.hasOwnProperty.call(params, 'branch')) message.branch = params.branch;
+      postBackgroundResult(await router.dispatch(message, null), (data) => data?.settings ?? {});
+      return;
+    }
+    if (method === 'github.test') {
+      postBackgroundResult(await router.dispatch({ type: GITHUB_MESSAGE_TYPES.TEST_CONNECTION }, null));
+      return;
+    }
+    if (method === 'github.init') {
+      postBackgroundResult(await router.dispatch({ type: GITHUB_MESSAGE_TYPES.INITIALIZE_REPOSITORY }, null));
+      return;
+    }
+
+    if (method === 'sync.start' || method === 'sync.status') {
+      const provider = normalizeSyncProvider(params.provider);
+      if (!provider) {
+        safePost(currentPort, response(requestId, false, null, 'invalid_argument', 'Unknown sync provider'));
+        return;
+      }
+      const messages = SYNC_PROVIDER_MESSAGES[provider];
+      const result = await router.dispatch(
+        method === 'sync.start'
+          ? {
+              type: messages.start,
+              conversationIds: Array.isArray(params.conversationIds) ? params.conversationIds.map(Number) : [],
+            }
+          : { type: messages.status },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
 
     if (method === 'conversation.list') {
       const cursor = params.cursor && typeof params.cursor === 'object' ? params.cursor : null;

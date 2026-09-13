@@ -4,11 +4,12 @@ import {
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@platform/messaging/message-contracts';
-import { storageGet } from '@platform/storage/local';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { getNotionParentPage } from '@services/sync/notion/settings-store';
 import { getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { ensureSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
+import { createSyncJobId } from '@services/sync/sync-job-lifecycle';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -16,15 +17,10 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
 };
 
-let notionDetachedRun: Promise<unknown> | null = null;
-let obsidianDetachedRun: Promise<unknown> | null = null;
-let feishuDetachedRun: Promise<unknown> | null = null;
-let githubDetachedRun: Promise<unknown> | null = null;
-
 type Deps = {
   getInstanceId: () => string;
   notionSyncOrchestrator: {
-    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
+    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string; jobId?: string }) => Promise<unknown>;
     getSyncJobStatus: () => Promise<unknown>;
     clearSyncJobStatus: () => Promise<unknown>;
     isRunActive: () => boolean;
@@ -35,13 +31,14 @@ type Deps = {
       conversationIds?: unknown[];
       forceFullConversationIds?: unknown[];
       instanceId: string;
+      jobId?: string;
     }) => Promise<unknown>;
     getSyncStatus: () => Promise<unknown>;
     clearSyncStatus: () => Promise<unknown>;
     isRunActive: () => boolean;
   };
   feishuSyncOrchestrator: {
-    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
+    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string; jobId?: string }) => Promise<unknown>;
     getSyncStatus: () => Promise<unknown>;
     clearSyncStatus: () => Promise<unknown>;
     isRunActive: () => boolean;
@@ -51,6 +48,7 @@ type Deps = {
       conversationIds?: readonly number[];
       mode?: 'incremental' | 'reconcile';
       instanceId?: string;
+      jobId?: string;
     }) => Promise<unknown>;
     getSyncStatus: () => Promise<unknown>;
     clearSyncStatus: () => Promise<unknown>;
@@ -93,54 +91,25 @@ function buildObsidianPreflightFailure(preflight: any) {
 
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    let lock: Promise<unknown> | null = null;
-    const releaseLock = () => {
-      if (lock && notionDetachedRun === lock) notionDetachedRun = null;
-    };
     try {
       const gateError = await ensureSyncProviderEnabled('notion');
       if (gateError) return router.err('sync provider disabled', gateError);
 
-      if (notionDetachedRun) {
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
-
       const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
-      // Acquire the lock before any async work, so concurrent requests can't race past the check.
-      lock = Promise.resolve();
-      notionDetachedRun = lock;
-
       const instanceId = deps.getInstanceId();
-      if (deps.notionSyncOrchestrator.isRunActive()) {
-        releaseLock();
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
-
       const token = await getNotionOAuthToken().catch(() => null);
-      if (!token?.accessToken) {
-        releaseLock();
-        return router.err('notion not connected');
-      }
+      if (!token?.accessToken) return router.err('notion not connected');
 
-      const res = await storageGet(['notion_parent_page_id']).catch(() => ({}));
-      const parentPageId = String((res as any)?.notion_parent_page_id || '').trim();
-      if (!parentPageId) {
-        releaseLock();
-        return router.err('missing parentPageId');
-      }
+      const parentPageId = (await getNotionParentPage()).id;
+      if (!parentPageId) return router.err('missing parentPageId');
 
-      const run = deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId });
-      notionDetachedRun = run;
-      void run
-        .finally(() => {
-          if (notionDetachedRun === run) notionDetachedRun = null;
-        })
-        .catch(() => {});
-      return router.ok({ started: true, provider: 'notion' });
+      const jobId = createSyncJobId();
+      const run = deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId, jobId });
+      void run.catch(() => {});
+      return router.ok({ started: true, provider: 'notion', jobId });
     } catch (error) {
-      releaseLock();
       return toSyncErrorResponse(router, error);
     }
   });
@@ -148,7 +117,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS, async () => {
     try {
       const data: any = await deps.notionSyncOrchestrator.getSyncJobStatus();
-      return router.ok({ ...data, active: Boolean(notionDetachedRun) || deps.notionSyncOrchestrator.isRunActive() });
+      return router.ok({ ...data, active: deps.notionSyncOrchestrator.isRunActive() });
     } catch (error) {
       return toSyncErrorResponse(router, error);
     }
@@ -166,10 +135,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
     try {
       const data: any = await deps.obsidianSyncOrchestrator.getSyncStatus();
-      return router.ok({
-        ...data,
-        active: Boolean(obsidianDetachedRun) || deps.obsidianSyncOrchestrator.isRunActive(),
-      });
+      return router.ok({ ...data, active: deps.obsidianSyncOrchestrator.isRunActive() });
     } catch (error) {
       return toSyncErrorResponse(router, error);
     }
@@ -185,103 +151,55 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    let lock: Promise<unknown> | null = null;
-    const releaseLock = () => {
-      if (lock && obsidianDetachedRun === lock) obsidianDetachedRun = null;
-    };
     try {
       const gateError = await ensureSyncProviderEnabled('obsidian');
       if (gateError) return router.err('sync provider disabled', gateError);
 
-      if (obsidianDetachedRun) {
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
-
       const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
-
       const forceFullConversationIds = normalizeSyncConversationIds(msg?.forceFullConversationIds);
-
-      // Acquire the lock before any async work, so concurrent requests can't race past the check.
-      lock = Promise.resolve();
-      obsidianDetachedRun = lock;
-
       const instanceId = deps.getInstanceId();
-      if (deps.obsidianSyncOrchestrator.isRunActive()) {
-        releaseLock();
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
 
       const preflight = await deps.obsidianSyncOrchestrator.testConnection({ instanceId }).catch((e: any) => ({
         ok: false,
         error: { code: 'network_error', message: e?.message ? String(e.message) : 'connection test failed' },
       }));
       if (!preflight || (preflight as any).ok !== true) {
-        releaseLock();
         const failure = buildObsidianPreflightFailure(preflight);
         return router.err(failure.message, failure.extra);
       }
 
+      const jobId = createSyncJobId();
       const run = deps.obsidianSyncOrchestrator.syncConversations({
         conversationIds,
         forceFullConversationIds,
         instanceId,
+        jobId,
       });
-      obsidianDetachedRun = run;
-      void run
-        .finally(() => {
-          if (obsidianDetachedRun === run) obsidianDetachedRun = null;
-        })
-        .catch(() => {});
-      return router.ok({ started: true, provider: 'obsidian' });
+      void run.catch(() => {});
+      return router.ok({ started: true, provider: 'obsidian', jobId });
     } catch (error) {
-      releaseLock();
       return toSyncErrorResponse(router, error);
     }
   });
 
   router.register(FEISHU_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    let lock: Promise<unknown> | null = null;
-    const releaseLock = () => {
-      if (lock && feishuDetachedRun === lock) feishuDetachedRun = null;
-    };
     try {
       const gateError = await ensureSyncProviderEnabled('feishu');
       if (gateError) return router.err('sync provider disabled', gateError);
 
-      if (feishuDetachedRun) {
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
-
       const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
-      // Acquire the lock before any async work, so concurrent requests can't race past the check.
-      lock = Promise.resolve();
-      feishuDetachedRun = lock;
-
       const instanceId = deps.getInstanceId();
-      if (deps.feishuSyncOrchestrator.isRunActive()) {
-        releaseLock();
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
-
       const token = await getFeishuOAuthToken().catch(() => null);
-      if (!token?.accessToken) {
-        releaseLock();
-        return router.err('feishu not connected');
-      }
+      if (!token?.accessToken) return router.err('feishu not connected');
 
-      const run = deps.feishuSyncOrchestrator.syncConversations({ conversationIds, instanceId });
-      feishuDetachedRun = run;
-      void run
-        .finally(() => {
-          if (feishuDetachedRun === run) feishuDetachedRun = null;
-        })
-        .catch(() => {});
-      return router.ok({ started: true, provider: 'feishu' });
+      const jobId = createSyncJobId();
+      const run = deps.feishuSyncOrchestrator.syncConversations({ conversationIds, instanceId, jobId });
+      void run.catch(() => {});
+      return router.ok({ started: true, provider: 'feishu', jobId });
     } catch (error) {
-      releaseLock();
       return toSyncErrorResponse(router, error);
     }
   });
@@ -289,7 +207,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(FEISHU_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
     try {
       const data: any = await deps.feishuSyncOrchestrator.getSyncStatus();
-      return router.ok({ ...data, active: Boolean(feishuDetachedRun) || deps.feishuSyncOrchestrator.isRunActive() });
+      return router.ok({ ...data, active: deps.feishuSyncOrchestrator.isRunActive() });
     } catch (error) {
       return toSyncErrorResponse(router, error);
     }
@@ -305,36 +223,19 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(GITHUB_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    let lock: Promise<unknown> | null = null;
-    const releaseLock = () => {
-      if (lock && githubDetachedRun === lock) githubDetachedRun = null;
-    };
     try {
       const gateError = await ensureSyncProviderEnabled('github');
       if (gateError) return router.err('sync provider disabled', gateError);
-      if (githubDetachedRun) return router.err('sync already in progress', { code: 'sync_already_running' });
 
       const conversationIds = normalizeSyncConversationIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
-      lock = Promise.resolve();
-      githubDetachedRun = lock;
       const instanceId = deps.getInstanceId();
-      if (deps.githubSyncOrchestrator.isRunActive()) {
-        releaseLock();
-        return router.err('sync already in progress', { code: 'sync_already_running' });
-      }
-
-      const run = deps.githubSyncOrchestrator.sync({ conversationIds, mode: 'reconcile', instanceId });
-      githubDetachedRun = run;
-      void run
-        .finally(() => {
-          if (githubDetachedRun === run) githubDetachedRun = null;
-        })
-        .catch(() => {});
-      return router.ok({ started: true, provider: 'github' });
+      const jobId = createSyncJobId();
+      const run = deps.githubSyncOrchestrator.sync({ conversationIds, mode: 'reconcile', instanceId, jobId });
+      void run.catch(() => {});
+      return router.ok({ started: true, provider: 'github', jobId });
     } catch (error) {
-      releaseLock();
       return toSyncErrorResponse(router, error);
     }
   });
@@ -342,7 +243,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(GITHUB_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
     try {
       const data: any = await deps.githubSyncOrchestrator.getSyncStatus();
-      return router.ok({ ...data, active: Boolean(githubDetachedRun) || deps.githubSyncOrchestrator.isRunActive() });
+      return router.ok({ ...data, active: deps.githubSyncOrchestrator.isRunActive() });
     } catch (error) {
       return toSyncErrorResponse(router, error);
     }

@@ -155,7 +155,6 @@ function createRouter({
   });
 
   registerNotionSettingsHandlers(router as any, {
-    conversationKinds,
     runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
   });
 
@@ -240,8 +239,10 @@ describe('background-router notion sync', () => {
     });
   });
 
-  it('returns a safe Notion auth summary without token material', async () => {
+  it('returns a safe Notion auth summary without token, raw pending state, or error text', async () => {
     const chromeMock = mockChromeStorage();
+    chromeMock.__store.notion_oauth_pending_state = 'raw-pending-state';
+    chromeMock.__store.notion_oauth_last_error = 'raw-error-text';
     const router = createRouter({
       chromeMock,
       notionServices: {
@@ -254,9 +255,14 @@ describe('background-router notion sync', () => {
     });
 
     const res = await router.dispatch({ type: 'getNotionAuthStatus' });
-    expect(res).toMatchObject({ ok: true, data: { connected: true, workspaceName: 'ws' } });
+    expect(res).toMatchObject({
+      ok: true,
+      data: { connected: true, workspaceName: 'ws', pending: true, errorPresent: true },
+    });
     expect(res.data).not.toHaveProperty('token');
     expect(JSON.stringify(res.data)).not.toContain('accessToken');
+    expect(JSON.stringify(res.data)).not.toContain('raw-pending-state');
+    expect(JSON.stringify(res.data)).not.toContain('raw-error-text');
   });
 
   it('registers Notion START_AUTH and returns the durable attempt state', async () => {
@@ -311,39 +317,14 @@ describe('background-router notion sync', () => {
     const removedFlatten = chromeMock.__removed.flat();
     expect(removedFlatten).toContain('notion_oauth_token_v1');
     expect(removedFlatten).toContain('notion_parent_page_id');
-    for (const storageKey of conversationKinds.getNotionStorageKeys()) {
+    for (const kindId of ['chat', 'article', 'video']) {
+      const storageKey = conversationKinds.getNotionDbSpecByKindId(kindId)?.storageKey;
+      expect(storageKey).toBeTruthy();
       expect(removedFlatten).toContain(storageKey);
     }
     expect(removedFlatten).toContain('notion_oauth_pending_state');
     expect(removedFlatten).toContain('notion_oauth_last_error');
     expect(removedFlatten).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
-  });
-
-  it('disconnect fails closed before credential deletion when canonical database keys are unavailable', async () => {
-    const chromeMock = mockChromeStorage();
-    // @ts-expect-error test global
-    globalThis.chrome = chromeMock;
-    const router = createBackgroundRouter({
-      fallback: (msg: any) => ({
-        ok: false,
-        data: null,
-        error: { message: `unknown message type: ${msg?.type}`, extra: null },
-      }),
-    });
-    registerNotionSettingsHandlers(router as any, {
-      conversationKinds: {
-        getNotionStorageKeys: () => {
-          throw new Error('canonical registry unavailable');
-        },
-      },
-      runExclusiveMaintenance: async (mutation) => await mutation(),
-    });
-
-    const res = await router.dispatch({ type: 'notionDisconnect' });
-
-    expect(res).toMatchObject({ ok: false, error: { message: 'canonical registry unavailable' } });
-    expect(chromeMock.__store.notion_oauth_token_v1).toBeTruthy();
-    expect(chromeMock.__removed.flat()).not.toContain('notion_oauth_token_v1');
   });
 
   it('rejects disconnect while a live notion run owns the provider before deleting credentials or config', async () => {
@@ -371,7 +352,10 @@ describe('background-router notion sync', () => {
 
     const started = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(started).toMatchObject({ ok: true, data: { started: true, provider: 'notion' } });
+    const startedJobId = String(started.data?.jobId || '');
+    expect(startedJobId).toMatch(/^\d+_[0-9a-f]+$/);
     await waitFor(() => jobStore.__getJob()?.status === 'running', 'notion running claim');
+    expect(jobStore.__getJob()?.id).toBe(startedJobId);
 
     const disconnected = await router.dispatch({ type: 'notionDisconnect' });
     expect(disconnected).toMatchObject({

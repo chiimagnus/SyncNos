@@ -210,32 +210,7 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
           callback({ ok: true, data: { mode }, error: null });
           return;
         }
-        if (message?.type !== FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
-          callback({ ok: false, data: null, error: { message: `unexpected message: ${message?.type}`, extra: null } });
-          return;
-        }
-
-        const nextClientId = Object.prototype.hasOwnProperty.call(message, 'clientId')
-          ? String(message.clientId || '').trim()
-          : String(store.feishu_oauth_client_id || '').trim();
-        const nextProxy = Object.prototype.hasOwnProperty.call(message, 'tokenExchangeProxyUrl')
-          ? String(message.tokenExchangeProxyUrl || '').trim()
-          : String(store.feishu_oauth_token_exchange_proxy_url || '').trim();
-        const changed =
-          nextClientId !== String(store.feishu_oauth_client_id || '').trim() ||
-          nextProxy !== String(store.feishu_oauth_token_exchange_proxy_url || '').trim();
-        if (changed) delete store.feishu_oauth_pending_state;
-        store.feishu_oauth_client_id = nextClientId;
-        store.feishu_oauth_token_exchange_proxy_url = nextProxy;
-        callback({
-          ok: true,
-          data: {
-            clientId: nextClientId,
-            clientSecretPresent: !!String(store.feishu_oauth_client_secret || '').trim(),
-            tokenExchangeProxyUrl: nextProxy,
-          },
-          error: null,
-        });
+        callback({ ok: false, data: null, error: { message: `unexpected message: ${message?.type}`, extra: null } });
       },
     },
     storage: {
@@ -630,12 +605,10 @@ describe('backup service', () => {
       feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
       feishu_chat_folder: 'AIChats',
     });
-    expect(chromeMock.__store.feishu_oauth_pending_state).toBeUndefined();
-    expect(chromeMock.__runtimeMessages).toContainEqual({
-      type: FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG,
-      clientId: 'feishu-app-id',
-      tokenExchangeProxyUrl: 'https://worker.example.com/exchange',
-    });
+    expect(chromeMock.__store.feishu_oauth_pending_state).toBe('');
+    expect(
+      chromeMock.__runtimeMessages.some((message: any) => message?.type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG),
+    ).toBe(false);
   });
 
   it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {

@@ -204,8 +204,14 @@ describe('github sync orchestrator staging through production sync', () => {
     const result = await createGithubSyncOrchestrator(services).sync({
       conversationIds: [1, 2],
       instanceId: 'staging-dedupe',
+      jobId: 'github-accepted-job',
     });
 
+    expect((services.jobStore.setJob as any).mock.calls[0]?.[0]).toMatchObject({
+      id: 'github-accepted-job',
+      provider: 'github',
+      status: 'running',
+    });
     expect(services.preflight).toHaveBeenCalledTimes(1);
     expect(services.preflight).toHaveBeenCalledWith({ repository: settings.repository, branch: settings.branch });
     expect(services.getSettings).toHaveBeenCalledTimes(1);

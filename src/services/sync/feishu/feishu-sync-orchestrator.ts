@@ -10,7 +10,7 @@ import { convertContentToBlocks, normalizeConvertedBlocksPreorder } from '@servi
 import { preprocessFeishuDocxMarkdownImages } from '@services/sync/feishu/docx/feishu-docx-image-preprocess';
 import { bindFeishuDocxImagesByOrder } from '@services/sync/feishu/docx/image-block-binder';
 import { sha256Hex } from '@services/sync/shared/content-hash';
-import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncJobId, createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import type { SyncJobSnapshot, SyncWarning } from '@services/sync/models';
@@ -523,9 +523,11 @@ function reconcileStartupSyncJob() {
 async function runSyncConversations({
   conversationIds,
   instanceId,
+  jobId,
 }: {
   conversationIds?: unknown[];
   instanceId?: string;
+  jobId?: string;
 } = {}) {
   const ids = normalizeSyncConversationIds(conversationIds);
   if (!ids.length) {
@@ -541,9 +543,10 @@ async function runSyncConversations({
 
   const safeInstanceId = safeString(instanceId);
   const startedAt = Date.now();
+  const acceptedJobId = safeString(jobId) || createSyncJobId(startedAt);
   const lifecycle = createSyncJobLifecycle({
     initialJob: {
-      id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+      id: acceptedJobId,
       provider: SYNC_PROVIDER,
       instanceId: safeInstanceId,
       status: 'running',

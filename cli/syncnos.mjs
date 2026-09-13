@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import process from 'node:process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
 import { contract } from './contract.mjs';
@@ -53,6 +54,10 @@ function parseArgs(argv) {
     keep: null,
     remove: null,
     text: null,
+    to: null,
+    provider: null,
+    noWait: false,
+    timeout: null,
     positionals: [],
     provided: new Set(),
   };
@@ -131,6 +136,26 @@ function parseArgs(argv) {
     if (token === '--text') {
       options.text = readValue(token);
       options.provided.add('text');
+      continue;
+    }
+    if (token === '--to') {
+      options.to = readValue(token);
+      options.provided.add('to');
+      continue;
+    }
+    if (token === '--provider') {
+      options.provider = readValue(token);
+      options.provided.add('provider');
+      continue;
+    }
+    if (token === '--no-wait') {
+      options.noWait = true;
+      options.provided.add('noWait');
+      continue;
+    }
+    if (token === '--timeout') {
+      options.timeout = readValue(token);
+      options.provided.add('timeout');
       continue;
     }
     if (String(token || '').startsWith('--')) throw codedError('usage_error', `Unknown argument: ${token}`, EXIT.usage);
@@ -328,6 +353,94 @@ async function requestSelected(selected, method, params = {}) {
   return response.data;
 }
 
+const SYNC_PROVIDERS = new Set(['notion', 'obsidian', 'feishu', 'github']);
+
+function parseSyncProvider(value, label = 'provider') {
+  const provider = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!SYNC_PROVIDERS.has(provider)) {
+    throw codedError('usage_error', `${label} must be notion, obsidian, feishu, or github`, EXIT.usage);
+  }
+  return provider;
+}
+
+function providerConfigPatch(provider, keyInput, value) {
+  const key = String(keyInput || '')
+    .trim()
+    .toLowerCase();
+  const maps = {
+    notion: {
+      'parent-page-id': 'parentPageId',
+      'parent-page-title': 'parentPageTitle',
+      'chat-database-id': ['databaseIds', 'chat'],
+      'article-database-id': ['databaseIds', 'article'],
+      'video-database-id': ['databaseIds', 'video'],
+    },
+    feishu: {
+      'client-id': 'clientId',
+      'client-secret': 'clientSecret',
+      'token-exchange-proxy-url': 'tokenExchangeProxyUrl',
+      'chat-folder': 'chatFolder',
+      'article-folder': 'articleFolder',
+      'video-folder': 'videoFolder',
+    },
+    obsidian: {
+      'api-base-url': 'apiBaseUrl',
+      'api-key': 'apiKey',
+      'auth-header-name': 'authHeaderName',
+      'chat-folder': 'chatFolder',
+      'article-folder': 'articleFolder',
+      'video-folder': 'videoFolder',
+    },
+    github: {
+      repository: 'repository',
+      branch: 'branch',
+    },
+  };
+  const target = maps[provider]?.[key];
+  if (!target) throw codedError('usage_error', `Unknown ${provider} config key: ${key}`, EXIT.usage);
+  if (Array.isArray(target)) return { [target[0]]: { [target[1]]: value } };
+  return { [target]: value };
+}
+
+async function waitForSyncJob(selected, provider, jobId, timeoutSeconds) {
+  const deadline = Date.now() + timeoutSeconds * 1000;
+  let observedExpectedJob = false;
+  let lastObservedStatus = null;
+  while (true) {
+    const status = await requestSelected(selected, 'sync.status', { provider });
+    lastObservedStatus = status;
+    const job = status?.job && typeof status.job === 'object' ? status.job : null;
+    const isExpectedJob = String(job?.id || '') === jobId;
+    if (isExpectedJob) observedExpectedJob = true;
+
+    if (isExpectedJob && status?.active === false) {
+      if (job?.status === 'done') return status;
+      if (job?.status === 'aborted') {
+        throw codedError('sync_aborted', 'Sync job was aborted', EXIT.business, { provider, jobId, status });
+      }
+    }
+
+    if (status?.active === false && !observedExpectedJob) {
+      throw codedError('sync_start_failed', 'Accepted sync job never became durable', EXIT.business, {
+        provider,
+        jobId,
+        lastObservedStatus,
+      });
+    }
+
+    if (Date.now() >= deadline) {
+      throw codedError('sync_wait_timeout', 'Timed out waiting for sync job', EXIT.business, {
+        provider,
+        jobId,
+        lastObservedStatus,
+      });
+    }
+    await sleep(250);
+  }
+}
+
 function publicInstance(item, preferredId) {
   const entry = item.entry;
   return {
@@ -373,6 +486,19 @@ function usage() {
     '  comments delete <comment-id>',
     '  mention search [query...] [--limit <n>]',
     '  mention build <conversation-id>',
+    '  notion auth status|start|disconnect',
+    '  notion pages list',
+    '  notion config get|set <key> <value>|reset-database <chat|article|video>',
+    '  feishu auth status|start|disconnect',
+    '  feishu config get|set <key> <value>',
+    '  obsidian config get|set <key> <value>',
+    '  obsidian test',
+    '  github auth status|start|poll|cancel|disconnect',
+    '  github repos list',
+    '  github config get|set <key> <value>',
+    '  github test|init',
+    '  sync <conversation-id> [...] --to notion|obsidian|feishu|github [--no-wait] [--timeout <seconds>]',
+    '  sync status --provider notion|obsidian|feishu|github',
     '  doctor [--human]',
   ].join('\n');
 }
@@ -664,6 +790,127 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       throw codedError('usage_error', 'mention action must be search or build', EXIT.usage);
+    }
+
+    if (
+      options.command === 'notion' ||
+      options.command === 'feishu' ||
+      options.command === 'obsidian' ||
+      options.command === 'github'
+    ) {
+      const provider = options.command;
+      assertAllowedOptions(options, new Set(['instance', 'human']));
+      const section = String(options.positionals[0] || '');
+      const action = String(options.positionals[1] || '');
+      let selectedPromise = null;
+      const requestProvider = async (method, params = {}) => {
+        selectedPromise ||= selectedInstance(options, context);
+        const { selected } = await selectedPromise;
+        return await requestSelected(selected, method, params);
+      };
+
+      if ((provider === 'notion' || provider === 'feishu' || provider === 'github') && section === 'auth') {
+        const allowedActions =
+          provider === 'github'
+            ? new Set(['status', 'start', 'poll', 'cancel', 'disconnect'])
+            : new Set(['status', 'start', 'disconnect']);
+        if (options.positionals.length !== 2 || !allowedActions.has(action)) {
+          throw codedError('usage_error', `invalid ${provider} auth action`, EXIT.usage);
+        }
+        const result = await requestProvider(`${provider}.auth.${action}`);
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      if (provider === 'notion' && section === 'pages' && action === 'list' && options.positionals.length === 2) {
+        const result = await requestProvider('notion.pages.list');
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      if (provider === 'github' && section === 'repos' && action === 'list' && options.positionals.length === 2) {
+        const result = await requestProvider('github.repos.list');
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      if (section === 'config') {
+        if (action === 'get' && options.positionals.length === 2) {
+          const result = await requestProvider(`${provider}.config.get`);
+          writeResult(stdout, envelopeOk(result), options.human);
+          return EXIT.success;
+        }
+        if (action === 'set' && options.positionals.length === 4) {
+          const patch = providerConfigPatch(provider, options.positionals[2], options.positionals[3]);
+          const result = await requestProvider(`${provider}.config.set`, patch);
+          writeResult(stdout, envelopeOk(result), options.human);
+          return EXIT.success;
+        }
+        if (
+          provider === 'notion' &&
+          action === 'reset-database' &&
+          options.positionals.length === 3 &&
+          ['chat', 'article', 'video'].includes(String(options.positionals[2] || ''))
+        ) {
+          const result = await requestProvider('notion.config.reset-database', { kindId: options.positionals[2] });
+          writeResult(stdout, envelopeOk(result), options.human);
+          return EXIT.success;
+        }
+        throw codedError('usage_error', `invalid ${provider} config action`, EXIT.usage);
+      }
+
+      if (provider === 'obsidian' && section === 'test' && options.positionals.length === 1) {
+        const result = await requestProvider('obsidian.test');
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      if (provider === 'github' && (section === 'test' || section === 'init') && options.positionals.length === 1) {
+        const result = await requestProvider(`github.${section}`);
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      throw codedError('usage_error', `invalid ${provider} command`, EXIT.usage);
+    }
+
+    if (options.command === 'sync') {
+      if (String(options.positionals[0] || '') === 'status') {
+        assertAllowedOptions(options, new Set(['instance', 'human', 'provider']));
+        if (options.positionals.length !== 1 || !options.provider) {
+          throw codedError('usage_error', 'sync status requires --provider', EXIT.usage);
+        }
+        const provider = parseSyncProvider(options.provider);
+        const { selected } = await selectedInstance(options, context);
+        const result = await requestSelected(selected, 'sync.status', { provider });
+        writeResult(stdout, envelopeOk(result), options.human);
+        return EXIT.success;
+      }
+
+      assertAllowedOptions(options, new Set(['instance', 'human', 'to', 'noWait', 'timeout']));
+      if (!options.to || !options.positionals.length) {
+        throw codedError('usage_error', 'sync requires conversation ids and --to', EXIT.usage);
+      }
+      const provider = parseSyncProvider(options.to, 'to');
+      const conversationIds = options.positionals.map((value) => parsePositiveInteger(value, 'conversation id'));
+      const timeoutSeconds =
+        options.timeout == null ? 600 : parsePositiveInteger(options.timeout, 'timeout', { max: 86_400 });
+      const { selected } = await selectedInstance(options, context);
+      const accepted = await requestSelected(selected, 'sync.start', { provider, conversationIds });
+      const jobId = String(accepted?.jobId || '').trim();
+      if (accepted?.started !== true || !jobId) {
+        throw codedError('sync_start_failed', 'Sync start did not return an accepted job id', EXIT.business, {
+          provider,
+          accepted,
+        });
+      }
+      if (options.noWait) {
+        writeResult(stdout, envelopeOk({ started: true, provider, jobId }), options.human);
+        return EXIT.success;
+      }
+      const status = await waitForSyncJob(selected, provider, jobId, timeoutSeconds);
+      writeResult(stdout, envelopeOk({ provider, jobId, ...status }), options.human);
+      return EXIT.success;
     }
 
     if (options.command === 'stats') {

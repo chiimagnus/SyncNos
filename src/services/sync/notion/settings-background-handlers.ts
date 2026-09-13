@@ -1,8 +1,20 @@
 import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { storageGet, storageRemove } from '@platform/storage/local';
-import { clearNotionOAuthAttemptAndToken, startNotionOAuthAttempt } from '@services/sync/notion/auth/oauth';
+import {
+  clearNotionOAuthAttemptAndToken,
+  getNotionOAuthAttemptSummary,
+  startNotionOAuthAttempt,
+} from '@services/sync/notion/auth/oauth';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { listNotionParentPages } from '@services/sync/notion/notion-parent-pages.ts';
+import {
+  clearAllNotionSettings,
+  getNotionParentPage,
+  getNotionSettingsConfig,
+  NOTION_DATABASE_KIND_IDS,
+  resetNotionDatabaseId,
+  setNotionDatabaseId,
+  setNotionParentPage,
+} from '@services/sync/notion/settings-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -11,26 +23,23 @@ type AnyRouter = {
 };
 
 type Deps = {
-  conversationKinds: { getNotionStorageKeys: () => unknown[] };
   runExclusiveMaintenance: <T>(mutation: () => Promise<T>) => Promise<T>;
 };
 
-function getNotionDisconnectStorageKeys(deps: Deps): string[] {
-  const base = ['notion_parent_page_id', 'notion_parent_page_title'];
-  const notionDbKeys = deps.conversationKinds
-    .getNotionStorageKeys()
-    .map((key) => String(key || '').trim())
-    .filter(Boolean);
-  if (!notionDbKeys.length) throw new Error('missing Notion database storage keys');
-  return Array.from(new Set([...base, ...notionDbKeys]));
+function handlerError(router: AnyRouter, error: unknown, fallback: string) {
+  const message = String((error as any)?.message ?? error ?? fallback);
+  const code = String((error as any)?.extra?.code ?? (error as any)?.code ?? '').trim();
+  return code ? router.err(message, { code }) : router.err(message);
 }
 
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
-    const token = await getNotionOAuthToken();
+    const [token, attempt] = await Promise.all([getNotionOAuthToken(), getNotionOAuthAttemptSummary()]);
     return router.ok({
       connected: !!(token && token.accessToken),
       workspaceName: token?.workspaceName ? String(token.workspaceName) : '',
+      pending: attempt.pending,
+      errorPresent: attempt.errorPresent,
     });
   });
 
@@ -38,7 +47,49 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
     try {
       return router.ok(await startNotionOAuthAttempt());
     } catch (error) {
-      return router.err(String((error as any)?.message ?? error ?? 'notion oauth start failed'));
+      return handlerError(router, error, 'notion oauth start failed');
+    }
+  });
+
+  router.register(NOTION_MESSAGE_TYPES.GET_CONFIG, async () => {
+    try {
+      return router.ok(await getNotionSettingsConfig());
+    } catch (error) {
+      return handlerError(router, error, 'failed to read Notion config');
+    }
+  });
+
+  router.register(NOTION_MESSAGE_TYPES.SAVE_CONFIG, async (msg) => {
+    try {
+      const hasParentId = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageId');
+      const hasParentTitle = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageTitle');
+      if (hasParentId || hasParentTitle) {
+        const current = await getNotionSettingsConfig();
+        await setNotionParentPage({
+          id: hasParentId ? msg?.parentPageId : current.parentPageId,
+          title: hasParentTitle ? msg?.parentPageTitle : current.parentPageTitle,
+        });
+      }
+
+      const databaseIds = msg?.databaseIds && typeof msg.databaseIds === 'object' ? msg.databaseIds : null;
+      if (databaseIds) {
+        for (const kindId of NOTION_DATABASE_KIND_IDS) {
+          if (!Object.prototype.hasOwnProperty.call(databaseIds, kindId)) continue;
+          await setNotionDatabaseId(kindId, databaseIds[kindId]);
+        }
+      }
+      return router.ok(await getNotionSettingsConfig());
+    } catch (error) {
+      return handlerError(router, error, 'failed to save Notion config');
+    }
+  });
+
+  router.register(NOTION_MESSAGE_TYPES.RESET_DATABASE_ID, async (msg) => {
+    try {
+      await resetNotionDatabaseId(msg?.kindId);
+      return router.ok(await getNotionSettingsConfig());
+    } catch (error) {
+      return handlerError(router, error, 'failed to reset Notion database id');
     }
   });
 
@@ -47,9 +98,7 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
     const accessToken = token?.accessToken ? String(token.accessToken) : '';
     if (!accessToken) return router.err('notion not connected');
 
-    const local = await storageGet(['notion_parent_page_id']).catch(() => ({}));
-    const savedPageId = String((local as any)?.notion_parent_page_id || '').trim();
-
+    const savedPageId = (await getNotionParentPage()).id;
     try {
       const { pages, resolvedSaved } = await listNotionParentPages(accessToken, { savedPageId });
       return router.ok({ pages, resolvedSaved });
@@ -66,7 +115,6 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
         const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
         message = `${message} Retry in about ${seconds}s.`;
       }
-
       return router.err(message, { code, status, requestId });
     }
   });
@@ -74,15 +122,12 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
       await deps.runExclusiveMaintenance(async () => {
-        const storageKeys = getNotionDisconnectStorageKeys(deps);
         await clearNotionOAuthAttemptAndToken();
-        await storageRemove(storageKeys);
+        await clearAllNotionSettings();
       });
       return router.ok({ disconnected: true });
     } catch (error) {
-      const message = String((error as any)?.message ?? error ?? 'notion disconnect failed');
-      const code = String((error as any)?.extra?.code ?? (error as any)?.code ?? '').trim();
-      return code ? router.err(message, { code }) : router.err(message);
+      return handlerError(router, error, 'notion disconnect failed');
     }
   });
 }

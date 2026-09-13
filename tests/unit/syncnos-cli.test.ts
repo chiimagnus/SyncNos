@@ -666,6 +666,175 @@ describe('syncnos CLI instance selection', () => {
     }
   });
 
+  it('rejects invalid provider syntax before attempting browser instance discovery', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const invalidAction = await run(['notion', 'nonsense'], runtimeRoot, homeDir);
+    expect(invalidAction.exitCode).toBe(2);
+    expect(invalidAction.json.error.code).toBe('usage_error');
+
+    const invalidKey = await run(['feishu', 'config', 'set', 'raw-storage-key', 'value'], runtimeRoot, homeDir);
+    expect(invalidKey.exitCode).toBe(2);
+    expect(invalidKey.json.error.code).toBe('usage_error');
+  });
+
+  it('routes provider auth/config commands through safe public RPCs', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'provider-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'notion.auth.start') return { data: { started: true, browserOpened: true } };
+        if (request.method === 'feishu.config.get') {
+          return {
+            data: {
+              auth: { clientId: 'app-id', clientSecretPresent: true, tokenExchangeProxyUrl: '' },
+              paths: { chatFolder: 'Chats', articleFolder: 'Articles', videoFolder: 'Videos' },
+            },
+          };
+        }
+        if (request.method === 'feishu.config.set') return { data: { auth: { clientSecretPresent: true } } };
+        if (request.method === 'obsidian.config.set') return { data: { apiKeyPresent: true, apiKeyMasked: '***' } };
+        if (request.method === 'github.auth.poll') return { data: { state: 'pending', userCode: 'ABCD-EFGH' } };
+        return null;
+      },
+    });
+    try {
+      const notionStart = await run(['notion', 'auth', 'start'], runtimeRoot, homeDir);
+      expect(notionStart.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'notion.auth.start', params: {} });
+      expect(JSON.stringify(notionStart.json)).not.toContain('state');
+
+      const feishuGet = await run(['feishu', 'config', 'get'], runtimeRoot, homeDir);
+      expect(feishuGet.exitCode).toBe(0);
+      expect(feishuGet.json.data.auth).toEqual({
+        clientId: 'app-id',
+        clientSecretPresent: true,
+        tokenExchangeProxyUrl: '',
+      });
+      expect(feishuGet.json.data.auth).not.toHaveProperty('clientSecret');
+
+      const feishuSecret = await run(
+        ['feishu', 'config', 'set', 'client-secret', 'replacement-secret'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(feishuSecret.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'feishu.config.set',
+        params: { clientSecret: 'replacement-secret' },
+      });
+
+      const obsidianSecret = await run(
+        ['obsidian', 'config', 'set', 'api-key', 'obsidian-secret'],
+        runtimeRoot,
+        homeDir,
+      );
+      expect(obsidianSecret.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'obsidian.config.set',
+        params: { apiKey: 'obsidian-secret' },
+      });
+      expect(obsidianSecret.json.data).not.toHaveProperty('apiKey');
+
+      const githubPoll = await run(['github', 'auth', 'poll'], runtimeRoot, homeDir);
+      expect(githubPoll.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'github.auth.poll', params: {} });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('waits for the exact accepted sync job instead of accepting an older terminal snapshot', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    let statusReads = 0;
+    const instance = await startFakeInstance(runtimeRoot, 'sync-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'sync.start') {
+          return { data: { started: true, provider: 'notion', jobId: 'accepted-job' } };
+        }
+        if (request.method === 'sync.status') {
+          statusReads += 1;
+          if (statusReads === 1) {
+            return { data: { provider: 'notion', active: true, job: { id: 'older-job', status: 'done' } } };
+          }
+          if (statusReads === 2) {
+            return { data: { provider: 'notion', active: true, job: { id: 'accepted-job', status: 'running' } } };
+          }
+          return { data: { provider: 'notion', active: false, job: { id: 'accepted-job', status: 'done' } } };
+        }
+        return null;
+      },
+    });
+    try {
+      const result = await run(['sync', '7', '9', '--to', 'notion', '--timeout', '5'], runtimeRoot, homeDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.json.data).toMatchObject({
+        provider: 'notion',
+        jobId: 'accepted-job',
+        active: false,
+        job: { id: 'accepted-job', status: 'done' },
+      });
+      expect(statusReads).toBe(3);
+      expect(instance.requests.find((request) => request.method === 'sync.start')).toEqual({
+        method: 'sync.start',
+        params: { provider: 'notion', conversationIds: [7, 9] },
+      });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('reports sync_start_failed when the accepted job never becomes durable, and supports no-wait', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'sync-start-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'sync.start') {
+          return { data: { started: true, provider: 'github', jobId: 'accepted-job' } };
+        }
+        if (request.method === 'sync.status') {
+          return { data: { provider: 'github', active: false, job: { id: 'older-job', status: 'done' } } };
+        }
+        return null;
+      },
+    });
+    try {
+      const failed = await run(['sync', '7', '--to', 'github'], runtimeRoot, homeDir);
+      expect(failed.exitCode).toBe(5);
+      expect(failed.json.error.code).toBe('sync_start_failed');
+      expect(failed.json.error.extra.jobId).toBe('accepted-job');
+
+      const statusCount = instance.requests.filter((request) => request.method === 'sync.status').length;
+      const noWait = await run(['sync', '7', '--to', 'github', '--no-wait'], runtimeRoot, homeDir);
+      expect(noWait.exitCode).toBe(0);
+      expect(noWait.json.data).toEqual({ started: true, provider: 'github', jobId: 'accepted-job' });
+      expect(instance.requests.filter((request) => request.method === 'sync.status')).toHaveLength(statusCount);
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('times out waiting without sending a cancel or clear request', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'sync-timeout-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'sync.start') {
+          return { data: { started: true, provider: 'obsidian', jobId: 'long-job' } };
+        }
+        if (request.method === 'sync.status') {
+          return { data: { provider: 'obsidian', active: true, job: { id: 'long-job', status: 'running' } } };
+        }
+        return null;
+      },
+    });
+    try {
+      const result = await run(['sync', '7', '--to', 'obsidian', '--timeout', '1'], runtimeRoot, homeDir);
+      expect(result.exitCode).toBe(5);
+      expect(result.json.error.code).toBe('sync_wait_timeout');
+      expect(result.json.error.extra.jobId).toBe('long-job');
+      expect(instance.requests.some((request) => /cancel|clear/i.test(request.method))).toBe(false);
+    } finally {
+      await instance.stop();
+    }
+  });
+
   it('selection helper encodes the public priority without recent-start heuristics', () => {
     const a = { entry: { cliInstanceId: 'a' } } as any;
     const b = { entry: { cliInstanceId: 'b' } } as any;

@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GITHUB_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  FEISHU_MESSAGE_TYPES,
+  GITHUB_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
@@ -275,8 +279,16 @@ beforeEach(() => {
   gateMocks.setSyncProviderEnabled.mockResolvedValue(undefined);
 
   runtimeMocks.send.mockImplementation(async (type: string, payload: Record<string, unknown> = {}) => {
-    if (type === 'getNotionAuthStatus') return ok({ connected: false });
-    if (type === 'getFeishuAuthStatus') return ok({ connected: false });
+    if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS) return ok({ connected: false, workspaceName: '' });
+    if (type === NOTION_MESSAGE_TYPES.GET_CONFIG) {
+      return ok({ parentPageId: '', parentPageTitle: '', databaseIds: { chat: '', article: '', video: '' } });
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_STATUS) {
+      return ok({ connected: false, pending: false, errorPresent: false });
+    }
+    if (type === FEISHU_MESSAGE_TYPES.GET_AUTH_CONFIG) {
+      return ok({ clientId: '', clientSecretPresent: false, tokenExchangeProxyUrl: '' });
+    }
     if (type === 'obsidianGetSettings') {
       return ok({
         apiBaseUrl: '',

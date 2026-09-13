@@ -19,7 +19,7 @@ import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cac
 import { collectOrderedSyncnosAssetIds, replaceSyncnosAssetImageTargets } from '@services/shared/markdown-asset-refs';
 import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
-import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncJobId, createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 
@@ -456,10 +456,12 @@ async function runSyncConversations({
   conversationIds,
   forceFullConversationIds,
   instanceId,
+  jobId,
 }: {
   conversationIds?: unknown[];
   forceFullConversationIds?: unknown[];
   instanceId?: string;
+  jobId?: string;
 } = {}) {
   const ids = normalizeSyncConversationIds(conversationIds);
   const forceFullIds = new Set(normalizeSyncConversationIds(forceFullConversationIds));
@@ -476,9 +478,10 @@ async function runSyncConversations({
 
   const safeInstanceId = safeString(instanceId);
   const startedAt = Date.now();
+  const acceptedJobId = safeString(jobId) || createSyncJobId(startedAt);
   const lifecycle = createSyncJobLifecycle({
     initialJob: {
-      id: `${startedAt}_${Math.random().toString(16).slice(2)}`,
+      id: acceptedJobId,
       provider: SYNC_PROVIDER,
       instanceId: safeInstanceId,
       status: 'running',

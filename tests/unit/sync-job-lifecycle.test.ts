@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
+import { createSyncJobId, createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { normalizeSyncJobSnapshot } from '@services/sync/sync-job-store';
 import type { SyncJobSnapshot } from '@services/sync/models';
 
@@ -23,6 +23,14 @@ function runningJob(conversationIds = [1, 2], overrides: Partial<SyncJobSnapshot
 }
 
 describe('sync job lifecycle', () => {
+  it('creates correlation job ids from the supplied clock without treating them as security tokens', () => {
+    const first = createSyncJobId(123456);
+    const second = createSyncJobId(() => 123456);
+    expect(first).toMatch(/^123456_[0-9a-f]+$/);
+    expect(second).toMatch(/^123456_[0-9a-f]+$/);
+    expect(first).not.toBe(second);
+  });
+
   it('never lets an empty later update erase a known conversation title', async () => {
     const persisted: SyncJobSnapshot[] = [];
     const lifecycle = createSyncJobLifecycle({

@@ -20,7 +20,6 @@ export function registerObsidianSettingsHandlers(router: AnyRouter, deps: Deps) 
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, async (msg) => {
     const data = await saveObsidianSettings({
-      enabled: msg.enabled,
       apiBaseUrl: msg.apiBaseUrl,
       apiKey: msg.apiKey,
       authHeaderName: msg.authHeaderName,

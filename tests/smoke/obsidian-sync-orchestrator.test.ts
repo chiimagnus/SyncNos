@@ -268,11 +268,16 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const firstRun = orch.syncConversations({ conversationIds: [1], instanceId: 'first' });
+    const firstRun = orch.syncConversations({
+      conversationIds: [1],
+      instanceId: 'first',
+      jobId: 'obsidian-accepted-job',
+    });
     await remoteStartedPromise;
 
     expect(orch.isRunActive()).toBe(true);
     expect(syncJobSetPayloads[0]).toMatchObject({
+      id: 'obsidian-accepted-job',
       provider: 'obsidian',
       status: 'running',
       totalCount: 1,
