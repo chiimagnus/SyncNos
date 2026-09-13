@@ -97,10 +97,10 @@ export function writeNativeMessage(stream, value) {
       resolve();
     };
     const cleanup = () => {
-      stream.off?.('error', onError);
-      stream.off?.('drain', onDrain);
+      stream.off('error', onError);
+      stream.off('drain', onDrain);
     };
-    stream.once?.('error', onError);
+    stream.once('error', onError);
     try {
       const accepted = stream.write(frame);
       if (accepted !== false) {
@@ -108,7 +108,7 @@ export function writeNativeMessage(stream, value) {
         resolve();
         return;
       }
-      stream.once?.('drain', onDrain);
+      stream.once('drain', onDrain);
     } catch (error) {
       cleanup();
       reject(error);
@@ -138,7 +138,7 @@ export function createNativeHostProtocol({
   const cleanupWaiter = (waiter) => {
     if (!waiter) return;
     if (waiter.timer) clearTimeout(waiter.timer);
-    if (waiter.signal && waiter.onAbort) waiter.signal.removeEventListener?.('abort', waiter.onAbort);
+    if (waiter.signal && waiter.onAbort) waiter.signal.removeEventListener('abort', waiter.onAbort);
   };
 
   const ackKey = (requestId, transferId, seq) => `${requestId}\u0000${transferId}\u0000${seq}`;
@@ -232,7 +232,7 @@ export function createNativeHostProtocol({
       };
     }
     pending.set(requestId, waiter);
-    signal?.addEventListener?.('abort', waiter.onAbort, { once: true });
+    signal?.addEventListener('abort', waiter.onAbort, { once: true });
     if (signal?.aborted) waiter.onAbort();
     return responsePromise;
   };
@@ -286,7 +286,7 @@ export function createNativeHostProtocol({
               : makeError('native_host_request_cancelled', 'File transfer cancelled');
           reject(reason);
         };
-        signal.addEventListener?.('abort', waiter.onAbort, { once: true });
+        signal.addEventListener('abort', waiter.onAbort, { once: true });
       }
       ackWaiters.set(key, waiter);
       if (signal?.aborted) waiter.onAbort();
@@ -801,36 +801,23 @@ export async function startNativeHostIpc({
           socket.end(encodeJsonLine(localErrorResponse('invalid_request', 'CLI IPC request method is required')));
           return;
         }
-        const AbortControllerCtor = globalThis.AbortController;
-        requestAbortController = AbortControllerCtor ? new AbortControllerCtor() : null;
+        requestAbortController = new globalThis.AbortController();
         requestSettled = false;
         const params = request?.params && typeof request.params === 'object' ? request.params : {};
-        const requestOptions = { timeoutMs: 0, signal: requestAbortController?.signal ?? null };
+        const requestOptions = { timeoutMs: 0, signal: requestAbortController.signal };
         let operation;
         if (method === 'export.markdown' || method === 'export.json' || method === 'backup.export') {
-          if (!protocol?.requestFileExport) {
-            operation = Promise.reject(
-              Object.assign(new Error('Native host file export unavailable'), { code: 'file_transfer_unavailable' }),
-            );
-          } else {
-            operation = protocol.requestFileExport(
-              method,
-              method === 'backup.export' ? {} : { conversationIds: params.conversationIds },
-              {
-                ...requestOptions,
-                outputPath: params.outputPath,
-                force: params.force === true,
-              },
-            );
-          }
+          operation = protocol.requestFileExport(
+            method,
+            method === 'backup.export' ? {} : { conversationIds: params.conversationIds },
+            {
+              ...requestOptions,
+              outputPath: params.outputPath,
+              force: params.force === true,
+            },
+          );
         } else if (method === 'backup.import') {
-          if (!protocol?.requestFileImport) {
-            operation = Promise.reject(
-              Object.assign(new Error('Native host file import unavailable'), { code: 'file_transfer_unavailable' }),
-            );
-          } else {
-            operation = protocol.requestFileImport(method, {}, { ...requestOptions, inputPath: params.inputPath });
-          }
+          operation = protocol.requestFileImport(method, {}, { ...requestOptions, inputPath: params.inputPath });
         } else {
           operation = protocol.request(method, params, requestOptions);
         }

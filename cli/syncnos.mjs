@@ -384,7 +384,6 @@ const TRANSPORT_RESPONSE_CODES = new Set([
   'file_transfer_hash_mismatch',
   'file_transfer_size_mismatch',
   'file_chunk_invalid_base64',
-  'file_transfer_unavailable',
 ]);
 
 async function requestSelected(selected, method, params = {}) {

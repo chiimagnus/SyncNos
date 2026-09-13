@@ -53,4 +53,18 @@ describe('Native Messaging browser metadata', () => {
       browserFamily: 'chromium',
     });
   });
+
+  it('does not hide a broken runtime manifest read behind empty metadata', () => {
+    setUserAgent('Mozilla/5.0 Chrome/152.0 Safari/537.36');
+    (globalThis as any).browser = undefined;
+    (globalThis as any).chrome = {
+      runtime: {
+        id: 'extension-id',
+        getManifest: () => {
+          throw new Error('extension context invalidated');
+        },
+      },
+    };
+    expect(() => readExtensionRuntimeMetadata()).toThrow('extension context invalidated');
+  });
 });

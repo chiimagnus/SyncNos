@@ -136,7 +136,6 @@ function safePost(port: NativeMessagingPort, frame: unknown): void {
       'response_too_large',
       'Native Messaging response exceeds platform limit',
     );
-    if (serializedByteLength(compact) > EXTENSION_TO_HOST_MAX_BYTES) throw new Error('response_too_large');
     port.postMessage(compact);
     return;
   }
@@ -152,8 +151,9 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     const current = port;
     port = null;
     connectGeneration += 1;
+    if (!current) return;
     try {
-      current?.disconnect?.();
+      current.disconnect();
     } catch (_error) {
       // ignore
     }
@@ -857,8 +857,8 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       }
     };
 
-    nextPort.onMessage?.addListener?.(onMessage);
-    nextPort.onDisconnect?.addListener?.(onDisconnect);
+    nextPort.onMessage.addListener(onMessage);
+    nextPort.onDisconnect.addListener(onDisconnect);
 
     const [cliInstanceId, metadata] = await Promise.all([
       deps.getCliInstanceId(),
@@ -892,7 +892,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     }
     if (stopped || generation !== connectGeneration) {
       try {
-        nextPort.disconnect?.();
+        nextPort.disconnect();
       } catch (_error) {
         // ignore
       }
