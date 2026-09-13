@@ -1,4 +1,5 @@
 import {
+  buildChatgptFileCacheKey,
   buildChatgptGeneratedImageMessageKey,
   chatgptFileIdFromAssetPointer,
 } from '@services/shared/chatgpt-image-identity';
@@ -17,7 +18,6 @@ export type ChatgptProtectedImageAsset = {
   alt: string;
   mimeType: string;
   sizeBytes: number | null;
-  failureReason?: 'unsupported_pointer';
 };
 
 export type ChatgptProtectedImages = {
@@ -31,7 +31,6 @@ export type ChatgptApiSnapshotResult = {
 };
 
 type PendingImage = Omit<ChatgptProtectedImageAsset, 'targetMessageKey'> & {
-  sourceMessageId: string;
   turnId: string;
 };
 
@@ -79,12 +78,26 @@ function primitivePartText(part: unknown): string {
 function isImagePart(part: unknown): part is Record<string, unknown> {
   if (!part || typeof part !== 'object' || Array.isArray(part)) return false;
   const record = part as Record<string, unknown>;
-  const type = stableString(record.content_type || record.type).toLowerCase();
-  return type.includes('image');
+  const type = stableString(record.content_type).toLowerCase();
+  return type === 'image_asset_pointer';
+}
+
+function currentParts(message: any): unknown[] {
+  const raw = message?.content?.parts;
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw apiSnapshotError('unsupported_content');
+  return raw;
+}
+
+function currentAttachments(message: any): any[] {
+  const raw = message?.metadata?.attachments;
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw apiSnapshotError('unsupported_content');
+  return raw;
 }
 
 function renderTextParts(message: any): string {
-  const parts = Array.isArray(message?.content?.parts) ? message.content.parts : [];
+  const parts = currentParts(message);
   const output: string[] = [];
   for (const part of parts) {
     if (isImagePart(part)) continue;
@@ -95,35 +108,61 @@ function renderTextParts(message: any): string {
     }
     if (part && typeof part === 'object') throw apiSnapshotError('unsupported_content');
   }
-  if (!output.length && typeof message?.content?.text === 'string' && message.content.text) {
-    output.push(message.content.text);
-  }
   return output.join('\n');
 }
 
+function readOptionalReasoningString(record: Record<string, unknown>, key: string): string {
+  if (!Object.prototype.hasOwnProperty.call(record, key) || record[key] == null) return '';
+  if (typeof record[key] !== 'string') throw apiSnapshotError('unsupported_content');
+  return stableString(record[key]);
+}
+
 function renderThoughts(message: any): string {
-  const rawThoughts = Array.isArray(message?.content?.thoughts) ? message.content.thoughts : [];
+  const raw = message?.content?.thoughts;
+  if (raw != null && !Array.isArray(raw)) throw apiSnapshotError('unsupported_content');
+  const rawThoughts = Array.isArray(raw) ? raw : [];
   const rendered: Array<{ summary: string; body: string }> = rawThoughts
     .map((thought: any): { summary: string; body: string } | null => {
-      if (!thought || typeof thought !== 'object' || Array.isArray(thought)) return null;
-      const summary = stableString(thought.summary);
-      const content = stableString(thought.content);
-      const chunks = Array.isArray(thought.chunks) ? thought.chunks : [];
+      if (!thought || typeof thought !== 'object' || Array.isArray(thought)) {
+        throw apiSnapshotError('unsupported_content');
+      }
+      const record = thought as Record<string, unknown>;
+      const summary = readOptionalReasoningString(record, 'summary');
+      const content = readOptionalReasoningString(record, 'content');
+      if (record.chunks != null && !Array.isArray(record.chunks)) throw apiSnapshotError('unsupported_content');
+      const chunks = Array.isArray(record.chunks) ? record.chunks : [];
       const chunkText = chunks
         .map((chunk: any) => {
-          if (typeof chunk === 'string') return chunk;
-          if (!chunk || typeof chunk !== 'object' || Array.isArray(chunk)) return '';
-          return stableString(chunk.content) || stableString(chunk.text) || stableString(chunk.summary);
+          if (typeof chunk === 'string') return stableString(chunk);
+          if (!chunk || typeof chunk !== 'object' || Array.isArray(chunk)) {
+            throw apiSnapshotError('unsupported_content');
+          }
+          const chunkRecord = chunk as Record<string, unknown>;
+          const text =
+            readOptionalReasoningString(chunkRecord, 'content') ||
+            readOptionalReasoningString(chunkRecord, 'text') ||
+            readOptionalReasoningString(chunkRecord, 'summary');
+          if (
+            !text &&
+            Object.keys(chunkRecord).some((key) => key !== 'content' && key !== 'text' && key !== 'summary')
+          ) {
+            throw apiSnapshotError('unsupported_content');
+          }
+          return text;
         })
         .filter(Boolean)
         .join('');
       const body = content || chunkText;
-      return { summary, body };
+      if (
+        !summary &&
+        !body &&
+        Object.keys(record).some((key) => key !== 'summary' && key !== 'content' && key !== 'chunks')
+      ) {
+        throw apiSnapshotError('unsupported_content');
+      }
+      return summary || body ? { summary, body } : null;
     })
-    .filter(
-      (value: { summary: string; body: string } | null): value is { summary: string; body: string } =>
-        !!value && (!!value.summary || !!value.body),
-    );
+    .filter((value: { summary: string; body: string } | null): value is { summary: string; body: string } => !!value);
 
   const summariesWithBody = new Set(rendered.filter((item) => item.summary && item.body).map((item) => item.summary));
   const seen = new Set<string>();
@@ -138,47 +177,52 @@ function renderThoughts(message: any): string {
   return output.join('\n\n');
 }
 
+function assertAssistantNonToolHasNoImages(message: any): void {
+  if (currentAttachments(message).length || currentParts(message).some(isImagePart)) {
+    throw apiSnapshotError('unsupported_content');
+  }
+}
+
 function renderAuxiliary(message: any): string {
+  assertAssistantNonToolHasNoImages(message);
   const type = contentType(message);
   if (type === 'thoughts') return renderThoughts(message);
-  if (type === 'reasoning_recap') return stableString(message?.content?.content);
+  if (type === 'reasoning_recap') {
+    const content = message?.content?.content;
+    if (content != null && typeof content !== 'string') throw apiSnapshotError('unsupported_content');
+    return stableString(content);
+  }
   if (message?.channel === 'commentary' && type === 'text') return renderTextParts(message);
   throw apiSnapshotError('unsupported_content');
 }
 
 function matchingAttachment(message: any, fileId: string): any | null {
   if (!fileId) return null;
-  const attachments = Array.isArray(message?.metadata?.attachments) ? message.metadata.attachments : [];
-  return (
-    attachments.find((item: any) => {
-      if (!item || typeof item !== 'object') return false;
-      return stableString(item.id) === fileId || stableString(item.file_id) === fileId;
-    }) || null
-  );
+  const attachments = currentAttachments(message);
+  return attachments.find((item: any) => item && typeof item === 'object' && stableString(item.id) === fileId) || null;
 }
 
-function imageAlt(message: any, attachment: any, part: Record<string, unknown>): string {
-  return (
-    stableString(attachment?.name) ||
-    stableString(message?.metadata?.image_gen_title) ||
-    stableString(part.alt) ||
-    stableString(part.name)
-  );
+function imageAlt(message: any, attachment: any): string {
+  return stableString(attachment?.name) || stableString(message?.metadata?.image_gen_title);
 }
 
-function hasUnsupportedAttachmentMetadata(message: any): boolean {
-  const attachments = Array.isArray(message?.metadata?.attachments) ? message.metadata.attachments : [];
+function hasUnsupportedAttachmentMetadata(message: any, images: PendingImage[]): boolean {
+  const attachments = currentAttachments(message);
+  if (!attachments.length) return false;
+  const imageFileIds = new Set(images.map((image) => image.fileId).filter(Boolean));
   return attachments.some((attachment: any) => {
-    if (!attachment || typeof attachment !== 'object') return false;
+    if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return true;
+    const id = stableString(attachment.id);
     const mimeType = stableString(attachment.mime_type).toLowerCase();
-    return !!mimeType && !mimeType.startsWith('image/');
+    if (!id || !mimeType.startsWith('image/')) return true;
+    return !imageFileIds.has(id);
   });
 }
 
 function collectMessageImages(message: any): PendingImage[] {
   const messageId = stableString(message?.id);
   const turnId = messageTurnId(message);
-  const parts = Array.isArray(message?.content?.parts) ? message.content.parts : [];
+  const parts = currentParts(message);
   const assets: PendingImage[] = [];
   for (let index = 0; index < parts.length; index += 1) {
     const part = parts[index];
@@ -191,12 +235,10 @@ function collectMessageImages(message: any): PendingImage[] {
     assets.push({
       ref,
       fileId,
-      cacheKey: fileId ? `chatgpt-file://${fileId}` : '',
-      alt: imageAlt(message, attachment, part),
+      cacheKey: buildChatgptFileCacheKey(fileId),
+      alt: imageAlt(message, attachment),
       mimeType,
       sizeBytes: Number.isFinite(sizeValue) && sizeValue > 0 ? sizeValue : null,
-      ...(fileId ? null : { failureReason: 'unsupported_pointer' as const }),
-      sourceMessageId: messageId,
       turnId,
     });
   }
@@ -204,7 +246,7 @@ function collectMessageImages(message: any): PendingImage[] {
 }
 
 function hasNonImagePartContent(message: any): boolean {
-  const parts = Array.isArray(message?.content?.parts) ? message.content.parts : [];
+  const parts = currentParts(message);
   return parts.some((part: unknown) => !isImagePart(part));
 }
 
@@ -232,7 +274,7 @@ function currentBranchNodes(mapping: unknown, currentNode: unknown): ChatgptMapp
 }
 
 function responseConversationId(data: any): string {
-  return stableString(data?.conversation_id) || stableString(data?.id);
+  return stableString(data?.conversation_id);
 }
 
 function appendBlocks(parts: string[]): string {
@@ -246,13 +288,15 @@ function assignAssets(
   targetMessageKey: string,
   pending: PendingImage[],
   output: ChatgptProtectedImageAsset[],
-  seenRefs: Set<string>,
+  seenBindings: Set<string>,
 ): void {
   for (const asset of pending) {
-    const dedupeKey = asset.fileId || asset.ref;
-    if (!dedupeKey || seenRefs.has(dedupeKey)) continue;
-    seenRefs.add(dedupeKey);
-    const { sourceMessageId: _sourceMessageId, turnId: _turnId, ...persistable } = asset;
+    const resourceKey = asset.fileId || asset.ref;
+    if (!resourceKey) continue;
+    const bindingKey = `${targetMessageKey}\u0000${resourceKey}`;
+    if (seenBindings.has(bindingKey)) continue;
+    seenBindings.add(bindingKey);
+    const { turnId: _turnId, ...persistable } = asset;
     output.push({ ...persistable, targetMessageKey });
   }
 }
@@ -274,7 +318,7 @@ export function buildChatgptApiSnapshot(input: {
   const messages: any[] = [];
   const protectedAssets: ChatgptProtectedImageAsset[] = [];
   const seenMessageKeys = new Set<string>();
-  const seenAssetRefs = new Set<string>();
+  const seenAssetBindings = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
   let pendingImageToolCallTurnId = '';
@@ -287,12 +331,13 @@ export function buildChatgptApiSnapshot(input: {
     if (pendingAuxiliary.some((item) => item.kind !== 'reasoning_recap')) {
       throw apiSnapshotError('unsupported_content');
     }
+    const imageTurnId = pendingImages.map((image) => image.turnId).find(Boolean) || '';
+    if (pendingAuxiliary.some((item) => item.turnId && item.turnId !== imageTurnId)) {
+      throw apiSnapshotError('unsupported_content');
+    }
     pendingAuxiliary = [];
-    const sourceMessageId = stableString(pendingImages[0]?.sourceMessageId);
-    if (!sourceMessageId) throw apiSnapshotError('unsupported_content');
-    const key =
-      buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId)) ||
-      `${sourceMessageId}:assistant:0`;
+    const key = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
+    if (!key) throw apiSnapshotError('conversation_identity_invalid');
     if (seenMessageKeys.has(key)) throw apiSnapshotError('duplicate_message_key');
     seenMessageKeys.add(key);
     messages.push({
@@ -302,7 +347,7 @@ export function buildChatgptApiSnapshot(input: {
       sequence: messages.length,
       updatedAt: capturedAt,
     });
-    assignAssets(key, pendingImages, protectedAssets, seenAssetRefs);
+    assignAssets(key, pendingImages, protectedAssets, seenAssetBindings);
     pendingImages = [];
   };
 
@@ -330,8 +375,11 @@ export function buildChatgptApiSnapshot(input: {
       if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
       if (!id) throw apiSnapshotError('conversation_identity_invalid');
       if (type !== 'text' && type !== 'multimodal_text') throw apiSnapshotError('unsupported_content');
-      if (hasUnsupportedAttachmentMetadata(message)) throw apiSnapshotError('unsupported_content');
       const images = collectMessageImages(message);
+      if ((images.length || currentAttachments(message).length) && type !== 'multimodal_text') {
+        throw apiSnapshotError('unsupported_content');
+      }
+      if (hasUnsupportedAttachmentMetadata(message, images)) throw apiSnapshotError('unsupported_content');
       const markdown = renderTextParts(message);
       if (!markdown && !images.length) continue;
       if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
@@ -343,7 +391,7 @@ export function buildChatgptApiSnapshot(input: {
         sequence: messages.length,
         updatedAt: capturedAt,
       });
-      assignAssets(id, images, protectedAssets, seenAssetRefs);
+      assignAssets(id, images, protectedAssets, seenAssetBindings);
       continue;
     }
 
@@ -351,9 +399,7 @@ export function buildChatgptApiSnapshot(input: {
       if (message.recipient !== 'all') {
         const isPendingImageToolCall = message.channel === 'commentary' && type === 'code' && !!turnId;
         if (!isPendingImageToolCall) throw apiSnapshotError('unsupported_tool_turn');
-        if (pendingImageToolCallTurnId && pendingImageToolCallTurnId !== turnId) {
-          throw apiSnapshotError('unsupported_tool_turn');
-        }
+        if (pendingImageToolCallTurnId) throw apiSnapshotError('unsupported_tool_turn');
         pendingImageToolCallTurnId = turnId;
         continue;
       }
@@ -361,13 +407,16 @@ export function buildChatgptApiSnapshot(input: {
       const isStableOwner = message.channel === 'final' && type === 'text';
       if (isStableOwner) {
         if (!id) throw apiSnapshotError('conversation_identity_invalid');
+        assertAssistantNonToolHasNoImages(message);
         assertPendingTurnMatches(turnId);
         const markdown = appendBlocks([...pendingAuxiliary.map((item) => item.markdown), renderTextParts(message)]);
         if (!markdown && !pendingImages.length) {
           pendingAuxiliary = [];
           continue;
         }
-        const ownerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId)) || id;
+        const imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
+        if (pendingImages.length && !imageOwnerKey) throw apiSnapshotError('conversation_identity_invalid');
+        const ownerKey = imageOwnerKey || id;
         if (seenMessageKeys.has(ownerKey)) throw apiSnapshotError('duplicate_message_key');
         seenMessageKeys.add(ownerKey);
         messages.push({
@@ -377,7 +426,7 @@ export function buildChatgptApiSnapshot(input: {
           sequence: messages.length,
           updatedAt: capturedAt,
         });
-        assignAssets(ownerKey, pendingImages, protectedAssets, seenAssetRefs);
+        assignAssets(ownerKey, pendingImages, protectedAssets, seenAssetBindings);
         pendingAuxiliary = [];
         pendingImages = [];
         continue;
@@ -399,10 +448,15 @@ export function buildChatgptApiSnapshot(input: {
 
     if (role === 'tool') {
       const images = collectMessageImages(message);
-      if (message.recipient !== 'all' || !images.length || hasNonImagePartContent(message)) {
-        throw apiSnapshotError('unsupported_tool_turn');
-      }
-      if (pendingImageToolCallTurnId && pendingImageToolCallTurnId !== turnId) {
+      if (
+        message.recipient !== 'all' ||
+        type !== 'multimodal_text' ||
+        !images.length ||
+        hasNonImagePartContent(message) ||
+        hasUnsupportedAttachmentMetadata(message, images) ||
+        !pendingImageToolCallTurnId ||
+        pendingImageToolCallTurnId !== turnId
+      ) {
         throw apiSnapshotError('unsupported_tool_turn');
       }
       pendingImageToolCallTurnId = '';

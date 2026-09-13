@@ -351,9 +351,12 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     let imageWarningFlags: string[] = [];
     if (sourceType !== 'video') {
       try {
-        const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
-        const enabled =
-          sourceType === 'article'
+        const local = chatgptProtectedImages
+          ? null
+          : await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+        const enabled = chatgptProtectedImages
+          ? false
+          : sourceType === 'article'
             ? local?.web_article_cache_images_enabled === true
             : local?.ai_chat_cache_images_enabled === true;
         const keys =

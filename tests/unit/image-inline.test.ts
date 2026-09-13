@@ -590,6 +590,47 @@ describe('image-inline', () => {
     expect(await readDataRevision('image_cache')).toBe(1);
   });
 
+  it('downloads one protected cache miss once and reuses it across multiple message bindings', async () => {
+    const messages = [
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'first', sequence: 0 },
+      { messageKey: 'm2', role: 'user', contentMarkdown: 'second', sequence: 1 },
+    ];
+    const downloader = vi.fn(async (bundle: any) => {
+      expect(bundle.assets).toHaveLength(1);
+      return [
+        {
+          cacheKey: 'chatgpt-file://file_shared',
+          ok: true as const,
+          blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+          byteSize: 3,
+          contentType: 'image/png',
+        },
+      ];
+    });
+
+    const result = await inlineChatImagesInMessages({
+      conversationId: 711,
+      messages,
+      enableHttpImages: false,
+      protectedImages: {
+        conversationKey: 'conversation-1',
+        assets: [
+          { ref: 'file_shared', cacheKey: 'chatgpt-file://file_shared', targetMessageKey: 'm1', alt: 'one.png' },
+          { ref: 'file_shared', cacheKey: 'chatgpt-file://file_shared', targetMessageKey: 'm2', alt: 'two.png' },
+        ],
+      },
+      downloadProtectedImages: downloader,
+    });
+
+    expect(downloader).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ downloadedCount: 1, fromCacheCount: 0, inlinedCount: 2, warningFlags: [] });
+    const firstAsset = messages[0].contentMarkdown.match(/syncnos-asset:\/\/(\d+)/)?.[1];
+    const secondAsset = messages[1].contentMarkdown.match(/syncnos-asset:\/\/(\d+)/)?.[1];
+    expect(firstAsset).toBeTruthy();
+    expect(secondAsset).toBe(firstAsset);
+    expect(await readDataRevision('image_cache')).toBe(1);
+  });
+
   it('degrades protected image failures to placeholders plus transient markdown protection', async () => {
     const messages = [{ messageKey: 'm1', role: 'assistant', contentMarkdown: 'answer', sequence: 0 }];
     const downloader = vi.fn(async () => [

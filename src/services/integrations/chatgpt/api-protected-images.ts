@@ -1,4 +1,5 @@
 import { downloadImagePlain } from '@platform/webext/image-download-proxy';
+import { buildChatgptFileCacheKey, chatgptFileIdFromEstuaryUrl } from '@services/shared/chatgpt-image-identity';
 import { CHATGPT_ORIGIN } from '@services/shared/chatgpt-route';
 import type { ChatgptProtectedImageAsset, ChatgptProtectedImages } from '@services/integrations/chatgpt/api-snapshot';
 
@@ -62,16 +63,6 @@ function resolverUrl(conversationKey: string, fileId: string): string {
   return url.href;
 }
 
-function isCanonicalEstuaryUrl(value: unknown): value is string {
-  if (typeof value !== 'string' || !value.trim()) return false;
-  try {
-    const url = new URL(value, CHATGPT_ORIGIN);
-    return url.origin === CHATGPT_ORIGIN && url.pathname === '/backend-api/estuary/content';
-  } catch (_error) {
-    return false;
-  }
-}
-
 function failed(
   asset: ChatgptProtectedImageAsset,
   reason: ChatgptProtectedImageDownloadResult & { ok: false },
@@ -92,7 +83,8 @@ export async function downloadChatgptProtectedImages(
 
   const output: ChatgptProtectedImageDownloadResult[] = [];
   for (const asset of assets) {
-    if (!asset.fileId || !asset.cacheKey || asset.failureReason) {
+    const expectedCacheKey = buildChatgptFileCacheKey(asset.fileId);
+    if (!asset.fileId || !asset.cacheKey || asset.cacheKey !== expectedCacheKey) {
       output.push({ cacheKey: asset.cacheKey, ok: false, reason: 'resolver' });
       continue;
     }
@@ -120,7 +112,7 @@ export async function downloadChatgptProtectedImages(
       continue;
     }
     const downloadUrl = resolver?.download_url;
-    if (!isCanonicalEstuaryUrl(downloadUrl)) {
+    if (chatgptFileIdFromEstuaryUrl(downloadUrl) !== asset.fileId) {
       output.push(failed(asset, { cacheKey: asset.cacheKey, ok: false, reason: 'resolver' }));
       continue;
     }

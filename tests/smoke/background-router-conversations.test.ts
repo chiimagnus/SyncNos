@@ -271,7 +271,10 @@ describe('background-router conversations', () => {
 
   it('forwards ChatGPT protected-image sidecars through the existing image-inline owner regardless of the generic cache toggle', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockResolvedValue({ ai_chat_cache_images_enabled: false });
+    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
+      if (keys.includes('ai_chat_cache_images_enabled')) throw new Error('generic image setting unavailable');
+      return {};
+    });
     const protectedImages = {
       conversationKey: 'conversation-1',
       assets: [{ ref: 'file_1', fileId: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'm1' }],
@@ -286,7 +289,6 @@ describe('background-router conversations', () => {
       type: 'syncConversationMessages',
       conversationId: 2002,
       conversationSourceType: 'chat',
-      conversationUrl: 'https://chatgpt.com/c/conversation-1',
       messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body' }],
       chatgptProtectedImages: protectedImages,
     });
@@ -303,6 +305,10 @@ describe('background-router conversations', () => {
         downloadProtectedImages: expect.any(Function),
       }),
     );
+    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith([
+      'ai_chat_cache_images_enabled',
+      'web_article_cache_images_enabled',
+    ]);
     const [, storedMessages, storageOptions] = storageMocks.syncConversationMessages.mock.calls.at(-1)!;
     expect(JSON.stringify({ storedMessages, storageOptions })).not.toContain('chatgptProtectedImages');
     expect(JSON.stringify({ storedMessages, storageOptions })).not.toContain('file_1');
@@ -345,7 +351,6 @@ describe('background-router conversations', () => {
       type: 'syncConversationMessages',
       conversationId: 2004,
       conversationSourceType: 'video',
-      conversationUrl: 'https://www.bilibili.com/video/BV1TEST12345/',
       messages,
     });
 
@@ -374,7 +379,6 @@ describe('background-router conversations', () => {
       type: 'syncConversationMessages',
       conversationId: 2003,
       conversationSourceType: 'chat',
-      conversationUrl: 'https://aistudio.google.com/app/1',
       mode: 'append',
       diff: { added: [], updated: ['m1'], removed: [] },
       messages: [
@@ -454,7 +458,6 @@ describe('background-router conversations', () => {
     const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 888,
-      conversationUrl: 'https://example.com/a',
     });
 
     expect(res.ok).toBe(true);
@@ -480,7 +483,6 @@ describe('background-router conversations', () => {
     const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 889,
-      conversationUrl: 'https://example.com/b',
     });
 
     expect(res.ok).toBe(true);
@@ -496,7 +498,6 @@ describe('background-router conversations', () => {
     const res = await router.dispatch({
       type: 'backfillConversationImages',
       conversationId: 890,
-      conversationUrl: 'https://example.com/c',
     });
 
     expect(res).toMatchObject({ ok: false, error: { message: 'conditional patch failed' } });

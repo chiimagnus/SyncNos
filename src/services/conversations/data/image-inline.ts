@@ -550,22 +550,31 @@ export async function inlineChatImagesInMessages(input: {
 
   if (protectedAssets.length) {
     const misses: ProtectedImageCandidate[] = [];
+    const missKeys = new Set<string>();
     const cachedAssetByKey = new Map<string, CachedAsset>();
+    const initialCacheHitKeys = new Set<string>();
+    const addMiss = (asset: ProtectedImageCandidate, cacheKey: string) => {
+      if (missKeys.has(cacheKey)) return;
+      missKeys.add(cacheKey);
+      misses.push(asset);
+    };
     if (!cacheLookupFailed) {
       for (const asset of protectedAssets) {
         const cacheKey = String(asset.cacheKey || '').trim();
-        if (!cacheKey) continue;
+        if (!cacheKey || cachedAssetByKey.has(cacheKey) || missKeys.has(cacheKey)) continue;
         const cached = cachedByUrl.get(cacheKey);
         if (!cached) {
-          misses.push(asset);
+          addMiss(asset, cacheKey);
           continue;
         }
         try {
           const cachedAsset = await ensureCachedAssetRecord(cached);
-          if (cachedAsset) cachedAssetByKey.set(cacheKey, cachedAsset);
-          else misses.push(asset);
+          if (cachedAsset) {
+            cachedAssetByKey.set(cacheKey, cachedAsset);
+            initialCacheHitKeys.add(cacheKey);
+          } else addMiss(asset, cacheKey);
         } catch (_error) {
-          misses.push(asset);
+          addMiss(asset, cacheKey);
         }
       }
     }
@@ -599,6 +608,7 @@ export async function inlineChatImagesInMessages(input: {
             byteSize: downloaded.byteSize,
             contentType: downloaded.contentType,
           });
+          cachedAssetByKey.set(cacheKey, cachedAsset);
           downloadedCount += 1;
         } catch (_error) {
           cachedAsset = null;
@@ -614,7 +624,7 @@ export async function inlineChatImagesInMessages(input: {
       const localUrl = formatSyncnosAssetUrl(cachedAsset.id);
       const alt = safeImageAlt(asset.alt);
       message.contentMarkdown = appendMarkdownBlock(message.contentMarkdown, `![${alt}](${localUrl})`);
-      if (cachedAssetByKey.has(cacheKey)) fromCacheCount += 1;
+      if (initialCacheHitKeys.has(cacheKey)) fromCacheCount += 1;
       inlinedCount += 1;
       inlinedBytes += cachedAsset.byteSize;
     }

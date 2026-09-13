@@ -1,7 +1,8 @@
+import { CHATGPT_ORIGIN } from '@services/shared/chatgpt-route';
 import { fnv1a32 } from '@services/shared/normalize.ts';
 
 const CHATGPT_FILE_ID_RE = /^file_[A-Za-z0-9_-]+$/;
-const CHATGPT_SEDIMENT_POINTER_RE = /^sediment:\/\/(file_[A-Za-z0-9_-]+)(?:[/?#]|$)/;
+const CHATGPT_SEDIMENT_POINTER_RE = /^sediment:\/\/(file_[A-Za-z0-9_-]+)$/;
 const CHATGPT_ESTUARY_PATH = '/backend-api/estuary/content';
 
 export function normalizeChatgptFileId(value: unknown): string {
@@ -14,12 +15,17 @@ export function chatgptFileIdFromAssetPointer(value: unknown): string {
   return CHATGPT_SEDIMENT_POINTER_RE.exec(value.trim())?.[1] || '';
 }
 
+export function buildChatgptFileCacheKey(value: unknown): string {
+  const fileId = normalizeChatgptFileId(value);
+  return fileId ? `chatgpt-file://${fileId}` : '';
+}
+
 export function chatgptFileIdFromEstuaryUrl(value: unknown): string {
   const raw = String(value || '').trim();
   if (!raw) return '';
   try {
     const url = new URL(raw);
-    if (url.origin !== 'https://chatgpt.com' || url.pathname !== CHATGPT_ESTUARY_PATH) return '';
+    if (url.origin !== CHATGPT_ORIGIN || url.pathname !== CHATGPT_ESTUARY_PATH) return '';
     return normalizeChatgptFileId(url.searchParams.get('id'));
   } catch {
     return '';

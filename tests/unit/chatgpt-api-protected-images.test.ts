@@ -37,7 +37,7 @@ beforeEach(() => {
 describe('ChatGPT protected image downloader', () => {
   it('reads one session, resolves each file with Bearer, validates Estuary, and returns only blob metadata', async () => {
     const token = 'PROTECTED_TOKEN_SENTINEL';
-    const signed = 'https://chatgpt.com/backend-api/estuary/content?id=SIGNED_SENTINEL';
+    const signed = 'https://chatgpt.com/backend-api/estuary/content?id=file_image_1&sig=SIGNED_SENTINEL';
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchFn = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
       const url = String(input);
@@ -90,12 +90,46 @@ describe('ChatGPT protected image downloader', () => {
       { cacheKey: 'chatgpt-file://file_image_1', ok: false, reason: 'resolver' },
     ]);
 
+    const relativeResolver = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/auth/session'))
+        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
+      return new Response(
+        JSON.stringify({ download_url: '/backend-api/estuary/content?id=file_image_1', file_size_bytes: 4 }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+    await expect(downloadChatgptProtectedImages(bundle(), { fetchFn: relativeResolver })).resolves.toEqual([
+      { cacheKey: 'chatgpt-file://file_image_1', ok: false, reason: 'resolver' },
+    ]);
+    expect(downloadMocks.plain).not.toHaveBeenCalled();
+
+    const mismatchedSignedId = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/auth/session'))
+        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          download_url: 'https://chatgpt.com/backend-api/estuary/content?id=file_other',
+          file_size_bytes: 4,
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+    await expect(downloadChatgptProtectedImages(bundle(), { fetchFn: mismatchedSignedId })).resolves.toEqual([
+      { cacheKey: 'chatgpt-file://file_image_1', ok: false, reason: 'resolver' },
+    ]);
+    expect(downloadMocks.plain).not.toHaveBeenCalled();
+
     const goodResolver = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/api/auth/session'))
         return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
       return new Response(
-        JSON.stringify({ download_url: 'https://chatgpt.com/backend-api/estuary/content?id=x', file_size_bytes: 5 }),
+        JSON.stringify({
+          download_url: 'https://chatgpt.com/backend-api/estuary/content?id=file_image_1',
+          file_size_bytes: 5,
+        }),
         { status: 200 },
       );
     }) as typeof fetch;
@@ -109,7 +143,10 @@ describe('ChatGPT protected image downloader', () => {
       if (url.endsWith('/api/auth/session'))
         return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
       return new Response(
-        JSON.stringify({ download_url: 'https://chatgpt.com/backend-api/estuary/content?id=x', file_size_bytes: 4 }),
+        JSON.stringify({
+          download_url: 'https://chatgpt.com/backend-api/estuary/content?id=file_image_1',
+          file_size_bytes: 4,
+        }),
         { status: 200 },
       );
     }) as typeof fetch;
@@ -118,22 +155,26 @@ describe('ChatGPT protected image downloader', () => {
     ]);
   });
 
-  it('never resolves legacy or missing file references', async () => {
+  it('never resolves missing references or mismatched provider cache identities', async () => {
     const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/api/auth/session'))
         return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
       throw new Error('resolver should not run');
     }) as typeof fetch;
-    const input = bundle();
-    input.assets[0].fileId = '';
-    input.assets[0].cacheKey = '';
-    (input.assets[0] as any).failureReason = 'unsupported_pointer';
-
-    await expect(downloadChatgptProtectedImages(input, { fetchFn })).resolves.toEqual([
+    const missing = bundle();
+    missing.assets[0].fileId = '';
+    missing.assets[0].cacheKey = '';
+    await expect(downloadChatgptProtectedImages(missing, { fetchFn })).resolves.toEqual([
       { cacheKey: '', ok: false, reason: 'resolver' },
     ]);
-    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    const mismatched = bundle();
+    mismatched.assets[0].cacheKey = 'chatgpt-file://file_other';
+    await expect(downloadChatgptProtectedImages(mismatched, { fetchFn })).resolves.toEqual([
+      { cacheKey: 'chatgpt-file://file_other', ok: false, reason: 'resolver' },
+    ]);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
     expect(downloadMocks.plain).not.toHaveBeenCalled();
   });
 });
