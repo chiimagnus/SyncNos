@@ -10,6 +10,7 @@ import {
   prepareCliPackage,
   readWxtManifestVersion,
   resolveCliPackageVersion,
+  semverCore,
 } from '../../cli/package.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
@@ -37,10 +38,18 @@ describe('CLI package staging', () => {
   });
 
   it('validates release core independently from packaging prerelease versions', async () => {
-    expect(assertReleaseCoreMatchesWxt('1.13.2-rc1', '1.13.2')).toBe(true);
-    expect(() => assertReleaseCoreMatchesWxt('1.13.3-rc1', '1.13.2')).toThrow(/does not match/);
-    expect(resolveCliPackageVersion({ explicitVersion: '1.13.3-rc1', wxtVersion: '1.13.2' })).toBe('1.13.3-rc1');
-    expect(() => resolveCliPackageVersion({ explicitVersion: 'v1.13.2', wxtVersion: '1.13.2' })).toThrow(
+    const wxtVersion = await readWxtManifestVersion({ repoRoot: REPO_ROOT });
+    const wxtCore = semverCore(wxtVersion);
+    const [major, minor, patch] = wxtCore.split('.').map(Number);
+    const matchingPrerelease = `${wxtCore}-rc1`;
+    const mismatchingPrerelease = `${major}.${minor}.${patch + 1}-rc1`;
+
+    expect(assertReleaseCoreMatchesWxt(matchingPrerelease, wxtVersion)).toBe(true);
+    expect(() => assertReleaseCoreMatchesWxt(mismatchingPrerelease, wxtVersion)).toThrow(/does not match/);
+    expect(resolveCliPackageVersion({ explicitVersion: mismatchingPrerelease, wxtVersion })).toBe(
+      mismatchingPrerelease,
+    );
+    expect(() => resolveCliPackageVersion({ explicitVersion: `v${wxtCore}`, wxtVersion })).toThrow(
       /Invalid npm semver/,
     );
 
@@ -48,7 +57,7 @@ describe('CLI package staging', () => {
       packageCli({
         repoRoot: REPO_ROOT,
         stagingDir: join(await tempDir('syncnos-cli-release-mismatch-'), 'package'),
-        version: '1.13.3-rc1',
+        version: mismatchingPrerelease,
         checkOnly: true,
         requireWxtCoreMatch: true,
       }),
@@ -58,11 +67,11 @@ describe('CLI package staging', () => {
       packageCli({
         repoRoot: REPO_ROOT,
         stagingDir: join(await tempDir('syncnos-cli-release-match-'), 'package'),
-        version: '1.13.2-rc1',
+        version: matchingPrerelease,
         checkOnly: true,
         requireWxtCoreMatch: true,
       }),
-    ).resolves.toMatchObject({ packageVersion: '1.13.2-rc1', wxtVersion: '1.13.2' });
+    ).resolves.toMatchObject({ packageVersion: matchingPrerelease, wxtVersion });
   });
 
   it('checks out the requested tag source for manual release and prerelease workflows', async () => {
