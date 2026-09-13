@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { ABOUT_YOU_USER_NAME_STORAGE_KEY } from '@services/shared/user-profile';
 import { AUTO_SYNC_CONVERSATION_CHANGED_REASONS } from '@services/sync/auto-sync/auto-sync-keys';
 
 const storageMocks = vi.hoisted(() => ({
@@ -40,6 +41,42 @@ beforeEach(() => {
 });
 
 describe('article comments background handler mutation side effects', () => {
+  it('injects the About You author and ignores a caller-supplied author field', async () => {
+    sharedStorageMocks.storageGet.mockResolvedValue({
+      [ABOUT_YOU_USER_NAME_STORAGE_KEY]: 'Canonical Author',
+    });
+    storageMocks.addArticleComment.mockImplementation(async (input: any) => ({
+      id: 16,
+      ...input,
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+
+    const response = await handlers.get(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT)?.({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 31,
+      parentId: null,
+      quoteText: '',
+      commentText: 'plain comment',
+      locator: null,
+      authorName: 'spoofed-caller',
+    });
+
+    expect(sharedStorageMocks.storageGet).toHaveBeenCalledWith([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+    expect(storageMocks.addArticleComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 31,
+        authorName: 'Canonical Author',
+        commentText: 'plain comment',
+      }),
+    );
+    expect(storageMocks.addArticleComment.mock.calls[0]?.[0]?.authorName).not.toBe('spoofed-caller');
+    expect(response).toMatchObject({ ok: true, data: { authorName: 'Canonical Author' } });
+  });
+
   it('accepts a highlight-only root through the runtime boundary and schedules auto-sync', async () => {
     const locator = {
       v: 1 as const,

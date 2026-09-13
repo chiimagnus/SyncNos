@@ -427,7 +427,11 @@ describe('CLI Native Messaging bridge', () => {
     );
     expect(router.dispatch.mock.calls.at(-1)?.[0]).not.toHaveProperty('canonicalUrl');
 
-    await emit('c-add', 'comments.add', { conversationId: 7, text: 'plain root' });
+    await emit('c-add', 'comments.add', {
+      conversationId: 7,
+      text: 'plain root',
+      authorName: 'spoofed-cli-author',
+    });
     const addMessage = router.dispatch.mock.calls.at(-1)?.[0];
     expect(addMessage).toEqual({
       type: COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT,
@@ -437,6 +441,7 @@ describe('CLI Native Messaging bridge', () => {
       commentText: 'plain root',
       locator: null,
     });
+    expect(addMessage).not.toHaveProperty('authorName');
 
     await emit('c-reply', 'comments.reply', { conversationId: 7, parentId: 3, text: 'plain reply' });
     const replyMessage = router.dispatch.mock.calls.at(-1)?.[0];
@@ -558,6 +563,67 @@ describe('CLI Native Messaging bridge', () => {
       { type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, conversationId: 42 },
       null,
     );
+    harness.controller.stop();
+  });
+
+  it('returns response_too_large for an oversized conversation.get and keeps the same Native Port usable', async () => {
+    const oversizedBody = 'x'.repeat(64 * 1024 * 1024);
+    const router = {
+      dispatch: vi.fn(async (message: any) => {
+        if (message.type === CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID) {
+          return {
+            ok: true,
+            data: { id: 77, source: 'chatgpt', conversationKey: 'oversized', lastActivityAt: 1 },
+            error: null,
+          };
+        }
+        if (message.type === CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL) {
+          return {
+            ok: true,
+            data: {
+              conversationId: 77,
+              messages: [{ messageKey: 'huge', role: 'assistant', contentMarkdown: oversizedBody, sequence: 1 }],
+            },
+            error: null,
+          };
+        }
+        return { ok: false, data: null, error: { message: 'unexpected message', extra: null } };
+      }),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'oversized-get',
+      method: 'conversation.get',
+      params: { conversationId: 77 },
+    });
+    await waitForPosted(harness, 2);
+    expect(harness.fakePort.posted[1]).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'oversized-get',
+      ok: false,
+      error: { code: 'response_too_large' },
+    });
+    expect(harness.fakePort.disconnect).not.toHaveBeenCalled();
+
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'after-oversized-get',
+      method: 'system.ping',
+      params: {},
+    });
+    await waitForPosted(harness, 3);
+    expect(harness.fakePort.posted[2]).toMatchObject({
+      kind: 'rpc-response',
+      requestId: 'after-oversized-get',
+      ok: true,
+      data: { alive: true },
+    });
+    expect(harness.fakePort.disconnect).not.toHaveBeenCalled();
     harness.controller.stop();
   });
 
