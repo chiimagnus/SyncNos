@@ -1,6 +1,6 @@
 ---
 name: syncnos
-description: Use `syncnos` CLI to interact with the SyncNos browser extension: capture, query, and manage content; work with comments and settings; sync providers; open, export, and back up data.
+description: "Use `syncnos` CLI to interact with the SyncNos browser extension: capture, query, and manage content; work with comments and settings; sync providers; open, export, and back up data."
 ---
 
 # SyncNos
