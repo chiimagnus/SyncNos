@@ -206,7 +206,7 @@ function collectMessageImages(message: any): PendingImage[] {
 
 function hasNonImagePartContent(message: any): boolean {
   const parts = Array.isArray(message?.content?.parts) ? message.content.parts : [];
-  return parts.some((part: unknown) => !isImagePart(part) && !!primitivePartText(part));
+  return parts.some((part: unknown) => !isImagePart(part));
 }
 
 function currentBranchNodes(mapping: unknown, currentNode: unknown): ChatgptMappingNode[] {

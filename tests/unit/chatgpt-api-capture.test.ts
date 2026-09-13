@@ -301,6 +301,22 @@ describe('ChatGPT API snapshot', () => {
     ]);
   });
 
+  it('fails when an image tool also contains any non-image part instead of silently dropping it', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['draw'] }),
+      message({
+        id: 'mixed-image-tool',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: [
+          { content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' },
+          { content_type: 'execution_output', value: { opaque: true } },
+        ],
+      }),
+    ]);
+    expect(errorCode(() => build(data))).toBe('unsupported_tool_turn');
+  });
+
   it('fails instead of misclassifying non-image attachment pointers as images', () => {
     const data = mappingFrom([
       message({
