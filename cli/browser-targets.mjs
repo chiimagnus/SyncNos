@@ -20,9 +20,8 @@ const macApps = (...names) =>
   ]);
 const linuxPaths = (...paths) => paths.map((path) => Object.freeze({ base: 'absolute', path }));
 const winPaths = (...items) => items.map(([base, path]) => Object.freeze({ base, path }));
-const fileRegistration = (id, family, base, relativeDir) =>
-  Object.freeze({ id, family, kind: 'file', base, relativeDir });
-const registryRegistration = (id, family, registryKey) => Object.freeze({ id, family, kind: 'registry', registryKey });
+const fileRegistration = (id, base, relativeDir) => Object.freeze({ id, kind: 'file', base, relativeDir });
+const registryRegistration = (id, registryKey) => Object.freeze({ id, kind: 'registry', registryKey });
 
 const REGISTRY = Object.freeze({
   chrome: `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${contract.nativeHostName}`,
@@ -41,14 +40,13 @@ const BROWSERS = Object.freeze({
         detect: macApps('Google Chrome'),
         registration: fileRegistration(
           'chrome',
-          'chromium',
           'home',
           'Library/Application Support/Google/Chrome/NativeMessagingHosts',
         ),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/google-chrome', '/opt/google/chrome/google-chrome'),
-        registration: fileRegistration('chrome', 'chromium', 'xdgConfig', 'google-chrome/NativeMessagingHosts'),
+        registration: fileRegistration('chrome', 'xdgConfig', 'google-chrome/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
@@ -56,7 +54,7 @@ const BROWSERS = Object.freeze({
           ['programFilesX86', 'Google\\Chrome\\Application\\chrome.exe'],
           ['localAppData', 'Google\\Chrome\\Application\\chrome.exe'],
         ),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -67,12 +65,7 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/google-chrome-beta', '/opt/google/chrome-beta/google-chrome-beta'),
-        registration: fileRegistration(
-          'chrome-beta',
-          'chromium',
-          'xdgConfig',
-          'google-chrome-beta/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('chrome-beta', 'xdgConfig', 'google-chrome-beta/NativeMessagingHosts'),
       }),
     }),
   }),
@@ -83,12 +76,7 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/google-chrome-unstable', '/opt/google/chrome-unstable/google-chrome-unstable'),
-        registration: fileRegistration(
-          'chrome-unstable',
-          'chromium',
-          'xdgConfig',
-          'google-chrome-unstable/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('chrome-unstable', 'xdgConfig', 'google-chrome-unstable/NativeMessagingHosts'),
       }),
     }),
   }),
@@ -101,7 +89,6 @@ const BROWSERS = Object.freeze({
         detect: macApps('Google Chrome for Testing'),
         registration: fileRegistration(
           'chrome-for-testing',
-          'chromium',
           'home',
           'Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts',
         ),
@@ -110,7 +97,6 @@ const BROWSERS = Object.freeze({
         detect: linuxPaths('/usr/bin/google-chrome-for-testing', '/opt/google/chrome-for-testing/chrome'),
         registration: fileRegistration(
           'chrome-for-testing',
-          'chromium',
           'xdgConfig',
           'google-chrome-for-testing/NativeMessagingHosts',
         ),
@@ -124,16 +110,11 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Chromium'),
-        registration: fileRegistration(
-          'chromium',
-          'chromium',
-          'home',
-          'Library/Application Support/Chromium/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('chromium', 'home', 'Library/Application Support/Chromium/NativeMessagingHosts'),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/chromium', '/usr/bin/chromium-browser'),
-        registration: fileRegistration('chromium', 'chromium', 'xdgConfig', 'chromium/NativeMessagingHosts'),
+        registration: fileRegistration('chromium', 'xdgConfig', 'chromium/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
@@ -141,7 +122,7 @@ const BROWSERS = Object.freeze({
           ['programFiles', 'Chromium\\Application\\chrome.exe'],
           ['programFilesX86', 'Chromium\\Application\\chrome.exe'],
         ),
-        registration: registryRegistration('chromium', 'chromium', REGISTRY.chromium),
+        registration: registryRegistration('chromium', REGISTRY.chromium),
       }),
     }),
   }),
@@ -154,14 +135,13 @@ const BROWSERS = Object.freeze({
         detect: macApps('Microsoft Edge'),
         registration: fileRegistration(
           'edge',
-          'chromium',
           'home',
           'Library/Application Support/Microsoft Edge/NativeMessagingHosts',
         ),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/microsoft-edge', '/usr/bin/microsoft-edge-stable', '/opt/microsoft/msedge/msedge'),
-        registration: fileRegistration('edge', 'chromium', 'xdgConfig', 'microsoft-edge/NativeMessagingHosts'),
+        registration: fileRegistration('edge', 'xdgConfig', 'microsoft-edge/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
@@ -169,7 +149,7 @@ const BROWSERS = Object.freeze({
           ['programFiles', 'Microsoft\\Edge\\Application\\msedge.exe'],
           ['localAppData', 'Microsoft\\Edge\\Application\\msedge.exe'],
         ),
-        registration: registryRegistration('edge', 'chromium', REGISTRY.edge),
+        registration: registryRegistration('edge', REGISTRY.edge),
       }),
     }),
   }),
@@ -182,19 +162,13 @@ const BROWSERS = Object.freeze({
         detect: macApps('Brave Browser'),
         registration: fileRegistration(
           'chrome',
-          'chromium',
           'home',
           'Library/Application Support/Google/Chrome/NativeMessagingHosts',
         ),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/brave-browser', '/opt/brave.com/brave/brave-browser'),
-        registration: fileRegistration(
-          'brave',
-          'chromium',
-          'xdgConfig',
-          'BraveSoftware/Brave-Browser/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('brave', 'xdgConfig', 'BraveSoftware/Brave-Browser/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
@@ -202,7 +176,7 @@ const BROWSERS = Object.freeze({
           ['programFilesX86', 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'],
           ['localAppData', 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'],
         ),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -213,16 +187,11 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Vivaldi'),
-        registration: fileRegistration(
-          'vivaldi',
-          'chromium',
-          'home',
-          'Library/Application Support/Vivaldi/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('vivaldi', 'home', 'Library/Application Support/Vivaldi/NativeMessagingHosts'),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/vivaldi', '/usr/bin/vivaldi-stable', '/opt/vivaldi/vivaldi'),
-        registration: fileRegistration('vivaldi', 'chromium', 'xdgConfig', 'vivaldi/NativeMessagingHosts'),
+        registration: fileRegistration('vivaldi', 'xdgConfig', 'vivaldi/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
@@ -230,7 +199,7 @@ const BROWSERS = Object.freeze({
           ['programFiles', 'Vivaldi\\Application\\vivaldi.exe'],
           ['programFilesX86', 'Vivaldi\\Application\\vivaldi.exe'],
         ),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -241,12 +210,7 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Arc'),
-        registration: fileRegistration(
-          'arc',
-          'chromium',
-          'home',
-          'Library/Application Support/Arc/User Data/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('arc', 'home', 'Library/Application Support/Arc/User Data/NativeMessagingHosts'),
       }),
     }),
   }),
@@ -259,7 +223,6 @@ const BROWSERS = Object.freeze({
         detect: macApps('Helium'),
         registration: fileRegistration(
           'chrome',
-          'chromium',
           'home',
           'Library/Application Support/Google/Chrome/NativeMessagingHosts',
         ),
@@ -275,18 +238,17 @@ const BROWSERS = Object.freeze({
         detect: macApps('Opera'),
         registration: fileRegistration(
           'chrome',
-          'chromium',
           'home',
           'Library/Application Support/Google/Chrome/NativeMessagingHosts',
         ),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/opera'),
-        registration: fileRegistration('chrome', 'chromium', 'xdgConfig', 'google-chrome/NativeMessagingHosts'),
+        registration: fileRegistration('chrome', 'xdgConfig', 'google-chrome/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(['localAppData', 'Programs\\Opera\\launcher.exe']),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -297,20 +259,15 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Iridium'),
-        registration: fileRegistration(
-          'iridium',
-          'chromium',
-          'home',
-          'Library/Application Support/Iridium/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('iridium', 'home', 'Library/Application Support/Iridium/NativeMessagingHosts'),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/iridium', '/usr/bin/iridium-browser'),
-        registration: fileRegistration('iridium', 'chromium', 'xdgConfig', 'iridium/NativeMessagingHosts'),
+        registration: fileRegistration('iridium', 'xdgConfig', 'iridium/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(['programFiles', 'Iridium\\iridium.exe'], ['programFilesX86', 'Iridium\\iridium.exe']),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -321,12 +278,7 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Yandex'),
-        registration: fileRegistration(
-          'yandex',
-          'chromium',
-          'home',
-          'Library/Application Support/Yandex/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('yandex', 'home', 'Library/Application Support/Yandex/NativeMessagingHosts'),
       }),
       linux: Object.freeze({
         detect: linuxPaths(
@@ -334,11 +286,11 @@ const BROWSERS = Object.freeze({
           '/usr/bin/yandex-browser-stable',
           '/opt/yandex/browser/yandex-browser',
         ),
-        registration: fileRegistration('yandex', 'chromium', 'xdgConfig', 'yandex-browser/NativeMessagingHosts'),
+        registration: fileRegistration('yandex', 'xdgConfig', 'yandex-browser/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(['localAppData', 'Yandex\\YandexBrowser\\Application\\browser.exe']),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -349,16 +301,11 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('FlashPeak Slimjet', 'Slimjet'),
-        registration: fileRegistration(
-          'slimjet',
-          'chromium',
-          'home',
-          'Library/Application Support/Slimjet/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('slimjet', 'home', 'Library/Application Support/Slimjet/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(['programFiles', 'Slimjet\\slimjet.exe'], ['programFilesX86', 'Slimjet\\slimjet.exe']),
-        registration: registryRegistration('chrome', 'chromium', REGISTRY.chrome),
+        registration: registryRegistration('chrome', REGISTRY.chrome),
       }),
     }),
   }),
@@ -369,23 +316,18 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Firefox'),
-        registration: fileRegistration(
-          'mozilla',
-          'firefox',
-          'home',
-          'Library/Application Support/Mozilla/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('mozilla', 'home', 'Library/Application Support/Mozilla/NativeMessagingHosts'),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/firefox'),
-        registration: fileRegistration('mozilla', 'firefox', 'home', '.mozilla/native-messaging-hosts'),
+        registration: fileRegistration('mozilla', 'home', '.mozilla/native-messaging-hosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
           ['programFiles', 'Mozilla Firefox\\firefox.exe'],
           ['programFilesX86', 'Mozilla Firefox\\firefox.exe'],
         ),
-        registration: registryRegistration('mozilla', 'firefox', REGISTRY.mozilla),
+        registration: registryRegistration('mozilla', REGISTRY.mozilla),
       }),
     }),
   }),
@@ -396,19 +338,14 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Firefox Developer Edition'),
-        registration: fileRegistration(
-          'mozilla',
-          'firefox',
-          'home',
-          'Library/Application Support/Mozilla/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('mozilla', 'home', 'Library/Application Support/Mozilla/NativeMessagingHosts'),
       }),
       win32: Object.freeze({
         detect: winPaths(
           ['programFiles', 'Firefox Developer Edition\\firefox.exe'],
           ['programFilesX86', 'Firefox Developer Edition\\firefox.exe'],
         ),
-        registration: registryRegistration('mozilla', 'firefox', REGISTRY.mozilla),
+        registration: registryRegistration('mozilla', REGISTRY.mozilla),
       }),
     }),
   }),
@@ -419,12 +356,7 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       darwin: Object.freeze({
         detect: macApps('Zen'),
-        registration: fileRegistration(
-          'mozilla',
-          'firefox',
-          'home',
-          'Library/Application Support/Mozilla/NativeMessagingHosts',
-        ),
+        registration: fileRegistration('mozilla', 'home', 'Library/Application Support/Mozilla/NativeMessagingHosts'),
       }),
     }),
   }),
@@ -437,14 +369,13 @@ const BROWSERS = Object.freeze({
         detect: macApps('LibreWolf'),
         registration: fileRegistration(
           'librewolf',
-          'firefox',
           'home',
           'Library/Application Support/librewolf/NativeMessagingHosts',
         ),
       }),
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/librewolf'),
-        registration: fileRegistration('librewolf', 'firefox', 'home', '.librewolf/native-messaging-hosts'),
+        registration: fileRegistration('librewolf', 'home', '.librewolf/native-messaging-hosts'),
       }),
     }),
   }),
@@ -455,7 +386,7 @@ const BROWSERS = Object.freeze({
     platforms: Object.freeze({
       linux: Object.freeze({
         detect: linuxPaths('/usr/bin/waterfox'),
-        registration: fileRegistration('waterfox', 'firefox', 'home', '.waterfox/native-messaging-hosts'),
+        registration: fileRegistration('waterfox', 'home', '.waterfox/native-messaging-hosts'),
       }),
     }),
   }),
@@ -468,7 +399,6 @@ const BROWSERS = Object.freeze({
         detect: macApps('Tor Browser'),
         registration: fileRegistration(
           'tor',
-          'firefox',
           'home',
           'Library/Application Support/TorBrowser-Data/Browser/Mozilla/NativeMessagingHosts',
         ),
@@ -482,14 +412,13 @@ const BROWSERS = Object.freeze({
         ],
         registration: fileRegistration(
           'tor',
-          'firefox',
           'home',
           '.local/share/torbrowser/tbb/x86_64/tor-browser/Browser/TorBrowser/Data/Browser/.mozilla/native-messaging-hosts',
         ),
       }),
       win32: Object.freeze({
         detect: [],
-        registration: registryRegistration('mozilla', 'firefox', REGISTRY.mozilla),
+        registration: registryRegistration('mozilla', REGISTRY.mozilla),
       }),
     }),
   }),
