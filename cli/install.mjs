@@ -412,7 +412,6 @@ export async function installNativeHost({
       .toLowerCase(),
     registrationId: registration.registrationId,
     registrationKind: registration.registrationKind,
-    extensionId: registration.extensionIds[0],
     extensionIds: registration.extensionIds,
     productionIdentity: registration.productionIdentity,
     launcherPath: installed.launcherPath,
