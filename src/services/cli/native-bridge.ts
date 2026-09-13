@@ -70,6 +70,26 @@ function response(requestId: string, ok: boolean, data: unknown, code = '', mess
   };
 }
 
+function toCliCaptureResult(data: any) {
+  const result: Record<string, unknown> = {
+    kind: data?.kind,
+    label: data?.label,
+    collectorId: data?.collectorId ?? null,
+    conversationId: data?.conversationId ?? null,
+    isNew: data?.isNew === true,
+  };
+  if (typeof data?.title === 'string' && data.title) result.title = data.title;
+  if (data?.kind === 'chat') {
+    if (data?.captureCompleteness === 'complete' || data?.captureCompleteness === 'partial') {
+      result.captureCompleteness = data.captureCompleteness;
+    }
+    if (Array.isArray(data?.captureReasons)) result.captureReasons = data.captureReasons.map(String);
+  } else if (data?.kind === 'video' && (data?.subtitleStatus === 'ok' || data?.subtitleStatus === 'empty')) {
+    result.subtitleStatus = data.subtitleStatus;
+  }
+  return result;
+}
+
 function safePost(port: NativeMessagingPort, frame: unknown): void {
   if (serializedByteLength(frame) > EXTENSION_TO_HOST_MAX_BYTES) {
     const requestId = validRequestId((frame as any)?.requestId) ? String((frame as any).requestId) : '';
@@ -376,7 +396,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
 
     if (method === 'capture.current-page') {
       const result = await router.dispatch({ type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE }, null);
-      postBackgroundResult(result);
+      postBackgroundResult(result, toCliCaptureResult);
       return;
     }
 

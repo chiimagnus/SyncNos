@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { startCliNativeBridge } from '@services/cli/native-bridge';
-import { CORE_MESSAGE_TYPES, DATA_REVISION_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  CORE_MESSAGE_TYPES,
+  DATA_REVISION_MESSAGE_TYPES,
+  UI_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 
 function createPort() {
   const posted: any[] = [];
@@ -340,6 +344,55 @@ describe('CLI Native Messaging bridge', () => {
       },
       null,
     );
+    harness.controller.stop();
+  });
+
+  it('maps capture.current-page only to the unified active-tab capture handler and exposes the stable result shape', async () => {
+    const router = {
+      dispatch: vi.fn(async () => ({
+        ok: true,
+        data: {
+          kind: 'video',
+          label: 'Video',
+          collectorId: 'video:bilibili',
+          conversationId: 77,
+          isNew: true,
+          title: 'Example',
+          subtitleStatus: 'ok',
+          url: 'https://example.com/should-not-leak',
+          debugTranscript: 'should-not-leak',
+        },
+        error: null,
+      })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'capture-1',
+      method: 'capture.current-page',
+      params: {},
+    });
+    await waitForPosted(harness, 2);
+
+    expect(router.dispatch).toHaveBeenCalledWith({ type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE }, null);
+    expect(harness.fakePort.posted[1]).toEqual({
+      kind: 'rpc-response',
+      protocolVersion: 1,
+      requestId: 'capture-1',
+      ok: true,
+      data: {
+        kind: 'video',
+        label: 'Video',
+        collectorId: 'video:bilibili',
+        conversationId: 77,
+        isNew: true,
+        title: 'Example',
+        subtitleStatus: 'ok',
+      },
+      error: null,
+    });
     harness.controller.stop();
   });
 

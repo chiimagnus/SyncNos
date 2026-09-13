@@ -517,6 +517,45 @@ describe('syncnos CLI instance selection', () => {
     }
   });
 
+  it('routes capture through the single current-page RPC and rejects video-specific positional variants', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'capture-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'capture.current-page') {
+          return {
+            data: {
+              kind: 'video',
+              label: 'Video',
+              collectorId: 'video:bilibili',
+              conversationId: 77,
+              isNew: false,
+              subtitleStatus: 'empty',
+            },
+          };
+        }
+        return null;
+      },
+    });
+    try {
+      const capture = await run(['capture'], runtimeRoot, homeDir);
+      expect(capture.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'capture.current-page', params: {} });
+      expect(capture.json.data).toMatchObject({
+        kind: 'video',
+        conversationId: 77,
+        subtitleStatus: 'empty',
+      });
+
+      const beforeInvalid = instance.requests.length;
+      const videoSpecific = await run(['capture', 'video'], runtimeRoot, homeDir);
+      expect(videoSpecific.exitCode).toBe(2);
+      expect(videoSpecific.json.error.code).toBe('usage_error');
+      expect(instance.requests.length).toBe(beforeInvalid);
+    } finally {
+      await instance.stop();
+    }
+  });
+
   it('routes comment and mention commands without any raw locator surface', async () => {
     const { runtimeRoot, homeDir } = await roots();
     const instance = await startFakeInstance(runtimeRoot, 'comment-instance', 'chromium', {
