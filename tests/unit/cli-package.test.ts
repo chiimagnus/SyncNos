@@ -65,6 +65,15 @@ describe('CLI package staging', () => {
     ).resolves.toMatchObject({ packageVersion: '1.13.2-rc1', wxtVersion: '1.13.2' });
   });
 
+  it('checks out the requested tag source for manual release and prerelease workflows', async () => {
+    for (const workflow of ['webclipper-release.yml', 'webclipper-prerelease.yml']) {
+      const source = await readFile(join(REPO_ROOT, '.github', 'workflows', workflow), 'utf8');
+      expect(source).toMatch(
+        /uses: actions\/checkout@v6\s+with:\s+ref: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.tag \|\| github\.ref \}\}/,
+      );
+    }
+  });
+
   it('copies the canonical RPC contract byte-for-byte into an isolated staging package', async () => {
     const stagingDir = join(await tempDir('syncnos-cli-stage-'), 'package');
     const prepared = await prepareCliPackage({ repoRoot: REPO_ROOT, stagingDir, version: '1.13.3-rc1' });
