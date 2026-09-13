@@ -291,6 +291,20 @@ describe('backup service', () => {
     expect(chromeMock.__store.inpage_display_mode).toBe('all');
   });
 
+  it('restores the portable ChatGPT Advanced API capture setting', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const stats = await importBackupZipMerge(emptyBackupZipEntries({ chatgpt_api_capture_enabled: true }));
+
+    expect(stats.settingsApplied).toBe(1);
+    expect(chromeMock.__store.chatgpt_api_capture_enabled).toBe(true);
+    expect(chromeMock.__runtimeMessages).toHaveLength(0);
+  });
+
   it('rejects restore when canonical display storage fails', async () => {
     const chromeMock = mockChromeStorage();
     chromeMock.storage.local.set = (_payload: Record<string, unknown>, callback: () => void) => {
