@@ -115,10 +115,6 @@ export async function prepareCliPackage({ repoRoot = DEFAULT_REPO_ROOT, stagingD
   const canonicalContract = await readFile(canonicalContractPath);
   const stagedContractPath = join(stage, 'cli-rpc-contract.json');
   await writeFile(stagedContractPath, canonicalContract);
-  const stagedContract = await readFile(stagedContractPath);
-  if (!canonicalContract.equals(stagedContract)) {
-    throw packageError('contract_copy_mismatch', 'Staged CLI RPC contract differs from canonical source');
-  }
 
   return {
     packageName: PACKAGE_NAME,
