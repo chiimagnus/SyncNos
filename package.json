@@ -15,6 +15,7 @@
     "compile": "tsc -p tsconfig.compile.json --noEmit",
     "check": "npm run build && node .github/scripts/webclipper/check-dist.mjs --root=.output/chrome-mv3",
     "test": "vitest run",
+    "cli:dev": "node cli/syncnos.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",

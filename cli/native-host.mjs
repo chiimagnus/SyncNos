@@ -2,32 +2,27 @@
 
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { chmod } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { endianness } from 'node:os';
 import process from 'node:process';
 import { TextDecoder } from 'node:util';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+import { contract } from './contract.mjs';
+import { createJsonLineReader, encodeJsonLine, requestEndpoint } from './ipc.mjs';
+import {
+  createProcessNonce,
+  ensureRuntimeDir,
+  readRegistryEntry,
+  registryPathForInstance,
+  removeFileIfExists,
+  removeRegistryEntryIfOwned,
+  socketPathForInstance,
+  writeRegistryEntry,
+} from './runtime-registry.mjs';
 
-function readContract() {
-  const candidates = [
-    join(SCRIPT_DIR, 'cli-rpc-contract.json'),
-    join(SCRIPT_DIR, '..', 'src', 'services', 'protocols', 'cli-rpc-contract.json'),
-  ];
-  let lastError = null;
-  for (const candidate of candidates) {
-    try {
-      return JSON.parse(readFileSync(candidate, 'utf8'));
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('CLI RPC contract not found');
-}
-
-export const contract = readContract();
+export { contract } from './contract.mjs';
 const LITTLE_ENDIAN = endianness() === 'LE';
 
 function readLength(buffer, offset = 0) {
@@ -117,7 +112,11 @@ export function writeNativeMessage(stream, value) {
   });
 }
 
-export function createNativeHostProtocol({ write = (frame) => writeNativeMessage(process.stdout, frame) } = {}) {
+export function createNativeHostProtocol({
+  write = (frame) => writeNativeMessage(process.stdout, frame),
+  onHello = async () => {},
+  onClose = () => {},
+} = {}) {
   let closed = false;
   let helloAccepted = false;
   const pending = new Map();
@@ -127,6 +126,11 @@ export function createNativeHostProtocol({ write = (frame) => writeNativeMessage
     closed = true;
     for (const { reject } of pending.values()) reject(error);
     pending.clear();
+    try {
+      void onClose(error);
+    } catch {
+      // ignore cleanup callback failures
+    }
   };
 
   const handleMessage = async (message) => {
@@ -140,6 +144,15 @@ export function createNativeHostProtocol({ write = (frame) => writeNativeMessage
         ok: compatible,
         error: compatible ? null : { code: 'protocol_mismatch', message: 'CLI protocol version mismatch' },
       });
+      if (compatible) {
+        try {
+          await onHello(message);
+        } catch (error) {
+          helloAccepted = false;
+          close(error instanceof Error ? error : new Error(String(error || 'native_host_ipc_start_failed')));
+          throw error;
+        }
+      }
       return;
     }
 
@@ -172,12 +185,204 @@ export function createNativeHostProtocol({ write = (frame) => writeNativeMessage
     return await responsePromise;
   };
 
-  return { handleMessage, request, close };
+  return { handleMessage, request, close, isClosed: () => closed, isReady: () => helloAccepted && !closed };
 }
 
-export function runNativeHost({ input = process.stdin, output = process.stdout, error = process.stderr } = {}) {
+function localErrorResponse(code, message) {
+  return {
+    protocolVersion: contract.protocolVersion,
+    ok: false,
+    data: null,
+    error: { code, message },
+  };
+}
+
+async function listenServer(server, endpoint) {
+  await new Promise((resolve, reject) => {
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const onListening = () => {
+      cleanup();
+      resolve();
+    };
+    const cleanup = () => {
+      server.off('error', onError);
+      server.off('listening', onListening);
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(endpoint);
+  });
+}
+
+async function closeServer(server) {
+  await new Promise((resolve) => {
+    try {
+      server.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+}
+
+function isConfirmedStaleEndpointError(error) {
+  return ['ENOENT', 'ECONNREFUSED'].includes(String(error?.code || ''));
+}
+
+export async function startNativeHostIpc({
+  hello,
+  protocol,
+  runtimeRoot,
+  uid = process.getuid?.(),
+  pid = process.pid,
+  processNonce = createProcessNonce(),
+  startedAt = Date.now(),
+  existingPingTimeoutMs = 500,
+} = {}) {
+  const cliInstanceId = String(hello?.cliInstanceId || '').trim();
+  if (!cliInstanceId || cliInstanceId.length > 256) throw new Error('invalid_cli_instance_id');
+  if (!protocol?.request) throw new Error('native_host_protocol_required');
+
+  const runtimeDir = await ensureRuntimeDir({ root: runtimeRoot, uid });
+  const endpoint = socketPathForInstance(runtimeDir, cliInstanceId);
+  const registryPath = registryPathForInstance(runtimeDir, cliInstanceId);
+
+  try {
+    const existing = await readRegistryEntry(registryPath);
+    try {
+      await requestEndpoint(
+        existing.endpoint,
+        { method: 'system.ping', params: {} },
+        { timeoutMs: existingPingTimeoutMs, maxResponseBytes: contract.nativeMessaging.extensionToHostMaxBytes },
+      );
+      throw new Error('cli_instance_already_online');
+    } catch (error) {
+      if (error?.message === 'cli_instance_already_online') throw error;
+      if (!isConfirmedStaleEndpointError(error)) throw error;
+    }
+    const removed = await removeRegistryEntryIfOwned(registryPath, existing.processNonce).catch(() => false);
+    if (!removed) throw new Error('cli_instance_registration_changed');
+    if (String(existing.endpoint || '') === endpoint) await removeFileIfExists(endpoint);
+  } catch (error) {
+    if (
+      error?.code !== 'ENOENT' &&
+      error?.code !== 'registry_invalid' &&
+      error?.message !== 'Unexpected end of JSON input' &&
+      !(error instanceof SyntaxError)
+    ) {
+      throw error;
+    }
+    await removeFileIfExists(registryPath).catch(() => {});
+    await removeFileIfExists(endpoint).catch(() => {});
+  }
+
+  const sockets = new Set();
+  let stopped = false;
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+    const reader = createJsonLineReader({
+      timeoutMs: 5000,
+      onValue(request) {
+        const method = String(request?.method || '').trim();
+        if (!method) {
+          socket.end(encodeJsonLine(localErrorResponse('invalid_request', 'CLI IPC request method is required')));
+          return;
+        }
+        void protocol
+          .request(method, request?.params ?? {})
+          .then((result) => {
+            if (!socket.destroyed) socket.end(encodeJsonLine(result));
+          })
+          .catch((error) => {
+            if (!socket.destroyed) {
+              socket.end(
+                encodeJsonLine(
+                  localErrorResponse(String(error?.code || 'transport_error'), String(error?.message || error)),
+                ),
+              );
+            }
+          });
+      },
+      onError(error) {
+        if (!socket.destroyed) {
+          socket.end(
+            encodeJsonLine(localErrorResponse(String(error?.code || 'ipc_error'), String(error?.message || error))),
+          );
+        }
+      },
+    });
+    socket.on('data', (chunk) => reader.push(chunk));
+    socket.on('end', () => reader.end());
+    socket.on('error', (error) => reader.error(error));
+  });
+
+  try {
+    await listenServer(server, endpoint);
+    await chmod(endpoint, 0o600);
+    await writeRegistryEntry(registryPath, {
+      cliInstanceId,
+      endpoint,
+      pid,
+      processNonce,
+      browserFamily: String(hello?.browserFamily || 'unknown'),
+      runtimeId: String(hello?.runtimeId || ''),
+      extensionVersion: String(hello?.extensionVersion || ''),
+      protocolVersion: contract.protocolVersion,
+      startedAt: Number(startedAt) || Date.now(),
+    });
+  } catch (error) {
+    for (const socket of sockets) socket.destroy();
+    await closeServer(server);
+    await removeFileIfExists(endpoint).catch(() => {});
+    throw error;
+  }
+
+  return {
+    cliInstanceId,
+    endpoint,
+    registryPath,
+    processNonce,
+    async stop() {
+      if (stopped) return;
+      stopped = true;
+      for (const socket of sockets) socket.destroy();
+      await closeServer(server);
+      const removed = await removeRegistryEntryIfOwned(registryPath, processNonce).catch(() => false);
+      if (removed) await removeFileIfExists(endpoint).catch(() => false);
+    },
+  };
+}
+
+export function runNativeHost({
+  input = process.stdin,
+  output = process.stdout,
+  error = process.stderr,
+  runtimeRoot,
+  startIpc = true,
+} = {}) {
   const parser = new NativeMessageParser();
-  const protocol = createNativeHostProtocol({ write: (frame) => writeNativeMessage(output, frame) });
+  let ipcController = null;
+  let protocol = null;
+  protocol = createNativeHostProtocol({
+    write: (frame) => writeNativeMessage(output, frame),
+    onHello: async (hello) => {
+      if (!startIpc || ipcController) return;
+      const started = await startNativeHostIpc({ hello, protocol, runtimeRoot });
+      if (protocol.isClosed()) {
+        await started.stop();
+        return;
+      }
+      ipcController = started;
+    },
+    onClose: () => {
+      const current = ipcController;
+      ipcController = null;
+      void current?.stop();
+    },
+  });
   let failed = false;
 
   const fail = (cause) => {

@@ -102,7 +102,7 @@ describe('native host framing', () => {
     const input = new PassThrough();
     const output = new PassThrough();
     const error = new PassThrough();
-    const protocol = runNativeHost({ input, output, error });
+    const protocol = runNativeHost({ input, output, error, startIpc: false });
     input.write(encodeNativeMessage({ kind: contract.frames.hello, protocolVersion: contract.protocolVersion }));
     await new Promise((resolve) => setImmediate(resolve));
 
