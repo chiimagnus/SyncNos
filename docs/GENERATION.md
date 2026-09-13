@@ -19,6 +19,7 @@
 | `PRIVACY.md` | 用户数据、权限、凭据、本地/外部网络边界 | manifest 权限、secret storage/backup exclusion、OAuth 或外部数据流变化 | README、商店隐私审查 |
 | Feishu / Obsidian setup guides | 对应 Provider 的用户配置步骤 | OAuth/Local REST API、必要权限、设置字段或用户操作变化 | README、Extension Settings |
 | `AGENTS.md`, `src/ui/AGENTS.md` | 维护者/agent 必须提前看到的架构与高风险不变量 | 分层、依赖方向或不可破坏产品/UI 契约变化 | agent rule loader、CONTRIBUTING |
+| `skills/syncnos/SKILL.md`, `skills/syncnos-zh/SKILL.md` | AI Agent 使用 `syncnos` 的运行说明 | 命令路由、JSON/error、instance、安装/权限或写入/sync 等调用契约变化 | Repository Skill 使用者 |
 | `docs/storage.md` | local-first、一致性、Backup/restore 和失败恢复边界 | IDB/revision、backup/import、asset remap 或 continuity 语义变化 | AGENTS、Privacy、CONTRIBUTING |
 | `docs/CONTRIBUTING.md` | 开发、PR 和验证责任 | scripts、CI gate、贡献流程或 manual validation 责任变化 | README、PR template |
 | `docs/troubleshooting.md` | 可复用的维护者诊断 | 故障分类、诊断入口或恢复动作变化 | CONTRIBUTING |

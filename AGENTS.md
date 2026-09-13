@@ -43,6 +43,22 @@ collectors -> services/shared
 - Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。旧 `Date: date` 且缺少 `Last Activity` 时直接重命名；managed section list/retrieve 失败必须传播或重试，不能当作“未找到”后创建重复 section。
 - IndexedDB 业务层统一借用 canonical connection；受 revision 跟踪的业务变更与 revision 必须同 transaction 提交，consumer 以 durable revision + canonical reread 为事实真源。恢复/失败语义见 [`docs/storage.md`](docs/storage.md)。
 
+## AI-Agent-first CLI contract
+
+- `syncnos` 的主要调用者是 AI Agent，不以人类交互式终端体验作为 API 设计前提。普通 operational command 的 canonical contract 是稳定、最小、可机器解析的 JSON envelope `{ ok, data, error }`；`--human` 只作 secondary/debug presentation，不能反过来决定数据模型，也不能要求 TTY、pager、ANSI 或交互式 prompt。
+- 任何可能无界增长的 query 都必须在实现层 bounded。存在 continuation 时，Agent 只原样回传 CLI 返回的 cursor，不解析内部编码；完整文件级交付使用 `export` / `backup export`，不能靠省略 `--limit` 隐式触发全量 JSON。Exact read/mutation 使用 CLI 返回的 conversation/comment identity；实例缺失或歧义必须 fail closed。
+- Agent 只表达业务意图，不要求它选择 IndexedDB、runtime message、Native Messaging manifest/Registry path、IPC frame 或其它内部 routing。公开能力与参数以 `syncnos --help`、`syncnos capabilities`、`syncnos settings schema` 为真源；本机安装/连接诊断统一走 `doctor`。
+- Machine-safe 成功与失败都通过 stdout 的 JSON envelope 返回，错误必须有稳定 `error.code` 和必要的结构化 `error.extra`；未来若增加纯诊断文本，不得污染 machine stdout。大文件通过 path/file-transfer 契约交付，不把 ZIP/Base64 打到终端。
+- State-changing command 必须返回可 read-back 的业务结果。`sync` 默认等待本次 accepted job id 到 terminal state；只有调用者明确要求异步时才使用 `--no-wait`，timeout 不等于取消。mutation outcome unknown 时先正式 read-back，不猜测性重复同一 mutation。
+
+## Repository Skill 规范
+
+- `skills/syncnos/SKILL.md` 与 `skills/syncnos-zh/SKILL.md` 是给 AI **使用 `syncnos`** 的运行说明，不是开发者设计文档。正文只保留会直接影响正确调用的内容：`--help` / `capabilities` 路由、JSON/error 解释、instance 选择、state-changing command 的授权/等待/read-back，以及 installation/browser-required 分支。
+- 不在 Skill 复制架构、IndexedDB/schema、内部 RPC/frame/type、浏览器矩阵与具体 manifest/Registry path、实现历史、task/commit 或测试清单。内部边界只有在调用者不知道它就会误用 CLI 时才保留最短规则；动态命令面由 CLI 自己输出，长期实现事实回到仓库 canonical docs/source。
+- 新建 Skill 或 reference 前先确认有独立调用场景；已有 Skill 能覆盖就不要再建。创建或实质更新时遵循 `$skill-creator` 的最小化与渐进式披露原则，不为“文档齐全”新增 README、quick reference、changelog 或命令副本。
+- 只有命令路由、JSON/error contract、instance 选择、安装/权限流程、写入/sync 或其它会改变 AI 调用方式的用户可见行为变化才触发 Skill 更新；纯内部重构、schema、资源预算或测试变化不触发。英文 `skills/syncnos/` 与中文 `skills/syncnos-zh/` 必须保持语义同步，目录名分别对应 frontmatter `name: syncnos` / `name: syncnos-zh`。
+- 修改 Skill 后按 `$skill-creator` 对中英文目录分别运行 `quick_validate.ts`，并至少运行 Markdown 对应的 `npm run format:check`；若 Skill 更新源于 CLI package/installer/Native Messaging contract 变化，同时按 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) 运行 `npm run cli:check` 与相称 gate。
+
 ## Agent 实现约束
 
 - 默认不查看或编辑 i18n 文案，除非任务明确涉及文案。
