@@ -156,9 +156,9 @@ describe('article-fetch-service', () => {
     expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
     expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0][0]).toMatchObject({
       conversationId: 11,
-      conversationUrl: 'https://example.com/post',
       enableHttpImages: true,
     });
+    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0][0]).not.toHaveProperty('conversationUrl');
     expect(Array.isArray(messages)).toBe(true);
     expect(messages[0]).toMatchObject({
       messageKey: 'article_body',

@@ -92,6 +92,23 @@ describe('image-download-proxy', () => {
     });
   });
 
+  describe('downloadImagePlain', () => {
+    it('downloads directly without reading anti-hotlink rules or installing DNR state', async () => {
+      const { downloadImagePlain } = await import('@platform/webext/image-download-proxy');
+      mockFetch.mockResolvedValue(mockFetchResponse({}));
+
+      const result = await downloadImagePlain({
+        url: 'https://cdnfile.sspai.com/protected-signed-image.png',
+        maxBytes: 1_000_000,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(storageGetMock).not.toHaveBeenCalled();
+      expect(mockUpdateSessionRules).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('downloadImageSmart', () => {
     it('registers and cleans up DNR rule for anti-hotlink URLs', async () => {
       const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');

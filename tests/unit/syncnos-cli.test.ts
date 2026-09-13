@@ -720,12 +720,11 @@ describe('syncnos CLI instance selection', () => {
       expect(backfill.exitCode).toBe(0);
       expect(instance.requests.slice(beforeBackfill).map((request) => request.method)).toEqual([
         'system.ping',
-        'conversation.get',
         'conversation.images.backfill',
       ]);
       expect(instance.requests.at(-1)).toEqual({
         method: 'conversation.images.backfill',
-        params: { conversationId: 7, conversationUrl: 'https://example.com/article' },
+        params: { conversationId: 7 },
       });
 
       const beforeLegacyForms = instance.requests.length;

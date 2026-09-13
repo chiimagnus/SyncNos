@@ -34,6 +34,12 @@ The Extension connects to the local `app.syncnos.cli` Native Messaging host, whi
 
 External sync is optional. Each provider can be synchronized manually and may also be configured for auto-sync.
 
+### ChatGPT Advanced capture
+
+When you explicitly enable ChatGPT Advanced capture and manually save the current conversation, SyncNos uses your current signed-in ChatGPT session to request that conversation from ChatGPT's non-public current-conversation backend API. If the conversation contains protected images, SyncNos also requests ChatGPT's file-resolution and image-content endpoints so those images can be cached locally. This mode does not add background polling or automatic ChatGPT capture.
+
+ChatGPT session cookies and the access token obtained for these requests are used only at runtime. SyncNos does not write those authentication values, signed image download URLs, or raw backend responses to captured messages, browser local storage, or Backup ZIP files. Successfully downloaded protected-image blobs are stored in the existing local image cache. If an image cannot be downloaded or cached, SyncNos can still save the captured text and reports that capture as incomplete.
+
 ### Notion
 
 Notion sync sends selected local content to the Notion API over HTTPS. When needed, referenced images may also be fetched and uploaded to Notion.

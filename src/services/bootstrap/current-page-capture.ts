@@ -7,6 +7,10 @@ import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
+import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api-capture-settings';
+import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
+import type { ChatgptProtectedImages } from '@services/integrations/chatgpt/api-snapshot';
+import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -167,13 +171,24 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     };
   }
 
-  async function saveSnapshot(snapshot: any, collectorId: string | null) {
+  async function saveSnapshot(
+    snapshot: any,
+    collectorId: string | null,
+    options?: { chatgptProtectedImages?: ChatgptProtectedImages | null; expectedChatgptConversationId?: string },
+  ) {
     if (!snapshot || !snapshot.conversation) return null;
 
     const integrity = resolveCaptureIntegrity(collectorId, snapshot);
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
     const activityAt = Date.now();
+    const assertExpectedChatgptRoute = () => {
+      const expected = String(options?.expectedChatgptConversationId || '').trim();
+      if (!expected) return;
+      const current = parseChatgptDurableConversationRoute(globalThis.location?.href || '');
+      if (!current || current.conversationId !== expected) throw new Error('chatgpt_api_navigation_changed');
+    };
+    assertExpectedChatgptRoute();
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: { ...normalizedSnapshot.conversation, lastActivityAt: 0 },
@@ -183,26 +198,35 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     }
 
     const conversation = conversationRes.data;
+    const conversationId = normalizeConversationId(conversation?.id);
+    const isNew = (conversation as any)?.__isNew;
+    if (conversationId == null || typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
+
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      conversationId: conversation.id,
+      conversationId,
       messages: normalizedSnapshot.messages || [],
       mode: integrity.persistence.mode,
       diff: integrity.persistence.diff,
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
-      conversationUrl: normalizedSnapshot?.conversation?.url || '',
       activityAt,
+      ...(options?.chatgptProtectedImages ? { chatgptProtectedImages: options.chatgptProtectedImages } : null),
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    const isNew = (conversation as any)?.__isNew;
-    if (typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
+    const protectedImagesIncomplete = Array.isArray(messagesRes?.data?.imageWarningFlags)
+      ? messagesRes.data.imageWarningFlags.includes('protected_images_incomplete')
+      : false;
+    const captureReasons = dedupeCodes([
+      ...(integrity.meta?.reasons || []),
+      ...(protectedImagesIncomplete ? ['chatgpt_api_images_incomplete'] : []),
+    ]);
     return {
-      conversationId: normalizeConversationId(conversation.id),
+      conversationId,
       isNew,
-      captureCompleteness: integrity.meta?.completeness,
-      captureReasons: integrity.meta?.reasons?.slice(),
+      captureCompleteness: protectedImagesIncomplete ? 'partial' : integrity.meta?.completeness,
+      captureReasons: captureReasons.length ? captureReasons : undefined,
     };
   }
 
@@ -262,34 +286,51 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       if (!target.collector) throw new Error(t('currentPageCannotBeCaptured'));
 
-      let preparedCapture: unknown;
-      if (typeof target.collector.prepareManualCapture === 'function') {
-        preparedCapture = await target.collector.prepareManualCapture({ manual: true });
-      }
-
-      const snapshot = await Promise.resolve(target.collector.capture({ manual: true, preparedCapture }));
-      if (!snapshot) {
-        throw new Error(t('noVisibleConversationFound'));
-      }
-
-      const isChatgpt =
-        String(snapshot?.conversation?.source || '')
-          .trim()
-          .toLowerCase() === 'chatgpt';
-      const hasDeepResearchPlaceholders =
-        isChatgpt &&
-        Array.isArray(snapshot?.messages) &&
-        snapshot.messages.some((message: any) => isUnresolvedDeepResearchMessage(message));
-      if (hasDeepResearchPlaceholders) {
-        try {
-          await hydrateChatgptDeepResearchSnapshot(snapshot, send);
-        } catch (_error) {
-          // The unresolved placeholder is marked partial below.
+      let snapshot: any = null;
+      let chatgptProtectedImages: ChatgptProtectedImages | null = null;
+      let expectedChatgptConversationId = '';
+      const useChatgptApi = target.collectorId === 'chatgpt' && (await readChatgptApiCaptureEnabled());
+      if (useChatgptApi) {
+        const apiCapture = await captureCurrentChatgptConversationViaApi({
+          fallbackTitle: String(globalThis.document?.title || ''),
+        });
+        if (apiCapture.applicable) {
+          snapshot = apiCapture.snapshot;
+          chatgptProtectedImages = apiCapture.chatgptProtectedImages;
+          expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
         }
-        markUnresolvedDeepResearch(snapshot);
       }
 
-      const saved = await saveSnapshot(snapshot, target.collectorId);
+      if (!snapshot) {
+        let preparedCapture: unknown;
+        if (typeof target.collector.prepareManualCapture === 'function') {
+          preparedCapture = await target.collector.prepareManualCapture({ manual: true });
+        }
+        snapshot = await Promise.resolve(target.collector.capture({ manual: true, preparedCapture }));
+        if (!snapshot) throw new Error(t('noVisibleConversationFound'));
+
+        const isChatgpt =
+          String(snapshot?.conversation?.source || '')
+            .trim()
+            .toLowerCase() === 'chatgpt';
+        const hasDeepResearchPlaceholders =
+          isChatgpt &&
+          Array.isArray(snapshot?.messages) &&
+          snapshot.messages.some((message: any) => isUnresolvedDeepResearchMessage(message));
+        if (hasDeepResearchPlaceholders) {
+          try {
+            await hydrateChatgptDeepResearchSnapshot(snapshot, send);
+          } catch (_error) {
+            // The unresolved placeholder is marked partial below.
+          }
+          markUnresolvedDeepResearch(snapshot);
+        }
+      }
+
+      const saved = await saveSnapshot(snapshot, target.collectorId, {
+        chatgptProtectedImages,
+        ...(expectedChatgptConversationId ? { expectedChatgptConversationId } : null),
+      });
       if (!saved) {
         throw new Error(t('noVisibleConversationFound'));
       }

@@ -133,7 +133,6 @@ export function createContentController(deps: Deps) {
       mode: options?.mode || 'snapshot',
       diff: options?.diff || null,
       conversationSourceType: snapshot?.conversation?.sourceType || 'chat',
-      conversationUrl: snapshot?.conversation?.url || '',
       activityAt,
     });
     if (!messagesRes?.ok) {

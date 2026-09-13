@@ -31,7 +31,7 @@ collectors -> services/shared
 
 - UI 圆角只使用 `src/ui/styles/tokens.css` 中的 `--radius-*`；细则见 `src/ui/AGENTS.md`。
 - 会话列表必须使用 `bootstrap + loadMore` 分页，禁止恢复全量读取。
-- ChatGPT 与 Google AI Studio 的虚拟列表会卸载离屏轮次，禁止加入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`；完整历史只走手动抓取和 `prepareManualCapture()`。
+- ChatGPT 与 Google AI Studio 的虚拟列表会卸载离屏轮次，禁止加入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`。Google AI Studio 完整历史继续只走手动 `prepareManualCapture()`；ChatGPT 默认也走手动 DOM `prepareManualCapture()`，仅用户显式开启 Advanced API 后，手动抓取才可改用已验证的 current-conversation backend mapping，并且不得静默回退 DOM。
 - 评论选区只附加到根评论 composer；reply 输入框和评论面板内选区不得覆盖正文引用。
 - 根评论允许仅划线：正文引用可在评论正文为空时保存，但必须有可验证的定位或稳定导入身份；reply 仍必须有非空正文。
 - 评论定位只接受全局唯一 exact Range，不新增模糊匹配、比例滚动或父元素高亮回退。

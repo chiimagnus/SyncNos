@@ -59,6 +59,8 @@ Supported: ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, P
 
 ChatGPT and Google AI Studio require manual capture because their virtualized conversation lists cannot be treated as complete automatically. Other supported AI chat collectors can auto-save when AI auto-save is enabled.
 
+ChatGPT uses DOM capture by default. In **Settings → AI Chats**, you can explicitly enable the current-conversation **Advanced API** path; it still runs only when you manually save, and it may stop working when ChatGPT changes its non-public backend API.
+
 ### Web articles
 
 Any ordinary `http(s)` page can be captured manually. SyncNos extracts readable content and relevant metadata, with site-specific handling where needed. Captured articles support local comments and highlight-only annotations.

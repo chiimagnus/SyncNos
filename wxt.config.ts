@@ -68,9 +68,7 @@ const resolveManifest: UserManifestFn = (env) => {
       {
         resources: ['icons/icon-128.png'],
         matches: [
-          'https://chat.openai.com/*',
           'https://chatgpt.com/*',
-          'https://www.chatgpt.com/*',
           'https://gemini.google.com/*',
           'https://chat.deepseek.com/*',
           'https://chat.z.ai/*',

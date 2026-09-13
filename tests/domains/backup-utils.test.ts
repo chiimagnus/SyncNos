@@ -51,6 +51,7 @@ describe('backup backup-utils', () => {
       [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
       syncnos_cli_instance_id_v1: 'profile-instance',
       syncnos_cli_integration_enabled_v1: true,
+      chatgpt_api_capture_enabled: true,
     });
     expect(filtered).toEqual({
       notion_parent_page_id: 'p1',
@@ -66,6 +67,7 @@ describe('backup backup-utils', () => {
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       github_repository: 'chiimagnus/SyncNos-Webclipper',
       github_branch: 'main',
+      chatgpt_api_capture_enabled: true,
     });
     expect(JSON.stringify(filtered)).not.toMatch(
       /ACCESS_SENTINEL_SECRET|REFRESH_SENTINEL_SECRET|DEVICE_SENTINEL_SECRET|FEISHU_SECRET_SENTINEL|FEISHU_ACCESS_SENTINEL|FEISHU_REFRESH_SENTINEL|FEISHU_PENDING_SENTINEL|FEISHU_ERROR_SENTINEL/,

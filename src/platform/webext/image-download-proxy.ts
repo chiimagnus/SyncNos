@@ -137,15 +137,19 @@ async function removeRefererRule(ruleId: number): Promise<void> {
 /**
  * 普通下载（公共逻辑）
  */
-async function downloadWithPlainFetch(
-  url: string,
-  maxBytes: number,
-): Promise<
+export async function downloadImagePlain(input: {
+  url: string;
+  maxBytes?: number;
+}): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
-  | { ok: false; reason: 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
+  | { ok: false; reason: 'invalid_input' | 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
 > {
+  const safeUrl = String(input.url || '').trim();
+  const maxBytes = Number(input.maxBytes) || 2_000_000;
+  if (!safeUrl) return { ok: false, reason: 'invalid_input' } as const;
+
   try {
-    const res = await fetch(url, {
+    const res = await fetch(safeUrl, {
       method: 'GET',
       credentials: 'include',
       redirect: 'follow',
@@ -153,9 +157,7 @@ async function downloadWithPlainFetch(
     if (!res.ok) return { ok: false, reason: 'http' } as const;
 
     const contentType = parseContentType(res.headers.get('content-type') || '');
-    if (!contentType.startsWith('image/')) {
-      return { ok: false, reason: 'non_image' } as const;
-    }
+    if (!contentType.startsWith('image/')) return { ok: false, reason: 'non_image' } as const;
 
     const blob = await res.blob();
     const byteSize = blob.size || 0;
@@ -199,7 +201,7 @@ export async function downloadImageSmart(input: {
 
   // 不需要防盗链处理，直接普通下载
   if (!referer) {
-    return downloadWithPlainFetch(safeUrl, maxBytes);
+    return downloadImagePlain({ url: safeUrl, maxBytes });
   }
 
   // 需要防盗链处理
@@ -209,7 +211,7 @@ export async function downloadImageSmart(input: {
       url: safeUrl,
       expectedReferer: referer,
     });
-    return downloadWithPlainFetch(safeUrl, maxBytes);
+    return downloadImagePlain({ url: safeUrl, maxBytes });
   }
 
   // 注册临时 DNR 规则注入 Referer
@@ -218,7 +220,7 @@ export async function downloadImageSmart(input: {
 
   try {
     await registerRefererRule(ruleId, safeUrl, referer);
-    return await downloadWithPlainFetch(safeUrl, maxBytes);
+    return await downloadImagePlain({ url: safeUrl, maxBytes });
   } finally {
     // 无论成功/失败都清理规则
     removeRefererRule(ruleId).catch((e) => {

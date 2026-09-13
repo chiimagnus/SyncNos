@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 
+vi.mock('@services/integrations/chatgpt/api-capture-settings', () => ({
+  readChatgptApiCaptureEnabled: vi.fn(async () => false),
+}));
+
 function setupDom(url: string) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url, pretendToBeVisual: true });
   Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });

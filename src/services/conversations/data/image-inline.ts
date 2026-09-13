@@ -1,4 +1,5 @@
 import { openDb } from '@platform/idb/schema';
+import { downloadImageSmart } from '@platform/webext/image-download-proxy';
 import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import {
@@ -293,7 +294,6 @@ async function ensureCachedAssetRecord(row: ImageCacheRow): Promise<CachedAsset 
 
 async function downloadImageAsBlob(input: {
   url: string;
-  referrer?: string;
   maxBytes: number;
 }): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
@@ -301,72 +301,31 @@ async function downloadImageAsBlob(input: {
 > {
   const safeUrl = String(input.url || '').trim();
   if (!isHttpUrl(safeUrl)) return { ok: false, reason: 'fetch' };
-
-  // 尝试使用智能下载（自动处理防盗链 Referer）
   try {
-    const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');
-    const result = await downloadImageSmart({
-      url: safeUrl,
-      maxBytes: input.maxBytes,
-    });
-
-    if (result.ok) {
-      // 智能下载成功
-      return {
-        ok: true,
-        blob: result.blob,
-        byteSize: result.byteSize,
-        contentType: result.contentType,
-      };
-    }
-
-    // 智能下载失败，记录日志并 fallthrough 到普通 fetch
-    // ⚠️ 注意：对于防盗链图片，fallback 路径（普通 fetch）无法设置 Referer header，仍会 403
-    // fallback 的意义在于：非防盗链图片在 downloadImageSmart 内部异常时，仍有最后的下载机会
-    // Firefox 下防盗链图片必定 403（DNR 不可用），这是已知限制
-    if (result.reason !== 'fetch' && result.reason !== 'http' && result.reason !== 'invalid_input') {
-      // non_image / empty / too_large 这些是内容问题，不需要 fallback
-      return { ok: false, reason: result.reason } as const;
-    }
-
-    console.info('[ImageInline] smart download failed, falling back to plain fetch', {
-      url: safeUrl,
-      reason: result.reason,
-    });
-  } catch (e) {
-    // 模块加载失败或其他异常，记录日志并 fallthrough
-    console.warn('[ImageInline] smart download exception, falling back to plain fetch', {
-      url: safeUrl,
-      error: e instanceof Error ? e.message : String(e),
-    });
-  }
-
-  // 普通下载逻辑（fallback）
-  // ⚠️ 区分：referrer（fetch 选项）控制 Referrer-Policy，不是具体的 Referer header 值
-  // 少数派需要的是 Referer: https://sspai.com/ 这个具体的 header 值，不是 ReferrerPolicy
-  const referrer = isHttpUrl(input.referrer) ? String(input.referrer) : undefined;
-  try {
-    const res = await fetch(safeUrl, {
-      method: 'GET',
-      credentials: 'include',
-      redirect: 'follow',
-      ...(referrer ? { referrer } : {}),
-    });
-    if (!res.ok) return { ok: false, reason: 'http' };
-
-    const contentType = parseContentType(res.headers.get('content-type') || '');
-    if (!contentType.startsWith('image/')) return { ok: false, reason: 'non_image' };
-
-    const blob = await res.blob();
-    const byteSize = blob.size || 0;
-    if (!byteSize) return { ok: false, reason: 'empty' };
-    if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
-
-    return { ok: true, blob, byteSize, contentType };
-  } catch (_e) {
+    const result = await downloadImageSmart({ url: safeUrl, maxBytes: input.maxBytes });
+    if (result.ok) return result;
+    return { ok: false, reason: result.reason === 'invalid_input' ? 'fetch' : result.reason };
+  } catch (_error) {
     return { ok: false, reason: 'fetch' };
   }
 }
+
+export type ProtectedImageCandidate = {
+  ref: string;
+  cacheKey: string;
+  targetMessageKey: string;
+  alt?: string;
+  [key: string]: unknown;
+};
+
+export type ProtectedImageDownloadResult =
+  | { cacheKey: string; ok: true; blob: Blob; byteSize: number; contentType: string }
+  | { cacheKey: string; ok: false; reason?: string };
+
+export type ProtectedImageBundle = {
+  assets: ProtectedImageCandidate[];
+  [key: string]: unknown;
+};
 
 export type InlineChatImagesResult = {
   messages: any[];
@@ -377,17 +336,52 @@ export type InlineChatImagesResult = {
   warningFlags: string[];
 };
 
+function safeImageAlt(value: unknown): string {
+  return String(value || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/]/g, '\\]')
+    .trim()
+    .slice(0, 200);
+}
+
+function appendMarkdownBlock(markdown: unknown, block: string): string {
+  const base = String(markdown || '').trimEnd();
+  if (!block || base.includes(block)) return base;
+  return base ? `${base}\n\n${block}` : block;
+}
+
+function markProtectedImageFailure(message: any, alt: unknown): void {
+  const safeAlt = safeImageAlt(alt);
+  message.contentMarkdown = appendMarkdownBlock(message.contentMarkdown, safeAlt ? `[image: ${safeAlt}]` : '[image]');
+  if (message.captureMergePolicy !== 'preserve-existing-content') {
+    message.captureMergePolicy = 'preserve-existing-markdown';
+  }
+}
+
 export async function inlineChatImagesInMessages(input: {
   conversationId: number;
-  conversationUrl?: string;
   messages: any[];
   onlyMessageKeys?: Set<string> | null;
   enableHttpImages?: boolean;
+  protectedImages?: ProtectedImageBundle | null;
+  downloadProtectedImages?: (bundle: ProtectedImageBundle) => Promise<ProtectedImageDownloadResult[]>;
 }): Promise<InlineChatImagesResult> {
   const conversationId = Number(input.conversationId);
   const messages = Array.isArray(input.messages) ? input.messages : [];
   const onlyKeys = input.onlyMessageKeys || null;
   const enableHttpImages = input.enableHttpImages !== false;
+  const protectedAssets = Array.isArray(input.protectedImages?.assets) ? input.protectedImages!.assets : [];
+  const messagesByKey = new Map<string, any>();
+  for (const message of messages) {
+    const key = String(message?.messageKey || '').trim();
+    if (key) messagesByKey.set(key, message);
+  }
+  for (const asset of protectedAssets) {
+    if (!asset?.targetMessageKey || !messagesByKey.has(String(asset.targetMessageKey))) {
+      throw new Error('protected image target message is missing');
+    }
+  }
 
   const parsedMessages: Array<{
     message: any;
@@ -403,6 +397,11 @@ export async function inlineChatImagesInMessages(input: {
     seenCacheLookupUrls.add(url);
     cacheLookupUrls.push(url);
   };
+
+  for (const asset of protectedAssets) {
+    const cacheKey = String(asset?.cacheKey || '').trim();
+    if (cacheKey) addCacheLookupUrl(cacheKey);
+  }
 
   for (const msg of messages) {
     if (!msg || !msg.messageKey) continue;
@@ -432,7 +431,15 @@ export async function inlineChatImagesInMessages(input: {
     }
   }
 
-  const cachedByUrl = await getCachedImagesByUrls(conversationId, cacheLookupUrls);
+  let cacheLookupFailed = false;
+  let cachedByUrl: Map<string, ImageCacheRow>;
+  try {
+    cachedByUrl = await getCachedImagesByUrls(conversationId, cacheLookupUrls);
+  } catch (error) {
+    if (!protectedAssets.length) throw error;
+    cacheLookupFailed = true;
+    cachedByUrl = new Map();
+  }
   const replacements = new Map<string, string>();
   const warningFlags = new Set<string>();
   let inlinedCount = 0;
@@ -462,15 +469,23 @@ export async function inlineChatImagesInMessages(input: {
         cacheLookupUrl = descriptor.cacheKey;
       }
 
+      if (cacheLookupFailed) {
+        warningFlags.add('inline_images_download_failed');
+        continue;
+      }
       const cached = cachedByUrl.get(cacheLookupUrl) || (isDataUrl ? cachedByUrl.get(url) : undefined);
       if (cached) {
-        const cachedAsset = await ensureCachedAssetRecord(cached);
-        if (cachedAsset) {
-          replacements.set(url, formatSyncnosAssetUrl(cachedAsset.id));
-          fromCacheCount += 1;
-          inlinedCount += 1;
-          inlinedBytes += cachedAsset.byteSize;
-          continue;
+        try {
+          const cachedAsset = await ensureCachedAssetRecord(cached);
+          if (cachedAsset) {
+            replacements.set(url, formatSyncnosAssetUrl(cachedAsset.id));
+            fromCacheCount += 1;
+            inlinedCount += 1;
+            inlinedBytes += cachedAsset.byteSize;
+            continue;
+          }
+        } catch (_error) {
+          // Treat a corrupt/unreadable cache row as a miss and retry the source once below.
         }
       }
 
@@ -483,17 +498,21 @@ export async function inlineChatImagesInMessages(input: {
           continue;
         }
 
-        nextAsset = await upsertCachedImageAsset({
-          conversationId,
-          url: parsed.cacheKey,
-          blob: parsed.blob,
-          byteSize: parsed.byteSize,
-          contentType: parsed.contentType,
-        });
+        try {
+          nextAsset = await upsertCachedImageAsset({
+            conversationId,
+            url: parsed.cacheKey,
+            blob: parsed.blob,
+            byteSize: parsed.byteSize,
+            contentType: parsed.contentType,
+          });
+        } catch (_error) {
+          warningFlags.add('inline_images_download_failed');
+          continue;
+        }
       } else {
         const downloaded = await downloadImageAsBlob({
           url,
-          referrer: input.conversationUrl,
           maxBytes: NO_IMAGE_SIZE_LIMIT,
         });
         if (!downloaded.ok) {
@@ -501,13 +520,18 @@ export async function inlineChatImagesInMessages(input: {
           continue;
         }
 
-        nextAsset = await upsertCachedImageAsset({
-          conversationId,
-          url,
-          blob: downloaded.blob,
-          byteSize: downloaded.byteSize,
-          contentType: downloaded.contentType,
-        });
+        try {
+          nextAsset = await upsertCachedImageAsset({
+            conversationId,
+            url,
+            blob: downloaded.blob,
+            byteSize: downloaded.byteSize,
+            contentType: downloaded.contentType,
+          });
+        } catch (_error) {
+          warningFlags.add('inline_images_download_failed');
+          continue;
+        }
       }
 
       replacements.set(url, formatSyncnosAssetUrl(nextAsset.id));
@@ -522,6 +546,88 @@ export async function inlineChatImagesInMessages(input: {
       return next ? { target: next } : null;
     });
     if (nextMarkdown !== markdown) message.contentMarkdown = nextMarkdown;
+  }
+
+  if (protectedAssets.length) {
+    const misses: ProtectedImageCandidate[] = [];
+    const missKeys = new Set<string>();
+    const cachedAssetByKey = new Map<string, CachedAsset>();
+    const initialCacheHitKeys = new Set<string>();
+    const addMiss = (asset: ProtectedImageCandidate, cacheKey: string) => {
+      if (missKeys.has(cacheKey)) return;
+      missKeys.add(cacheKey);
+      misses.push(asset);
+    };
+    if (!cacheLookupFailed) {
+      for (const asset of protectedAssets) {
+        const cacheKey = String(asset.cacheKey || '').trim();
+        if (!cacheKey || cachedAssetByKey.has(cacheKey) || missKeys.has(cacheKey)) continue;
+        const cached = cachedByUrl.get(cacheKey);
+        if (!cached) {
+          addMiss(asset, cacheKey);
+          continue;
+        }
+        try {
+          const cachedAsset = await ensureCachedAssetRecord(cached);
+          if (cachedAsset) {
+            cachedAssetByKey.set(cacheKey, cachedAsset);
+            initialCacheHitKeys.add(cacheKey);
+          } else addMiss(asset, cacheKey);
+        } catch (_error) {
+          addMiss(asset, cacheKey);
+        }
+      }
+    }
+
+    let downloadedByKey = new Map<string, ProtectedImageDownloadResult>();
+    if (!cacheLookupFailed && misses.length && input.downloadProtectedImages) {
+      try {
+        const downloaded = await input.downloadProtectedImages({ ...(input.protectedImages || {}), assets: misses });
+        downloadedByKey = new Map(
+          (Array.isArray(downloaded) ? downloaded : [])
+            .filter((item) => item && typeof item.cacheKey === 'string')
+            .map((item) => [item.cacheKey, item]),
+        );
+      } catch (_error) {
+        downloadedByKey = new Map();
+      }
+    }
+
+    for (const asset of protectedAssets) {
+      const message = messagesByKey.get(String(asset.targetMessageKey));
+      const cacheKey = String(asset.cacheKey || '').trim();
+      let cachedAsset = cacheKey ? cachedAssetByKey.get(cacheKey) || null : null;
+      let downloaded = cacheKey ? downloadedByKey.get(cacheKey) : undefined;
+
+      if (!cachedAsset && downloaded?.ok) {
+        try {
+          cachedAsset = await upsertCachedImageAsset({
+            conversationId,
+            url: cacheKey,
+            blob: downloaded.blob,
+            byteSize: downloaded.byteSize,
+            contentType: downloaded.contentType,
+          });
+          cachedAssetByKey.set(cacheKey, cachedAsset);
+          downloadedCount += 1;
+        } catch (_error) {
+          cachedAsset = null;
+        }
+      }
+
+      if (!cachedAsset) {
+        warningFlags.add('protected_images_incomplete');
+        markProtectedImageFailure(message, asset.alt);
+        continue;
+      }
+
+      const localUrl = formatSyncnosAssetUrl(cachedAsset.id);
+      const alt = safeImageAlt(asset.alt);
+      message.contentMarkdown = appendMarkdownBlock(message.contentMarkdown, `![${alt}](${localUrl})`);
+      if (initialCacheHitKeys.has(cacheKey)) fromCacheCount += 1;
+      inlinedCount += 1;
+      inlinedBytes += cachedAsset.byteSize;
+    }
   }
 
   return {
