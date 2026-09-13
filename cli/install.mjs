@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
@@ -10,7 +11,6 @@ import {
   buildNativeHostManifest,
   discoverInstalledBrowsers,
   listBrowserTargets,
-  resolveBrowserTarget,
   resolveRegistrationTargets,
   validateNativeHostManifest,
 } from './browser-targets.mjs';

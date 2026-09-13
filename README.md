@@ -29,29 +29,40 @@ SyncNos is local-first: captured content is saved locally before any optional sy
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari (macOS / iOS) | Build from source with Xcode |
 
-### Local CLI (macOS)
+### Local CLI (macOS / Windows / Linux)
 
 The SyncNos CLI is a local frontend for the data and business logic owned by the running browser Extension. It does not maintain a second database and is not an offline daemon.
 
-Download `syncnos-cli-<version>.tgz` from the matching GitHub Release, then install and register the Native Messaging host for Chrome:
+Download `syncnos-cli-<version>.tgz` from the matching GitHub Release. By default the CLI discovers supported browsers installed on the current OS and registers each distinct Native Messaging target once:
 
 ```bash
 npm install -g ./syncnos-cli-<version>.tgz
-syncnos install --browser chrome
+syncnos install
 syncnos doctor
 ```
 
-In the same browser profile, open **Settings → General → Local CLI Integration** and enable **SyncNos CLI**. The browser must remain running for business CLI commands. `syncnos doctor` reports package/manifest/connection state without guessing which browser-side condition is responsible when the Extension is unreachable.
+Discovery checks a finite set of known application/executable locations; it does not crawl the disk or read browser profiles. For portable, development, or non-standard installs, use `syncnos install --browser <id>`. `--extension-id` is only valid with an explicit `--browser`. `syncnos uninstall` removes only SyncNos-owned `app.syncnos.cli` registrations; browsers that share one Native Messaging target share one manifest/Registry key.
 
-CLI Native Messaging has a separate support boundary from Extension installation channels:
+In each browser profile that should expose its data to the CLI, open **Settings → General → Local CLI Integration** and enable **SyncNos CLI**. The browser must remain running for business CLI commands. `syncnos doctor` reports `detectedBrowsers`, registration state, package state, and online instances separately; successful registration does not imply that an Extension instance is connected.
 
-| Browser / platform | CLI v1 status |
-| --- | --- |
-| Google Chrome / macOS | Release target. A real Chrome `connectNative → status/revision` smoke is required before a release is considered validated. |
-| Firefox / macOS | Not claimed as supported until a real browser round-trip passes. |
-| Helium / macOS | Not claimed in v1; Native Messaging discovery works through Chrome-compatible paths, but the full SyncNos product gate is incomplete. |
-| Zen / macOS | Not claimed in v1; the current CLI-enabled test XPI is not a signed release artifact, so the product gate is incomplete. |
-| Windows / Linux / Safari | Outside this CLI v1 scope. |
+“Auto registration” below means the installer implements discovery plus the OS manifest/Registry contract. “Real round-trip” is stronger evidence and requires a real Extension → Native Host → CLI path:
+
+| Browser | Auto discovery / registration | Real round-trip evidence |
+| --- | --- | --- |
+| Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Iridium / Yandex | macOS / Linux / Windows | Not verified browser-by-browser; the standard Chrome smoke is explicitly deferred. |
+| Slimjet | macOS / Windows | Not verified. |
+| Arc | macOS | Not verified. |
+| Helium | macOS | **Verified** with the current SyncNos 1.13.2 Extension and real Extension data. |
+| Chrome Beta / Chrome Unstable | Linux | Not verified. |
+| Chrome for Testing | macOS / Linux | Not verified. |
+| Firefox | macOS / Linux / Windows | Signed release round-trip not yet verified. |
+| Firefox Developer Edition | macOS / Windows | Not verified. |
+| LibreWolf | macOS / Linux / Windows | Not verified. |
+| Waterfox | Linux | Not verified. |
+| Tor Browser | macOS / Linux auto-discovery; Windows explicit `--browser tor` registration only | Not verified. |
+| Zen | macOS | **Transport and real-data path verified** with a same-ID current 1.13.2 build; signed-release packaging and the final real user permission gesture remain separate release evidence. |
+
+Chromium production manifests allow both the Chrome Web Store and Microsoft Edge Add-ons SyncNos IDs. Firefox-family manifests use the stable Gecko ID `syncnos-webclipper@syncnos.app`. Safari uses a different native bridge model and is outside this WebExtension Native Messaging installer.
 
 ## Demo Video
 

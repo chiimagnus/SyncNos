@@ -109,7 +109,7 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 | 代码 PR 准备接受审查 | `npm run gate:ci` |
 | 仅文档 / GitHub 模板变更 | 运行 `npm run format:check` 并检查本次修改的本地链接；若未修改运行时、构建或依赖文件，`gate:ci` 可填写 `N/A` 并说明原因 |
 | 生产构建、manifest、权限、打包或发布变更 | `npm run gate` |
-| CLI package / installer / Native Messaging 变更 | `npm run gate`、`npm run cli:check`，并运行 `tests/unit/cli-package.test.ts` / `tests/unit/cli-installer.test.ts`；涉及真实 browser discovery/permission/launch 时还必须做对应 macOS browser smoke |
+| CLI package / installer / Native Messaging 变更 | `npm run gate`、`npm run cli:check`，并运行 `tests/unit/cli-package.test.ts`、`tests/unit/cli-browser-targets.test.ts`、`tests/unit/cli-installer.test.ts`、`tests/unit/cli-runtime-registry.test.ts`；受影响 OS 的 manifest/Registry/IPC 契约必须有平台模拟或实机验证。当前可用平台还要做真实 browser discovery/read-back；没有对应 Windows/Linux 机器时不得把模拟测试写成产品级 E2E。 |
 | 浏览器/站点专项行为 | 手动验证受影响的浏览器/站点路径；适用时运行对应的 `dev:*` / build 命令 |
 | 视觉行为 | 记录受影响状态的修改前/后效果，或提供等价截图 |
 
@@ -123,7 +123,7 @@ PR 应在不依赖作者本地上下文的情况下也能被理解。
 
 ## 数据与隐私变更
 
-SyncNos 采用 local-first，因此涉及 IndexedDB、备份/恢复、同步映射、OAuth、缓存图片、权限、Native Messaging/本机 CLI 或迁移的改动，都需要明确审查失败路径。请说明外部目标失败时会发生什么，以及现有本地数据如何保持可恢复。CLI/host 改动还应确认 Extension/IndexedDB 仍是唯一业务事实真源，machine-safe response 不泄露 provider secret / Reader TTS AI API key，且 installer/uninstaller 只操作声明过的固定路径。
+SyncNos 采用 local-first，因此涉及 IndexedDB、备份/恢复、同步映射、OAuth、缓存图片、权限、Native Messaging/本机 CLI 或迁移的改动，都需要明确审查失败路径。请说明外部目标失败时会发生什么，以及现有本地数据如何保持可恢复。CLI/host 改动还应确认 Extension/IndexedDB 仍是唯一业务事实真源，machine-safe response 不泄露 provider secret / Reader TTS AI API key，且 installer/uninstaller 只操作声明过的固定 registration target。浏览器自动发现必须是有限候选检查：不递归扫描磁盘、不解析 Profile；Windows 只写当前用户 HKCU NativeMessagingHosts key，macOS/Linux 只写 user-level manifest。新增长尾浏览器时必须同时给出 detection 与 registration 依据，不能只凭 browser family 猜路径。
 
 涉及 durable revision、跨 surface 刷新或备份 merge 的改动，定向验证还应覆盖：no-op 不制造 revision、业务数据与 revision 同事务提交、wake 丢失后仍可从 snapshot 收敛、canonical read reject 保留 last-good 并可 replay、相同备份重复导入保持幂等，以及恢复出的图片 local ID 与 Markdown asset 引用一致。若改动影响已挂载 UI，请至少做一次不 reload 的真实浏览器 smoke；通用命令仍按上面的验证矩阵执行。
 

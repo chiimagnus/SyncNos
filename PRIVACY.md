@@ -39,7 +39,9 @@ For the current backup, storage, and recovery contract, see [docs/storage.md](do
 
 ### Local CLI and Native Messaging
 
-On supported CLI targets, you can explicitly enable **Local CLI Integration** for a browser profile. The Extension then uses the optional browser `nativeMessaging` permission to connect to the local `app.syncnos.cli` Native Messaging host. The host and `syncnos` command communicate through same-user local IPC on the same computer; the host does not expose a remote network service, does not run an independent SyncNos database, and the CLI does not parse browser profile storage as a second source of truth.
+On supported CLI targets, you can explicitly enable **Local CLI Integration** for a browser profile. The Extension then uses the optional browser `nativeMessaging` permission to connect to the local `app.syncnos.cli` Native Messaging host. The host and `syncnos` command communicate through same-user local IPC on the same computer: Unix domain sockets on macOS/Linux and a local named pipe on Windows. The host does not expose a remote network service, does not run an independent SyncNos database, and the CLI does not parse browser profile storage as a second source of truth.
+
+`syncnos install` discovers browsers only from a finite set of known application/executable locations and registers the matching user-level Native Messaging targets. It does not crawl the disk or inspect browser profile databases. On Windows it uses current-user (`HKCU`) Native Messaging registration; on macOS/Linux it writes user-level manifest files.
 
 CLI RPC responses use a machine-safe surface and do not return provider OAuth tokens/secrets, Obsidian API keys, GitHub access credentials, or the Reader TTS AI API key. CLI file export/import operations use paths explicitly supplied by the user and transfer file contents locally between the Extension and host rather than through a SyncNos remote service.
 

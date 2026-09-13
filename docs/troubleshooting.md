@@ -18,11 +18,21 @@
 | Bilibili 视频已保存但没有章节/看点 | 章节取自当前页播放器自然加载的章节 response；当前视频没有章节或该 response 尚未被页面加载时，Video 仍会保存其它可用信息。 |
 | Bilibili 稍后再看页被当成网页文章或重复 Video | 仅 `/list/watchlater` 且带合法 `bvid` 的播放页属于 Video；SyncNos 会把它归一到 `/video/<BV>/`，忽略 `oid` 等列表参数。其它 `/list/*` 不会仅凭 `bvid` query 被提升为 Video。旧版本已经误存成 Article 的历史条目不会被自动删除，可按需手动清理。 |
 | `Could not establish connection` / `Receiving end does not exist` | 先按发送方向和生命周期分类：content → background 冷启动、background → content 尚未注入、port 已建立后关闭、旧 context 失效是不同问题。不要用通用 retry 掩盖 background cold-start，也不要把 `message port closed` 或 `Extension context invalidated` 当成 missing receiver。 |
-| `syncnos doctor` → `native_host_not_installed` | 当前声明的 macOS browser target 没有可用 Native Messaging manifest；先运行对应的 `syncnos install --browser ...`，再 read-back doctor。 |
-| `syncnos doctor` → `native_host_install_invalid` | launcher/manifest 存在但 path、schema、allowlist 或固定权限不符合当前 package；重新运行 installer 覆盖固定路径，不要扫描或手改 browser Profile。 |
+| `syncnos install` → `browser_not_found` | 自动发现没有命中当前 OS 的任何已知 browser candidate。先确认浏览器确实安装在该产品的标准位置；portable/自定义路径不要靠全盘扫描兜底，可用 `syncnos install --browser <id>` 显式注册已知 target。 |
+| `syncnos doctor` → `native_host_not_installed` | 当前检测到的浏览器没有可用 SyncNos Native Messaging registration，且没有残留 registration。先运行 `syncnos install`；需要单目标诊断时再用 `--browser <id>`。 |
+| `syncnos doctor` → `native_host_install_invalid` | launcher/manifest/Windows Registry registration 存在但 path、schema、allowlist、read-back 或 POSIX 固定权限不符合当前 package；重新运行 installer 收敛固定 target，不要扫描或手改 browser Profile。 |
 | `syncnos doctor` → `extension_unreachable` | Native Host 安装可用，但没有在线 SyncNos instance。依次检查浏览器是否运行、General → Local CLI Integration 是否开启、`nativeMessaging` optional permission 是否已授权/被撤销；doctor 不能证明具体是哪一个原因。 |
 | `syncnos doctor` → `protocol_mismatch` | CLI/native host 与在线 Extension 使用不同 CLI protocol；更新为同一 release 的 Extension 与 CLI asset，不加兼容 tunnel。 |
 | `syncnos doctor` → `instance_ambiguous` | 有多个在线 browser instance 且没有可确定的默认实例；运行 `syncnos instances`，用 `syncnos instances --set-default <id>` 固定主实例，或对单次命令传 `--instance <id>`。 |
+
+### CLI 自动发现与 registration
+
+`syncnos doctor` 的 `detectedBrowsers` 只来自有限的标准安装候选；`registrations` 只显示当前检测到的 browser 所需 target，或机器上实际存在的 SyncNos registration。不要把“未检测到 portable browser”解释成浏览器不存在，也不要为了找它递归扫描 Profile/磁盘。
+
+- macOS/Linux：registration 是 user-level Native Messaging manifest；Chrome-family、Firefox-family 与部分长尾浏览器可能有各自目录，也可能共享 target，以 `doctor` 返回的 `path` 为准。
+- Windows：manifest 保存在当前用户的 SyncNos support dir，`HKCU\\Software\\<vendor>\\...\\NativeMessagingHosts\\app.syncnos.cli` 的默认值指向该 manifest；不写 HKLM。Chrome-compatible 浏览器可共享 Chrome key，Edge 与 Mozilla family 使用各自 key。
+- Windows Extension → host → CLI 的本地 IPC 使用 named pipe；macOS/Linux 使用 Unix domain socket。两者都不是远程网络服务。
+- 同一 registration target 被多个浏览器共享时，显式卸载其中一个 browser target 会影响共享该 target 的其它浏览器；普通用户优先使用无参数 `syncnos install` / `syncnos uninstall` 管理整套 SyncNos registration。
 
 ### 连接错误的五类生命周期
 
@@ -40,4 +50,4 @@
 
 使用 `npm run build:zen` 生成本地测试 XPI；可用 `FIREFOX_EXTENSION_ID` 覆盖 gecko id。运行 `npm run dev:zen` 时，可用 `WXT_ZEN_BINARY` 指定 Zen 浏览器可执行文件。仅本地测试 profile 才可关闭 unsigned XPI 的签名要求，不能作为发行方案。
 
-当前 CLI v1 不声明 Zen Native Messaging 支持。可行性 Gate 已确认 macOS Zen 的 Native Messaging 生态实际依赖 Mozilla-compatible manifest 路径，但当前含 CLI feature 的 Zen XPI 不是已签名 release artifact，未完成真实 General toggle → `connectNative` → `status/revision` 产品 round-trip。不要用 `about:debugging`、Remote Debugging/CDP 或直接改用户 Profile 来把这个 Gate 做成“通过”。
+macOS Zen 的 installer discovery 与 Mozilla-compatible Native Messaging registration 已纳入 `syncnos install`。真实 Zen Profile 上已经用同 Gecko ID 的 current 1.13.2 临时 build 验证 `Native Messaging → CLI → status/revision/stats/list/get` 数据链；这证明 transport/data path，而不是已签名 release XPI 的完整产品 Gate。Firefox 对 optional `nativeMessaging` 的最终授权仍要求真实用户 gesture，不能用 BiDi/WebDriver 合成输入冒充用户授权。不要用 `about:debugging`、Profile 文件修改或其它绕过方式把签名/permission 证据写成 PASS。

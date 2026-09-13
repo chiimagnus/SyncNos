@@ -29,29 +29,40 @@ SyncNos 以本地数据为真源：采集内容先写入浏览器本地，再派
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari（macOS / iOS） | 使用 Xcode 从源码构建 |
 
-### 本机 CLI（macOS）
+### 本机 CLI（macOS / Windows / Linux）
 
 SyncNos CLI 是运行中浏览器 Extension 的本机前端，复用 Extension 已有的数据与业务逻辑；它不会维护第二份数据库，也不是离线 daemon。
 
-从对应 GitHub Release 下载 `syncnos-cli-<version>.tgz`，然后安装并为 Chrome 注册 Native Messaging host：
+从对应 GitHub Release 下载 `syncnos-cli-<version>.tgz` 后，默认让 CLI 自动发现当前系统中已安装的受支持浏览器，并为实际检测到的 Native Messaging registration target 去重注册：
 
 ```bash
 npm install -g ./syncnos-cli-<version>.tgz
-syncnos install --browser chrome
+syncnos install
 syncnos doctor
 ```
 
-在同一个浏览器 Profile 中打开 **设置 → 通用 → 本地 CLI 集成**，启用 **SyncNos CLI**。业务 CLI 命令依赖浏览器保持运行。`syncnos doctor` 会报告 package / manifest / 连接状态；当 Extension 不可达时只给出可验证的候选原因，不会猜测具体是哪一个浏览器侧条件。
+自动发现只检查有限的已知应用 / 可执行文件位置，不遍历整个磁盘，也不读取浏览器 Profile。需要显式注册 portable、开发版或非标准安装时，可使用 `syncnos install --browser <id>`；`--extension-id` 只允许与显式 `--browser` 同用。`syncnos uninstall` 默认只删除 SyncNos 自己的 `app.syncnos.cli` registration；共享同一个 browser target 的浏览器只写一份 manifest / Registry key。
 
-CLI Native Messaging 与“扩展可安装在哪些浏览器”是两套独立支持边界：
+在需要使用 CLI 的浏览器 Profile 中打开 **设置 → 通用 → 本地 CLI 集成**，启用 **SyncNos CLI**。业务 CLI 命令依赖浏览器保持运行。`syncnos doctor` 会分别报告 `detectedBrowsers`、registration、package 与在线 instance；registration 写入成功不等于 Extension 已连接。
 
-| 浏览器 / 平台 | CLI v1 状态 |
-| --- | --- |
-| Google Chrome / macOS | v1 发布目标；正式发布前仍必须通过真实 Chrome 的 `connectNative → status/revision` smoke。 |
-| Firefox / macOS | 尚不声明支持，必须先通过真实浏览器 round-trip。 |
-| Helium / macOS | v1 尚不声明支持；Chrome-compatible Native Messaging discovery 已验证，但完整 SyncNos 产品 Gate 未完成。 |
-| Zen / macOS | v1 尚不声明支持；当前含 CLI 功能的测试 XPI 不是已签名发布物，完整产品 Gate 未完成。 |
-| Windows / Linux / Safari | 不属于本次 CLI v1 范围。 |
+下面的“自动注册”表示 installer 已实现对应 OS 的 discovery + manifest/Registry 契约；“实机 round-trip”是更高一级证据，必须真实完成 Extension → Native Host → CLI：
+
+| 浏览器 | 自动发现 / 注册覆盖 | 实机 round-trip 证据 |
+| --- | --- | --- |
+| Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Iridium / Yandex | macOS / Linux / Windows | 尚未逐浏览器验证；标准 Chrome smoke 已按产品决定 Deferred。 |
+| Slimjet | macOS / Windows | 尚未验证。 |
+| Arc | macOS | 尚未验证。 |
+| Helium | macOS | **已验证**：当前 SyncNos 1.13.2 可经 CLI 读取真实 Extension 数据。 |
+| Chrome Beta / Chrome Unstable | Linux | 尚未验证。 |
+| Chrome for Testing | macOS / Linux | 尚未验证。 |
+| Firefox | macOS / Linux / Windows | 尚未验证正式 release round-trip。 |
+| Firefox Developer Edition | macOS / Windows | 尚未验证。 |
+| LibreWolf | macOS / Linux / Windows | 尚未验证。 |
+| Waterfox | Linux | 尚未验证。 |
+| Tor Browser | macOS / Linux 自动发现；Windows 仅显式 `--browser tor` 注册 | 尚未验证。 |
+| Zen | macOS | **传输与真实数据链已验证**：current 1.13.2 same-ID build 可经 Native Messaging/CLI 读取原 Profile 数据；签名 release 与最终用户 permission gesture 仍是独立发布证据。 |
+
+Chromium production manifest 同时允许 Chrome Web Store 与 Microsoft Edge Add-ons 的 SyncNos 正式扩展 ID；Firefox family 使用固定 Gecko ID `syncnos-webclipper@syncnos.app`。Safari 的原生桥模型不同，不属于这套 WebExtension Native Messaging installer。
 
 ## 操作演示视频
 
