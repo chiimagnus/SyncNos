@@ -21,7 +21,8 @@ async function fetchJson(input: {
   try {
     let response: Response;
     try {
-      response = await input.fetchFn(input.url, { ...input.init, signal: controller.signal });
+      const fetchFn = input.fetchFn;
+      response = await fetchFn(input.url, { ...input.init, signal: controller.signal });
     } catch (_error) {
       throw apiCaptureError(
         controller.signal.aborted ? `${input.errorPrefix}_timeout` : `${input.errorPrefix}_network`,

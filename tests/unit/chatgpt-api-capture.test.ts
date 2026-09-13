@@ -352,6 +352,30 @@ describe('ChatGPT API snapshot', () => {
 });
 
 describe('ChatGPT API transport', () => {
+  it('invokes native-style fetch without rebinding its receiver', async () => {
+    const mapping = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['question'] }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
+    ]);
+    let callCount = 0;
+    const fetchFn = async function receiverSensitiveFetch(this: unknown, input: RequestInfo | URL) {
+      if (this !== undefined) throw new TypeError('Illegal invocation');
+      callCount += 1;
+      if (String(input).endsWith('/api/auth/session')) {
+        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
+      }
+      return new Response(JSON.stringify(mapping), { status: 200 });
+    } as typeof fetch;
+
+    await expect(
+      captureCurrentChatgptConversationViaApi({
+        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
+        fetchFn,
+      }),
+    ).resolves.toMatchObject({ applicable: true });
+    expect(callCount).toBe(2);
+  });
+
   it('uses session cookies plus Bearer mapping only, never returns credentials, and never calls paged endpoints', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const token = 'ACCESS_TOKEN_SENTINEL';
