@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const resolveObsidianOpenTargetMock = vi.fn();
 const openObsidianTargetMock = vi.fn();
 const getSyncMappingByConversationMock = vi.fn();
+const isSyncProviderEnabledMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const formatConversationMarkdownMock = vi.fn();
 const { storageGetMock, storageSetMock } = vi.hoisted(() => ({
@@ -13,12 +14,29 @@ const { storageGetMock, storageSetMock } = vi.hoisted(() => ({
 vi.mock('@services/integrations/openin/obsidian-open-target', () => ({
   resolveObsidianOpenTarget: (...args: any[]) => resolveObsidianOpenTargetMock(...args),
   openObsidianTarget: (...args: any[]) => openObsidianTargetMock(...args),
+  defaultObsidianDetailHeaderServices: {},
+  defaultObsidianTargetActionPort: {
+    launchProtocolUrl: vi.fn(async () => true),
+    wait: vi.fn(async () => {}),
+    reportError: vi.fn(),
+  },
   waitForDelay: vi.fn(async () => {}),
   reportObsidianOpenError: vi.fn(),
 }));
 
 vi.mock('@services/conversations/data/storage-idb', () => ({
+  getConversationById: vi.fn(),
   getSyncMappingByConversation: (...args: any[]) => getSyncMappingByConversationMock(...args),
+}));
+
+vi.mock('@services/sync/sync-provider-gate', () => ({
+  isSyncProviderEnabled: (...args: any[]) => isSyncProviderEnabledMock(...args),
+  getSyncProviderEnabledStorageKeys: () => [
+    'webclipper_sync_provider_obsidian_enabled',
+    'webclipper_sync_provider_notion_enabled',
+    'webclipper_sync_provider_feishu_enabled',
+    'webclipper_sync_provider_github_enabled',
+  ],
 }));
 
 vi.mock('@services/shared/clipboard', () => ({
@@ -123,6 +141,8 @@ describe('detail-header-actions', () => {
     openObsidianTargetMock.mockResolvedValue({ ok: true });
     getSyncMappingByConversationMock.mockReset();
     getSyncMappingByConversationMock.mockResolvedValue(null);
+    isSyncProviderEnabledMock.mockReset();
+    isSyncProviderEnabledMock.mockResolvedValue(true);
     writeTextToClipboardMock.mockReset();
     writeTextToClipboardMock.mockResolvedValue(true);
     formatConversationMarkdownMock.mockReset();
@@ -155,6 +175,25 @@ describe('detail-header-actions', () => {
     ).toBe(true);
     expect(hasDetailHeaderActionStorageDependencyChange({ unrelated: {} }, 'local')).toBe(false);
     expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.apiKey]: {} }, 'sync')).toBe(false);
+  });
+
+  it('keeps provider-disabled machine targets hidden from UI open/copy actions', async () => {
+    isSyncProviderEnabledMock.mockImplementation(async (provider: string) => provider !== 'notion');
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 7,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        conversationKey: 'conv-7',
+        title: 'Conversation',
+        url: 'https://chatgpt.com/c/7',
+        notionPageId: NOTION_PAGE_ID,
+      } as any,
+      port: createPort(),
+    });
+
+    expect(bySlot(actions, 'open').map((action) => action.provider)).not.toContain('notion');
+    expect(bySlot(actions, 'copy').map((action) => action.provider)).not.toContain('notion');
   });
 
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
@@ -718,7 +757,12 @@ describe('detail-header-actions', () => {
       port: createPort(),
     });
 
-    expect(bySlot(actions, 'open').map((action) => action.provider)).toEqual(['notion']);
+    expect(bySlot(actions, 'open').map((action) => action.provider)).toEqual(['notion', 'obsidian']);
+    expect(byId(actions, 'open-in-obsidian-unavailable')).toMatchObject({
+      provider: 'obsidian',
+      label: 'Obsidian API not connected',
+      disabled: true,
+    });
     expect(bySlot(actions, 'copy').map((action) => action.provider)).toEqual(['notion']);
   });
 

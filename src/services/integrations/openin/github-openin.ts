@@ -1,6 +1,5 @@
 import { readGithubContinuity } from '@platform/idb/sync-mapping-record';
 import type { Conversation } from '@services/conversations/domain/models';
-import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 import { isGithubManagedPathOwnedByConversation } from '@services/sync/github/github-managed-path-ownership';
 import {
   encodeGithubBranchPath,
@@ -59,32 +58,4 @@ export function buildGithubSyncedMarkdownUrl(input: {
   } catch (_error) {
     return '';
   }
-}
-
-export function buildGithubOpenInAction({
-  conversation,
-  mapping,
-  port,
-  labels,
-}: {
-  conversation: Conversation | null | undefined;
-  mapping: unknown;
-  port: DetailHeaderActionPort;
-  labels: { openInGithub: string };
-}): DetailHeaderAction | null {
-  const githubUrl = buildGithubSyncedMarkdownUrl({ conversation, mapping });
-  if (!githubUrl) return null;
-
-  return {
-    id: 'open-in-github',
-    label: labels.openInGithub,
-    kind: 'external-link',
-    provider: 'github',
-    slot: 'open',
-    href: githubUrl,
-    onTrigger: async () => {
-      const opened = await port.openExternalUrl(githubUrl);
-      if (!opened) throw new Error('Failed to open GitHub file');
-    },
-  };
 }

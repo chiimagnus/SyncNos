@@ -25,6 +25,7 @@ import {
   ITEM_MENTION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
+  OPEN_TARGET_MESSAGE_TYPES,
   SETTINGS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
@@ -536,6 +537,50 @@ describe('CLI Native Messaging bridge', () => {
         error: { code: 'parent_not_root' },
       },
     );
+    harness.controller.stop();
+  });
+
+  it('maps open resolve/launch only by conversation id and provider without forwarding arbitrary URLs', async () => {
+    const router = {
+      dispatch: vi.fn(async (message: any) => ({ ok: true, data: { echoed: message }, error: null })),
+    };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+
+    const emit = async (requestId: string, method: string, params: Record<string, unknown> = {}) => {
+      const before = harness.fakePort.posted.length;
+      harness.fakePort.emitMessage({ kind: 'rpc-request', protocolVersion: 1, requestId, method, params });
+      await waitForPosted(harness, before + 1);
+      return harness.fakePort.posted[before];
+    };
+
+    await emit('open-resolve-all', 'open.resolve', { conversationId: 7, url: 'javascript:alert(1)' });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: OPEN_TARGET_MESSAGE_TYPES.RESOLVE, conversationId: 7 },
+      null,
+    );
+
+    await emit('open-resolve-one', 'open.resolve', {
+      conversationId: 7,
+      target: 'github',
+      url: 'https://attacker.example/',
+    });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: OPEN_TARGET_MESSAGE_TYPES.RESOLVE, conversationId: 7, target: 'github' },
+      null,
+    );
+
+    await emit('open-launch', 'open.launch', {
+      conversationId: 9,
+      target: 'notion',
+      url: 'https://attacker.example/',
+      resolvedNotePath: '/tmp/attacker.md',
+    });
+    expect(router.dispatch).toHaveBeenLastCalledWith(
+      { type: OPEN_TARGET_MESSAGE_TYPES.LAUNCH, conversationId: 9, target: 'notion' },
+      null,
+    );
+
     harness.controller.stop();
   });
 

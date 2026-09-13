@@ -29,6 +29,7 @@ import {
 } from '@services/shared/inpage-display-mode';
 import { startCliNativeBridge } from '@services/cli/native-bridge';
 import { registerPublicSettingsHandlers } from '@services/settings/background-handlers';
+import { registerOpenTargetHandlers } from '@services/integrations/openin/background-handlers';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -94,6 +95,7 @@ export default defineBackground(() => {
   }
   registerUiMessageHandlers(router, { localeReady });
   registerPublicSettingsHandlers(router);
+  registerOpenTargetHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,

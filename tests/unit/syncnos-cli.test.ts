@@ -677,6 +677,108 @@ describe('syncnos CLI instance selection', () => {
     expect(invalidKey.json.error.code).toBe('usage_error');
   });
 
+  it('returns canonical capabilities offline without discovering or pinging a browser instance', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const result = await run(['capabilities'], runtimeRoot, homeDir);
+    expect(result.exitCode).toBe(0);
+    expect(result.json.data).toEqual({
+      protocolVersion: contract.protocolVersion,
+      publicMethods: contract.publicMethods,
+      browserRequired: contract.browserRequired,
+    });
+    expect(result.json.data.browserRequired).toEqual([
+      {
+        capability: 'comments.selection-locator',
+        reason: 'Requires live webpage DOM selection context.',
+      },
+      {
+        capability: 'oauth.user-approval',
+        providers: ['notion', 'feishu', 'github'],
+        reason: 'Requires browser-mediated user approval.',
+      },
+    ]);
+
+    for (const entry of contract.browserRequired) {
+      const attempted = await run([entry.capability], runtimeRoot, homeDir);
+      expect(attempted.exitCode).toBe(2);
+      expect(attempted.json.error.code).toBe('usage_error');
+    }
+  });
+
+  it('routes open resolve/launch only through declared target providers and never accepts a caller URL', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'open-instance', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'open.resolve') {
+          return {
+            data: {
+              targets: [
+                {
+                  provider: request.params.target || 'source',
+                  available: true,
+                  kind: 'external-url',
+                  target: 'https://current.example/item',
+                  availabilityState: 'ready',
+                },
+              ],
+            },
+          };
+        }
+        if (request.method === 'open.launch') {
+          return {
+            data: {
+              launched: true,
+              target: {
+                provider: request.params.target,
+                available: true,
+                kind: 'external-url',
+                target: 'https://current.example/item',
+                availabilityState: 'ready',
+              },
+            },
+          };
+        }
+        return null;
+      },
+    });
+    try {
+      const all = await run(['open', '7'], runtimeRoot, homeDir);
+      expect(all.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'open.resolve', params: { conversationId: 7 } });
+
+      const notion = await run(['open', '7', '--target', 'notion'], runtimeRoot, homeDir);
+      expect(notion.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'open.resolve',
+        params: { conversationId: 7, target: 'notion' },
+      });
+
+      const launched = await run(['open', '7', '--target', 'source', '--launch'], runtimeRoot, homeDir);
+      expect(launched.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'open.launch',
+        params: { conversationId: 7, target: 'source' },
+      });
+      expect(JSON.stringify(instance.requests.at(-1))).not.toContain('current.example');
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects unsafe/incomplete open syntax before attempting browser discovery', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    for (const argv of [
+      ['open', '7', '--launch'],
+      ['open', '7', '--target', 'javascript:alert(1)'],
+      ['open', '7', 'https://attacker.example/', '--target', 'source', '--launch'],
+      ['open'],
+    ]) {
+      const result = await run(argv, runtimeRoot, homeDir);
+      expect(result.exitCode).toBe(2);
+      expect(result.json.error.code).toBe('usage_error');
+    }
+  });
+
   it('routes settings through schema-driven public RPCs and rejects raw/invalid values before settings.set', async () => {
     const { runtimeRoot, homeDir } = await roots();
     const schema = [

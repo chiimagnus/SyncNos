@@ -38,6 +38,8 @@
     "comments.delete",
     "mention.search",
     "mention.build-insert-text",
+    "open.resolve",
+    "open.launch",
     "notion.auth.status",
     "notion.auth.start",
     "notion.auth.disconnect",
@@ -73,5 +75,15 @@
     "backup.export",
     "backup.import"
   ],
-  "browserRequired": []
+  "browserRequired": [
+    {
+      "capability": "comments.selection-locator",
+      "reason": "Requires live webpage DOM selection context."
+    },
+    {
+      "capability": "oauth.user-approval",
+      "providers": ["notion", "feishu", "github"],
+      "reason": "Requires browser-mediated user approval."
+    }
+  ]
 }

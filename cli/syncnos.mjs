@@ -57,6 +57,8 @@ function parseArgs(argv) {
     text: null,
     to: null,
     provider: null,
+    target: null,
+    launch: false,
     noWait: false,
     timeout: null,
     output: null,
@@ -149,6 +151,16 @@ function parseArgs(argv) {
     if (token === '--provider') {
       options.provider = readValue(token);
       options.provided.add('provider');
+      continue;
+    }
+    if (token === '--target') {
+      options.target = readValue(token);
+      options.provided.add('target');
+      continue;
+    }
+    if (token === '--launch') {
+      options.launch = true;
+      options.provided.add('launch');
       continue;
     }
     if (token === '--no-wait') {
@@ -353,6 +365,9 @@ const TRANSPORT_RESPONSE_CODES = new Set([
 ]);
 
 async function requestSelected(selected, method, params = {}) {
+  if (!contract.publicMethods.includes(method)) {
+    throw codedError('cli_contract_method_missing', `RPC method is not declared public: ${method}`, EXIT.business);
+  }
   const response = await requestEndpoint(
     selected.entry.endpoint,
     { method, params },
@@ -374,6 +389,17 @@ async function requestSelected(selected, method, params = {}) {
 }
 
 const SYNC_PROVIDERS = new Set(['notion', 'obsidian', 'feishu', 'github']);
+const OPEN_TARGETS = new Set(['source', 'notion', 'obsidian', 'feishu', 'github']);
+
+function parseOpenTarget(value) {
+  const target = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!OPEN_TARGETS.has(target)) {
+    throw codedError('usage_error', 'target must be source, notion, obsidian, feishu, or github', EXIT.usage);
+  }
+  return target;
+}
 
 function parseSyncProvider(value, label = 'provider') {
   const provider = String(value || '')
@@ -506,6 +532,8 @@ function usage() {
     '  comments delete <comment-id>',
     '  mention search [query...] [--limit <n>]',
     '  mention build <conversation-id>',
+    '  open <conversation-id> [--target source|notion|obsidian|feishu|github] [--launch]',
+    '  capabilities',
     '  notion auth status|start|disconnect',
     '  notion pages list',
     '  notion config get|set <key> <value>|reset-database <chat|article|video>',
@@ -546,6 +574,23 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
 
   const context = { runtimeRoot, homeDir };
   try {
+    if (options.command === 'capabilities') {
+      assertAllowedOptions(options, new Set(['human']));
+      if (options.positionals.length) {
+        throw codedError('usage_error', 'capabilities does not accept positional arguments', EXIT.usage);
+      }
+      writeResult(
+        stdout,
+        envelopeOk({
+          protocolVersion: contract.protocolVersion,
+          publicMethods: contract.publicMethods,
+          browserRequired: contract.browserRequired,
+        }),
+        options.human,
+      );
+      return EXIT.success;
+    }
+
     if (options.command === 'instances') {
       assertAllowedOptions(options, new Set(['setDefault', 'clearDefault', 'human']));
       if (options.positionals.length)
@@ -817,6 +862,25 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
         return EXIT.success;
       }
       throw codedError('usage_error', 'mention action must be search or build', EXIT.usage);
+    }
+
+    if (options.command === 'open') {
+      assertAllowedOptions(options, new Set(['instance', 'human', 'target', 'launch']));
+      if (options.positionals.length !== 1) {
+        throw codedError('usage_error', 'open requires exactly one conversation id', EXIT.usage);
+      }
+      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
+      const target = options.target == null ? null : parseOpenTarget(options.target);
+      if (options.launch && !target) {
+        throw codedError('usage_error', 'open --launch requires --target', EXIT.usage);
+      }
+      const { selected } = await selectedInstance(options, context);
+      const result = await requestSelected(selected, options.launch ? 'open.launch' : 'open.resolve', {
+        conversationId,
+        ...(target ? { target } : null),
+      });
+      writeResult(stdout, envelopeOk(result), options.human);
+      return EXIT.success;
     }
 
     if (options.command === 'settings') {

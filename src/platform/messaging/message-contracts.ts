@@ -79,6 +79,11 @@ export const SETTINGS_MESSAGE_TYPES = {
   SCHEMA: 'getPublicSettingsSchema',
 } as const;
 
+export const OPEN_TARGET_MESSAGE_TYPES = {
+  RESOLVE: 'resolveOpenTarget',
+  LAUNCH: 'launchOpenTarget',
+} as const;
+
 export const CHATGPT_MESSAGE_TYPES = {
   EXTRACT_DEEP_RESEARCH: 'chatgptExtractDeepResearch',
 } as const;
@@ -123,6 +128,7 @@ export const messageContracts = {
   GITHUB_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
   SETTINGS_MESSAGE_TYPES,
+  OPEN_TARGET_MESSAGE_TYPES,
   CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
@@ -138,6 +144,7 @@ export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISH
 export type GithubMessageType = (typeof GITHUB_MESSAGE_TYPES)[keyof typeof GITHUB_MESSAGE_TYPES];
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
 export type SettingsMessageType = (typeof SETTINGS_MESSAGE_TYPES)[keyof typeof SETTINGS_MESSAGE_TYPES];
+export type OpenTargetMessageType = (typeof OPEN_TARGET_MESSAGE_TYPES)[keyof typeof OPEN_TARGET_MESSAGE_TYPES];
 export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
 export type ItemMentionMessageType = (typeof ITEM_MENTION_MESSAGE_TYPES)[keyof typeof ITEM_MENTION_MESSAGE_TYPES];
@@ -153,6 +160,7 @@ export type MessageType =
   | GithubMessageType
   | ArticleMessageType
   | SettingsMessageType
+  | OpenTargetMessageType
   | ChatgptMessageType
   | CurrentPageMessageType
   | ItemMentionMessageType

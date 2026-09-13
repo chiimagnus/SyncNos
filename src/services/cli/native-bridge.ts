@@ -15,6 +15,7 @@ import {
   ITEM_MENTION_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
+  OPEN_TARGET_MESSAGE_TYPES,
   SETTINGS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
@@ -750,6 +751,32 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
         {
           type: ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT,
           conversationId: Number(params.conversationId),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'open.resolve') {
+      const result = await router.dispatch(
+        {
+          type: OPEN_TARGET_MESSAGE_TYPES.RESOLVE,
+          conversationId: Number(params.conversationId),
+          ...(params.target == null ? null : { target: params.target }),
+        },
+        null,
+      );
+      postBackgroundResult(result);
+      return;
+    }
+
+    if (method === 'open.launch') {
+      const result = await router.dispatch(
+        {
+          type: OPEN_TARGET_MESSAGE_TYPES.LAUNCH,
+          conversationId: Number(params.conversationId),
+          target: params.target,
         },
         null,
       );

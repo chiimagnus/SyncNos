@@ -15,7 +15,8 @@ import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integ
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import { reportObsidianOpenError, waitForDelay } from '@services/integrations/openin/obsidian-open-target';
 import { resolveOpenInDetailHeaderActions } from '@services/integrations/openin/openin-detail-header-actions';
-import { normalizeHttpUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
+import { resolveSourceOpenTarget } from '@services/integrations/openin/openin-targets';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 
 export { DETAIL_HEADER_ACTION_LABELS } from '@services/integrations/openin/openin-detail-header-actions';
 export type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
@@ -66,7 +67,8 @@ function buildDetailUtilityActions({
 }): DetailHeaderAction[] {
   const matchingDetail =
     conversation && detail && Number(detail.conversationId) === Number(conversation.id) ? detail : null;
-  const safeOriginalUrl = sanitizeHttpUrl(conversation?.url);
+  const sourceTarget = resolveSourceOpenTarget(conversation);
+  const safeOriginalUrl = sourceTarget.available ? String(sourceTarget.target || '') : '';
 
   return [
     {

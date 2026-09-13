@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   registerFeishuSettingsHandlers: vi.fn(),
   registerGithubSettingsHandlers: vi.fn(),
   registerPublicSettingsHandlers: vi.fn(),
+  registerOpenTargetHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
   ensureDefaultFeishuOAuthConfig: vi.fn(),
@@ -67,6 +68,9 @@ vi.mock('@services/sync/github/settings-background-handlers', () => ({
 }));
 vi.mock('@services/settings/background-handlers', () => ({
   registerPublicSettingsHandlers: mocks.registerPublicSettingsHandlers,
+}));
+vi.mock('@services/integrations/openin/background-handlers', () => ({
+  registerOpenTargetHandlers: mocks.registerOpenTargetHandlers,
 }));
 vi.mock('@services/sync/notion/auth/oauth', () => ({
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
@@ -224,6 +228,7 @@ describe('background entrypoint cold start', () => {
     expect(menuOptions.ready).toBeInstanceOf(Promise);
     expect(mocks.registerGithubSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerPublicSettingsHandlers).toHaveBeenCalledTimes(1);
+    expect(mocks.registerOpenTargetHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerSyncHandlers.mock.calls[0]?.[1]?.githubSyncOrchestrator).toBe(
       mocks.createBackgroundServices.mock.results[0]?.value.githubSyncOrchestrator,
     );
