@@ -81,7 +81,11 @@ function hasOpenShortcutSettingsApi(): boolean {
 
 function runtimeScheme(): string {
   try {
-    return String(getURL('') || '').split(':', 1)[0]?.toLowerCase() || '';
+    return (
+      String(getURL('') || '')
+        .split(':', 1)[0]
+        ?.toLowerCase() || ''
+    );
   } catch (_error) {
     return '';
   }

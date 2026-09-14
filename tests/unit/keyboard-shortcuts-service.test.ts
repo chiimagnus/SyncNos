@@ -10,10 +10,7 @@ vi.mock('@platform/webext/commands', () => ({
   openShortcutSettings: (...args: any[]) => openShortcutSettings(...args),
 }));
 
-import {
-  openKeyboardShortcutSettings,
-  readKeyboardShortcutSnapshot,
-} from '@services/shortcuts/keyboard-shortcuts';
+import { openKeyboardShortcutSettings, readKeyboardShortcutSnapshot } from '@services/shortcuts/keyboard-shortcuts';
 
 describe('keyboard shortcuts service', () => {
   beforeEach(() => {
@@ -41,9 +38,7 @@ describe('keyboard shortcuts service', () => {
   });
 
   it('keeps missing browser commands as unassigned rows', async () => {
-    commandsGetAll.mockResolvedValue([
-      { name: '_execute_action', description: '', shortcut: '⌘+Shift+Y' },
-    ]);
+    commandsGetAll.mockResolvedValue([{ name: '_execute_action', description: '', shortcut: '⌘+Shift+Y' }]);
 
     const snapshot = await readKeyboardShortcutSnapshot();
 
@@ -55,9 +50,7 @@ describe('keyboard shortcuts service', () => {
   });
 
   it('preserves shortcut strings without parsing or rewriting them', async () => {
-    commandsGetAll.mockResolvedValue([
-      { name: 'capture-current-page', description: '', shortcut: 'Ctrl+Shift+Y' },
-    ]);
+    commandsGetAll.mockResolvedValue([{ name: 'capture-current-page', description: '', shortcut: 'Ctrl+Shift+Y' }]);
 
     const snapshot = await readKeyboardShortcutSnapshot();
 

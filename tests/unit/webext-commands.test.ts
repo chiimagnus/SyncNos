@@ -64,7 +64,13 @@ describe('WebExtension commands adapter', () => {
     const chromeAddListener = vi.fn();
     const listener = vi.fn();
     (globalThis as any).browser = {
-      commands: { onCommand: { addListener: () => { throw new Error('browser failed'); } } },
+      commands: {
+        onCommand: {
+          addListener: () => {
+            throw new Error('browser failed');
+          },
+        },
+      },
     };
     (globalThis as any).chrome = { commands: { onCommand: { addListener: chromeAddListener } } };
 
@@ -79,9 +85,9 @@ describe('WebExtension commands adapter', () => {
   it('reads and normalizes browser commands through the Promise API', async () => {
     (globalThis as any).browser = {
       commands: {
-        getAll: vi.fn().mockResolvedValue([
-          { name: 'capture-current-page', description: 'Capture', shortcut: '⌘+Shift+Y' },
-        ]),
+        getAll: vi
+          .fn()
+          .mockResolvedValue([{ name: 'capture-current-page', description: 'Capture', shortcut: '⌘+Shift+Y' }]),
       },
     };
 

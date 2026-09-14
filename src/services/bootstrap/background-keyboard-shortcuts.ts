@@ -22,7 +22,10 @@ function runShortcutAction(action: () => unknown | Promise<unknown>): void {
   }
 }
 
-export function registerBackgroundKeyboardShortcuts({ dispatchMessage, openApp }: BackgroundKeyboardShortcutDeps): boolean {
+export function registerBackgroundKeyboardShortcuts({
+  dispatchMessage,
+  openApp,
+}: BackgroundKeyboardShortcutDeps): boolean {
   return commandsOnCommand((command) => {
     if (command === KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage) {
       runShortcutAction(() =>
