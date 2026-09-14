@@ -239,16 +239,21 @@ b {
   }
 }
 
-.masthead {
+.site-glow {
   position: relative;
-  overflow: hidden;
 }
-.masthead::before {
+.site-glow::before {
   content: '';
   position: absolute;
   inset: 0;
   background: var(--hero-glow);
   pointer-events: none;
+}
+.site-glow > * {
+  position: relative;
+}
+.masthead {
+  overflow: hidden;
 }
 .hero {
   position: relative;

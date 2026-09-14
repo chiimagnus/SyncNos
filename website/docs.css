@@ -33,6 +33,13 @@
   font-weight: 650;
   text-decoration: none;
 }
+.docs-sidebar a:hover,
+.docs-mobile-nav a:hover,
+.docs-toc a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .docs-nav-group {
   margin-top: 14px;
 }
@@ -176,6 +183,13 @@
 }
 .docs-toc a {
   color: var(--muted);
+}
+.docs-toc a.active {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--sky);
+  text-underline-offset: 3px;
 }
 .docs-toc .level-3 {
   padding-left: 12px;

@@ -59,21 +59,24 @@ export function renderDocsPage({ page, tree, language, rendered, counterpartRout
     <link rel="stylesheet" href="${basePath}/docs.css" />
   </head>
   <body>
-    <div data-site-header="docs" data-lang="${language.id}" data-counterpart="${counterpart}"></div>
-    <script src="${basePath}/site-header.js"></script>
-    ${mobileNavHtml(tree.items, page.route, language, basePath)}
-    <div class="docs-layout">
-      <aside class="docs-sidebar"><nav>${navHtml(tree.items, page.route, basePath)}</nav></aside>
-      <main class="docs-main">
-        <div class="docs-heading">
-          <h1>${escapeHtml(page.title)}</h1>
-          ${page.description ? `<p>${escapeHtml(page.description)}</p>` : ''}
-          <a class="docs-source" href="${sourceUrl}">${editLabel}</a>
-        </div>
-        <article class="docs-prose">${rendered.html}</article>
-      </main>
-      ${tocHtml(rendered.headings, language)}
+    <div class="site-glow docs-site-shell">
+      <div data-site-header="docs" data-lang="${language.id}" data-counterpart="${counterpart}"></div>
+      <script src="${basePath}/site-header.js"></script>
+      ${mobileNavHtml(tree.items, page.route, language, basePath)}
+      <div class="docs-layout">
+        <aside class="docs-sidebar"><nav>${navHtml(tree.items, page.route, basePath)}</nav></aside>
+        <main class="docs-main">
+          <div class="docs-heading">
+            <h1>${escapeHtml(page.title)}</h1>
+            ${page.description ? `<p>${escapeHtml(page.description)}</p>` : ''}
+            <a class="docs-source" href="${sourceUrl}">${editLabel}</a>
+          </div>
+          <article class="docs-prose">${rendered.html}</article>
+        </main>
+        ${tocHtml(rendered.headings, language)}
+      </div>
     </div>
+    <script src="${basePath}/docs.js"></script>
   </body>
 </html>`;
 }
