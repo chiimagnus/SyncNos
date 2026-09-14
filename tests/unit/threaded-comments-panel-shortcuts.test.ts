@@ -218,7 +218,7 @@ describe('Threaded comments panel shortcuts', () => {
     await flushReactScheduler();
 
     const shadow = (host.querySelector('webclipper-threaded-comments-panel') as HTMLElement).shadowRoot!;
-    const reply = shadow.querySelector('[data-reply-id="2"]') as HTMLElement;
+    const reply = shadow.querySelector('.webclipper-inpage-comments-panel__reply') as HTMLElement;
     expect(reply).toBeTruthy();
     expect(reply.querySelector('.webclipper-inpage-comments-panel__reply-connector')).toBeNull();
     expect(reply.querySelector('.webclipper-inpage-comments-panel__avatar')?.classList.contains('is-small')).toBe(
@@ -229,7 +229,6 @@ describe('Threaded comments panel shortcuts', () => {
       '[data-thread-root-id="1"] .webclipper-inpage-comments-panel__quote-delete',
     ) as HTMLButtonElement;
     expect(deleteButton).toBeTruthy();
-    expect(deleteButton.dataset.webclipperCommentDeleteId).toBe('1');
     expect(deleteButton.dataset.confirm).toBeUndefined();
 
     deleteButton.click();
@@ -267,7 +266,7 @@ describe('Threaded comments panel shortcuts', () => {
 
     (
       shadow.querySelector(
-        '[data-webclipper-root-composer="1"] .webclipper-inpage-comments-panel__send',
+        '.webclipper-inpage-comments-panel__reply-composer.is-root .webclipper-inpage-comments-panel__send',
       ) as HTMLButtonElement
     ).click();
     await flushReactScheduler();

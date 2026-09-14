@@ -106,13 +106,13 @@ async function exerciseReplyAndDelete(shadow: ShadowRoot, expectedRootId: number
   await flushTasks();
 
   let deleteButton = shadow.querySelector(
-    `button[data-webclipper-comment-delete-id='${expectedRootId}']`,
+    `.webclipper-inpage-comments-panel__thread[data-thread-root-id='${expectedRootId}'] .webclipper-inpage-comments-panel__comment button.webclipper-inpage-comments-panel__overflow-menu-item[data-destructive='1']`,
   ) as HTMLButtonElement | null;
   expect(deleteButton).toBeTruthy();
   deleteButton!.click();
   await flushTasks();
   deleteButton = shadow.querySelector(
-    `button[data-webclipper-comment-delete-id='${expectedRootId}']`,
+    `.webclipper-inpage-comments-panel__thread[data-thread-root-id='${expectedRootId}'] .webclipper-inpage-comments-panel__comment button.webclipper-inpage-comments-panel__overflow-menu-item[data-destructive='1']`,
   ) as HTMLButtonElement | null;
   expect(deleteButton).toBeTruthy();
   deleteButton!.click();

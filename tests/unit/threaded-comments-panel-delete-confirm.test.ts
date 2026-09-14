@@ -60,7 +60,9 @@ async function openRootMenu(shadow: ShadowRoot) {
 }
 
 function deleteButton(shadow: ShadowRoot): HTMLButtonElement {
-  const button = shadow.querySelector('button[data-webclipper-comment-delete-id="1"]') as HTMLButtonElement | null;
+  const button = shadow.querySelector(
+    'button.webclipper-inpage-comments-panel__overflow-menu-item[data-destructive="1"]',
+  ) as HTMLButtonElement | null;
   expect(button).toBeTruthy();
   return button!;
 }

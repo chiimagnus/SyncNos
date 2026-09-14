@@ -6,7 +6,6 @@ export type CommentOverflowAction = {
   disabled?: boolean;
   destructive?: boolean;
   confirm?: boolean;
-  dataCommentDeleteId?: number;
 };
 
 type CommentOverflowMenuProps = {
@@ -120,9 +119,6 @@ export function CommentOverflowMenu({
               disabled={Boolean(action.disabled)}
               data-confirm={action.confirm ? '1' : undefined}
               data-destructive={action.destructive ? '1' : undefined}
-              data-webclipper-comment-delete-id={
-                action.dataCommentDeleteId == null ? undefined : String(action.dataCommentDeleteId)
-              }
               onClick={() => void onAction(action)}
             >
               {action.label}

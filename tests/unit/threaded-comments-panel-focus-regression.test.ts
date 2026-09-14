@@ -103,7 +103,7 @@ describe('Threaded comments panel focus regression', () => {
     composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
 
     const send = shadow.querySelector(
-      '[data-webclipper-root-composer="1"] .webclipper-inpage-comments-panel__send',
+      '.webclipper-inpage-comments-panel__reply-composer.is-root .webclipper-inpage-comments-panel__send',
     ) as HTMLButtonElement | null;
     expect(send).toBeTruthy();
     send!.click();

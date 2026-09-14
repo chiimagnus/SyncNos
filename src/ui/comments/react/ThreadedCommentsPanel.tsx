@@ -17,9 +17,11 @@ import { useCommentFocusIntent } from './use-comment-focus-intent';
 import { CommentsSidebarHeader } from './CommentsSidebarHeader';
 import { CommentsPanelState, resolveCommentsPanelVisualState } from './CommentsPanelState';
 
+const DELETE_CONTROL_SELECTOR =
+  '.webclipper-inpage-comments-panel__quote-delete, .webclipper-inpage-comments-panel__overflow-menu-item[data-destructive="1"]';
+
 export function ThreadedCommentsPanel({
   variant,
-  fullWidth,
   showHeader,
   showCollapseButton,
   snapshot,
@@ -168,9 +170,7 @@ export function ThreadedCommentsPanel({
       const isDeleteAction = path.some((node) => {
         const element = node as Element | null;
         return Boolean(
-          element &&
-          typeof (element as any).matches === 'function' &&
-          element.matches('button[data-webclipper-comment-delete-id]'),
+          element && typeof (element as any).matches === 'function' && element.matches(DELETE_CONTROL_SELECTOR),
         );
       });
       if (!isDeleteAction) updateArmedDeleteId(null);
@@ -212,7 +212,6 @@ export function ThreadedCommentsPanel({
     label: armedDeleteId === id ? t('deleteButton') : 'Delete',
     destructive: true,
     confirm: armedDeleteId === id,
-    dataCommentDeleteId: id,
   });
 
   const getReplyMenuActions = (reply: { id: number }): CommentOverflowAction[] => [deleteMenuAction(Number(reply.id))];
@@ -271,7 +270,7 @@ export function ThreadedCommentsPanel({
       className="webclipper-inpage-comments-panel__surface"
       onClick={(event) => {
         const target = event.target as HTMLElement | null;
-        if (target?.closest('button[data-webclipper-comment-delete-id]')) return;
+        if (target?.closest(DELETE_CONTROL_SELECTOR)) return;
         if (!target?.closest('.webclipper-inpage-comments-panel__overflow')) {
           syncLocalState(() => {
             discussion.setOpenMenu(null);
@@ -335,7 +334,6 @@ export function ThreadedCommentsPanel({
                       text={String(root.quoteText || '')}
                       invalid={!root.locator}
                       onLocate={() => runLocate(rootId)}
-                      deleteId={rootId}
                       deleteConfirm={armedDeleteId === rootId}
                       deleteDisabled={busy}
                       onDelete={() => handleDelete(rootId)}
@@ -373,7 +371,6 @@ export function ThreadedCommentsPanel({
           </CommentsPanelState>
         </div>
       </div>
-      <span style={{ display: 'none' }} data-variant={variant} data-full-width={fullWidth ? '1' : '0'} />
     </div>
   );
 }

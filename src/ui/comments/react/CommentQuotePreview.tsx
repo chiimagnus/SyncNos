@@ -7,7 +7,6 @@ type CommentQuotePreviewProps = {
   invalid?: boolean;
   onClear?: () => void;
   onLocate?: () => void | Promise<void>;
-  deleteId?: number;
   deleteConfirm?: boolean;
   deleteDisabled?: boolean;
   onDelete?: () => void | Promise<void>;
@@ -19,7 +18,6 @@ export function CommentQuotePreview({
   invalid = false,
   onClear,
   onLocate,
-  deleteId,
   deleteConfirm = false,
   deleteDisabled = false,
   onDelete,
@@ -31,11 +29,7 @@ export function CommentQuotePreview({
       ? 'webclipper-inpage-comments-panel__quote'
       : 'webclipper-inpage-comments-panel__thread-quote';
   return (
-    <div
-      className={`${className}${invalid ? ' is-invalid' : ''}`}
-      data-variant={variant}
-      data-locator-invalid={invalid ? '1' : undefined}
-    >
+    <div className={`${className}${invalid ? ' is-invalid' : ''}`} data-locator-invalid={invalid ? '1' : undefined}>
       <div className="webclipper-inpage-comments-panel__text webclipper-inpage-comments-panel__quote-text">
         {displayText}
       </div>
@@ -77,7 +71,6 @@ export function CommentQuotePreview({
                 .filter(Boolean)
                 .join(' ')}
               data-confirm={deleteConfirm ? '1' : undefined}
-              data-webclipper-comment-delete-id={deleteId == null ? undefined : String(deleteId)}
               disabled={deleteDisabled}
               aria-label={deleteConfirm ? 'Confirm delete comment note' : 'Delete comment note'}
               onClick={() => void onDelete()}

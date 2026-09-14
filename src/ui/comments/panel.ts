@@ -21,8 +21,6 @@ type ThreadedCommentsPanelReactBridgeProps = {
   store: ThreadedCommentsPanelStore;
   actions: CommentSidebarHostActions;
   variant: 'sidebar';
-  fullWidth: boolean;
-  surfaceBg?: string;
   showHeader: boolean;
   showCollapseButton: boolean;
   onRequestClose: () => void;
@@ -37,8 +35,6 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
   const snapshot = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot, props.store.getSnapshot);
   return createElement(ThreadedCommentsPanel, {
     variant: props.variant,
-    fullWidth: props.fullWidth,
-    surfaceBg: props.surfaceBg,
     showHeader: props.showHeader,
     showCollapseButton: props.showCollapseButton,
     snapshot,
@@ -346,8 +342,6 @@ export function mountThreadedCommentsPanel(
         store: panelStore,
         actions: panelController.actions,
         variant,
-        fullWidth: isFullWidth,
-        surfaceBg: surfaceBg || undefined,
         showHeader,
         showCollapseButton,
         onRequestClose: () => panelController.actions.close(),

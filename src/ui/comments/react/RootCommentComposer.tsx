@@ -34,7 +34,6 @@ export function RootCommentComposer({
   return (
     <div
       className="webclipper-inpage-comments-panel__reply-composer is-root"
-      data-webclipper-root-composer="1"
       data-disabled={disabled ? '1' : undefined}
       role="group"
       aria-label="New comment"

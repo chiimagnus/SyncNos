@@ -38,7 +38,7 @@ export function CommentReplyItem({
 }: CommentReplyItemProps) {
   const author = String(reply.authorName || 'You');
   return (
-    <div className="webclipper-inpage-comments-panel__reply" data-reply-id={String(reply.id)} role="listitem">
+    <div className="webclipper-inpage-comments-panel__reply" role="listitem">
       <div className="webclipper-inpage-comments-panel__avatar" aria-hidden="true">
         {avatarLabel(author)}
       </div>
