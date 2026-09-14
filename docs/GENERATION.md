@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `README.md`, `README.zh-CN.md` | 用户入口：定位、安装、采集来源、输出目标和文档导航 | 用户可见能力、安装渠道或顶层支持范围变化 | GitHub 项目首页 |
 | `PRIVACY.md` | 用户数据、权限、凭据、本地/外部网络边界 | manifest 权限、secret storage/backup exclusion、OAuth 或外部数据流变化 | README、商店隐私审查 |
-| `website/content/docs/**` | 面向用户的网站文档：安装、采集范围、Provider 配置、常用功能、CLI 与 FAQ；隐私页只做 `PRIVACY.md` 的用户摘要。官网品牌图标复用 `public/icons/**`，产品截图复用 `docs/assets/**`，由 website build 复制到发布产物 | 用户可见流程、设置字段、支持范围、安装渠道、用户操作或复用资产变化 | GitHub Pages、README、Extension Settings |
+| `website/content/docs/**` | 面向用户的网站文档：用户任务导航、功能发现、安装、采集、使用与整理、同步、导出/备份、CLI 与 FAQ；隐私页只做 `PRIVACY.md` 的用户摘要。官网品牌图标复用 `public/icons/**`，产品截图复用 `docs/assets/**`，由 website build 复制到发布产物 | 用户可见能力/入口、导航分组、操作流程、设置字段、支持范围、安装渠道或复用资产变化 | GitHub Pages、README、Extension Settings |
 | `AGENTS.md`, `src/ui/AGENTS.md` | 维护者/agent 必须提前看到的架构与高风险不变量 | 分层、依赖方向或不可破坏产品/UI 契约变化 | agent rule loader、CONTRIBUTING |
 | `skills/syncnos/SKILL.md`, `skills/syncnos-zh/SKILL.md` | AI Agent 使用 `syncnos` 的运行说明 | 命令路由、JSON/error、instance、安装/权限或写入/sync 等调用契约变化 | Repository Skill 使用者 |
 | `docs/storage.md` | local-first、一致性、Backup/restore 和失败恢复边界 | IDB/revision、backup/import、asset remap 或 continuity 语义变化 | AGENTS、Privacy、CONTRIBUTING |
@@ -32,6 +32,6 @@
 - 同一受众的同一长期事实只保留一个详细 owner；其它页面只导航或保留必要的一句高风险 guardrail。
 - Runtime 结构、符号、storage key、schema/index、默认目录和 browser 路径由源码/配置/测试回答，不镜像进长期 Markdown。
 - README 只做快速用户入口；详细用户操作与 Provider 配置归 `website/content/docs/**`，恢复边界归 storage，完整数据流归 Privacy，验证责任归 CONTRIBUTING。
-- 用户文档从“用户要做什么”出发，只保留最少步骤、可观察结果、必要限制与可执行排障；不把 storage key、内部 URI、RPC、类型名或实现流水线暴露成使用说明。维护者文档只保留长期不变量、失败语义、ownership、edit trigger 与验证入口，不逐步复述实现。
+- 用户文档从“用户要做什么”出发。大范围调整时先盘点真实用户可见功能，再按具体用户任务设计导航；重要独立功能必须从 Docs 导航或入口页可发现，避免“管理与流转”这类依赖内部分类逻辑的抽象大组。正文只保留最少步骤、可观察结果、必要限制与可执行排障，不把 storage key、内部 URI、RPC、类型名或实现流水线暴露成使用说明。维护者文档只保留长期不变量、失败语义、ownership、edit trigger 与验证入口，不逐步复述实现。
 - 同一事实只写一次。其它页面优先链接 owner；只有读者不在当前页面看到就会误操作的关键信息，才保留一句摘要。
 - 新页面是最后选项；新增时必须同时有长期消费者、明确 edit trigger 和真实导航入口。

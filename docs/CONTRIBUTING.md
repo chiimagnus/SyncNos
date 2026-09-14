@@ -60,11 +60,12 @@ PR 应让不掌握作者本地上下文的人也能判断改动是否正确：
 | 改动 | 最低验证 |
 | --- | --- |
 | 仅 Markdown / GitHub 模板 | `npm run format:check`，并检查修改过的本地链接 |
+| 用户 Docs 内容 / 导航（`website/content/docs/**`） | `npm run website:build`；在真实浏览器渲染所有修改页面。涉及导航/信息架构时，逐个走完所有受影响的中英文正式 route，并核对重要功能仍有可发现入口 |
 | 常规代码 PR | `npm run gate:ci` |
 | production build、manifest、权限、打包或发布 | `npm run gate` |
 | CLI package / installer / Native Messaging | `npm run gate` + `npm run cli:check`；对受影响 OS 验证 manifest/Registry/IPC 契约，并在可用平台做真实 discovery/read-back |
 | 浏览器或站点专项行为 | 手动走通受影响的真实浏览器/站点路径 |
-| 官网 / GitHub Pages 视觉改动 | `npm run website:build`，并在 push 前通过本地 HTTP 以 `/SyncNos/` Pages 路径在真实浏览器渲染首页与受影响 Docs；检查受影响的深浅色、导航与滚动状态 |
+| 官网 / GitHub Pages 布局与样式改动 | `npm run website:build`，并在 push 前通过本地 HTTP 以 `/SyncNos/` Pages 路径在真实浏览器渲染首页与受影响 Docs；检查受影响的深浅色、导航与滚动状态 |
 | 视觉行为 | 记录受影响状态的前后效果 |
 
 模拟平台测试只能证明对应契约，不应写成真实 Windows/Linux/浏览器 E2E。CI 对 WebClipper 代码运行 `npm run gate:ci`；绿色 CI 不能替代要求的 production build 或手动验证。

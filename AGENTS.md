@@ -63,6 +63,7 @@ collectors -> services/shared
 ## Agent 实现约束
 
 - 默认不查看或编辑 i18n 文案，除非任务明确涉及文案。
+- 修改 `website/content/docs/**` 时，按用户任务而不是内部模块组织信息；大范围重组先盘点真实用户可见功能，重要独立功能必须能从 Docs 导航或入口页直接发现。长期归属见 [`docs/GENERATION.md`](docs/GENERATION.md)，验证责任见 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)。
 - 新 API、新状态或新文件必须接入生产入口；不要留下只被测试引用、没有生产消费者的实现。
 
 ## 架构自检
