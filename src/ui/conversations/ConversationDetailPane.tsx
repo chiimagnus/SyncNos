@@ -18,6 +18,7 @@ import {
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { countConversationMessageImages } from '@services/conversations/domain/image-count';
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
 import { formatVideoTimecode } from '@services/conversations/domain/video-content';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
@@ -195,13 +196,22 @@ export function ConversationDetailPane({
     if (!Array.isArray(detail?.messages) || !detail.messages.length) return null;
     return countConversationMessageTextUnits(detail.messages);
   }, [detail?.messages, selected]);
+  const imageCount = useMemo(() => {
+    if (!selected) return null;
+    if (!Array.isArray(detail?.messages) || !detail.messages.length) return null;
+    return countConversationMessageImages(detail.messages);
+  }, [detail?.messages, selected]);
   const textCountLabel = t('detailTextCountLabel');
   const textCountText =
     textCount != null && Number.isFinite(textCount)
       ? `${textCountLabel} ${Math.max(0, Math.floor(textCount)).toLocaleString()}`
       : '';
+  const imageCountText = imageCount
+    ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()} · ${t('detailImageCachedLabel')} ${imageCount.cached.toLocaleString()} · ${t('detailImageUncachedLabel')} ${imageCount.uncached.toLocaleString()}`
+    : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
-  const hasMoreMenuContent = Boolean(textCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
+  const hasMoreMenuContent =
+    Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
   const moreMenuPanelClassName = 'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
   const floatingIslandClassName = [
     'tw-pointer-events-auto tw-flex tw-w-fit tw-items-center tw-gap-1 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-p-1',
@@ -541,20 +551,28 @@ export function ConversationDetailPane({
                         </div>
                       ) : null}
 
-                      {textCountText ? (
+                      {textCountText || imageCountText ? (
                         <div
                           className={[
                             hasReaderMoreMenuContent || moreActions.length
                               ? 'tw-border-t tw-border-[var(--border)] tw-pt-1'
                               : '',
-                            'tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]',
+                            'tw-flex tw-flex-col tw-gap-0.5 tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]',
                           ]
                             .filter(Boolean)
                             .join(' ')}
-                          data-detail-text-count-row="true"
-                          {...tooltipAttrs(textCountText)}
+                          data-detail-stats="true"
                         >
-                          {textCountText}
+                          {textCountText ? (
+                            <div data-detail-text-count-row="true" {...tooltipAttrs(textCountText)}>
+                              {textCountText}
+                            </div>
+                          ) : null}
+                          {imageCountText ? (
+                            <div data-detail-image-count-row="true" {...tooltipAttrs(imageCountText)}>
+                              {imageCountText}
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

@@ -496,6 +496,9 @@ export const zh: { [K in TranslationKey]: string } = {
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
   detailHeaderCacheImagesLabel: '缓存图片',
   detailTextCountLabel: '字数',
+  detailImageCountLabel: '图片',
+  detailImageCachedLabel: '已缓存',
+  detailImageUncachedLabel: '未缓存',
   videoDescriptionLabel: '简介',
   videoChaptersLabel: '章节',
 
