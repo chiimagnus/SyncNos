@@ -594,8 +594,7 @@ export function createContentController(deps: Deps) {
 
     async function refreshInpageButton() {
       const positionState = await ensureInpageButtonPositionLoadedOnce();
-      if (stopped) return null;
-      const collector = resolveActiveCollector(collectorsRegistry);
+      if (stopped) return;
       const captureState = currentPageCapture.getCurrentPageCaptureState();
       const buttonCollectorId = captureState.readiness !== 'unsupported' ? captureState.collectorId || '' : '';
       inpageButton?.cleanupButtons?.(buttonCollectorId);
@@ -613,9 +612,8 @@ export function createContentController(deps: Deps) {
       });
       if (stopped) {
         inpageButton?.cleanupButtons?.('');
-        return null;
+        return;
       }
-      return collector;
     }
 
     function isAutoSaveRequestAllowed(generation: number) {
