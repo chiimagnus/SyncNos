@@ -21,7 +21,7 @@ Once installed, SyncNos can capture locally without connecting any external sync
 3. Capture the current page from the popup or in-page entry point.
 4. Open the saved item in SyncNos and confirm the title and body / conversation / transcript look correct.
 
-Not every source uses the same capture mode. ChatGPT, Google AI Studio, web articles, and video content use manual capture; some other supported AI sites can auto-save when enabled. See [Capture content](/docs/en/capture/).
+See [Capture content](/docs/en/capture/) for source-specific save behavior.
 
 ## Need the CLI?
 

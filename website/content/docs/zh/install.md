@@ -21,7 +21,7 @@ description: 安装 SyncNos 浏览器扩展，并确认第一次采集可以正�
 3. 使用 Popup 或页内入口执行一次当前页采集。
 4. 在 SyncNos 中打开已保存内容，确认标题和正文 / 对话 / 字幕符合预期。
 
-不同来源并不都使用同一种采集方式。ChatGPT、Google AI Studio、网页文章和视频内容使用手动采集；部分其它 AI 对话站点可按设置自动保存。详见[采集内容](/docs/capture/)。
+不同来源的保存方式见[采集内容](/docs/capture/)。
 
 ## 需要 CLI？
 
