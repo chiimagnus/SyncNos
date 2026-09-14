@@ -41,7 +41,7 @@ export function ThreadedCommentsPanel({
   const selectionAttachment = useCommentSelectionAttachment({
     open: snapshot.open,
     panelRootRef: panelSurfaceRef,
-    requestSelection: (input) => actions.requestComposerSelection(input),
+    requestSelection: () => actions.requestComposerSelection(),
   });
   const unmountedRef = useRef(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);

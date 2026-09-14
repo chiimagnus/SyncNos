@@ -12,10 +12,6 @@ export type CommentSidebarLoadError = {
 
 export type CommentSaveResult = void | boolean | { ok: boolean; createdRootId?: number | null };
 
-export type CommentSidebarComposerSelectionRequest = {
-  trigger: 'button' | 'auto';
-};
-
 export type CommentSidebarComposerAttachment = {
   quoteText: string;
   locator: ArticleCommentLocator | null;
@@ -39,7 +35,7 @@ export type CommentSidebarHostActionCallbacks = {
   onReply?: (parentId: number, text: string) => CommentSaveResult | Promise<CommentSaveResult>;
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
-  onComposerSelectionRequest?: (input: CommentSidebarComposerSelectionRequest) => void | Promise<void>;
+  onComposerSelectionRequest?: () => void;
   onComposerQuoteClearRequest?: () => void | Promise<void>;
   onRetry?: () => void | Promise<void>;
 };
@@ -49,7 +45,7 @@ export type CommentSidebarHostActions = {
   reply: (parentId: number, text: string) => CommentSaveResult | Promise<CommentSaveResult>;
   delete: (id: number) => void | Promise<void>;
   close: () => void;
-  requestComposerSelection: (input: CommentSidebarComposerSelectionRequest) => void | Promise<void>;
+  requestComposerSelection: () => void;
   clearComposerAttachment: () => void | Promise<void>;
   retry: () => void | Promise<void>;
 };
@@ -77,8 +73,7 @@ export function createCommentSidebarHostActions(
     reply: (parentId: number, text: string) => read().onReply?.(parentId, text),
     delete: (id: number) => read().onDelete?.(id),
     close: () => read().onClose?.(),
-    requestComposerSelection: (input: CommentSidebarComposerSelectionRequest) =>
-      read().onComposerSelectionRequest?.(input),
+    requestComposerSelection: () => read().onComposerSelectionRequest?.(),
     clearComposerAttachment: () => read().onComposerQuoteClearRequest?.(),
     retry: () => read().onRetry?.(),
   });

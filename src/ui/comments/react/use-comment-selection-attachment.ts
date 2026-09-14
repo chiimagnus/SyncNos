@@ -4,7 +4,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 type SelectionAttachmentInput = {
   open: boolean;
   panelRootRef: React.RefObject<HTMLElement | null>;
-  requestSelection: (input: { trigger: 'auto' }) => void | Promise<void>;
+  requestSelection: () => void;
 };
 
 function buildNodePathSignature(node: Node | null | undefined): string {
@@ -79,7 +79,11 @@ export function useCommentSelectionAttachment({ open, panelRootRef, requestSelec
       }
       if (signature === 'empty' || signature === lastSignatureRef.current) return;
       lastSignatureRef.current = signature;
-      void Promise.resolve(requestSelectionRef.current({ trigger: 'auto' })).catch(() => {});
+      try {
+        requestSelectionRef.current();
+      } catch (_error) {
+        // Selection attachment is best-effort UI state; the controller owns selection validation.
+      }
     });
   }, [cancelCommit, panelRootRef]);
 

@@ -106,10 +106,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     publish({ open: false, lastOpenSource: null });
   }
 
-  function setComposerAttachment(input: {
-    quoteText: string;
-    locator?: CommentSidebarComposerAttachment['locator'];
-  }): CommentSidebarComposerAttachment {
+  function setComposerAttachment(input: { quoteText: string; locator?: unknown }): CommentSidebarComposerAttachment {
     if (disposed) return snapshot.composerAttachment;
     const nextAttachment = {
       quoteText: toCanonicalCommentQuote(input.quoteText),

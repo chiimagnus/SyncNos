@@ -182,7 +182,6 @@ describe('inpage comments sidebar toggle', () => {
     });
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
 
     const composer = shadow?.querySelector(
       '.webclipper-inpage-comments-panel__composer-textarea',

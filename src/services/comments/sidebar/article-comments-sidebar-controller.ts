@@ -1,13 +1,10 @@
 import type {
-  CommentSidebarComposerSelectionRequest,
   CommentSidebarHostActionCallbacks,
   CommentSidebarLoadError,
   CommentSidebarLoadStatus,
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
-import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
-import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -29,15 +26,13 @@ import type {
 } from '@services/comments/sidebar/article-comments-sidebar-adapter';
 
 export type ArticleCommentsSidebarControllerOpenInput = {
-  selectionText?: string | null;
-  locator?: unknown;
   focusComposer?: boolean;
   source?: string;
   ensureContext?: boolean;
   ensureContextInput?: ArticleCommentsSidebarEnsureContextInput;
 };
 
-export type ArticleCommentsSidebarControllerComposerSelectionPayload = {
+type ArticleCommentsSidebarControllerComposerSelectionPayload = {
   selectionText?: string | null;
   locator?: unknown;
 };
@@ -122,13 +117,7 @@ export function createArticleCommentsSidebarController(input: {
   session: CommentSidebarSession;
   adapter: ArticleCommentsSidebarAdapter;
   onClose?: () => void;
-  resolveComposerSelection?: (
-    request: CommentSidebarComposerSelectionRequest,
-  ) =>
-    | ArticleCommentsSidebarControllerComposerSelectionPayload
-    | null
-    | undefined
-    | Promise<ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined>;
+  resolveComposerSelection?: () => ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined;
 }): ArticleCommentsSidebarController {
   const session = input.session;
   const adapter = input.adapter;
@@ -137,7 +126,6 @@ export function createArticleCommentsSidebarController(input: {
   let activeContext: ArticleCommentsSidebarContext | null = null;
   let lastLoadedContext: ArticleCommentsSidebarContext | null = null;
   let lastEnsureContextInput: ArticleCommentsSidebarEnsureContextInput | undefined;
-  let composerSelectionRequestSeq = 0;
   let operationGeneration = 0;
   let mutationGeneration = 0;
   let activeOperation: ControllerOperation | null = null;
@@ -232,12 +220,9 @@ export function createArticleCommentsSidebarController(input: {
 
   const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
     if (disposed) return;
-    const quoteText = toCanonicalCommentQuote(payload?.selectionText);
+    const quoteText = String(payload?.selectionText ?? '');
     if (!quoteText) return;
-    session.setComposerAttachment({
-      quoteText: quoteText,
-      locator: normalizeArticleCommentLocator(payload?.locator),
-    });
+    session.setComposerAttachment({ quoteText, locator: payload?.locator });
   };
 
   const assignContext = (
@@ -542,7 +527,7 @@ export function createArticleCommentsSidebarController(input: {
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment save');
 
         const attachment = session.getSnapshot().composerAttachment;
-        const quoteText = toCanonicalCommentQuote(attachment.quoteText);
+        const quoteText = attachment.quoteText;
         const locator = quoteText ? attachment.locator : null;
         if (!hasValidArticleCommentContent({ parentId: null, quoteText, commentText: value, locator })) return false;
         const selectionRevision = attachment.selectionRevision;
@@ -554,7 +539,6 @@ export function createArticleCommentsSidebarController(input: {
           locator,
         });
         if (!isMutationCurrent(generation)) return false;
-        composerSelectionRequestSeq += 1;
         session.clearComposerAttachment(selectionRevision);
         await refresh();
         if (!isMutationCurrent(generation)) return false;
@@ -594,38 +578,17 @@ export function createArticleCommentsSidebarController(input: {
         if (!isMutationCurrent(generation)) return;
         await refresh();
       },
-      onComposerSelectionRequest: async (request) => {
-        if (disposed) return;
-        const resolveComposerSelection = input.resolveComposerSelection;
-        if (typeof resolveComposerSelection !== 'function') return;
-        const requestSeq = ++composerSelectionRequestSeq;
-        const applyIfLatest = (
-          payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined,
-        ) => {
-          if (disposed || requestSeq !== composerSelectionRequestSeq) return;
-          applyComposerSelection(payload);
-        };
+      onComposerSelectionRequest: () => {
+        if (disposed || typeof input.resolveComposerSelection !== 'function') return;
         try {
-          const resolved = resolveComposerSelection(request);
-          if (resolved && typeof (resolved as PromiseLike<unknown>).then === 'function') {
-            void Promise.resolve(resolved)
-              .then((payload) => {
-                applyIfLatest(payload as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
-              })
-              .catch(() => {
-                applyIfLatest(null);
-              });
-            return;
-          }
-          applyIfLatest(resolved as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
+          applyComposerSelection(input.resolveComposerSelection());
         } catch (_error) {
-          applyIfLatest(null);
+          // Ignore a transient DOM selection read failure; no attachment is safer than a guessed one.
         }
       },
       onRetry: () => refresh(),
       onComposerQuoteClearRequest: () => {
         if (disposed) return;
-        composerSelectionRequestSeq += 1;
         session.clearComposerAttachment();
       },
     };
@@ -638,10 +601,6 @@ export function createArticleCommentsSidebarController(input: {
   const open = async (openInput?: ArticleCommentsSidebarControllerOpenInput) => {
     if (disposed) return;
     mutationGeneration += 1;
-    const selectionText = openInput?.selectionText;
-    if (selectionText != null) {
-      applyComposerSelection({ selectionText, locator: openInput?.locator });
-    }
     session.requestOpen({ focusComposer: openInput?.focusComposer === true, source: openInput?.source });
     if (!(await waitForCurrentActivationReadiness())) return;
 
@@ -718,7 +677,6 @@ export function createArticleCommentsSidebarController(input: {
     sessionUnsubscribe?.();
     sessionUnsubscribe = null;
     session.updateHost({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '', actionCallbacks: {} });
-    composerSelectionRequestSeq += 1;
     mutationGeneration += 1;
     operationGeneration += 1;
     abortActiveOperation();

@@ -1,5 +1,4 @@
 import type { CommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
-import type { ArticleCommentLocator } from '@services/comments/domain/models';
 import type {
   CommentSidebarComposerAttachment,
   CommentSidebarHostActionCallbacks,
@@ -13,7 +12,6 @@ import type {
 export type {
   CommentSaveResult,
   CommentSidebarComposerAttachment,
-  CommentSidebarComposerSelectionRequest,
   CommentSidebarHostActionCallbacks,
   CommentSidebarHostActions,
   CommentSidebarHostSnapshot,
@@ -56,10 +54,7 @@ export type CommentSidebarSession = CommentSidebarHost & {
   attachPanel: (panel: CommentSidebarPanelApi) => CommentSidebarPanelLease;
   requestOpen: (input?: CommentSidebarOpenInput) => void;
   requestClose: () => void;
-  setComposerAttachment: (input: {
-    quoteText: string;
-    locator?: ArticleCommentLocator | null;
-  }) => CommentSidebarComposerAttachment;
+  setComposerAttachment: (input: { quoteText: string; locator?: unknown }) => CommentSidebarComposerAttachment;
   clearComposerAttachment: (expectedSelectionRevision?: number) => boolean;
   updateHost: (input: CommentSidebarHostUpdate) => void;
   dispose: () => void;

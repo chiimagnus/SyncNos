@@ -108,7 +108,6 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'auto' });
 
     mounted.cleanup();
   });
@@ -262,7 +261,6 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
 
     selectionState.text = '';
 

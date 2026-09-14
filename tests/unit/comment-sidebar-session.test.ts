@@ -301,7 +301,7 @@ describe('comment-sidebar-session', () => {
 
   it('forwards selection and clear actions without clearing the attachment on save', async () => {
     const session = createCommentSidebarSession();
-    const onComposerSelectionRequest = vi.fn(async () => {});
+    const onComposerSelectionRequest = vi.fn(() => {});
     const onComposerQuoteClearRequest = vi.fn(async () => {
       session.clearComposerAttachment();
     });
@@ -312,8 +312,8 @@ describe('comment-sidebar-session', () => {
       actionCallbacks: { onSave, onComposerSelectionRequest, onComposerQuoteClearRequest },
     });
 
-    await session.actions.requestComposerSelection({ trigger: 'button' });
-    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'button' });
+    session.actions.requestComposerSelection();
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     await session.actions.save('hello');
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('quoted text');

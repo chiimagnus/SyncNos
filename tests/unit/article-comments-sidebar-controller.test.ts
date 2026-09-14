@@ -105,7 +105,7 @@ describe('article-comments-sidebar-controller', () => {
     revisionMocks.requestDataRevisionRetry.mockReset();
   });
 
-  it('opens: sets quote, requests open, ensures context, and refreshes comments', async () => {
+  it('opens: requests open, ensures context, and refreshes comments', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
 
@@ -123,7 +123,6 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     await controller.open({
-      selectionText: 'Quoted',
       focusComposer: true,
       source: 'test',
       ensureContext: true,
@@ -131,7 +130,6 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const snapshot = session.getSnapshot();
-    expect(snapshot.composerAttachment.quoteText).toBe('Quoted');
     expect(snapshot.open).toBe(true);
     expect(snapshot.contextKey).toContain('/article');
     expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
@@ -244,8 +242,8 @@ describe('article-comments-sidebar-controller', () => {
 
     const resolveComposerSelection = vi
       .fn()
-      .mockResolvedValueOnce({ selectionText: 'Quoted from page', locator })
-      .mockResolvedValueOnce({ selectionText: '', locator: null });
+      .mockReturnValueOnce({ selectionText: 'Quoted from page', locator })
+      .mockReturnValueOnce({ selectionText: '', locator: null });
 
     createArticleCommentsSidebarController({
       session,
@@ -256,8 +254,8 @@ describe('article-comments-sidebar-controller', () => {
     const handlers = panel.getState().handlers;
     expect(typeof handlers.onComposerSelectionRequest).toBe('function');
 
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(resolveComposerSelection).toHaveBeenNthCalledWith(1, { trigger: 'button' });
+    handlers.onComposerSelectionRequest();
+    expect(resolveComposerSelection).toHaveBeenCalledTimes(1);
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('Quoted from page');
 
     await handlers.onSave('root comment');
@@ -270,48 +268,9 @@ describe('article-comments-sidebar-controller', () => {
     });
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
 
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'button' });
+    handlers.onComposerSelectionRequest();
+    expect(resolveComposerSelection).toHaveBeenCalledTimes(2);
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
-  });
-
-  it('ignores stale composer selection responses and keeps latest result', async () => {
-    const panel = createMockPanel();
-    const session = createCommentSidebarSession(panel.api as any);
-
-    const adapter = {
-      list: vi.fn(async () => []),
-      addRoot: vi.fn(async () => ({ id: 1 })),
-      addReply: vi.fn(async () => {}),
-      delete: vi.fn(async () => {}),
-      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 1 })),
-    };
-
-    const slow = createDeferred<{ selectionText: string; locator: unknown | null }>();
-    const fast = createDeferred<{ selectionText: string; locator: unknown | null }>();
-
-    const resolveComposerSelection = vi
-      .fn()
-      .mockImplementationOnce(() => slow.promise)
-      .mockImplementationOnce(() => fast.promise);
-
-    createArticleCommentsSidebarController({
-      session,
-      adapter: adapter as any,
-      resolveComposerSelection,
-    });
-
-    const handlers = panel.getState().handlers;
-    const oldRequest = handlers.onComposerSelectionRequest({ trigger: 'button' });
-    const newRequest = handlers.onComposerSelectionRequest({ trigger: 'button' });
-
-    fast.resolve({ selectionText: 'new quote', locator: null });
-    await newRequest;
-    expect(session.getSnapshot().composerAttachment.quoteText).toBe('new quote');
-
-    slow.resolve({ selectionText: 'old quote', locator: null });
-    await oldRequest;
-    expect(session.getSnapshot().composerAttachment.quoteText).toBe('new quote');
   });
 
   it('preserves quote text when locator is missing and saves with null locator', async () => {
@@ -326,7 +285,7 @@ describe('article-comments-sidebar-controller', () => {
       ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
     };
 
-    const resolveComposerSelection = vi.fn().mockResolvedValue({
+    const resolveComposerSelection = vi.fn().mockReturnValue({
       selectionText: 'Selection text only',
       locator: null,
     });
@@ -338,7 +297,7 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const handlers = panel.getState().handlers;
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
+    handlers.onComposerSelectionRequest();
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('Selection text only');
 
     await handlers.onSave('comment');
@@ -408,7 +367,7 @@ describe('article-comments-sidebar-controller', () => {
       position: { start: 0, end: 6 },
     };
 
-    const resolveComposerSelection = vi.fn().mockResolvedValue({
+    const resolveComposerSelection = vi.fn().mockReturnValue({
       selectionText: 'Quote A',
       locator: locatorFromA,
     });
@@ -422,7 +381,7 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
 
     const handlers = panel.getState().handlers;
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
+    handlers.onComposerSelectionRequest();
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('Quote A');
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
@@ -741,23 +700,18 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().open).toBe(true);
   });
 
-  it('dispose drops late save and composer-selection completions', async () => {
+  it('dispose drops late save and delete completions', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
     const addRoot = createDeferred<{ id: number }>();
     const remove = createDeferred<void>();
-    const selection = createDeferred<{ selectionText: string; locator: unknown | null }>();
     const adapter = {
       list: vi.fn(async () => []),
       addRoot: vi.fn(() => addRoot.promise),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(() => remove.promise),
     };
-    const controller = createArticleCommentsSidebarController({
-      session,
-      adapter: adapter as any,
-      resolveComposerSelection: () => selection.promise,
-    });
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
@@ -767,12 +721,10 @@ describe('article-comments-sidebar-controller', () => {
     const handlers = panel.getState().handlers;
     const savePromise = handlers.onSave('late save');
     const deletePromise = handlers.onDelete(7);
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
 
     controller.dispose();
     addRoot.resolve({ id: 99 });
     remove.resolve();
-    selection.resolve({ selectionText: 'late selection', locator: null });
 
     await expect(savePromise).resolves.toBe(false);
     await expect(deletePromise).resolves.toBeUndefined();
