@@ -125,7 +125,6 @@ describe('popup current-page video capture', () => {
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 19, isNew: true });
     expect(onCaptured).toHaveBeenCalledTimes(1);
     expect(latest?.status).toEqual({
-      phase: 'saved',
       kind: 'success',
       message: 'No subtitles detected; available video details were saved.',
     });
@@ -150,9 +149,7 @@ describe('popup current-page video capture', () => {
 
     expect(latest?.buttonDisabled).toBe(true);
     expect(latest?.buttonLabel).toBe('ChatGPT · waiting for messages…');
-    expect(latest?.phase).toBe('waiting');
     expect(latest?.status).toEqual({
-      phase: 'waiting',
       kind: 'info',
       message: 'ChatGPT · waiting for messages…',
     });
@@ -235,12 +232,26 @@ describe('popup current-page video capture', () => {
       await latest?.capture();
     });
 
-    expect(latest?.phase).toBe('saved-partial');
     expect(latest?.status).toEqual({
-      phase: 'saved-partial',
       kind: 'warning',
       message: 'Live reply saved; confirm later.',
     });
+  });
+
+  it('keeps state relay failures as errors without exposing a fabricated capture state', async () => {
+    const onCaptured = vi.fn();
+    sendMock.mockRejectedValue(new Error('relay failed'));
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+
+    expect(latest?.buttonDisabled).toBe(true);
+    expect(latest?.buttonLabel).toBe('Unavailable');
+    expect(latest?.status).toEqual({ kind: 'error', message: 'relay failed' });
+    expect(Object.prototype.hasOwnProperty.call(latest, 'captureState')).toBe(false);
+    expect(await latest?.capture()).toBeNull();
+    expect(onCaptured).not.toHaveBeenCalled();
   });
 
   it('runs the captured callback only for a saved video', async () => {
@@ -279,7 +290,7 @@ describe('popup current-page video capture', () => {
 
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'ok', conversationId: 21, isNew: true });
     expect(onCaptured).toHaveBeenCalledTimes(1);
-    expect(latest?.status).toEqual({ phase: 'saved', kind: 'success', message: 'Saved: Talk' });
+    expect(latest?.status).toEqual({ kind: 'success', message: 'Saved: Talk' });
     expect(sendMock.mock.calls.filter(([type]) => type === 'getActiveTabCaptureState')).toHaveLength(2);
   });
 });
