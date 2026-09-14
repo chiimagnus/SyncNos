@@ -86,6 +86,13 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       return self.renderToken(tokens, idx, opts);
     });
 
+  function renderExternalImageWithLink(img: string, href: string): string {
+    const escapedHref = inst.utils.escapeHtml(href);
+    const linkText = inst.utils.escapeHtml(sanitizeUrlForDisplay(href));
+    const a = `<a href="${escapedHref}" target="_blank" rel="noreferrer noopener">${linkText || 'Image link'}</a>`;
+    return `<span class="syncnos-md-image">${img}<br><span class="syncnos-md-image-link">${a}</span></span>`;
+  }
+
   inst.renderer.rules.image = (tokens, idx, opts, env, self) => {
     const token = tokens[idx];
     const src = token && typeof token.attrGet === 'function' ? String(token.attrGet('src') || '') : '';
@@ -119,7 +126,8 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
         envMap && (typeof envMap.get === 'function' ? envMap.get(chatgptFileId) : (envMap as any)[chatgptFileId]);
       const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
       const finalSrc = safeResolved || INTERNAL_IMAGE_PLACEHOLDER_SRC;
-      return `<img src="${inst.utils.escapeHtml(finalSrc)}" alt="${escapedAlt}" data-chatgpt-file-id="${inst.utils.escapeHtml(chatgptFileId)}"${titleAttr}>`;
+      const img = `<img src="${inst.utils.escapeHtml(finalSrc)}" alt="${escapedAlt}" data-chatgpt-file-id="${inst.utils.escapeHtml(chatgptFileId)}"${titleAttr}>`;
+      return safeResolved && isHttpUrl(safeResolved) ? renderExternalImageWithLink(img, safeResolved) : img;
     }
 
     const escapedSrc = inst.utils.escapeHtml(safeSrc);
@@ -127,9 +135,7 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
 
     if (!isHttpUrl(safeSrc) || isDataImageUrl(safeSrc)) return img;
 
-    const linkText = inst.utils.escapeHtml(sanitizeUrlForDisplay(safeSrc));
-    const a = `<a href="${escapedSrc}" target="_blank" rel="noreferrer noopener">${linkText || 'Image link'}</a>`;
-    return `<span class="syncnos-md-image">${img}<br><span class="syncnos-md-image-link">${a}</span></span>`;
+    return renderExternalImageWithLink(img, safeSrc);
   };
 
   if (openLinksInNewTab) {

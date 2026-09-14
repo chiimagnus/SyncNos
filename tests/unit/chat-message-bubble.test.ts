@@ -69,6 +69,7 @@ describe('ChatMessageBubble', () => {
     );
     expect(resolved).toContain('src="blob:resolved-7"');
     expect(resolved).toContain('data-syncnos-asset-id="7"');
+    expect(resolved).not.toContain('<span class="syncnos-md-image-link">');
 
     const unresolved = renderToStaticMarkup(
       createElement(ChatMessageBubble, { markdown: '![cached](syncnos-asset://7)' }),
@@ -90,6 +91,11 @@ describe('ChatMessageBubble', () => {
       'src="https://chatgpt.com/backend-api/estuary/content?id=file_generated_1&amp;sig=test"',
     );
     expect(resolved).toContain('data-chatgpt-file-id="file_generated_1"');
+    expect(resolved).toContain('class="syncnos-md-image-link"');
+    expect(resolved).toContain(
+      'href="https://chatgpt.com/backend-api/estuary/content?id=file_generated_1&amp;sig=test"',
+    );
+    expect(resolved).toContain('https://chatgpt.com/backend-api/estuary/content?keys=id,sig');
     expect(resolved).not.toContain('src="chatgpt-file://');
 
     const unresolved = renderToStaticMarkup(
@@ -97,6 +103,7 @@ describe('ChatMessageBubble', () => {
     );
     expect(unresolved).toContain('data:image/gif;base64,');
     expect(unresolved).not.toContain('src="chatgpt-file://');
+    expect(unresolved).not.toContain('<span class="syncnos-md-image-link">');
   });
 
   it('keeps core readability guard classes mounted on markdown container', () => {
