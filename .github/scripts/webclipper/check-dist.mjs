@@ -43,6 +43,23 @@ function fail(message) {
   process.exit(1);
 }
 
+function readJsonFile(path, label = 'JSON') {
+  if (!existsSync(path)) fail(`${label} missing: ${path}`);
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch (e) {
+    fail(`${label} parse error: ${path}: ${e?.message || e}`);
+  }
+}
+
+function readLocaleMessages(root, locale) {
+  const messagesPath = join(root, '_locales', locale, 'messages.json');
+  return {
+    messagesPath,
+    messages: readJsonFile(messagesPath, 'messages.json'),
+  };
+}
+
 const cli = parseArgs(process.argv.slice(2));
 const repoRoot = resolveRepoRoot(import.meta.url);
 const webclipperRoot = resolveWebclipperRoot(repoRoot);
@@ -53,12 +70,7 @@ if (!existsSync(manifestPath)) {
   fail(`manifest.json missing: ${manifestPath} (run \`npm run build\` first)`);
 }
 
-let manifest;
-try {
-  manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-} catch (e) {
-  fail(`manifest.json parse error: ${e?.message || e}`);
-}
+const manifest = readJsonFile(manifestPath, 'manifest.json');
 
 if (manifest.manifest_version !== 3) fail('manifest_version must be 3');
 if (
@@ -70,6 +82,46 @@ if (
 if (!manifest.action?.default_popup) fail('action.default_popup missing');
 if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length === 0) fail('content_scripts missing');
 if (!manifest.icons?.['16'] || !manifest.icons?.['48'] || !manifest.icons?.['128']) fail('icons 16/48/128 missing');
+
+const expectedCommandIds = ['_execute_action', 'capture-current-page', 'open-syncnos-app'];
+const commands = manifest.commands;
+if (!commands || typeof commands !== 'object' || Array.isArray(commands)) fail('manifest.commands must be an object');
+const actualCommandIds = Object.keys(commands).sort();
+if (JSON.stringify(actualCommandIds) !== JSON.stringify([...expectedCommandIds].sort())) {
+  fail(`manifest.commands must contain exactly: ${expectedCommandIds.join(', ')}`);
+}
+
+for (const commandId of expectedCommandIds) {
+  const command = commands[commandId];
+  if (!command || typeof command !== 'object' || Array.isArray(command)) {
+    fail(`manifest.commands.${commandId} must be an object`);
+  }
+  if (Object.hasOwn(command, 'suggested_key')) fail(`manifest.commands.${commandId} must not declare suggested_key`);
+  if (Object.hasOwn(command, 'global')) fail(`manifest.commands.${commandId} must not declare global`);
+}
+
+const customCommandIds = ['capture-current-page', 'open-syncnos-app'];
+const commandDescriptionKeys = new Map();
+for (const commandId of customCommandIds) {
+  const descriptionKey = extractManifestMsgKey(commands[commandId]?.description);
+  if (!descriptionKey) fail(`manifest.commands.${commandId}.description must use __MSG_*__ localization`);
+  commandDescriptionKeys.set(commandId, descriptionKey);
+}
+
+const defaultLocale = String(manifest.default_locale || '').trim();
+if (!defaultLocale) fail('manifest.default_locale missing for localized command descriptions');
+const requiredCommandLocales = [defaultLocale, 'zh_CN', 'zh_TW'];
+for (const locale of requiredCommandLocales) {
+  const localeDir = join(root, '_locales', locale);
+  if (locale !== defaultLocale && !existsSync(localeDir)) continue;
+  const { messages, messagesPath } = readLocaleMessages(root, locale);
+  for (const [commandId, descriptionKey] of commandDescriptionKeys) {
+    const message = messages?.[descriptionKey]?.message;
+    if (typeof message !== 'string' || !message.trim()) {
+      fail(`Missing non-empty __MSG_${descriptionKey}__ for ${commandId} in ${messagesPath}`);
+    }
+  }
+}
 
 for (const size of [16, 48, 128]) {
   const p = join(root, manifest.icons[String(size)]);
@@ -88,14 +140,7 @@ if (isSafariBuild) {
 
   const locales = readdirSync(localesRoot).filter((d) => !d.startsWith('.'));
   for (const locale of locales) {
-    const messagesPath = join(localesRoot, locale, 'messages.json');
-    if (!existsSync(messagesPath)) fail(`messages.json missing: ${messagesPath}`);
-    let messages;
-    try {
-      messages = JSON.parse(readFileSync(messagesPath, 'utf-8'));
-    } catch (e) {
-      fail(`messages.json parse error: ${messagesPath}: ${e?.message || e}`);
-    }
+    const { messages, messagesPath } = readLocaleMessages(root, locale);
 
     const name = messages?.[nameKey]?.message;
     const desc = messages?.[descriptionKey]?.message;
