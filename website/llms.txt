@@ -1,13 +1,13 @@
 # SyncNos
 
-> SyncNos 是一款开源、本地优先的浏览器扩展（WebClipper），把 AI 对话、网页文章、视频字幕一键剪藏并同步到 Notion、Obsidian 或飞书。数据始终归用户所有，全程不经过第三方服务器。
+> SyncNos 是一款开源、本地优先的浏览器扩展（WebClipper），把 AI 对话、网页文章、视频字幕一键剪藏并同步到 Notion、Obsidian、飞书或 GitHub。采集内容先保存在浏览器本地；只有用户主动启用同步或其它联网功能时，相关数据才会发送到对应服务。
 
 ## 能做什么
 
 - **采集 AI 对话**：覆盖 ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 共 11 个平台，另支持 Google AI Studio。
 - **采集网页文章**：提取任意网页正文（含标题、作者、时间），已专适配微信公众号与小红书。
 - **采集视频字幕**：抓取 YouTube、Bilibili 字幕，保留时间戳。
-- **同步去向**：Notion（OAuth）、Obsidian（Local REST API 本地直写）、飞书云文档（DocX）；也可导出 Markdown / Zip。
+- **同步去向**：Notion（OAuth）、Obsidian（Local REST API 本地直写）、飞书云文档（DocX）、GitHub 仓库；也可导出 Markdown / Zip。
 
 ## 安装
 

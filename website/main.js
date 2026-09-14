@@ -78,8 +78,8 @@
       en: 'SyncNos · Everything you read, saved to your own library',
     },
     desc: {
-      zh: 'SyncNos WebClipper —— 将 AI 对话、网页文章与视频字幕一键存入 Notion、Obsidian 或飞书。开源、本地优先，数据始终归你所有。',
-      en: 'SyncNos WebClipper — save AI chats, web articles and video transcripts to Notion, Obsidian or Feishu in one click. Open-source, local-first, your data stays yours.',
+      zh: 'SyncNos WebClipper —— 将 AI 对话、网页文章与视频字幕一键存入 Notion、Obsidian、飞书或 GitHub。开源、本地优先，数据始终归你所有。',
+      en: 'SyncNos WebClipper — save AI chats, web articles and video transcripts to Notion, Obsidian, Feishu or GitHub in one click. Open-source, local-first, your data stays yours.',
     },
   };
   var langNodes = document.querySelectorAll('[data-en]');
