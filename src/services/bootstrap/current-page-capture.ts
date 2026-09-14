@@ -31,10 +31,8 @@ type CurrentPageCaptureProgress = {
   message: string;
 };
 
-export type CurrentPageCaptureReadiness = 'ready' | 'waiting' | 'unsupported';
-
 export type CurrentPageCaptureState = {
-  readiness: CurrentPageCaptureReadiness;
+  readiness: 'ready' | 'waiting' | 'unsupported';
   kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;

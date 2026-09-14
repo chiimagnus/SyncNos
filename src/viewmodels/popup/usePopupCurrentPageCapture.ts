@@ -16,8 +16,6 @@ type ApiResponse<T> = {
   error: { message: string; extra: unknown } | null;
 };
 
-type CaptureState = CurrentPageCaptureState;
-
 type PopupCaptureStatus = {
   kind: 'info' | 'success' | 'warning' | 'error';
   message: string;
@@ -33,7 +31,7 @@ function unwrap<T>(response: ApiResponse<T>): T {
 
 export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Promise<void> }) {
   const onCaptured = input.onCaptured;
-  const [captureState, setCaptureState] = useState<CaptureState | null>(null);
+  const [captureState, setCaptureState] = useState<CurrentPageCaptureState | null>(null);
   const [checking, setChecking] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [status, setStatus] = useState<PopupCaptureStatus | null>(null);
@@ -42,7 +40,7 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     const silent = options?.silent === true;
     if (!silent) setChecking(true);
     try {
-      const response = await send<ApiResponse<CaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
+      const response = await send<ApiResponse<CurrentPageCaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
       const nextState = unwrap(response);
       setCaptureState(nextState);
       if (nextState.readiness === 'waiting') {
