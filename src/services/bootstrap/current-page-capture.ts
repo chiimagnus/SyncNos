@@ -316,12 +316,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (apiCapture.applicable) {
           snapshot = apiCapture.snapshot;
           expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
-          if (typeof target.collector.captureApiLiveTurn === 'function') {
-            const liveTurn = await Promise.resolve(
-              target.collector.captureApiLiveTurn({ expectedConversationId: expectedChatgptConversationId }),
-            );
-            snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn);
-          }
+          const liveTurn = target.collector.captureApiLiveTurn({
+            expectedConversationId: expectedChatgptConversationId,
+          });
+          snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn);
         }
       }
 

@@ -73,9 +73,9 @@ function appendMessage(messages: any[], incoming: any): any[] {
  */
 export function augmentChatgptApiSnapshotWithLiveTurn(
   snapshot: any,
-  live: ChatgptApiLiveTurnCapture | null | undefined,
+  live: ChatgptApiLiveTurnCapture,
 ): any {
-  if (!live || live.kind === 'none') return snapshot;
+  if (live.kind === 'none') return snapshot;
   if (live.kind === 'identity_changed') {
     throw Object.assign(new Error('chatgpt_api_navigation_changed'), { code: 'chatgpt_api_navigation_changed' });
   }

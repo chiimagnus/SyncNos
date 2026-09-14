@@ -809,7 +809,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   };
 
   function captureApiLiveTurn(input: { expectedConversationId: string }) {
-    const expectedConversationId = String(input?.expectedConversationId || '').trim();
+    const expectedConversationId = String(input.expectedConversationId || '').trim();
     const currentConversationId = String(findConversationIdFromUrl() || '').trim();
     if (!expectedConversationId || !currentConversationId || currentConversationId !== expectedConversationId) {
       return { kind: 'identity_changed', conversationId: currentConversationId };

@@ -70,7 +70,8 @@ function createHarness(input: {
     },
   };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
-  if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
+  if (input.collectorId === 'chatgpt') collector.captureApiLiveTurn = input.liveTurn || (() => ({ kind: 'none' }));
+  else if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
     captureVideoTranscript: vi.fn(
