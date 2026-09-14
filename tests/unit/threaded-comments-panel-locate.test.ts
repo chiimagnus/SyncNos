@@ -154,7 +154,6 @@ describe('Threaded comments panel locate', () => {
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
       showHeader: false,
-      variant: 'sidebar',
       locatorEnv: 'app',
       getLocatorSurfaceRoots: () => ({ sourceRoot: article, scrollRoot }),
     });
@@ -227,7 +226,6 @@ describe('Threaded comments panel locate', () => {
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
       showHeader: false,
-      variant: 'sidebar',
       locatorEnv: 'app',
       getLocatorSurfaceRoots: () => ({ sourceRoot: article, scrollRoot }),
     });
@@ -267,7 +265,6 @@ describe('Threaded comments panel locate', () => {
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
       showHeader: false,
-      variant: 'sidebar',
       getLocatorSurfaceRoots: () => null,
     });
 

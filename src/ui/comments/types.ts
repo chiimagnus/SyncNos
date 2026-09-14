@@ -15,7 +15,6 @@ export type MountOptions = {
   initiallyOpen?: boolean;
   showHeader?: boolean;
   showCollapseButton?: boolean;
-  variant?: 'sidebar';
   surface?: 'app-wide' | 'app-narrow' | 'inpage';
   fullWidth?: boolean;
   surfaceBg?: string;

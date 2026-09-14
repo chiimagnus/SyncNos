@@ -20,7 +20,6 @@ import type { MountOptions, ThreadedCommentsPanelApi } from './types';
 type ThreadedCommentsPanelReactBridgeProps = {
   store: ThreadedCommentsPanelStore;
   actions: CommentSidebarHostActions;
-  variant: 'sidebar';
   showHeader: boolean;
   showCollapseButton: boolean;
   onRequestClose: () => void;
@@ -34,7 +33,6 @@ type ThreadedCommentsPanelReactBridgeProps = {
 function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridgeProps) {
   const snapshot = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot, props.store.getSnapshot);
   return createElement(ThreadedCommentsPanel, {
-    variant: props.variant,
     showHeader: props.showHeader,
     showCollapseButton: props.showCollapseButton,
     snapshot,
@@ -211,7 +209,6 @@ export function mountThreadedCommentsPanel(
 ): { el: HTMLElement; api: ThreadedCommentsPanelApi; cleanup: () => void } {
   const el = document.createElement('webclipper-threaded-comments-panel') as HTMLElement;
   const isOverlay = options.overlay === true;
-  const variant = 'sidebar' as const;
   const isFullWidth = options.fullWidth === true;
   const surface = options.surface || (isOverlay ? 'inpage' : isFullWidth ? 'app-narrow' : 'app-wide');
   const showHeader = options.showHeader !== false;
@@ -227,7 +224,7 @@ export function mountThreadedCommentsPanel(
           })
       : syncReactUpdate;
   if (isOverlay) el.setAttribute('data-overlay', '1');
-  if (variant === 'sidebar') el.setAttribute('data-variant', 'sidebar');
+  el.setAttribute('data-variant', 'sidebar');
   el.setAttribute('data-surface', surface);
   if (isFullWidth) {
     el.setAttribute('data-layout', 'full-width');
@@ -242,7 +239,7 @@ export function mountThreadedCommentsPanel(
   }
 
   const HEADER_DIVIDER_CSS_VAR = '--webclipper-comments-panel-header-divider';
-  const headerDivider = options.headerDivider ?? variant !== 'sidebar';
+  const headerDivider = options.headerDivider === true;
   setImportantStyle(el, HEADER_DIVIDER_CSS_VAR, headerDivider && showHeader ? '1px solid var(--panel-border)' : '0');
 
   const dockController = createDockController({
@@ -320,7 +317,7 @@ export function mountThreadedCommentsPanel(
   shadow.appendChild(reactRootHost);
 
   let cleanupSidebarResize: (() => void) | null = null;
-  if (variant === 'sidebar' && !isFullWidth) {
+  if (!isFullWidth) {
     const handle = document.createElement('div');
     handle.className = 'webclipper-inpage-comments-panel__resize-handle';
     shadow.appendChild(handle);
@@ -341,7 +338,6 @@ export function mountThreadedCommentsPanel(
       createElement(ThreadedCommentsPanelReactBridge, {
         store: panelStore,
         actions: panelController.actions,
-        variant,
         showHeader,
         showCollapseButton,
         onRequestClose: () => panelController.actions.close(),

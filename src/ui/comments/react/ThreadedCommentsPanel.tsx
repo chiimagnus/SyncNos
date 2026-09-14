@@ -21,7 +21,6 @@ const DELETE_CONTROL_SELECTOR =
   '.webclipper-inpage-comments-panel__quote-delete, .webclipper-inpage-comments-panel__overflow-menu-item[data-destructive="1"]';
 
 export function ThreadedCommentsPanel({
-  variant,
   showHeader,
   showCollapseButton,
   snapshot,
@@ -145,7 +144,7 @@ export function ThreadedCommentsPanel({
   );
 
   const runLocate = async (rootId: number) => {
-    if (busy || variant !== 'sidebar') return;
+    if (busy) return;
     if (typeof locateThreadRoot !== 'function') return;
     const result = await locateThreadRoot(rootId);
     if (!result.ok && result.reason !== 'aborted') onLocateFailed?.(result.reason);

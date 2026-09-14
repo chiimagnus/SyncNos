@@ -115,7 +115,6 @@ function ArticleCommentsPanelMount({
 
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
-      variant: 'sidebar',
       surface: fullWidth ? 'app-narrow' : 'app-wide',
       fullWidth,
       showHeader: true,

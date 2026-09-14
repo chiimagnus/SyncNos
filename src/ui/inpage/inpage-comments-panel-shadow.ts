@@ -49,7 +49,6 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     overlay: true,
     dockPage: true,
     initiallyOpen: false,
-    variant: 'sidebar',
     surface: 'inpage',
     surfaceBg: 'var(--bg-card)',
     showHeader: true,
