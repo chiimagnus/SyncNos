@@ -169,8 +169,18 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     }
 
     const readiness = collector.getCaptureReadiness();
-    if (readiness !== 'ready' && readiness !== 'waiting') {
+    if (readiness !== 'ready' && readiness !== 'waiting' && readiness !== 'unsupported') {
       throw new Error(`invalid capture readiness: ${String(readiness)}`);
+    }
+    if (readiness === 'unsupported') {
+      return {
+        readiness,
+        kind: 'unsupported' as const,
+        label: t('unavailable'),
+        collectorId: collector.id,
+        reason: t('currentPageCannotBeCaptured'),
+        collector: null,
+      };
     }
     return {
       readiness,

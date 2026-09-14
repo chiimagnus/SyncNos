@@ -25,6 +25,14 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     }
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    try {
+      return /^\/chat(?:\/|$)/.test(env.location.pathname || '');
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return conversationKeyFromLocation(env.location);
   }
@@ -289,6 +297,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
   const collector = {
     capture,
     getCaptureReadiness: () => {
+      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
       if (!isValidConversationUrl()) return 'waiting' as const;
       const rows = Array.from(getConversationRoot()?.querySelectorAll?.('[data-message-id]') || []);
       return rows.some((row: any) => detectModernRole(row)) ? ('ready' as const) : ('waiting' as const);

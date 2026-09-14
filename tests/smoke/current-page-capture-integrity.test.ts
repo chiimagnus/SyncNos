@@ -46,7 +46,7 @@ function createHarness(input: {
   url?: string;
   syncResponse?: any;
   liveTurn?: () => any;
-  readiness?: 'ready' | 'waiting';
+  readiness?: 'ready' | 'waiting' | 'unsupported';
   readinessError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
@@ -179,6 +179,20 @@ describe('current page capture integrity routing', () => {
     expect(progress.at(-1)).toEqual({ message: state.reason, kind: 'default' });
     expect(harness.capture).not.toHaveBeenCalled();
     expect(harness.calls).toEqual([]);
+  });
+
+  it('keeps collector-declared non-chat routes unsupported instead of waiting', async () => {
+    const harness = createHarness({ collectorId: 'gemini', snapshot: null, readiness: 'unsupported' });
+    const state = harness.service.getCurrentPageCaptureState();
+
+    expect(state).toMatchObject({
+      readiness: 'unsupported',
+      kind: 'unsupported',
+      collectorId: 'gemini',
+      reason: t('currentPageCannotBeCaptured'),
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow(t('currentPageCannotBeCaptured'));
+    expect(harness.capture).not.toHaveBeenCalled();
   });
 
   it('surfaces collector readiness failures instead of masking them as waiting', async () => {

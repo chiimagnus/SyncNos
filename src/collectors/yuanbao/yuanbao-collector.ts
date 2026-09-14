@@ -22,6 +22,15 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
     }
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    try {
+      const p = env.location.pathname || '';
+      return p === '/' || /^\/chat(?:\/|$)/.test(p);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return conversationKeyFromLocation(env.location);
   }
@@ -110,11 +119,13 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   const collector = {
     capture,
-    getCaptureReadiness: () =>
-      isValidConversationUrl() &&
-      !!getConversationRoot()?.querySelector('.agent-chat__list__item--human, .agent-chat__list__item--ai')
+    getCaptureReadiness: () => {
+      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      return getConversationRoot()?.querySelector('.agent-chat__list__item--human, .agent-chat__list__item--ai')
         ? ('ready' as const)
-        : ('waiting' as const),
+        : ('waiting' as const);
+    },
     getRoot: getConversationRoot,
   };
   return { id: 'yuanbao', matches, collector };

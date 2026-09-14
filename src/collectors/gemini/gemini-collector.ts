@@ -39,6 +39,15 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     }
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    try {
+      const p = env.location.pathname || '';
+      return /^\/(app|gem)(\/|$)/.test(p);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return conversationKeyFromLocation(env.location);
   }
@@ -984,13 +993,15 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
   const collector = {
     capture,
-    getCaptureReadiness: () =>
-      isValidConversationUrl() &&
-      !!getConversationRoot()?.querySelector(
+    getCaptureReadiness: () => {
+      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      return getConversationRoot()?.querySelector(
         ".conversation-container user-query, .conversation-container [data-test-id='user-message'], .conversation-container model-response",
       )
         ? ('ready' as const)
-        : ('waiting' as const),
+        : ('waiting' as const);
+    },
     getRoot: getConversationRoot,
     __test: {
       collectMessages: async (options: { manual?: boolean } = {}) =>

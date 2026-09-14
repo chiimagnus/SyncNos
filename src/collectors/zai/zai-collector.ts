@@ -27,6 +27,15 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     }
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    try {
+      const p = env.location.pathname || '';
+      return p === '/' || /^\/c(?:\/|$)/.test(p);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return findConversationIdFromUrl() || conversationKeyFromLocation(env.location);
   }
@@ -171,10 +180,11 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   const collector: any = {
     capture,
-    getCaptureReadiness: () =>
-      isValidConversationUrl() && getMessageWrappers(getConversationRoot()).length > 0
-        ? ('ready' as const)
-        : ('waiting' as const),
+    getCaptureReadiness: () => {
+      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      return getMessageWrappers(getConversationRoot()).length > 0 ? ('ready' as const) : ('waiting' as const);
+    },
     getRoot: getConversationRoot,
   };
   collector.__test = {
