@@ -219,8 +219,7 @@ export function ThreadedCommentsPanel({
 
   const getRootMenuActions = (rootId: number): CommentOverflowAction[] => [deleteMenuAction(rootId)];
 
-  const toggleRootMenu = (root: (typeof roots)[number]) => {
-    const rootId = Number(root.id);
+  const toggleRootMenu = (rootId: number) => {
     if (discussion.state.openMenu === rootId) {
       discussion.setOpenMenu(null);
       return;

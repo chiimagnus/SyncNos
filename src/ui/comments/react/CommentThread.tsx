@@ -41,8 +41,8 @@ type CommentThreadProps = {
   getReplyMenuTriggerRef?: (replyId: number) => Ref<HTMLButtonElement>;
   children?: ReactNode;
   onActivate: (rootId: number) => void;
-  onRootMenuToggle: (root: CommentSidebarItem, replies: readonly CommentSidebarItem[]) => void | Promise<void>;
-  onReplyMenuToggle: (id: number) => void | Promise<void>;
+  onRootMenuToggle: (rootId: number) => void;
+  onReplyMenuToggle: (id: number) => void;
   onMenuAction: (id: number, action: CommentOverflowAction) => void | Promise<void>;
 };
 
@@ -103,7 +103,7 @@ export function CommentThread({
                 disabled={busy}
                 actions={rootMenuActions}
                 triggerRef={rootMenuTriggerRef}
-                onToggle={() => onRootMenuToggle(root, replies)}
+                onToggle={() => onRootMenuToggle(rootId)}
                 onAction={(action) => onMenuAction(rootId, action)}
               />
             </div>

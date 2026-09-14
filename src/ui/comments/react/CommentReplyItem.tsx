@@ -23,7 +23,7 @@ type CommentReplyItemProps = {
   menuOpen: boolean;
   menuActions: readonly CommentOverflowAction[];
   menuTriggerRef?: Ref<HTMLButtonElement>;
-  onMenuToggle: (id: number) => void | Promise<void>;
+  onMenuToggle: (id: number) => void;
   onMenuAction: (id: number, action: CommentOverflowAction) => void | Promise<void>;
 };
 

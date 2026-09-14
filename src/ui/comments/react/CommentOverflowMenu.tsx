@@ -17,7 +17,7 @@ type CommentOverflowMenuProps = {
   triggerClassName?: string;
   triggerRef?: Ref<HTMLButtonElement>;
   menuClassName?: string;
-  onToggle: () => void | Promise<void>;
+  onToggle: () => void;
   onAction: (action: CommentOverflowAction) => void | Promise<void>;
 };
 
@@ -73,11 +73,11 @@ export function CommentOverflowMenu({
         aria-controls={menuId}
         aria-expanded={open ? 'true' : 'false'}
         disabled={disabled}
-        onClick={() => void onToggle()}
+        onClick={onToggle}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return;
           event.preventDefault();
-          if (!open) void onToggle();
+          if (!open) onToggle();
           else menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
         }}
       >
