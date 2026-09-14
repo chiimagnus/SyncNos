@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type UserManifestFn } from 'wxt';
 
+import { KEYBOARD_SHORTCUT_COMMAND_IDS } from './src/services/shortcuts/keyboard-shortcut-contract';
+
 const viteAlias = {
   '@ui': path.resolve('src/ui'),
   '@viewmodels': path.resolve('src/viewmodels'),
@@ -62,6 +64,15 @@ const resolveManifest: UserManifestFn = (env) => {
     description: isSafari ? '__MSG_description__' : '__MSG_extDescription__',
     default_locale: 'en',
     permissions,
+    commands: {
+      [KEYBOARD_SHORTCUT_COMMAND_IDS.openPopup]: {},
+      [KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage]: {
+        description: '__MSG_commandCaptureCurrentPageDescription__',
+      },
+      [KEYBOARD_SHORTCUT_COMMAND_IDS.openApp]: {
+        description: '__MSG_commandOpenSyncnosAppDescription__',
+      },
+    },
     ...(isSafari ? {} : { optional_permissions: ['nativeMessaging'] }),
     host_permissions: ['http://*/*', 'https://*/*'],
     web_accessible_resources: [

@@ -14,5 +14,13 @@
   "description": {
     "message": "本地优先的开源网页剪藏器：保存 AI 对话、文章和视频字幕，可同步到 Notion、Obsidian、飞书或 GitHub。",
     "description": "App description for Safari"
+  },
+  "commandCaptureCurrentPageDescription": {
+    "message": "将当前页面保存到 SyncNos",
+    "description": "保存当前活动页面的浏览器快捷命令说明"
+  },
+  "commandOpenSyncnosAppDescription": {
+    "message": "打开 SyncNos 应用",
+    "description": "打开或聚焦 SyncNos 应用的浏览器快捷命令说明"
   }
 }
