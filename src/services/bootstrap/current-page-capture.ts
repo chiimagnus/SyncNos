@@ -9,6 +9,7 @@ import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-u
 import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
 import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api-capture-settings';
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
+import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 
 type RuntimeClient = {
@@ -287,6 +288,12 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (apiCapture.applicable) {
           snapshot = apiCapture.snapshot;
           expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
+          if (typeof target.collector.captureApiLiveTurn === 'function') {
+            const liveTurn = await Promise.resolve(
+              target.collector.captureApiLiveTurn({ expectedConversationId: expectedChatgptConversationId }),
+            );
+            snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn);
+          }
         }
       }
 

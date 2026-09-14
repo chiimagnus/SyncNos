@@ -634,6 +634,39 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     }
   }
 
+  function createCurrentExtractionInput(input: {
+    wrapper: any;
+    role: 'user' | 'assistant';
+    key: string;
+    turnKey: string;
+    withinTurn: number;
+    cot: CotAssociation | null;
+  }): ChatgptExtractionInput {
+    const { wrapper, role, key, turnKey, withinTurn, cot } = input;
+    const imageUrls = extractChatgptImageUrls(wrapper);
+    const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
+    const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
+    const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
+    const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
+    const effectiveCot = role === 'assistant' && !iframe ? cot : null;
+    const cotText = String(effectiveCot?.semanticText || '');
+    const cotMarkdown = String(effectiveCot?.semanticMarkdown || '');
+    return {
+      key,
+      turnKey,
+      withinTurn,
+      role,
+      fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
+      hasDeepResearch: !!iframe,
+      rendered: !!text || imageUrls.length > 0 || !!iframe,
+      visible: isVisibleWindow(wrapper),
+      outerHtml: String(wrapper?.outerHTML || ''),
+      imageUrls,
+      iframeUrl,
+      cotOuterHtml: effectiveCot?.outerHtml || '',
+    };
+  }
+
   function readCurrentManualWindow(includeInputs = false): {
     descriptors: ChatgptDescriptor[];
     inputsByKey: Map<string, ChatgptExtractionInput>;
@@ -653,33 +686,23 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const imageUrls = extractChatgptImageUrls(wrapper);
       const key = stableManualMessageKey(wrapper, role, turnKey, withinTurn, imageUrls);
       if (!key) continue;
-      const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
-      const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
-      const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
-      const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
-      const cot = role === 'assistant' && !iframe ? cotByOwner.get(wrapper) || null : null;
-      const cotText = String(cot?.semanticText || '');
-      const cotMarkdown = String(cot?.semanticMarkdown || '');
-      const descriptor: ChatgptDescriptor = {
+      const extractionInput = createCurrentExtractionInput({
+        wrapper,
+        role,
         key,
         turnKey,
         withinTurn,
-        role,
-        fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
-        hasDeepResearch: !!iframe,
-        rendered: !!text || imageUrls.length > 0 || !!iframe,
-        visible: isVisibleWindow(wrapper),
-      };
+        cot: cotByOwner.get(wrapper) || null,
+      });
+      const {
+        outerHtml: _outerHtml,
+        imageUrls: _imageUrls,
+        iframeUrl: _iframeUrl,
+        cotOuterHtml: _cotOuterHtml,
+        ...descriptor
+      } = extractionInput;
       descriptors.push(descriptor);
-      if (includeInputs) {
-        inputsByKey.set(key, {
-          ...descriptor,
-          outerHtml: String(wrapper?.outerHTML || ''),
-          imageUrls,
-          iframeUrl,
-          cotOuterHtml: cot?.outerHtml || '',
-        });
-      }
+      if (includeInputs) inputsByKey.set(key, extractionInput);
     }
     return { descriptors, inputsByKey };
   }
@@ -784,6 +807,95 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     readWindow: () => readCurrentManualWindow(true),
     getExtractionCount: () => manualExtractionCount,
   };
+
+  function captureApiLiveTurn(input: { expectedConversationId: string }) {
+    const expectedConversationId = String(input?.expectedConversationId || '').trim();
+    const currentConversationId = String(findConversationIdFromUrl() || '').trim();
+    if (!expectedConversationId || !currentConversationId || currentConversationId !== expectedConversationId) {
+      return { kind: 'identity_changed', conversationId: currentConversationId };
+    }
+
+    try {
+      const root = getConversationRoot();
+      if (!root) return { kind: 'none', conversationId: currentConversationId };
+      const wrappers = getTurnWrappers(root);
+      let lastUserIndex = -1;
+      for (let index = wrappers.length - 1; index >= 0; index -= 1) {
+        if (roleFromWrapper(wrappers[index]) === 'user' && !isExplicitlyHiddenWithin(wrappers[index], root)) {
+          lastUserIndex = index;
+          break;
+        }
+      }
+      if (lastUserIndex < 0) return { kind: 'none', conversationId: currentConversationId };
+
+      let assistantWrapper: any = null;
+      for (let index = wrappers.length - 1; index > lastUserIndex; index -= 1) {
+        const wrapper = wrappers[index];
+        if (
+          roleFromWrapper(wrapper) !== 'assistant' ||
+          isExplicitlyHiddenWithin(wrapper, root) ||
+          !isVisibleWindow(wrapper)
+        )
+          continue;
+        const node = assistantContentNode(wrapper);
+        const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
+        if (!text && !extractChatgptImageUrls(wrapper).length && !findDeepResearchIframe(wrapper)) continue;
+        assistantWrapper = wrapper;
+        break;
+      }
+      if (!assistantWrapper) return { kind: 'none', conversationId: currentConversationId };
+
+      const userWrapper = wrappers[lastUserIndex];
+      const userKey = directMessageId(userWrapper);
+      const assistantKey = directMessageId(assistantWrapper);
+      if (!userKey || !assistantKey) return { kind: 'unsafe', conversationId: currentConversationId };
+
+      const cotByOwner = buildCotAssociations(wrappers, true);
+      const userTurnKey = turnKeyOf(userWrapper);
+      const assistantTurnKey = turnKeyOf(assistantWrapper);
+      const withinTurn = (index: number, turnKey: string) =>
+        wrappers.slice(0, index).filter((candidate: any) => turnKeyOf(candidate) === turnKey).length;
+      const userInput = createCurrentExtractionInput({
+        wrapper: userWrapper,
+        role: 'user',
+        key: userKey,
+        turnKey: userTurnKey,
+        withinTurn: withinTurn(lastUserIndex, userTurnKey),
+        cot: null,
+      });
+      const assistantIndex = wrappers.indexOf(assistantWrapper);
+      const assistantInput = createCurrentExtractionInput({
+        wrapper: assistantWrapper,
+        role: 'assistant',
+        key: assistantKey,
+        turnKey: assistantTurnKey,
+        withinTurn: withinTurn(assistantIndex, assistantTurnKey),
+        cot: cotByOwner.get(assistantWrapper) || null,
+      });
+      if (!assistantInput.rendered) return { kind: 'unsafe', conversationId: currentConversationId };
+      // Generated images and deep-research frames have separate ownership/identity rules in the API snapshot.
+      if (
+        userInput.imageUrls.length > 0 ||
+        assistantInput.imageUrls.length > 0 ||
+        assistantInput.hasDeepResearch ||
+        assistantInput.iframeUrl
+      ) {
+        return { kind: 'unsafe', conversationId: currentConversationId };
+      }
+
+      const userMessage = extractManualMessage(userInput, 0);
+      const assistantMessage = extractManualMessage(assistantInput, 1);
+      if (!userMessage || !assistantMessage) return { kind: 'unsafe', conversationId: currentConversationId };
+      return {
+        kind: 'candidate',
+        conversationId: currentConversationId,
+        userMessage,
+        assistantMessage,
+      };
+    } catch (_error) {
+      return { kind: 'unsafe', conversationId: currentConversationId };
+    }
+  }
 
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
@@ -963,10 +1075,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     capture,
     getRoot: getConversationRoot,
     prepareManualCapture,
+    captureApiLiveTurn,
     __test: {
       sampleIdentityGuard,
       identityConversationKey,
       manualAdapter,
+      captureApiLiveTurn,
       getRoot: getConversationRoot,
     },
   };

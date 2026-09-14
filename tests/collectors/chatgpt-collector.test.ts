@@ -47,6 +47,67 @@ describe('chatgpt-collector', () => {
     expect(makeDefinition('https://chat.openai.com/c/conv').matches({ hostname: 'chat.openai.com' })).toBe(false);
   });
 
+  it('captures only the current visible API live turn with stable backend message ids', () => {
+    const html = `
+      <article data-testid="conversation-turn-1" data-turn-id="turn-user">
+        <div data-message-author-role="user" data-message-id="user-1">
+          <div class="whitespace-pre-wrap">question</div>
+        </div>
+      </article>
+      <article data-testid="conversation-turn-2" data-turn-id="turn-assistant">
+        <div data-message-author-role="assistant" data-message-id="assistant-1" data-is-intersecting="true">
+          <div class="markdown prose"><p>streaming answer</p></div>
+        </div>
+      </article>
+    `;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-1');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toMatchObject({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'user-1', role: 'user', contentMarkdown: 'question' },
+      assistantMessage: { messageKey: 'assistant-1', role: 'assistant' },
+    });
+    expect(
+      semanticText(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' }).assistantMessage),
+    ).toBe('streaming answer');
+  });
+
+  it('fails closed when the visible API live turn lacks stable ids or the durable route changed', () => {
+    const html = `
+      <article data-testid="conversation-turn-1" data-turn-id="turn-user">
+        <div data-message-author-role="user" data-message-id="user-1"><div class="whitespace-pre-wrap">question</div></div>
+      </article>
+      <article data-testid="conversation-turn-2" data-turn-id="turn-assistant">
+        <div data-message-author-role="assistant" data-is-intersecting="true"><div class="markdown prose"><p>streaming answer</p></div></div>
+      </article>
+    `;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-1');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toEqual({
+      kind: 'unsafe',
+      conversationId: 'conversation-1',
+    });
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-2' })).toEqual({
+      kind: 'identity_changed',
+      conversationId: 'conversation-1',
+    });
+  });
+
   it('uses active conversation title in ChatGPT Projects pages (instead of project name h1)', async () => {
     const html = `
       <h1>Research</h1>

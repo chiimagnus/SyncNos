@@ -45,6 +45,7 @@ function createHarness(input: {
   video?: any;
   url?: string;
   syncResponse?: any;
+  liveTurn?: () => any;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
@@ -61,6 +62,7 @@ function createHarness(input: {
   };
   const collector: any = { capture };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
+  if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
     captureVideoTranscript: vi.fn(
@@ -187,6 +189,65 @@ describe('current page capture integrity routing', () => {
     });
     expect(harness.calls[1].payload).not.toHaveProperty('conversationUrl');
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
+  });
+
+  it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    const liveTurn = vi.fn(() => ({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0, updatedAt: 1 },
+      assistantMessage: {
+        messageKey: 'assistant-live',
+        role: 'assistant',
+        contentMarkdown: 'visible streaming answer',
+        sequence: 1,
+        updatedAt: 2,
+      },
+    }));
+    const prepare = vi.fn();
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      prepare,
+      liveTurn,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    const result = await harness.service.captureCurrentPage();
+
+    expect(liveTurn).toHaveBeenCalledWith({ expectedConversationId: 'conversation-1' });
+    expect(prepare).not.toHaveBeenCalled();
+    expect(harness.capture).not.toHaveBeenCalled();
+    expect(harness.calls[1].payload).toMatchObject({
+      mode: 'append',
+      diff: { added: ['m1', 'assistant-live'], updated: [], removed: [] },
+      messages: [
+        expect.objectContaining({ messageKey: 'm1', contentMarkdown: 'hello' }),
+        expect.objectContaining({ messageKey: 'assistant-live', contentMarkdown: 'visible streaming answer' }),
+      ],
+    });
+    expect(result).toMatchObject({
+      captureCompleteness: 'partial',
+      captureReasons: ['chatgpt_api_live_tail_unconfirmed'],
+    });
+  });
+
+  it('fails closed before persistence when the API live-turn reader observes another durable conversation', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      liveTurn: () => ({ kind: 'identity_changed', conversationId: 'conversation-2' }),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    expect(harness.calls).toEqual([]);
   });
 
   it('falls back to DOM only when enabled API mode is not applicable to the current ChatGPT route', async () => {
