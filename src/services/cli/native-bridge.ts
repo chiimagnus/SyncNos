@@ -714,7 +714,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
           locator: null,
           ...(method === 'comments.reply' ? { parentId: Number(params.parentId) } : null),
         },
-        null,
+        'syncnos-cli',
       );
       postCommentResult(result);
       return;

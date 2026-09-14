@@ -19,7 +19,7 @@ vi.mock('@services/shared/storage', () => sharedStorageMocks);
 
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 
-type Handler = (message: any) => Promise<any> | any;
+type Handler = (message: any, sender?: any) => Promise<any> | any;
 
 function createRouter() {
   const handlers = new Map<string, Handler>();
@@ -75,6 +75,44 @@ describe('article comments background handler mutation side effects', () => {
     );
     expect(storageMocks.addArticleComment.mock.calls[0]?.[0]?.authorName).not.toBe('spoofed-caller');
     expect(response).toMatchObject({ ok: true, data: { authorName: 'Canonical Author' } });
+  });
+
+  it('uses a distinct derived author for CLI-created comments without accepting caller author spoofing', async () => {
+    storageMocks.addArticleComment.mockImplementation(async (input: any) => ({
+      id: 17,
+      ...input,
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    const onConversationChanged = vi.fn();
+    const { router, handlers } = createRouter();
+    registerArticleCommentsHandlers(router, { onConversationChanged });
+    const handler = handlers.get(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT);
+    const message = {
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 31,
+      parentId: null,
+      quoteText: '',
+      commentText: 'CLI comment',
+      locator: null,
+      authorName: 'spoofed-caller',
+    };
+
+    sharedStorageMocks.storageGet.mockResolvedValue({
+      [ABOUT_YOU_USER_NAME_STORAGE_KEY]: 'Chii',
+    });
+    const namedResponse = await handler?.(message, 'syncnos-cli');
+    expect(storageMocks.addArticleComment).toHaveBeenLastCalledWith(
+      expect.objectContaining({ authorName: "Chii' CLI", commentText: 'CLI comment' }),
+    );
+    expect(namedResponse).toMatchObject({ ok: true, data: { authorName: "Chii' CLI" } });
+
+    sharedStorageMocks.storageGet.mockResolvedValue({});
+    const fallbackResponse = await handler?.(message, 'syncnos-cli');
+    expect(storageMocks.addArticleComment).toHaveBeenLastCalledWith(
+      expect.objectContaining({ authorName: 'CLI', commentText: 'CLI comment' }),
+    );
+    expect(fallbackResponse).toMatchObject({ ok: true, data: { authorName: 'CLI' } });
   });
 
   it('accepts a highlight-only root through the runtime boundary and schedules auto-sync', async () => {

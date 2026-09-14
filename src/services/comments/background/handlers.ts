@@ -20,7 +20,7 @@ import { parseArticleCommentAddRequest, serializeArticleCommentDto } from '@serv
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
-  register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  register: (type: string, handler: (msg: any, sender: any) => Promise<any> | any) => void;
 };
 
 type ArticleCommentsHandlersDeps = {
@@ -52,12 +52,18 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
     return router.err('missing canonicalUrl or conversationId');
   });
 
-  router.register(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, async (msg) => {
+  router.register(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, async (msg, sender) => {
     const request = parseArticleCommentAddRequest(msg);
     if (!request) return router.err('invalid article comment payload');
 
     const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
-    const authorName = resolveAboutYouUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+    const configuredUserName = String(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY] ?? '').trim();
+    const authorName =
+      sender === 'syncnos-cli'
+        ? configuredUserName
+          ? `${configuredUserName}' CLI`
+          : 'CLI'
+        : resolveAboutYouUserName(configuredUserName);
 
     let comment;
     try {
