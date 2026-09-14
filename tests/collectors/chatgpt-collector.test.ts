@@ -56,7 +56,7 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
     const def = createChatgptCollectorDef(env);
-    expect(def.collector.getCaptureReadiness?.()).toBe('waiting');
+    expect(def.collector.getCaptureReadiness()).toBe('waiting');
   });
 
   it('captures only the current visible API live turn with stable backend message ids', () => {

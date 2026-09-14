@@ -30,7 +30,7 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
     const def = createGoogleAiStudioCollectorDef(env);
-    expect(def.collector.getCaptureReadiness?.()).toBe('waiting');
+    expect(def.collector.getCaptureReadiness()).toBe('waiting');
   });
 
   it('captures AI Studio ms-chat-turn DOM and renders assistant markdown', async () => {
@@ -72,7 +72,7 @@ describe('googleaistudio-collector', () => {
     });
 
     const def = createGoogleAiStudioCollectorDef(env);
-    expect(def.collector.getCaptureReadiness?.()).toBe('ready');
+    expect(def.collector.getCaptureReadiness()).toBe('ready');
     const snap = (await capturePrepared(def)) as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.source).toBe('googleaistudio');
