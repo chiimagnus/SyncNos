@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="zh" data-theme="light">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>SyncNos · 把读到的一切，存进你自己的知识库</title>
+        <meta
+            name="description"
+            content="SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian 或飞书。开源、本地优先，数据始终归你所有。"
+        />
+        <link rel="icon" href="assets/icon-128.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+        <script>
+            document.documentElement.classList.add("js");
+            (function () {
+                try {
+                    var t =
+                        localStorage.getItem("theme") ||
+                        (matchMedia("(prefers-color-scheme: dark)").matches
+                            ? "dark"
+                            : "light");
+                    document.documentElement.setAttribute("data-theme", t);
+                } catch (e) {}
+            })();
+        </script>
+        <link rel="canonical" href="https://syncnos.github.io/" />
+        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+        <meta name="author" content="SyncNos" />
+        <meta name="keywords" content="SyncNos, WebClipper, 网页剪藏, AI 对话保存, Notion 剪藏, Obsidian, 飞书, ChatGPT 导出, 开源, 本地优先" />
+        <meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#0f141c" media="(prefers-color-scheme: dark)" />
+        <meta name="color-scheme" content="light dark" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="SyncNos" />
+        <meta property="og:title" content="SyncNos · 把读到的一切，存进你自己的知识库" />
+        <meta property="og:description" content="SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian 或飞书。开源、本地优先，数据始终归你所有。" />
+        <meta property="og:url" content="https://syncnos.github.io/" />
+        <meta property="og:image" content="https://syncnos.github.io/assets/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="SyncNos WebClipper" />
+        <meta property="og:locale" content="zh_CN" />
+        <meta property="og:locale:alternate" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="SyncNos · 把读到的一切，存进你自己的知识库" />
+        <meta name="twitter:description" content="SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian 或飞书。开源、本地优先，数据始终归你所有。" />
+        <meta name="twitter:image" content="https://syncnos.github.io/assets/og-image.png" />
+        <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+        <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://syncnos.github.io/#website","url":"https://syncnos.github.io/","name":"SyncNos","description":"SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian 或飞书。开源、本地优先，数据始终归你所有。","inLanguage":"zh-CN"},{"@type":"Organization","@id":"https://syncnos.github.io/#org","name":"SyncNos","url":"https://syncnos.github.io/","logo":"https://syncnos.github.io/assets/icon-128.png","sameAs":["https://github.com/SyncNos/SyncNos-Webclipper","https://linux.do/t/topic/1635410"]},{"@type":"SoftwareApplication","@id":"https://syncnos.github.io/#app","name":"SyncNos WebClipper","applicationCategory":"BrowserApplication","operatingSystem":"Chrome, Microsoft Edge, Firefox","url":"https://syncnos.github.io/","description":"SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian 或飞书。开源、本地优先，数据始终归你所有。","image":"https://syncnos.github.io/assets/og-image.png","author":{"@id":"https://syncnos.github.io/#org"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isAccessibleForFree":true,"license":"https://www.gnu.org/licenses/agpl-3.0.html","downloadUrl":"https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok","featureList":["保存 11 个平台的 AI 对话","提取网页正文（含微信公众号、小红书）","抓取 YouTube / Bilibili 视频字幕","同步到 Notion / Obsidian / 飞书","导出 Markdown 或 Zip"],"sameAs":["https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok","https://microsoftedge.microsoft.com/addons/detail/syncnosaiweb-clipper/ijkpghlfmkbjcgafapjcjahaikmnjncl","https://addons.mozilla.org/firefox/addon/syncnos-webclipper/","https://github.com/SyncNos/SyncNos-Webclipper"]},{"@type":"FAQPage","@id":"https://syncnos.github.io/#faq","mainEntity":[{"@type":"Question","name":"SyncNos 是什么？","acceptedAnswer":{"@type":"Answer","text":"SyncNos 是一款开源、本地优先的浏览器扩展（WebClipper），把 AI 对话、网页文章和视频字幕一键剪藏并同步到 Notion、Obsidian 或飞书。"}},{"@type":"Question","name":"支持哪些浏览器？","acceptedAnswer":{"@type":"Answer","text":"支持 Chrome、Microsoft Edge 和 Firefox。"}},{"@type":"Question","name":"能保存哪些内容？","acceptedAnswer":{"@type":"Answer","text":"可以保存 11 个平台的 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai）与 Google AI Studio；网页正文（含微信公众号、小红书）；以及 YouTube / Bilibili 的视频字幕。"}},{"@type":"Question","name":"免费吗？数据安全吗？","acceptedAnswer":{"@type":"Answer","text":"完全免费且开源。SyncNos 本地优先，数据不经过第三方服务器；Obsidian 通过本地 REST API 直写，数据始终归你所有。"}}]}]}</script>
+    </head>
+    <body id="top">
+        <div class="masthead">
+            <header class="nav">
+                <a class="brand" href="#top"
+                    ><img
+                        src="assets/icon-128.png"
+                        alt="SyncNos"
+                        width="30"
+                        height="30"
+                    /><span>SyncNos</span></a
+                >
+                <nav class="nav-links">
+                    <a href="#capture" data-en="Capture">采集</a>
+                    <a href="#sync" data-en="Sync">同步</a>
+                    <a href="#privacy" data-en="Privacy">隐私</a>
+                    <a href="#open" data-en="Open source">开源</a>
+                </nav>
+                <div class="nav-actions">
+                    <button
+                        id="lang"
+                        class="ghost-btn"
+                        aria-label="Switch language"
+                    >
+                        EN
+                    </button>
+                    <button
+                        id="theme"
+                        class="ghost-btn"
+                        aria-label="Toggle dark mode"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="18"
+                            height="18"
+                            aria-hidden="true"
+                        >
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="9"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            />
+                            <path d="M12 3a9 9 0 000 18z" fill="currentColor" />
+                        </svg>
+                    </button>
+                    <a
+                        class="btn btn-sm"
+                        data-install="nav"
+                        href="https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok"
+                        data-en="Install"
+                        >安装</a
+                    >
+                </div>
+            </header>
+
+            <section class="hero">
+                <div class="wrap">
+                    <p
+                        class="eyebrow reveal"
+                        data-en="Open-source web clipper · local-first"
+                    >
+                        开源浏览器剪藏 · 本地优先
+                    </p>
+                    <h1
+                        class="reveal"
+                        data-d="1"
+                        data-en="Everything you read, in a library that's yours."
+                    >
+                        把读到的一切，存进你自己的知识库。
+                    </h1>
+                    <p
+                        class="lead reveal"
+                        data-d="2"
+                        data-en="AI chats, web articles and video transcripts — saved to Notion, Obsidian or Feishu in one click. Open-source, local-first, and your data stays yours."
+                    >
+                        AI 对话、网页文章、视频字幕，一键存入 Notion、Obsidian
+                        或飞书。开源、本地优先，数据始终归你所有。
+                    </p>
+                    <div class="cta-row reveal" data-d="3">
+                        <div class="install-split">
+                            <a
+                                class="btn install-main"
+                                data-install="hero"
+                                href="https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok"
+                                data-en="Install free"
+                                >免费安装</a
+                            >
+                            <button
+                                class="btn install-toggle"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                aria-label="其他浏览器版本"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    width="16"
+                                    height="16"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        d="M6 9l6 6 6-6"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+                                </svg>
+                            </button>
+                            <div class="install-menu" role="menu">
+                                <a
+                                    role="menuitem"
+                                    data-menu-store="chrome"
+                                    href="https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok"
+                                    >Chrome</a
+                                >
+                                <a
+                                    role="menuitem"
+                                    data-menu-store="edge"
+                                    href="https://microsoftedge.microsoft.com/addons/detail/syncnosaiweb-clipper/ijkpghlfmkbjcgafapjcjahaikmnjncl"
+                                    >Edge</a
+                                >
+                                <a
+                                    role="menuitem"
+                                    data-menu-store="firefox"
+                                    href="https://addons.mozilla.org/firefox/addon/syncnos-webclipper/"
+                                    >Firefox</a
+                                >
+                            </div>
+                        </div>
+                        <a
+                            class="btn btn-ghost"
+                            href="https://github.com/SyncNos/SyncNos-Webclipper"
+                            data-en="View source on GitHub"
+                            >在 GitHub 查看源码</a
+                        >
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section id="capture">
+            <div class="wrap">
+                <p class="sec-eyebrow reveal" data-en="What you can capture">
+                    采集范围
+                </p>
+                <h2 class="sec-title reveal" data-en="Whatever you read in the browser, one click saves it.">
+                    在浏览器中读到的内容，一键即可保存。
+                </h2>
+                <div class="capture-lay">
+                    <div class="feature reveal">
+                        <span class="tag num-lead">01</span>
+                        <h3 data-en="AI conversations">AI 对话</h3>
+                        <p data-en="Eleven platforms — ChatGPT, Claude, Gemini, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI and z.ai — plus Google AI Studio. Full conversations, saved exactly as they are.">
+                            覆盖 ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 共 11 个平台，另支持 Google AI Studio。完整对话，原样保存。
+                        </p>
+                    </div>
+                    <ol class="numlist">
+                        <li class="reveal" data-d="1">
+                            <span class="num">02</span>
+                            <div class="num-body">
+                                <h3 data-en="Web articles">网页文章</h3>
+                                <p data-en="Extracts the main text from any page, along with its title, author and date. WeChat and Xiaohongshu articles are specially supported.">
+                                    一键提取任意网页正文，并保留标题、作者与发布时间。微信公众号、小红书图文均已专门适配。
+                                </p>
+                            </div>
+                        </li>
+                        <li class="reveal" data-d="2">
+                            <span class="num">03</span>
+                            <div class="num-body">
+                                <h3 data-en="Video transcripts">视频字幕</h3>
+                                <p data-en="Captures subtitles from YouTube and Bilibili, with complete timestamps.">
+                                    抓取 YouTube、Bilibili 的字幕，完整保留时间戳。
+                                </p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <section id="sync">
+            <div class="wrap">
+                <p class="sec-eyebrow reveal" data-en="Destinations">
+                    同步去向
+                </p>
+                <h2 class="sec-title reveal" data-en="Send it wherever you need.">
+                    存到哪里，由你决定。
+                </h2>
+                <div class="flow">
+                    <div class="hub reveal">
+                        <img class="hub-ico" src="assets/icon-128.png" alt="SyncNos" width="44" height="44" />
+                        <div class="hub-name">SyncNos</div>
+                        <div class="hub-sub" data-en="Clip once, send anywhere">剪藏一次，去向由你</div>
+                    </div>
+                    <svg class="flow-tree" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="M300 2 C300 44 100 16 100 56 M300 2 C300 26 300 32 300 56 M300 2 C300 44 500 16 500 56" fill="none" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    </svg>
+                    <div class="dests">
+                        <div class="dest reveal">
+                            <img class="ico ico-invert" src="assets/notion.svg" alt="Notion" />
+                            <h3>Notion</h3>
+                            <p data-en="One-click OAuth authorization, with databases created automatically for AI chats, web articles and videos.">
+                                OAuth 一键授权，自动创建数据库，AI 对话、网页与视频分类归档。
+                            </p>
+                        </div>
+                        <div class="dest reveal" data-d="1">
+                            <img class="ico" src="assets/obsidian.svg" alt="Obsidian" />
+                            <h3>Obsidian</h3>
+                            <p data-en="Writes directly into your vault via the Local REST API — local to local, never over the network.">
+                                通过 Local REST API 直接写入本地 vault，全程不经过网络。
+                            </p>
+                        </div>
+                        <div class="dest reveal" data-d="2">
+                            <img class="ico" src="assets/feishu.png" alt="Feishu" />
+                            <h3 data-en="Feishu">飞书</h3>
+                            <p data-en="One-click OAuth sync to Feishu Docs (DocX), organized by type.">
+                                OAuth 授权，一键同步至飞书云文档（DocX），按类型分类整理。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <p class="note reveal" data-en="Or export to Markdown or Zip at any time and take everything with you.">
+                    也可随时导出 Markdown 或 Zip 备份，完整带走。
+                </p>
+            </div>
+        </section>
+
+        <section id="showcase">
+            <div class="wrap">
+                <p class="sec-eyebrow reveal" data-en="See it in action">
+                    实际界面
+                </p>
+                <h2
+                    class="sec-title reveal"
+                    data-en="Real screenshots, straight from the extension."
+                >
+                    以下均为扩展中的真实界面。
+                </h2>
+                <div class="shots">
+                    <figure class="shot reveal">
+                        <img src="assets/popup.png" alt="SyncNos popup" />
+                        <figcaption
+                            data-en="Save and browse everything you've clipped, directly from the popup."
+                        >
+                            在弹窗中一键保存，并浏览已剪藏的对话与文章。
+                        </figcaption>
+                    </figure>
+                    <figure class="shot reveal" data-d="1">
+                        <img src="assets/settings.png" alt="SyncNos settings" />
+                        <figcaption
+                            data-en="Back up locally, or sync to Notion or Obsidian — your choice."
+                        >
+                            本地备份，或同步至 Notion、Obsidian，由你选择。
+                        </figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <section id="story" class="story">
+            <div class="wrap">
+                <p class="sec-eyebrow reveal" data-en="Why it matters">
+                    为什么选择它
+                </p>
+                <div class="gather">
+                    <span class="frag" data-en="a chat">一条对话</span>
+                    <span class="frag" data-en="a long read">一篇长文</span>
+                    <span class="frag" data-en="a transcript">一段字幕</span>
+                    <span class="frag" data-en="a highlight">一处划线</span>
+                    <span class="frag" data-en="a note">一条笔记</span>
+                </div>
+                <p class="phase reveal">
+                    <b data-en="Scattered.">散落。</b>
+                    <span
+                        data-en="What you read ends up spread across dozens of open tabs."
+                        >读过的内容，分散在几十个未关闭的标签页中。</span
+                    >
+                </p>
+                <p class="phase reveal" data-d="1">
+                    <b data-en="Gathered.">收拢。</b>
+                    <span data-en="One click brings it all into one place."
+                        >一键保存，汇聚到同一处。</span
+                    >
+                </p>
+                <p class="phase reveal" data-d="2">
+                    <b data-en="At hand.">取用。</b>
+                    <span
+                        data-en="When you need it, it's right there in your own notes."
+                        >需要时，随时回到你自己的笔记中。</span
+                    >
+                </p>
+                <p
+                    class="big reveal"
+                    data-d="3"
+                    data-en="Save it while you're reading, not while you're searching for it later."
+                >
+                    在阅读时即保存，而非事后四处查找。
+                </p>
+            </div>
+        </section>
+
+        <section id="privacy" class="privacy">
+            <div class="wrap">
+                <p
+                    class="sec-eyebrow reveal"
+                    data-en="Privacy &amp; open source"
+                >
+                    隐私 & 开源
+                </p>
+                <h2
+                    class="sec-title reveal"
+                    id="open"
+                    data-en="Fully open-source, with no server in between and no tracking of any kind."
+                >
+                    代码完全开源，没有中间服务器，也不收集你的任何数据。
+                </h2>
+                <div class="bento">
+                    <div class="card reveal">
+                        <h3 data-en="Local-first">本地优先</h3>
+                        <p
+                            data-en="Everything is stored in your browser's IndexedDB first. Whether it ever syncs out is entirely up to you."
+                        >
+                            内容首先存储在浏览器的 IndexedDB
+                            中，是否同步至别处，完全由你决定。
+                        </p>
+                    </div>
+                    <div class="card reveal" data-d="1">
+                        <h3 data-en="Your keys never leave">密钥不出本机</h3>
+                        <p
+                            data-en="Backups automatically exclude your OAuth tokens. There's no third-party server, and no remote code is ever downloaded or run."
+                        >
+                            备份自动排除 OAuth
+                            令牌；没有第三方服务器，也不会下载或执行任何远程代码。
+                        </p>
+                    </div>
+                    <div class="card reveal" data-d="2">
+                        <h3 data-en="Fully open-source">完全开源</h3>
+                        <p
+                            data-en="Every line lives in the public repo. Export and leave whenever you like — no lock-in."
+                        >
+                            每一行代码都在开源仓库中，随时可导出离开，绝不锁定。
+                        </p>
+                    </div>
+                </div>
+                <p
+                    class="community reveal"
+                    data-en="Built and maintained by one developer, active on linux.do and GitHub."
+                >
+                    由个人独立开发与维护，活跃于 linux.do 与 GitHub。
+                </p>
+            </div>
+        </section>
+
+        <section id="sponsors" class="sponsors">
+            <div class="wrap">
+                <p class="sec-eyebrow reveal" data-en="Angel sponsors">
+                    天使赞助者
+                </p>
+                <h2
+                    class="sec-title reveal"
+                    data-en="Kept going by a few kind people."
+                >
+                    因为一些温暖的人，它得以持续。
+                </h2>
+                <p
+                    class="sponsors-lead reveal"
+                    data-en="SyncNos is free and open-source. These unsolicited notes and small tokens of kindness are what keep it moving forward — thank you, every one of you."
+                >
+                    SyncNos 始终免费、开源。这些不期而至的留言与心意，是它持续前行的动力——谢谢你们每一位。
+                </p>
+                <div class="sponsors-grid">
+                    <figure class="sponsor reveal">
+                        <div class="sponsor-amt">¥20.00</div>
+                        <blockquote
+                            data-en="&ldquo;You&rsquo;re my hero! I&rsquo;d used other clipping tools before—some even charged just to export. Thank you! The icon looks great too, really nicely designed.&rdquo;"
+                        >
+                            「你是我的神！之前用过别的剪藏工具，导出文件竟然还要收费。感谢佬～图标也很好看，很有设计感。」
+                        </blockquote>
+                        <figcaption>
+                            <a
+                                class="sp-name"
+                                href="https://linux.do/u/jkl1/summary"
+                                data-en="jkl1 · comic artist"
+                                >漫画美术家 jkl1</a
+                            >
+                            <span class="sp-date">2026.02.28</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="sponsor reveal" data-d="1">
+                        <div class="sponsor-amt">¥6.00</div>
+                        <p
+                            class="sponsor-note"
+                            data-en="Kept reporting issues and helping shape the product in the community."
+                        >
+                            在社区一路反馈问题、共建产品。
+                        </p>
+                        <figcaption>
+                            <a
+                                class="sp-name"
+                                href="https://linux.do/u/cassianvale/summary"
+                                data-en="Changqiu · Cassianvale"
+                                >长秋 Cassianvale</a
+                            >
+                            <span class="sp-date">2026.03.08</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="sponsor reveal" data-d="2">
+                        <div class="sponsor-amt">¥6.66</div>
+                        <blockquote data-en="&ldquo;gogogo!&rdquo;">
+                            「gogogo！」
+                        </blockquote>
+                        <figcaption>
+                            <span class="sp-name" data-en="Kongkong Tianqing"
+                                >空空天晴</span
+                            >
+                            <span class="sp-date">2026.03.12</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="sponsor reveal">
+                        <div class="sponsor-amt">¥6.00</div>
+                        <blockquote
+                            data-en="&ldquo;I went through plenty of clipping tools and finally found yours—a small token of thanks.&rdquo;"
+                        >
+                            「折腾了很多剪藏工具，终于找到你了，一点小小的心意。」
+                        </blockquote>
+                        <figcaption>
+                            <span class="sp-name" data-en="Anonymous angel"
+                                >匿名天使</span
+                            >
+                            <span class="sp-date">2026.03.18</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="sponsor reveal" data-d="1">
+                        <div class="sponsor-amt">¥1.00</div>
+                        <blockquote
+                            data-en="&ldquo;The Obsidian saving works great—exactly what I&rsquo;d always wanted. Thank you!&rdquo;"
+                        >
+                            「保存 ob 软件好用！一直想要的这样的，感谢！」
+                        </blockquote>
+                        <figcaption>
+                            <span class="sp-name" data-en="Anonymous angel"
+                                >匿名天使</span
+                            >
+                            <span class="sp-date">2026.03.29</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="sponsor reveal" data-d="2">
+                        <div class="sponsor-amt">¥8.20</div>
+                        <blockquote
+                            data-en="&ldquo;You did an amazing job, my friend.&rdquo;"
+                        >
+                            「你做的太棒了，兄弟。」
+                        </blockquote>
+                        <figcaption>
+                            <span class="sp-name" data-en="Chai Juntao"
+                                >柴俊涛</span
+                            >
+                            <span class="sp-date">2026.05.25</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="sponsor reveal">
+                        <div class="sponsor-amt">¥5.00</div>
+                        <blockquote
+                            data-en="&ldquo;Keep it up—a genuinely handy extension.&rdquo;"
+                        >
+                            「加油，很好用的一个插件。」
+                        </blockquote>
+                        <figcaption>
+                            <span class="sp-name" data-en="Anonymous angel"
+                                >匿名天使</span
+                            >
+                            <span class="sp-date">2026.06.10</span>
+                        </figcaption>
+                    </figure>
+                </div>
+                <p
+                    class="sponsors-total reveal"
+                    data-en="7 angels so far, ¥52.86 in all—every single one is remembered."
+                >
+                    至今共 7 位天使、累计 ¥52.86 —— 每一笔，都记在心里。
+                </p>
+                <p class="sponsors-names reveal">
+                    <span data-en="And thanks, too, to "
+                        >也谢谢</span
+                    >
+                    <span
+                        data-en="everyone who shared it, starred it, and spread the word."
+                        >每一位转发、点亮 Star、口口相传的你。</span
+                    >
+                </p>
+            </div>
+        </section>
+
+        <footer class="foot">
+            <div class="wrap">
+                <p
+                    class="big reveal"
+                    data-en="Install SyncNos and stop losing what you read."
+                >
+                    立即安装 SyncNos，不再遗失你读过的内容。
+                </p>
+                <div class="store-row reveal" data-d="1" id="get">
+                    <a
+                        class="btn"
+                        data-store="chrome"
+                        href="https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok"
+                        >Chrome</a
+                    >
+                    <a
+                        class="btn btn-ghost"
+                        data-store="edge"
+                        href="https://microsoftedge.microsoft.com/addons/detail/syncnosaiweb-clipper/ijkpghlfmkbjcgafapjcjahaikmnjncl"
+                        >Edge</a
+                    >
+                    <a
+                        class="btn btn-ghost"
+                        data-store="firefox"
+                        href="https://addons.mozilla.org/firefox/addon/syncnos-webclipper/"
+                        >Firefox</a
+                    >
+                </div>
+                <p
+                    class="safari-note reveal"
+                    data-d="1"
+                    data-en="Safari (macOS / iOS): build from source with Xcode."
+                >
+                    Safari（macOS / iOS）：可通过 Xcode 从源码构建。
+                </p>
+                <div class="foot-links reveal">
+                    <a
+                        href="https://github.com/SyncNos/SyncNos-Webclipper"
+                        data-en="Source"
+                        >GitHub 源码</a
+                    >
+                    <a
+                        href="https://github.com/SyncNos/SyncNos-Webclipper/releases"
+                        data-en="Changelog"
+                        >更新日志</a
+                    >
+                    <a
+                        href="https://linux.do/t/topic/1635410"
+                        data-en="Community"
+                        >linux.do 社区</a
+                    >
+                    <a
+                        href="https://chiimagnus.notion.site/syncnos"
+                        data-en="Docs"
+                        >文档</a
+                    >
+                </div>
+                <p class="copyright">
+                    © 2026 SyncNos ·
+                    <span data-en="an open-source project">开源项目</span>
+                </p>
+            </div>
+        </footer>
+        <script src="main.js"></script>
+    </body>
+</html>
