@@ -1,4 +1,4 @@
-export const COMMENT_DISPLAY_QUOTE_GRAPHEME_LIMIT = 200;
+const COMMENT_DISPLAY_QUOTE_GRAPHEME_LIMIT = 200;
 
 export function toCanonicalCommentQuote(value: unknown): string {
   return String(value ?? '').replace(/\r\n?/g, '\n');
@@ -24,13 +24,9 @@ function splitGraphemes(value: string): string[] {
   return Array.from(value);
 }
 
-export function toDisplayCommentQuote(value: unknown, options?: { graphemeLimit?: number; ellipsis?: string }): string {
+export function toDisplayCommentQuote(value: unknown): string {
   const canonical = toCanonicalCommentQuote(value);
-  const requestedLimit = Number(options?.graphemeLimit ?? COMMENT_DISPLAY_QUOTE_GRAPHEME_LIMIT);
-  const limit = Number.isFinite(requestedLimit)
-    ? Math.max(0, Math.floor(requestedLimit))
-    : COMMENT_DISPLAY_QUOTE_GRAPHEME_LIMIT;
   const graphemes = splitGraphemes(canonical);
-  if (graphemes.length <= limit) return canonical;
-  return `${graphemes.slice(0, limit).join('')}${String(options?.ellipsis ?? '…')}`;
+  if (graphemes.length <= COMMENT_DISPLAY_QUOTE_GRAPHEME_LIMIT) return canonical;
+  return `${graphemes.slice(0, COMMENT_DISPLAY_QUOTE_GRAPHEME_LIMIT).join('')}…`;
 }
