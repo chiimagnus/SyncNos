@@ -36,6 +36,15 @@ export const en = {
   localeSystem: 'Follow system',
   localeEnglish: 'English',
   localeChinese: 'Chinese',
+  keyboardShortcutsHeading: 'Keyboard shortcuts',
+  keyboardShortcutsDescription: 'Shortcut keys are assigned and managed by your browser.',
+  keyboardShortcutsOpenPopup: 'Open SyncNos popup',
+  keyboardShortcutsCaptureCurrentPage: 'Save current page',
+  keyboardShortcutsOpenApp: 'Open SyncNos app',
+  keyboardShortcutsUnassigned: 'Unassigned',
+  keyboardShortcutsManage: 'Manage shortcuts',
+  keyboardShortcutsManualHint: 'Configure these actions in your browser’s extension keyboard shortcut settings.',
+  keyboardShortcutsUnsupported: 'This browser cannot read extension keyboard shortcuts.',
 
   // InpageSection
   appearanceHeading: 'Appearance',

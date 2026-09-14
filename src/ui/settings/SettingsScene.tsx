@@ -5,6 +5,7 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { headerButtonClassName } from '@ui/shared/button-styles';
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
+import { useKeyboardShortcutsController } from '@viewmodels/settings/useKeyboardShortcutsController';
 import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
 import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
 import { type SettingsSectionKey } from '@viewmodels/settings/types';
@@ -200,6 +201,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeAboutYouUserName,
     onSaveAboutYouUserName,
   } = useSettingsSceneController({ activeSection, focusKey });
+  const keyboardShortcuts = useKeyboardShortcutsController({ active: activeSection === 'general' });
 
   const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
 
@@ -474,6 +476,14 @@ export function SettingsScene(props: SettingsSceneProps) {
           localePreference={localePreference}
           onChangeLocalePreference={(next) => {
             void onChangeLocalePreference(next);
+          }}
+          keyboardShortcuts={{
+            status: keyboardShortcuts.status,
+            items: keyboardShortcuts.items,
+            managerAccess: keyboardShortcuts.managerAccess,
+            onOpenManager: () => {
+              void keyboardShortcuts.openManager();
+            },
           }}
           aiChatAutoSaveEnabled={aiChatAutoSaveEnabled}
           onToggleAiChatAutoSaveEnabled={(next) => {

@@ -38,6 +38,15 @@ export const zh: { [K in TranslationKey]: string } = {
   localeSystem: '跟随系统',
   localeEnglish: 'English',
   localeChinese: '中文',
+  keyboardShortcutsHeading: '快捷键',
+  keyboardShortcutsDescription: '快捷键由浏览器分配和管理，SyncNos 仅显示浏览器当前的实际绑定。',
+  keyboardShortcutsOpenPopup: '打开 SyncNos Popup',
+  keyboardShortcutsCaptureCurrentPage: '保存当前页面',
+  keyboardShortcutsOpenApp: '打开 SyncNos 应用',
+  keyboardShortcutsUnassigned: '未分配',
+  keyboardShortcutsManage: '管理快捷键',
+  keyboardShortcutsManualHint: '请在浏览器的扩展快捷键设置中配置这些操作。',
+  keyboardShortcutsUnsupported: '当前浏览器无法读取扩展快捷键。',
 
   // InpageSection
   appearanceHeading: '外观',

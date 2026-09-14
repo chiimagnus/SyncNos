@@ -3,11 +3,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   openKeyboardShortcutSettings,
   readKeyboardShortcutSnapshot,
+  type KeyboardShortcutAction,
   type KeyboardShortcutItem,
   type KeyboardShortcutManagerAccess,
 } from '@services/shortcuts/keyboard-shortcuts';
 
 export type KeyboardShortcutsControllerStatus = 'idle' | 'loading' | 'ready' | 'unsupported';
+export type KeyboardShortcutsControllerItem = KeyboardShortcutItem;
+export type KeyboardShortcutsControllerManagerAccess = KeyboardShortcutManagerAccess;
+export type { KeyboardShortcutAction };
 
 type UseKeyboardShortcutsControllerArgs = {
   active: boolean;

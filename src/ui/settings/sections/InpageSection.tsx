@@ -3,6 +3,7 @@ import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
+import { KeyboardShortcutsCard, type KeyboardShortcutsCardProps } from '@ui/settings/sections/KeyboardShortcutsCard';
 import {
   AntiHotlinkDomainsEditor,
   type AntiHotlinkRuleEditorError,
@@ -51,6 +52,7 @@ export function InpageSection(props: {
   onToggleCliIntegration: (next: boolean) => void;
   localePreference: LocalePreference;
   onChangeLocalePreference: (next: LocalePreference) => void;
+  keyboardShortcuts: KeyboardShortcutsCardProps;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
@@ -83,6 +85,7 @@ export function InpageSection(props: {
     onToggleCliIntegration,
     localePreference,
     onChangeLocalePreference,
+    keyboardShortcuts,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
@@ -135,6 +138,8 @@ export function InpageSection(props: {
           </div>
         </div>
       </section>
+
+      <KeyboardShortcutsCard {...keyboardShortcuts} />
 
       <section className={cardClassName} aria-label={t('localCliIntegrationHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">

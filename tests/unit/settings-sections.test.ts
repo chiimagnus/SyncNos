@@ -570,6 +570,16 @@ describe('inpage anti-hotlink advanced editor', () => {
       onToggleCliIntegration: () => {},
       localePreference: 'system',
       onChangeLocalePreference: () => {},
+      keyboardShortcuts: {
+        status: 'ready',
+        items: [
+          { action: 'open-popup', shortcut: 'Ctrl+Shift+P' },
+          { action: 'capture-current-page', shortcut: '' },
+          { action: 'open-app', shortcut: '' },
+        ],
+        managerAccess: 'openable',
+        onOpenManager: () => {},
+      },
       aiChatAutoSaveEnabled: true,
       onToggleAiChatAutoSaveEnabled: () => {},
       aiChatCacheImagesEnabled: true,
@@ -595,6 +605,85 @@ describe('inpage anti-hotlink advanced editor', () => {
       root!.render(createElement(InpageSection, { ...baseProps, ...props }));
     });
   }
+
+  it('renders browser-managed keyboard shortcuts between Language and Local CLI Integration', () => {
+    renderInpage();
+
+    const sections = Array.from(document.querySelectorAll('section'));
+    const languageIndex = sections.findIndex((section) => section.getAttribute('aria-label') === 'Language');
+    const shortcutsIndex = sections.findIndex((section) => section.getAttribute('aria-label') === 'Keyboard shortcuts');
+    const cliIndex = sections.findIndex((section) => section.getAttribute('aria-label') === 'Local CLI Integration');
+    expect(languageIndex).toBeGreaterThanOrEqual(0);
+    expect(shortcutsIndex).toBe(languageIndex + 1);
+    expect(cliIndex).toBe(shortcutsIndex + 1);
+
+    const shortcutSection = sections[shortcutsIndex];
+    expect(shortcutSection?.textContent).toContain('Open SyncNos popup');
+    expect(shortcutSection?.textContent).toContain('Save current page');
+    expect(shortcutSection?.textContent).toContain('Open SyncNos app');
+    expect(shortcutSection?.querySelector('kbd')?.textContent).toBe('Ctrl+Shift+P');
+    expect(shortcutSection?.textContent).toContain('Unassigned');
+  });
+
+  it('opens the native shortcut manager only from the injected callback', () => {
+    const onOpenManager = vi.fn();
+    renderInpage({
+      keyboardShortcuts: {
+        status: 'ready',
+        items: [
+          { action: 'open-popup', shortcut: '' },
+          { action: 'capture-current-page', shortcut: '' },
+          { action: 'open-app', shortcut: '' },
+        ],
+        managerAccess: 'openable',
+        onOpenManager,
+      },
+    });
+
+    const button = document.querySelector('button[aria-label="Manage shortcuts"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    act(() => button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onOpenManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows manual shortcut guidance without a dead manage button', () => {
+    renderInpage({
+      keyboardShortcuts: {
+        status: 'ready',
+        items: [
+          { action: 'open-popup', shortcut: '' },
+          { action: 'capture-current-page', shortcut: '' },
+          { action: 'open-app', shortcut: '' },
+        ],
+        managerAccess: 'manual',
+        onOpenManager: vi.fn(),
+      },
+    });
+
+    expect(document.body.textContent || '').toContain(
+      'Configure these actions in your browser’s extension keyboard shortcut settings.',
+    );
+    expect(document.querySelector('button[aria-label="Manage shortcuts"]')).toBeNull();
+  });
+
+  it('keeps the rest of General settings available when shortcut discovery is unsupported', () => {
+    renderInpage({
+      keyboardShortcuts: {
+        status: 'unsupported',
+        items: [
+          { action: 'open-popup', shortcut: '' },
+          { action: 'capture-current-page', shortcut: '' },
+          { action: 'open-app', shortcut: '' },
+        ],
+        managerAccess: 'unsupported',
+        onOpenManager: vi.fn(),
+      },
+    });
+
+    expect(document.body.textContent || '').toContain('This browser cannot read extension keyboard shortcuts.');
+    expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeTruthy();
+    expect(document.querySelector('section[aria-label="Inpage Button"]')).toBeTruthy();
+  });
 
   it('renders Local CLI Integration and forwards the user toggle', () => {
     const onToggleCliIntegration = vi.fn();
