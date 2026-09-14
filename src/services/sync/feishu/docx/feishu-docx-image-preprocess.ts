@@ -5,7 +5,7 @@ import {
   collectMarkdownImageReferences,
   replaceMarkdownImageReferences,
 } from '@services/shared/markdown-image-references';
-import { chatgptFileIdFromUrl, isChatgptFileUrl } from '@services/shared/chatgpt-image-identity';
+import { chatgptFileIdFromUrl, hasChatgptFileScheme } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 function safeString(v: unknown) {
@@ -169,8 +169,8 @@ export async function preprocessFeishuDocxMarkdownImages(
         };
       }
 
-      if (isChatgptFileUrl(sourceUrl)) {
-        const fileId = chatgptFileIdFromUrl(sourceUrl);
+      const fileId = chatgptFileIdFromUrl(sourceUrl);
+      if (fileId || hasChatgptFileScheme(sourceUrl)) {
         const image = fileId ? chatgptImagesByFileId.get(fileId) : undefined;
         const contentType = image?.ok ? safeString(image.contentType) : '';
         const ext = extFromContentType(contentType || 'image/png');

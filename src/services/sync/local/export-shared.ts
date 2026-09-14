@@ -7,7 +7,7 @@ import {
   replaceMarkdownImageReferences,
   type MarkdownImageReference,
 } from '@services/shared/markdown-image-references';
-import { chatgptFileIdFromUrl, isChatgptFileUrl } from '@services/shared/chatgpt-image-identity';
+import { chatgptFileIdFromUrl, hasChatgptFileScheme } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 function normalizeImageExt(raw: string): string {
@@ -140,11 +140,12 @@ export async function materializeConversationMarkdownAssets(input: {
         const target = attachmentPathById.get(assetId);
         return target ? { target } : { replacement: '[Image unavailable]' };
       }
-      if (isChatgptFileUrl(reference.target)) {
-        const fileId = chatgptFileIdFromUrl(reference.target);
-        const target = fileId ? attachmentPathByChatgptFileId.get(fileId) : null;
+      const fileId = chatgptFileIdFromUrl(reference.target);
+      if (fileId) {
+        const target = attachmentPathByChatgptFileId.get(fileId);
         return target ? { target } : { replacement: '[Image unavailable]' };
       }
+      if (hasChatgptFileScheme(reference.target)) return { replacement: '[Image unavailable]' };
       return null;
     }),
   );

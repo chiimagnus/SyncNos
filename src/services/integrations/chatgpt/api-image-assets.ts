@@ -25,11 +25,9 @@ async function fetchWithTimeout(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    try {
-      return await fetchFn(url, { ...init, signal: controller.signal });
-    } catch (_error) {
-      return null;
-    }
+    return await fetchFn(url, { ...init, signal: controller.signal });
+  } catch (_error) {
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -140,18 +138,14 @@ export async function downloadChatgptImages(input: {
   timeoutMs?: number;
   concurrency?: number;
 }): Promise<ChatgptImageDownloadResult[]> {
-  const fileIds = normalizeFileIds(input.fileIds);
-  if (!fileIds.length) return [];
   const timeoutMs = Math.max(1, Number(input.timeoutMs) || 30_000);
   const concurrency = Math.max(1, Math.floor(Number(input.concurrency) || 4));
-  const resolutions = await resolveChatgptImageUrls({ ...input, fileIds, timeoutMs, concurrency });
-  const resolvedById = new Map(resolutions.map((resolution) => [resolution.fileId, resolution]));
+  const resolutions = await resolveChatgptImageUrls({ ...input, timeoutMs, concurrency });
 
-  return await mapConcurrent(fileIds, concurrency, async (fileId): Promise<ChatgptImageDownloadResult> => {
-    const cacheKey = buildChatgptFileCacheKey(fileId);
-    const resolution = resolvedById.get(fileId);
-    if (!resolution?.ok) {
-      return { cacheKey, ok: false, reason: resolution?.reason === 'session' ? 'session' : 'resolver' };
+  return await mapConcurrent(resolutions, concurrency, async (resolution): Promise<ChatgptImageDownloadResult> => {
+    const cacheKey = buildChatgptFileCacheKey(resolution.fileId);
+    if (!resolution.ok) {
+      return { cacheKey, ok: false, reason: resolution.reason === 'session' ? 'session' : 'resolver' };
     }
     const downloaded = await downloadImagePlain({
       url: resolution.url,

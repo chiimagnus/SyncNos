@@ -7,11 +7,11 @@ vi.mock('@services/conversations/background/image-backfill-job', () => backfillM
 
 import {
   AI_CHAT_IMAGE_BACKFILL_ALARM_NAME,
-  AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY,
-  AI_CHAT_IMAGE_BACKFILL_RETRY_MS,
-  AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY,
   createImageBackfillScheduler,
 } from '@services/conversations/background/image-backfill-scheduler';
+
+const AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY = 'ai_chat_image_backfill_queue_v1';
+const AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY = 'ai_chat_cache_images_enabled';
 
 function makeInfra(startNow = 1_000_000, alarmsAvailable = true) {
   let now = startNow;
@@ -91,14 +91,20 @@ describe('image backfill scheduler', () => {
     expect(backfillMocks.backfillConversationImages).not.toHaveBeenCalled();
   });
 
-  it('flushes due work, notifies only changed conversations, and retries only incomplete ones', async () => {
+  it('flushes due work once, notifies only changed conversations, and does not spin on best-effort failures', async () => {
     const pack = makeInfra();
     const now = pack.infra.now();
     pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;
-    pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY] = { '7': now, '8': now, '9': now + 30_000 };
+    pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY] = {
+      '7': now,
+      '8': now,
+      '9': now + 30_000,
+      '10': now,
+    };
     backfillMocks.backfillConversationImages.mockImplementation(async ({ conversationId }: any) => {
       if (conversationId === 7) return result({ updatedMessages: 1 });
       if (conversationId === 8) return result({ warningFlags: ['chatgpt_images_cache_incomplete'] });
+      if (conversationId === 10) throw new Error('download failed');
       throw new Error(`unexpected id ${conversationId}`);
     });
     const onConversationChanged = vi.fn(async () => {});
@@ -106,15 +112,13 @@ describe('image backfill scheduler', () => {
 
     await scheduler.flush();
 
-    expect(backfillMocks.backfillConversationImages).toHaveBeenCalledTimes(2);
+    expect(backfillMocks.backfillConversationImages).toHaveBeenCalledTimes(3);
     expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(1, { conversationId: 7 });
     expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(2, { conversationId: 8 });
+    expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(3, { conversationId: 10 });
     expect(onConversationChanged).toHaveBeenCalledWith(7, 'backfillImages');
     expect(onConversationChanged).not.toHaveBeenCalledWith(8, expect.anything());
-    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({
-      '8': now + AI_CHAT_IMAGE_BACKFILL_RETRY_MS,
-      '9': now + 30_000,
-    });
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({ '9': now + 30_000 });
     expect(pack.alarm.when).toBe(now + 30_000);
   });
 

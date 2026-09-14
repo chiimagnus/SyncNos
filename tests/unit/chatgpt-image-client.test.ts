@@ -29,8 +29,8 @@ describe('chatgpt image client', () => {
       fileIds: [...fileIds, fileIds[0]],
     });
 
-    expect(runtimeMocks.send).toHaveBeenCalledTimes(3);
-    expect(runtimeMocks.send.mock.calls.map((call) => call[1].fileIds.length)).toEqual([16, 16, 3]);
+    expect(runtimeMocks.send).toHaveBeenCalledTimes(5);
+    expect(runtimeMocks.send.mock.calls.map((call) => call[1].fileIds.length)).toEqual([8, 8, 8, 8, 3]);
     expect(runtimeMocks.send.mock.calls.flatMap((call) => call[1].fileIds)).toEqual(fileIds);
     expect(resolved.size).toBe(35);
     expect(resolved.get('file_35')).toBe('https://files.example/file_35');
@@ -45,19 +45,19 @@ describe('chatgpt image client', () => {
       .mockRejectedValueOnce(new Error('runtime.sendMessage timed out after 60000ms'))
       .mockResolvedValueOnce({
         ok: true,
-        data: [{ fileId: 'file_33', ok: true, url: 'https://files.example/file_33' }],
+        data: [{ fileId: 'file_17', ok: true, url: 'https://files.example/file_17' }],
       });
 
     const resolved = await resolveChatgptImageUrlsForConversation({
       conversationId: 8,
-      fileIds: Array.from({ length: 33 }, (_, index) => `file_${index + 1}`),
+      fileIds: Array.from({ length: 17 }, (_, index) => `file_${index + 1}`),
     });
 
     expect(runtimeMocks.send).toHaveBeenCalledTimes(3);
     expect(resolved).toEqual(
       new Map([
         ['file_1', 'https://files.example/file_1'],
-        ['file_33', 'https://files.example/file_33'],
+        ['file_17', 'https://files.example/file_17'],
       ]),
     );
   });

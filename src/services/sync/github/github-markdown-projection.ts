@@ -15,7 +15,7 @@ import {
 import {
   buildChatgptFileCacheKey,
   chatgptFileIdFromUrl,
-  isChatgptFileUrl,
+  hasChatgptFileScheme,
 } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { buildSyncnosObject } from '@services/sync/shared/remote-markdown-metadata';
@@ -271,15 +271,16 @@ export async function buildGithubMarkdownProjection(input: {
       const target = assetId != null ? replacementByAssetId.get(assetId) : null;
       return target ? { target } : null;
     }
-    if (isChatgptFileUrl(reference.target)) {
-      const fileId = chatgptFileIdFromUrl(reference.target);
-      const target = fileId ? replacementByChatgptFileId.get(fileId) : null;
-      return target ? { target } : null;
+    const fileId = chatgptFileIdFromUrl(reference.target);
+    if (fileId) {
+      const target = replacementByChatgptFileId.get(fileId);
+      return target ? { target } : { replacement: '[Image unavailable]' };
     }
+    if (hasChatgptFileScheme(reference.target)) return { replacement: '[Image unavailable]' };
     return null;
   });
   const hasUnresolvedInternalImage = collectMarkdownImageReferences(markdownText).some(
-    (reference) => isSyncnosAssetUrl(reference.target) || isChatgptFileUrl(reference.target),
+    (reference) => isSyncnosAssetUrl(reference.target) || hasChatgptFileScheme(reference.target),
   );
   if (hasUnresolvedInternalImage) throw new Error('github_internal_asset_ref_unresolved');
 

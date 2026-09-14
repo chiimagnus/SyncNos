@@ -33,19 +33,21 @@ describe('ChatGPT image background handlers', () => {
     ]);
   });
 
-  it('resolves only normalized deduplicated file ids in the stored ChatGPT conversation scope', async () => {
+  it('passes the runtime batch into the stored ChatGPT conversation resolver', async () => {
     const router = createRouter();
+    const fileIds = ['file_image_1', 'file_image_1', 'bad', '', null];
     const response = await router.dispatch({
       type: CHATGPT_MESSAGE_TYPES.RESOLVE_IMAGE_URLS,
       conversationId: 7,
-      fileIds: ['file_image_1', 'file_image_1', 'bad', '', null],
+      fileIds,
     });
 
     expect(response.ok).toBe(true);
     expect(imageMocks.resolveChatgptImageUrlsForStoredConversation).toHaveBeenCalledWith({
       conversationId: 7,
-      fileIds: ['file_image_1'],
+      fileIds,
       concurrency: 4,
+      timeoutMs: 15_000,
     });
   });
 
@@ -60,12 +62,12 @@ describe('ChatGPT image background handlers', () => {
     expect(imageMocks.resolveChatgptImageUrlsForStoredConversation).not.toHaveBeenCalled();
   });
 
-  it('returns an empty result without loading conversation metadata when no valid file ids remain', async () => {
+  it('returns an empty result without loading conversation metadata when the file-id batch is empty', async () => {
     const router = createRouter();
     const response = await router.dispatch({
       type: CHATGPT_MESSAGE_TYPES.RESOLVE_IMAGE_URLS,
       conversationId: 7,
-      fileIds: ['bad', '', null],
+      fileIds: [],
     });
 
     expect(response).toMatchObject({ ok: true, data: [] });

@@ -37,9 +37,7 @@ export function useChatgptFileSrcMap(input: {
     const fileIds = fileIdsKey ? fileIdsKey.split(',') : [];
     if (!conversationId || !fileIds.length) {
       setSrcByFileId(new Map());
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
 
     void resolveChatgptImageUrlsForConversation({ conversationId, fileIds })

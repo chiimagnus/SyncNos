@@ -157,6 +157,19 @@ describe('feishu docx image preprocess', () => {
     expect(result.markdownForConvert).not.toContain('chatgpt-file://');
   });
 
+  it('converts malformed ChatGPT internal image references to non-leaking placeholders', async () => {
+    const result = await preprocessFeishuDocxMarkdownImages('![bad](chatgpt-file://bad)', 1);
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+    expect(result.imageSourcesInOrder[0]).toMatchObject({
+      kind: 'chatgpt',
+      sourceUrl: 'chatgpt-file://bad',
+    });
+    expect(result.imageSourcesInOrder[0]?.blob).toBeUndefined();
+    expect(result.imageSourcesInOrder[0]?.urlForConvert).toMatch(/^https:\/\/syncnos\.invalid\/chatgpt\//);
+    expect(result.markdownForConvert).not.toContain('chatgpt-file://');
+  });
+
   it('keeps HTTP/data-image preprocessing unchanged and skips the local bulk reader when no local ids exist', async () => {
     const dataUrl = `data:image/png;base64,${Buffer.from(Uint8Array.of(4, 5, 6)).toString('base64')}`;
     const result = await preprocessFeishuDocxMarkdownImages(

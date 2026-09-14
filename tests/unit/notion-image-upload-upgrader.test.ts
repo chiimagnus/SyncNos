@@ -197,6 +197,21 @@ describe('notion-image-upload-upgrader', () => {
     expect(JSON.stringify(out)).not.toContain('chatgpt-file://');
   });
 
+  it('omits malformed ChatGPT internal image references without treating them as external URLs', async () => {
+    const createExternalUrlUpload = vi
+      .spyOn(notionFilesApi, 'createExternalURLUpload')
+      .mockResolvedValue({ id: 'unexpected' } as any);
+
+    const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('chatgpt-file://bad')] as any, 1);
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+    expect(createExternalUrlUpload).not.toHaveBeenCalled();
+    expect(out).toHaveLength(1);
+    expect(out[0]?.type).toBe('paragraph');
+    expect(paragraphText(out[0])).toContain('ChatGPT image upload failed');
+    expect(JSON.stringify(out)).not.toContain('chatgpt-file://');
+  });
+
   it('keeps data and HTTP image upload behavior outside the local bulk reader', async () => {
     const bulkRead = vi.spyOn(imageCacheRead, 'getImageCacheAssetsByIds');
     const dataUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([1, 2, 3])).toString('base64')}`;

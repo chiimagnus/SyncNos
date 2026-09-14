@@ -177,6 +177,34 @@ describe('local markdown export', () => {
     expect(markdown).not.toContain('chatgpt-file://');
   });
 
+  it('replaces malformed ChatGPT internal image references instead of leaking them into exports', async () => {
+    const c = {
+      ...conversation(1, 'Chat'),
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'conversation-1',
+    };
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [
+        {
+          messageKey: 'assistant-1',
+          role: 'assistant',
+          contentMarkdown: 'before\n\n![bad](chatgpt-file://bad)\n\nafter',
+        },
+      ],
+    });
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+
+    expect(mocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+    expect(markdown).toContain('[Image unavailable]');
+    expect(markdown).not.toContain('chatgpt-file://');
+    expect(markdown).toContain('before');
+    expect(markdown).toContain('after');
+  });
+
   it('consumes a scoped asset returned by the data layer without adding a second blob-size gate', async () => {
     const c = conversation(1, 'One');
     mocks.getConversationDetail.mockResolvedValue({

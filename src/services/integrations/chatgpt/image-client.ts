@@ -2,7 +2,7 @@ import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { send } from '@platform/runtime/runtime';
 import { normalizeChatgptFileId } from '@services/shared/chatgpt-image-identity';
 
-const RESOLVE_BATCH_SIZE = 16;
+const RESOLVE_BATCH_SIZE = 8;
 
 export async function resolveChatgptImageUrlsForConversation(input: {
   conversationId: number;

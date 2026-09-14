@@ -1,7 +1,7 @@
 import { openDb } from '@platform/idb/schema';
 import { downloadImageSmart } from '@platform/webext/image-download-proxy';
 import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
-import { chatgptFileIdFromUrl, isChatgptFileUrl } from '@services/shared/chatgpt-image-identity';
+import { chatgptFileIdFromUrl } from '@services/shared/chatgpt-image-identity';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import {
   collectMarkdownImageReferences,
@@ -71,12 +71,16 @@ function collectInlineCandidateUrls(references: readonly MarkdownImageReference[
   const output: string[] = [];
   for (const reference of references) {
     const url = reference.target;
-    if (!isDataImageUrl(url) && !isHttpUrl(url) && !isChatgptFileUrl(url)) continue;
+    if (!isDataImageUrl(url) && !isHttpUrl(url) && !chatgptFileIdFromUrl(url)) continue;
     if (seen.has(url)) continue;
     seen.add(url);
     output.push(url);
   }
   return output;
+}
+
+export function hasCacheableChatImageReference(markdown: unknown): boolean {
+  return collectInlineCandidateUrls(collectMarkdownImageReferences(markdown)).length > 0;
 }
 
 function parseContentType(value: unknown): string {
@@ -311,7 +315,7 @@ async function downloadImageAsBlob(input: {
   }
 }
 
-export type DeferredImageDownloadResult =
+type DeferredImageDownloadResult =
   | { cacheKey: string; ok: true; blob: Blob; byteSize: number; contentType: string }
   | { cacheKey: string; ok: false; reason?: string };
 
@@ -366,7 +370,7 @@ export async function inlineChatImagesInMessages(input: {
     parsedMessages.push({ message: msg, markdown, references, urls });
     for (const url of urls) {
       const isDataUrl = isDataImageUrl(url);
-      const isChatgptImage = !isDataUrl && isChatgptFileUrl(url);
+      const isChatgptImage = !isDataUrl && !!chatgptFileIdFromUrl(url);
       const isHttpImage = !isDataUrl && !isChatgptImage && isHttpUrl(url);
       if (isHttpImage && !enableHttpImages) continue;
       if (isChatgptImage && !enableChatgptImages) continue;
@@ -464,7 +468,7 @@ export async function inlineChatImagesInMessages(input: {
     for (const url of urls) {
       if (replacements.has(url)) continue;
       const isDataUrl = isDataImageUrl(url);
-      const isChatgptImage = !isDataUrl && isChatgptFileUrl(url);
+      const isChatgptImage = !isDataUrl && !!chatgptFileIdFromUrl(url);
       const isHttpImage = !isDataUrl && !isChatgptImage && isHttpUrl(url);
       if (isHttpImage && !enableHttpImages) continue;
       if (isChatgptImage && !enableChatgptImages) continue;

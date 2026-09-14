@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBDatabase, IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { hasCacheableChatImageReference, inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import {
   hasReusableImageCachePayload,
   reusableImageCacheByteSize,
@@ -53,6 +53,14 @@ afterEach(() => {
 });
 
 describe('image-inline', () => {
+  it('recognizes only image references that can still be cached', () => {
+    expect(hasCacheableChatImageReference('plain text')).toBe(false);
+    expect(hasCacheableChatImageReference('![](syncnos-asset://42)')).toBe(false);
+    expect(hasCacheableChatImageReference('![](chatgpt-file://file_remote_1)')).toBe(true);
+    expect(hasCacheableChatImageReference('![](https://example.com/image.png)')).toBe(true);
+    expect(hasCacheableChatImageReference('![](data:image/png;base64,AAAA)')).toBe(true);
+  });
+
   it('shares one persisted reusable-payload rule with conversation merge', () => {
     const valid = { blob: new Blob(['data'], { type: 'image/png' }), byteSize: 4 };
     expect(hasReusableImageCachePayload(valid)).toBe(true);

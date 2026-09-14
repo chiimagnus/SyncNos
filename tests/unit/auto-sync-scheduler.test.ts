@@ -109,6 +109,30 @@ describe('auto-sync-scheduler-core', () => {
     await expect(scheduler.enqueue(1, 'a')).rejects.toThrow('storage write failed');
   });
 
+  it('does not overwrite a durable queue when reading that queue fails', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    infraPack.storage[QUEUE_KEY] = { '9': infraPack.infra.now() + 30_000 };
+    const originalGet = infraPack.infra.storage.get;
+    infraPack.infra.storage.get = vi.fn(async (keys) => {
+      if (keys.includes(QUEUE_KEY)) throw new Error('queue read failed');
+      return await originalGet(keys);
+    });
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-storage-read-failure',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await expect(scheduler.enqueue(1, 'a')).rejects.toThrow('queue read failed');
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '9': infraPack.infra.now() + 30_000 });
+  });
+
   it('updates dueAt on repeated enqueue for same conversation', async () => {
     infraPack.storage[ENABLED_KEY] = true;
     const scheduler = createAutoSyncSchedulerCore({
@@ -326,30 +350,6 @@ describe('auto-sync-scheduler-core', () => {
     await scheduler.flush();
 
     expect(infraPack.storage[QUEUE_KEY]).toEqual({});
-  });
-
-  it('requeues only the successful-run subset explicitly requested for retry', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    const now = infraPack.infra.now();
-    infraPack.storage[QUEUE_KEY] = { '1': now - 1, '2': now - 1, '3': now + 30_000 };
-    syncConversations.mockResolvedValue({ retryConversationIds: [2], retryDelayMs: 120_000 });
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-partial-retry',
-      isProviderEnabled,
-      syncConversations,
-    });
-
-    await scheduler.flush();
-
-    expect(syncConversations).toHaveBeenCalledWith([1, 2], 'i-partial-retry');
-    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '2': now + 120_000, '3': now + 30_000 });
-    expect(infraPack.alarm.when).toBe(now + 30_000);
   });
 
   it('can persist enqueue without synchronously flushing when alarms are unavailable', async () => {

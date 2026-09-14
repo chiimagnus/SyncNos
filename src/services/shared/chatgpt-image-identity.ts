@@ -21,8 +21,8 @@ export function buildChatgptFileCacheKey(value: unknown): string {
   return fileId ? `chatgpt-file://${fileId}` : '';
 }
 
-export function isChatgptFileUrl(value: unknown): boolean {
-  return typeof value === 'string' && CHATGPT_FILE_URL_RE.test(value.trim());
+export function hasChatgptFileScheme(value: unknown): boolean {
+  return typeof value === 'string' && /^chatgpt-file:\/\//i.test(value.trim());
 }
 
 export function chatgptFileIdFromUrl(value: unknown): string {

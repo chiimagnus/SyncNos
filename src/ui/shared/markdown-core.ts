@@ -1,6 +1,6 @@
 import MarkdownIt from 'markdown-it';
 import linkAttributes from 'markdown-it-link-attributes';
-import { chatgptFileIdFromUrl } from '@services/shared/chatgpt-image-identity';
+import { chatgptFileIdFromUrl, hasChatgptFileScheme } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 const INTERNAL_IMAGE_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -128,6 +128,11 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       const finalSrc = safeResolved || INTERNAL_IMAGE_PLACEHOLDER_SRC;
       const img = `<img src="${inst.utils.escapeHtml(finalSrc)}" alt="${escapedAlt}" data-chatgpt-file-id="${inst.utils.escapeHtml(chatgptFileId)}"${titleAttr}>`;
       return safeResolved && isHttpUrl(safeResolved) ? renderExternalImageWithLink(img, safeResolved) : img;
+    }
+
+    if (hasChatgptFileScheme(safeSrc)) {
+      const escapedPlaceholder = inst.utils.escapeHtml(INTERNAL_IMAGE_PLACEHOLDER_SRC);
+      return `<img src="${escapedPlaceholder}" alt="${escapedAlt}"${titleAttr}>`;
     }
 
     const escapedSrc = inst.utils.escapeHtml(safeSrc);

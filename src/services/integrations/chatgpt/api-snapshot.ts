@@ -16,14 +16,12 @@ export type ChatgptApiSnapshotResult = {
 
 type PendingImage = {
   fileId: string;
-  cacheKey: string;
   alt: string;
   turnId: string;
 };
 
 type PendingAuxiliary = {
   turnId: string;
-  kind: 'thoughts' | 'reasoning_recap' | 'commentary';
   markdown: string;
 };
 
@@ -249,7 +247,6 @@ function collectMessageImages(message: any, onSchemaDrift: SchemaDriftReporter):
     const attachment = matchingAttachment(message, fileId, onSchemaDrift);
     assets.push({
       fileId,
-      cacheKey: buildChatgptFileCacheKey(fileId),
       alt: imageAlt(message, attachment),
       turnId,
     });
@@ -309,7 +306,7 @@ function renderImageBlocks(images: readonly PendingImage[]): string {
   const seen = new Set<string>();
   const blocks: string[] = [];
   for (const image of images) {
-    const target = stableString(image.cacheKey);
+    const target = buildChatgptFileCacheKey(image.fileId);
     if (!target || seen.has(target)) continue;
     seen.add(target);
     blocks.push(`![${safeImageAlt(image.alt)}](${target})`);
@@ -477,11 +474,7 @@ export function buildChatgptApiSnapshot(input: {
         startTurn(turnId);
         const markdown = renderAuxiliary(message, markSchemaDrift);
         if (markdown) {
-          pendingAuxiliary.push({
-            turnId,
-            kind: type === 'thoughts' ? 'thoughts' : type === 'reasoning_recap' ? 'reasoning_recap' : 'commentary',
-            markdown,
-          });
+          pendingAuxiliary.push({ turnId, markdown });
         }
         continue;
       }

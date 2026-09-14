@@ -1,7 +1,7 @@
 import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read.ts';
 import { downloadChatgptImagesForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
-import { chatgptFileIdFromUrl, isChatgptFileUrl } from '@services/shared/chatgpt-image-identity';
+import { chatgptFileIdFromUrl, hasChatgptFileScheme } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
@@ -210,7 +210,7 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any[
     const assetId = parseSyncnosAssetId(url);
     const isInternalAsset = isSyncnosAssetUrl(url);
     const chatgptFileId = chatgptFileIdFromUrl(url);
-    const isChatgptImage = isChatgptFileUrl(url);
+    const isChatgptImage = hasChatgptFileScheme(url);
     const isDataImage = isDataImageUrl(url);
     let uploadId = cache.get(url) || '';
     if (!uploadId) {

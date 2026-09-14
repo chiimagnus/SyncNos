@@ -446,6 +446,138 @@ describe('obsidian-sync-orchestrator', () => {
     expect(String(markdownPut?.body || '')).not.toContain('chatgpt-file://');
   });
 
+  it('keeps Obsidian text sync usable when remote ChatGPT images are unavailable or malformed', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'chatgpt-image-failure',
+      title: 'Remote image failure',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      {
+        messageKey: 'm1',
+        sequence: 1,
+        contentMarkdown: [
+          'before',
+          '![missing](chatgpt-file://file_missing_1)',
+          '![malformed](chatgpt-file://bad)',
+          'after',
+        ].join('\n\n'),
+        updatedAt: 1,
+      },
+    ]);
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      { cacheKey: 'chatgpt-file://file_missing_1', ok: false, reason: 'resolver' },
+    ]);
+
+    const seen: Array<{ method: string; url: string; body: unknown }> = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      seen.push({ method, url: String(url), body: init?.body });
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(syncRes.results[0].ok).toBe(true);
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 1,
+      fileIds: ['file_missing_1'],
+      concurrency: 4,
+    });
+    const puts = seen.filter((call) => call.method === 'PUT');
+    expect(puts).toHaveLength(1);
+    const markdown = String(puts[0]?.body || '');
+    expect(markdown.match(/\[Image unavailable\]/g)).toHaveLength(2);
+    expect(markdown).not.toContain('chatgpt-file://');
+    expect(markdown).toContain('before');
+    expect(markdown).toContain('after');
+  });
+
+  it('keeps Obsidian text sync usable when a ChatGPT attachment upload fails', async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'chatgpt-upload-failure',
+      title: 'Remote upload failure',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      {
+        messageKey: 'm1',
+        sequence: 1,
+        contentMarkdown: 'before\n\n![generated](chatgpt-file://file_generated_1)\n\nafter',
+        updatedAt: 1,
+      },
+    ]);
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+
+    const markdownPuts: string[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (method === 'PUT') {
+        if (typeof init?.body !== 'string') {
+          return new Response(JSON.stringify({ message: 'attachment failed' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        markdownPuts.push(init.body);
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected:${method}`);
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+
+    expect(syncRes.results[0].ok).toBe(true);
+    expect(markdownPuts).toHaveLength(1);
+    expect(markdownPuts[0]).toContain('[Image unavailable]');
+    expect(markdownPuts[0]).not.toContain('chatgpt-file://');
+  });
+
   it.each([
     ['missing asset', 'missing'],
     ['bulk read rejection', 'reject'],

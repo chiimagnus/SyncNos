@@ -20,7 +20,7 @@ import { downloadChatgptImagesForStoredConversation } from '@services/integratio
 import {
   buildChatgptFileCacheKey,
   chatgptFileIdFromUrl,
-  isChatgptFileUrl,
+  hasChatgptFileScheme,
 } from '@services/shared/chatgpt-image-identity';
 import {
   collectMarkdownImageReferences,
@@ -103,7 +103,7 @@ async function materializeMarkdownAssetsForObsidian({
   }
 
   const internalReferences = collectMarkdownImageReferences(targetMarkdown).filter(
-    (reference) => isSyncnosAssetUrl(reference.target) || isChatgptFileUrl(reference.target),
+    (reference) => isSyncnosAssetUrl(reference.target) || hasChatgptFileScheme(reference.target),
   );
   if (!internalReferences.length) return targetMarkdown;
 
@@ -127,7 +127,7 @@ async function materializeMarkdownAssetsForObsidian({
       continue;
     }
     const fileId = chatgptFileIdFromUrl(reference.target);
-    if (!fileId) throw new Error('invalid ChatGPT image target');
+    if (!fileId) continue;
     if (!seenChatgptFileIds.has(fileId)) {
       seenChatgptFileIds.add(fileId);
       targetChatgptFileIds.push(fileId);
@@ -168,9 +168,6 @@ async function materializeMarkdownAssetsForObsidian({
       const image = downloaded[index];
       if (image) chatgptImageByFileId.set(fileId, image);
     });
-    for (const fileId of targetChatgptFileIds) {
-      if (!chatgptImageByFileId.get(fileId)?.ok) throw new Error(`ChatGPT image unavailable: ${fileId}`);
-    }
   }
 
   const noteBase = buildNoteBasenameFromFilePath(filePath);
@@ -203,21 +200,27 @@ async function materializeMarkdownAssetsForObsidian({
     );
   }
   for (const fileId of targetChatgptFileIds) {
-    const image = chatgptImageByFileId.get(fileId)!;
-    if (!image.ok) continue;
+    const image = chatgptImageByFileId.get(fileId);
+    if (!image?.ok) continue;
     const ext = inferImageExtFromAsset({ contentType: image.contentType, url: '' });
-    await upload(
-      `chatgpt:${fileId}`,
-      buildChatgptFileCacheKey(fileId),
-      image.blob,
-      safeString(image.contentType) || `image/${ext}`,
-      ext,
-    );
+    try {
+      await upload(
+        `chatgpt:${fileId}`,
+        buildChatgptFileCacheKey(fileId),
+        image.blob,
+        safeString(image.contentType) || `image/${ext}`,
+        ext,
+      );
+    } catch (_error) {
+      // Remote ChatGPT images are optional for text sync; leave a placeholder below.
+    }
   }
 
   return replaceMarkdownImageReferences(targetMarkdown, internalReferences, (reference) => {
     const target = replacementByTarget.get(reference.target);
-    return target ? { target } : null;
+    if (target) return { target };
+    if (hasChatgptFileScheme(reference.target)) return { replacement: '[Image unavailable]' };
+    return null;
   });
 }
 

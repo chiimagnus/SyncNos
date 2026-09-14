@@ -23,6 +23,7 @@ export async function resolveChatgptImageUrlsForStoredConversation(input: {
   conversationId: number;
   fileIds: Iterable<unknown>;
   concurrency?: number;
+  timeoutMs?: number;
 }): Promise<ChatgptImageUrlResolution[]> {
   const conversationKey = await readChatgptConversationKey(input.conversationId);
   if (!conversationKey) return [];
@@ -30,6 +31,7 @@ export async function resolveChatgptImageUrlsForStoredConversation(input: {
     conversationKey,
     fileIds: input.fileIds,
     concurrency: input.concurrency,
+    ...(input.timeoutMs == null ? null : { timeoutMs: input.timeoutMs }),
   });
 }
 

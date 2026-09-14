@@ -1,6 +1,7 @@
 import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { resolveChatgptImageUrlsForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
-import { normalizeChatgptFileId } from '@services/shared/chatgpt-image-identity';
+
+const IMAGE_URL_RESOLVE_TIMEOUT_MS = 15_000;
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -13,14 +14,16 @@ export function registerChatgptImageHandlers(router: AnyRouter): void {
     const conversationId = Number(msg?.conversationId);
     if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
 
-    const fileIds = Array.isArray(msg?.fileIds)
-      ? msg.fileIds
-          .map(normalizeChatgptFileId)
-          .filter(Boolean)
-          .filter((value: string, index: number, values: string[]) => values.indexOf(value) === index)
-      : [];
+    const fileIds = Array.isArray(msg?.fileIds) ? msg.fileIds : [];
     if (!fileIds.length) return router.ok([]);
 
-    return router.ok(await resolveChatgptImageUrlsForStoredConversation({ conversationId, fileIds, concurrency: 4 }));
+    return router.ok(
+      await resolveChatgptImageUrlsForStoredConversation({
+        conversationId,
+        fileIds,
+        concurrency: 4,
+        timeoutMs: IMAGE_URL_RESOLVE_TIMEOUT_MS,
+      }),
+    );
   });
 }

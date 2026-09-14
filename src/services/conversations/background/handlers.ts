@@ -14,9 +14,8 @@ import {
   updateConversationUrlById,
   upsertConversation,
 } from '@services/conversations/data/storage';
-import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { hasCacheableChatImageReference, inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
-import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
 import {
   ABOUT_YOU_USER_NAME_STORAGE_KEY,
   DEFAULT_ABOUT_YOU_USER_NAME,
@@ -386,8 +385,8 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         });
       }
     } else if (sourceType === 'chat') {
-      shouldScheduleChatImageBackfill = messages.some(
-        (message: any) => collectMarkdownImageReferences(message?.contentMarkdown).length > 0,
+      shouldScheduleChatImageBackfill = messages.some((message: any) =>
+        hasCacheableChatImageReference(message?.contentMarkdown),
       );
     }
 

@@ -18,11 +18,6 @@ export type AutoSyncScheduler = {
   flush: () => Promise<void>;
 };
 
-export type AutoSyncSchedulerRunResult = void | {
-  retryConversationIds?: readonly number[];
-  retryDelayMs?: number;
-};
-
 type QueueMap = Record<string, number>;
 
 function normalizeQueue(value: unknown): QueueMap {
@@ -72,7 +67,7 @@ export function createAutoSyncSchedulerCore(config: {
   infra: AutoSyncSchedulerInfra;
   getInstanceId: () => string;
   isProviderEnabled: () => Promise<boolean>;
-  syncConversations: (conversationIds: number[], instanceId: string) => Promise<AutoSyncSchedulerRunResult>;
+  syncConversations: (conversationIds: number[], instanceId: string) => Promise<void>;
   getFailureRetryDelayMs?: (error: unknown) => number | null | undefined;
   flushWhenAlarmsUnavailable?: boolean;
 }): AutoSyncScheduler {
@@ -91,7 +86,7 @@ export function createAutoSyncSchedulerCore(config: {
   } = config;
 
   const readQueue = async (): Promise<QueueMap> => {
-    const res = await infra.storage.get([queueStorageKey]).catch(() => ({}) as any);
+    const res = await infra.storage.get([queueStorageKey]);
     return normalizeQueue((res as any)?.[queueStorageKey]);
   };
 
@@ -171,18 +166,7 @@ export function createAutoSyncSchedulerCore(config: {
     }
 
     try {
-      const result = await syncConversations(dueConversationIds, instanceId);
-      const retryConversationIds = normalizeSyncConversationIds(result?.retryConversationIds || []);
-      const retryDelayMs = Number(result?.retryDelayMs);
-      if (retryConversationIds.length && Number.isFinite(retryDelayMs) && retryDelayMs > 0) {
-        const delayedQueue: QueueMap = { ...restQueue };
-        const delayedDueAt = now + Math.floor(retryDelayMs);
-        for (const conversationId of retryConversationIds) delayedQueue[String(conversationId)] = delayedDueAt;
-        const trimmed = trimQueue(delayedQueue, maxItems);
-        await writeQueue(trimmed);
-        await scheduleNextAlarm(trimmed);
-        return;
-      }
+      await syncConversations(dueConversationIds, instanceId);
       await writeQueue(restQueue);
       await scheduleNextAlarm(restQueue);
     } catch (error) {

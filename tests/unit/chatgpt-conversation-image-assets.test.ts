@@ -31,6 +31,7 @@ describe('stored ChatGPT conversation image assets', () => {
       conversationId: 7,
       fileIds: ['file_image_1'],
       concurrency: 4,
+      timeoutMs: 15_000,
     });
 
     expect(storageMocks.getConversationById).toHaveBeenCalledWith(7);
@@ -38,6 +39,7 @@ describe('stored ChatGPT conversation image assets', () => {
       conversationKey: 'conversation-7',
       fileIds: ['file_image_1'],
       concurrency: 4,
+      timeoutMs: 15_000,
     });
   });
 

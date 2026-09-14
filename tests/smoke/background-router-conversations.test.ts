@@ -44,6 +44,10 @@ vi.mock('@platform/storage/local', () => ({
 
 vi.mock('@services/conversations/data/image-inline', () => ({
   inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
+  hasCacheableChatImageReference: (markdown: unknown) => {
+    const value = String(markdown || '');
+    return /!\[[^\]]*\]\((?:https?:\/\/|data:image\/|chatgpt-file:\/\/)/i.test(value);
+  },
 }));
 
 vi.mock('@services/conversations/background/image-backfill-job', () => ({
@@ -254,6 +258,27 @@ describe('background-router conversations', () => {
     expect(scheduleImageBackfill).not.toHaveBeenCalled();
     expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
     expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2001, messages, {
+      mode: 'snapshot',
+      diff: null,
+    });
+  });
+
+  it('does not schedule AI chat image backfill for already-local image references', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const messages = [{ messageKey: 'm-local', role: 'assistant', contentMarkdown: '![](syncnos-asset://42)' }];
+    const router = createRouter({ scheduleImageBackfill });
+
+    const res = await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 2002,
+      conversationSourceType: 'chat',
+      messages,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(scheduleImageBackfill).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2002, messages, {
       mode: 'snapshot',
       diff: null,
     });
