@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { toCanonicalCommentQuote, toDisplayCommentQuote } from '../../src/services/comments/locator/comment-quote-policy';
+import {
+  toCanonicalCommentQuote,
+  toDisplayCommentQuote,
+} from '../../src/services/comments/locator/comment-quote-policy';
 
 describe('comment quote policy', () => {
   test('canonical quote keeps full text, line breaks, and zero-width characters', () => {

@@ -31,7 +31,7 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
         id: 'web',
         matches: () => true,
         inpageMatches: () => true,
-        collector: { capture: () => null },
+        collector: { capture: () => null, getCaptureReadiness: () => 'ready' as const },
       },
     ],
   };

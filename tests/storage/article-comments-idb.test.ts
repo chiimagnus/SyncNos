@@ -96,7 +96,6 @@ describe('article comments storage-idb', () => {
     const c1 = await addArticleComment({
       conversationId: null,
       canonicalUrl: url,
-      quoteText: 'q',
       commentText: 'hello',
       createdAt: 10,
     });
@@ -120,6 +119,50 @@ describe('article comments storage-idb', () => {
 
     const after = await listArticleCommentsByCanonicalUrl('https://example.com/a');
     expect(after.map((c) => c.id)).toEqual([c2.id]);
+  });
+
+  it('splits quote + immediate comment into independently deletable attributed nodes', async () => {
+    const locator = {
+      v: 1 as const,
+      env: 'app' as const,
+      quote: { type: 'TextQuoteSelector' as const, exact: 'quoted text' },
+      position: { type: 'TextPositionSelector' as const, start: 0, end: 11 },
+    };
+    const root = await addArticleComment({
+      conversationId: 7,
+      canonicalUrl: 'https://example.com/split-note',
+      authorName: 'Chii',
+      quoteText: 'quoted text',
+      commentText: 'immediate comment',
+      locator,
+      createdAt: 100,
+      updatedAt: 101,
+    });
+
+    const saved = await listArticleCommentsByConversationId(7);
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject({
+      id: root.id,
+      parentId: null,
+      authorName: 'Chii',
+      quoteText: 'quoted text',
+      commentText: '',
+      locator,
+      createdAt: 100,
+      updatedAt: 101,
+    });
+    expect(saved[1]).toMatchObject({
+      parentId: root.id,
+      authorName: 'Chii',
+      quoteText: '',
+      commentText: 'immediate comment',
+      locator: null,
+      createdAt: 100,
+      updatedAt: 101,
+    });
+
+    expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: 7 });
+    expect(await listArticleCommentsByConversationId(7)).toEqual([]);
   });
 
   it('stores highlight-only roots with a locator but still rejects empty unanchored roots and replies', async () => {
@@ -252,11 +295,13 @@ describe('article comments storage-idb', () => {
     expect(second).toEqual({ created: 0, updated: 2 });
 
     const comments = await listArticleCommentsByConversationId(7);
-    expect(comments).toHaveLength(2);
+    expect(comments).toHaveLength(3);
     expect(comments.map((item) => [item.authorName, item.quoteText, item.commentText])).toEqual([
       ['Chii', '原文划线', ''],
-      ['Chii', '带批注的原文', '修改后的批注'],
+      ['Chii', '带批注的原文', ''],
+      ['Chii', '', '修改后的批注'],
     ]);
+    expect(comments[2].parentId).toBe(comments[1].id);
   });
 
   it('returns a stable missing result without revision churn or guessing context from malformed children', async () => {
@@ -279,7 +324,7 @@ describe('article comments storage-idb', () => {
     ).toEqual([childId]);
   });
 
-  it('round-trips author metadata and V1/V2 locators without field loss', async () => {
+  it('keeps author metadata on both quote and immediate-comment nodes while preserving the locator on the quote', async () => {
     const v2 = {
       v: 2 as const,
       textModelVersion: 'dom-text-v2' as const,
@@ -299,10 +344,18 @@ describe('article comments storage-idb', () => {
       createdAt: 100,
       updatedAt: 101,
     });
-    const [read] = await listArticleCommentsByCanonicalUrl('https://example.com/v2');
+    const [read, child] = await listArticleCommentsByCanonicalUrl('https://example.com/v2');
     expect(read).toEqual(saved);
     expect(read.authorName).toBe('Alice');
+    expect(read.commentText).toBe('');
     expect(read.locator).toEqual(v2);
+    expect(child).toMatchObject({
+      parentId: read.id,
+      authorName: 'Alice',
+      quoteText: '',
+      commentText: 'note',
+      locator: null,
+    });
   });
 
   it('rejects missing, nested, and cross-context reply parents', async () => {
@@ -440,7 +493,9 @@ describe('article comments storage-idb', () => {
       updatedAt: 5,
     });
     expect(await deleteArticleCommentById(5101)).toEqual({ deleted: true, conversationId: null });
-    expect((await listArticleCommentsByCanonicalUrl(url)).map((item) => item.id)).toEqual([rootId, middleId]);
+    const afterCycleDelete = await listArticleCommentsByCanonicalUrl(url);
+    expect(afterCycleDelete.map((item) => item.id)).toEqual([rootId, middleId, 5102]);
+    expect(afterCycleDelete.find((item) => item.id === 5102)?.parentId).toBe(5101);
   });
 
   it('skips malformed fractional owners while resolving the nearest valid ancestor owner', async () => {
@@ -485,13 +540,12 @@ describe('article comments storage-idb', () => {
     expect(await deleteArticleCommentById(targetId)).toEqual({ deleted: true, conversationId: 71 });
   });
 
-  it('supports replies and cascades delete on root', async () => {
+  it('deletes the entire thread when the root is deleted', async () => {
     const url = 'https://example.com/thread';
     const root = await addArticleComment({
       parentId: null,
       conversationId: null,
       canonicalUrl: url,
-      quoteText: 'quote',
       commentText: 'root',
       createdAt: 10,
     });
@@ -522,7 +576,7 @@ describe('article comments storage-idb', () => {
     }
     expect(await readDataRevision('article_comments')).toBe(beforeDeleteRevision + 1);
     const after = await listArticleCommentsByCanonicalUrl(url);
-    expect(after.length).toBe(0);
+    expect(after).toEqual([]);
   });
 
   it('deletes deep descendants and target-connected cycles in one revision per delete', async () => {
@@ -592,12 +646,16 @@ describe('article comments storage-idb', () => {
     const before = await readDataRevision('article_comments');
     expect(await deleteArticleCommentById(root.id)).toEqual({ deleted: true, conversationId: 1 });
     expect(await readDataRevision('article_comments')).toBe(before + 1);
-    expect((await listArticleCommentsByCanonicalUrl(url)).map((item) => item.id)).toEqual([6003, 6004, 6005]);
+    const afterRootDelete = await listArticleCommentsByCanonicalUrl(url);
+    expect(afterRootDelete.map((item) => item.id)).toEqual([6003, 6004, 6005]);
 
     const beforeCycleDelete = await readDataRevision('article_comments');
     expect(await deleteArticleCommentById(6003)).toEqual({ deleted: true, conversationId: 1 });
     expect(await readDataRevision('article_comments')).toBe(beforeCycleDelete + 1);
-    expect(await listArticleCommentsByCanonicalUrl(url)).toEqual([]);
+    const afterCycleDelete = await listArticleCommentsByCanonicalUrl(url);
+    expect(afterCycleDelete.map((item) => item.id)).toEqual([6004, 6005]);
+    expect(afterCycleDelete.find((item) => item.id === 6004)?.parentId).toBe(6003);
+    expect(afterCycleDelete.find((item) => item.id === 6005)?.parentId).toBe(6004);
   });
 
   it('fails instead of fabricating empty comment results when IDBKeyRange is unavailable', async () => {

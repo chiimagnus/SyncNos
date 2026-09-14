@@ -40,7 +40,10 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     const silent = options?.silent === true;
     if (!silent) setChecking(true);
     try {
-      const response = await send<ApiResponse<CurrentPageCaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
+      const response = await send<ApiResponse<CurrentPageCaptureState>>(
+        UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE,
+        {},
+      );
       const nextState = unwrap(response);
       setCaptureState(nextState);
       if (nextState.readiness === 'waiting') {

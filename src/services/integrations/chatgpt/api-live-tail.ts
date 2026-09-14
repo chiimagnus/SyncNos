@@ -71,10 +71,7 @@ function appendMessage(messages: any[], incoming: any): any[] {
  * The DOM candidate is accepted only when every message has a stable backend id and
  * the current user message anchors to the backend branch (or can itself be appended).
  */
-export function augmentChatgptApiSnapshotWithLiveTurn(
-  snapshot: any,
-  live: ChatgptApiLiveTurnCapture,
-): any {
+export function augmentChatgptApiSnapshotWithLiveTurn(snapshot: any, live: ChatgptApiLiveTurnCapture): any {
   if (live.kind === 'none') return snapshot;
   if (live.kind === 'identity_changed') {
     throw Object.assign(new Error('chatgpt_api_navigation_changed'), { code: 'chatgpt_api_navigation_changed' });

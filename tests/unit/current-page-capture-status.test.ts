@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCaptureWaitingMessage, buildPartialCaptureMessage } from '@services/bootstrap/current-page-capture-status';
+import {
+  buildCaptureWaitingMessage,
+  buildPartialCaptureMessage,
+} from '@services/bootstrap/current-page-capture-status';
 import { t } from '@i18n';
 
 describe('current-page capture status semantics', () => {

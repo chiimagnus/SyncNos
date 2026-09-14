@@ -1,9 +1,12 @@
 import { toDisplayCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
+import { commentAuthorLabel, formatCommentTime } from './comment-display';
 
 type CommentQuotePreviewProps = {
   text: string;
   variant: 'composer' | 'thread';
+  authorName?: string | null;
+  createdAt?: number | null;
   invalid?: boolean;
   onClear?: () => void;
   onLocate?: () => void | Promise<void>;
@@ -15,6 +18,8 @@ type CommentQuotePreviewProps = {
 export function CommentQuotePreview({
   text,
   variant,
+  authorName,
+  createdAt,
   invalid = false,
   onClear,
   onLocate,
@@ -28,8 +33,16 @@ export function CommentQuotePreview({
     variant === 'composer'
       ? 'webclipper-inpage-comments-panel__quote'
       : 'webclipper-inpage-comments-panel__thread-quote';
+  const author = commentAuthorLabel(authorName);
+  const time = formatCommentTime(createdAt);
   return (
     <div className={`${className}${invalid ? ' is-invalid' : ''}`} data-locator-invalid={invalid ? '1' : undefined}>
+      {variant === 'thread' ? (
+        <div className="webclipper-inpage-comments-panel__quote-meta">
+          <span className="webclipper-inpage-comments-panel__comment-author">{author}</span>
+          {time ? <time className="webclipper-inpage-comments-panel__comment-time">{time}</time> : null}
+        </div>
+      ) : null}
       <div className="webclipper-inpage-comments-panel__text webclipper-inpage-comments-panel__quote-text">
         {displayText}
       </div>

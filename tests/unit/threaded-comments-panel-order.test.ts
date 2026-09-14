@@ -96,6 +96,36 @@ describe('Threaded comments panel ordering', () => {
     mounted.cleanup();
   });
 
+  it('renders an attributed quote root without an empty root-comment row', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
+      {
+        id: 20,
+        parentId: null,
+        createdAt: 1000,
+        authorName: 'Chii',
+        quoteText: 'quoted root',
+        commentText: '',
+        importSource: 'dedao',
+        importKey: 'quote-20',
+      },
+      { id: 21, parentId: 20, createdAt: 1001, authorName: 'Chii', quoteText: '', commentText: 'comment child' },
+    ]);
+
+    const shadow = host.querySelector('webclipper-threaded-comments-panel')?.shadowRoot;
+    const thread = shadow!.querySelector('[data-thread-root-id="20"]') as HTMLElement;
+    expect(thread.querySelector('.webclipper-inpage-comments-panel__thread-quote')?.textContent).toContain('Chii');
+    expect(thread.querySelector('.webclipper-inpage-comments-panel__thread-quote')?.textContent).toContain(
+      'quoted root',
+    );
+    expect(thread.querySelectorAll('.webclipper-inpage-comments-panel__comment')).toHaveLength(0);
+    expect(thread.querySelector('.webclipper-inpage-comments-panel__reply')?.textContent).toContain('comment child');
+
+    mounted.cleanup();
+  });
+
   it('uses the canonical graph for orphan and nested reply placement', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

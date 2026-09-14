@@ -211,7 +211,7 @@ describe('Threaded comments panel locate', () => {
     expect(document.querySelector('[data-webclipper-comment-highlights]')).toBeNull();
   });
 
-  it('locates an imported Dedao root when its comment body is activated', async () => {
+  it('locates an imported Dedao quote root when its quote is activated', async () => {
     const scrollRoot = createScrollRoot();
     const article = document.createElement('article');
     article.textContent = 'Hello world';
@@ -243,9 +243,9 @@ describe('Threaded comments panel locate', () => {
     await flushReactScheduler();
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
-    const rootComment = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement;
+    const rootQuote = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__thread-quote') as HTMLElement;
     const beforeBodyClick = (resolveCommentAnchor as any).mock.calls.length;
-    rootComment.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    rootQuote.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     await flushReactScheduler();
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 

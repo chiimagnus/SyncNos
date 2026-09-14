@@ -2,21 +2,7 @@ import type { CommentSidebarItem } from '@services/comments/sidebar/comment-side
 import type { KeyboardEvent, ReactNode, Ref } from 'react';
 import { CommentOverflowMenu, type CommentOverflowAction } from './CommentOverflowMenu';
 import { CommentReplyList } from './CommentReplyList';
-
-function formatTime(ts: number | null | undefined): string {
-  const value = Number(ts);
-  if (!Number.isFinite(value) || value <= 0) return '';
-  try {
-    return new Date(value).toLocaleString();
-  } catch (_error) {
-    return '';
-  }
-}
-
-function avatarLabel(name: string | null | undefined): string {
-  const value = String(name || 'You').trim();
-  return Array.from(value)[0]?.toUpperCase() || 'Y';
-}
+import { commentAuthorLabel, commentAvatarLabel, formatCommentTime } from './comment-display';
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
@@ -64,7 +50,7 @@ export function CommentThread({
   onMenuAction,
 }: CommentThreadProps) {
   const rootId = Number(root.id);
-  const author = String(root.authorName || 'You');
+  const author = commentAuthorLabel(root.authorName);
   return (
     <article
       className={`webclipper-inpage-comments-panel__thread${active ? ' is-active' : ''}`}
@@ -72,11 +58,13 @@ export function CommentThread({
       role="listitem"
       tabIndex={0}
       aria-current={active ? 'true' : undefined}
-      aria-label={`Comment by ${author}`}
+      aria-label={`Note by ${author}`}
       onClick={(event) => {
         const target = event.target as HTMLElement | null;
-        const primaryComment = target?.closest('.webclipper-inpage-comments-panel__comment');
-        if (primaryComment && !isInteractiveTarget(event.target)) onActivate(rootId);
+        const primaryContent = target?.closest(
+          '.webclipper-inpage-comments-panel__comment, .webclipper-inpage-comments-panel__thread-quote',
+        );
+        if (primaryContent && !isInteractiveTarget(event.target)) onActivate(rootId);
       }}
       onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
         if (isInteractiveTarget(event.target)) return;
@@ -86,33 +74,35 @@ export function CommentThread({
       }}
     >
       {quotePreview}
-      <div className="webclipper-inpage-comments-panel__comment">
-        <div className="webclipper-inpage-comments-panel__avatar" aria-hidden="true">
-          {avatarLabel(author)}
-        </div>
-        <div className="webclipper-inpage-comments-panel__comment-main">
-          <div className="webclipper-inpage-comments-panel__comment-header">
-            <div className="webclipper-inpage-comments-panel__comment-meta">
-              <span className="webclipper-inpage-comments-panel__comment-author">{author}</span>
-              <time className="webclipper-inpage-comments-panel__comment-time">{formatTime(root.createdAt)}</time>
-            </div>
-            <div className="webclipper-inpage-comments-panel__comment-actions">
-              <CommentOverflowMenu
-                targetLabel="Comment actions"
-                open={openMenuId === rootId}
-                disabled={busy}
-                actions={rootMenuActions}
-                triggerRef={rootMenuTriggerRef}
-                onToggle={() => onRootMenuToggle(rootId)}
-                onAction={(action) => onMenuAction(rootId, action)}
-              />
-            </div>
+      {String(root.commentText || '').trim() ? (
+        <div className="webclipper-inpage-comments-panel__comment">
+          <div className="webclipper-inpage-comments-panel__avatar" aria-hidden="true">
+            {commentAvatarLabel(author)}
           </div>
-          {String(root.commentText || '').trim() ? (
+          <div className="webclipper-inpage-comments-panel__comment-main">
+            <div className="webclipper-inpage-comments-panel__comment-header">
+              <div className="webclipper-inpage-comments-panel__comment-meta">
+                <span className="webclipper-inpage-comments-panel__comment-author">{author}</span>
+                <time className="webclipper-inpage-comments-panel__comment-time">
+                  {formatCommentTime(root.createdAt)}
+                </time>
+              </div>
+              <div className="webclipper-inpage-comments-panel__comment-actions">
+                <CommentOverflowMenu
+                  targetLabel="Comment actions"
+                  open={openMenuId === rootId}
+                  disabled={busy}
+                  actions={rootMenuActions}
+                  triggerRef={rootMenuTriggerRef}
+                  onToggle={() => onRootMenuToggle(rootId)}
+                  onAction={(action) => onMenuAction(rootId, action)}
+                />
+              </div>
+            </div>
             <div className="webclipper-inpage-comments-panel__text">{String(root.commentText || '')}</div>
-          ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
       <CommentReplyList
         replies={replies}
         busy={busy}

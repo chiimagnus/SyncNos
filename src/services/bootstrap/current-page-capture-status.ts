@@ -35,7 +35,9 @@ const HISTORY_PARTIAL_REASONS = new Set([
 const MEDIA_PARTIAL_REASONS = new Set(['deep_research_hydration_incomplete', 'inline_images_incomplete']);
 
 function normalizeCollectorId(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function captureSourceLabel(collectorId: unknown): string {

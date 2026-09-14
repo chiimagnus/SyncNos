@@ -375,6 +375,12 @@ describe('backup -> Notion sync continuity', () => {
       authorName: 'Alice',
       quoteText: 'Stable quote',
       commentText: 'Stable root comment',
+      locator: {
+        v: 1,
+        env: 'app',
+        quote: { type: 'TextQuoteSelector', exact: 'Stable quote' },
+        position: { type: 'TextPositionSelector', start: 0, end: 12 },
+      },
       createdAt: 300,
       updatedAt: 300,
     });
@@ -389,8 +395,8 @@ describe('backup -> Notion sync continuity', () => {
       updatedAt: 310,
     });
     const commentsA = await listArticleCommentsByConversationId(conversationIdA);
-    expect(commentsA).toHaveLength(2);
-    expect(commentsA.map((comment) => comment.id).sort((a, b) => a - b)).toEqual([3, 4]);
+    expect(commentsA).toHaveLength(3);
+    expect(commentsA.map((comment) => comment.id).sort((a, b) => a - b)).toEqual([3, 4, 5]);
     const commentsSectionDigest = computeNotionCommentsDigest(commentsA);
 
     const dbAMapping = await openDb();
@@ -423,8 +429,8 @@ describe('backup -> Notion sync continuity', () => {
 
     const conversationIdB = await getOnlyConversationId();
     const importedComments = await listArticleCommentsByConversationId(conversationIdB);
-    expect(importedComments).toHaveLength(2);
-    expect(importedComments.map((comment) => comment.id).sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(importedComments).toHaveLength(3);
+    expect(importedComments.map((comment) => comment.id).sort((a, b) => a - b)).toEqual([1, 2, 3]);
     expect(computeNotionCommentsDigest(importedComments)).toBe(commentsSectionDigest);
 
     const imported = await backgroundStorage.getSyncMappingByConversation(conversationIdB);

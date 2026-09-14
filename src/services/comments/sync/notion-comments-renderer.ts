@@ -2,7 +2,7 @@ import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 
 const MAX_TEXT = 1900;
-const NOTION_COMMENTS_DIGEST_VERSION = 7;
+const NOTION_COMMENTS_DIGEST_VERSION = 8;
 const DEFAULT_COMMENT_AUTHOR = 'You';
 
 function pad2(value: number): string {
@@ -100,21 +100,9 @@ function bulletedItemBlock(content: string, children?: any[]) {
   } as any;
 }
 
-function commentItemBlock(input: {
-  authorName?: unknown;
-  commentText: unknown;
-  createdAt: unknown;
-  extraChildren?: any[];
-}) {
+function commentItemBlock(input: { authorName?: unknown; commentText: unknown; createdAt: unknown }) {
   const metaLine = formatCommentMetaLine({ authorName: input?.authorName, createdAt: input?.createdAt });
-  const commentText = safeString(input?.commentText);
-  const commentParts = splitText(commentText);
-
-  const children: any[] = [];
-  if (commentParts.length) children.push(...paragraphBlocksFromParts(commentParts));
-  if (Array.isArray(input?.extraChildren) && input.extraChildren.length) children.push(...input.extraChildren);
-
-  return bulletedItemBlock(metaLine, children);
+  return bulletedItemBlock(metaLine, paragraphBlocksFromParts(splitText(safeString(input?.commentText))));
 }
 
 export function buildNotionCommentsBlocks(comments: ArticleCommentDto[]): {
@@ -128,23 +116,28 @@ export function buildNotionCommentsBlocks(comments: ArticleCommentDto[]): {
 
   for (const thread of graph.threads) {
     const threadBlocks: any[] = [];
-    for (const part of splitText(safeString(thread.root.quoteText))) threadBlocks.push(quoteBlock(part));
+    const rootQuoteParts = splitText(safeString(thread.root.quoteText));
+    if (rootQuoteParts.length) {
+      threadBlocks.push(
+        bulletedItemBlock(
+          formatCommentMetaLine({ authorName: thread.root.authorName, createdAt: thread.root.createdAt }),
+          rootQuoteParts.map(quoteBlock),
+        ),
+      );
+    }
 
-    for (const comment of [thread.root, ...thread.replies]) {
+    const comments = [thread.root, ...thread.replies];
+    for (const comment of comments) {
       const text = safeString(comment.commentText);
-      const metaLine = formatCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt });
-      if (text) {
-        items += 1;
-        threadBlocks.push(
-          commentItemBlock({
-            authorName: comment.authorName,
-            commentText: text,
-            createdAt: comment.createdAt,
-          }),
-        );
-      } else if (metaLine) {
-        threadBlocks.push(bulletedItemBlock(metaLine));
-      }
+      if (!text) continue;
+      items += 1;
+      threadBlocks.push(
+        commentItemBlock({
+          authorName: comment.authorName,
+          commentText: text,
+          createdAt: comment.createdAt,
+        }),
+      );
     }
 
     if (!threadBlocks.length) continue;

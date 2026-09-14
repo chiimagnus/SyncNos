@@ -326,6 +326,8 @@ export function ThreadedCommentsPanel({
                     <CommentQuotePreview
                       variant="thread"
                       text={String(root.quoteText || '')}
+                      authorName={root.authorName}
+                      createdAt={root.createdAt}
                       invalid={!root.locator}
                       onLocate={() => runLocate(rootId)}
                       deleteConfirm={armedDeleteId === rootId}

@@ -107,6 +107,49 @@ describe('Threaded comments panel delete confirmation', () => {
     mounted.cleanup();
   });
 
+  it('keeps quote-root deletion and child-comment deletion on independent ids', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onDelete });
+    getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
+      {
+        id: 10,
+        parentId: null,
+        createdAt: 1000,
+        authorName: 'Chii',
+        quoteText: 'quote',
+        commentText: '',
+        importSource: 'dedao',
+        importKey: 'quote-10',
+      },
+      { id: 11, parentId: 10, createdAt: 1001, authorName: 'Chii', quoteText: '', commentText: 'comment' },
+    ]);
+    const shadow = panelShadow(host);
+
+    const quoteDelete = shadow.querySelector('.webclipper-inpage-comments-panel__quote-delete') as HTMLButtonElement;
+    expect(quoteDelete).toBeTruthy();
+    quoteDelete.click();
+    await flushReactScheduler();
+    (shadow.querySelector('.webclipper-inpage-comments-panel__quote-delete') as HTMLButtonElement).click();
+    await flushReactScheduler();
+    expect(onDelete).toHaveBeenLastCalledWith(10);
+
+    const replyTrigger = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__reply .webclipper-inpage-comments-panel__overflow-trigger',
+    ) as HTMLButtonElement;
+    replyTrigger.click();
+    await flushReactScheduler();
+    deleteButton(shadow).click();
+    await flushReactScheduler();
+    deleteButton(shadow).click();
+    await flushReactScheduler();
+    expect(onDelete).toHaveBeenLastCalledWith(11);
+
+    mounted.cleanup();
+  });
+
   it('shows a notice and keeps the comment when deletion fails', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

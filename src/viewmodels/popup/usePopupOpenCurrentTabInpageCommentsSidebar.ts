@@ -48,7 +48,10 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     if (!runtimeAvailable) return;
     if (mountedRef.current) setChecking(true);
     try {
-      const response = await send<ApiResponse<CurrentPageCaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
+      const response = await send<ApiResponse<CurrentPageCaptureState>>(
+        UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE,
+        {},
+      );
       const state = unwrap(response);
 
       if (state.readiness !== 'ready') {
