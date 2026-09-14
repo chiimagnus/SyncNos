@@ -38,10 +38,12 @@ type PendingAuxiliary = {
   turnId: string;
   kind: 'thoughts' | 'reasoning_recap' | 'commentary';
   markdown: string;
-  finished: boolean;
 };
 
 const INTERNAL_CONTENT_TYPES = new Set(['model_editable_context']);
+const SCHEMA_DRIFT_REASON = 'chatgpt_api_schema_drift_partial';
+const UNOWNED_AUXILIARY_REASON = 'chatgpt_api_unowned_auxiliary_omitted';
+type SchemaDriftReporter = () => void;
 
 function apiSnapshotError(code: string): Error & { code: string } {
   return Object.assign(new Error(code), { code });
@@ -83,22 +85,24 @@ function isImagePart(part: unknown): part is Record<string, unknown> {
   return type === 'image_asset_pointer';
 }
 
-function currentParts(message: any): unknown[] {
+function currentParts(message: any, onSchemaDrift: SchemaDriftReporter): unknown[] {
   const raw = message?.content?.parts;
   if (raw == null) return [];
-  if (!Array.isArray(raw)) throw apiSnapshotError('unsupported_content');
-  return raw;
+  if (Array.isArray(raw)) return raw;
+  onSchemaDrift();
+  return [];
 }
 
-function currentAttachments(message: any): any[] {
+function currentAttachments(message: any, onSchemaDrift: SchemaDriftReporter): any[] {
   const raw = message?.metadata?.attachments;
   if (raw == null) return [];
-  if (!Array.isArray(raw)) throw apiSnapshotError('unsupported_content');
-  return raw;
+  if (Array.isArray(raw)) return raw;
+  onSchemaDrift();
+  return [];
 }
 
-function renderTextParts(message: any): string {
-  const parts = currentParts(message);
+function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
+  const parts = currentParts(message, onSchemaDrift);
   const output: string[] = [];
   for (const part of parts) {
     if (isImagePart(part)) continue;
@@ -107,47 +111,65 @@ function renderTextParts(message: any): string {
       output.push(text);
       continue;
     }
-    if (part && typeof part === 'object') throw apiSnapshotError('unsupported_content');
+    if (part != null && typeof part === 'object') onSchemaDrift();
   }
-  return output.join('\n');
+  if (output.length) return output.join('\n');
+
+  const content = message?.content;
+  if (content && typeof content === 'object' && !Array.isArray(content)) {
+    for (const key of ['text', 'content']) {
+      const fallback = stableString(content[key]);
+      if (!fallback) continue;
+      onSchemaDrift();
+      return fallback;
+    }
+  }
+  return '';
 }
 
-function readOptionalReasoningString(record: Record<string, unknown>, key: string): string {
+function readOptionalReasoningString(
+  record: Record<string, unknown>,
+  key: string,
+  onSchemaDrift: SchemaDriftReporter,
+): string {
   if (!Object.prototype.hasOwnProperty.call(record, key) || record[key] == null) return '';
-  if (typeof record[key] !== 'string') throw apiSnapshotError('unsupported_content');
-  return stableString(record[key]);
+  if (typeof record[key] === 'string') return stableString(record[key]);
+  onSchemaDrift();
+  return '';
 }
 
-function renderThoughts(message: any): string {
+function renderThoughts(message: any, onSchemaDrift: SchemaDriftReporter): string {
   const raw = message?.content?.thoughts;
-  if (raw != null && !Array.isArray(raw)) throw apiSnapshotError('unsupported_content');
+  if (raw != null && !Array.isArray(raw)) onSchemaDrift();
   const rawThoughts = Array.isArray(raw) ? raw : [];
   const rendered: Array<{ summary: string; body: string }> = rawThoughts
     .map((thought: any): { summary: string; body: string } | null => {
       if (!thought || typeof thought !== 'object' || Array.isArray(thought)) {
-        throw apiSnapshotError('unsupported_content');
+        onSchemaDrift();
+        return null;
       }
       const record = thought as Record<string, unknown>;
-      const summary = readOptionalReasoningString(record, 'summary');
-      const content = readOptionalReasoningString(record, 'content');
-      if (record.chunks != null && !Array.isArray(record.chunks)) throw apiSnapshotError('unsupported_content');
+      const summary = readOptionalReasoningString(record, 'summary', onSchemaDrift);
+      const content = readOptionalReasoningString(record, 'content', onSchemaDrift);
+      if (record.chunks != null && !Array.isArray(record.chunks)) onSchemaDrift();
       const chunks = Array.isArray(record.chunks) ? record.chunks : [];
       const chunkText = chunks
         .map((chunk: any) => {
           if (typeof chunk === 'string') return stableString(chunk);
           if (!chunk || typeof chunk !== 'object' || Array.isArray(chunk)) {
-            throw apiSnapshotError('unsupported_content');
+            onSchemaDrift();
+            return '';
           }
           const chunkRecord = chunk as Record<string, unknown>;
           const text =
-            readOptionalReasoningString(chunkRecord, 'content') ||
-            readOptionalReasoningString(chunkRecord, 'text') ||
-            readOptionalReasoningString(chunkRecord, 'summary');
+            readOptionalReasoningString(chunkRecord, 'content', onSchemaDrift) ||
+            readOptionalReasoningString(chunkRecord, 'text', onSchemaDrift) ||
+            readOptionalReasoningString(chunkRecord, 'summary', onSchemaDrift);
           if (
             !text &&
             Object.keys(chunkRecord).some((key) => key !== 'content' && key !== 'text' && key !== 'summary')
           ) {
-            throw apiSnapshotError('unsupported_content');
+            onSchemaDrift();
           }
           return text;
         })
@@ -159,7 +181,7 @@ function renderThoughts(message: any): string {
         !body &&
         Object.keys(record).some((key) => key !== 'summary' && key !== 'content' && key !== 'chunks')
       ) {
-        throw apiSnapshotError('unsupported_content');
+        onSchemaDrift();
       }
       return summary || body ? { summary, body } : null;
     })
@@ -178,28 +200,26 @@ function renderThoughts(message: any): string {
   return output.join('\n\n');
 }
 
-function assertAssistantNonToolHasNoImages(message: any): void {
-  if (currentAttachments(message).length || currentParts(message).some(isImagePart)) {
-    throw apiSnapshotError('unsupported_content');
-  }
-}
-
-function renderAuxiliary(message: any): string {
-  assertAssistantNonToolHasNoImages(message);
+function renderAuxiliary(message: any, onSchemaDrift: SchemaDriftReporter): string {
+  const parts = currentParts(message, onSchemaDrift);
+  if (currentAttachments(message, onSchemaDrift).length || parts.some(isImagePart)) onSchemaDrift();
   const type = contentType(message);
-  if (type === 'thoughts') return renderThoughts(message);
+  if (type === 'thoughts') return renderThoughts(message, onSchemaDrift);
   if (type === 'reasoning_recap') {
     const content = message?.content?.content;
-    if (content != null && typeof content !== 'string') throw apiSnapshotError('unsupported_content');
-    return stableString(content);
+    if (content == null) return '';
+    if (typeof content === 'string') return stableString(content);
+    onSchemaDrift();
+    return '';
   }
-  if (message?.channel === 'commentary' && type === 'text') return renderTextParts(message);
-  throw apiSnapshotError('unsupported_content');
+  if (message?.channel === 'commentary' && type === 'text') return renderTextParts(message, onSchemaDrift);
+  onSchemaDrift();
+  return '';
 }
 
-function matchingAttachment(message: any, fileId: string): any | null {
+function matchingAttachment(message: any, fileId: string, onSchemaDrift: SchemaDriftReporter): any | null {
   if (!fileId) return null;
-  const attachments = currentAttachments(message);
+  const attachments = currentAttachments(message, onSchemaDrift);
   return attachments.find((item: any) => item && typeof item === 'object' && stableString(item.id) === fileId) || null;
 }
 
@@ -207,8 +227,12 @@ function imageAlt(message: any, attachment: any): string {
   return stableString(attachment?.name) || stableString(message?.metadata?.image_gen_title);
 }
 
-function hasUnsupportedAttachmentMetadata(message: any, images: PendingImage[]): boolean {
-  const attachments = currentAttachments(message);
+function hasUnsupportedAttachmentMetadata(
+  message: any,
+  images: PendingImage[],
+  onSchemaDrift: SchemaDriftReporter,
+): boolean {
+  const attachments = currentAttachments(message, onSchemaDrift);
   if (!attachments.length) return false;
   const imageFileIds = new Set(images.map((image) => image.fileId).filter(Boolean));
   return attachments.some((attachment: any) => {
@@ -220,16 +244,17 @@ function hasUnsupportedAttachmentMetadata(message: any, images: PendingImage[]):
   });
 }
 
-function collectMessageImages(message: any): PendingImage[] {
+function collectMessageImages(message: any, onSchemaDrift: SchemaDriftReporter): PendingImage[] {
   const messageId = stableString(message?.id);
   const turnId = messageTurnId(message);
-  const parts = currentParts(message);
+  const parts = currentParts(message, onSchemaDrift);
   const assets: PendingImage[] = [];
   for (let index = 0; index < parts.length; index += 1) {
     const part = parts[index];
     if (!isImagePart(part)) continue;
     const fileId = chatgptFileIdFromAssetPointer(part.asset_pointer);
-    const attachment = matchingAttachment(message, fileId);
+    if (!fileId) onSchemaDrift();
+    const attachment = matchingAttachment(message, fileId, onSchemaDrift);
     const mimeType = stableString(part.mime_type) || stableString(attachment?.mime_type);
     const sizeValue = Number(part.size_bytes ?? attachment?.size);
     const ref = fileId || `${messageId || 'image'}:${index}`;
@@ -246,8 +271,8 @@ function collectMessageImages(message: any): PendingImage[] {
   return assets;
 }
 
-function hasNonImagePartContent(message: any): boolean {
-  const parts = currentParts(message);
+function hasNonImagePartContent(message: any, onSchemaDrift: SchemaDriftReporter): boolean {
+  const parts = currentParts(message, onSchemaDrift);
   return parts.some((part: unknown) => !isImagePart(part));
 }
 
@@ -320,26 +345,27 @@ export function buildChatgptApiSnapshot(input: {
   const protectedAssets: ChatgptProtectedImageAsset[] = [];
   const seenMessageKeys = new Set<string>();
   const seenAssetBindings = new Set<string>();
+  const partialReasons = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
-  let omittedUnownedAuxiliary = false;
 
-  const flushImageOnly = () => {
-    if (!pendingImages.length) {
-      if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
+  const markSchemaDrift = () => partialReasons.add(SCHEMA_DRIFT_REASON);
+  const markUnownedAuxiliary = () => partialReasons.add(UNOWNED_AUXILIARY_REASON);
+
+  const flushPendingImages = () => {
+    if (!pendingImages.length) return;
+    const key = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
+    if (!key) {
+      markSchemaDrift();
+      pendingImages = [];
       return;
     }
-    if (pendingAuxiliary.some((item) => item.kind !== 'reasoning_recap')) {
-      throw apiSnapshotError('unsupported_content');
+    if (seenMessageKeys.has(key)) {
+      markSchemaDrift();
+      assignAssets(key, pendingImages, protectedAssets, seenAssetBindings);
+      pendingImages = [];
+      return;
     }
-    const imageTurnId = pendingImages.map((image) => image.turnId).find(Boolean) || '';
-    if (pendingAuxiliary.some((item) => item.turnId && item.turnId !== imageTurnId)) {
-      throw apiSnapshotError('unsupported_content');
-    }
-    pendingAuxiliary = [];
-    const key = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
-    if (!key) throw apiSnapshotError('conversation_identity_invalid');
-    if (seenMessageKeys.has(key)) throw apiSnapshotError('duplicate_message_key');
     seenMessageKeys.add(key);
     messages.push({
       messageKey: key,
@@ -352,11 +378,25 @@ export function buildChatgptApiSnapshot(input: {
     pendingImages = [];
   };
 
-  const assertPendingTurnMatches = (turnId: string) => {
+  const flushPendingWithoutOwner = () => {
+    flushPendingImages();
+    if (pendingAuxiliary.length) {
+      markUnownedAuxiliary();
+      pendingAuxiliary = [];
+    }
+  };
+
+  const pendingMatchesTurn = (turnId: string): boolean => {
     const known = [...pendingAuxiliary.map((item) => item.turnId), ...pendingImages.map((item) => item.turnId)].filter(
       Boolean,
     );
-    if (turnId && known.some((value) => value !== turnId)) throw apiSnapshotError('unsupported_content');
+    if (!known.length) return true;
+    if (!turnId) return false;
+    return !known.some((value) => value !== turnId);
+  };
+
+  const startTurn = (turnId: string) => {
+    if (!pendingMatchesTurn(turnId)) flushPendingWithoutOwner();
   };
 
   for (const node of branch) {
@@ -371,23 +411,20 @@ export function buildChatgptApiSnapshot(input: {
     if (INTERNAL_CONTENT_TYPES.has(type)) continue;
 
     if (role === 'user') {
-      // Reasoning/commentary that reaches the next user without a stable assistant owner cannot
-      // be assigned a durable API/DOM-shared message identity. Omit it and downgrade the capture below.
-      if (!pendingImages.length && pendingAuxiliary.length) {
-        omittedUnownedAuxiliary = true;
-        pendingAuxiliary = [];
+      flushPendingWithoutOwner();
+      if (!id) {
+        markSchemaDrift();
+        continue;
       }
-      flushImageOnly();
-      if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
-      if (!id) throw apiSnapshotError('conversation_identity_invalid');
-      if (type !== 'text' && type !== 'multimodal_text') throw apiSnapshotError('unsupported_content');
-      const images = collectMessageImages(message);
-      if ((images.length || currentAttachments(message).length) && type !== 'multimodal_text') {
-        throw apiSnapshotError('unsupported_content');
-      }
-      if (hasUnsupportedAttachmentMetadata(message, images)) throw apiSnapshotError('unsupported_content');
-      const markdown = renderTextParts(message);
-      if (!markdown && !images.length) continue;
+      if (type !== 'text' && type !== 'multimodal_text') markSchemaDrift();
+      const parts = currentParts(message, markSchemaDrift);
+      const images = collectMessageImages(message, markSchemaDrift);
+      const attachments = currentAttachments(message, markSchemaDrift);
+      if ((images.length || attachments.length) && type !== 'multimodal_text') markSchemaDrift();
+      if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
+      const markdown = renderTextParts(message, markSchemaDrift);
+      const hasOpaquePayload = parts.length > 0 || attachments.length > 0;
+      if (!markdown && !images.length && !hasOpaquePayload) continue;
       if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
       seenMessageKeys.add(id);
       messages.push({
@@ -403,22 +440,37 @@ export function buildChatgptApiSnapshot(input: {
 
     if (role === 'assistant') {
       // Tool-call messages are execution-pipeline nodes, not standalone conversation messages.
-      // ChatGPT may emit thousands of these in long agentic conversations; the visible output
-      // remains owned by recipient=all assistant messages and image-bearing tool results below.
+      // Unknown tool recipients stay ignorable even when ChatGPT adds new tool protocols.
       if (message.recipient !== 'all') continue;
-      const isStableOwner = message.channel === 'final' && type === 'text';
+
+      const isStableOwner = message.channel === 'final';
       if (isStableOwner) {
-        if (!id) throw apiSnapshotError('conversation_identity_invalid');
-        assertAssistantNonToolHasNoImages(message);
-        assertPendingTurnMatches(turnId);
-        const markdown = appendBlocks([...pendingAuxiliary.map((item) => item.markdown), renderTextParts(message)]);
+        startTurn(turnId);
+        if (type !== 'text') markSchemaDrift();
+        const finalImages = collectMessageImages(message, markSchemaDrift);
+        if (hasUnsupportedAttachmentMetadata(message, finalImages, markSchemaDrift)) markSchemaDrift();
+        pendingImages.push(...finalImages);
+
+        const markdown = appendBlocks([
+          ...pendingAuxiliary.map((item) => item.markdown),
+          renderTextParts(message, markSchemaDrift),
+        ]);
+        let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
+        if (pendingImages.length && !imageOwnerKey) {
+          markSchemaDrift();
+          pendingImages = [];
+          imageOwnerKey = '';
+        }
+        const ownerKey = imageOwnerKey || id;
+        if (!ownerKey) {
+          markSchemaDrift();
+          flushPendingWithoutOwner();
+          continue;
+        }
         if (!markdown && !pendingImages.length) {
           pendingAuxiliary = [];
           continue;
         }
-        const imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
-        if (pendingImages.length && !imageOwnerKey) throw apiSnapshotError('conversation_identity_invalid');
-        const ownerKey = imageOwnerKey || id;
         if (seenMessageKeys.has(ownerKey)) throw apiSnapshotError('duplicate_message_key');
         seenMessageKeys.add(ownerKey);
         messages.push({
@@ -436,47 +488,55 @@ export function buildChatgptApiSnapshot(input: {
 
       const isAuxiliary =
         type === 'thoughts' || type === 'reasoning_recap' || (message.channel === 'commentary' && type === 'text');
-      if (!isAuxiliary) throw apiSnapshotError('unsupported_content');
-      const markdown = renderAuxiliary(message);
-      if (markdown) {
-        pendingAuxiliary.push({
-          turnId,
-          kind: type === 'thoughts' ? 'thoughts' : type === 'reasoning_recap' ? 'reasoning_recap' : 'commentary',
-          markdown,
-          finished: message.status === 'finished_successfully',
-        });
+      if (isAuxiliary) {
+        startTurn(turnId);
+        const markdown = renderAuxiliary(message, markSchemaDrift);
+        if (markdown) {
+          pendingAuxiliary.push({
+            turnId,
+            kind: type === 'thoughts' ? 'thoughts' : type === 'reasoning_recap' ? 'reasoning_recap' : 'commentary',
+            markdown,
+          });
+        }
+        continue;
       }
+
+      // A new recipient=all assistant shape may be visible, but its DOM ownership is unknown.
+      // Preserve obvious text under the backend message id and downgrade instead of aborting the conversation.
+      markSchemaDrift();
+      flushPendingWithoutOwner();
+      const markdown = renderTextParts(message, markSchemaDrift);
+      if (!id || !markdown) continue;
+      if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
+      seenMessageKeys.add(id);
+      messages.push({
+        messageKey: id,
+        role: 'assistant',
+        contentMarkdown: markdown,
+        sequence: messages.length,
+        updatedAt: capturedAt,
+      });
       continue;
     }
 
     if (role === 'tool') {
-      // Ordinary tool results are execution-pipeline data. Only tool results that contain the
-      // current visible image_asset_pointer schema become conversation content.
+      // Ordinary tool results are execution-pipeline data. Ignore opaque tool schema completely;
+      // only a current image pointer makes the tool node relevant to visible conversation content.
       const rawParts = message?.content?.parts;
       if (!Array.isArray(rawParts) || !rawParts.some(isImagePart)) continue;
-      const images = collectMessageImages(message);
-      if (
-        message.recipient !== 'all' ||
-        type !== 'multimodal_text' ||
-        !images.length ||
-        hasNonImagePartContent(message) ||
-        hasUnsupportedAttachmentMetadata(message, images)
-      ) {
-        throw apiSnapshotError('unsupported_content');
-      }
+      startTurn(turnId);
+      const images = collectMessageImages(message, markSchemaDrift);
+      if (message.recipient !== 'all' || type !== 'multimodal_text') markSchemaDrift();
+      if (hasNonImagePartContent(message, markSchemaDrift)) markSchemaDrift();
+      if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
       pendingImages.push(...images);
       continue;
     }
 
-    throw apiSnapshotError('unsupported_content');
+    markSchemaDrift();
   }
 
-  if (!pendingImages.length && pendingAuxiliary.length && pendingAuxiliary.every((item) => item.finished)) {
-    omittedUnownedAuxiliary = true;
-    pendingAuxiliary = [];
-  }
-  flushImageOnly();
-  if (pendingAuxiliary.length) throw apiSnapshotError('unsupported_content');
+  flushPendingWithoutOwner();
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
 
   const title = stableString(input.data?.title) || stableString(input.fallbackTitle) || 'ChatGPT';
@@ -491,9 +551,9 @@ export function buildChatgptApiSnapshot(input: {
     },
     messages,
     captureMeta: {
-      completeness: omittedUnownedAuxiliary ? ('partial' as const) : ('complete' as const),
+      completeness: partialReasons.size ? ('partial' as const) : ('complete' as const),
       identityVerified: true,
-      ...(omittedUnownedAuxiliary ? { reasons: ['chatgpt_api_unowned_auxiliary_omitted'] } : null),
+      ...(partialReasons.size ? { reasons: Array.from(partialReasons) } : null),
     },
   };
 

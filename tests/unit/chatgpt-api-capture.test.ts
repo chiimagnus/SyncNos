@@ -94,26 +94,44 @@ beforeEach(() => {
 });
 
 describe('ChatGPT API snapshot', () => {
-  it('rejects malformed current parts and attachment container shapes', () => {
+  it('downgrades malformed parts and attachment containers without aborting the conversation', () => {
     const malformedParts = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['a'] }),
     ]);
     malformedParts.mapping.n1.message.content.parts = { text: 'not-an-array' };
-    expect(errorCode(() => build(malformedParts))).toBe('unsupported_content');
+    const partsResult = build(malformedParts);
+    expect(partsResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'assistant-1', contentMarkdown: 'a' }),
+    ]);
+    expect(partsResult.snapshot.captureMeta).toEqual({
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_schema_drift_partial'],
+    });
 
     const malformedAttachments = mappingFrom([
       message({ id: 'user-1', role: 'user', contentType: 'multimodal_text', parts: ['q'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['a'] }),
     ]);
     malformedAttachments.mapping.n1.message.metadata.attachments = { id: 'file_image_1' };
-    expect(errorCode(() => build(malformedAttachments))).toBe('unsupported_content');
+    const attachmentsResult = build(malformedAttachments);
+    expect(attachmentsResult.snapshot.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['q', 'a']);
+    expect(attachmentsResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('does not accept legacy top-level content.text as current visible message content', () => {
+  it('uses legacy top-level text only as a partial schema-drift fallback', () => {
     const data = mappingFrom([message({ id: 'user-1', role: 'user' })]);
     data.mapping.n1.message.content.text = 'legacy text';
-    expect(errorCode(() => build(data))).toBe('no_visible_messages');
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'legacy text' }),
+    ]);
+    expect(result.snapshot.captureMeta).toEqual({
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_schema_drift_partial'],
+    });
   });
 
   it('uses only current conversation_id response identity and ignores legacy id aliases', () => {
@@ -195,7 +213,7 @@ describe('ChatGPT API snapshot', () => {
     );
   });
 
-  it('fails fast for unsupported reasoning shapes instead of silently dropping visible auxiliary content', () => {
+  it('keeps stable visible output when reasoning schema drifts', () => {
     const unsupportedThought = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
@@ -207,7 +225,12 @@ describe('ChatGPT API snapshot', () => {
       }),
       message({ id: 'assistant-final', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-    expect(errorCode(() => build(unsupportedThought))).toBe('unsupported_content');
+    const thoughtResult = build(unsupportedThought);
+    expect(thoughtResult.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-final',
+      contentMarkdown: 'answer',
+    });
+    expect(thoughtResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const unsupportedChunk = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
@@ -220,7 +243,12 @@ describe('ChatGPT API snapshot', () => {
       }),
       message({ id: 'assistant-final', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-    expect(errorCode(() => build(unsupportedChunk))).toBe('unsupported_content');
+    const chunkResult = build(unsupportedChunk);
+    expect(chunkResult.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-final',
+      contentMarkdown: '**Plan**\n\nanswer',
+    });
+    expect(chunkResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const unsupportedRecap = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
@@ -228,10 +256,12 @@ describe('ChatGPT API snapshot', () => {
       message({ id: 'assistant-final', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
     unsupportedRecap.mapping.n2.message.content.content = { opaque: true };
-    expect(errorCode(() => build(unsupportedRecap))).toBe('unsupported_content');
+    const recapResult = build(unsupportedRecap);
+    expect(recapResult.snapshot.messages.at(-1)).toMatchObject({ contentMarkdown: 'answer' });
+    expect(recapResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('rejects image parts or attachment metadata on assistant non-tool messages', () => {
+  it('supports final image pointers and downgrades unfamiliar assistant image metadata', () => {
     const finalImage = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
@@ -241,7 +271,14 @@ describe('ChatGPT API snapshot', () => {
         parts: ['answer', { content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
       }),
     ]);
-    expect(errorCode(() => build(finalImage))).toBe('unsupported_content');
+    const finalImageResult = build(finalImage);
+    const finalImageKey = buildChatgptGeneratedImageMessageKey(['file_image_1']);
+    expect(finalImageResult.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: finalImageKey,
+      role: 'assistant',
+      contentMarkdown: 'answer',
+    });
+    expect(finalImageResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
 
     const commentaryImage = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
@@ -254,7 +291,12 @@ describe('ChatGPT API snapshot', () => {
       }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-    expect(errorCode(() => build(commentaryImage))).toBe('unsupported_content');
+    const commentaryResult = build(commentaryImage);
+    expect(commentaryResult.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-1',
+      contentMarkdown: 'progress\n\nanswer',
+    });
+    expect(commentaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const finalAttachment = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
@@ -266,7 +308,12 @@ describe('ChatGPT API snapshot', () => {
         attachments: [{ id: 'file_image_1', name: 'image.png', mime_type: 'image/png', size: 10 }],
       }),
     ]);
-    expect(errorCode(() => build(finalAttachment))).toBe('unsupported_content');
+    const attachmentResult = build(finalAttachment);
+    expect(attachmentResult.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-1',
+      contentMarkdown: 'answer',
+    });
+    expect(attachmentResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
   it('ignores opaque tool execution nodes while preserving visible assistant output', () => {
@@ -414,11 +461,55 @@ describe('ChatGPT API snapshot', () => {
     });
   });
 
-  it('still fails fast for unknown visible assistant content and unfinished auxiliary output at branch end', () => {
+  it('preserves readable text from unknown final content types as partial', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'assistant-future',
+        role: 'assistant',
+        channel: 'final',
+        contentType: 'future_rich_text',
+        parts: ['future answer'],
+        turnId: 'turn-a',
+      }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'assistant-future',
+      role: 'assistant',
+      contentMarkdown: 'future answer',
+    });
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+  });
+
+  it('skips unknown roles and missing message ids without aborting safe history', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['first'] }),
+      message({ id: 'future-role', role: 'future_role', parts: ['opaque'] }),
+      message({ id: '', role: 'user', parts: ['missing id'] }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'first' }),
+      expect.objectContaining({ messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'answer' }),
+    ]);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+  });
+
+  it('omits unknown assistant shapes and unfinished auxiliary tails without aborting prior safe messages', () => {
     const unknownAssistant = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'assistant-unknown', role: 'assistant', contentType: 'audio', parts: [] }),
     ]);
+    const unknownResult = build(unknownAssistant);
+    expect(unknownResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
+    ]);
+    expect(unknownResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+
     const unfinishedAuxiliary = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
@@ -429,9 +520,32 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-a',
       }),
     ]);
+    const auxiliaryResult = build(unfinishedAuxiliary);
+    expect(auxiliaryResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
+    ]);
+    expect(auxiliaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
+  });
 
-    expect(errorCode(() => build(unknownAssistant))).toBe('unsupported_content');
-    expect(errorCode(() => build(unfinishedAuxiliary))).toBe('unsupported_content');
+  it('does not attach pending auxiliary content when a later owner loses its turn id', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'commentary-1',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['progress'],
+        turnId: 'turn-a',
+      }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'] }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', contentMarkdown: 'q' }),
+      expect.objectContaining({ messageKey: 'assistant-1', contentMarkdown: 'answer' }),
+    ]);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
   });
 
   it('materializes generated images independently of opaque tool-call nodes', () => {
@@ -587,7 +701,77 @@ describe('ChatGPT API snapshot', () => {
     ]);
   });
 
-  it('rejects image-only reasoning recaps that explicitly belong to a different turn', () => {
+  it('keeps image-only turns when same-turn auxiliary output has no stable owner', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
+      message({
+        id: 'image-commentary',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['working'],
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'image-thoughts',
+        role: 'assistant',
+        contentType: 'thoughts',
+        thoughts: [{ summary: 'Plan', content: 'Generate image.' }],
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'image-tool',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_only_1' }],
+        turnId: 'turn-image',
+      }),
+      message({ id: 'user-2', role: 'user', parts: ['continue'] }),
+      message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['done'], turnId: 'turn-2' }),
+    ]);
+
+    const result = build(data);
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_only_1']);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
+      expect.objectContaining({ messageKey: imageKey, role: 'assistant', contentMarkdown: '' }),
+      expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'continue' }),
+      expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'done' }),
+    ]);
+    expect(result.snapshot.captureMeta).toEqual({
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
+    });
+    expect(result.chatgptProtectedImages?.assets).toEqual([
+      expect.objectContaining({ fileId: 'file_only_1', targetMessageKey: imageKey }),
+    ]);
+
+    const unfinishedAtBranchEnd = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
+      message({
+        id: 'image-commentary',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['working'],
+        turnId: 'turn-image',
+      }),
+      message({
+        id: 'image-tool',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_only_1' }],
+        turnId: 'turn-image',
+      }),
+    ]);
+    const unfinishedResult = build(unfinishedAtBranchEnd);
+    expect(unfinishedResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
+      expect.objectContaining({ messageKey: imageKey, role: 'assistant', contentMarkdown: '' }),
+    ]);
+    expect(unfinishedResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
+  });
+
+  it('separates image and auxiliary state when their turn ids diverge', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
       message({
@@ -614,7 +798,43 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-other',
       }),
     ]);
-    expect(errorCode(() => build(data))).toBe('unsupported_content');
+    const result = build(data);
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_only_1']);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
+      expect.objectContaining({ messageKey: imageKey, role: 'assistant', contentMarkdown: '' }),
+    ]);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
+  });
+
+  it('dedupes repeated image-only keys as partial instead of throwing or duplicating content', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['first'] }),
+      message({
+        id: 'image-tool-1',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_same_1' }],
+        turnId: 'turn-1',
+      }),
+      message({ id: 'user-2', role: 'user', parts: ['second'] }),
+      message({
+        id: 'image-tool-2',
+        role: 'tool',
+        contentType: 'multimodal_text',
+        parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_same_1' }],
+        turnId: 'turn-2',
+      }),
+    ]);
+
+    const result = build(data);
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_same_1']);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', contentMarkdown: 'first' }),
+      expect.objectContaining({ messageKey: imageKey, role: 'assistant' }),
+      expect.objectContaining({ messageKey: 'user-2', contentMarkdown: 'second' }),
+    ]);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
   it('uses the current DOM-compatible image-only key and records unsupported pointers for protective materialization', () => {
@@ -728,7 +948,7 @@ describe('ChatGPT API snapshot', () => {
     expect(build(data).snapshot.messages.at(-1)).toMatchObject({ messageKey: imageKey, role: 'assistant' });
   });
 
-  it('fails when an image tool also contains any non-image part or attachment instead of silently dropping it', () => {
+  it('keeps recognized images when surrounding tool schema contains unfamiliar content', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
@@ -751,7 +971,10 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(data))).toBe('unsupported_content');
+    const result = build(data);
+    const imageKey = buildChatgptGeneratedImageMessageKey(['file_image_1']);
+    expect(result.snapshot.messages.at(-1)).toMatchObject({ messageKey: imageKey, role: 'assistant' });
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const attachmentData = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
@@ -773,10 +996,12 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(attachmentData))).toBe('unsupported_content');
+    const attachmentResult = build(attachmentData);
+    expect(attachmentResult.snapshot.messages.at(-1)).toMatchObject({ messageKey: imageKey, role: 'assistant' });
+    expect(attachmentResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('requires current multimodal_text schema for user and tool image messages', () => {
+  it('accepts image pointers even when ChatGPT changes the surrounding content type', () => {
     const userTextImage = mappingFrom([
       message({
         id: 'user-1',
@@ -785,7 +1010,9 @@ describe('ChatGPT API snapshot', () => {
         parts: ['image', { content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
       }),
     ]);
-    expect(errorCode(() => build(userTextImage))).toBe('unsupported_content');
+    const userResult = build(userTextImage);
+    expect(userResult.snapshot.messages[0]).toMatchObject({ messageKey: 'user-1', contentMarkdown: 'image' });
+    expect(userResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const toolTextImage = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
@@ -806,10 +1033,15 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(toolTextImage))).toBe('unsupported_content');
+    const toolResult = build(toolTextImage);
+    expect(toolResult.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: buildChatgptGeneratedImageMessageKey(['file_image_1']),
+      role: 'assistant',
+    });
+    expect(toolResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('accepts only the current exact image part schema and exact sediment file pointer', () => {
+  it('does not reinterpret unknown image aliases but preserves the stable turn as partial', () => {
     const typeAlias = mappingFrom([
       message({
         id: 'user-1',
@@ -818,7 +1050,11 @@ describe('ChatGPT API snapshot', () => {
         parts: [{ type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
       }),
     ]);
-    expect(errorCode(() => build(typeAlias))).toBe('unsupported_content');
+    const aliasResult = build(typeAlias);
+    expect(aliasResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: '' }),
+    ]);
+    expect(aliasResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const suffixedPointer = mappingFrom([
       message({
@@ -832,9 +1068,10 @@ describe('ChatGPT API snapshot', () => {
     expect(result.chatgptProtectedImages?.assets).toEqual([
       expect.objectContaining({ fileId: '', cacheKey: '', targetMessageKey: 'user-1' }),
     ]);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('does not treat unknown object part types containing the word image as current image pointers', () => {
+  it('does not misclassify unknown image-like objects while keeping the conversation capturable', () => {
     const userData = mappingFrom([
       message({
         id: 'user-1',
@@ -843,7 +1080,12 @@ describe('ChatGPT API snapshot', () => {
         parts: [{ content_type: 'image_analysis', content: { visible: true } }],
       }),
     ]);
-    expect(errorCode(() => build(userData))).toBe('unsupported_content');
+    const userResult = build(userData);
+    expect(userResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: '' }),
+    ]);
+    expect(userResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+    expect(userResult.chatgptProtectedImages).toBeNull();
 
     const toolData = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
@@ -864,12 +1106,14 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(build(toolData).snapshot.messages).toEqual([
+    const toolResult = build(toolData);
+    expect(toolResult.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw' }),
     ]);
+    expect(toolResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
-  it('fails generated-image capture when no current file identity can produce a DOM-compatible owner key', () => {
+  it('drops an unkeyable generated image as partial instead of aborting the conversation', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
@@ -889,10 +1133,15 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-image',
       }),
     ]);
-    expect(errorCode(() => build(data))).toBe('conversation_identity_invalid');
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw' }),
+    ]);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+    expect(result.chatgptProtectedImages).toBeNull();
   });
 
-  it('fails instead of misclassifying non-image or unmatched attachment metadata as supported content', () => {
+  it('keeps text when non-image or unmatched attachment metadata is unsupported', () => {
     const nonImage = mappingFrom([
       message({
         id: 'user-file',
@@ -902,7 +1151,11 @@ describe('ChatGPT API snapshot', () => {
         attachments: [{ id: 'file_pdf_1', name: 'document.pdf', mime_type: 'application/pdf', size: 100 }],
       }),
     ]);
-    expect(errorCode(() => build(nonImage))).toBe('unsupported_content');
+    const nonImageResult = build(nonImage);
+    expect(nonImageResult.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-file', role: 'user', contentMarkdown: 'see file' }),
+    ]);
+    expect(nonImageResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const unknownMime = mappingFrom([
       message({
@@ -913,7 +1166,12 @@ describe('ChatGPT API snapshot', () => {
         attachments: [{ id: 'file_unknown_1', name: 'unknown.bin' }],
       }),
     ]);
-    expect(errorCode(() => build(unknownMime))).toBe('unsupported_content');
+    const unknownMimeResult = build(unknownMime);
+    expect(unknownMimeResult.snapshot.messages[0]).toMatchObject({
+      messageKey: 'user-file',
+      contentMarkdown: 'see file',
+    });
+    expect(unknownMimeResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const unmatchedImage = mappingFrom([
       message({
@@ -924,10 +1182,33 @@ describe('ChatGPT API snapshot', () => {
         attachments: [{ id: 'file_image_1', name: 'image.png', mime_type: 'image/png', size: 100 }],
       }),
     ]);
-    expect(errorCode(() => build(unmatchedImage))).toBe('unsupported_content');
+    const unmatchedImageResult = build(unmatchedImage);
+    expect(unmatchedImageResult.snapshot.messages[0]).toMatchObject({
+      messageKey: 'user-image',
+      contentMarkdown: 'image metadata without current pointer',
+    });
+    expect(unmatchedImageResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('rejects mapping identity, missing parents, cycles and duplicate stable message keys', () => {
+  it('still fails closed for conversation identity, mapping topology and duplicate stable message keys', () => {
+    expect(
+      errorCode(() =>
+        buildChatgptApiSnapshot({
+          data: mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]),
+          conversationId: '',
+          conversationUrl: 'https://chatgpt.com/c/conversation-1',
+        }),
+      ),
+    ).toBe('conversation_identity_invalid');
+
+    const invalidMapping = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    invalidMapping.mapping = null as any;
+    expect(errorCode(() => build(invalidMapping))).toBe('mapping_invalid');
+
+    const invalidCurrent = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    invalidCurrent.current_node = 'missing';
+    expect(errorCode(() => build(invalidCurrent))).toBe('mapping_current_node_invalid');
+
     const mismatch = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
     mismatch.conversation_id = 'other';
     expect(errorCode(() => build(mismatch))).toBe('conversation_identity_mismatch');
