@@ -17,7 +17,7 @@ On supported current article pages, you can also open the in-page comments sideb
 
 Select text in the article and attach that selection to the root comment composer.
 
-If you only want a highlight, save the quote without comment text. SyncNos only stores highlights that can be anchored reliably to the source text instead of guessing with fuzzy positions.
+If you only want a highlight, save the quote without comment text. Long or multi-line selections keep the full source quote; the sidebar may shorten only the visual preview. SyncNos only stores highlights that can be anchored reliably to the source text instead of guessing with fuzzy positions.
 
 ## Comments and replies
 

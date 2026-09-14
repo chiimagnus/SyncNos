@@ -10,6 +10,7 @@ export type CollectorDefinition = {
   inpageMatches?: (location: { href?: string; hostname?: string; pathname?: string }) => boolean;
   collector: {
     capture: (options?: CollectorCaptureOptions) => unknown;
+    getCaptureReadiness?: () => 'ready' | 'waiting';
     prepareManualCapture?: (options?: CollectorCaptureOptions) => unknown | Promise<unknown>;
     [key: string]: unknown;
   };

@@ -46,6 +46,7 @@ function createHarness(input: {
   url?: string;
   syncResponse?: any;
   liveTurn?: () => any;
+  readiness?: 'ready' | 'waiting';
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
@@ -63,6 +64,7 @@ function createHarness(input: {
   const collector: any = { capture };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
   if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
+  if (input.readiness) collector.getCaptureReadiness = () => input.readiness;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
     captureVideoTranscript: vi.fn(
@@ -106,7 +108,7 @@ describe('current page capture integrity routing', () => {
     ]) {
       const harness = createHarness({ collectorId: 'web', url });
       expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
-        available: true,
+        readiness: 'ready',
         kind: 'video',
         collectorId: 'video',
       });
@@ -151,6 +153,27 @@ describe('current page capture integrity routing', () => {
       expect(harness.service.getCurrentPageCaptureState()).toMatchObject({ kind: 'article', collectorId: 'web' });
       vi.unstubAllGlobals();
     }
+  });
+
+  it('reports a supported chat with no current messages as waiting instead of unsupported', async () => {
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'waiting' });
+    const state = harness.service.getCurrentPageCaptureState();
+
+    expect(state).toMatchObject({
+      readiness: 'waiting',
+      kind: 'chat',
+      collectorId: 'chatgpt',
+      sourceLabel: 'ChatGPT',
+    });
+    expect(state.reason).toContain('ChatGPT');
+
+    const progress: any[] = [];
+    await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
+      state.reason,
+    );
+    expect(progress.at(-1)).toEqual({ message: state.reason, kind: 'default' });
+    expect(harness.capture).not.toHaveBeenCalled();
+    expect(harness.calls).toEqual([]);
   });
 
   it('keeps the existing DOM manual path when Advanced API is disabled', async () => {

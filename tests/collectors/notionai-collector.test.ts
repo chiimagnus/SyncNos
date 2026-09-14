@@ -35,6 +35,7 @@ describe('notionai-collector', () => {
     const { collector, registry } = createCollectorHarness();
 
     expect(typeof collector.__test.inpageMatches).toBe('function');
+    expect(collector.getCaptureReadiness()).toBe('waiting');
     expect(
       collector.__test.inpageMatches({ hostname: 'app.notion.com', pathname: '/', href: 'https://app.notion.com/' }),
     ).toBe(true);
@@ -58,7 +59,7 @@ describe('notionai-collector', () => {
       url: 'https://app.notion.com/0123456789abcdef0123456789abcdef',
     });
     setupDom(dom);
-    const { registry } = createCollectorHarness();
+    const { collector, registry } = createCollectorHarness();
 
     const active = registry.pickActive({
       hostname: 'app.notion.com',
@@ -66,6 +67,7 @@ describe('notionai-collector', () => {
       href: 'https://app.notion.com/0123456789abcdef0123456789abcdef',
     });
     expect(active && active.id).toBe('notionai');
+    expect(collector.getCaptureReadiness()).toBe('ready');
   });
 
   it('uses thread id `t` as stable conversationKey and canonical /chat URL', () => {

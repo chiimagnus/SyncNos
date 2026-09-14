@@ -90,7 +90,7 @@ describe('clipper context menu save title', () => {
 
     vi.mocked(tabsSendMessage).mockResolvedValue({
       ok: true,
-      data: { available: true, kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
+      data: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
       error: null,
     } as any);
 
@@ -124,7 +124,7 @@ describe('clipper context menu save title', () => {
 
     vi.mocked(tabsSendMessage).mockResolvedValue({
       ok: true,
-      data: { available: true, kind: 'video', label: 'Save Video', collectorId: 'video' },
+      data: { readiness: 'ready', kind: 'video', label: 'Save Video', collectorId: 'video' },
       error: null,
     } as any);
 

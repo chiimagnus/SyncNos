@@ -128,7 +128,7 @@ function createHarness(options: {
     currentPageCapture: {
       captureCurrentPage: vi.fn(),
       getCurrentPageCaptureState: vi.fn(() => ({
-        available: true,
+        readiness: 'ready',
         kind: 'chat',
         label: 'Fetch AI Chat',
         collectorId: options.collectorId || 'gemini',

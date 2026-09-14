@@ -11,6 +11,11 @@ import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
+import {
+  buildCaptureWaitingMessage,
+  buildPartialCaptureMessage,
+  captureSourceLabel,
+} from '@services/bootstrap/current-page-capture-status';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -27,11 +32,14 @@ type CurrentPageCaptureProgress = {
   message: string;
 };
 
+export type CurrentPageCaptureReadiness = 'ready' | 'waiting' | 'unsupported';
+
 export type CurrentPageCaptureState = {
-  available: boolean;
+  readiness: CurrentPageCaptureReadiness;
   kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;
+  sourceLabel?: string;
   reason?: string;
 };
 
@@ -132,7 +140,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   function resolveCaptureTarget() {
     if (detectSupportedVideoPagePlatform(globalThis.location?.href || '')) {
       return {
-        available: true,
+        readiness: 'ready' as const,
         kind: 'video' as const,
         label: t('fetchVideoTranscript'),
         collectorId: 'video' as const,
@@ -143,7 +151,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const collector = resolveActiveOrInpageCollector(collectorsRegistry);
     if (!collector) {
       return {
-        available: false,
+        readiness: 'unsupported' as const,
         kind: 'unsupported' as const,
         label: t('unavailable'),
         collectorId: null,
@@ -154,19 +162,31 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
     if (collector.id === 'web') {
       return {
-        available: true,
+        readiness: 'ready' as const,
         kind: 'article' as const,
         label: t('fetchArticle'),
         collectorId: 'web',
+        sourceLabel: captureSourceLabel('web'),
         collector,
       };
     }
 
+    let readiness: 'ready' | 'waiting' = 'ready';
+    if (typeof collector.getCaptureReadiness === 'function') {
+      try {
+        readiness = collector.getCaptureReadiness() === 'waiting' ? 'waiting' : 'ready';
+      } catch (_error) {
+        readiness = 'waiting';
+      }
+    }
+    const sourceLabel = captureSourceLabel(collector.id);
     return {
-      available: true,
+      readiness,
       kind: 'chat' as const,
       label: t('fetchAiChat'),
       collectorId: collector.id,
+      sourceLabel,
+      ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage(collector.id) } : null),
       collector,
     };
   }
@@ -233,8 +253,15 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
     try {
       const target = resolveCaptureTarget();
-      if (!target.available) {
-        throw new Error(target.reason || t('currentPageCannotBeCaptured'));
+      if (target.readiness !== 'ready') {
+        const fallback =
+          target.readiness === 'waiting'
+            ? buildCaptureWaitingMessage(target.collectorId)
+            : t('currentPageCannotBeCaptured');
+        const error = Object.assign(new Error(target.reason || fallback), {
+          code: target.readiness === 'waiting' ? 'capture_waiting' : 'capture_unsupported',
+        });
+        throw error;
       }
 
       if (target.kind === 'video') {
@@ -334,7 +361,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       const isNew = saved.isNew;
       report(
         saved.captureCompleteness === 'partial'
-          ? t('partialCaptureSaved')
+          ? buildPartialCaptureMessage(saved.captureReasons)
           : buildCaptureSuccessTipMessage({ isNew, title }),
         'default',
       );
@@ -349,7 +376,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
-      report(errorMessage(error, t('captureFailedFallback')), 'error');
+      report(
+        errorMessage(error, t('captureFailedFallback')),
+        (error as any)?.code === 'capture_waiting' ? 'default' : 'error',
+      );
       throw error;
     }
   }
@@ -357,10 +387,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   function getCurrentPageCaptureState(): CurrentPageCaptureState {
     const target = resolveCaptureTarget();
     return {
-      available: target.available,
+      readiness: target.readiness,
       kind: target.kind,
       label: target.label,
       collectorId: target.collectorId,
+      sourceLabel: target.sourceLabel,
       reason: target.reason,
     };
   }

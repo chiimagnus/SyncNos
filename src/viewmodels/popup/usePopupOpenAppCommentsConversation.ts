@@ -53,7 +53,7 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
       const response = await send<ApiResponse<CaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
       const state = unwrap(response);
 
-      if (!state.available) {
+      if (state.readiness !== 'ready') {
         if (!mountedRef.current) return;
         setEligible(false);
         setDisabledReason(t('commentsSidebarUnavailableHint'));

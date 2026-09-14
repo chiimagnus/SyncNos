@@ -47,6 +47,18 @@ describe('chatgpt-collector', () => {
     expect(makeDefinition('https://chat.openai.com/c/conv').matches({ hostname: 'chat.openai.com' })).toBe(false);
   });
 
+  it('reports an empty supported ChatGPT page as waiting', () => {
+    const dom = setupChatgptDom('', 'https://chatgpt.com/');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env);
+    expect(def.collector.getCaptureReadiness?.()).toBe('waiting');
+  });
+
   it('captures only the current visible API live turn with stable backend message ids', () => {
     const html = `
       <article data-testid="conversation-turn-1" data-turn-id="turn-user">
@@ -69,6 +81,7 @@ describe('chatgpt-collector', () => {
     });
     const def = createChatgptCollectorDef(env) as any;
 
+    expect(def.collector.getCaptureReadiness()).toBe('ready');
     expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toMatchObject({
       kind: 'candidate',
       conversationId: 'conversation-1',

@@ -18,7 +18,7 @@ describe('background-router current page capture relay', () => {
     vi.mocked(tabsSendMessage).mockResolvedValue({
       ok: true,
       data: {
-        available: true,
+        readiness: 'ready',
         kind: 'chat',
         label: 'Fetch AI Chat',
         collectorId: 'chatgpt',
@@ -31,7 +31,7 @@ describe('background-router current page capture relay', () => {
 
     expect(response.ok).toBe(true);
     expect(response.data).toEqual({
-      available: true,
+      readiness: 'ready',
       kind: 'chat',
       label: 'Fetch AI Chat',
       collectorId: 'chatgpt',
@@ -46,7 +46,7 @@ describe('background-router current page capture relay', () => {
     const response = await router.dispatch({ type: 'getActiveTabCaptureState' });
 
     expect(response.ok).toBe(true);
-    expect(response.data?.available).toBe(false);
+    expect(response.data?.readiness).toBe('unsupported');
     expect(response.data?.kind).toBe('unsupported');
     expect(tabsSendMessage).not.toHaveBeenCalled();
   });

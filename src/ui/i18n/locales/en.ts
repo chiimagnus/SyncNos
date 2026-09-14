@@ -88,11 +88,11 @@ export const en = {
   aiChatsSectionSupportedListPrefix: 'Built-in support for:',
   aiChatsSectionSupportedListSuffix: '.',
   aiChatsSectionSupportedNote:
-    'Default page capture uses content that is already loaded/visible. If ChatGPT Advanced capture is enabled, manual save can read the full current conversation branch from ChatGPT’s backend instead.',
+    'Default page capture uses content that is already loaded/visible. With ChatGPT Advanced capture enabled, manual save treats the current backend branch as canonical history and can safely augment a current visible reply that has not reached the backend yet.',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT Advanced capture',
   chatgptApiCaptureAdvancedLabel: 'Use the ChatGPT API for the current conversation',
   chatgptApiCaptureAdvancedHint:
-    'Off by default. Only when you manually save the current ChatGPT conversation, SyncNos uses your signed-in session with ChatGPT’s non-public backend API. It may stop working after ChatGPT changes. Turn it off to keep using manual DOM capture.',
+    'Off by default. Only manual save uses your signed-in session with ChatGPT’s non-public backend API. A live reply is augmented only with stable message identity, and Advanced capture never silently falls back to full DOM capture. It may stop working after ChatGPT changes. Turn it off to use manual DOM capture.',
   chatgptApiCaptureAdvancedSupport:
     'Supports text, visible reasoning, and conversation images. Unknown backend shapes keep content that can be assigned safely and are reported as partial; conversation identity or tree-integrity failures still stop the capture.',
   chatgptApiCaptureAdvancedFallback:
@@ -403,6 +403,11 @@ export const en = {
   loadingFullHistory: 'Loading full history...',
   captureFailedFallback: 'Capture failed',
   partialCaptureSaved: 'Visible messages were saved, but full history could not be confirmed.',
+  captureWaitingForMessages: 'waiting for messages…',
+  partialCaptureSavedLive: 'The visible reply was saved; save again after it finishes to confirm the final content.',
+  partialCaptureSavedHistory: 'Current messages were saved; full history is still unconfirmed.',
+  partialCaptureSavedContent: 'Safely confirmed messages were saved; some content or ordering is still unconfirmed.',
+  partialCaptureSavedMedia: 'Text was saved; some images or deep-research content are still incomplete.',
   fetchingDots: 'Fetching...',
   checkingDots: 'Checking...',
   savedPrefix: 'Saved: ',

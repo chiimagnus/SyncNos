@@ -16,6 +16,12 @@ vi.mock('@i18n', () => ({
       fetchingDots: 'Fetching...',
       checkingDots: 'Checking...',
       partialCaptureSaved: 'Partial capture saved',
+      captureWaitingForMessages: 'waiting for messages…',
+      partialCaptureSavedLive: 'Live reply saved; confirm later.',
+      partialCaptureSavedHistory: 'History still unconfirmed.',
+      partialCaptureSavedContent: 'Some content remains unconfirmed.',
+      partialCaptureSavedMedia: 'Some media remains incomplete.',
+      sourceChatgpt: 'ChatGPT',
       videoTranscriptTipNoSubtitles: 'No subtitles detected; available video details were saved.',
     })[key] || key,
 }));
@@ -77,7 +83,7 @@ describe('popup current-page video capture', () => {
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
         return apiOk({
-          available: true,
+          readiness: 'ready',
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',
@@ -110,10 +116,76 @@ describe('popup current-page video capture', () => {
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 19, isNew: true });
     expect(onCaptured).toHaveBeenCalledTimes(1);
     expect(latest?.status).toEqual({
-      kind: 'default',
+      phase: 'saved',
+      kind: 'success',
       message: 'No subtitles detected; available video details were saved.',
     });
     expect(sendMock.mock.calls.filter(([type]) => type === 'getActiveTabCaptureState')).toHaveLength(2);
+  });
+
+  it('shows supported-but-empty chat pages as neutral waiting and keeps capture disabled', async () => {
+    const onCaptured = vi.fn();
+    sendMock.mockResolvedValue(
+      apiOk({
+        readiness: 'waiting',
+        kind: 'chat',
+        label: 'Fetch AI Chat',
+        collectorId: 'chatgpt',
+        sourceLabel: 'ChatGPT',
+        reason: 'ChatGPT · waiting for messages…',
+      }),
+    );
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+
+    expect(latest?.buttonDisabled).toBe(true);
+    expect(latest?.buttonLabel).toBe('ChatGPT · waiting for messages…');
+    expect(latest?.phase).toBe('waiting');
+    expect(latest?.status).toEqual({
+      phase: 'waiting',
+      kind: 'info',
+      message: 'ChatGPT · waiting for messages…',
+    });
+    expect(await latest?.capture()).toBeNull();
+    expect(onCaptured).not.toHaveBeenCalled();
+  });
+
+  it('maps ChatGPT live-tail partial reasons to a warning instead of the generic history message', async () => {
+    const onCaptured = vi.fn();
+    sendMock.mockImplementation(async (type: string) => {
+      if (type === 'getActiveTabCaptureState') {
+        return apiOk({ readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' });
+      }
+      if (type === 'captureActiveTabCurrentPage') {
+        return apiOk({
+          kind: 'chat',
+          label: 'Fetch AI Chat',
+          collectorId: 'chatgpt',
+          conversationId: 20,
+          isNew: false,
+          captureCompleteness: 'partial',
+          captureReasons: ['chatgpt_api_live_tail_unconfirmed'],
+          title: 'Chat',
+        });
+      }
+      throw new Error(`unexpected message: ${type}`);
+    });
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+    await act(async () => {
+      await latest?.capture();
+    });
+
+    expect(latest?.phase).toBe('saved-partial');
+    expect(latest?.status).toEqual({
+      phase: 'saved-partial',
+      kind: 'warning',
+      message: 'Live reply saved; confirm later.',
+    });
   });
 
   it('runs the captured callback only for a saved video', async () => {
@@ -121,7 +193,7 @@ describe('popup current-page video capture', () => {
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
         return apiOk({
-          available: true,
+          readiness: 'ready',
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',
@@ -152,7 +224,7 @@ describe('popup current-page video capture', () => {
 
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'ok', conversationId: 21, isNew: true });
     expect(onCaptured).toHaveBeenCalledTimes(1);
-    expect(latest?.status).toEqual({ kind: 'default', message: 'Saved: Talk' });
+    expect(latest?.status).toEqual({ phase: 'saved', kind: 'success', message: 'Saved: Talk' });
     expect(sendMock.mock.calls.filter(([type]) => type === 'getActiveTabCaptureState')).toHaveLength(2);
   });
 });

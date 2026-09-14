@@ -1073,6 +1073,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   const collector = {
     capture,
+    getCaptureReadiness: () => {
+      const root = getConversationRoot();
+      if (!root) return 'waiting' as const;
+      return getTurnWrappers(root).some((wrapper: any) => !isExplicitlyHiddenWithin(wrapper, root))
+        ? ('ready' as const)
+        : ('waiting' as const);
+    },
     getRoot: getConversationRoot,
     prepareManualCapture,
     captureApiLiveTurn,

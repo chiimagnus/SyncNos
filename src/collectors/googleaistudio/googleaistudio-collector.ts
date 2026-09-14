@@ -655,6 +655,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
   const collector = {
     capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() && stableTurnAnchors().length ? ('ready' as const) : ('waiting' as const),
     getRoot: getConversationRoot,
     prepareManualCapture,
     __test: {
