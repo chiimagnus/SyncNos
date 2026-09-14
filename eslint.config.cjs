@@ -17,6 +17,7 @@ module.exports = [
       '_temp/**',
       'cloudflare-workers/**',
       'public/src/vendor/**',
+      'website/.site/**',
     ],
   },
 
@@ -119,6 +120,26 @@ module.exports = [
     rules: {
       'no-undef': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
+  {
+    files: ['website/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        document: 'readonly',
+        localStorage: 'readonly',
+        matchMedia: 'readonly',
+        navigator: 'readonly',
+        window: 'readonly',
+        IntersectionObserver: 'readonly',
+        setTimeout: 'readonly',
+      },
+    },
+    rules: {
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      '@typescript-eslint/no-unused-vars': ['error', { caughtErrors: 'none' }],
     },
   },
 

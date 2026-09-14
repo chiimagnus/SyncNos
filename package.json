@@ -27,7 +27,8 @@
     "dev:safari": "wxt -b safari --mv3",
     "build:safari": "wxt build -b safari --mv3",
     "check:safari": "npm run build:safari && node .github/scripts/webclipper/check-dist.mjs --root=.output/safari-mv3",
-    "setup:safari:xcode": "node .github/scripts/webclipper/setup-safari-xcode.mjs"
+    "setup:safari:xcode": "node .github/scripts/webclipper/setup-safari-xcode.mjs",
+    "website:build": "node .github/scripts/website/build-docs.mjs"
   },
   "prettier": {
     "singleQuote": true,

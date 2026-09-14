@@ -8,7 +8,7 @@
       name="description"
       content="SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian、飞书或 GitHub。开源、本地优先，数据始终归你所有。"
     />
-    <link rel="icon" href="assets/icon-128.png" />
+    <link rel="icon" href="assets/icon-128.png" type="image/png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -44,10 +44,10 @@
       content="SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian、飞书或 GitHub。开源、本地优先，数据始终归你所有。"
     />
     <meta property="og:url" content="https://chiimagnus.github.io/SyncNos/" />
-    <meta property="og:image" content="https://chiimagnus.github.io/SyncNos/assets/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="SyncNos WebClipper" />
+    <meta property="og:image" content="https://chiimagnus.github.io/SyncNos/assets/product/popup-screenshots.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="800" />
+    <meta property="og:image:alt" content="SyncNos WebClipper popup screenshot" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:locale:alternate" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -56,7 +56,7 @@
       name="twitter:description"
       content="SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian、飞书或 GitHub。开源、本地优先，数据始终归你所有。"
     />
-    <meta name="twitter:image" content="https://chiimagnus.github.io/SyncNos/assets/og-image.png" />
+    <meta name="twitter:image" content="https://chiimagnus.github.io/SyncNos/assets/product/popup-screenshots.png" />
     <link rel="sitemap" type="application/xml" href="/SyncNos/sitemap.xml" />
     <script type="application/ld+json">
       {
@@ -86,14 +86,14 @@
             "operatingSystem": "Chrome, Microsoft Edge, Firefox",
             "url": "https://chiimagnus.github.io/SyncNos/",
             "description": "SyncNos WebClipper：把 AI 对话、网页文章、视频字幕一键存入 Notion、Obsidian、飞书或 GitHub。开源、本地优先，数据始终归你所有。",
-            "image": "https://chiimagnus.github.io/SyncNos/assets/og-image.png",
+            "image": "https://chiimagnus.github.io/SyncNos/assets/product/popup-screenshots.png",
             "author": { "@id": "https://chiimagnus.github.io/SyncNos/#org" },
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
             "isAccessibleForFree": true,
             "license": "https://www.gnu.org/licenses/agpl-3.0.html",
             "downloadUrl": "https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok",
             "featureList": [
-              "保存 11 个平台的 AI 对话",
+              "保存支持站点的 AI 对话",
               "提取网页正文（含微信公众号、小红书）",
               "抓取 YouTube / Bilibili 视频字幕",
               "同步到 Notion / Obsidian / 飞书 / GitHub",
@@ -128,7 +128,7 @@
                 "name": "能保存哪些内容？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "可以保存 11 个平台的 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai）与 Google AI Studio；网页正文（含微信公众号、小红书）；以及 YouTube / Bilibili 的视频字幕。"
+                  "text": "可以保存 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 与 z.ai 的 AI 对话；网页正文；以及 YouTube / Bilibili 的视频字幕。ChatGPT 与 Google AI Studio 使用手动完整采集。"
                 }
               },
               {
@@ -154,6 +154,7 @@
         <nav class="nav-links">
           <a href="#capture" data-en="Capture">采集</a>
           <a href="#sync" data-en="Sync">同步</a>
+          <a href="docs/" data-en="Docs">文档</a>
           <a href="#privacy" data-en="Privacy">隐私</a>
           <a href="#open" data-en="Open source">开源</a>
         </nav>
@@ -249,10 +250,10 @@
             <span class="tag num-lead">01</span>
             <h3 data-en="AI conversations">AI 对话</h3>
             <p
-              data-en="Eleven platforms — ChatGPT, Claude, Gemini, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI and z.ai — plus Google AI Studio. Full conversations, saved exactly as they are."
+              data-en="ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI and z.ai. ChatGPT and Google AI Studio use explicit complete capture; other supported sites can auto-save when enabled."
             >
-              覆盖 ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 共 11 个平台，另支持 Google
-              AI Studio。完整对话，原样保存。
+              支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 与 z.ai。ChatGPT 与
+              Google AI Studio 使用手动完整采集，其余支持站点可按设置自动保存。
             </p>
           </div>
           <ol class="numlist">
@@ -320,19 +321,14 @@
               </p>
             </div>
             <div class="dest reveal" data-d="2">
-              <img class="ico" src="assets/feishu.png" alt="Feishu" />
+              <img class="ico" src="assets/feishu.svg" alt="Feishu" />
               <h3 data-en="Feishu">飞书</h3>
               <p data-en="One-click OAuth sync to Feishu Docs (DocX), organized by type.">
                 OAuth 授权，一键同步至飞书云文档（DocX），按类型分类整理。
               </p>
             </div>
             <div class="dest reveal" data-d="3">
-              <svg class="ico ico-github" viewBox="0 0 34 34" width="34" height="34" aria-hidden="true">
-                <circle cx="10" cy="8" r="3" />
-                <circle cx="10" cy="26" r="3" />
-                <circle cx="24" cy="17" r="3" />
-                <path d="M10 11v12M13 8h3a8 8 0 0 1 8 8v-2" />
-              </svg>
+              <img class="ico ico-invert" src="assets/github.svg" alt="GitHub" />
               <h3>GitHub</h3>
               <p data-en="Sync Markdown into a repository and branch you choose, with incremental updates.">
                 将 Markdown 同步到你选择的仓库与分支，并支持增量更新。
@@ -354,15 +350,15 @@
         </h2>
         <div class="shots">
           <figure class="shot reveal">
-            <img src="assets/popup.png" alt="SyncNos popup" />
+            <img src="assets/product/popup-screenshots.png" alt="SyncNos popup" />
             <figcaption data-en="Save and browse everything you've clipped, directly from the popup.">
               在弹窗中一键保存，并浏览已剪藏的对话与文章。
             </figcaption>
           </figure>
           <figure class="shot reveal" data-d="1">
-            <img src="assets/settings.png" alt="SyncNos settings" />
-            <figcaption data-en="Back up locally, or sync to Notion, Obsidian, Feishu or GitHub — your choice.">
-              本地备份，或同步至 Notion、Obsidian、飞书、GitHub，由你选择。
+            <img src="assets/product/comments-discussion.png" alt="SyncNos article discussion sidebar" />
+            <figcaption data-en="Keep comments connected to exact passages while reading saved articles.">
+              阅读已保存文章时，让评论与精确原文保持关联。
             </figcaption>
           </figure>
         </div>
@@ -575,7 +571,7 @@
           <a href="https://github.com/chiimagnus/SyncNos" data-en="Source">GitHub 源码</a>
           <a href="https://github.com/chiimagnus/SyncNos/releases" data-en="Changelog">更新日志</a>
           <a href="https://linux.do/t/topic/1635410" data-en="Community">linux.do 社区</a>
-          <a href="https://chiimagnus.notion.site/syncnos" data-en="Docs">文档</a>
+          <a href="docs/" data-en="Docs">文档</a>
         </div>
         <p class="copyright">
           © 2026 SyncNos ·

@@ -2,5 +2,5 @@ _light.html
 _dark.html
 preview-light.png
 preview-dark.png
-assets/vendor/
+.site/
 .DS_Store

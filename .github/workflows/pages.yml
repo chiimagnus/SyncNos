@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - 'website/**'
+      - 'public/icons/**'
+      - 'docs/assets/**'
+      - '.github/scripts/website/build-docs.mjs'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -28,13 +33,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install website build dependencies
+        run: npm ci --ignore-scripts --omit=dev --no-audit --no-fund
+
+      - name: Build website
+        run: npm run website:build
+
       - name: Configure Pages
         uses: actions/configure-pages@v6
 
       - name: Upload website
         uses: actions/upload-pages-artifact@v5
         with:
-          path: website
+          path: website/.site
 
       - name: Deploy Pages
         id: deployment

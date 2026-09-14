@@ -4,7 +4,7 @@
 
 ## 能做什么
 
-- **采集 AI 对话**：覆盖 ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 共 11 个平台，另支持 Google AI Studio。
+- **采集 AI 对话**：支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai；其中 ChatGPT 与 Google AI Studio 使用手动完整采集，其余支持站点可按设置自动保存。
 - **采集网页文章**：提取任意网页正文（含标题、作者、时间），已专适配微信公众号与小红书。
 - **采集视频字幕**：抓取 YouTube、Bilibili 字幕，保留时间戳。
 - **同步去向**：Notion（OAuth）、Obsidian（Local REST API 本地直写）、飞书云文档（DocX）、GitHub 仓库；也可导出 Markdown / Zip。
@@ -18,6 +18,7 @@
 ## 链接
 
 - [官网](https://chiimagnus.github.io/SyncNos/)
+- [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
 - [源码 (GitHub)](https://github.com/chiimagnus/SyncNos)
 - [社区讨论 (linux.do)](https://linux.do/t/topic/1635410)
 

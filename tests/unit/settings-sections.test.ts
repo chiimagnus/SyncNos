@@ -429,7 +429,7 @@ describe('settings section definitions', () => {
   it('uses the supplied Obsidian setup guide URL', () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
-    const setupGuideUrl = 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.en.md';
+    const setupGuideUrl = 'https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/';
     const onTest = vi.fn();
 
     act(() => {

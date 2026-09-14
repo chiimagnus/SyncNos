@@ -357,16 +357,6 @@ section {
 [data-theme='dark'] .ico-invert {
   filter: invert(1);
 }
-.ico-github {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.ico-github circle {
-  fill: var(--surface);
-}
 .alt-install {
   margin: 14px 0 0;
   font-size: 13px;

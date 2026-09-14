@@ -88,7 +88,7 @@ export function AboutSection() {
             id="btnAboutAngels"
             className={buttonClassName}
             type="button"
-            onClick={() => openUrl('https://chiimagnus.notion.site/syncnos-angels').catch(() => {})}
+            onClick={() => openUrl('https://chiimagnus.github.io/SyncNos/#sponsors').catch(() => {})}
           >
             {t('angelsLinkLabel')}
           </button>

@@ -6,7 +6,7 @@ Local-first capture for AI conversations, web articles, and useful video-page co
 
 Save to the browser first, then optionally sync to Notion, Obsidian, Feishu (Lark), or GitHub, export selected items as Markdown/JSON, or create a local Backup ZIP.
 
-[Website](https://chiimagnus.github.io/SyncNos/) · [SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
+[Website](https://chiimagnus.github.io/SyncNos/) · [SyncNos Angel Sponsors 😍](https://chiimagnus.github.io/SyncNos/#sponsors) · **English** · [中文](README.zh-CN.md)
 
 [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
 [![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Fijkpghlfmkbjcgafapjcjahaikmnjncl&query=%24.version&label=Edge%20Add-ons&color=blue)](https://microsoftedge.microsoft.com/addons/detail/ijkpghlfmkbjcgafapjcjahaikmnjncl)
@@ -74,8 +74,8 @@ SyncNos supports YouTube watch/youtu.be pages and Bilibili BV playback pages, in
 | Target | Behavior |
 | --- | --- |
 | **Notion** | Sync local content through the Notion API after OAuth. |
-| **Obsidian** | Write Markdown and local image attachments through the Local REST API. [Setup guide](docs/guide/obsidian/LocalRestAPI.en.md) |
-| **Feishu (Lark)** | Sync local content to Feishu DocX after OAuth. [Setup guide](docs/guide/feishu/DocxSync.en.md) |
+| **Obsidian** | Write Markdown and local image attachments through the Local REST API. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/) |
+| **Feishu (Lark)** | Sync local content to Feishu DocX after OAuth. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/) |
 | **GitHub** | Write the local projection to an authorized repository/branch through the SyncNos GitHub App. |
 | **Markdown / JSON** | Export selected items and referenced cached attachments locally. |
 | **Backup ZIP** | Create the local recovery package described in [storage and recovery](docs/storage.md). |
@@ -94,10 +94,11 @@ Article discussion sidebar: exact quotes, compact threads, and one active reply 
 
 ## Documentation
 
+- [User documentation](https://chiimagnus.github.io/SyncNos/docs/en/)
 - [Privacy](PRIVACY.md)
 - [Storage, backup, and recovery](docs/storage.md)
-- [Feishu setup](docs/guide/feishu/DocxSync.en.md)
-- [Obsidian setup](docs/guide/obsidian/LocalRestAPI.en.md)
+- [Feishu setup](https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/)
+- [Obsidian setup](https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/)
 - [Contributing](docs/CONTRIBUTING.md)
 
 ## Support

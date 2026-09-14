@@ -6,7 +6,7 @@
 
 内容先进入浏览器本地，再按需同步到 Notion、Obsidian、飞书或 GitHub，导出选中的 Markdown / JSON，或创建本地 Backup ZIP。
 
-[官网](https://chiimagnus.github.io/SyncNos/) · [SyncNos 天使赞助者们😍](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
+[官网](https://chiimagnus.github.io/SyncNos/) · [SyncNos 天使赞助者们😍](https://chiimagnus.github.io/SyncNos/#sponsors) · [English](README.md) · **中文**
 
 [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
 [![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Fijkpghlfmkbjcgafapjcjahaikmnjncl&query=%24.version&label=Edge%20Add-ons&color=blue)](https://microsoftedge.microsoft.com/addons/detail/ijkpghlfmkbjcgafapjcjahaikmnjncl)
@@ -74,8 +74,8 @@ SyncNos 支持 YouTube watch / youtu.be 页面和 Bilibili BV 播放页，也支
 | 目标 | 行为 |
 | --- | --- |
 | **Notion** | OAuth 后通过 Notion API 同步本地内容。 |
-| **Obsidian** | 通过 Local REST API 写入 Markdown 和本地图片附件。[配置指南](docs/guide/obsidian/LocalRestAPI.zh.md) |
-| **飞书** | OAuth 后同步到飞书 DocX。[配置指南](docs/guide/feishu/DocxSync.zh.md) |
+| **Obsidian** | 通过 Local REST API 写入 Markdown 和本地图片附件。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/) |
+| **飞书** | OAuth 后同步到飞书 DocX。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/feishu/) |
 | **GitHub** | 通过 SyncNos GitHub App 写入已授权的 repository / branch。 |
 | **Markdown / JSON** | 在本机导出选中的条目和实际引用的缓存附件。 |
 | **Backup ZIP** | 创建[本地数据、备份与恢复](docs/storage.md)中定义的恢复包。 |
@@ -94,10 +94,11 @@ WebClipper Popup：保存并浏览已采集内容。
 
 ## 文档
 
+- [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
 - [隐私政策](PRIVACY.md)
 - [本地数据、备份与恢复](docs/storage.md)
-- [飞书配置](docs/guide/feishu/DocxSync.zh.md)
-- [Obsidian 配置](docs/guide/obsidian/LocalRestAPI.zh.md)
+- [飞书配置](https://chiimagnus.github.io/SyncNos/docs/sync/feishu/)
+- [Obsidian 配置](https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/)
 - [参与贡献](docs/CONTRIBUTING.md)
 
 ## 支持

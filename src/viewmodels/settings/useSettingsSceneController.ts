@@ -2111,12 +2111,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const guideLocale = getCurrentLocale();
   const obsidianSetupGuideUrl =
     guideLocale === 'zh'
-      ? 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.zh.md'
-      : 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.en.md';
+      ? 'https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/'
+      : 'https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/';
   const feishuSetupGuideUrl =
     guideLocale === 'zh'
-      ? 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.zh.md'
-      : 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.en.md';
+      ? 'https://chiimagnus.github.io/SyncNos/docs/sync/feishu/'
+      : 'https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/';
 
   const onOpenObsidianSetupGuide = useCallback(() => {
     openHttpUrl(obsidianSetupGuideUrl);
