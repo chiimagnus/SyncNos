@@ -129,6 +129,13 @@ b {
   align-items: center;
   gap: 10px;
 }
+.github-link {
+  gap: 7px;
+  text-decoration: none;
+}
+.github-link svg {
+  flex: none;
+}
 .ghost-btn {
   background: none;
   border: 1px solid var(--line);
@@ -234,7 +241,21 @@ b {
   background: var(--line);
 }
 @media (max-width: 720px) {
+  .nav {
+    gap: 12px;
+    padding: 12px 16px;
+  }
   .nav-links {
+    gap: 12px;
+  }
+  .nav-actions {
+    gap: 6px;
+  }
+  .github-link {
+    min-width: 34px;
+    padding: 0;
+  }
+  .github-link span {
     display: none;
   }
 }
@@ -505,19 +526,6 @@ section {
   color: var(--muted);
   font-size: 14px;
   margin: 0 0 44px;
-}
-.foot-links {
-  display: flex;
-  gap: 24px;
-  justify-content: center;
-  flex-wrap: wrap;
-  color: var(--muted);
-  font-size: 15px;
-  border-top: 1px solid var(--line);
-  padding-top: 32px;
-}
-.foot-links a:hover {
-  color: var(--ink);
 }
 .copyright {
   margin-top: 22px;
