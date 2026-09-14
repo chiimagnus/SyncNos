@@ -59,7 +59,7 @@ export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {
                   —
                 </span>
               ) : shortcut ? (
-                <kbd className="tw-max-w-[55%] tw-shrink-0 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-font-mono tw-text-xs tw-font-bold tw-text-[var(--text-primary)]">
+                <kbd className="tw-max-w-[55%] tw-shrink-0 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-font-mono tw-text-xs tw-font-bold tw-text-[var(--text-primary)]">
                   {shortcut}
                 </kbd>
               ) : (

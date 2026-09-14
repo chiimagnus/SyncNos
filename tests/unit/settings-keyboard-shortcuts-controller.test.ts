@@ -103,7 +103,7 @@ afterEach(async () => {
 });
 
 describe('useKeyboardShortcutsController', () => {
-  it('does not read shortcuts while General settings is inactive', async () => {
+  it('does not read shortcuts while the Keyboard shortcuts section is inactive', async () => {
     await renderController(false);
 
     expect(shortcutMocks.read).not.toHaveBeenCalled();
