@@ -13,7 +13,6 @@
   --card-shadow: 0 1px 2px rgba(36, 48, 63, 0.05), 0 12px 32px -20px rgba(36, 48, 63, 0.22);
   --line-strong: rgba(36, 48, 63, 0.18);
   --serif: 'Noto Serif SC', 'Noto Serif CJK SC', 'Songti SC', Georgia, serif;
-  --sans: 'Noto Sans SC', 'Noto Sans CJK SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   --maxw: 1140px;
   --hero-glow: radial-gradient(
     1200px 720px at 80% -10%,
@@ -71,7 +70,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--sans);
+  font-family: var(--serif);
   font-weight: 300;
   line-height: 1.72;
   -webkit-font-smoothing: antialiased;

@@ -8,6 +8,7 @@
   --accent: #3156d3;
   --code: #f1efe9;
   --header: rgba(248, 247, 244, 0.9);
+  --serif: 'Noto Serif SC', 'Noto Serif CJK SC', 'Songti SC', Georgia, serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,12 +34,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font:
-    15px/1.72 ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font: 15px/1.72 var(--serif);
 }
 a {
   color: var(--accent);
@@ -145,10 +141,7 @@ a:hover {
 }
 .docs-heading h1 {
   margin: 0 0 8px;
-  font:
-    700 clamp(30px, 4vw, 42px)/1.15 Georgia,
-    'Times New Roman',
-    serif;
+  font: 700 clamp(30px, 4vw, 42px)/1.15 var(--serif);
 }
 .docs-heading p {
   margin: 0 0 12px;
