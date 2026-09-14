@@ -244,14 +244,12 @@ export function createArticleCommentsSidebarController(input: {
     ) {
       try {
         await waitForOperation(
-          Promise.resolve(
-            adapter.migrateCanonicalUrl({
-              fromCanonicalUrl: transition.previous.canonicalUrl,
-              toCanonicalUrl: transition.next.canonicalUrl,
-              conversationId: transition.next.conversationId,
-              signal: operation.abortController.signal,
-            }),
-          ),
+          adapter.migrateCanonicalUrl({
+            fromCanonicalUrl: transition.previous.canonicalUrl,
+            toCanonicalUrl: transition.next.canonicalUrl,
+            conversationId: transition.next.conversationId,
+            signal: operation.abortController.signal,
+          }),
           operation.abortController.signal,
         );
       } catch (error) {
