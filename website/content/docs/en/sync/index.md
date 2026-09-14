@@ -1,37 +1,35 @@
 ---
 title: Sync overview
-description: Choose Notion, Obsidian, Feishu, or GitHub, then decide between manual and automatic sync.
+description: Send local content to Notion, Obsidian, Feishu, or GitHub.
 ---
 
-Sync is optional. Even with no external service connected, SyncNos can capture, read, search, export, and back up content locally.
+Sync is optional. SyncNos works without connecting any external service.
 
 ## Choose a destination
 
-| Destination | Good for | Connection |
-| --- | --- | --- |
-| [Notion](/docs/en/sync/notion/) | Database-style archive and Notion pages | OAuth |
-| [Obsidian](/docs/en/sync/obsidian/) | Local Markdown vault | Local REST API |
-| [Feishu](/docs/en/sync/feishu/) | Feishu DocX / cloud documents | OAuth (Proxy or Direct) |
-| [GitHub](/docs/en/sync/github/) | Markdown repositories and Git workflows | GitHub App Device Flow |
+| Destination | Good for |
+| --- | --- |
+| [Notion](/docs/en/sync/notion/) | Organizing content in databases and pages |
+| [Obsidian](/docs/en/sync/obsidian/) | Saving to a local Markdown vault |
+| [Feishu](/docs/en/sync/feishu/) | Saving to Feishu cloud documents |
+| [GitHub](/docs/en/sync/github/) | Saving to a Markdown repository |
 
-You can configure only one destination or several. Each destination has its own enablement and configuration.
+Use one destination or several at the same time.
 
-## Manual and automatic sync
+## Manual or automatic sync
 
-Every external destination supports manual sync and can enable automatic sync independently. Both modes use the same provider sync flow; automatic sync changes when work starts, not which system owns your data.
+Each destination can be synced manually or have automatic sync enabled separately.
 
-When a ChatGPT item references an image that is not cached locally, SyncNos may retrieve it temporarily for the destination instead of forcing a permanent local cache first. If that image is unavailable, the local text remains intact and the destination degrades the image according to that provider's capabilities.
+Automatic sync only changes when syncing happens. Your local content remains in SyncNos.
 
-## Sync, export, and backup are different
+## Sync, export, and backup
 
-- **Sync** keeps a configured external service updated.
-- **Markdown / JSON export** creates local files you can carry and read elsewhere.
-- **Backup ZIP** stores data intended to restore SyncNos local state.
+- **Sync** keeps an external service updated
+- **Export** creates Markdown / JSON files
+- **Backup** creates a package that can later be restored into SyncNos
 
-If all you need is a file, you do not need to configure a sync destination. See [Export & backup](/docs/en/export-backup/).
+If you only want files, you do not need to configure sync. See [Export & backup](/docs/en/export-backup/).
 
 ## When sync fails
 
-Your local content remains available. Fix the destination's connection, permissions, or configuration, then retry the sync.
-
-Open the destination-specific page for setup and troubleshooting. See [Privacy & data](/docs/en/privacy/) for network, credential, and authorization boundaries.
+Your local content stays available. Fix the connection or permissions, then sync again.
