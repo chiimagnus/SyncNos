@@ -3,44 +3,31 @@ title: Use your library
 description: Read, search, comment on, and reuse content already saved in SyncNos.
 ---
 
-This page is about what you can do **after content has already been saved**. For capture behavior, see [Capture content](/docs/en/capture/). For external destinations, see [Sync to external services](/docs/en/sync/).
+## Browse and search
 
-## Browse, search, and read
+Saved AI conversations, web articles, and videos all appear in your local library.
 
-AI conversations, web articles, and video content live in the same local content library. You can browse and search saved items in SyncNos and open their details for reading.
+Search for an item or open its details to keep reading.
 
-Reading themes and Markdown display preferences change presentation only; they do not rewrite the saved content.
+## Images
 
-## Image status and local cache
+The detail **More** menu shows the image cache status.
 
-Open the detail **More** menu to see the saved text count plus image totals: **Images**, **Cached**, and **Uncached**. The count follows image occurrences in the saved Markdown, so the same image used twice counts twice.
+Choose **Cache images** when you want to save the remaining images locally.
 
-**Cache images** tries to localize the remaining images for the current item. This is useful for older items even when automatic image caching is off. An uncached ChatGPT image can still display on demand while your current ChatGPT session can resolve it; once cached, the saved item uses the local copy instead.
+## Highlights and comments
 
-## Highlights, comments, and replies
+Web articles support highlights, comments, and replies.
 
-Saved web articles can have comments and replies attached to exact text references. A root annotation can also be highlight-only, without extra comment text.
+You can also save a highlight without adding comment text.
 
-Comments stay with the local article and are included in Backup / Restore.
+## Reuse content in AI
 
-## Reuse content with `$` Mention
+- Type `$` in a supported AI input to search your local library and insert saved content
+- Use **Chat with AI** to open your configured AI platform; you still decide whether to send anything
 
-Type `$` in a supported AI conversation input to search your local SyncNos library and insert the selected item as a Markdown snippet.
-
-This uses your local library. The item does not need to be synced to an external provider first.
-
-## Chat with AI
-
-When you start **Chat with AI** from saved content, SyncNos copies the content to the clipboard and opens the AI platform you configured.
-
-SyncNos does not silently submit a new AI message for you. You still decide what to send on the destination page.
+These features use your local library directly and do not require an external sync service.
 
 ## Insight
 
-Insight calculates capture counts, source distribution, trends, and selected rankings from local data. Viewing Insight does not require uploading your library to a SyncNos content service.
-
-## Next steps
-
-- Want an external service to stay updated? Configure a [sync destination](/docs/en/sync/).
-- Want portable files or a recovery package? Use [Export & backup](/docs/en/export-backup/).
-- Want local automation to access the library? Use the [CLI](/docs/en/cli/).
+Insight shows capture counts, source distribution, and trends from your local content.
