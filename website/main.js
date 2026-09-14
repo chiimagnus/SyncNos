@@ -83,6 +83,7 @@
     },
   };
   var langNodes = document.querySelectorAll('[data-en]');
+  var docsLinks = document.querySelectorAll('[data-docs-link]');
   var reduceMotion = false;
   try {
     reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -110,6 +111,7 @@
       if (el.getAttribute('data-zh') === null) el.setAttribute('data-zh', el.innerHTML);
       el.innerHTML = l === 'en' ? el.getAttribute('data-en') : el.getAttribute('data-zh');
     }
+    for (var j = 0; j < docsLinks.length; j++) docsLinks[j].setAttribute('href', l === 'en' ? 'docs/en/' : 'docs/');
     var lb = document.getElementById('lang');
     if (lb) lb.textContent = l === 'en' ? '\u4e2d' : 'EN';
     try {
