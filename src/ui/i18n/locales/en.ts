@@ -16,6 +16,8 @@ export const en = {
   section_aboutyou_desc: 'See your local clip stats at a glance.',
   section_general_label: 'General',
   section_general_desc: 'Inpage visibility + auto-save behavior.',
+  section_shortcuts_label: 'Keyboard shortcuts',
+  section_shortcuts_desc: 'Browser-managed shortcut bindings.',
   section_articles_label: 'Web article capture',
   section_articles_desc: 'Supported types + how-to.',
   section_ai_chats_label: 'AI chat capture',

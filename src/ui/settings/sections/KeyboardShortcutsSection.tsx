@@ -8,7 +8,7 @@ import type {
   KeyboardShortcutsControllerStatus,
 } from '@viewmodels/settings/useKeyboardShortcutsController';
 
-export type KeyboardShortcutsCardProps = {
+export type KeyboardShortcutsSectionProps = {
   status: KeyboardShortcutsControllerStatus;
   items: KeyboardShortcutsControllerItem[];
   managerAccess: KeyboardShortcutsControllerManagerAccess;
@@ -21,7 +21,7 @@ const ACTION_ROWS: ReadonlyArray<{ action: KeyboardShortcutAction; labelKey: Tra
   { action: 'open-app', labelKey: 'keyboardShortcutsOpenApp' },
 ];
 
-export function KeyboardShortcutsCard(props: KeyboardShortcutsCardProps) {
+export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {
   const { status, items, managerAccess, onOpenManager } = props;
   const loading = status === 'idle' || status === 'loading';
   const unsupported = status === 'unsupported';

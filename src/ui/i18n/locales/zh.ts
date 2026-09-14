@@ -18,6 +18,8 @@ export const zh: { [K in TranslationKey]: string } = {
   section_aboutyou_desc: '一眼看到你的本地剪藏积累。',
   section_general_label: '通用',
   section_general_desc: '页面内按钮显示与自动保存设置。',
+  section_shortcuts_label: '快捷键',
+  section_shortcuts_desc: '查看并管理浏览器分配的快捷键。',
   section_articles_label: '网页文章抓取',
   section_articles_desc: '支持范围与抓取教程。',
   section_ai_chats_label: 'AI 对话抓取',
