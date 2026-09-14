@@ -658,7 +658,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       role,
       fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
       hasDeepResearch: !!iframe,
-      rendered: !!text || imageUrls.length > 0 || !!iframe,
+      rendered: !!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe,
       visible: isVisibleWindow(wrapper),
       outerHtml: String(wrapper?.outerHTML || ''),
       imageUrls,
@@ -828,6 +828,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       }
       if (lastUserIndex < 0) return { kind: 'none', conversationId: currentConversationId };
 
+      const cotByOwner = buildCotAssociations(wrappers, true);
       let assistantWrapper: any = null;
       for (let index = wrappers.length - 1; index > lastUserIndex; index -= 1) {
         const wrapper = wrappers[index];
@@ -839,7 +840,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           continue;
         const node = assistantContentNode(wrapper);
         const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
-        if (!text && !extractChatgptImageUrls(wrapper).length && !findDeepResearchIframe(wrapper)) continue;
+        const cot = cotByOwner.get(wrapper);
+        const hasCot = !!String(cot?.semanticText || cot?.semanticMarkdown || '').trim();
+        if (!text && !hasCot && !extractChatgptImageUrls(wrapper).length && !findDeepResearchIframe(wrapper)) continue;
         assistantWrapper = wrapper;
         break;
       }
@@ -850,7 +853,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const assistantKey = directMessageId(assistantWrapper);
       if (!userKey || !assistantKey) return { kind: 'unsafe', conversationId: currentConversationId };
 
-      const cotByOwner = buildCotAssociations(wrappers, true);
       const userTurnKey = turnKeyOf(userWrapper);
       const assistantTurnKey = turnKeyOf(assistantWrapper);
       const withinTurn = (index: number, turnKey: string) =>

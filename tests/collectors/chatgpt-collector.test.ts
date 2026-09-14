@@ -93,6 +93,42 @@ describe('chatgpt-collector', () => {
     ).toBe('streaming answer');
   });
 
+  it('captures a visible reasoning-only API live turn before final text appears', () => {
+    const html = `
+      <article data-testid="conversation-turn-1" data-turn-id="turn-live-reasoning">
+        <div data-message-author-role="user" data-message-id="user-reasoning">
+          <div class="whitespace-pre-wrap">question</div>
+        </div>
+        <button type="button" aria-expanded="true">Reasoning</button>
+        <div data-testid="cot-top-body" data-item-anchor="start" data-dimension="height" data-direction="in">
+          <div class="markdown prose"><p>Visible reasoning in progress.</p></div>
+        </div>
+        <div
+          data-message-author-role="assistant"
+          data-message-id="assistant-reasoning"
+          data-is-intersecting="true"
+        ></div>
+      </article>
+    `;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-1');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+
+    const liveTurn = def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' });
+    expect(liveTurn).toMatchObject({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'user-reasoning', role: 'user' },
+      assistantMessage: { messageKey: 'assistant-reasoning', role: 'assistant' },
+    });
+    expect(semanticText(liveTurn.assistantMessage)).toContain('Visible reasoning in progress.');
+  });
+
   it('fails closed when the visible API live turn lacks stable ids or the durable route changed', () => {
     const html = `
       <article data-testid="conversation-turn-1" data-turn-id="turn-user">
