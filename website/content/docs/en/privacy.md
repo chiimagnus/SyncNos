@@ -1,39 +1,41 @@
 ---
 title: Privacy & data
-description: Where content is stored by default, which features use the network, and how credentials and backups are handled.
+description: Learn where content is stored, when SyncNos uses the network, and how credentials and permissions are handled.
 ---
 
-This page is a user-facing summary. The complete and continuously maintained policy is [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).
+This page is a quick summary. See [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md) for the complete policy.
 
-## Where your content is stored by default
+## Content is local by default
 
-Captured content is saved locally in the browser first. SyncNos does not require uploading your local library to a SyncNos cloud content service before you can use it.
+Captured content is saved in your browser first.
 
-Whether content is sent to an external service depends on the features you explicitly configure or invoke.
+You can capture, read, search, export, and back up content without connecting any external service.
 
-## Features that use the network
+## When SyncNos uses the network
 
-- **Notion** sends content you choose to sync to the Notion API and may process referenced images when needed.
-- **Feishu** sends content you choose to sync to the Feishu API; OAuth can use Proxy or Direct mode.
-- **GitHub** authorizes through GitHub App Device Flow and writes repository content through the GitHub API.
-- **ChatGPT Advanced capture** runs only when explicitly enabled and manually invoked for the current conversation.
-- **Images** may be requested from their original sites / CDNs when you cache them. An uncached ChatGPT image may also be resolved temporarily when you view, export, or sync content that references it.
-- **Obsidian** normally talks to a Local REST API on the same computer rather than a SyncNos cloud service.
+SyncNos contacts an external service only when you enable or use a feature that needs it, for example:
 
-Once a third-party service receives data, that service's own privacy policy applies.
+- syncing to Notion, Feishu, or GitHub
+- using the Obsidian Local REST API on the same computer
+- enabling ChatGPT Advanced capture
+- caching or retrieving images used by saved content
 
-## Credentials stay local
+Once data is sent to a third party, that service's own privacy policy applies.
 
-Required provider tokens, API keys, and client secrets are stored in browser-extension local storage. Authentication secrets are not written into ordinary captured content.
+## Credentials and backups
 
-Backup ZIPs exclude those authentication secrets as well. See [Export & backup](/docs/en/export-backup/) for what a Backup contains and when to use one.
+Tokens, API keys, client secrets, and other credentials required by sync services are stored locally by the extension.
 
-## Remote code
+These authentication secrets are not written into ordinary captured content and are not included in SyncNos Backups.
 
-Executable extension code ships with SyncNos. The extension does not download and execute remote code from the network.
+See [Export & backup](/docs/en/export-backup/) for how backups work.
 
 ## Browser permissions
 
-Browser host permissions allow capture on pages you request and access to configured OAuth, sync, and image endpoints. Broad host access does not mean page content is uploaded by default.
+SyncNos needs access to pages you choose to capture and to sync, authorization, and image endpoints you configure or use.
 
-For exact data-flow, permission, and credential boundaries, read the full [Privacy Policy](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).
+Broad webpage access does not mean page content is uploaded by default.
+
+The extension ships with its executable code and does not download and run remote code from the network.
+
+For complete data-flow, permission, and credential details, read [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).

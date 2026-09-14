@@ -1,39 +1,41 @@
 ---
 title: 隐私与数据
-description: 内容默认保存在哪里，哪些功能会联网，以及凭据和 Backup 如何处理。
+description: 了解内容保存位置、联网场景、凭据和浏览器权限。
 ---
 
-本页是面向用户的摘要。完整、持续更新的政策以仓库中的 [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md) 为准。
+本页只做快速说明。完整政策见 [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md)。
 
-## 内容默认保存在哪里
+## 内容默认保存在本地
 
-采集内容先保存到浏览器本地。SyncNos 不要求把本地库上传到某个 SyncNos 云端内容服务后才能使用。
+采集内容会先保存到浏览器本地。
 
-是否把内容发往外部服务，取决于你实际启用或主动调用的功能。
+不连接任何外部服务，也可以正常采集、阅读、搜索、导出和备份。
 
-## 哪些功能会联网
+## 什么情况下会联网
 
-- **Notion**：把你选择同步的内容发送到 Notion API；需要时会处理引用图片。
-- **飞书**：把你选择同步的内容发送到飞书 API；OAuth 可使用 Proxy 或 Direct。
-- **GitHub**：通过 GitHub App Device Flow 授权，并向 GitHub API 写入仓库内容。
-- **ChatGPT 高级采集**：仅在显式开启后，用当前已登录 ChatGPT 会话执行手动当前对话采集。
-- **图片**：缓存图片时可能请求原始站点 / CDN；查看、导出或同步仍引用未缓存 ChatGPT 图片的内容时，也可能临时解析并获取对应图片。
-- **Obsidian**：默认访问同一台电脑上的 Local REST API，而不是 SyncNos 云服务。
+只有你启用或主动使用相关功能时，SyncNos 才会访问对应服务，例如：
 
-第三方服务收到数据后，适用各自的隐私政策。
+- 同步到 Notion、飞书或 GitHub
+- 使用同一台电脑上的 Obsidian Local REST API
+- 开启 ChatGPT 高级采集
+- 缓存或获取内容中的图片
 
-## 凭据保存在本地
+数据发送给第三方后，适用对应服务自己的隐私政策。
 
-Provider token、API key、Client Secret 等必要凭据保存在浏览器扩展本地存储中。不同 Provider 的授权方式不同，但这些认证秘密不会写入普通采集内容。
+## 凭据和 Backup
 
-Backup ZIP 也会排除这些认证秘密。Backup 包含什么、适合什么场景见[导出与备份](/docs/export-backup/)。
+同步服务需要的 token、API Key、Client Secret 等认证信息保存在扩展本地。
 
-## 远程代码
+这些认证秘密不会写进普通采集内容，也不会进入 SyncNos Backup。
 
-扩展的可执行代码随 SyncNos 一起打包；扩展不会从网络下载并执行远程代码。
+Backup 的用途见[导出与备份](/docs/export-backup/)。
 
 ## 浏览器权限
 
-浏览器 host 权限用于在用户请求的页面进行采集，以及访问配置的 OAuth、同步和图片端点。广泛 host access 并不表示页面正文默认会上传到网络。
+SyncNos 需要访问你要采集的页面，以及你主动配置的同步、授权和图片地址。
 
-需要精确的数据流、权限与凭据边界时，请阅读完整的 [Privacy Policy](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md)。
+较广的网页访问权限并不表示页面内容会被默认上传。
+
+SyncNos 的扩展代码随安装包提供，不会从网络下载并执行远程代码。
+
+需要完整的数据流、权限和凭据说明时，请阅读 [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md)。
