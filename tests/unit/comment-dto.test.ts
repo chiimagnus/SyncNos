@@ -42,6 +42,29 @@ describe('article comment runtime DTO', () => {
     ).toBeNull();
     expect(parseArticleCommentAddRequest({ ...valid, parentId: 7, commentText: '', locator })).toBeNull();
 
+    const spacedQuote = '  quote\r\nline  ';
+    const spacedLocator = {
+      ...locator,
+      quote: { ...locator.quote, exact: '  quote\nline  ' },
+      position: { ...locator.position, end: 14 },
+    };
+    expect(
+      parseArticleCommentAddRequest({
+        ...valid,
+        quoteText: spacedQuote,
+        commentText: '',
+        locator: spacedLocator,
+      }),
+    ).toMatchObject({ quoteText: '  quote\nline  ', locator: spacedLocator });
+    expect(
+      parseArticleCommentAddRequest({
+        ...valid,
+        quoteText: spacedQuote,
+        commentText: '',
+        locator: { ...spacedLocator, quote: { ...spacedLocator.quote, exact: 'quote\nline' } },
+      }),
+    ).toBeNull();
+
     expect(
       parseArticleCommentDto({
         id: 1,

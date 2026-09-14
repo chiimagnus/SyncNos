@@ -81,7 +81,7 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStoreCo
     reply: (parentId, text) => readHostActions()?.reply(parentId, text),
     delete: (id) => readHostActions()?.delete(id),
     close: () => readHostActions()?.close(),
-    requestComposerSelection: (input) => readHostActions()?.requestComposerSelection(input),
+    requestComposerSelection: () => readHostActions()?.requestComposerSelection(),
     clearComposerAttachment: () => readHostActions()?.clearComposerAttachment(),
     retry: () => readHostActions()?.retry(),
   });

@@ -37,6 +37,7 @@ function createHarness(options?: {
   const sendCalls: Array<{ type: string; payload?: any }> = [];
 
   const collector: any = {
+    getCaptureReadiness: () => 'ready' as const,
     capture: (args?: any) => {
       if (typeof options?.captureImpl === 'function') return options.captureImpl(args);
       return null;

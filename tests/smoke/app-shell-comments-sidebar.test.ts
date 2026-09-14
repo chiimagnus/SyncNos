@@ -586,7 +586,9 @@ describe('AppShell comments sidebar', () => {
       (commentsByUrl.get('https://example.com/article') || []).find((item) => item.commentText === 'Created reply')?.id,
     );
 
-    const replyItem = shadow.querySelector(`[data-reply-id="${replyId}"]`) as HTMLElement | null;
+    const replyItem = Array.from(shadow.querySelectorAll<HTMLElement>('.webclipper-inpage-comments-panel__reply')).find(
+      (item) => item.querySelector('.webclipper-inpage-comments-panel__text')?.textContent === 'Created reply',
+    );
     const overflow = replyItem?.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement | null;
     act(() => overflow!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     let deleteAction = replyItem?.querySelector('[role="menuitem"]') as HTMLButtonElement | null;
@@ -595,7 +597,11 @@ describe('AppShell comments sidebar', () => {
     deleteAction = replyItem?.querySelector('[role="menuitem"]') as HTMLButtonElement | null;
     act(() => deleteAction!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     await waitForCommentsUi(() => {
-      expect(shadow.querySelector(`[data-reply-id="${replyId}"]`)).toBeFalsy();
+      expect(
+        Array.from(shadow.querySelectorAll<HTMLElement>('.webclipper-inpage-comments-panel__reply')).some(
+          (item) => item.querySelector('.webclipper-inpage-comments-panel__text')?.textContent === 'Created reply',
+        ),
+      ).toBe(false);
     });
     expect(deleteArticleCommentByIdMock).toHaveBeenCalledWith(replyId);
   });

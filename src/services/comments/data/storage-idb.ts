@@ -3,6 +3,7 @@ import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export type ImportedArticleCommentInput = {
@@ -94,7 +95,7 @@ function toComment(row: any): ArticleComment {
     conversationId: normalizeConversationId(row?.conversationId),
     canonicalUrl: normalizeCanonicalUrl(row?.canonicalUrl),
     authorName: safeString(row?.authorName) || null,
-    quoteText: safeString(row?.quoteText),
+    quoteText: toCanonicalCommentQuote(row?.quoteText),
     commentText: normalizeCommentText(row?.commentText),
     locator: normalizeArticleCommentLocator(row?.locator),
     ...(importSource && importKey ? { importSource, importKey } : {}),
@@ -108,12 +109,18 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const now = Date.now();
   const canonicalUrl = normalizeCanonicalUrl(input?.canonicalUrl);
   const commentText = normalizeCommentText(input?.commentText);
-  const quoteText = safeString(input?.quoteText);
+  const quoteText = toCanonicalCommentQuote(input?.quoteText);
   const parentId = normalizeParentId(input?.parentId);
   const locator = normalizeArticleCommentLocator(input?.locator);
   if (!canonicalUrl) throw new Error('canonicalUrl required');
+  if (parentId != null && quoteText.trim()) throw new Error('reply quote is not allowed');
   if (!hasValidArticleCommentContent({ parentId, quoteText, commentText, locator })) {
     throw new Error('commentText or anchored quote required');
+  }
+
+  const splitQuoteAndComment = parentId == null && !!quoteText.trim() && !!commentText;
+  if (splitQuoteAndComment && !hasValidArticleCommentContent({ parentId: null, quoteText, commentText: '', locator })) {
+    throw new Error('anchored quote required when saving quote with comment');
   }
 
   const createdAt = normalizeTimestamp(input?.createdAt, now);
@@ -125,7 +132,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
     canonicalUrl,
     authorName: safeString(input?.authorName) || '',
     quoteText,
-    commentText,
+    commentText: splitQuoteAndComment ? '' : commentText,
     locator,
     createdAt,
     updatedAt,
@@ -152,6 +159,21 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
       }
 
       const id = await reqToPromise<number>(stores.article_comments.add(row) as any);
+      if (splitQuoteAndComment) {
+        await reqToPromise(
+          stores.article_comments.add({
+            parentId: id,
+            conversationId,
+            canonicalUrl,
+            authorName: row.authorName,
+            quoteText: '',
+            commentText,
+            locator: null,
+            createdAt,
+            updatedAt,
+          }) as any,
+        );
+      }
       markChanged('article_comments');
       if (conversation) {
         const currentActivityAt = normalizeActivityTimestamp(conversation.lastActivityAt);
@@ -174,7 +196,7 @@ export async function syncImportedArticleComments(
       const importKey = safeString(item.importKey);
       const conversationId = normalizeConversationId(item.conversationId);
       const canonicalUrl = normalizeCanonicalUrl(item.canonicalUrl);
-      const quoteText = safeString(item.quoteText);
+      const quoteText = toCanonicalCommentQuote(item.quoteText);
       const commentText = normalizeCommentText(item.commentText);
       if (
         !importSource ||
@@ -222,11 +244,15 @@ export async function syncImportedArticleComments(
       const index = stores.article_comments.index('by_conversationId_createdAt');
       const range = globalThis.IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
       const existingRows = (await reqToPromise<any[]>(index.getAll(range) as any)) || [];
-      const existingByImportIdentity = new Map<string, any>();
+      const rootsByImportIdentity = new Map<string, any>();
+      const commentsByImportIdentity = new Map<string, any>();
       for (const row of existingRows) {
         const source = safeString(row?.importSource);
         const key = safeString(row?.importKey);
-        if (source && key) existingByImportIdentity.set(`${source}\u0000${key}`, row);
+        if (!source || !key) continue;
+        const identity = `${source}\u0000${key}`;
+        const target = normalizeParentId(row?.parentId) == null ? rootsByImportIdentity : commentsByImportIdentity;
+        if (!target.has(identity)) target.set(identity, row);
       }
 
       let created = 0;
@@ -234,54 +260,96 @@ export async function syncImportedArticleComments(
       let latestHistoricalActivityAt = 0;
       for (const item of normalized) {
         const identity = `${item.importSource}\u0000${item.importKey}`;
-        const existing = existingByImportIdentity.get(identity);
+        const existingRoot = rootsByImportIdentity.get(identity) || null;
         latestHistoricalActivityAt = Math.max(latestHistoricalActivityAt, item.createdAt);
-        if (!existing) {
-          const row = {
-            parentId: null,
-            conversationId,
-            canonicalUrl,
-            authorName: item.authorName,
-            quoteText: item.quoteText,
-            commentText: item.commentText,
-            locator: null,
-            createdAt: item.createdAt,
-            updatedAt: item.updatedAt,
-            importSource: item.importSource,
-            importKey: item.importKey,
-          };
-          const id = await reqToPromise<number>(stores.article_comments.add(row) as any);
-          existingByImportIdentity.set(identity, { ...row, id });
-          created += 1;
-          continue;
-        }
+        const hasQuote = !!item.quoteText.trim();
+        const rootQuoteText = hasQuote ? item.quoteText : '';
+        const rootCommentText = hasQuote ? '' : item.commentText;
+        let root = existingRoot;
+        let changed = false;
 
-        const next = {
-          ...existing,
+        const desiredRoot = {
+          ...(existingRoot || {}),
           parentId: null,
           conversationId,
           canonicalUrl,
           authorName: item.authorName,
-          quoteText: item.quoteText,
-          commentText: item.commentText,
+          quoteText: rootQuoteText,
+          commentText: rootCommentText,
           locator: null,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
           importSource: item.importSource,
           importKey: item.importKey,
         };
-        const changed =
-          safeString(existing.authorName) !== next.authorName ||
-          safeString(existing.quoteText) !== next.quoteText ||
-          normalizeCommentText(existing.commentText) !== next.commentText ||
-          normalizeCanonicalUrl(existing.canonicalUrl) !== next.canonicalUrl ||
-          Number(existing.createdAt) !== next.createdAt ||
-          Number(existing.updatedAt) !== next.updatedAt ||
-          normalizeParentId(existing.parentId) !== null ||
-          existing.locator != null;
-        if (!changed) continue;
-        await reqToPromise(stores.article_comments.put(next));
-        updated += 1;
+        if (!existingRoot) {
+          const id = await reqToPromise<number>(stores.article_comments.add(desiredRoot) as any);
+          root = { ...desiredRoot, id };
+          rootsByImportIdentity.set(identity, root);
+          created += 1;
+          changed = true;
+        } else {
+          const rootChanged =
+            safeString(existingRoot.authorName) !== desiredRoot.authorName ||
+            toCanonicalCommentQuote(existingRoot.quoteText) !== desiredRoot.quoteText ||
+            normalizeCommentText(existingRoot.commentText) !== desiredRoot.commentText ||
+            normalizeCanonicalUrl(existingRoot.canonicalUrl) !== desiredRoot.canonicalUrl ||
+            Number(existingRoot.createdAt) !== desiredRoot.createdAt ||
+            Number(existingRoot.updatedAt) !== desiredRoot.updatedAt ||
+            normalizeParentId(existingRoot.parentId) !== null ||
+            existingRoot.locator != null;
+          if (rootChanged) {
+            await reqToPromise(stores.article_comments.put(desiredRoot));
+            root = desiredRoot;
+            rootsByImportIdentity.set(identity, root);
+            changed = true;
+          }
+        }
+
+        const desiredChildText = hasQuote ? item.commentText : '';
+        const existingChild = commentsByImportIdentity.get(identity) || null;
+        if (desiredChildText) {
+          const desiredChild = {
+            ...(existingChild || {}),
+            parentId: Number(root.id),
+            conversationId,
+            canonicalUrl,
+            authorName: item.authorName,
+            quoteText: '',
+            commentText: desiredChildText,
+            locator: null,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            importSource: item.importSource,
+            importKey: item.importKey,
+          };
+          const childChanged =
+            !existingChild ||
+            normalizeParentId(existingChild.parentId) !== Number(root.id) ||
+            safeString(existingChild.authorName) !== desiredChild.authorName ||
+            toCanonicalCommentQuote(existingChild.quoteText) !== '' ||
+            normalizeCommentText(existingChild.commentText) !== desiredChild.commentText ||
+            normalizeCanonicalUrl(existingChild.canonicalUrl) !== desiredChild.canonicalUrl ||
+            Number(existingChild.createdAt) !== desiredChild.createdAt ||
+            Number(existingChild.updatedAt) !== desiredChild.updatedAt ||
+            existingChild.locator != null;
+          if (childChanged) {
+            if (existingChild) {
+              await reqToPromise(stores.article_comments.put(desiredChild));
+              commentsByImportIdentity.set(identity, desiredChild);
+            } else {
+              const id = await reqToPromise<number>(stores.article_comments.add(desiredChild) as any);
+              commentsByImportIdentity.set(identity, { ...desiredChild, id });
+            }
+            changed = true;
+          }
+        } else if (existingChild) {
+          await reqToPromise(stores.article_comments.delete(Number(existingChild.id)) as any);
+          commentsByImportIdentity.delete(identity);
+          changed = true;
+        }
+
+        if (existingRoot && changed) updated += 1;
       }
 
       if (created > 0 || updated > 0) markChanged('article_comments');
@@ -339,18 +407,9 @@ export async function deleteArticleCommentById(id: number): Promise<ArticleComme
       const store = stores.article_comments;
       const rows = (await reqToPromise<any[]>(store.getAll() as any)) || [];
       const byId = new Map<number, any>();
-      const childrenByParentId = new Map<number, number[]>();
-
       for (const row of rows) {
         const rowId = Number(row?.id);
-        if (!Number.isSafeInteger(rowId) || rowId <= 0) continue;
-        byId.set(rowId, row);
-
-        const parentId = normalizeParentId(row?.parentId);
-        if (parentId == null) continue;
-        const children = childrenByParentId.get(parentId) || [];
-        children.push(rowId);
-        childrenByParentId.set(parentId, children);
+        if (Number.isSafeInteger(rowId) && rowId > 0) byId.set(rowId, row);
       }
 
       const target = byId.get(commentId);
@@ -370,18 +429,28 @@ export async function deleteArticleCommentById(id: number): Promise<ArticleComme
         }
       }
 
-      const descendants = new Set<number>();
-      const pending = [commentId];
-      while (pending.length) {
-        const rowId = pending.pop();
-        if (rowId == null || descendants.has(rowId)) continue;
-        descendants.add(rowId);
-        for (const childId of childrenByParentId.get(rowId) || []) {
-          if (!descendants.has(childId)) pending.push(childId);
+      if (normalizeParentId(target?.parentId) == null) {
+        const childrenByParentId = new Map<number, number[]>();
+        for (const row of rows) {
+          const rowId = Number(row?.id);
+          const parentId = normalizeParentId(row?.parentId);
+          if (!Number.isSafeInteger(rowId) || rowId <= 0 || parentId == null) continue;
+          const children = childrenByParentId.get(parentId) ?? [];
+          children.push(rowId);
+          childrenByParentId.set(parentId, children);
         }
+        const deleteIds = new Set<number>();
+        const pending = [commentId];
+        while (pending.length) {
+          const rowId = pending.pop();
+          if (rowId == null || deleteIds.has(rowId)) continue;
+          deleteIds.add(rowId);
+          for (const childId of childrenByParentId.get(rowId) ?? []) pending.push(childId);
+        }
+        await Promise.all([...deleteIds].map((rowId) => reqToPromise(store.delete(rowId) as any)));
+      } else {
+        await reqToPromise(store.delete(commentId) as any);
       }
-
-      await Promise.all([...descendants].map((rowId) => reqToPromise(store.delete(rowId) as any)));
       markChanged('article_comments');
       if (conversationId != null) {
         const conversation = await reqToPromise<any>(stores.conversations.get(conversationId as any));

@@ -658,6 +658,12 @@ describe('GitHub Markdown production-chain integration', () => {
       authorName: 'Alice',
       quoteText: 'Local article text',
       commentText: 'E2E owned comment',
+      locator: {
+        v: 1,
+        env: 'app',
+        quote: { type: 'TextQuoteSelector', exact: 'Local article text' },
+        position: { type: 'TextPositionSelector', start: 0, end: 18 },
+      },
       createdAt: 30,
       updatedAt: 30,
     });

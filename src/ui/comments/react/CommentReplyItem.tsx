@@ -1,21 +1,7 @@
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Ref } from 'react';
 import { CommentOverflowMenu, type CommentOverflowAction } from './CommentOverflowMenu';
-
-function formatTime(ts: number | null | undefined): string {
-  const value = Number(ts);
-  if (!Number.isFinite(value) || value <= 0) return '';
-  try {
-    return new Date(value).toLocaleString();
-  } catch (_error) {
-    return '';
-  }
-}
-
-function avatarLabel(name: string | null | undefined): string {
-  const value = String(name || 'You').trim();
-  return Array.from(value)[0]?.toUpperCase() || 'Y';
-}
+import { commentAuthorLabel, commentAvatarLabel, formatCommentTime } from './comment-display';
 
 type CommentReplyItemProps = {
   reply: CommentSidebarItem;
@@ -23,7 +9,7 @@ type CommentReplyItemProps = {
   menuOpen: boolean;
   menuActions: readonly CommentOverflowAction[];
   menuTriggerRef?: Ref<HTMLButtonElement>;
-  onMenuToggle: (id: number) => void | Promise<void>;
+  onMenuToggle: (id: number) => void;
   onMenuAction: (id: number, action: CommentOverflowAction) => void | Promise<void>;
 };
 
@@ -36,18 +22,17 @@ export function CommentReplyItem({
   onMenuToggle,
   onMenuAction,
 }: CommentReplyItemProps) {
-  const author = String(reply.authorName || 'You');
+  const author = commentAuthorLabel(reply.authorName);
   return (
-    <div className="webclipper-inpage-comments-panel__reply" data-reply-id={String(reply.id)} role="listitem">
-      <span className="webclipper-inpage-comments-panel__reply-connector" aria-hidden="true" />
-      <div className="webclipper-inpage-comments-panel__avatar is-small" aria-hidden="true">
-        {avatarLabel(author)}
+    <div className="webclipper-inpage-comments-panel__reply" role="listitem">
+      <div className="webclipper-inpage-comments-panel__avatar" aria-hidden="true">
+        {commentAvatarLabel(author)}
       </div>
       <div className="webclipper-inpage-comments-panel__reply-main">
         <div className="webclipper-inpage-comments-panel__reply-header">
           <div className="webclipper-inpage-comments-panel__reply-meta">
             <span className="webclipper-inpage-comments-panel__comment-author">{author}</span>
-            <time className="webclipper-inpage-comments-panel__comment-time">{formatTime(reply.createdAt)}</time>
+            <time className="webclipper-inpage-comments-panel__comment-time">{formatCommentTime(reply.createdAt)}</time>
           </div>
           <div className="webclipper-inpage-comments-panel__comment-actions">
             <CommentOverflowMenu

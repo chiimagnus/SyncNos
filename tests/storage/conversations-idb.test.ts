@@ -352,6 +352,60 @@ describe('conversations storage-idb', () => {
     expect(after.map((m) => m.messageKey)).toEqual(['m1']);
   });
 
+  it('reconciles a ChatGPT live-tail append into the later canonical snapshot without duplicating the assistant', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'live-tail-final-reconcile',
+      title: 'Live tail',
+      lastActivityAt: 1,
+    });
+    const id = Number(convo.id);
+    const partialMessages = [
+      {
+        messageKey: 'user-1',
+        role: 'user',
+        contentMarkdown: 'question',
+        sequence: 0,
+        updatedAt: 1,
+        captureSequencePolicy: 'reconcile-existing-order',
+      },
+      {
+        messageKey: 'assistant-1',
+        role: 'assistant',
+        contentMarkdown: 'streaming',
+        sequence: 1,
+        updatedAt: 2,
+        captureSequencePolicy: 'reconcile-existing-order',
+      },
+    ];
+
+    await syncConversationMessages(id, partialMessages, {
+      mode: 'append',
+      diff: { added: ['user-1', 'assistant-1'], updated: [], removed: [] },
+    });
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual([
+      'user-1',
+      'assistant-1',
+    ]);
+
+    await syncConversationMessages(id, [
+      { messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0, updatedAt: 3 },
+      {
+        messageKey: 'assistant-1',
+        role: 'assistant',
+        contentMarkdown: 'streaming complete',
+        sequence: 1,
+        updatedAt: 4,
+      },
+    ]);
+
+    const finalMessages = await getMessagesByConversationId(id);
+    expect(finalMessages).toHaveLength(2);
+    expect(finalMessages.map((message) => message.messageKey)).toEqual(['user-1', 'assistant-1']);
+    expect(finalMessages[1]?.contentMarkdown).toBe('streaming complete');
+  });
+
   it('commits capture activity with messages while keeping Activity-only recaptures message-revision stable', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

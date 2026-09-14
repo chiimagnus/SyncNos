@@ -20,11 +20,6 @@ import type { MountOptions, ThreadedCommentsPanelApi } from './types';
 type ThreadedCommentsPanelReactBridgeProps = {
   store: ThreadedCommentsPanelStore;
   actions: CommentSidebarHostActions;
-  variant: 'sidebar';
-  fullWidth: boolean;
-  surfaceBg?: string;
-  showHeader: boolean;
-  showCollapseButton: boolean;
   onRequestClose: () => void;
   locateThreadRoot?: (rootId: number) => Promise<ThreadLocateResult>;
   onActiveRootChange?: (rootId: number | null) => void;
@@ -36,11 +31,6 @@ type ThreadedCommentsPanelReactBridgeProps = {
 function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridgeProps) {
   const snapshot = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot, props.store.getSnapshot);
   return createElement(ThreadedCommentsPanel, {
-    variant: props.variant,
-    fullWidth: props.fullWidth,
-    surfaceBg: props.surfaceBg,
-    showHeader: props.showHeader,
-    showCollapseButton: props.showCollapseButton,
     snapshot,
     actions: props.actions,
     onRequestClose: props.onRequestClose,
@@ -211,46 +201,31 @@ function locateFailureNotice(reason: string): string {
 
 export function mountThreadedCommentsPanel(
   host: HTMLElement,
-  options: MountOptions = {},
+  options: MountOptions,
 ): { el: HTMLElement; api: ThreadedCommentsPanelApi; cleanup: () => void } {
   const el = document.createElement('webclipper-threaded-comments-panel') as HTMLElement;
-  const isOverlay = options.overlay === true;
-  const variant = 'sidebar' as const;
-  const isFullWidth = options.fullWidth === true;
-  const surface = options.surface || (isOverlay ? 'inpage' : isFullWidth ? 'app-narrow' : 'app-wide');
-  const showHeader = options.showHeader !== false;
-  const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
-  const dockPage = options.dockPage === true && options.overlay === true;
-  const surfaceBg = String(options.surfaceBg || '').trim();
+  const surface = options.surface;
+  const isOverlay = surface === 'inpage';
+  const isFullWidth = surface === 'app-narrow';
+  const deferReactUpdates = surface !== 'inpage';
   let disposed = false;
-  const runReactUpdate =
-    options.deferReactUpdates === true
-      ? (run: () => void) =>
-          asyncReactUpdate(() => {
-            if (!disposed) run();
-          })
-      : syncReactUpdate;
+  const runReactUpdate = deferReactUpdates
+    ? (run: () => void) =>
+        asyncReactUpdate(() => {
+          if (!disposed) run();
+        })
+    : syncReactUpdate;
   if (isOverlay) el.setAttribute('data-overlay', '1');
-  if (variant === 'sidebar') el.setAttribute('data-variant', 'sidebar');
+  el.setAttribute('data-variant', 'sidebar');
   el.setAttribute('data-surface', surface);
   if (isFullWidth) {
     el.setAttribute('data-layout', 'full-width');
     el.style.width = '100%';
     el.style.borderLeft = '0';
   }
-  if (options.initiallyOpen) el.setAttribute('data-open', '1');
-
-  const SURFACE_BG_CSS_VAR = '--webclipper-comments-panel-surface-bg';
-  if (surfaceBg) {
-    setImportantStyle(el, SURFACE_BG_CSS_VAR, surfaceBg);
-  }
-
-  const HEADER_DIVIDER_CSS_VAR = '--webclipper-comments-panel-header-divider';
-  const headerDivider = options.headerDivider ?? variant !== 'sidebar';
-  setImportantStyle(el, HEADER_DIVIDER_CSS_VAR, headerDivider && showHeader ? '1px solid var(--panel-border)' : '0');
 
   const dockController = createDockController({
-    enabled: dockPage,
+    enabled: isOverlay,
     panelEl: el,
   });
 
@@ -266,7 +241,7 @@ export function mountThreadedCommentsPanel(
     document: panelDocument,
     window: panelDocument.defaultView || undefined,
     styleSource: el,
-    renderMode: options.locatorEnv === 'app' ? 'native' : 'overlay',
+    renderMode: surface === 'inpage' ? 'overlay' : 'native',
   });
   const anchorController = createCommentAnchorController({
     getRoots: (locator) => readLocatorRoots(options, locator),
@@ -324,7 +299,7 @@ export function mountThreadedCommentsPanel(
   shadow.appendChild(reactRootHost);
 
   let cleanupSidebarResize: (() => void) | null = null;
-  if (variant === 'sidebar' && !isFullWidth) {
+  if (!isFullWidth) {
     const handle = document.createElement('div');
     handle.className = 'webclipper-inpage-comments-panel__resize-handle';
     shadow.appendChild(handle);
@@ -345,11 +320,6 @@ export function mountThreadedCommentsPanel(
       createElement(ThreadedCommentsPanelReactBridge, {
         store: panelStore,
         actions: panelController.actions,
-        variant,
-        fullWidth: isFullWidth,
-        surfaceBg: surfaceBg || undefined,
-        showHeader,
-        showCollapseButton,
         onRequestClose: () => panelController.actions.close(),
         locateThreadRoot: async (rootId) => {
           const root = panelStore
@@ -460,7 +430,7 @@ export function mountThreadedCommentsPanel(
             el.remove();
           }
         };
-        if (options.deferReactUpdates === true) asyncReactUpdate(unmountAndRemove);
+        if (deferReactUpdates) asyncReactUpdate(unmountAndRemove);
         else syncReactUpdate(unmountAndRemove);
       },
     ];

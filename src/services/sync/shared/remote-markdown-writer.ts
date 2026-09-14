@@ -173,21 +173,32 @@ function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentT
   const output: string[] = [];
 
   const renderItem = (comment: ArticleCommentDto): string => {
-    const lines: string[] = [];
+    const text = safeString(comment.commentText);
+    if (!text) return '';
     const head = buildListItemHead(
       buildCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt, timeZone }),
       0,
     );
-    if (head) lines.push(head);
-    const text = safeString(comment.commentText);
-    if (text) lines.push(...buildListItemParagraph(text, 0));
-    return lines.join('\n').trim();
+    return [head, ...buildListItemParagraph(text, 0)].filter(Boolean).join('\n').trim();
   };
 
   for (const thread of graph.threads) {
     const chunks: string[] = [];
     const quote = safeString(thread.root.quoteText);
-    if (quote) chunks.push(buildMarkdownQuote(quote));
+    if (quote) {
+      const head = buildListItemHead(
+        buildCommentMetaLine({
+          authorName: thread.root.authorName,
+          createdAt: thread.root.createdAt,
+          timeZone,
+        }),
+        0,
+      );
+      const quoteLines = buildMarkdownQuote(quote)
+        .split('\n')
+        .map((line) => `  ${line}`.trimEnd());
+      chunks.push([head, ...quoteLines].filter(Boolean).join('\n'));
+    }
     const items = [thread.root, ...thread.replies].map(renderItem).filter(Boolean);
     if (items.length) chunks.push(items.join('\n\n'));
     const rendered = chunks.join('\n\n').trim();

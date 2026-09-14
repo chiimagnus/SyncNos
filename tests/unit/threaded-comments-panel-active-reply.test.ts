@@ -45,7 +45,7 @@ describe('single active reply composer', () => {
   it('does not auto-open a reply composer for a single root', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
     ]);
@@ -59,7 +59,7 @@ describe('single active reply composer', () => {
     const host = document.createElement('div');
     const outside = document.createElement('button');
     document.body.append(host, outside);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
     ]);
@@ -88,7 +88,7 @@ describe('single active reply composer', () => {
     const host = document.createElement('div');
     const outside = document.createElement('button');
     document.body.append(host, outside);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
     ]);
@@ -107,7 +107,7 @@ describe('single active reply composer', () => {
   it('mounts only for the active root and preserves drafts across switches', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'one' },
       { id: 2, parentId: null, createdAt: 2000, commentText: 'two' },
@@ -138,7 +138,7 @@ describe('single active reply composer', () => {
   it('clears the active reply composer when its root disappears', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     driver.replaceComments([{ id: 1, parentId: null, createdAt: 1000, commentText: 'one' }]);
     await flush();

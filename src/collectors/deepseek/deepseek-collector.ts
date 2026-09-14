@@ -22,6 +22,15 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     }
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    try {
+      const p = env.location.pathname || '';
+      return p === '/' || /^\/a\/chat(?:\/|$)/.test(p);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return conversationKeyFromLocation(env.location);
   }
@@ -104,6 +113,16 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     };
   }
 
-  const collector = { capture, getRoot: getConversationRoot };
+  const collector = {
+    capture,
+    getCaptureReadiness: () => {
+      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      return getConversationRoot()?.querySelector('._9663006, ._4f9bf79._43c05b5')
+        ? ('ready' as const)
+        : ('waiting' as const);
+    },
+    getRoot: getConversationRoot,
+  };
   return { id: 'deepseek', matches, collector };
 }

@@ -22,7 +22,7 @@ function createMockPanel() {
   let snapshot = {
     open: false,
     busy: false,
-    composerAttachment: { displayQuote: '', locator: null, selectionRevision: 0 },
+    composerAttachment: { quoteText: '', locator: null, selectionRevision: 0 },
     comments: [] as any[],
     focusComposerSignal: 0,
     lastOpenSource: null as string | null,
@@ -66,7 +66,7 @@ function createMockPanel() {
     getState: () => ({
       open: snapshot.open,
       busy: snapshot.busy,
-      quoteText: snapshot.composerAttachment.displayQuote,
+      quoteText: snapshot.composerAttachment.quoteText,
       comments: snapshot.comments,
       handlers: handlers(),
       focusCount: snapshot.focusComposerSignal,
@@ -105,7 +105,7 @@ describe('article-comments-sidebar-controller', () => {
     revisionMocks.requestDataRevisionRetry.mockReset();
   });
 
-  it('opens: sets quote, requests open, ensures context, and refreshes comments', async () => {
+  it('opens: requests open, ensures context, and refreshes comments', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
 
@@ -123,7 +123,6 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     await controller.open({
-      selectionText: 'Quoted',
       focusComposer: true,
       source: 'test',
       ensureContext: true,
@@ -131,7 +130,6 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const snapshot = session.getSnapshot();
-    expect(snapshot.composerAttachment.displayQuote).toBe('Quoted');
     expect(snapshot.open).toBe(true);
     expect(snapshot.contextKey).toContain('/article');
     expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
@@ -161,7 +159,7 @@ describe('article-comments-sidebar-controller', () => {
     await controller.open({ ensureContext: true });
     adapter.list.mockClear();
 
-    session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
+    session.setComposerAttachment({ quoteText: 'Quoted', locator: null });
 
     const handlers = panel.getState().handlers;
     expect(typeof handlers.onSave).toBe('function');
@@ -176,7 +174,7 @@ describe('article-comments-sidebar-controller', () => {
       locator: null,
     });
     expect(adapter.list).toHaveBeenCalled();
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });
 
   it('saves an empty root only when the composer carries a valid quote locator', async () => {
@@ -200,7 +198,7 @@ describe('article-comments-sidebar-controller', () => {
     await controller.open({ ensureContext: true });
     const handlers = panel.getState().handlers;
 
-    session.setComposerAttachment({ displayQuote: 'Quoted', locator });
+    session.setComposerAttachment({ quoteText: 'Quoted', locator });
     expect(await handlers.onSave('')).toEqual({ ok: true, createdRootId: 92 });
     expect(adapter.addRoot).toHaveBeenCalledWith({
       canonicalUrl: 'https://example.com/article',
@@ -211,12 +209,12 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     adapter.addRoot.mockClear();
-    session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
+    session.setComposerAttachment({ quoteText: 'Quoted', locator: null });
     expect(await handlers.onSave('')).toBe(false);
     expect(adapter.addRoot).not.toHaveBeenCalled();
 
     session.setComposerAttachment({
-      displayQuote: 'Quoted',
+      quoteText: 'Quoted',
       locator: { ...locator, quote: { ...locator.quote, exact: 'Different quote' } },
     });
     expect(await handlers.onSave('')).toBe(false);
@@ -244,8 +242,8 @@ describe('article-comments-sidebar-controller', () => {
 
     const resolveComposerSelection = vi
       .fn()
-      .mockResolvedValueOnce({ selectionText: 'Quoted from page', locator })
-      .mockResolvedValueOnce({ selectionText: '', locator: null });
+      .mockReturnValueOnce({ selectionText: 'Quoted from page', locator })
+      .mockReturnValueOnce({ selectionText: '', locator: null });
 
     createArticleCommentsSidebarController({
       session,
@@ -256,9 +254,9 @@ describe('article-comments-sidebar-controller', () => {
     const handlers = panel.getState().handlers;
     expect(typeof handlers.onComposerSelectionRequest).toBe('function');
 
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(resolveComposerSelection).toHaveBeenNthCalledWith(1, { trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Quoted from page');
+    handlers.onComposerSelectionRequest();
+    expect(resolveComposerSelection).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('Quoted from page');
 
     await handlers.onSave('root comment');
     expect(adapter.addRoot).toHaveBeenLastCalledWith({
@@ -268,50 +266,11 @@ describe('article-comments-sidebar-controller', () => {
       commentText: 'root comment',
       locator,
     });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
 
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
-  });
-
-  it('ignores stale composer selection responses and keeps latest result', async () => {
-    const panel = createMockPanel();
-    const session = createCommentSidebarSession(panel.api as any);
-
-    const adapter = {
-      list: vi.fn(async () => []),
-      addRoot: vi.fn(async () => ({ id: 1 })),
-      addReply: vi.fn(async () => {}),
-      delete: vi.fn(async () => {}),
-      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 1 })),
-    };
-
-    const slow = createDeferred<{ selectionText: string; locator: unknown | null }>();
-    const fast = createDeferred<{ selectionText: string; locator: unknown | null }>();
-
-    const resolveComposerSelection = vi
-      .fn()
-      .mockImplementationOnce(() => slow.promise)
-      .mockImplementationOnce(() => fast.promise);
-
-    createArticleCommentsSidebarController({
-      session,
-      adapter: adapter as any,
-      resolveComposerSelection,
-    });
-
-    const handlers = panel.getState().handlers;
-    const oldRequest = handlers.onComposerSelectionRequest({ trigger: 'button' });
-    const newRequest = handlers.onComposerSelectionRequest({ trigger: 'button' });
-
-    fast.resolve({ selectionText: 'new quote', locator: null });
-    await newRequest;
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('new quote');
-
-    slow.resolve({ selectionText: 'old quote', locator: null });
-    await oldRequest;
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('new quote');
+    handlers.onComposerSelectionRequest();
+    expect(resolveComposerSelection).toHaveBeenCalledTimes(2);
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });
 
   it('preserves quote text when locator is missing and saves with null locator', async () => {
@@ -326,7 +285,7 @@ describe('article-comments-sidebar-controller', () => {
       ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
     };
 
-    const resolveComposerSelection = vi.fn().mockResolvedValue({
+    const resolveComposerSelection = vi.fn().mockReturnValue({
       selectionText: 'Selection text only',
       locator: null,
     });
@@ -338,8 +297,8 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const handlers = panel.getState().handlers;
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Selection text only');
+    handlers.onComposerSelectionRequest();
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('Selection text only');
 
     await handlers.onSave('comment');
     expect(adapter.addRoot).toHaveBeenLastCalledWith({
@@ -370,12 +329,12 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     createArticleCommentsSidebarController({ session, adapter: adapter as any });
-    const first = session.setComposerAttachment({ displayQuote: 'first quote', locator: firstLocator });
+    const first = session.setComposerAttachment({ quoteText: 'first quote', locator: firstLocator });
     const savePromise = panel.getState().handlers.onSave('comment');
     await vi.waitFor(() => {
       expect(adapter.addRoot).toHaveBeenCalledTimes(1);
     });
-    const second = session.setComposerAttachment({ displayQuote: 'second quote', locator: null });
+    const second = session.setComposerAttachment({ quoteText: 'second quote', locator: null });
 
     save.resolve({ id: 7 });
     await savePromise;
@@ -408,7 +367,7 @@ describe('article-comments-sidebar-controller', () => {
       position: { start: 0, end: 6 },
     };
 
-    const resolveComposerSelection = vi.fn().mockResolvedValue({
+    const resolveComposerSelection = vi.fn().mockReturnValue({
       selectionText: 'Quote A',
       locator: locatorFromA,
     });
@@ -422,11 +381,11 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
 
     const handlers = panel.getState().handlers;
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Quote A');
+    handlers.onComposerSelectionRequest();
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('Quote A');
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
 
     await handlers.onSave('comment in b');
     expect(adapter.addRoot).toHaveBeenLastCalledWith({
@@ -507,13 +466,13 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
 
     expect(seenSignals[0]?.aborted).toBe(true);
-    expect(controller.getLoadSnapshot().status).toBe('loading');
+    expect(session.getSnapshot().loadStatus).toBe('loading');
 
     deferredB.resolve([{ id: 2, parentId: null, commentText: 'B', quoteText: '', createdAt: 2 }]);
     await vi.waitFor(() => {
       expect(panel.getState().comments[0]?.commentText).toBe('B');
     });
-    expect(controller.getLoadSnapshot()).toMatchObject({ status: 'ready', error: null });
+    expect(session.getSnapshot()).toMatchObject({ loadStatus: 'ready', loadError: null });
 
     deferredA.resolve([{ id: 1, parentId: null, commentText: 'A', quoteText: '', createdAt: 1 }]);
     await Promise.resolve();
@@ -540,16 +499,16 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
 
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     expect(panel.getState().comments[0]?.commentText).toBe('Ready');
 
     await controller.refresh();
 
     expect(panel.getState().comments[0]?.commentText).toBe('Ready');
-    expect(controller.getLoadSnapshot()).toMatchObject({
-      status: 'stale_error',
-      error: { code: 'request_failed', message: 'background unavailable' },
+    expect(session.getSnapshot()).toMatchObject({
+      loadStatus: 'stale_error',
+      loadError: { code: 'request_failed', message: 'background unavailable' },
     });
     expect(panel.getState().busy).toBe(false);
   });
@@ -572,25 +531,25 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 9 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     expect(adapter.list).toHaveBeenCalledTimes(1);
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
     await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(1));
-    expect(controller.getLoadSnapshot().status).toBe('loading');
+    expect(session.getSnapshot().loadStatus).toBe('loading');
     expect(adapter.list).toHaveBeenCalledTimes(1);
     const migrationSignal = adapter.migrateCanonicalUrl.mock.calls[0]?.[0]?.signal as AbortSignal;
     expect(migrationSignal.aborted).toBe(false);
 
     migration.reject(Object.assign(new Error('migration failed'), { code: 'request_failed' }));
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('stale_error');
+      expect(session.getSnapshot().loadStatus).toBe('stale_error');
     });
 
     expect(panel.getState().comments[0]?.commentText).toBe('https://example.com/a');
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(controller.getLoadSnapshot().error).toEqual({
+    expect(session.getSnapshot().loadError).toEqual({
       code: 'request_failed',
       message: 'migration failed',
     });
@@ -617,7 +576,7 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 9 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
@@ -634,7 +593,7 @@ describe('article-comments-sidebar-controller', () => {
 
     migrationToC.resolve();
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
       expect(panel.getState().comments[0]?.commentText).toBe('https://example.com/c');
     });
     expect(adapter.list).toHaveBeenCalledTimes(2);
@@ -652,16 +611,20 @@ describe('article-comments-sidebar-controller', () => {
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
     await activateSession(session);
-    const states: string[] = [controller.getLoadSnapshot().status];
-    const unsubscribe = controller.subscribeLoadState(() => {
-      states.push(controller.getLoadSnapshot().status);
+    const states: string[] = [session.getSnapshot().loadStatus];
+    let lastStatus = states[0];
+    const unsubscribe = session.subscribe(() => {
+      const nextStatus = session.getSnapshot().loadStatus;
+      if (nextStatus === lastStatus) return;
+      lastStatus = nextStatus;
+      states.push(nextStatus);
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => expect(panel.getState().busy).toBe(true));
     deferred.resolve([]);
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     unsubscribe();
 
@@ -690,14 +653,14 @@ describe('article-comments-sidebar-controller', () => {
     });
     expect(adapter.list).toHaveBeenCalledTimes(1);
 
-    session.setComposerAttachment({ displayQuote: 'keep draft', locator: null });
+    session.setComposerAttachment({ quoteText: 'keep draft', locator: null });
     controller.setContext({ canonicalUrl: 'https://linux.do/t/topic-slug/123/1', conversationId: 9 });
 
     await Promise.resolve();
     await Promise.resolve();
 
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('keep draft');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('keep draft');
     expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
   });
 
@@ -712,8 +675,6 @@ describe('article-comments-sidebar-controller', () => {
       delete: vi.fn(async () => {}),
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
-    const listener = vi.fn();
-    controller.subscribeLoadState(listener);
     await activateSession(session);
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
@@ -733,7 +694,7 @@ describe('article-comments-sidebar-controller', () => {
     await Promise.resolve();
 
     expect(panel.getState().comments).toEqual([]);
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot()).toMatchObject({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '' });
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     await controller.open({ focusComposer: true });
@@ -741,45 +702,38 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().open).toBe(true);
   });
 
-  it('dispose drops late save and composer-selection completions', async () => {
+  it('dispose drops late save and delete completions', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
     const addRoot = createDeferred<{ id: number }>();
     const remove = createDeferred<void>();
-    const selection = createDeferred<{ selectionText: string; locator: unknown | null }>();
     const adapter = {
       list: vi.fn(async () => []),
       addRoot: vi.fn(() => addRoot.promise),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(() => remove.promise),
     };
-    const controller = createArticleCommentsSidebarController({
-      session,
-      adapter: adapter as any,
-      resolveComposerSelection: () => selection.promise,
-    });
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
-    session.setComposerAttachment({ displayQuote: 'keep after dispose', locator: null });
+    session.setComposerAttachment({ quoteText: 'keep after dispose', locator: null });
     const handlers = panel.getState().handlers;
     const savePromise = handlers.onSave('late save');
     const deletePromise = handlers.onDelete(7);
-    await handlers.onComposerSelectionRequest({ trigger: 'button' });
 
     controller.dispose();
     addRoot.resolve({ id: 99 });
     remove.resolve();
-    selection.resolve({ selectionText: 'late selection', locator: null });
 
     await expect(savePromise).resolves.toBe(false);
     await expect(deletePromise).resolves.toBeUndefined();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('keep after dispose');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('keep after dispose');
     expect(adapter.list).toHaveBeenCalledTimes(1);
   });
 
@@ -797,14 +751,14 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
 
     const savePromise = panel.getState().handlers.onSave('obsolete save');
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot()).toMatchObject({
-        status: 'ready',
+      expect(session.getSnapshot()).toMatchObject({
+        loadStatus: 'ready',
         contextKey: expect.stringContaining('/b'),
       });
     });
@@ -841,7 +795,7 @@ describe('article-comments-sidebar-controller', () => {
 
     expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(controller.getLoadSnapshot().status).toBe('ready');
+    expect(session.getSnapshot().loadStatus).toBe('ready');
   });
 
   it('keeps closed setContext side-effect free and defers A-to-B migration until reopen', async () => {
@@ -933,13 +887,13 @@ describe('article-comments-sidebar-controller', () => {
     revisionMocks.requestDataRevisionRetry.mockClear();
 
     revisionListener?.(['article_comments']);
-    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('stale_error'));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('stale_error'));
     expect(panel.getState().comments[0]?.commentText).toBe('ready');
     expect(revisionMocks.requestDataRevisionRetry).toHaveBeenCalledWith(['article_comments']);
 
     revisionMocks.requestDataRevisionRetry.mockClear();
     revisionListener?.(['article_comments']);
-    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('ready'));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('ready'));
     expect(panel.getState().comments).toEqual([]);
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
   });
@@ -977,7 +931,7 @@ describe('article-comments-sidebar-controller', () => {
     await reopened;
     await Promise.resolve();
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
-    expect(controller.getLoadSnapshot().status).toBe('idle');
+    expect(session.getSnapshot().loadStatus).toBe('idle');
   });
 
   it('ignores conversations revisions for adapters without a readonly identity lookup', async () => {
@@ -1196,7 +1150,7 @@ describe('article-comments-sidebar-controller', () => {
     expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 7 });
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
 
-    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('ready'));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('ready'));
     adapter.list.mockClear();
     revisionListener?.(['conversations']);
     await vi.waitFor(() => expect(adapter.findExistingContext).toHaveBeenCalledTimes(2));

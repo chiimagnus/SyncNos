@@ -91,7 +91,8 @@ describe('settings section definitions', () => {
     const text = document.body.textContent || '';
     expect(text).toContain('ChatGPT Advanced capture');
     expect(text).toContain('Default page capture uses content that is already loaded/visible');
-    expect(text).toContain('full current conversation branch');
+    expect(text).toContain('current backend branch as canonical history');
+    expect(text).toContain('current visible reply that has not reached the backend yet');
     expect(text).toContain('Off by default');
     expect(text).toContain('non-public backend API');
     expect(text).toContain('reported as partial');

@@ -236,10 +236,13 @@ function buildImportedArticleCommentMergeKey(input: {
   canonicalUrl: string;
   importSource: unknown;
   importKey: unknown;
+  isRoot: boolean;
 }): string {
   const importSource = safeString(input.importSource);
   const importKey = safeString(input.importKey);
-  return importSource && importKey ? [input.canonicalUrl, importSource, importKey].join('\u0000') : '';
+  return importSource && importKey
+    ? [input.canonicalUrl, importSource, importKey, input.isRoot ? 'root' : 'child'].join('\u0000')
+    : '';
 }
 
 const CONVERSATION_MAPPING_MIRROR_FIELDS = [
@@ -564,6 +567,7 @@ export async function importBackupZipMerge(
               canonicalUrl,
               importSource: row?.importSource,
               importKey: row?.importKey,
+              isRoot: !(Number.isSafeInteger(parentId) && parentId > 0),
             });
             if (importedMergeKey && !existingByImportIdentity.has(importedMergeKey)) {
               existingByImportIdentity.set(importedMergeKey, row);
@@ -587,38 +591,37 @@ export async function importBackupZipMerge(
           }
         }
 
-        const incomingIdToLocalId = new Map<number, number>();
-        for (const item of articleCommentItems) {
-          const parentId =
-            item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
-          const mappedConversationId =
-            item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
-              ? uniqueToLocalId.get(item.uniqueKey)!
-              : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
-          noteHistoricalActivity(mappedConversationId, item.createdAt);
+        const upsertCommentNode = async (input: {
+          item: AnyRecord;
+          parentId: number | null;
+          conversationId: number | null;
+          fingerprint: string;
+          isRoot: boolean;
+        }): Promise<{ id: number; created: boolean; changed: boolean; incomingContentWins: boolean }> => {
+          const item = input.item;
           const importedMergeKey = buildImportedArticleCommentMergeKey({
             canonicalUrl: item.canonicalUrl,
             importSource: item.importSource,
             importKey: item.importKey,
+            isRoot: input.isRoot,
           });
           const existing = importedMergeKey
             ? (existingByImportIdentity.get(importedMergeKey) ?? null)
-            : (existingByFingerprint.get(item.fingerprint) ?? null);
+            : (existingByFingerprint.get(input.fingerprint) ?? null);
+          const incomingUpdatedAt = Number(item.updatedAt) || 0;
 
           if (existing?.id) {
-            const existingId = Number(existing.id);
-            incomingIdToLocalId.set(item.commentId, existingId);
-            const incomingUpdatedAt = Number(item.updatedAt) || 0;
+            const id = Number(existing.id);
             const existingUpdatedAt = Number(existing.updatedAt) || 0;
             const incomingContentWins = importedMergeKey
               ? incomingUpdatedAt > existingUpdatedAt
               : incomingUpdatedAt >= existingUpdatedAt;
-            const next = {
+            const next: AnyRecord = {
               ...existing,
-              parentId: existing.parentId == null && parentId != null ? parentId : existing.parentId,
+              parentId: existing.parentId == null && input.parentId != null ? input.parentId : existing.parentId,
               conversationId:
-                existing.conversationId == null && mappedConversationId != null
-                  ? mappedConversationId
+                existing.conversationId == null && input.conversationId != null
+                  ? input.conversationId
                   : existing.conversationId,
               canonicalUrl: item.canonicalUrl,
               authorName: incomingContentWins ? (item.authorName ?? '') : existing.authorName,
@@ -635,20 +638,17 @@ export async function importBackupZipMerge(
               updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt),
             };
             if (areBackupValuesEqual(next, existing)) {
-              stats.commentsSkipped += 1;
-              continue;
+              return { id, created: false, changed: false, incomingContentWins };
             }
-
             await reqToPromise(store.put(next as any));
-            if (importedMergeKey) existingByImportIdentity.set(importedMergeKey, next as AnyRecord);
-            stats.commentsUpdated += 1;
-            markChanged('article_comments');
-            continue;
+            if (importedMergeKey) existingByImportIdentity.set(importedMergeKey, next);
+            else existingByFingerprint.set(input.fingerprint, next);
+            return { id, created: false, changed: true, incomingContentWins };
           }
 
-          const record = {
-            parentId,
-            conversationId: mappedConversationId,
+          const record: AnyRecord = {
+            parentId: input.parentId,
+            conversationId: input.conversationId,
             canonicalUrl: item.canonicalUrl,
             authorName: item.authorName ?? '',
             quoteText: item.quoteText,
@@ -660,14 +660,76 @@ export async function importBackupZipMerge(
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
           };
-          const newId = Number(await reqToPromise(store.add(record as any) as any));
-          if (Number.isSafeInteger(newId) && newId > 0) {
-            incomingIdToLocalId.set(item.commentId, newId);
-            if (importedMergeKey) existingByImportIdentity.set(importedMergeKey, { ...record, id: newId });
+          const id = Number(await reqToPromise(store.add(record as any) as any));
+          const saved = { ...record, id };
+          if (importedMergeKey) existingByImportIdentity.set(importedMergeKey, saved);
+          else existingByFingerprint.set(input.fingerprint, saved);
+          return { id, created: true, changed: true, incomingContentWins: true };
+        };
+
+        const incomingIdToLocalId = new Map<number, number>();
+        let commentsChanged = false;
+        for (const item of articleCommentItems) {
+          const parentId =
+            item.parentCommentId == null ? null : (incomingIdToLocalId.get(item.parentCommentId) ?? null);
+          const mappedConversationId =
+            item.uniqueKey && uniqueToLocalId.has(item.uniqueKey)
+              ? uniqueToLocalId.get(item.uniqueKey)!
+              : (localConversationIdByCanonicalUrl.get(item.canonicalUrl) ?? null);
+          noteHistoricalActivity(mappedConversationId, item.createdAt);
+
+          const splitCompositeRoot =
+            item.parentCommentId == null &&
+            !!item.quoteText.trim() &&
+            !!item.commentText.trim() &&
+            hasValidArticleCommentContent({
+              parentId: null,
+              quoteText: item.quoteText,
+              commentText: '',
+              locator: item.locator,
+              importSource: item.importSource,
+              importKey: item.importKey,
+            });
+          const primaryItem: AnyRecord = splitCompositeRoot ? { ...item, commentText: '' } : item;
+          const primaryBaseKey = splitCompositeRoot
+            ? buildArticleCommentArchiveBaseKey(primaryItem as any)
+            : item.baseKey;
+          const primaryFingerprint = splitCompositeRoot
+            ? buildArticleCommentArchiveFingerprint(primaryBaseKey, '')
+            : item.fingerprint;
+          const primary = await upsertCommentNode({
+            item: primaryItem,
+            parentId,
+            conversationId: mappedConversationId,
+            fingerprint: primaryFingerprint,
+            isRoot: item.parentCommentId == null,
+          });
+          incomingIdToLocalId.set(item.commentId, primary.id);
+
+          let sourceChanged = primary.changed;
+          if (splitCompositeRoot && primary.incomingContentWins) {
+            const childItem: AnyRecord = {
+              ...item,
+              quoteText: '',
+              locator: null,
+            };
+            const childBaseKey = buildArticleCommentArchiveBaseKey(childItem as any);
+            const child = await upsertCommentNode({
+              item: childItem,
+              parentId: primary.id,
+              conversationId: mappedConversationId,
+              fingerprint: buildArticleCommentArchiveFingerprint(childBaseKey, primaryBaseKey),
+              isRoot: false,
+            });
+            sourceChanged = sourceChanged || child.changed;
           }
-          stats.commentsAdded += 1;
-          markChanged('article_comments');
+
+          if (primary.created) stats.commentsAdded += 1;
+          else if (sourceChanged) stats.commentsUpdated += 1;
+          else stats.commentsSkipped += 1;
+          commentsChanged = commentsChanged || sourceChanged;
         }
+        if (commentsChanged) markChanged('article_comments');
 
         for (const [conversationId, historicalActivityAt] of activityByConversationId) {
           const conversation = await reqToPromise<any>(s.conversations.get(conversationId as any));

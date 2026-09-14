@@ -50,10 +50,11 @@ describe('notion article comments blocks', () => {
     expect(res.threads).toBe(1);
     expect(res.items).toBe(2);
     expect(Array.isArray(res.blocks)).toBe(true);
-    expect(res.blocks[0]?.type).toBe('quote');
-    expect(res.blocks[0]?.quote?.rich_text?.[0]?.text?.content).toBe('Quoted text');
+    expect(res.blocks[0]?.type).toBe('bulleted_list_item');
+    expect(String(res.blocks[0]?.bulleted_list_item?.rich_text?.[0]?.text?.content || '')).toContain('You |');
+    expect(res.blocks[0]?.bulleted_list_item?.children?.[0]?.type).toBe('quote');
+    expect(res.blocks[0]?.bulleted_list_item?.children?.[0]?.quote?.rich_text?.[0]?.text?.content).toBe('Quoted text');
     expect(res.blocks[1]?.type).toBe('bulleted_list_item');
-    expect(String(res.blocks[1]?.bulleted_list_item?.rich_text?.[0]?.text?.content || '')).toContain('You |');
     const children = res.blocks[1]?.bulleted_list_item?.children || [];
     const rootText = children.find(
       (c: any) =>
@@ -91,11 +92,13 @@ describe('notion article comments blocks', () => {
 
     expect(res.threads).toBe(1);
     expect(res.items).toBe(0);
-    expect(res.blocks).toHaveLength(2);
-    expect(res.blocks[0]?.type).toBe('quote');
-    expect(res.blocks[0]?.quote?.rich_text?.[0]?.text?.content).toBe('Highlight only');
-    expect(res.blocks[1]?.type).toBe('bulleted_list_item');
-    expect(res.blocks[1]?.bulleted_list_item?.children).toBeUndefined();
+    expect(res.blocks).toHaveLength(1);
+    expect(res.blocks[0]?.type).toBe('bulleted_list_item');
+    expect(String(res.blocks[0]?.bulleted_list_item?.rich_text?.[0]?.text?.content || '')).toContain('You |');
+    expect(res.blocks[0]?.bulleted_list_item?.children?.[0]?.type).toBe('quote');
+    expect(res.blocks[0]?.bulleted_list_item?.children?.[0]?.quote?.rich_text?.[0]?.text?.content).toBe(
+      'Highlight only',
+    );
     expect(JSON.stringify(res.blocks)).not.toContain('划线');
   });
 
@@ -115,7 +118,12 @@ describe('notion article comments blocks', () => {
       },
     ]);
 
-    const bullet = res.blocks.find((b: any) => b && b.type === 'bulleted_list_item');
+    const bullet = res.blocks.find(
+      (b: any) =>
+        b &&
+        b.type === 'bulleted_list_item' &&
+        (b?.bulleted_list_item?.children || []).some((child: any) => child?.type === 'paragraph'),
+    );
     expect(bullet).toBeTruthy();
     const children = bullet?.bulleted_list_item?.children || [];
     expect(children.length).toBeGreaterThan(0);

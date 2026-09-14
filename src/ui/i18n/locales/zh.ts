@@ -89,11 +89,11 @@ export const zh: { [K in TranslationKey]: string } = {
   aiChatsSectionSupportedListPrefix: '当前内置支持：',
   aiChatsSectionSupportedListSuffix: ' 等页面。',
   aiChatsSectionSupportedNote:
-    '默认页面采集以已加载/可见内容为准；如果开启 ChatGPT 高级采集，手动保存时可以改为从 ChatGPT 后端读取当前会话的完整分支。',
+    '默认页面采集以已加载/可见内容为准；开启 ChatGPT 高级采集后，手动保存以后端当前分支为历史真源，并可安全补充尚未进入后端的当前可见实时回复。',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT 高级采集',
   chatgptApiCaptureAdvancedLabel: '使用 ChatGPT API 采集当前会话',
   chatgptApiCaptureAdvancedHint:
-    '默认关闭。只有手动保存当前 ChatGPT 会话时，SyncNos 才会使用当前登录 Session 访问 ChatGPT 的未公开后端 API；ChatGPT 改版后可能失效。关闭后继续使用 DOM 手动采集。',
+    '默认关闭。只有手动保存当前 ChatGPT 会话时，SyncNos 才会使用当前登录 Session 访问 ChatGPT 的未公开后端 API；实时回复只在具有稳定消息身份时补充，且不会静默回退整段 DOM。ChatGPT 改版后可能失效。关闭后继续使用 DOM 手动采集。',
   chatgptApiCaptureAdvancedSupport:
     '支持文本、可见 reasoning 和对话图片。遇到未知后端结构时，会保留能够安全归属的内容并标记为部分结果；会话身份或消息树完整性无法确认时仍会停止采集。',
   chatgptApiCaptureAdvancedFallback:
@@ -398,6 +398,11 @@ export const zh: { [K in TranslationKey]: string } = {
   loadingFullHistory: '正在加载完整历史...',
   captureFailedFallback: '获取失败',
   partialCaptureSaved: '已保存可见消息，但无法确认完整历史。',
+  captureWaitingForMessages: '等待消息…',
+  partialCaptureSavedLive: '已保存当前可见回复；回复仍在变化，完成后再次保存可确认最终内容。',
+  partialCaptureSavedHistory: '已保存当前消息；历史记录完整性仍待确认。',
+  partialCaptureSavedContent: '已保存可安全确认的消息；部分内容或顺序仍待确认。',
+  partialCaptureSavedMedia: '正文已保存；部分图片或深度研究内容仍待补全。',
   fetchingDots: '获取中...',
   checkingDots: '检测中...',
   savedPrefix: '已保存：',

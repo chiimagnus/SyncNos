@@ -96,7 +96,7 @@ export function createCommentSidebarPanelTestDriver(api: CommentSidebarPanelApi)
     },
     updateComposerQuote(text) {
       publish(() => {
-        session.setComposerAttachment({ displayQuote: String(text || ''), locator: null });
+        session.setComposerAttachment({ quoteText: String(text || ''), locator: null });
       });
     },
     replaceComments(items) {

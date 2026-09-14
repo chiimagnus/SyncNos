@@ -49,7 +49,7 @@ describe('UI background handler locale readiness', () => {
     const locale = deferred<void>();
     const { router, handlers } = createRouter();
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
-    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { available: true }, error: null } as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { readiness: 'ready' }, error: null } as any);
 
     registerUiMessageHandlers(router, { localeReady: locale.promise });
 
@@ -61,7 +61,7 @@ describe('UI background handler locale readiness', () => {
     expect(tabsSendMessage).not.toHaveBeenCalled();
 
     locale.resolve();
-    await expect(responsePromise).resolves.toEqual({ ok: true, data: { available: true }, error: null });
+    await expect(responsePromise).resolves.toEqual({ ok: true, data: { readiness: 'ready' }, error: null });
     expect(tabsQuery).toHaveBeenCalledTimes(1);
     expect(tabsSendMessage).toHaveBeenCalledTimes(1);
   });

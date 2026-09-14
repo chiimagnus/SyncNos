@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  createCommentSidebarSession,
-  normalizeCommentSidebarQuoteText,
-} from '@services/comments/sidebar/comment-sidebar-session';
+import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type {
   CommentSidebarHost,
   CommentSidebarHostActionCallbacks,
@@ -92,7 +89,7 @@ describe('comment-sidebar-host-state', () => {
     const loadError = { code: 'read_failed', message: 'failed' };
 
     session.updateHost({ comments: [comment], loadError });
-    session.setComposerAttachment({ displayQuote: 'first\r\nsecond', locator });
+    session.setComposerAttachment({ quoteText: 'first\r\nsecond', locator });
 
     comment.commentText = 'mutated';
     loadError.message = 'mutated';
@@ -105,7 +102,7 @@ describe('comment-sidebar-host-state', () => {
     });
     expect(snapshot.loadError).toEqual({ code: 'read_failed', message: 'failed' });
     expect(snapshot.composerAttachment).toMatchObject({
-      displayQuote: 'first\nsecond',
+      quoteText: 'first\nsecond',
       locator: { quote: { exact: 'quoted text' } },
     });
   });
@@ -145,11 +142,6 @@ describe('comment-sidebar-host-state', () => {
 });
 
 describe('comment-sidebar-session', () => {
-  it('normalizes quote text without destroying line breaks', () => {
-    expect(normalizeCommentSidebarQuoteText(null)).toBe('');
-    expect(normalizeCommentSidebarQuoteText('hello\r\nworld')).toBe('hello\nworld');
-  });
-
   it('publishes one atomic snapshot before and after a panel attaches', () => {
     const session = createCommentSidebarSession();
     const panel = createPanelMock();
@@ -157,7 +149,7 @@ describe('comment-sidebar-session', () => {
     const comment = createComment();
 
     const attachment = session.setComposerAttachment({
-      displayQuote: ' first\r\nsecond ',
+      quoteText: ' first\r\nsecond ',
       locator: {
         v: 1,
         env: 'inpage',
@@ -200,7 +192,7 @@ describe('comment-sidebar-session', () => {
   it('sets and clears quote + locator atomically with a guarded selection revision', () => {
     const session = createCommentSidebarSession();
     const first = session.setComposerAttachment({
-      displayQuote: 'first quote',
+      quoteText: 'first quote',
       locator: {
         v: 1,
         env: 'app',
@@ -209,7 +201,7 @@ describe('comment-sidebar-session', () => {
       },
     });
     const second = session.setComposerAttachment({
-      displayQuote: 'second quote',
+      quoteText: 'second quote',
       locator: null,
     });
 
@@ -220,7 +212,7 @@ describe('comment-sidebar-session', () => {
 
     expect(session.clearComposerAttachment(second.selectionRevision)).toBe(true);
     expect(session.getSnapshot().composerAttachment).toEqual({
-      displayQuote: '',
+      quoteText: '',
       locator: null,
       selectionRevision: 3,
     });
@@ -309,25 +301,25 @@ describe('comment-sidebar-session', () => {
 
   it('forwards selection and clear actions without clearing the attachment on save', async () => {
     const session = createCommentSidebarSession();
-    const onComposerSelectionRequest = vi.fn(async () => {});
-    const onComposerQuoteClearRequest = vi.fn(async () => {
+    const onComposerSelectionRequest = vi.fn(() => {});
+    const onComposerQuoteClearRequest = vi.fn(() => {
       session.clearComposerAttachment();
     });
     const onSave = vi.fn(async () => ({ ok: true }));
 
-    session.setComposerAttachment({ displayQuote: 'quoted text', locator: null });
+    session.setComposerAttachment({ quoteText: 'quoted text', locator: null });
     session.updateHost({
       actionCallbacks: { onSave, onComposerSelectionRequest, onComposerQuoteClearRequest },
     });
 
-    await session.actions.requestComposerSelection({ trigger: 'button' });
-    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'button' });
+    session.actions.requestComposerSelection();
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     await session.actions.save('hello');
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('quoted text');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('quoted text');
 
-    await session.actions.clearComposerAttachment();
+    session.actions.clearComposerAttachment();
     expect(onComposerQuoteClearRequest).toHaveBeenCalledTimes(1);
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });
 });

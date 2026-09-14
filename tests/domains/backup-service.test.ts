@@ -988,6 +988,7 @@ describe('backup service', () => {
       updatedAt = 100,
       uniqueKey = 'web||article:https://example.com/reload-free-article',
       imported = true,
+      locator: unknown = null,
     ) => {
       const entries = new Map(fixtureEntries);
       const manifest = JSON.parse(decoder.decode(entries.get('manifest.json')!));
@@ -1008,7 +1009,7 @@ describe('backup service', () => {
                 ...(imported ? { importSource: 'dedao', importKey: 'line-1' } : {}),
                 quoteText: 'Imported highlight',
                 commentText,
-                locator: null,
+                locator,
                 createdAt: 100,
                 updatedAt,
               },
@@ -1050,8 +1051,11 @@ describe('backup service', () => {
       verifyUpdate.onerror = () => reject(verifyUpdate.error);
       verifyUpdate.onabort = () => reject(verifyUpdate.error);
     });
-    expect(updatedRows).toHaveLength(1);
-    expect(updatedRows[0]?.commentText).toBe('Source note added later');
+    expect(updatedRows).toHaveLength(2);
+    const importedRoot = updatedRows.find((row) => row.parentId == null && row.importSource === 'dedao');
+    const importedComment = updatedRows.find((row) => Number(row.parentId) === Number(importedRoot?.id));
+    expect(importedRoot).toMatchObject({ quoteText: 'Imported highlight', commentText: '' });
+    expect(importedComment).toMatchObject({ quoteText: '', commentText: 'Source note added later' });
 
     const ordinary = await importBackupZipMerge(
       buildEntries('Source note added later', 101, 'web||article:https://example.com/reload-free-article', false),
@@ -1064,8 +1068,45 @@ describe('backup service', () => {
       verifyNamespaces.onerror = () => reject(verifyNamespaces.error);
       verifyNamespaces.onabort = () => reject(verifyNamespaces.error);
     });
-    expect(separateRows).toHaveLength(2);
-    expect(separateRows.filter((row) => row.importSource === 'dedao' && row.importKey === 'line-1')).toHaveLength(1);
+    expect(separateRows).toHaveLength(3);
+    expect(separateRows.filter((row) => row.importSource === 'dedao' && row.importKey === 'line-1')).toHaveLength(2);
+
+    const anchoredLocator = {
+      v: 1,
+      env: 'app',
+      quote: { type: 'TextQuoteSelector', exact: 'Imported highlight' },
+      position: { type: 'TextPositionSelector', start: 0, end: 18 },
+    };
+    const anchored = buildEntries(
+      'Anchored ordinary note',
+      102,
+      'web||article:https://example.com/reload-free-article',
+      false,
+      anchoredLocator,
+    );
+    expect(await importBackupZipMerge(anchored)).toMatchObject({ commentsAdded: 1, commentsUpdated: 0 });
+    expect(await importBackupZipMerge(anchored)).toMatchObject({
+      commentsAdded: 0,
+      commentsUpdated: 0,
+      commentsSkipped: 1,
+    });
+    const verifyAnchoredRepeat = db.transaction(['article_comments'], 'readonly');
+    const anchoredRows = await reqToPromise<any[]>(verifyAnchoredRepeat.objectStore('article_comments').getAll());
+    await new Promise<void>((resolve, reject) => {
+      verifyAnchoredRepeat.oncomplete = () => resolve();
+      verifyAnchoredRepeat.onerror = () => reject(verifyAnchoredRepeat.error);
+      verifyAnchoredRepeat.onabort = () => reject(verifyAnchoredRepeat.error);
+    });
+    expect(anchoredRows).toHaveLength(5);
+    const anchoredRoot = anchoredRows.find(
+      (row) => row.parentId == null && row.locator?.quote?.exact === 'Imported highlight',
+    );
+    expect(anchoredRoot).toMatchObject({ quoteText: 'Imported highlight', commentText: '' });
+    expect(
+      anchoredRows.find(
+        (row) => Number(row.parentId) === Number(anchoredRoot?.id) && row.commentText === 'Anchored ordinary note',
+      ),
+    ).toMatchObject({ quoteText: '', locator: null });
   });
 
   it('importBackupZipMerge restores image cache and rewrites only real Markdown asset images', async () => {

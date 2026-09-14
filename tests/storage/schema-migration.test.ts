@@ -159,6 +159,12 @@ async function openV12Db() {
   return reqToPromise(indexedDB.open('webclipper', 12));
 }
 
+async function openV13Db() {
+  const db12 = await openV12Db();
+  db12.close();
+  return reqToPromise(indexedDB.open('webclipper', 13));
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -662,6 +668,100 @@ describe('storage schema migration (v11 conversation hygiene)', () => {
       expect(Number(row.lastActivityAt)).toBeGreaterThan(0);
       expect(Object.prototype.hasOwnProperty.call(row, 'lastCapturedAt')).toBe(false);
     }
+  });
+});
+
+describe('storage schema migration (v14 independent comment content nodes)', () => {
+  it('splits anchored/imported composite roots without touching unverifiable historical quotes', async () => {
+    const db13 = await openV13Db();
+    const tx13 = db13.transaction(['article_comments'], 'readwrite');
+    const comments = tx13.objectStore('article_comments');
+    const anchoredRootId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v14',
+        authorName: 'Chii',
+        quoteText: 'quoted text',
+        commentText: 'immediate comment',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'quoted text' },
+          position: { type: 'TextPositionSelector', start: 0, end: 11 },
+        },
+        createdAt: 100,
+        updatedAt: 101,
+      }) as IDBRequest<number>,
+    );
+    const laterReplyId = await reqToPromise<number>(
+      comments.add({
+        parentId: anchoredRootId,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v14',
+        authorName: 'Chii',
+        quoteText: '',
+        commentText: 'later reply',
+        locator: null,
+        createdAt: 200,
+        updatedAt: 200,
+      }) as IDBRequest<number>,
+    );
+    const unverifiedRootId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v14',
+        authorName: 'Chii',
+        quoteText: 'unverified quote',
+        commentText: 'must stay attached',
+        locator: null,
+        createdAt: 300,
+        updatedAt: 300,
+      }) as IDBRequest<number>,
+    );
+    const importedRootId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v14',
+        authorName: 'Chii',
+        quoteText: 'imported quote',
+        commentText: 'imported note',
+        locator: null,
+        importSource: 'dedao',
+        importKey: 'note-1',
+        createdAt: 400,
+        updatedAt: 401,
+      }) as IDBRequest<number>,
+    );
+    await txDone(tx13);
+    db13.close();
+
+    const currentDb = await openDb();
+    expect(currentDb.version).toBe(DB_VERSION);
+    const verifyTx = currentDb.transaction(['article_comments'], 'readonly');
+    const rows = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
+    await txDone(verifyTx);
+
+    const anchoredRoot = rows.find((row) => Number(row.id) === anchoredRootId);
+    expect(anchoredRoot).toMatchObject({ quoteText: 'quoted text', commentText: '' });
+    const anchoredComment = rows.find(
+      (row) => Number(row.parentId) === anchoredRootId && row.commentText === 'immediate comment',
+    );
+    expect(anchoredComment).toMatchObject({ authorName: 'Chii', quoteText: '', locator: null, createdAt: 100 });
+    expect(rows.find((row) => Number(row.id) === laterReplyId)?.parentId).toBe(anchoredRootId);
+
+    expect(rows.find((row) => Number(row.id) === unverifiedRootId)).toMatchObject({
+      quoteText: 'unverified quote',
+      commentText: 'must stay attached',
+    });
+
+    const importedRoot = rows.find((row) => Number(row.id) === importedRootId);
+    expect(importedRoot).toMatchObject({ quoteText: 'imported quote', commentText: '' });
+    expect(
+      rows.find((row) => Number(row.parentId) === importedRootId && row.commentText === 'imported note'),
+    ).toMatchObject({ importSource: 'dedao', importKey: 'note-1', quoteText: '', locator: null });
   });
 });
 

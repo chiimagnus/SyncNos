@@ -798,6 +798,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
 
   const collector: any = {
     capture,
+    getCaptureReadiness: () => (hasChatSignals(document) ? 'ready' : 'waiting'),
     getRoot: () => {
       if (!isNotionAiPage()) return null;
       const seed = getLastUserStepEl(document) || getAnyUserStepEl(document);

@@ -8,7 +8,7 @@ import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-reco
 import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 13;
+export const DB_VERSION = 14;
 
 type MigrationContext = {
   tx: IDBTransaction;
@@ -149,6 +149,36 @@ function normalizeMessageRecordsForV12({ tx }: MigrationContext): void {
     const hasLegacyText = Object.prototype.hasOwnProperty.call(value, 'contentText');
     if (hasLegacyText || String(value.contentMarkdown ?? '') !== String(next.contentMarkdown ?? '')) {
       cursor.update(next as any);
+    }
+    cursor.continue();
+  };
+}
+
+function migrateArticleCommentContentNodesForV14({ tx }: MigrationContext): void {
+  const commentsStore = tx.objectStore('article_comments');
+  const req = commentsStore.openCursor();
+  req.onsuccess = () => {
+    const cursor = req.result;
+    if (!cursor) return;
+    const row = (cursor.value || {}) as Record<string, unknown>;
+    const rowId = Number(row.id);
+    const parentId = Number(row.parentId);
+    const quoteText = String(row.quoteText ?? '').replace(/\r\n?/g, '\n');
+    const commentText = safeString(row.commentText);
+    const locatorExact = String((row.locator as any)?.quote?.exact ?? '').replace(/\r\n?/g, '\n');
+    const hasStableImportIdentity = !!safeString(row.importSource) && !!safeString(row.importKey);
+    if (
+      Number.isSafeInteger(rowId) &&
+      rowId > 0 &&
+      !(Number.isSafeInteger(parentId) && parentId > 0) &&
+      quoteText.trim() &&
+      commentText &&
+      (locatorExact === quoteText || hasStableImportIdentity)
+    ) {
+      cursor.update({ ...row, parentId: null, quoteText, commentText: '' } as any);
+      const child = { ...row, parentId: rowId, quoteText: '', commentText, locator: null } as Record<string, unknown>;
+      delete child.id;
+      commentsStore.add(child as any);
     }
     cursor.continue();
   };
@@ -739,6 +769,8 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureDataRevisionStores(db);
 
   if (!tx || oldVersion === 0 || oldVersion >= DB_VERSION) return;
+
+  if (oldVersion < 14) migrateArticleCommentContentNodesForV14({ tx });
 
   const migrateMessages = () => {
     if (oldVersion < 12) normalizeMessageRecordsForV12({ tx });

@@ -114,16 +114,8 @@ function ArticleCommentsPanelMount({
     const host = hostRef.current;
 
     const mounted = mountThreadedCommentsPanel(host, {
-      overlay: false,
-      variant: 'sidebar',
       surface: fullWidth ? 'app-narrow' : 'app-wide',
-      fullWidth,
-      showHeader: true,
-      showCollapseButton: true,
-      surfaceBg: 'var(--bg-card)',
-      locatorEnv: 'app',
       getLocatorSurfaceRoots: () => locatorSurfaceRootsGetterRef.current(),
-      deferReactUpdates: true,
     });
     apiRef.current = mounted.api;
     const panelLease = sidebarSession.attachPanel(

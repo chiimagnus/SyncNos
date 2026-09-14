@@ -83,7 +83,7 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
     buttonDisabled: false,
     buttonLabel: 'Fetch AI Chat',
     capture: vi.fn(),
-    captureState: { available: true, kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
+    captureState: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
     checking: false,
     fetching: false,
     refreshState: vi.fn(),
@@ -284,7 +284,7 @@ describe('PopupShell header actions', () => {
       if (type === UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE) {
         return {
           ok: true,
-          data: { available: true, kind: 'article', label: 'Fetch Article', collectorId: 'web' },
+          data: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
           error: null,
         };
       }

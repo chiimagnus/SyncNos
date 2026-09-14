@@ -45,6 +45,9 @@ function createHarness(input: {
   video?: any;
   url?: string;
   syncResponse?: any;
+  liveTurn?: () => any;
+  readiness?: 'ready' | 'waiting' | 'unsupported';
+  readinessError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
@@ -59,8 +62,16 @@ function createHarness(input: {
       return { ok: true, data: {} };
     }),
   };
-  const collector: any = { capture };
+  const collector: any = {
+    capture,
+    getCaptureReadiness: () => {
+      if (input.readinessError) throw new Error(input.readinessError);
+      return input.readiness ?? 'ready';
+    },
+  };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
+  if (input.collectorId === 'chatgpt') collector.captureApiLiveTurn = input.liveTurn || (() => ({ kind: 'none' }));
+  else if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
     captureVideoTranscript: vi.fn(
@@ -104,7 +115,7 @@ describe('current page capture integrity routing', () => {
     ]) {
       const harness = createHarness({ collectorId: 'web', url });
       expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
-        available: true,
+        readiness: 'ready',
         kind: 'video',
         collectorId: 'video',
       });
@@ -151,6 +162,67 @@ describe('current page capture integrity routing', () => {
     }
   });
 
+  it('reports a supported chat with no current messages as waiting instead of unsupported', async () => {
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'waiting' });
+    const state = harness.service.getCurrentPageCaptureState();
+
+    expect(state).toMatchObject({
+      readiness: 'waiting',
+      kind: 'chat',
+      collectorId: 'chatgpt',
+    });
+    expect(state.reason).toContain('ChatGPT');
+
+    const progress: any[] = [];
+    await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
+      state.reason,
+    );
+    expect(progress.at(-1)).toEqual({ message: state.reason, kind: 'default' });
+    expect(harness.capture).not.toHaveBeenCalled();
+    expect(harness.calls).toEqual([]);
+  });
+
+  it('keeps collector-declared non-chat routes unsupported instead of waiting', async () => {
+    const harness = createHarness({ collectorId: 'gemini', snapshot: null, readiness: 'unsupported' });
+    const state = harness.service.getCurrentPageCaptureState();
+
+    expect(state).toMatchObject({
+      readiness: 'unsupported',
+      kind: 'unsupported',
+      collectorId: 'gemini',
+      reason: t('currentPageCannotBeCaptured'),
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow(t('currentPageCannotBeCaptured'));
+    expect(harness.capture).not.toHaveBeenCalled();
+  });
+
+  it('surfaces collector readiness failures instead of masking them as waiting', async () => {
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: null,
+      readinessError: 'readiness failed',
+    });
+
+    expect(() => harness.service.getCurrentPageCaptureState()).toThrow('readiness failed');
+    const progress: any[] = [];
+    await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
+      'readiness failed',
+    );
+    expect(progress.at(-1)).toEqual({ message: 'readiness failed', kind: 'error' });
+  });
+
+  it('consumes the web collector readiness contract before routing to article capture', async () => {
+    const harness = createHarness({ collectorId: 'web', snapshot: null, readiness: 'unsupported' });
+
+    expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
+      readiness: 'unsupported',
+      kind: 'unsupported',
+      collectorId: 'web',
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow(t('currentPageCannotBeCaptured'));
+    expect(harness.calls).toEqual([]);
+  });
+
   it('keeps the existing DOM manual path when Advanced API is disabled', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({ collectorId: 'chatgpt', snapshot: chatSnapshot(), prepare });
@@ -187,6 +259,65 @@ describe('current page capture integrity routing', () => {
     });
     expect(harness.calls[1].payload).not.toHaveProperty('conversationUrl');
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
+  });
+
+  it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    const liveTurn = vi.fn(() => ({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0, updatedAt: 1 },
+      assistantMessage: {
+        messageKey: 'assistant-live',
+        role: 'assistant',
+        contentMarkdown: 'visible streaming answer',
+        sequence: 1,
+        updatedAt: 2,
+      },
+    }));
+    const prepare = vi.fn();
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      prepare,
+      liveTurn,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    const result = await harness.service.captureCurrentPage();
+
+    expect(liveTurn).toHaveBeenCalledWith({ expectedConversationId: 'conversation-1' });
+    expect(prepare).not.toHaveBeenCalled();
+    expect(harness.capture).not.toHaveBeenCalled();
+    expect(harness.calls[1].payload).toMatchObject({
+      mode: 'append',
+      diff: { added: ['m1', 'assistant-live'], updated: [], removed: [] },
+      messages: [
+        expect.objectContaining({ messageKey: 'm1', contentMarkdown: 'hello' }),
+        expect.objectContaining({ messageKey: 'assistant-live', contentMarkdown: 'visible streaming answer' }),
+      ],
+    });
+    expect(result).toMatchObject({
+      captureCompleteness: 'partial',
+      captureReasons: ['chatgpt_api_live_tail_unconfirmed'],
+    });
+  });
+
+  it('fails closed before persistence when the API live-turn reader observes another durable conversation', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      liveTurn: () => ({ kind: 'identity_changed' }),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    expect(harness.calls).toEqual([]);
   });
 
   it('falls back to DOM only when enabled API mode is not applicable to the current ChatGPT route', async () => {

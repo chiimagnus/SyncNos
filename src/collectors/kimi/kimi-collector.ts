@@ -22,6 +22,15 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
     }
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    try {
+      const p = env.location.pathname || '';
+      return p === '/' || /^\/chat(?:\/|$)/.test(p);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return conversationKeyFromLocation(env.location);
   }
@@ -154,6 +163,16 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
     };
   }
 
-  const collector = { capture, getRoot: getConversationRoot };
+  const collector = {
+    capture,
+    getCaptureReadiness: () => {
+      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      return getConversationRoot()?.querySelector('.chat-content-item-user, .chat-content-item-assistant')
+        ? ('ready' as const)
+        : ('waiting' as const);
+    },
+    getRoot: getConversationRoot,
+  };
   return { id: 'kimi', matches, collector };
 }

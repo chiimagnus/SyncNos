@@ -17,6 +17,7 @@ describe('web-collector', () => {
     const def = createWebCollectorDef(env);
     expect(def.matches({ href: 'https://example.com/a' })).toBe(true);
     expect(def.inpageMatches?.({ href: 'https://example.com/a' })).toBe(true);
+    expect(def.collector.getCaptureReadiness()).toBe('ready');
     expect(def.collector.capture()).toBe(null);
   });
 });

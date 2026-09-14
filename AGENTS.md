@@ -34,8 +34,8 @@ collectors -> services/shared
 - 会话列表必须使用 `bootstrap + loadMore` 分页，禁止恢复全量读取。
 - ChatGPT 与 Google AI Studio 的虚拟列表会卸载离屏轮次，禁止加入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`。Google AI Studio 完整历史继续只走手动 `prepareManualCapture()`；ChatGPT 默认也走手动 DOM `prepareManualCapture()`，仅用户显式开启 Advanced API 后，手动抓取才可改用已验证的 current-conversation backend mapping，并且不得静默回退 DOM。
 - AI 对话正文持久化不得等待图片网络；ChatGPT 未缓存内容图片保留可恢复身份，禁止持久化临时 signed URL / session credential。用户上传和 AI 生成图片属于内容，普通 tool/MCP 截图与视觉执行产物不属于内容。完整图片缓存、导出和失败语义见 [`docs/storage.md`](docs/storage.md)。
-- 评论选区只附加到根评论 composer；reply 输入框和评论面板内选区不得覆盖正文引用。
-- 根评论允许仅划线：正文引用可在评论正文为空时保存，但必须有可验证的定位或稳定导入身份；reply 仍必须有非空正文。
+- 评论选区只附加到 thread 首条引用内容的 composer；reply 输入框和评论面板内选区不得覆盖已附加引用。
+- 新写入和可安全迁移的评论 thread 中，首节点只承载一种内容：可以是仅引用或仅评论；第二条及后续节点都是有正文的同级 comment child，并直接挂首节点。引用节点必须有可验证定位或稳定导入身份；引用与评论具有独立 id/作者/时间和删除生命周期。删除首节点时删除整个 thread；删除非首节点时只删除该节点。历史数据若同时含 quote+comment 且缺少可验证 locator / stable import identity，不得为满足结构整齐而丢弃内容或伪造可定位 quote。
 - 评论定位只接受全局唯一 exact Range，不新增模糊匹配、比例滚动或父元素高亮回退。
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。

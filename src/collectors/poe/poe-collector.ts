@@ -30,6 +30,15 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     }
   }
 
+  function isKnownNonChatUrl(): boolean {
+    try {
+      const p = String(location.pathname || '');
+      return /^\/(login|logout|settings|explore|pricing|subscriptions)(\/|$)/.test(p);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findConversationKey(): any {
     return conversationKeyFromLocation(location);
   }
@@ -375,7 +384,16 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     };
   }
 
-  const collector: any = { capture, getRoot: getConversationRoot, prepareManualCapture };
+  const collector: any = {
+    capture,
+    getCaptureReadiness: () => {
+      if (isKnownNonChatUrl()) return 'unsupported' as const;
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      return getMessageWrappers(getConversationRoot()).length > 0 ? ('ready' as const) : ('waiting' as const);
+    },
+    getRoot: getConversationRoot,
+    prepareManualCapture,
+  };
   const markdown = poeMarkdown();
   collector.__test = {
     removeThinkingNodes: markdown.removeThinkingNodes,

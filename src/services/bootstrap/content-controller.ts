@@ -594,10 +594,9 @@ export function createContentController(deps: Deps) {
 
     async function refreshInpageButton() {
       const positionState = await ensureInpageButtonPositionLoadedOnce();
-      if (stopped) return null;
-      const collector = resolveActiveCollector(collectorsRegistry);
+      if (stopped) return;
       const captureState = currentPageCapture.getCurrentPageCaptureState();
-      const buttonCollectorId = captureState.available ? captureState.collectorId || '' : '';
+      const buttonCollectorId = captureState.readiness !== 'unsupported' ? captureState.collectorId || '' : '';
       inpageButton?.cleanupButtons?.(buttonCollectorId);
       inpageButton?.ensureInpageButton?.({
         collectorId: buttonCollectorId || undefined,
@@ -613,9 +612,8 @@ export function createContentController(deps: Deps) {
       });
       if (stopped) {
         inpageButton?.cleanupButtons?.('');
-        return null;
+        return;
       }
-      return collector;
     }
 
     function isAutoSaveRequestAllowed(generation: number) {

@@ -70,7 +70,7 @@ describe('Threaded comments panel focus regression', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([]);
 
     let nextId = 1;
@@ -103,7 +103,7 @@ describe('Threaded comments panel focus regression', () => {
     composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
 
     const send = shadow.querySelector(
-      '[data-webclipper-root-composer="1"] .webclipper-inpage-comments-panel__send',
+      '.webclipper-inpage-comments-panel__reply-composer.is-root .webclipper-inpage-comments-panel__send',
     ) as HTMLButtonElement | null;
     expect(send).toBeTruthy();
     send!.click();
@@ -124,7 +124,7 @@ describe('Threaded comments panel focus regression', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([]);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;

@@ -83,7 +83,7 @@ describe('remote-markdown-writer', () => {
     expect(md).toContain('last_activity_at: "2026-09-08T03:00:00.000Z"');
     expect(md).toContain('comments_root_count: 1');
     expect(md).toContain('> Quoted');
-    expect(md.match(/^- You \|/gm)?.length || 0).toBe(2);
+    expect(md.match(/^- You \|/gm)?.length || 0).toBe(3);
     expect(md).toContain('  Root');
     expect(md).toContain('  Reply');
   });
