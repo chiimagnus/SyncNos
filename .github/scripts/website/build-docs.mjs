@@ -2,6 +2,7 @@ import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promi
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import MarkdownIt from 'markdown-it';
+import { renderDocsPage } from '../../../website/docs-page.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const WEBSITE = path.join(ROOT, 'website');
@@ -33,15 +34,6 @@ const ROUTE_REDIRECTS = [
   ['/docs/features/', '/docs/library/'],
   ['/docs/en/features/', '/docs/en/library/'],
 ];
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
 
 function parseFrontmatter(source) {
   const normalized = String(source).replaceAll('\r\n', '\n');
@@ -172,18 +164,6 @@ function assertSamePageSet(label, expected, actual) {
   }
 }
 
-function navHtml(items, currentRoute) {
-  return items
-    .map((item) => {
-      if (item.type === 'group') {
-        return `<div class="docs-nav-group"><div class="docs-nav-label">${escapeHtml(item.title)}</div>${navHtml(item.items, currentRoute)}</div>`;
-      }
-      const active = item.route === currentRoute ? ' aria-current="page" class="active"' : '';
-      return `<a href="${BASE_PATH}${item.route}"${active}>${escapeHtml(item.title)}</a>`;
-    })
-    .join('');
-}
-
 function createMarkdownRenderer() {
   const md = new MarkdownIt({ html: true, linkify: true, typographer: false });
   const defaultLinkOpen =
@@ -238,85 +218,17 @@ function renderMarkdown(body) {
   return { html: md.renderer.render(tokens, md.options, {}), headings };
 }
 
-function tocHtml(headings, language) {
-  if (!headings.length) return '';
-  const title = language.id === 'zh' ? '本页目录' : 'On this page';
-  return `<aside class="docs-toc"><div class="docs-toc-title">${title}</div>${headings
-    .map((heading) => `<a class="level-${heading.level}" href="#${heading.id}">${escapeHtml(heading.text)}</a>`)
-    .join('')}</aside>`;
-}
-
-function mobileNavHtml(items, currentRoute, language) {
-  const label = language.id === 'zh' ? '文档导航' : 'Docs navigation';
-  return `<details class="docs-mobile-nav"><summary>${label}</summary><nav>${navHtml(items, currentRoute)}</nav></details>`;
-}
-
-function pageHtml({ page, tree, language }) {
-  const rendered = renderMarkdown(page.body);
-  const counterpartRoute = counterpartRouteFor(page, language);
-  const languageLabel = language.id === 'zh' ? 'English' : '中文';
-  const editLabel = language.id === 'zh' ? '在 GitHub 查看 Markdown' : 'View Markdown on GitHub';
-  const themeLabel = language.id === 'zh' ? '切换深浅色' : 'Toggle dark mode';
-  const title = `${page.title} · SyncNos Docs`;
-  const canonical = `${SITE_ORIGIN}${BASE_PATH}${page.route}`;
-  const sourceUrl = `${REPO}/blob/main/website/content/docs/${language.id}/${page.relativePath}`;
-  return `<!doctype html>
-<html lang="${language.id === 'zh' ? 'zh-CN' : 'en'}" data-theme="light">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(title)}</title>
-    <meta name="description" content="${escapeHtml(page.description)}" />
-    <link rel="canonical" href="${canonical}" />
-    <link rel="icon" href="${BASE_PATH}/assets/icon-128.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" />
-    <meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0f141c" media="(prefers-color-scheme: dark)" />
-    <meta name="color-scheme" content="light dark" />
-    <script src="${BASE_PATH}/theme.js"></script>
-    <link rel="stylesheet" href="${BASE_PATH}/styles.css" />
-    <link rel="stylesheet" href="${BASE_PATH}/docs.css" />
-  </head>
-  <body>
-    <header class="nav docs-header">
-      <a class="brand" href="${BASE_PATH}/"><img src="${BASE_PATH}/assets/icon-128.png" alt="SyncNos" width="30" height="30" /> <span>SyncNos Docs</span></a>
-      <nav class="nav-links docs-header-links">
-        <a href="${REPO}">GitHub</a>
-        <a href="${BASE_PATH}${counterpartRoute}">${languageLabel}</a>
-      </nav>
-      <div class="nav-actions">
-        <button id="theme" class="ghost-btn" type="button" aria-label="${themeLabel}">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-            <path d="M12 3a9 9 0 000 18z" fill="currentColor" />
-          </svg>
-        </button>
-      </div>
-    </header>
-    ${mobileNavHtml(tree.items, page.route, language)}
-    <div class="docs-layout">
-      <aside class="docs-sidebar"><nav>${navHtml(tree.items, page.route)}</nav></aside>
-      <main class="docs-main">
-        <div class="docs-heading">
-          <h1>${escapeHtml(page.title)}</h1>
-          ${page.description ? `<p>${escapeHtml(page.description)}</p>` : ''}
-          <a class="docs-source" href="${sourceUrl}">${editLabel}</a>
-        </div>
-        <article class="docs-prose">${rendered.html}</article>
-      </main>
-      ${tocHtml(rendered.headings, language)}
-    </div>
-  </body>
-</html>`;
-}
-
 async function copyStaticWebsite() {
   await rm(OUTPUT, { recursive: true, force: true });
   await mkdir(OUTPUT, { recursive: true });
   for (const entry of await readdir(WEBSITE, { withFileTypes: true })) {
-    if (entry.name === '.site' || entry.name === 'content' || entry.name === '.gitignore') continue;
+    if (
+      entry.name === '.site' ||
+      entry.name === 'content' ||
+      entry.name === '.gitignore' ||
+      entry.name === 'docs-page.mjs'
+    )
+      continue;
     await cp(path.join(WEBSITE, entry.name), path.join(OUTPUT, entry.name), { recursive: true });
   }
 }
@@ -382,7 +294,19 @@ async function main() {
     for (const page of pages) {
       const out = outputPathFor(page.route);
       await mkdir(path.dirname(out), { recursive: true });
-      await writeFile(out, pageHtml({ page, tree, language }));
+      await writeFile(
+        out,
+        renderDocsPage({
+          page,
+          tree,
+          language,
+          rendered: renderMarkdown(page.body),
+          counterpartRoute: counterpartRouteFor(page, language),
+          basePath: BASE_PATH,
+          siteOrigin: SITE_ORIGIN,
+          repo: REPO,
+        }),
+      );
     }
   }
 
