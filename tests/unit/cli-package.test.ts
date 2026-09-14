@@ -96,10 +96,10 @@ describe('CLI package staging', () => {
   it('publishes npm from the canonical tag release workflow before creating GitHub Release', async () => {
     const source = await readFile(join(REPO_ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
     expect(source).toMatch(
-      /uses: actions\/checkout@v6\s+with:\s+ref: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.tag \|\| github\.ref \}\}/,
+      /uses: actions\/checkout@v7\s+with:\s+ref: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.tag \|\| github\.ref \}\}/,
     );
     expect(source).toContain('id-token: write');
-    expect(source).toContain('uses: actions/setup-node@v6');
+    expect(source).toContain('uses: actions/setup-node@v7');
     expect(source).toContain("node-version: '24'");
     expect(source).toContain("registry-url: 'https://registry.npmjs.org'");
     expect(source).toContain('package-manager-cache: false');
