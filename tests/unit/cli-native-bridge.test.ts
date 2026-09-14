@@ -462,6 +462,7 @@ describe('CLI Native Messaging bridge', () => {
       locator: null,
     });
     expect(addMessage).not.toHaveProperty('authorName');
+    expect(router.dispatch.mock.calls.at(-1)?.[1]).toBe('syncnos-cli');
 
     await emit('c-reply', 'comments.reply', { conversationId: 7, parentId: 3, text: 'plain reply' });
     const replyMessage = router.dispatch.mock.calls.at(-1)?.[0];
@@ -474,6 +475,7 @@ describe('CLI Native Messaging bridge', () => {
       locator: null,
       parentId: 3,
     });
+    expect(router.dispatch.mock.calls.at(-1)?.[1]).toBe('syncnos-cli');
 
     const callsBeforeDelete = router.dispatch.mock.calls.length;
     await emit('c-delete', 'comments.delete', { commentId: 9 });
