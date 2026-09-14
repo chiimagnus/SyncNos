@@ -77,6 +77,16 @@ describe('WXT browser-scoped Vite config', () => {
     expect(safari.optional_permissions).toBeUndefined();
   });
 
+  it('registers the existing app settings route as the browser-native options page', async () => {
+    for (const browser of ['chrome', 'firefox', 'safari'] as const) {
+      const manifest = await resolveManifest(browser);
+      expect(manifest.options_ui).toEqual({
+        page: 'app.html#/settings',
+        open_in_tab: true,
+      });
+    }
+  });
+
   it('declares the same unbound keyboard commands for every browser', async () => {
     for (const browser of ['chrome', 'firefox', 'safari'] as const) {
       const manifest = await resolveManifest(browser);

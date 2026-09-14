@@ -64,6 +64,10 @@ const resolveManifest: UserManifestFn = (env) => {
     description: isSafari ? '__MSG_description__' : '__MSG_extDescription__',
     default_locale: 'en',
     permissions,
+    options_ui: {
+      page: 'app.html#/settings',
+      open_in_tab: true,
+    },
     commands: {
       [KEYBOARD_SHORTCUT_COMMAND_IDS.openPopup]: {},
       [KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage]: {

@@ -83,6 +83,11 @@ if (!manifest.action?.default_popup) fail('action.default_popup missing');
 if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length === 0) fail('content_scripts missing');
 if (!manifest.icons?.['16'] || !manifest.icons?.['48'] || !manifest.icons?.['128']) fail('icons 16/48/128 missing');
 
+if (manifest.options_ui?.page !== 'app.html#/settings') fail('options_ui.page must be app.html#/settings');
+if (manifest.options_ui?.open_in_tab !== true) fail('options_ui.open_in_tab must be true');
+const optionsPageFile = manifest.options_ui.page.split('#', 1)[0];
+if (!existsSync(join(root, optionsPageFile))) fail(`options page missing: ${optionsPageFile}`);
+
 const expectedCommandIds = ['_execute_action', 'capture-current-page', 'open-syncnos-app'];
 const commands = manifest.commands;
 if (!commands || typeof commands !== 'object' || Array.isArray(commands)) fail('manifest.commands must be an object');
