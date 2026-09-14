@@ -375,7 +375,15 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     };
   }
 
-  const collector: any = { capture, getRoot: getConversationRoot, prepareManualCapture };
+  const collector: any = {
+    capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() && getMessageWrappers(getConversationRoot()).length > 0
+        ? ('ready' as const)
+        : ('waiting' as const),
+    getRoot: getConversationRoot,
+    prepareManualCapture,
+  };
   const markdown = poeMarkdown();
   collector.__test = {
     removeThinkingNodes: markdown.removeThinkingNodes,

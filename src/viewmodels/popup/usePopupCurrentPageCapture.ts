@@ -145,10 +145,18 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
 
   useEffect(() => {
     if (checking || fetching || captureState.readiness !== 'waiting') return;
-    const timer = window.setInterval(() => {
-      void refreshState({ silent: true });
-    }, 1000);
-    return () => window.clearInterval(timer);
+    let cancelled = false;
+    let timer: number | null = null;
+    const poll = async () => {
+      await refreshState({ silent: true });
+      if (cancelled) return;
+      timer = window.setTimeout(() => void poll(), 1000);
+    };
+    timer = window.setTimeout(() => void poll(), 1000);
+    return () => {
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
   }, [captureState.readiness, checking, fetching, refreshState]);
 
   const buttonLabel = useMemo(() => {

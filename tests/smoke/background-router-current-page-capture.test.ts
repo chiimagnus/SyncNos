@@ -51,6 +51,22 @@ describe('background-router current page capture relay', () => {
     expect(tabsSendMessage).not.toHaveBeenCalled();
   });
 
+  it('surfaces content capture-state failures as errors instead of unsupported state', async () => {
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 10, url: 'https://chatgpt.com/c/123' }] as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({
+      ok: false,
+      data: null,
+      error: { message: 'capture state failed', extra: null },
+    } as any);
+
+    const router = createTestBackgroundRouter();
+    const response = await router.dispatch({ type: 'getActiveTabCaptureState' });
+
+    expect(response.ok).toBe(false);
+    expect(response.error?.message).toBe('capture state failed');
+    expect(response.error?.extra).toEqual({ code: 'CAPTURE_FAILED' });
+  });
+
   it('relays shortcut capture with only the controlled shortcut source', async () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 11, url: 'https://example.com/article' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { title: 'Saved' }, error: null });

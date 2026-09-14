@@ -104,6 +104,13 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     };
   }
 
-  const collector = { capture, getRoot: getConversationRoot };
+  const collector = {
+    capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() && !!getConversationRoot()?.querySelector('._9663006, ._4f9bf79._43c05b5')
+        ? ('ready' as const)
+        : ('waiting' as const),
+    getRoot: getConversationRoot,
+  };
   return { id: 'deepseek', matches, collector };
 }

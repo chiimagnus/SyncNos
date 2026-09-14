@@ -984,6 +984,13 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
   const collector = {
     capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() &&
+      !!getConversationRoot()?.querySelector(
+        ".conversation-container user-query, .conversation-container [data-test-id='user-message'], .conversation-container model-response",
+      )
+        ? ('ready' as const)
+        : ('waiting' as const),
     getRoot: getConversationRoot,
     __test: {
       collectMessages: async (options: { manual?: boolean } = {}) =>

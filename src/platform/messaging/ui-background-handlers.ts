@@ -75,7 +75,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
     if (!activeTab.ok) return router.ok(activeTab.state);
 
     const relayed = await relayToActiveTab(activeTab.tab.id, CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE);
-    if (!relayed.ok) return router.ok(relayed.state);
+    if (!relayed.ok) return router.err(relayed.message, { code: relayed.code });
 
     return router.ok(relayed.data);
   });
@@ -98,7 +98,6 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
     if (!relayed.ok) {
       return router.err(relayed.message, {
         code: relayed.code,
-        state: relayed.state,
       });
     }
 
@@ -145,7 +144,6 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
         ok: false as const,
         code: 'CAPTURE_UNAVAILABLE',
         message: t('currentPageCannotBeCaptured'),
-        state: unsupportedState(t('currentPageCannotBeCaptured')),
       };
     }
 
@@ -163,14 +161,12 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
       ok: false as const,
       code: 'CAPTURE_FAILED',
       message,
-      state: unsupportedState(message),
     };
   } catch (_error) {
     return {
       ok: false as const,
       code: 'CAPTURE_UNAVAILABLE',
       message: t('currentPageCannotBeCaptured'),
-      state: unsupportedState(t('currentPageCannotBeCaptured')),
     };
   }
 }

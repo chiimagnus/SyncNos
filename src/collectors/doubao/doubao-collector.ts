@@ -286,6 +286,14 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     };
   }
 
-  const collector = { capture, getRoot: getConversationRoot };
+  const collector = {
+    capture,
+    getCaptureReadiness: () => {
+      if (!isValidConversationUrl()) return 'waiting' as const;
+      const rows = Array.from(getConversationRoot()?.querySelectorAll?.('[data-message-id]') || []);
+      return rows.some((row: any) => detectModernRole(row)) ? ('ready' as const) : ('waiting' as const);
+    },
+    getRoot: getConversationRoot,
+  };
   return { id: 'doubao', matches, collector };
 }

@@ -40,6 +40,14 @@ function apiOk<T>(data: T) {
   return { ok: true, data, error: null };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function Probe(props: { onCaptured: () => void | Promise<void> }) {
   latest = usePopupCurrentPageCapture({ onCaptured: props.onCaptured });
   return React.createElement('button', null, latest.buttonLabel);
@@ -65,6 +73,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   if (root) {
     await act(async () => root?.unmount());
     root = null;
@@ -131,7 +140,6 @@ describe('popup current-page video capture', () => {
         kind: 'chat',
         label: 'Fetch AI Chat',
         collectorId: 'chatgpt',
-        sourceLabel: 'ChatGPT',
         reason: 'ChatGPT · waiting for messages…',
       }),
     );
@@ -150,6 +158,53 @@ describe('popup current-page video capture', () => {
     });
     expect(await latest?.capture()).toBeNull();
     expect(onCaptured).not.toHaveBeenCalled();
+  });
+
+  it('serializes waiting polls so one slow state request cannot overlap the next', async () => {
+    vi.useFakeTimers();
+    const onCaptured = vi.fn();
+    const slowPoll = deferred<ReturnType<typeof apiOk<any>>>();
+    let stateCalls = 0;
+    const waitingState = {
+      readiness: 'waiting',
+      kind: 'chat',
+      label: 'Fetch AI Chat',
+      collectorId: 'chatgpt',
+      reason: 'ChatGPT · waiting for messages…',
+    };
+    sendMock.mockImplementation(async (type: string) => {
+      if (type !== 'getActiveTabCaptureState') throw new Error(`unexpected message: ${type}`);
+      stateCalls += 1;
+      if (stateCalls === 2) return slowPoll.promise;
+      return apiOk(waitingState);
+    });
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+    expect(stateCalls).toBe(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(stateCalls).toBe(2);
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+    });
+    expect(stateCalls).toBe(2);
+
+    await act(async () => {
+      slowPoll.resolve(apiOk(waitingState));
+      for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    });
+    expect(stateCalls).toBe(3);
   });
 
   it('maps ChatGPT live-tail partial reasons to a warning instead of the generic history message', async () => {

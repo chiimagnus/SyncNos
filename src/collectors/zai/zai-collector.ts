@@ -169,7 +169,14 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     };
   }
 
-  const collector: any = { capture, getRoot: getConversationRoot };
+  const collector: any = {
+    capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() && getMessageWrappers(getConversationRoot()).length > 0
+        ? ('ready' as const)
+        : ('waiting' as const),
+    getRoot: getConversationRoot,
+  };
   collector.__test = {
     removeThinkingNodes: (zaiMarkdown as any).removeThinkingNodes,
     removeNonContentNodes: (zaiMarkdown as any).removeNonContentNodes,

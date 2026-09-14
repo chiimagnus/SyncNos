@@ -10,7 +10,7 @@ export type CollectorDefinition = {
   inpageMatches?: (location: { href?: string; hostname?: string; pathname?: string }) => boolean;
   collector: {
     capture: (options?: CollectorCaptureOptions) => unknown;
-    getCaptureReadiness?: () => 'ready' | 'waiting';
+    getCaptureReadiness: () => 'ready' | 'waiting';
     prepareManualCapture?: (options?: CollectorCaptureOptions) => unknown | Promise<unknown>;
     [key: string]: unknown;
   };
@@ -29,6 +29,9 @@ export function assertCollectorDef(definition: unknown): CollectorDefinition {
   }
   if (!normalized.collector || typeof normalized.collector.capture !== 'function') {
     throw new Error(`collector ${normalized.id} missing capture()`);
+  }
+  if (typeof normalized.collector.getCaptureReadiness !== 'function') {
+    throw new Error(`collector ${normalized.id} missing getCaptureReadiness()`);
   }
   return normalized as CollectorDefinition;
 }

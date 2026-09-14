@@ -154,6 +154,14 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
     };
   }
 
-  const collector = { capture, getRoot: getConversationRoot };
+  const collector = {
+    capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() &&
+      !!getConversationRoot()?.querySelector('.chat-content-item-user, .chat-content-item-assistant')
+        ? ('ready' as const)
+        : ('waiting' as const),
+    getRoot: getConversationRoot,
+  };
   return { id: 'kimi', matches, collector };
 }

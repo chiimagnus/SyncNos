@@ -14,7 +14,6 @@ import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-r
 import {
   buildCaptureWaitingMessage,
   buildPartialCaptureMessage,
-  captureSourceLabel,
 } from '@services/bootstrap/current-page-capture-status';
 
 type RuntimeClient = {
@@ -39,7 +38,6 @@ export type CurrentPageCaptureState = {
   kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;
-  sourceLabel?: string;
   reason?: string;
 };
 
@@ -166,26 +164,19 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         kind: 'article' as const,
         label: t('fetchArticle'),
         collectorId: 'web',
-        sourceLabel: captureSourceLabel('web'),
         collector,
       };
     }
 
-    let readiness: 'ready' | 'waiting' = 'ready';
-    if (typeof collector.getCaptureReadiness === 'function') {
-      try {
-        readiness = collector.getCaptureReadiness() === 'waiting' ? 'waiting' : 'ready';
-      } catch (_error) {
-        readiness = 'waiting';
-      }
+    const readiness = collector.getCaptureReadiness();
+    if (readiness !== 'ready' && readiness !== 'waiting') {
+      throw new Error(`invalid capture readiness: ${String(readiness)}`);
     }
-    const sourceLabel = captureSourceLabel(collector.id);
     return {
       readiness,
       kind: 'chat' as const,
       label: t('fetchAiChat'),
       collectorId: collector.id,
-      sourceLabel,
       ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage(collector.id) } : null),
       collector,
     };
@@ -391,7 +382,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       kind: target.kind,
       label: target.label,
       collectorId: target.collectorId,
-      sourceLabel: target.sourceLabel,
       reason: target.reason,
     };
   }

@@ -47,6 +47,7 @@ function createHarness(input: {
   syncResponse?: any;
   liveTurn?: () => any;
   readiness?: 'ready' | 'waiting';
+  readinessError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
@@ -61,10 +62,15 @@ function createHarness(input: {
       return { ok: true, data: {} };
     }),
   };
-  const collector: any = { capture };
+  const collector: any = {
+    capture,
+    getCaptureReadiness: () => {
+      if (input.readinessError) throw new Error(input.readinessError);
+      return input.readiness ?? 'ready';
+    },
+  };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
   if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
-  if (input.readiness) collector.getCaptureReadiness = () => input.readiness;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
     captureVideoTranscript: vi.fn(
@@ -163,7 +169,6 @@ describe('current page capture integrity routing', () => {
       readiness: 'waiting',
       kind: 'chat',
       collectorId: 'chatgpt',
-      sourceLabel: 'ChatGPT',
     });
     expect(state.reason).toContain('ChatGPT');
 
@@ -174,6 +179,21 @@ describe('current page capture integrity routing', () => {
     expect(progress.at(-1)).toEqual({ message: state.reason, kind: 'default' });
     expect(harness.capture).not.toHaveBeenCalled();
     expect(harness.calls).toEqual([]);
+  });
+
+  it('surfaces collector readiness failures instead of masking them as waiting', async () => {
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: null,
+      readinessError: 'readiness failed',
+    });
+
+    expect(() => harness.service.getCurrentPageCaptureState()).toThrow('readiness failed');
+    const progress: any[] = [];
+    await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
+      'readiness failed',
+    );
+    expect(progress.at(-1)).toEqual({ message: 'readiness failed', kind: 'error' });
   });
 
   it('keeps the existing DOM manual path when Advanced API is disabled', async () => {

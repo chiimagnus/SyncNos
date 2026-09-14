@@ -108,6 +108,14 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
-  const collector = { capture, getRoot: getConversationRoot };
+  const collector = {
+    capture,
+    getCaptureReadiness: () =>
+      isValidConversationUrl() &&
+      !!getConversationRoot()?.querySelector('.agent-chat__list__item--human, .agent-chat__list__item--ai')
+        ? ('ready' as const)
+        : ('waiting' as const),
+    getRoot: getConversationRoot,
+  };
   return { id: 'yuanbao', matches, collector };
 }

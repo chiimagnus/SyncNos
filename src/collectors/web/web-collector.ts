@@ -23,6 +23,6 @@ export function createWebCollectorDef(env: CollectorEnv): CollectorDefinition {
     return matches({ href });
   }
 
-  const collector = { capture: () => null };
+  const collector = { capture: () => null, getCaptureReadiness: () => 'ready' as const };
   return { id: 'web', matches: matchesWithEnv, inpageMatches: matchesWithEnv, collector };
 }
