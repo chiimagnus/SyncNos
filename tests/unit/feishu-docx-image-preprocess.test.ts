@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const imageCacheMocks = vi.hoisted(() => ({
   getImageCacheAssetsByIds: vi.fn(),
 }));
+const chatgptImageMocks = vi.hoisted(() => ({ downloadChatgptImagesForStoredConversation: vi.fn() }));
 
 vi.mock('@services/conversations/data/image-cache-read', () => ({
   getImageCacheAssetsByIds: (...args: any[]) => imageCacheMocks.getImageCacheAssetsByIds(...args),
 }));
+vi.mock('@services/integrations/chatgpt/conversation-image-assets', () => chatgptImageMocks);
 
 import { preprocessFeishuDocxMarkdownImages } from '@services/sync/feishu/docx/feishu-docx-image-preprocess';
 
@@ -24,6 +26,8 @@ function makeAsset(id: number) {
 describe('feishu docx image preprocess', () => {
   beforeEach(() => {
     imageCacheMocks.getImageCacheAssetsByIds.mockReset();
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockReset();
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([]);
   });
 
   it('bulk-loads unique SyncNos assets once while preserving repeated source order', async () => {
@@ -121,6 +125,49 @@ describe('feishu docx image preprocess', () => {
     expect(result.markdownForConvert).toContain('![fenced](syncnos-asset://9)');
     expect(result.markdownForConvert).toContain('    ![indented](syncnos-asset://10)');
     expect(result.markdownForConvert).not.toContain('![real](syncnos-asset://7)');
+  });
+
+  it('materializes uncached ChatGPT references into transient blobs for Feishu binding', async () => {
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+
+    const result = await preprocessFeishuDocxMarkdownImages('![generated](chatgpt-file://file_generated_1)', 1);
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 1,
+      fileIds: ['file_generated_1'],
+      concurrency: 4,
+    });
+    expect(result.imageSourcesInOrder[0]).toMatchObject({
+      kind: 'chatgpt',
+      sourceUrl: 'chatgpt-file://file_generated_1',
+      contentType: 'image/png',
+    });
+    expect(result.imageSourcesInOrder[0]?.blob).toBeInstanceOf(Blob);
+    expect(result.imageSourcesInOrder[0]?.urlForConvert).toMatch(
+      /^https:\/\/syncnos\.invalid\/chatgpt\/[a-f0-9]+\.png$/,
+    );
+    expect(result.markdownForConvert).not.toContain('chatgpt-file://');
+  });
+
+  it('converts malformed ChatGPT internal image references to non-leaking placeholders', async () => {
+    const result = await preprocessFeishuDocxMarkdownImages('![bad](chatgpt-file://bad)', 1);
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+    expect(result.imageSourcesInOrder[0]).toMatchObject({
+      kind: 'chatgpt',
+      sourceUrl: 'chatgpt-file://bad',
+    });
+    expect(result.imageSourcesInOrder[0]?.blob).toBeUndefined();
+    expect(result.imageSourcesInOrder[0]?.urlForConvert).toMatch(/^https:\/\/syncnos\.invalid\/chatgpt\//);
+    expect(result.markdownForConvert).not.toContain('chatgpt-file://');
   });
 
   it('keeps HTTP/data-image preprocessing unchanged and skips the local bulk reader when no local ids exist', async () => {

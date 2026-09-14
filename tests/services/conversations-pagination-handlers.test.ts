@@ -50,6 +50,7 @@ function createRouter(
   registerConversationHandlers(router as any, {
     onConversationChanged: deps.onConversationChanged || (async () => {}),
     onRemoteCleanupPending: deps.onRemoteCleanupPending || (async () => {}),
+    scheduleImageBackfill: async () => {},
   });
   return router;
 }

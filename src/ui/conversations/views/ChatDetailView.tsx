@@ -1,6 +1,7 @@
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 import { t } from '@i18n';
 import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAssetSrcMap';
+import { useChatgptFileSrcMap } from '@viewmodels/conversations/useChatgptFileSrcMap';
 import type { DetailViewSharedProps } from '@ui/conversations/views/detail-view-props';
 
 export type ChatDetailViewProps = DetailViewSharedProps & {
@@ -26,12 +27,13 @@ export function ChatDetailView({
   setMessagesRootRef,
 }: ChatDetailViewProps) {
   const detailConversationId = Number((detail as any)?.conversationId || (selected as any)?.id || activeId);
-  const assetSrcById = useSyncnosAssetSrcMap({
-    conversationId: Number.isFinite(detailConversationId) && detailConversationId > 0 ? detailConversationId : null,
-    markdowns: Array.isArray(detail?.messages)
-      ? detail.messages.map((message: any) => String(message?.contentMarkdown || ''))
-      : [],
-  });
+  const markdowns = Array.isArray(detail?.messages)
+    ? detail.messages.map((message: any) => String(message?.contentMarkdown || ''))
+    : [];
+  const conversationId =
+    Number.isFinite(detailConversationId) && detailConversationId > 0 ? detailConversationId : null;
+  const assetSrcById = useSyncnosAssetSrcMap({ conversationId, markdowns });
+  const chatgptFileSrcById = useChatgptFileSrcMap({ conversationId, markdowns });
 
   return (
     <div className="tw-flex tw-min-w-0 tw-gap-4">
@@ -64,7 +66,12 @@ export function ChatDetailView({
                     data-chat-outline-message-id={messageId}
                     ref={getUserMessageRefSetter(messageId)}
                   >
-                    <ChatMessageBubble role={(m as any).role} markdown={text} syncnosAssetSrcById={assetSrcById} />
+                    <ChatMessageBubble
+                      role={(m as any).role}
+                      markdown={text}
+                      syncnosAssetSrcById={assetSrcById}
+                      chatgptFileSrcById={chatgptFileSrcById}
+                    />
                   </div>
                 );
               }
@@ -75,6 +82,7 @@ export function ChatDetailView({
                   role={(m as any).role}
                   markdown={text}
                   syncnosAssetSrcById={assetSrcById}
+                  chatgptFileSrcById={chatgptFileSrcById}
                 />
               );
             })}

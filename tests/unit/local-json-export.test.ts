@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getConversationDetail: vi.fn(),
   getImageCacheAssetsByIds: vi.fn(),
+  downloadChatgptImagesForStoredConversation: vi.fn(),
 }));
 
 vi.mock('@services/conversations/client/repo', () => ({
@@ -11,6 +12,11 @@ vi.mock('@services/conversations/client/repo', () => ({
 
 vi.mock('@services/conversations/data/image-cache-read', () => ({
   getImageCacheAssetsByIds: (...args: any[]) => mocks.getImageCacheAssetsByIds(...args),
+}));
+
+vi.mock('@services/integrations/chatgpt/conversation-image-assets', () => ({
+  downloadChatgptImagesForStoredConversation: (...args: any[]) =>
+    mocks.downloadChatgptImagesForStoredConversation(...args),
 }));
 
 vi.mock('@services/shared/file-timestamp', () => ({
@@ -67,6 +73,7 @@ async function readJsonEntries(blob: Blob): Promise<Array<{ name: string; value:
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+  mocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([]);
 });
 
 describe('local JSON v2 export', () => {
@@ -363,6 +370,40 @@ describe('local JSON v2 export', () => {
     expect(second.content).toMatchObject({ format: 'markdown' });
     expect(second.content.value).toContain(`![one](${onePath})`);
     expect(second.content.value).toContain(`![two-again](${twoPath})`);
+  });
+
+  it('materializes uncached ChatGPT image references without leaking internal URLs', async () => {
+    const c = conversation(51);
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 51,
+      messages: [message('m', { contentMarkdown: '![generated](chatgpt-file://file_generated_1)' })],
+    });
+    mocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.of(1, 2, 3)], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+
+    const result = await buildConversationsJsonZipExport({ conversations: [c] });
+    const entries = await extractZipEntries(result.zipBlob);
+    const [entry] = await readJsonEntries(result.zipBlob);
+
+    expect(mocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 51,
+      fileIds: ['file_generated_1'],
+      concurrency: 4,
+    });
+    expect(entry.value.attachments).toEqual([
+      { path: expect.stringMatching(/-0001\.png$/), mediaType: 'image/png', byteSize: 3 },
+    ]);
+    const attachmentPath = entry.value.attachments[0].path;
+    expect(entries.has(attachmentPath)).toBe(true);
+    expect(entry.value.messages[0].content.value).toContain(`![generated](${attachmentPath})`);
+    expect(JSON.stringify(entry.value)).not.toContain('chatgpt-file://');
   });
 
   it('uses actual Blob metadata, falls back from malformed cache MIME to Blob MIME, then to octet-stream', async () => {

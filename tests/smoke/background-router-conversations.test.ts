@@ -44,6 +44,10 @@ vi.mock('@platform/storage/local', () => ({
 
 vi.mock('@services/conversations/data/image-inline', () => ({
   inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
+  hasCacheableChatImageReference: (markdown: unknown) => {
+    const value = String(markdown || '');
+    return /!\[[^\]]*\]\((?:https?:\/\/|data:image\/|chatgpt-file:\/\/)/i.test(value);
+  },
 }));
 
 vi.mock('@services/conversations/background/image-backfill-job', () => ({
@@ -64,6 +68,7 @@ function makeInlineResult(messages: any[]) {
 function createRouter(deps?: {
   onConversationChanged?: ReturnType<typeof vi.fn>;
   onRemoteCleanupPending?: ReturnType<typeof vi.fn>;
+  scheduleImageBackfill?: ReturnType<typeof vi.fn>;
 }) {
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
@@ -75,6 +80,7 @@ function createRouter(deps?: {
   registerConversationHandlers(router as any, {
     onConversationChanged: deps?.onConversationChanged ?? vi.fn(async () => {}),
     onRemoteCleanupPending: deps?.onRemoteCleanupPending ?? vi.fn(async () => {}),
+    scheduleImageBackfill: deps?.scheduleImageBackfill ?? vi.fn(async () => {}),
   });
   return router;
 }
@@ -235,105 +241,106 @@ describe('background-router conversations', () => {
     expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
   });
 
-  it('uses ai_chat_cache_images_enabled for chat source auto-save', async () => {
+  it('does not schedule AI chat image backfill when the saved messages contain no image references', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
-      if (Array.isArray(keys) && keys.includes('ai_chat_cache_images_enabled')) {
-        return {
-          ai_chat_cache_images_enabled: false,
-          web_article_cache_images_enabled: true,
-        };
-      }
-      return {};
-    });
-
-    const router = createRouter();
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const messages = [{ messageKey: 'm-1', contentMarkdown: 'plain text', role: 'assistant' }];
+    const router = createRouter({ scheduleImageBackfill });
 
     const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2001,
       conversationSourceType: 'chat',
-      messages: [{ messageKey: 'm-1', contentMarkdown: '![img](https://example.com/a.png)' }],
+      messages,
     });
 
     expect(res.ok).toBe(true);
-    expect(localStorageMocks.storageGet).toHaveBeenCalledWith([
-      'ai_chat_cache_images_enabled',
-      'web_article_cache_images_enabled',
-    ]);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2001,
-        enableHttpImages: false,
-      }),
-    );
+    expect(scheduleImageBackfill).not.toHaveBeenCalled();
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2001, messages, {
+      mode: 'snapshot',
+      diff: null,
+    });
   });
 
-  it('forwards ChatGPT protected-image sidecars through the existing image-inline owner regardless of the generic cache toggle', async () => {
+  it('does not schedule AI chat image backfill for already-local image references', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
-      if (keys.includes('ai_chat_cache_images_enabled')) throw new Error('generic image setting unavailable');
-      return {};
-    });
-    const protectedImages = {
-      conversationKey: 'conversation-1',
-      assets: [{ ref: 'file_1', fileId: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'm1' }],
-    };
-    imageInlineMocks.inlineChatImagesInMessages.mockImplementationOnce(async (input: any) => ({
-      ...makeInlineResult(input.messages),
-      warningFlags: ['protected_images_incomplete'],
-    }));
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const messages = [{ messageKey: 'm-local', role: 'assistant', contentMarkdown: '![](syncnos-asset://42)' }];
+    const router = createRouter({ scheduleImageBackfill });
 
-    const router = createRouter();
     const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2002,
       conversationSourceType: 'chat',
-      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body' }],
-      chatgptProtectedImages: protectedImages,
+      messages,
     });
 
-    expect(res).toMatchObject({
-      ok: true,
-      data: { upserted: 1, deleted: 0, imageWarningFlags: ['protected_images_incomplete'] },
+    expect(res.ok).toBe(true);
+    expect(scheduleImageBackfill).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2002, messages, {
+      mode: 'snapshot',
+      diff: null,
     });
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2002,
-        enableHttpImages: false,
-        protectedImages,
-        downloadProtectedImages: expect.any(Function),
-      }),
-    );
-    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith([
-      'ai_chat_cache_images_enabled',
-      'web_article_cache_images_enabled',
-    ]);
-    const [, storedMessages, storageOptions] = storageMocks.syncConversationMessages.mock.calls.at(-1)!;
-    expect(JSON.stringify({ storedMessages, storageOptions })).not.toContain('chatgptProtectedImages');
-    expect(JSON.stringify({ storedMessages, storageOptions })).not.toContain('file_1');
   });
 
-  it('does not swallow protected-image sidecar validation failures before message storage', async () => {
-    imageInlineMocks.inlineChatImagesInMessages.mockRejectedValueOnce(
-      new Error('protected image target message is missing'),
+  it('persists AI chat messages before durably enqueueing image backfill and never downloads in the save request', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    let releaseSchedule: (() => void) | null = null;
+    const scheduleImageBackfill = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSchedule = resolve;
+        }),
     );
-    const router = createRouter();
+    const router = createRouter({ scheduleImageBackfill });
+    const messages = [{ messageKey: 'm1', role: 'assistant', contentMarkdown: '![](chatgpt-file://file_image_1)' }];
+
+    const pending = router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 2002,
+      conversationSourceType: 'chat',
+      messages,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2002, messages, {
+      mode: 'snapshot',
+      diff: null,
+    });
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+    expect(storageMocks.syncConversationMessages.mock.invocationCallOrder[0]).toBeLessThan(
+      scheduleImageBackfill.mock.invocationCallOrder[0]!,
+    );
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(backfillJobMocks.backfillConversationImages).not.toHaveBeenCalled();
+
+    releaseSchedule?.();
+    await expect(pending).resolves.toMatchObject({ ok: true, data: { upserted: 1, deleted: 0 } });
+  });
+
+  it('keeps a successful AI chat save successful when durable image-backfill enqueue fails', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const scheduleImageBackfill = vi.fn(async () => {
+      throw new Error('queue unavailable');
+    });
+    const router = createRouter({ scheduleImageBackfill });
+    const messages = [{ messageKey: 'm1', role: 'assistant', contentMarkdown: '![](chatgpt-file://file_image_1)' }];
 
     const res = await router.dispatch({
       type: 'syncConversationMessages',
-      conversationId: 2003,
+      conversationId: 2004,
       conversationSourceType: 'chat',
-      messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body' }],
-      chatgptProtectedImages: {
-        conversationKey: 'conversation-1',
-        assets: [{ ref: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'missing' }],
-      },
+      messages,
     });
 
-    expect(res.ok).toBe(false);
-    expect(res.error?.message).toBe('protected image target message is missing');
-    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2004, messages, {
+      mode: 'snapshot',
+      diff: null,
+    });
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2004);
+    expect(res).toMatchObject({ ok: true, data: { upserted: 1, deleted: 0 } });
   });
 
   it('skips chat/article image inlining for Video transcript messages', async () => {
@@ -363,16 +370,9 @@ describe('background-router conversations', () => {
     });
   });
 
-  it('keeps transient protective policies through author normalization and image inlining', async () => {
+  it('keeps transient protective policies through author normalization without blocking on chat image caching', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
-      makeInlineResult(
-        input.messages.map((message: any) => ({
-          ...message,
-          contentMarkdown: 'fallback\n\n![](syncnos-asset://9)',
-        })),
-      ),
-    );
+    localStorageMocks.storageGet.mockResolvedValue({ ai_chat_cache_images_enabled: false });
     const router = createRouter();
 
     const res = await router.dispatch({
@@ -399,26 +399,19 @@ describe('background-router conversations', () => {
         expect.objectContaining({
           messageKey: 'm1',
           authorName: 'You',
-          contentMarkdown: 'fallback\n\n![](syncnos-asset://9)',
+          contentMarkdown: 'fallback\n\n![](data:image/png;base64,AQ==)',
           captureSequencePolicy: 'preserve-existing-tail',
           captureMergePolicy: 'preserve-existing-markdown',
         }),
       ],
       { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
     );
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
   });
 
   it('uses web_article_cache_images_enabled for article source auto-save', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
-      if (Array.isArray(keys) && keys.includes('ai_chat_cache_images_enabled')) {
-        return {
-          ai_chat_cache_images_enabled: false,
-          web_article_cache_images_enabled: true,
-        };
-      }
-      return {};
-    });
+    localStorageMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
 
     const router = createRouter();
 
@@ -430,10 +423,7 @@ describe('background-router conversations', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(localStorageMocks.storageGet).toHaveBeenCalledWith([
-      'ai_chat_cache_images_enabled',
-      'web_article_cache_images_enabled',
-    ]);
+    expect(localStorageMocks.storageGet).toHaveBeenCalledWith(['web_article_cache_images_enabled']);
     expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
       expect.objectContaining({
         conversationId: 2002,

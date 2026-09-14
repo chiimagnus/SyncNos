@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBDatabase, IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { hasCacheableChatImageReference, inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import {
   hasReusableImageCachePayload,
   reusableImageCacheByteSize,
@@ -53,6 +53,14 @@ afterEach(() => {
 });
 
 describe('image-inline', () => {
+  it('recognizes only image references that can still be cached', () => {
+    expect(hasCacheableChatImageReference('plain text')).toBe(false);
+    expect(hasCacheableChatImageReference('![](syncnos-asset://42)')).toBe(false);
+    expect(hasCacheableChatImageReference('![](chatgpt-file://file_remote_1)')).toBe(true);
+    expect(hasCacheableChatImageReference('![](https://example.com/image.png)')).toBe(true);
+    expect(hasCacheableChatImageReference('![](data:image/png;base64,AAAA)')).toBe(true);
+  });
+
   it('shares one persisted reusable-payload rule with conversation merge', () => {
     const valid = { blob: new Blob(['data'], { type: 'image/png' }), byteSize: 4 };
     expect(hasReusableImageCachePayload(valid)).toBe(true);
@@ -524,43 +532,40 @@ describe('image-inline', () => {
     expect(String(messages[1].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
   });
 
-  it('materializes protected images through the canonical cache owner even when generic HTTP image caching is off', async () => {
+  it('materializes ChatGPT file references through the canonical cache owner only when enabled', async () => {
     const conversationId = 71;
-    const protectedImages = {
-      conversationKey: 'conversation-1',
-      assets: [
+    const downloader = vi.fn(async (fileIds: string[]) => {
+      expect(fileIds).toEqual(['file_1']);
+      return [
         {
-          ref: 'file_1',
-          fileId: 'file_1',
           cacheKey: 'chatgpt-file://file_1',
-          targetMessageKey: 'm1',
-          alt: 'upload.png',
+          ok: true as const,
+          blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+          byteSize: 3,
+          contentType: 'image/png',
         },
-      ],
-    };
-    const downloader = vi.fn(async (bundle: any) =>
-      bundle.assets.map((asset: any) => ({
-        cacheKey: asset.cacheKey,
-        ok: true as const,
-        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
-        byteSize: 3,
-        contentType: 'image/png',
-      })),
-    );
-    const firstMessages = [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body', sequence: 0 }];
+      ];
+    });
+    const firstMessages = [
+      {
+        messageKey: 'm1',
+        role: 'user',
+        contentMarkdown: 'body\n\n![upload.png](chatgpt-file://file_1)',
+        sequence: 0,
+      },
+    ];
 
     const first = await inlineChatImagesInMessages({
       conversationId,
       messages: firstMessages,
       enableHttpImages: false,
-      protectedImages,
-      downloadProtectedImages: downloader,
+      enableChatgptImages: true,
+      downloadChatgptImages: downloader,
     });
 
     expect(downloader).toHaveBeenCalledTimes(1);
     expect(first).toMatchObject({ downloadedCount: 1, fromCacheCount: 0, inlinedCount: 1, warningFlags: [] });
     expect(firstMessages[0].contentMarkdown).toMatch(/^body\n\n!\[upload\.png\]\(syncnos-asset:\/\/\d+\)$/);
-    expect(firstMessages[0]).not.toHaveProperty('captureMergePolicy');
     expect(await readDataRevision('image_cache')).toBe(1);
 
     const db = await openDb();
@@ -576,27 +581,28 @@ describe('image-inline', () => {
     });
 
     const secondDownloader = vi.fn();
-    const secondMessages = [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body', sequence: 0 }];
+    const secondMessages = [
+      { messageKey: 'm1', role: 'user', contentMarkdown: '![](chatgpt-file://file_1)', sequence: 0 },
+    ];
     const second = await inlineChatImagesInMessages({
       conversationId,
       messages: secondMessages,
-      enableHttpImages: false,
-      protectedImages,
-      downloadProtectedImages: secondDownloader,
+      enableChatgptImages: true,
+      downloadChatgptImages: secondDownloader,
     });
     expect(secondDownloader).not.toHaveBeenCalled();
     expect(second).toMatchObject({ downloadedCount: 0, fromCacheCount: 1, inlinedCount: 1, warningFlags: [] });
-    expect(secondMessages[0].contentMarkdown).toMatch(/^body\n\n!\[upload\.png\]\(syncnos-asset:\/\/\d+\)$/);
+    expect(secondMessages[0].contentMarkdown).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
     expect(await readDataRevision('image_cache')).toBe(1);
   });
 
-  it('downloads one protected cache miss once and reuses it across multiple message bindings', async () => {
+  it('downloads one ChatGPT cache miss once and reuses it across repeated references', async () => {
     const messages = [
-      { messageKey: 'm1', role: 'user', contentMarkdown: 'first', sequence: 0 },
-      { messageKey: 'm2', role: 'user', contentMarkdown: 'second', sequence: 1 },
+      { messageKey: 'm1', role: 'user', contentMarkdown: '![one](chatgpt-file://file_shared)', sequence: 0 },
+      { messageKey: 'm2', role: 'user', contentMarkdown: '![two](chatgpt-file://file_shared)', sequence: 1 },
     ];
-    const downloader = vi.fn(async (bundle: any) => {
-      expect(bundle.assets).toHaveLength(1);
+    const downloader = vi.fn(async (fileIds: string[]) => {
+      expect(fileIds).toEqual(['file_shared']);
       return [
         {
           cacheKey: 'chatgpt-file://file_shared',
@@ -611,19 +617,12 @@ describe('image-inline', () => {
     const result = await inlineChatImagesInMessages({
       conversationId: 711,
       messages,
-      enableHttpImages: false,
-      protectedImages: {
-        conversationKey: 'conversation-1',
-        assets: [
-          { ref: 'file_shared', cacheKey: 'chatgpt-file://file_shared', targetMessageKey: 'm1', alt: 'one.png' },
-          { ref: 'file_shared', cacheKey: 'chatgpt-file://file_shared', targetMessageKey: 'm2', alt: 'two.png' },
-        ],
-      },
-      downloadProtectedImages: downloader,
+      enableChatgptImages: true,
+      downloadChatgptImages: downloader,
     });
 
     expect(downloader).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ downloadedCount: 1, fromCacheCount: 0, inlinedCount: 2, warningFlags: [] });
+    expect(result).toMatchObject({ downloadedCount: 1, fromCacheCount: 0, inlinedCount: 1, warningFlags: [] });
     const firstAsset = messages[0].contentMarkdown.match(/syncnos-asset:\/\/(\d+)/)?.[1];
     const secondAsset = messages[1].contentMarkdown.match(/syncnos-asset:\/\/(\d+)/)?.[1];
     expect(firstAsset).toBeTruthy();
@@ -631,8 +630,10 @@ describe('image-inline', () => {
     expect(await readDataRevision('image_cache')).toBe(1);
   });
 
-  it('degrades protected image failures to placeholders plus transient markdown protection', async () => {
-    const messages = [{ messageKey: 'm1', role: 'assistant', contentMarkdown: 'answer', sequence: 0 }];
+  it('keeps stable ChatGPT references intact when deferred caching fails', async () => {
+    const messages = [
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: '![failed](chatgpt-file://file_failed)', sequence: 0 },
+    ];
     const downloader = vi.fn(async () => [
       { cacheKey: 'chatgpt-file://file_failed', ok: false as const, reason: 'download' },
     ]);
@@ -640,66 +641,44 @@ describe('image-inline', () => {
     const result = await inlineChatImagesInMessages({
       conversationId: 72,
       messages,
-      enableHttpImages: false,
-      protectedImages: {
-        conversationKey: 'conversation-1',
-        assets: [
-          {
-            ref: 'file_failed',
-            cacheKey: 'chatgpt-file://file_failed',
-            targetMessageKey: 'm1',
-            alt: 'failed.png',
-          },
-        ],
-      },
-      downloadProtectedImages: downloader,
+      enableChatgptImages: true,
+      downloadChatgptImages: downloader,
     });
 
-    expect(result.warningFlags).toEqual(['protected_images_incomplete']);
-    expect(messages[0]).toMatchObject({
-      contentMarkdown: 'answer\n\n[image: failed.png]',
-      captureMergePolicy: 'preserve-existing-markdown',
-    });
+    expect(result.warningFlags).toEqual(['chatgpt_images_cache_incomplete']);
+    expect(messages[0]).toEqual(expect.objectContaining({ contentMarkdown: '![failed](chatgpt-file://file_failed)' }));
+    expect(messages[0]).not.toHaveProperty('captureMergePolicy');
   });
 
-  it('treats protected cache lookup failure as image-incomplete without running the network downloader', async () => {
-    const getSpy = vi.spyOn(IDBIndex.prototype, 'get').mockImplementationOnce(() => {
-      throw new Error('cache unavailable');
-    });
+  it('does not resolve or cache ChatGPT references while ChatGPT image caching is disabled', async () => {
     const downloader = vi.fn();
-    const messages = [{ messageKey: 'm1', role: 'assistant', contentMarkdown: 'answer', sequence: 0 }];
+    const messages = [
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: '![](chatgpt-file://file_1)', sequence: 0 },
+    ];
 
     const result = await inlineChatImagesInMessages({
       conversationId: 73,
       messages,
-      protectedImages: {
-        conversationKey: 'conversation-1',
-        assets: [{ ref: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'm1', alt: '' }],
-      },
-      downloadProtectedImages: downloader,
+      enableChatgptImages: false,
+      downloadChatgptImages: downloader,
     });
 
-    expect(getSpy).toHaveBeenCalled();
     expect(downloader).not.toHaveBeenCalled();
-    expect(result.warningFlags).toEqual(['protected_images_incomplete']);
-    expect(messages[0]).toMatchObject({
-      contentMarkdown: 'answer\n\n[image]',
-      captureMergePolicy: 'preserve-existing-markdown',
-    });
+    expect(result).toMatchObject({ downloadedCount: 0, fromCacheCount: 0, inlinedCount: 0, warningFlags: [] });
+    expect(messages[0].contentMarkdown).toBe('![](chatgpt-file://file_1)');
   });
 
-  it('rejects a protected sidecar whose target message is absent before opening IndexedDB', async () => {
-    const transactionSpy = vi.spyOn(IDBDatabase.prototype, 'transaction');
-    await expect(
-      inlineChatImagesInMessages({
-        conversationId: 74,
-        messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'body', sequence: 0 }],
-        protectedImages: {
-          assets: [{ ref: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'missing' }],
-        },
-      }),
-    ).rejects.toThrow('protected image target message is missing');
-    expect(transactionSpy).not.toHaveBeenCalled();
+  it('reports an incomplete ChatGPT cache when no downloader is available without altering Markdown', async () => {
+    const messages = [
+      { messageKey: 'm1', role: 'assistant', contentMarkdown: '![](chatgpt-file://file_1)', sequence: 0 },
+    ];
+    const result = await inlineChatImagesInMessages({
+      conversationId: 74,
+      messages,
+      enableChatgptImages: true,
+    });
+    expect(result.warningFlags).toEqual(['chatgpt_images_cache_incomplete']);
+    expect(messages[0].contentMarkdown).toBe('![](chatgpt-file://file_1)');
   });
 
   it('does not retry a failed smart HTTP image download through a second plain fetch', async () => {

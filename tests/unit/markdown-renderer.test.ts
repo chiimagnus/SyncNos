@@ -59,9 +59,14 @@ describe('createMarkdownRenderer', () => {
     expect(html).not.toContain('src="https://');
   });
 
-  it('renders malformed internal image targets as safe placeholders without local asset markers', () => {
+  it('renders malformed internal image targets as safe placeholders without leaking internal urls', () => {
     const md = createMarkdownRenderer({ openLinksInNewTab: true });
-    for (const target of ['syncnos-asset://nope', 'syncnos-asset://0', 'syncnos-asset://9007199254740992']) {
+    for (const target of [
+      'syncnos-asset://nope',
+      'syncnos-asset://0',
+      'syncnos-asset://9007199254740992',
+      'chatgpt-file://bad',
+    ]) {
       const html = md.render(`![bad](${target})`);
       expect(html).toContain('src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="');
       expect(html).not.toContain(target);

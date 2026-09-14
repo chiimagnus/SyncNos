@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getConversationDetail: vi.fn(),
   getImageCacheAssetsByIds: vi.fn(),
   createZipBlob: vi.fn(),
+  downloadChatgptImagesForStoredConversation: vi.fn(),
   realCreateZipBlob: null as null | ((entries: any[]) => Promise<Blob>),
 }));
 
@@ -13,6 +14,11 @@ vi.mock('@services/conversations/client/repo', () => ({
 
 vi.mock('@services/conversations/data/image-cache-read', () => ({
   getImageCacheAssetsByIds: (...args: any[]) => mocks.getImageCacheAssetsByIds(...args),
+}));
+
+vi.mock('@services/integrations/chatgpt/conversation-image-assets', () => ({
+  downloadChatgptImagesForStoredConversation: (...args: any[]) =>
+    mocks.downloadChatgptImagesForStoredConversation(...args),
 }));
 
 vi.mock('@services/sync/backup/zip-utils', async (importOriginal) => {
@@ -61,6 +67,7 @@ function capturedFiles(): Array<{ name: string; data: string | Blob }> {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.createZipBlob.mockResolvedValue(new Blob(['zip'], { type: 'application/zip' }));
+  mocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([]);
 });
 
 describe('local markdown export', () => {
@@ -125,6 +132,77 @@ describe('local markdown export', () => {
     expect(markdown).toContain('    ![indented](syncnos-asset://15)');
     expect(markdown).not.toContain('![missing](syncnos-asset://12)');
     expect(markdown).not.toContain('![malformed](syncnos-asset://nope)');
+  });
+
+  it('materializes uncached ChatGPT image references as export attachments without leaking internal URLs', async () => {
+    const c = {
+      ...conversation(1, 'Chat'),
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'conversation-1',
+    };
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [
+        {
+          messageKey: 'assistant-1',
+          role: 'assistant',
+          contentMarkdown: 'answer\n\n![generated](chatgpt-file://file_generated_1)',
+        },
+      ],
+    });
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+    mocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+
+    expect(mocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 1,
+      fileIds: ['file_generated_1'],
+      concurrency: 4,
+    });
+    const files = capturedFiles();
+    const attachment = files.find((file) => file.name.startsWith('attachments/'))!;
+    const markdown = String(files.find((file) => file.name.endsWith('.md'))?.data || '');
+    expect(attachment.name).toMatch(/-0001\.png$/);
+    expect(markdown).toContain(`![generated](${attachment.name})`);
+    expect(markdown).not.toContain('chatgpt-file://');
+  });
+
+  it('replaces malformed ChatGPT internal image references instead of leaking them into exports', async () => {
+    const c = {
+      ...conversation(1, 'Chat'),
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'conversation-1',
+    };
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [
+        {
+          messageKey: 'assistant-1',
+          role: 'assistant',
+          contentMarkdown: 'before\n\n![bad](chatgpt-file://bad)\n\nafter',
+        },
+      ],
+    });
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+
+    expect(mocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+    expect(markdown).toContain('[Image unavailable]');
+    expect(markdown).not.toContain('chatgpt-file://');
+    expect(markdown).toContain('before');
+    expect(markdown).toContain('after');
   });
 
   it('consumes a scoped asset returned by the data layer without adding a second blob-size gate', async () => {

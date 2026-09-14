@@ -14,13 +14,8 @@ import {
   updateConversationUrlById,
   upsertConversation,
 } from '@services/conversations/data/storage';
-import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { hasCacheableChatImageReference, inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
-import {
-  downloadChatgptProtectedImages,
-  type ChatgptProtectedImageDownloadResult,
-} from '@services/integrations/chatgpt/api-protected-images';
-import type { ChatgptProtectedImages } from '@services/integrations/chatgpt/api-snapshot';
 import {
   ABOUT_YOU_USER_NAME_STORAGE_KEY,
   DEFAULT_ABOUT_YOU_USER_NAME,
@@ -40,6 +35,7 @@ type AnyRouter = {
 type ConversationHandlersDeps = {
   onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
   onRemoteCleanupPending: () => void | Promise<void>;
+  scheduleImageBackfill: (conversationId: number) => Promise<void>;
 };
 
 function fireAndForget(task: void | Promise<void>) {
@@ -344,21 +340,11 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         // ignore: authorName is optional and will fallback during rendering
       }
     }
-    const chatgptProtectedImages =
-      msg?.chatgptProtectedImages && typeof msg.chatgptProtectedImages === 'object'
-        ? (msg.chatgptProtectedImages as ChatgptProtectedImages)
-        : null;
     let imageWarningFlags: string[] = [];
-    if (sourceType !== 'video') {
+    let shouldScheduleChatImageBackfill = false;
+    if (sourceType === 'article') {
       try {
-        const local = chatgptProtectedImages
-          ? null
-          : await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
-        const enabled = chatgptProtectedImages
-          ? false
-          : sourceType === 'article'
-            ? local?.web_article_cache_images_enabled === true
-            : local?.ai_chat_cache_images_enabled === true;
+        const local = await storageGet(['web_article_cache_images_enabled']);
         const keys =
           (mode === 'incremental' || mode === 'append') && diff
             ? new Set(
@@ -371,14 +357,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           conversationId,
           messages,
           onlyMessageKeys: keys,
-          enableHttpImages: enabled,
-          protectedImages: chatgptProtectedImages,
-          downloadProtectedImages: chatgptProtectedImages
-            ? async (bundle) =>
-                (await downloadChatgptProtectedImages(
-                  bundle as ChatgptProtectedImages,
-                )) as ChatgptProtectedImageDownloadResult[]
-            : undefined,
+          enableHttpImages: local?.web_article_cache_images_enabled === true,
         });
         messages = inlined.messages;
         imageWarningFlags = Array.isArray(inlined.warningFlags) ? inlined.warningFlags.slice() : [];
@@ -386,7 +365,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           inlined.inlinedCount > 0 ||
           inlined.downloadedCount > 0 ||
           inlined.fromCacheCount > 0 ||
-          (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
+          imageWarningFlags.length
         ) {
           console.info('[ImageInline]', {
             conversationId,
@@ -395,17 +374,20 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
             downloadedCount: inlined.downloadedCount,
             fromCacheCount: inlined.fromCacheCount,
             inlinedBytes: inlined.inlinedBytes,
-            warningFlags: inlined.warningFlags,
+            warningFlags: imageWarningFlags,
           });
         }
       } catch (error) {
-        if (chatgptProtectedImages) throw error;
         console.warn('[ImageInline] failed but capture continues', {
           conversationId,
           mode,
           error: error instanceof Error ? error.message : String(error || ''),
         });
       }
+    } else if (sourceType === 'chat') {
+      shouldScheduleChatImageBackfill = messages.some((message: any) =>
+        hasCacheableChatImageReference(message?.contentMarkdown),
+      );
     }
 
     const res = await syncConversationMessages(conversationId, messages, {
@@ -416,6 +398,16 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     fireAndForget(
       deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
     );
+    if (shouldScheduleChatImageBackfill) {
+      try {
+        await deps.scheduleImageBackfill(conversationId);
+      } catch (error) {
+        console.warn('[ImageBackfill] enqueue failed but message persistence already succeeded', {
+          conversationId,
+          error: error instanceof Error ? error.message : String(error || ''),
+        });
+      }
+    }
     return router.ok(imageWarningFlags.length ? { ...res, imageWarningFlags } : res);
   });
 

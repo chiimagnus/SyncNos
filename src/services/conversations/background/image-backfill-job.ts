@@ -4,6 +4,7 @@ import {
   type ConversationMessageMarkdownPatch,
 } from '@services/conversations/data/storage-idb';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { downloadChatgptImagesForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
 
 export type BackfillConversationImagesResult = {
   scannedMessages: number;
@@ -34,6 +35,10 @@ export async function backfillConversationImages(input: {
   const inlined = await inlineChatImagesInMessages({
     conversationId,
     messages: messages as any,
+    enableHttpImages: true,
+    enableChatgptImages: true,
+    downloadChatgptImages: async (fileIds) =>
+      await downloadChatgptImagesForStoredConversation({ conversationId, fileIds, concurrency: 4 }),
   });
 
   const patches: ConversationMessageMarkdownPatch[] = [];

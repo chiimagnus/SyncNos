@@ -16,8 +16,16 @@ import {
 } from '@services/sync/shared/remote-markdown-metadata.ts';
 import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { getImageCacheAssetsByIds } from '@services/conversations/data/image-cache-read';
-import { collectOrderedSyncnosAssetIds, replaceSyncnosAssetImageTargets } from '@services/shared/markdown-asset-refs';
-import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import { downloadChatgptImagesForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
+import {
+  buildChatgptFileCacheKey,
+  chatgptFileIdFromUrl,
+  hasChatgptFileScheme,
+} from '@services/shared/chatgpt-image-identity';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { createSyncJobId, createSyncJobLifecycle } from '@services/sync/sync-job-lifecycle';
 import { createSyncRunOwnership } from '@services/sync/sync-run-ownership';
@@ -94,59 +102,126 @@ async function materializeMarkdownAssetsForObsidian({
     throw new Error('obsidian client does not support binary attachment upload');
   }
 
-  const internalReferences = collectMarkdownImageReferences(targetMarkdown).filter((reference) =>
-    isSyncnosAssetUrl(reference.target),
+  const internalReferences = collectMarkdownImageReferences(targetMarkdown).filter(
+    (reference) => isSyncnosAssetUrl(reference.target) || hasChatgptFileScheme(reference.target),
   );
   if (!internalReferences.length) return targetMarkdown;
 
-  const targetIds: number[] = [];
-  const seenTargetIds = new Set<number>();
-  for (const reference of internalReferences) {
-    const assetId = parseSyncnosAssetId(reference.target);
-    if (assetId == null) throw new Error('missing local asset blob: invalid SyncNos asset target');
-    if (seenTargetIds.has(assetId)) continue;
-    seenTargetIds.add(assetId);
-    targetIds.push(assetId);
-  }
-
-  const scopeIds = collectOrderedSyncnosAssetIds(indexScopeMarkdown || targetMarkdown);
-  const indexByAssetId = new Map<number, number>();
-  for (let i = 0; i < scopeIds.length; i += 1) indexByAssetId.set(scopeIds[i]!, i + 1);
-  for (const assetId of targetIds) {
-    if (!indexByAssetId.has(assetId)) throw new Error(`missing asset index mapping: ${assetId}`);
-  }
-
   const safeConversationId = Number(conversationId);
   if (!Number.isSafeInteger(safeConversationId) || safeConversationId <= 0) {
-    throw new Error('missing local asset blob: invalid conversation id');
+    throw new Error('invalid conversation id for image materialization');
   }
-  const assetsById = await getImageCacheAssetsByIds({ ids: targetIds, conversationId: safeConversationId });
-  for (const assetId of targetIds) {
+
+  const targetAssetIds: number[] = [];
+  const seenAssetIds = new Set<number>();
+  const targetChatgptFileIds: string[] = [];
+  const seenChatgptFileIds = new Set<string>();
+  for (const reference of internalReferences) {
+    if (isSyncnosAssetUrl(reference.target)) {
+      const assetId = parseSyncnosAssetId(reference.target);
+      if (assetId == null) throw new Error('invalid SyncNos asset target');
+      if (!seenAssetIds.has(assetId)) {
+        seenAssetIds.add(assetId);
+        targetAssetIds.push(assetId);
+      }
+      continue;
+    }
+    const fileId = chatgptFileIdFromUrl(reference.target);
+    if (!fileId) continue;
+    if (!seenChatgptFileIds.has(fileId)) {
+      seenChatgptFileIds.add(fileId);
+      targetChatgptFileIds.push(fileId);
+    }
+  }
+
+  const scopeKeys: string[] = [];
+  const seenScopeKeys = new Set<string>();
+  for (const reference of collectMarkdownImageReferences(indexScopeMarkdown || targetMarkdown)) {
+    const assetId = parseSyncnosAssetId(reference.target);
+    const fileId = chatgptFileIdFromUrl(reference.target);
+    const key = assetId != null ? `asset:${assetId}` : fileId ? `chatgpt:${fileId}` : '';
+    if (!key || seenScopeKeys.has(key)) continue;
+    seenScopeKeys.add(key);
+    scopeKeys.push(key);
+  }
+  const indexByKey = new Map(scopeKeys.map((key, index) => [key, index + 1] as const));
+
+  const assetsById = targetAssetIds.length
+    ? await getImageCacheAssetsByIds({ ids: targetAssetIds, conversationId: safeConversationId })
+    : new Map();
+  for (const assetId of targetAssetIds) {
     const asset = assetsById.get(assetId);
     if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
   }
 
-  const noteBase = buildNoteBasenameFromFilePath(filePath);
-  const attachmentNameByAssetId = new Map<number, string>();
-  for (const assetId of targetIds) {
-    const asset = assetsById.get(assetId)!;
-    const index = indexByAssetId.get(assetId)!;
-    const ext = inferImageExtFromAsset(asset);
-    const attachmentName = `${noteBase}-${index}.${ext}`;
-    attachmentNameByAssetId.set(assetId, attachmentName);
-
-    const contentType = safeString(asset.contentType || asset.blob.type) || `image/${ext}`;
-    const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-    const putRes = await client.putVaultBinaryFile(buildAttachmentPath(filePath, attachmentName), bytes, {
-      contentType,
+  const chatgptImageByFileId = new Map<
+    string,
+    Awaited<ReturnType<typeof downloadChatgptImagesForStoredConversation>>[number]
+  >();
+  if (targetChatgptFileIds.length) {
+    const downloaded = await downloadChatgptImagesForStoredConversation({
+      conversationId: safeConversationId,
+      fileIds: targetChatgptFileIds,
+      concurrency: 4,
     });
+    targetChatgptFileIds.forEach((fileId, index) => {
+      const image = downloaded[index];
+      if (image) chatgptImageByFileId.set(fileId, image);
+    });
+  }
+
+  const noteBase = buildNoteBasenameFromFilePath(filePath);
+  const replacementByTarget = new Map<string, string>();
+  const upload = async (key: string, sourceTarget: string, blob: Blob, contentType: string, ext: string) => {
+    const index = indexByKey.get(key);
+    if (!index) throw new Error(`missing asset index mapping: ${key}`);
+    const attachmentName = `${noteBase}-${index}.${ext}`;
+    const putRes = await client.putVaultBinaryFile(
+      buildAttachmentPath(filePath, attachmentName),
+      new Uint8Array(await blob.arrayBuffer()),
+      { contentType },
+    );
     if (!putRes || !putRes.ok) {
       const message = putRes && putRes.error && putRes.error.message ? putRes.error.message : 'attachment put failed';
       throw new Error(String(message || 'attachment put failed'));
     }
+    replacementByTarget.set(sourceTarget, attachmentName);
+  };
+
+  for (const assetId of targetAssetIds) {
+    const asset = assetsById.get(assetId)!;
+    const ext = inferImageExtFromAsset(asset);
+    await upload(
+      `asset:${assetId}`,
+      `syncnos-asset://${assetId}`,
+      asset.blob,
+      safeString(asset.contentType || asset.blob.type) || `image/${ext}`,
+      ext,
+    );
+  }
+  for (const fileId of targetChatgptFileIds) {
+    const image = chatgptImageByFileId.get(fileId);
+    if (!image?.ok) continue;
+    const ext = inferImageExtFromAsset({ contentType: image.contentType, url: '' });
+    try {
+      await upload(
+        `chatgpt:${fileId}`,
+        buildChatgptFileCacheKey(fileId),
+        image.blob,
+        safeString(image.contentType) || `image/${ext}`,
+        ext,
+      );
+    } catch (_error) {
+      // Remote ChatGPT images are optional for text sync; leave a placeholder below.
+    }
   }
 
-  return replaceSyncnosAssetImageTargets(targetMarkdown, attachmentNameByAssetId);
+  return replaceMarkdownImageReferences(targetMarkdown, internalReferences, (reference) => {
+    const target = replacementByTarget.get(reference.target);
+    if (target) return { target };
+    if (hasChatgptFileScheme(reference.target)) return { replacement: '[Image unavailable]' };
+    return null;
+  });
 }
 
 function buildJobPersistenceError() {

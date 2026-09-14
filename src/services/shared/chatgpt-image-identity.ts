@@ -3,6 +3,7 @@ import { fnv1a32 } from '@services/shared/normalize.ts';
 
 const CHATGPT_FILE_ID_RE = /^file_[A-Za-z0-9_-]+$/;
 const CHATGPT_SEDIMENT_POINTER_RE = /^sediment:\/\/(file_[A-Za-z0-9_-]+)$/;
+const CHATGPT_FILE_URL_RE = /^chatgpt-file:\/\/(file_[A-Za-z0-9_-]+)$/i;
 const CHATGPT_ESTUARY_PATH = '/backend-api/estuary/content';
 
 export function normalizeChatgptFileId(value: unknown): string {
@@ -18,6 +19,15 @@ export function chatgptFileIdFromAssetPointer(value: unknown): string {
 export function buildChatgptFileCacheKey(value: unknown): string {
   const fileId = normalizeChatgptFileId(value);
   return fileId ? `chatgpt-file://${fileId}` : '';
+}
+
+export function hasChatgptFileScheme(value: unknown): boolean {
+  return typeof value === 'string' && /^chatgpt-file:\/\//i.test(value.trim());
+}
+
+export function chatgptFileIdFromUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return CHATGPT_FILE_URL_RE.exec(value.trim())?.[1] || '';
 }
 
 export function chatgptFileIdFromEstuaryUrl(value: unknown): string {

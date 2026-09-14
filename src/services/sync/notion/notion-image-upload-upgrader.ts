@@ -1,5 +1,7 @@
 import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read.ts';
+import { downloadChatgptImagesForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
+import { chatgptFileIdFromUrl, hasChatgptFileScheme } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
@@ -115,85 +117,82 @@ async function uploadFromExternalUrl(accessToken: string, url: string) {
   return id;
 }
 
-async function uploadFromBytes(accessToken: string, url: string) {
-  const dl = await downloadBytes(url);
-  if (!dl.bytes.byteLength) throw new Error('download empty');
-  if (dl.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${dl.bytes.byteLength}`);
-  const ct = dl.contentType || guessContentTypeFromUrl(url) || 'application/octet-stream';
-  const filename = notionFilesApi.guessFilenameFromUrl(url);
-  const up = await notionFilesApi.createFileUpload({
-    accessToken,
-    filename,
-    contentType: ct,
-  });
+async function uploadByteArray(accessToken: string, bytes: Uint8Array, contentType: string, filename: string) {
+  if (!bytes.byteLength) throw new Error('image bytes empty');
+  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${bytes.byteLength}`);
+  const up = await notionFilesApi.createFileUpload({ accessToken, filename, contentType });
   const fileId = up && up.id ? String(up.id).trim() : '';
   if (!fileId) throw new Error('missing file upload id');
-  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes: dl.bytes, filename, contentType: ct });
+  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
   await notionFilesApi.waitUntilUploaded({ accessToken, id: fileId });
   return fileId;
+}
+
+async function uploadFromBytes(accessToken: string, url: string) {
+  const dl = await downloadBytes(url);
+  const contentType = dl.contentType || guessContentTypeFromUrl(url) || 'application/octet-stream';
+  return await uploadByteArray(accessToken, dl.bytes, contentType, notionFilesApi.guessFilenameFromUrl(url));
 }
 
 async function uploadFromDataUrl(accessToken: string, dataUrl: string) {
   const parsed = parseDataImageUrl(dataUrl);
-  const bytes = parsed.bytes;
-  const contentType = parsed.contentType;
-  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${bytes.byteLength}`);
-
-  const ext = guessExtensionFromContentType(contentType);
-  const filename = `image.${ext}`;
-  const up = await notionFilesApi.createFileUpload({
-    accessToken,
-    filename,
-    contentType,
-  });
-  const fileId = up && up.id ? String(up.id).trim() : '';
-  if (!fileId) throw new Error('missing file upload id');
-  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
-  await notionFilesApi.waitUntilUploaded({ accessToken, id: fileId });
-  return fileId;
+  const ext = guessExtensionFromContentType(parsed.contentType);
+  return await uploadByteArray(accessToken, parsed.bytes, parsed.contentType, `image.${ext}`);
 }
 
 async function uploadFromSyncnosAsset(accessToken: string, assetId: number, asset: ImageCacheAsset | null) {
   if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
-
-  const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-  if (!bytes.byteLength) throw new Error('local asset bytes empty');
-  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${bytes.byteLength}`);
-
   const contentType =
     String(asset.contentType || asset.blob.type || guessContentTypeFromUrl(asset.url) || '').trim() ||
     'application/octet-stream';
   const ext = guessExtensionFromContentType(contentType);
-  const filename = `image-${assetId}.${ext}`;
-
-  const up = await notionFilesApi.createFileUpload({
+  return await uploadByteArray(
     accessToken,
-    filename,
+    new Uint8Array(await asset.blob.arrayBuffer()),
     contentType,
-  });
-  const fileId = up && up.id ? String(up.id).trim() : '';
-  if (!fileId) throw new Error('missing file upload id');
-  await notionFilesApi.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
-  await notionFilesApi.waitUntilUploaded({ accessToken, id: fileId });
-  return fileId;
+    `image-${assetId}.${ext}`,
+  );
 }
 
 async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any[], conversationId: number) {
   const localAssetIds: number[] = [];
   const seenLocalAssetIds = new Set<number>();
+  const chatgptFileIds: string[] = [];
+  const seenChatgptFileIds = new Set<string>();
   for (const block of blocks) {
     if (block?.type !== 'image' || block.image?.type !== 'external') continue;
     const url = String(block.image.external?.url || '').trim();
     const assetId = parseSyncnosAssetId(url);
-    if (assetId == null || seenLocalAssetIds.has(assetId)) continue;
-    seenLocalAssetIds.add(assetId);
-    localAssetIds.push(assetId);
+    if (assetId != null && !seenLocalAssetIds.has(assetId)) {
+      seenLocalAssetIds.add(assetId);
+      localAssetIds.push(assetId);
+    }
+    const fileId = chatgptFileIdFromUrl(url);
+    if (fileId && !seenChatgptFileIds.has(fileId)) {
+      seenChatgptFileIds.add(fileId);
+      chatgptFileIds.push(fileId);
+    }
   }
   const localAssets: Map<number, ImageCacheAsset> = localAssetIds.length
     ? await getImageCacheAssetsByIds({ ids: localAssetIds, conversationId }).catch(
         () => new Map<number, ImageCacheAsset>(),
       )
     : new Map<number, ImageCacheAsset>();
+  const chatgptImagesByFileId = new Map<
+    string,
+    Awaited<ReturnType<typeof downloadChatgptImagesForStoredConversation>>[number]
+  >();
+  if (chatgptFileIds.length) {
+    const downloaded = await downloadChatgptImagesForStoredConversation({
+      conversationId,
+      fileIds: chatgptFileIds,
+      concurrency: 4,
+    });
+    chatgptFileIds.forEach((fileId, index) => {
+      const image = downloaded[index];
+      if (image) chatgptImagesByFileId.set(fileId, image);
+    });
+  }
   const cache = new Map<string, string>();
   const out: any[] = [];
 
@@ -210,6 +209,8 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any[
 
     const assetId = parseSyncnosAssetId(url);
     const isInternalAsset = isSyncnosAssetUrl(url);
+    const chatgptFileId = chatgptFileIdFromUrl(url);
+    const isChatgptImage = hasChatgptFileScheme(url);
     const isDataImage = isDataImageUrl(url);
     let uploadId = cache.get(url) || '';
     if (!uploadId) {
@@ -229,6 +230,23 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any[
           } catch (e) {
             const msg = e && (e as any).message ? String((e as any).message) : String(e);
             console.warn('[NotionImageUpload] syncnos_asset upload failed:', assetId, msg);
+          }
+        }
+      } else if (isChatgptImage) {
+        const image = chatgptFileId ? chatgptImagesByFileId.get(chatgptFileId) : undefined;
+        if (image?.ok) {
+          try {
+            const contentType = image.contentType || 'application/octet-stream';
+            uploadId = await uploadByteArray(
+              accessToken,
+              new Uint8Array(await image.blob.arrayBuffer()),
+              contentType,
+              `chatgpt-${chatgptFileId}.${guessExtensionFromContentType(contentType)}`,
+            );
+            cache.set(url, uploadId);
+          } catch (e) {
+            const msg = e && (e as any).message ? String((e as any).message) : String(e);
+            console.warn('[NotionImageUpload] chatgpt image upload failed:', chatgptFileId, msg);
           }
         }
       } else {
@@ -251,9 +269,9 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any[
     }
 
     if (!uploadId) {
-      if (isDataImage || isInternalAsset) {
-        out.push(paragraphBlock('[Image omitted: local image upload failed]'));
-      } else out.push(b);
+      if (isChatgptImage) out.push(paragraphBlock('[Image omitted: ChatGPT image upload failed]'));
+      else if (isDataImage || isInternalAsset) out.push(paragraphBlock('[Image omitted: local image upload failed]'));
+      else out.push(b);
       continue;
     }
 

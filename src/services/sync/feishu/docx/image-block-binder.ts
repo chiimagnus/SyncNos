@@ -185,7 +185,7 @@ export async function bindFeishuDocxImagesByOrder({
     let blob: Blob | undefined = source.blob instanceof Blob ? source.blob : undefined;
     let contentType = safeString(source.contentType) || safeString(blob?.type);
 
-    if (!blob && source.kind === 'syncnos_asset') {
+    if (!blob && (source.kind === 'syncnos_asset' || source.kind === 'chatgpt')) {
       warnings.push(`local image unavailable: ${sanitizeUrlForWarning(source.urlForConvert)}`);
       continue;
     }

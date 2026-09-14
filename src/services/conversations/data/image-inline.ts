@@ -1,6 +1,7 @@
 import { openDb } from '@platform/idb/schema';
 import { downloadImageSmart } from '@platform/webext/image-download-proxy';
 import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
+import { chatgptFileIdFromUrl } from '@services/shared/chatgpt-image-identity';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import {
   collectMarkdownImageReferences,
@@ -70,12 +71,16 @@ function collectInlineCandidateUrls(references: readonly MarkdownImageReference[
   const output: string[] = [];
   for (const reference of references) {
     const url = reference.target;
-    if (!isDataImageUrl(url) && !isHttpUrl(url)) continue;
+    if (!isDataImageUrl(url) && !isHttpUrl(url) && !chatgptFileIdFromUrl(url)) continue;
     if (seen.has(url)) continue;
     seen.add(url);
     output.push(url);
   }
   return output;
+}
+
+export function hasCacheableChatImageReference(markdown: unknown): boolean {
+  return collectInlineCandidateUrls(collectMarkdownImageReferences(markdown)).length > 0;
 }
 
 function parseContentType(value: unknown): string {
@@ -310,22 +315,9 @@ async function downloadImageAsBlob(input: {
   }
 }
 
-export type ProtectedImageCandidate = {
-  ref: string;
-  cacheKey: string;
-  targetMessageKey: string;
-  alt?: string;
-  [key: string]: unknown;
-};
-
-export type ProtectedImageDownloadResult =
+type DeferredImageDownloadResult =
   | { cacheKey: string; ok: true; blob: Blob; byteSize: number; contentType: string }
   | { cacheKey: string; ok: false; reason?: string };
-
-export type ProtectedImageBundle = {
-  assets: ProtectedImageCandidate[];
-  [key: string]: unknown;
-};
 
 export type InlineChatImagesResult = {
   messages: any[];
@@ -336,52 +328,19 @@ export type InlineChatImagesResult = {
   warningFlags: string[];
 };
 
-function safeImageAlt(value: unknown): string {
-  return String(value || '')
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/\\/g, '\\\\')
-    .replace(/]/g, '\\]')
-    .trim()
-    .slice(0, 200);
-}
-
-function appendMarkdownBlock(markdown: unknown, block: string): string {
-  const base = String(markdown || '').trimEnd();
-  if (!block || base.includes(block)) return base;
-  return base ? `${base}\n\n${block}` : block;
-}
-
-function markProtectedImageFailure(message: any, alt: unknown): void {
-  const safeAlt = safeImageAlt(alt);
-  message.contentMarkdown = appendMarkdownBlock(message.contentMarkdown, safeAlt ? `[image: ${safeAlt}]` : '[image]');
-  if (message.captureMergePolicy !== 'preserve-existing-content') {
-    message.captureMergePolicy = 'preserve-existing-markdown';
-  }
-}
-
 export async function inlineChatImagesInMessages(input: {
   conversationId: number;
   messages: any[];
   onlyMessageKeys?: Set<string> | null;
   enableHttpImages?: boolean;
-  protectedImages?: ProtectedImageBundle | null;
-  downloadProtectedImages?: (bundle: ProtectedImageBundle) => Promise<ProtectedImageDownloadResult[]>;
+  enableChatgptImages?: boolean;
+  downloadChatgptImages?: (fileIds: string[]) => Promise<DeferredImageDownloadResult[]>;
 }): Promise<InlineChatImagesResult> {
   const conversationId = Number(input.conversationId);
   const messages = Array.isArray(input.messages) ? input.messages : [];
   const onlyKeys = input.onlyMessageKeys || null;
   const enableHttpImages = input.enableHttpImages !== false;
-  const protectedAssets = Array.isArray(input.protectedImages?.assets) ? input.protectedImages!.assets : [];
-  const messagesByKey = new Map<string, any>();
-  for (const message of messages) {
-    const key = String(message?.messageKey || '').trim();
-    if (key) messagesByKey.set(key, message);
-  }
-  for (const asset of protectedAssets) {
-    if (!asset?.targetMessageKey || !messagesByKey.has(String(asset.targetMessageKey))) {
-      throw new Error('protected image target message is missing');
-    }
-  }
+  const enableChatgptImages = input.enableChatgptImages === true;
 
   const parsedMessages: Array<{
     message: any;
@@ -390,6 +349,8 @@ export async function inlineChatImagesInMessages(input: {
     urls: string[];
   }> = [];
   const dataDescriptorByUrl = new Map<string, DataImageDescriptor>();
+  const chatgptUrls: string[] = [];
+  const seenChatgptUrls = new Set<string>();
   const cacheLookupUrls: string[] = [];
   const seenCacheLookupUrls = new Set<string>();
   const addCacheLookupUrl = (url: string) => {
@@ -397,11 +358,6 @@ export async function inlineChatImagesInMessages(input: {
     seenCacheLookupUrls.add(url);
     cacheLookupUrls.push(url);
   };
-
-  for (const asset of protectedAssets) {
-    const cacheKey = String(asset?.cacheKey || '').trim();
-    if (cacheKey) addCacheLookupUrl(cacheKey);
-  }
 
   for (const msg of messages) {
     if (!msg || !msg.messageKey) continue;
@@ -414,9 +370,12 @@ export async function inlineChatImagesInMessages(input: {
     parsedMessages.push({ message: msg, markdown, references, urls });
     for (const url of urls) {
       const isDataUrl = isDataImageUrl(url);
-      const isHttpImage = !isDataUrl && isHttpUrl(url);
-      if (!isDataUrl && !isHttpImage) continue;
+      const isChatgptImage = !isDataUrl && !!chatgptFileIdFromUrl(url);
+      const isHttpImage = !isDataUrl && !isChatgptImage && isHttpUrl(url);
       if (isHttpImage && !enableHttpImages) continue;
+      if (isChatgptImage && !enableChatgptImages) continue;
+      if (!isDataUrl && !isHttpImage && !isChatgptImage) continue;
+
       if (isDataUrl) {
         if (!dataDescriptorByUrl.has(url)) {
           dataDescriptorByUrl.set(url, describeDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT }));
@@ -425,27 +384,82 @@ export async function inlineChatImagesInMessages(input: {
         if (!descriptor.ok) continue;
         addCacheLookupUrl(descriptor.cacheKey);
         addCacheLookupUrl(url);
-      } else {
-        addCacheLookupUrl(url);
+        continue;
+      }
+
+      addCacheLookupUrl(url);
+      if (isChatgptImage && !seenChatgptUrls.has(url)) {
+        seenChatgptUrls.add(url);
+        chatgptUrls.push(url);
       }
     }
   }
 
-  let cacheLookupFailed = false;
-  let cachedByUrl: Map<string, ImageCacheRow>;
-  try {
-    cachedByUrl = await getCachedImagesByUrls(conversationId, cacheLookupUrls);
-  } catch (error) {
-    if (!protectedAssets.length) throw error;
-    cacheLookupFailed = true;
-    cachedByUrl = new Map();
-  }
+  const cachedByUrl = await getCachedImagesByUrls(conversationId, cacheLookupUrls);
   const replacements = new Map<string, string>();
   const warningFlags = new Set<string>();
   let inlinedCount = 0;
   let fromCacheCount = 0;
   let downloadedCount = 0;
   let inlinedBytes = 0;
+
+  const chatgptAssetByUrl = new Map<string, CachedAsset>();
+  const chatgptCacheHitUrls = new Set<string>();
+  const chatgptMissUrls: string[] = [];
+  for (const url of chatgptUrls) {
+    const cached = cachedByUrl.get(url);
+    if (cached) {
+      try {
+        const asset = await ensureCachedAssetRecord(cached);
+        if (asset) {
+          chatgptAssetByUrl.set(url, asset);
+          chatgptCacheHitUrls.add(url);
+          continue;
+        }
+      } catch (_error) {
+        // Corrupt cache rows are ordinary misses and are retried through the source below.
+      }
+    }
+    chatgptMissUrls.push(url);
+  }
+
+  if (chatgptMissUrls.length) {
+    const fileIds = chatgptMissUrls.map(chatgptFileIdFromUrl).filter(Boolean);
+    let downloadedByKey = new Map<string, DeferredImageDownloadResult>();
+    if (fileIds.length && input.downloadChatgptImages) {
+      try {
+        const downloaded = await input.downloadChatgptImages(fileIds);
+        downloadedByKey = new Map(
+          (Array.isArray(downloaded) ? downloaded : [])
+            .filter((item) => item && typeof item.cacheKey === 'string')
+            .map((item) => [item.cacheKey, item]),
+        );
+      } catch (_error) {
+        downloadedByKey = new Map();
+      }
+    }
+
+    for (const url of chatgptMissUrls) {
+      const downloaded = downloadedByKey.get(url);
+      if (!downloaded?.ok) {
+        warningFlags.add('chatgpt_images_cache_incomplete');
+        continue;
+      }
+      try {
+        const asset = await upsertCachedImageAsset({
+          conversationId,
+          url,
+          blob: downloaded.blob,
+          byteSize: downloaded.byteSize,
+          contentType: downloaded.contentType,
+        });
+        chatgptAssetByUrl.set(url, asset);
+        downloadedCount += 1;
+      } catch (_error) {
+        warningFlags.add('chatgpt_images_cache_incomplete');
+      }
+    }
+  }
 
   for (const parsedMessage of parsedMessages) {
     const { message, markdown, references, urls } = parsedMessage;
@@ -454,9 +468,24 @@ export async function inlineChatImagesInMessages(input: {
     for (const url of urls) {
       if (replacements.has(url)) continue;
       const isDataUrl = isDataImageUrl(url);
-      const isHttpImage = !isDataUrl && isHttpUrl(url);
-      if (!isDataUrl && !isHttpImage) continue;
+      const isChatgptImage = !isDataUrl && !!chatgptFileIdFromUrl(url);
+      const isHttpImage = !isDataUrl && !isChatgptImage && isHttpUrl(url);
       if (isHttpImage && !enableHttpImages) continue;
+      if (isChatgptImage && !enableChatgptImages) continue;
+      if (!isDataUrl && !isHttpImage && !isChatgptImage) continue;
+
+      if (isChatgptImage) {
+        const asset = chatgptAssetByUrl.get(url);
+        if (!asset) {
+          warningFlags.add('chatgpt_images_cache_incomplete');
+          continue;
+        }
+        replacements.set(url, formatSyncnosAssetUrl(asset.id));
+        if (chatgptCacheHitUrls.has(url)) fromCacheCount += 1;
+        inlinedCount += 1;
+        inlinedBytes += asset.byteSize;
+        continue;
+      }
 
       let cacheLookupUrl = url;
       if (isDataUrl) {
@@ -469,10 +498,6 @@ export async function inlineChatImagesInMessages(input: {
         cacheLookupUrl = descriptor.cacheKey;
       }
 
-      if (cacheLookupFailed) {
-        warningFlags.add('inline_images_download_failed');
-        continue;
-      }
       const cached = cachedByUrl.get(cacheLookupUrl) || (isDataUrl ? cachedByUrl.get(url) : undefined);
       if (cached) {
         try {
@@ -491,13 +516,11 @@ export async function inlineChatImagesInMessages(input: {
 
       let nextAsset: CachedAsset | null = null;
       if (isDataUrl) {
-        // ponytail: 预扫描只保留 cacheKey；cache miss 在原处理位置二次解码，避免整批 Blob 常驻。只有 profiling 证明 CPU 成本更高时才缓存解码结果。
         const parsed = parseDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT });
         if (!parsed.ok) {
           warningFlags.add('inline_images_download_failed');
           continue;
         }
-
         try {
           nextAsset = await upsertCachedImageAsset({
             conversationId,
@@ -511,15 +534,11 @@ export async function inlineChatImagesInMessages(input: {
           continue;
         }
       } else {
-        const downloaded = await downloadImageAsBlob({
-          url,
-          maxBytes: NO_IMAGE_SIZE_LIMIT,
-        });
+        const downloaded = await downloadImageAsBlob({ url, maxBytes: NO_IMAGE_SIZE_LIMIT });
         if (!downloaded.ok) {
           warningFlags.add('inline_images_download_failed');
           continue;
         }
-
         try {
           nextAsset = await upsertCachedImageAsset({
             conversationId,
@@ -546,88 +565,6 @@ export async function inlineChatImagesInMessages(input: {
       return next ? { target: next } : null;
     });
     if (nextMarkdown !== markdown) message.contentMarkdown = nextMarkdown;
-  }
-
-  if (protectedAssets.length) {
-    const misses: ProtectedImageCandidate[] = [];
-    const missKeys = new Set<string>();
-    const cachedAssetByKey = new Map<string, CachedAsset>();
-    const initialCacheHitKeys = new Set<string>();
-    const addMiss = (asset: ProtectedImageCandidate, cacheKey: string) => {
-      if (missKeys.has(cacheKey)) return;
-      missKeys.add(cacheKey);
-      misses.push(asset);
-    };
-    if (!cacheLookupFailed) {
-      for (const asset of protectedAssets) {
-        const cacheKey = String(asset.cacheKey || '').trim();
-        if (!cacheKey || cachedAssetByKey.has(cacheKey) || missKeys.has(cacheKey)) continue;
-        const cached = cachedByUrl.get(cacheKey);
-        if (!cached) {
-          addMiss(asset, cacheKey);
-          continue;
-        }
-        try {
-          const cachedAsset = await ensureCachedAssetRecord(cached);
-          if (cachedAsset) {
-            cachedAssetByKey.set(cacheKey, cachedAsset);
-            initialCacheHitKeys.add(cacheKey);
-          } else addMiss(asset, cacheKey);
-        } catch (_error) {
-          addMiss(asset, cacheKey);
-        }
-      }
-    }
-
-    let downloadedByKey = new Map<string, ProtectedImageDownloadResult>();
-    if (!cacheLookupFailed && misses.length && input.downloadProtectedImages) {
-      try {
-        const downloaded = await input.downloadProtectedImages({ ...(input.protectedImages || {}), assets: misses });
-        downloadedByKey = new Map(
-          (Array.isArray(downloaded) ? downloaded : [])
-            .filter((item) => item && typeof item.cacheKey === 'string')
-            .map((item) => [item.cacheKey, item]),
-        );
-      } catch (_error) {
-        downloadedByKey = new Map();
-      }
-    }
-
-    for (const asset of protectedAssets) {
-      const message = messagesByKey.get(String(asset.targetMessageKey));
-      const cacheKey = String(asset.cacheKey || '').trim();
-      let cachedAsset = cacheKey ? cachedAssetByKey.get(cacheKey) || null : null;
-      let downloaded = cacheKey ? downloadedByKey.get(cacheKey) : undefined;
-
-      if (!cachedAsset && downloaded?.ok) {
-        try {
-          cachedAsset = await upsertCachedImageAsset({
-            conversationId,
-            url: cacheKey,
-            blob: downloaded.blob,
-            byteSize: downloaded.byteSize,
-            contentType: downloaded.contentType,
-          });
-          cachedAssetByKey.set(cacheKey, cachedAsset);
-          downloadedCount += 1;
-        } catch (_error) {
-          cachedAsset = null;
-        }
-      }
-
-      if (!cachedAsset) {
-        warningFlags.add('protected_images_incomplete');
-        markProtectedImageFailure(message, asset.alt);
-        continue;
-      }
-
-      const localUrl = formatSyncnosAssetUrl(cachedAsset.id);
-      const alt = safeImageAlt(asset.alt);
-      message.contentMarkdown = appendMarkdownBlock(message.contentMarkdown, `![${alt}](${localUrl})`);
-      if (initialCacheHitKeys.has(cacheKey)) fromCacheCount += 1;
-      inlinedCount += 1;
-      inlinedBytes += cachedAsset.byteSize;
-    }
   }
 
   return {

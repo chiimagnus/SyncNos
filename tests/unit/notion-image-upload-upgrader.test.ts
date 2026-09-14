@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const chatgptImageMocks = vi.hoisted(() => ({ downloadChatgptImagesForStoredConversation: vi.fn() }));
+vi.mock('@services/integrations/chatgpt/conversation-image-assets', () => chatgptImageMocks);
+
 import * as notionFilesApi from '@services/sync/notion/notion-files-api.ts';
 import * as imageCacheRead from '@services/conversations/data/image-cache-read';
 import { upgradeImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader';
@@ -32,6 +36,8 @@ function paragraphText(block: any): string {
 describe('notion-image-upload-upgrader', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockReset();
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([]);
   });
 
   it('bulk-loads unique local assets once, reuses repeated URL uploads, and keeps serial upload order', async () => {
@@ -152,6 +158,58 @@ describe('notion-image-upload-upgrader', () => {
     expect(out.every((block: any) => block?.type === 'paragraph')).toBe(true);
     expect(out.every((block: any) => paragraphText(block).includes('local image upload failed'))).toBe(true);
     expect(JSON.stringify(out)).not.toContain('syncnos-asset://');
+  });
+
+  it('uploads uncached ChatGPT images directly without treating internal references as external URLs', async () => {
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+    const createExternalUrlUpload = vi
+      .spyOn(notionFilesApi, 'createExternalURLUpload')
+      .mockResolvedValue({ id: 'unexpected' } as any);
+    const createFileUpload = vi
+      .spyOn(notionFilesApi, 'createFileUpload')
+      .mockResolvedValue({ id: 'up-chatgpt' } as any);
+    const sendFileUpload = vi.spyOn(notionFilesApi, 'sendFileUpload').mockResolvedValue({} as any);
+    vi.spyOn(notionFilesApi, 'waitUntilUploaded').mockResolvedValue({ id: 'up-chatgpt' } as any);
+
+    const out = await upgradeImageBlocksToFileUploads(
+      'token',
+      [externalImageBlock('chatgpt-file://file_generated_1')] as any,
+      1,
+    );
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 1,
+      fileIds: ['file_generated_1'],
+      concurrency: 4,
+    });
+    expect(createExternalUrlUpload).not.toHaveBeenCalled();
+    expect(createFileUpload).toHaveBeenCalledTimes(1);
+    expect(sendFileUpload).toHaveBeenCalledTimes(1);
+    expect(out[0]?.image?.file_upload?.id).toBe('up-chatgpt');
+    expect(JSON.stringify(out)).not.toContain('chatgpt-file://');
+  });
+
+  it('omits malformed ChatGPT internal image references without treating them as external URLs', async () => {
+    const createExternalUrlUpload = vi
+      .spyOn(notionFilesApi, 'createExternalURLUpload')
+      .mockResolvedValue({ id: 'unexpected' } as any);
+
+    const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('chatgpt-file://bad')] as any, 1);
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+    expect(createExternalUrlUpload).not.toHaveBeenCalled();
+    expect(out).toHaveLength(1);
+    expect(out[0]?.type).toBe('paragraph');
+    expect(paragraphText(out[0])).toContain('ChatGPT image upload failed');
+    expect(JSON.stringify(out)).not.toContain('chatgpt-file://');
   });
 
   it('keeps data and HTTP image upload behavior outside the local bulk reader', async () => {

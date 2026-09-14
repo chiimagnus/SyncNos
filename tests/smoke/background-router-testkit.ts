@@ -46,6 +46,7 @@ export function createTestBackgroundRouter(
   registerConversationHandlers(router, {
     onConversationChanged: async () => {},
     onRemoteCleanupPending: async () => {},
+    scheduleImageBackfill: async () => {},
   });
   registerWebArticleHandlers(router, {
     onConversationChanged: options.onArticleConversationChanged ?? (async () => {}),

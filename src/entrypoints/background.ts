@@ -5,6 +5,7 @@ import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerWebArticleHandlers } from '@collectors/web/article-fetch-background-handlers';
 import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
+import { registerChatgptImageHandlers } from '@services/integrations/chatgpt/image-background-handlers';
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
@@ -66,6 +67,8 @@ export default defineBackground(() => {
   registerConversationHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
     onRemoteCleanupPending: () => services.autoSync.onRemoteCleanupPending(),
+    scheduleImageBackfill: (conversationId) =>
+      services.autoSync.imageBackfillScheduler.enqueue(conversationId, 'chat_image'),
   });
   registerDataRevisionHandlers(router);
   registerItemMentionHandlers(router);
@@ -76,6 +79,7 @@ export default defineBackground(() => {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
   registerChatgptDeepResearchHandlers(router);
+  registerChatgptImageHandlers(router);
   registerNotionSettingsHandlers(router, {
     runExclusiveMaintenance: services.notionSyncOrchestrator.runExclusiveMaintenance,
   });
@@ -177,4 +181,5 @@ export default defineBackground(() => {
   runBestEffort(() => services.autoSync.feishuScheduler.flush());
   runBestEffort(() => services.autoSync.githubScheduler.flush());
   runBestEffort(() => services.autoSync.githubScheduler.flushCleanup());
+  runBestEffort(() => services.autoSync.imageBackfillScheduler.flush());
 });

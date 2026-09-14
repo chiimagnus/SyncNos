@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const chatgptImageMocks = vi.hoisted(() => ({ downloadChatgptImages: vi.fn() }));
+vi.mock('@services/integrations/chatgpt/api-image-assets', () => chatgptImageMocks);
+
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { sha256Hex } from '@services/sync/github/github-content-hash';
 import { buildGithubMarkdownProjection } from '@services/sync/github/github-markdown-projection';
@@ -42,6 +45,7 @@ function batchLoaderFromAssets(assets: ReadonlyMap<number, ReturnType<typeof ima
 
 afterEach(() => {
   process.env.TZ = originalTz;
+  chatgptImageMocks.downloadChatgptImages.mockReset();
 });
 
 describe('github markdown projection', () => {
@@ -490,6 +494,104 @@ describe('github markdown projection', () => {
     expect(projection.attachments).toEqual([]);
     expect(projection.markdownText).toContain('![x](https://cdn.example.com/safe.png)');
     expect(projection.warnings).toEqual([{ code: 'image_upload_failed', assetId: 1 }]);
+  });
+
+  it('materializes uncached ChatGPT image references into GitHub attachments', async () => {
+    chatgptImageMocks.downloadChatgptImages.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+    const blobUploader = vi.fn(async () => ({ sha: 'b'.repeat(40) }));
+
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [
+        {
+          messageKey: 'm1',
+          sequence: 1,
+          contentMarkdown: 'answer\n\n![generated](chatgpt-file://file_generated_1)',
+        },
+      ],
+      blobUploader,
+    });
+
+    expect(chatgptImageMocks.downloadChatgptImages).toHaveBeenCalledWith({
+      conversationKey: 'chat-key',
+      fileIds: ['file_generated_1'],
+      concurrency: 4,
+    });
+    expect(blobUploader).toHaveBeenCalledTimes(1);
+    expect(projection.attachments).toHaveLength(1);
+    expect(projection.markdownText).toContain(`![generated](${projection.attachments[0]!.relativeTarget})`);
+    expect(projection.markdownText).not.toContain('chatgpt-file://');
+  });
+
+  it('keeps GitHub text export usable when remote ChatGPT images are unavailable or malformed', async () => {
+    chatgptImageMocks.downloadChatgptImages.mockResolvedValue([
+      { cacheKey: 'chatgpt-file://file_missing_1', ok: false, reason: 'resolver' },
+    ]);
+    const blobUploader = vi.fn(async () => ({ sha: 'b'.repeat(40) }));
+
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [
+        {
+          messageKey: 'm1',
+          sequence: 1,
+          contentMarkdown: [
+            'before',
+            '![missing](chatgpt-file://file_missing_1)',
+            '![malformed](chatgpt-file://bad)',
+            'after',
+          ].join('\n\n'),
+        },
+      ],
+      blobUploader,
+    });
+
+    expect(projection.attachments).toEqual([]);
+    expect(blobUploader).not.toHaveBeenCalled();
+    expect(projection.warnings).toEqual([{ code: 'image_missing', fileId: 'file_missing_1' }]);
+    expect(projection.markdownText.match(/\[Image unavailable\]/g)).toHaveLength(2);
+    expect(projection.markdownText).not.toContain('chatgpt-file://');
+    expect(projection.markdownText).toContain('before');
+    expect(projection.markdownText).toContain('after');
+  });
+
+  it('degrades a ChatGPT blob-upload failure without leaking the internal image reference', async () => {
+    chatgptImageMocks.downloadChatgptImages.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+      },
+    ]);
+
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [
+        {
+          messageKey: 'm1',
+          sequence: 1,
+          contentMarkdown: 'answer\n\n![generated](chatgpt-file://file_generated_1)',
+        },
+      ],
+      blobUploader: async () => {
+        throw new Error('upload failed');
+      },
+    });
+
+    expect(projection.attachments).toEqual([]);
+    expect(projection.warnings).toEqual([{ code: 'image_upload_failed', fileId: 'file_generated_1' }]);
+    expect(projection.markdownText).toContain('[Image unavailable]');
+    expect(projection.markdownText).not.toContain('chatgpt-file://');
   });
 
   it('preserves prose and code literals while materializing a real internal image', async () => {

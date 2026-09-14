@@ -69,6 +69,7 @@ export function createAutoSyncSchedulerCore(config: {
   isProviderEnabled: () => Promise<boolean>;
   syncConversations: (conversationIds: number[], instanceId: string) => Promise<void>;
   getFailureRetryDelayMs?: (error: unknown) => number | null | undefined;
+  flushWhenAlarmsUnavailable?: boolean;
 }): AutoSyncScheduler {
   const {
     queueStorageKey,
@@ -81,15 +82,16 @@ export function createAutoSyncSchedulerCore(config: {
     isProviderEnabled,
     syncConversations,
     getFailureRetryDelayMs,
+    flushWhenAlarmsUnavailable = true,
   } = config;
 
   const readQueue = async (): Promise<QueueMap> => {
-    const res = await infra.storage.get([queueStorageKey]).catch(() => ({}) as any);
+    const res = await infra.storage.get([queueStorageKey]);
     return normalizeQueue((res as any)?.[queueStorageKey]);
   };
 
   const writeQueue = async (queue: QueueMap): Promise<void> => {
-    await infra.storage.set({ [queueStorageKey]: queue }).catch(() => {});
+    await infra.storage.set({ [queueStorageKey]: queue });
   };
 
   const scheduleNextAlarm = async (queue: QueueMap): Promise<void> => {
@@ -131,7 +133,7 @@ export function createAutoSyncSchedulerCore(config: {
     // Best-effort fallback when `alarms` API is unavailable: we cannot wake the
     // background to flush at `dueAt`, so we opportunistically flush any due
     // items whenever we have an activity signal (enqueue).
-    if (!infra.alarms.isAvailable()) {
+    if (!infra.alarms.isAvailable() && flushWhenAlarmsUnavailable) {
       await flush();
     }
   };

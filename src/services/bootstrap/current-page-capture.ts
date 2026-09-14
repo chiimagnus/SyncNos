@@ -9,7 +9,6 @@ import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-u
 import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
 import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api-capture-settings';
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
-import type { ChatgptProtectedImages } from '@services/integrations/chatgpt/api-snapshot';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 
 type RuntimeClient = {
@@ -174,7 +173,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   async function saveSnapshot(
     snapshot: any,
     collectorId: string | null,
-    options?: { chatgptProtectedImages?: ChatgptProtectedImages | null; expectedChatgptConversationId?: string },
+    options?: { expectedChatgptConversationId?: string },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
 
@@ -209,23 +208,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       diff: integrity.persistence.diff,
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
       activityAt,
-      ...(options?.chatgptProtectedImages ? { chatgptProtectedImages: options.chatgptProtectedImages } : null),
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    const protectedImagesIncomplete = Array.isArray(messagesRes?.data?.imageWarningFlags)
-      ? messagesRes.data.imageWarningFlags.includes('protected_images_incomplete')
-      : false;
-    const captureReasons = dedupeCodes([
-      ...(integrity.meta?.reasons || []),
-      ...(protectedImagesIncomplete ? ['chatgpt_api_images_incomplete'] : []),
-    ]);
+    const captureReasons = dedupeCodes(integrity.meta?.reasons || []);
     return {
       conversationId,
       isNew,
-      captureCompleteness: protectedImagesIncomplete ? 'partial' : integrity.meta?.completeness,
+      captureCompleteness: integrity.meta?.completeness,
       captureReasons: captureReasons.length ? captureReasons : undefined,
     };
   }
@@ -287,7 +279,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       if (!target.collector) throw new Error(t('currentPageCannotBeCaptured'));
 
       let snapshot: any = null;
-      let chatgptProtectedImages: ChatgptProtectedImages | null = null;
       let expectedChatgptConversationId = '';
       const useChatgptApi = target.collectorId === 'chatgpt' && (await readChatgptApiCaptureEnabled());
       if (useChatgptApi) {
@@ -296,7 +287,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         });
         if (apiCapture.applicable) {
           snapshot = apiCapture.snapshot;
-          chatgptProtectedImages = apiCapture.chatgptProtectedImages;
           expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
         }
       }
@@ -328,7 +318,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       }
 
       const saved = await saveSnapshot(snapshot, target.collectorId, {
-        chatgptProtectedImages,
         ...(expectedChatgptConversationId ? { expectedChatgptConversationId } : null),
       });
       if (!saved) {
