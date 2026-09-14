@@ -165,7 +165,7 @@ function assertSamePageSet(label, expected, actual) {
 }
 
 function createMarkdownRenderer() {
-  const md = new MarkdownIt({ html: true, linkify: true, typographer: false });
+  const md = new MarkdownIt({ html: true, linkify: false, typographer: false });
   const defaultLinkOpen =
     md.renderer.rules.link_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
