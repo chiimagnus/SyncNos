@@ -17,8 +17,8 @@
 
 ## 链接
 
-- [官网](https://syncnos.github.io/)
-- [源码 (GitHub)](https://github.com/SyncNos/SyncNos-Webclipper)
+- [官网](https://chiimagnus.github.io/SyncNos/)
+- [源码 (GitHub)](https://github.com/chiimagnus/SyncNos)
 - [社区讨论 (linux.do)](https://linux.do/t/topic/1635410)
 
 ## 特点

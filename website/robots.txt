@@ -44,4 +44,4 @@ Allow: /
 User-agent: meta-externalagent
 Allow: /
 
-Sitemap: https://syncnos.github.io/sitemap.xml
+Sitemap: https://chiimagnus.github.io/SyncNos/sitemap.xml
