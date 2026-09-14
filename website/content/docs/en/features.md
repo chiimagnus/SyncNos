@@ -8,6 +8,7 @@ Capture is only the first step. The features below work directly with the local 
 | Feature | What it is for |
 | --- | --- |
 | [Local library](/docs/en/library/) | Search, read, copy full Markdown, and open original or synced destinations |
+| [Browser keyboard shortcuts](/docs/en/capture/#browser-keyboard-shortcuts) | Open the popup, save the current page, or open/focus the SyncNos app; bindings are managed by the browser |
 | [Highlights & comments](/docs/en/comments/) | Save quotes, highlights, comments, and replies on web articles |
 | [Reading, narration & outlines](/docs/en/reader/) | Adjust article/video typography and theme, read content aloud, and navigate long items |
 | [$ Mention](/docs/en/dollar-mention/) | Search local items and insert them into supported AI inputs |

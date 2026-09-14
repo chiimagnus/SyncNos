@@ -47,6 +47,8 @@ syncnos doctor
 
 ## 采集
 
+除了 Popup 和页内入口，SyncNos 还提供浏览器原生快捷键，用于打开 Popup、保存当前页面，以及打开 / 聚焦 SyncNos 应用。默认不预设键位，可在 **设置 → 快捷键** 查看浏览器当前绑定。详见[采集方式](https://chiimagnus.github.io/SyncNos/docs/capture/#浏览器快捷键)。
+
 ### AI 对话
 
 支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 和 z.ai。

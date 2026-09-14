@@ -14,6 +14,8 @@ description: Install the SyncNos browser extension and confirm that your first c
 
 Once installed, SyncNos can capture locally without connecting any external sync service.
 
+In browsers that expose a native extension Options / Preferences entry, that entry opens the SyncNos Settings page directly.
+
 ## Confirm the install works
 
 1. Open the SyncNos extension.

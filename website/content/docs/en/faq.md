@@ -12,6 +12,12 @@ description: Start here when capture, sync, or connection behavior is not workin
 
 See [Capture content](/docs/en/capture/) for supported sources.
 
+## What if a keyboard shortcut does not work?
+
+Open **Settings → Keyboard shortcuts** and check the binding the browser is actually using. If it shows **Unassigned**, use **Manage shortcuts** to open the browser's native shortcut settings; when that cannot be opened directly, follow the page guidance and configure the binding in your browser's extension shortcut settings.
+
+See [Browser keyboard shortcuts](/docs/en/capture/#browser-keyboard-shortcuts) for the three available actions and their support boundaries.
+
 ## What if sync fails?
 
 A failed sync does not delete local content. Fix the connection or permissions, then sync again.

@@ -19,7 +19,7 @@ Supported pages expose a current-page capture action in the SyncNos popup or in-
 
 Auto-save availability depends on the AI platform. Web articles and videos use manual capture.
 
-### Keyboard shortcuts
+## Browser keyboard shortcuts
 
 SyncNos provides three browser shortcut actions: **Open SyncNos popup**, **Save current page**, and **Open/focus SyncNos app**.
 

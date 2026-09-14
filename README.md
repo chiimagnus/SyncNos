@@ -47,6 +47,8 @@ See [Automate with the CLI](https://chiimagnus.github.io/SyncNos/docs/en/cli/) f
 
 ## Capture
 
+Alongside the popup and in-page entry points, SyncNos provides browser-native shortcuts to open the popup, save the current page, and open/focus the SyncNos app. No keys are assigned by default; use **Settings → Keyboard shortcuts** to see the browser's current bindings. See [Capture](https://chiimagnus.github.io/SyncNos/docs/en/capture/#browser-keyboard-shortcuts).
+
 ### AI conversations
 
 Supported: ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai.

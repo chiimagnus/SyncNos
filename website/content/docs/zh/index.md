@@ -27,7 +27,7 @@ description: 先保存一条内容，再按需要阅读、同步或导出。
 ## 继续了解
 
 - [采集总览](/docs/capture/)：按 AI 对话、网页文章、视频查看具体保存方式
-- [功能总览](/docs/features/)：划线评论、阅读朗读、`$` 插入、数据概览等
+- [功能总览](/docs/features/)：浏览器快捷键、划线评论、阅读朗读、`$` 插入、数据概览等
 - [同步](/docs/sync/)：连接 Notion、Obsidian、飞书或 GitHub
 - [使用 CLI 自动化](/docs/cli/)：让本机工具或 AI Agent 使用 SyncNos
 - [排障与常见问题](/docs/faq/)：遇到问题时从这里开始

@@ -18,6 +18,7 @@
 | `README.md`, `README.zh-CN.md` | 用户入口：定位、安装、采集来源、输出目标和文档导航 | 用户可见能力、安装渠道或顶层支持范围变化 | GitHub 项目首页 |
 | `PRIVACY.md` | 用户数据、权限、凭据、本地/外部网络边界 | manifest 权限、secret storage/backup exclusion、OAuth 或外部数据流变化 | README、商店隐私审查 |
 | `website/content/docs/**` | 面向用户的网站文档：用户任务导航、功能发现、安装、采集、使用与整理、同步、导出/备份、CLI 与 FAQ；隐私页只做 `PRIVACY.md` 的用户摘要。官网品牌图标复用 `public/icons/**`，产品截图复用 `docs/assets/**`，由 website build 复制到发布产物 | 用户可见能力/入口、导航分组、操作流程、设置字段、支持范围、安装渠道或复用资产变化 | GitHub Pages、README、Extension Settings |
+| `website/llms.txt` | 面向 LLM / Agent 的官网级产品能力摘要与主要文档入口，不复制具体操作步骤 | 顶层用户可见能力、支持范围或主要文档入口变化 | 官网 `llms.txt` 消费者 |
 | `AGENTS.md`, `src/ui/AGENTS.md` | 维护者/agent 必须提前看到的架构与高风险不变量 | 分层、依赖方向或不可破坏产品/UI 契约变化 | agent rule loader、CONTRIBUTING |
 | `skills/syncnos/SKILL.md`, `skills/syncnos-zh/SKILL.md` | AI Agent 使用 `syncnos` 的运行说明 | 命令路由、JSON/error、instance、安装/权限或写入/sync 等调用契约变化 | Repository Skill 使用者 |
 | `docs/storage.md` | local-first、一致性、Backup/restore 和失败恢复边界 | IDB/revision、backup/import、asset remap 或 continuity 语义变化 | AGENTS、Privacy、CONTRIBUTING |
