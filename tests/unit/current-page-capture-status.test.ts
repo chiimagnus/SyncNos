@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  buildCaptureWaitingMessage,
-  buildPartialCaptureMessage,
-  captureSourceLabel,
-} from '@services/bootstrap/current-page-capture-status';
+import { buildCaptureWaitingMessage, buildPartialCaptureMessage } from '@services/bootstrap/current-page-capture-status';
 import { t } from '@i18n';
 
 describe('current-page capture status semantics', () => {
-  it('uses localized source names for neutral waiting states', () => {
-    expect(captureSourceLabel('chatgpt')).toBe(t('sourceChatgpt'));
-    expect(captureSourceLabel('google-ai-studio')).toBe(t('sourceGoogleAiStudio'));
+  it('uses localized canonical source names for neutral waiting states', () => {
     expect(buildCaptureWaitingMessage('chatgpt')).toBe(`${t('sourceChatgpt')} · ${t('captureWaitingForMessages')}`);
+    expect(buildCaptureWaitingMessage('googleaistudio')).toBe(
+      `${t('sourceGoogleAiStudio')} · ${t('captureWaitingForMessages')}`,
+    );
   });
 
   it('maps live-tail, history, media, and content partial reasons without exposing raw codes', () => {
