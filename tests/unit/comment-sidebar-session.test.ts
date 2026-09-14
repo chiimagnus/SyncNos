@@ -302,7 +302,7 @@ describe('comment-sidebar-session', () => {
   it('forwards selection and clear actions without clearing the attachment on save', async () => {
     const session = createCommentSidebarSession();
     const onComposerSelectionRequest = vi.fn(() => {});
-    const onComposerQuoteClearRequest = vi.fn(async () => {
+    const onComposerQuoteClearRequest = vi.fn(() => {
       session.clearComposerAttachment();
     });
     const onSave = vi.fn(async () => ({ ok: true }));
@@ -318,7 +318,7 @@ describe('comment-sidebar-session', () => {
     await session.actions.save('hello');
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('quoted text');
 
-    await session.actions.clearComposerAttachment();
+    session.actions.clearComposerAttachment();
     expect(onComposerQuoteClearRequest).toHaveBeenCalledTimes(1);
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });

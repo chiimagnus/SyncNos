@@ -36,7 +36,7 @@ export type CommentSidebarHostActionCallbacks = {
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
   onComposerSelectionRequest?: () => void;
-  onComposerQuoteClearRequest?: () => void | Promise<void>;
+  onComposerQuoteClearRequest?: () => void;
   onRetry?: () => void | Promise<void>;
 };
 
@@ -46,7 +46,7 @@ export type CommentSidebarHostActions = {
   delete: (id: number) => void | Promise<void>;
   close: () => void;
   requestComposerSelection: () => void;
-  clearComposerAttachment: () => void | Promise<void>;
+  clearComposerAttachment: () => void;
   retry: () => void | Promise<void>;
 };
 

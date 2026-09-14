@@ -302,7 +302,7 @@ export function ThreadedCommentsPanel({
           text={snapshot.composerAttachment.quoteText}
           onClear={() => {
             selectionAttachment.resetDedupe();
-            void Promise.resolve(actions.clearComposerAttachment()).catch(() => {});
+            actions.clearComposerAttachment();
           }}
         />
         <RootCommentComposer
