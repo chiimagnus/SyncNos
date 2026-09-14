@@ -1,36 +1,32 @@
 ---
 title: Notion
-description: 通过 OAuth 连接 Notion，并在选定 Parent Page 下管理 SyncNos 内容。
+description: 连接 Notion，并把 SyncNos 内容同步到你选择的页面下。
 ---
 
 ## 连接 Notion
 
-1. 打开 **SyncNos → 设置 → Notion**。
-2. 点击 **Connect**，在 Notion 完成 OAuth 授权。
-3. 授权完成后，从 SyncNos 中选择要使用的 **Parent Page**。
-4. 开始手动同步；如有需要，再单独开启自动同步。
+1. 打开 **SyncNos → 设置 → Notion**
+2. 点击 **Connect**，完成 Notion 授权
+3. 选择一个 **Parent Page**
+4. 执行一次手动同步，确认内容正常写入
 
-SyncNos 只会看到你通过 Notion 授权明确开放给集成的内容。
+需要时再开启自动同步。
 
-## Parent Page 与数据库
+SyncNos 只能访问你在 Notion 授权时开放给它的内容。
 
-SyncNos 会在你选定的 Parent Page 下查找或创建它管理的内容数据库，并按 AI 对话、网页文章和视频内容使用对应的受管结构。
+## SyncNos 会创建什么
 
-这些数据库的受管字段和 section 由 SyncNos 维护。正常使用不需要手工创建或修改 schema。
+SyncNos 会在选定的 Parent Page 下创建或使用它管理的内容数据库。
 
-如果你更换 Parent Page，SyncNos 会重新解析对应目标，而不是继续盲用旧页面下缓存的数据库 ID。
+正常使用不需要自己创建数据库结构，也不要手动修改 SyncNos 管理的字段和 section。
 
-## OAuth 与凭据
+更换 Parent Page 后，后续同步会使用新的目标。
 
-Notion OAuth 使用 token-exchange proxy，以避免把官方 Client Secret 打包进浏览器扩展。Proxy 处理 OAuth 兑换数据，不接收你要同步的对话、文章或视频正文。
+## 断开连接
 
-Notion token 保存在浏览器扩展的本地存储中，并从 SyncNos Backup ZIP 中排除。
+- 在 SyncNos 中点击 **Disconnect** 可以断开当前连接
+- 如果要彻底撤销授权，也可以在 Notion 的连接设置中移除 SyncNos
 
-## 撤销访问
+## 同步失败
 
-- 在 SyncNos 中 **Disconnect**：清理扩展本地的 Notion 连接状态。
-- 如需在 Notion 一侧撤销授权，请在 Notion 的连接设置中撤销 SyncNos 集成。
-
-## 排障
-
-本地数据库始终是主记录。Notion API、图片上传或页面写入失败不会把本地原始内容替换成远端状态；修复连接后可以重新执行同步。
+本地内容不会丢失。修复连接后重新同步即可。

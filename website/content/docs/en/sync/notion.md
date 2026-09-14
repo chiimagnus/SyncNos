@@ -1,36 +1,32 @@
 ---
 title: Notion
-description: Connect Notion over OAuth and let SyncNos manage content under a selected parent page.
+description: Connect Notion and sync SyncNos content under a page you choose.
 ---
 
 ## Connect Notion
 
-1. Open **SyncNos → Settings → Notion**.
-2. Click **Connect** and complete Notion OAuth.
-3. Select the **Parent Page** that SyncNos should use.
-4. Run a manual sync; enable auto-sync separately if you want it.
+1. Open **SyncNos → Settings → Notion**
+2. Click **Connect** and complete Notion authorization
+3. Choose a **Parent Page**
+4. Run one manual sync and confirm the content appears correctly
 
-SyncNos can only access content that you explicitly make available to the Notion integration.
+Enable automatic sync afterward if you want it.
 
-## Parent page and managed databases
+SyncNos can only access content you make available during Notion authorization.
 
-Under the selected parent page, SyncNos finds or creates the databases it manages for AI chats, web articles, and video content.
+## What SyncNos creates
 
-Their managed properties and sections are owned by SyncNos. Normal setup does not require manually creating or editing that schema.
+SyncNos creates or uses its managed content databases under the selected Parent Page.
 
-When you change the parent page, SyncNos resolves the destination again instead of blindly continuing to use cached database IDs from the previous parent.
+You do not need to create the database structure yourself. Avoid manually changing properties and sections managed by SyncNos.
 
-## OAuth and credentials
+If you change the Parent Page, future syncs use the new destination.
 
-Notion OAuth uses a token-exchange proxy so the official client secret is not embedded in the browser extension. The proxy handles OAuth exchange data; it does not receive the conversation, article, or video bodies you sync.
+## Disconnect
 
-The Notion token is stored in extension-local storage and excluded from SyncNos Backup ZIP files.
+- Click **Disconnect** in SyncNos to remove the current connection
+- To fully revoke access, remove SyncNos from Notion's connection settings as well
 
-## Revoke access
+## When sync fails
 
-- **Disconnect** in SyncNos clears the extension's local Notion connection state.
-- To revoke authorization on the Notion side, remove SyncNos from Notion's connection settings.
-
-## Troubleshooting
-
-The local database remains the primary record. Notion API, image-upload, or page-write failures do not replace the local source with remote state; fix the connection and sync again.
+Your local content stays available. Fix the connection and sync again.
