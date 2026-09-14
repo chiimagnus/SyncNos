@@ -1,40 +1,31 @@
 ---
 title: 导出与备份
-description: 选择 Markdown / JSON 导出，或创建用于恢复 SyncNos 的 Backup ZIP。
+description: 导出可读文件，或创建以后可以恢复到 SyncNos 的 Backup。
 ---
 
-导出和 Backup 解决的是两件不同的事：**导出给人和其它工具使用，Backup 给 SyncNos 自己恢复。**
-
-| 需求 | 应该使用 |
-| --- | --- |
-| 想长期保留可读文件，或交给其它工具处理 | Markdown / JSON 导出 |
-| 想恢复 SyncNos 本地内容和可恢复状态 | Backup ZIP |
-| 想让外部服务持续跟随本地内容更新 | [同步到外部服务](/docs/sync/) |
+- 想拿到可以长期保存或交给其它工具的文件：使用 **Markdown / JSON 导出**
+- 想以后恢复 SyncNos：使用 **Backup**
+- 想持续更新 Notion、Obsidian、飞书或 GitHub：[使用同步](/docs/sync/)
 
 ## 导出 Markdown / JSON
 
-从本地库选择内容后，可以导出 Markdown 或 JSON。导出结果以 ZIP 交付，并按所选条目生成对应文件。
+从本地库选择内容后，可以导出 Markdown 或 JSON。导出结果会打包成 ZIP。
 
-正文已经引用的本地缓存图片会在可用时一起放进 ZIP。如果选中的 ChatGPT 条目仍有未缓存图片，SyncNos 可以在导出时使用当前 ChatGPT 登录状态临时获取；这不会把图片永久加入本地缓存。图片无法取得时，正文仍会正常导出，对应图片会显示为不可用，而不会把内部引用泄漏到导出文件。
+- **Markdown**：适合直接阅读、整理和继续写作
+- **JSON**：适合程序处理，并保留更多结构化信息
 
-Markdown 更适合直接阅读和继续写作；JSON 更适合程序化处理，并保留结构化的类型、来源、时间和附件信息。
+可用的本地图片会一起导出。图片暂时无法取得时，正文仍然会正常导出。
 
-## 创建 Backup ZIP
+## 创建 Backup
 
-在 **设置 → Backup** 中可以导出恢复包。Backup 可以包含：
+打开 **设置 → Backup** 创建恢复包。
 
-- 本地采集内容；
-- 可恢复的同步 mapping；
-- 已缓存图片；
-- 文章评论 / 高亮；
-- 非敏感设置。
+Backup 会保存可恢复的本地内容，例如已采集内容、缓存图片、评论和高亮，以及非敏感设置。
 
-认证秘密不会进入 Backup，例如 Provider access / refresh token、Client Secret、Obsidian API Key、GitHub Device Flow 凭据，以及设备 / 浏览器 Profile 特定的 CLI 身份与启用状态。
+密码、token、API Key 等认证秘密不会进入 Backup。
 
 ## 恢复 Backup
 
-Backup 导入采用 merge restore，而不是先清空当前数据库再覆盖。同一份 Backup 重复导入应保持幂等，不应该因为重复导入制造两份相同内容。
+导入 Backup 会把内容合并到当前本地库，不会先清空现有数据。
 
-Backup 是 SyncNos 的恢复格式，不是长期稳定的通用归档格式；旧 Backup schema 不保证一直可被未来版本读取。如果你的目标是长期可读或交给其它软件，优先保留 Markdown / JSON 导出。
-
-完整的网络与凭据边界见[隐私与数据](/docs/privacy/)。
+Backup 主要用于恢复 SyncNos。如果希望长期保留可读数据，建议同时保存 Markdown / JSON 导出。
