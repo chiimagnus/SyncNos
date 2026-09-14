@@ -1,11 +1,11 @@
 ---
 title: 使用 CLI 自动化
-description: 安装 syncnos CLI，让本机自动化和 AI Agent 访问正在运行的浏览器 Profile。
+description: 安装 syncnos CLI，让本机工具或 AI Agent 使用浏览器中的 SyncNos 数据。
 ---
 
-`syncnos` CLI 是可选的本机自动化入口。普通浏览器使用不需要安装它；浏览器扩展和 IndexedDB 仍然是业务真源，CLI 不维护第二套 SyncNos 数据库。
+普通浏览器使用不需要 CLI。只有需要本机自动化时才安装它。
 
-## 安装并连接浏览器
+## 安装
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -13,15 +13,15 @@ syncnos install
 syncnos doctor
 ```
 
-在要暴露给 CLI 的浏览器 Profile 中开启：
+然后在要使用的浏览器 Profile 中开启：
 
 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**
 
-业务命令执行时，该 Profile 需要保持运行。
+执行 CLI 命令时，这个浏览器 Profile 需要保持运行。
 
-## 先发现当前能力
+## 查看当前命令
 
-CLI 的命令和参数会持续演进，不在 Docs 复制一份完整命令表。以当前安装版本自己的输出为准：
+命令和参数以你安装的版本为准：
 
 ```bash
 syncnos --help
@@ -30,33 +30,22 @@ syncnos settings schema
 syncnos doctor
 ```
 
-## 常用工作流
+## 常用示例
 
 ```bash
 syncnos instances
 syncnos list --limit 20
 syncnos search "keyword" --limit 20
 syncnos get <conversation-id>
-syncnos comments list <conversation-id>
 syncnos sync <conversation-id> --to notion
 syncnos export markdown <conversation-id> --output ./export
 syncnos backup export --output ./syncnos-backup.zip
 ```
 
-同步目标可以是 `notion`、`obsidian`、`feishu` 或 `github`。
+同步目标可以换成 `notion`、`obsidian`、`feishu` 或 `github`。
 
-## 面向 Agent 的输出
+## 给自动化使用
 
-默认 operational command 使用稳定、可机器解析的 JSON envelope：
+CLI 默认输出 JSON，适合脚本和 AI Agent 读取。
 
-```json
-{ "ok": true, "data": {}, "error": null }
-```
-
-`--human` 只用于诊断 / 人类展示。自动化应读取 JSON，而不是解析 ANSI、表格或自然语言终端文本。
-
-## 写入与同步
-
-状态修改命令执行后应读取返回的业务结果。`sync` 默认等待本次 accepted job 到 terminal state；只有调用者明确希望异步时才使用 `--no-wait`。
-
-如果 mutation 的结果未知，先 read-back 当前状态，不要猜测性地重复执行同一个写入。
+`sync` 默认等待同步完成；需要异步执行时可以加 `--no-wait`。
