@@ -11,8 +11,6 @@ type ApiResponse<T> = {
   error: { message: string; extra: unknown } | null;
 };
 
-type CaptureState = CurrentPageCaptureState;
-
 function unwrap<T>(response: ApiResponse<T>): T {
   if (!response || typeof response.ok !== 'boolean') {
     throw new Error('no response from background');
@@ -50,7 +48,7 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     if (!runtimeAvailable) return;
     if (mountedRef.current) setChecking(true);
     try {
-      const response = await send<ApiResponse<CaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
+      const response = await send<ApiResponse<CurrentPageCaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
       const state = unwrap(response);
 
       if (state.readiness !== 'ready') {
@@ -100,14 +98,14 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     if (checking || opening || !eligible) return false;
     if (mountedRef.current) setOpening(true);
     try {
-      const response = await send<ApiResponse<{ opened?: boolean }>>(
+      const response = await send<ApiResponse<{ opened: boolean }>>(
         UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
         {
           source: 'popup',
         },
       );
       const result = unwrap(response);
-      return Boolean((result as any)?.opened ?? true);
+      return result.opened === true;
     } catch (_error) {
       return false;
     } finally {
@@ -126,5 +124,3 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
 
   return { disabled, tooltip, open, ariaLabel };
 }
-
-export const usePopupOpenAppCommentsConversation = usePopupOpenCurrentTabInpageCommentsSidebar;
