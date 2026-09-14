@@ -579,33 +579,6 @@ section {
   }
 }
 
-/* Language switch — per-character chimney-smoke dissipation */
-.ch {
-  display: inline-block;
-  white-space: pre;
-  will-change: transform, opacity, filter;
-}
-@keyframes smoke-away {
-  0% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(0) scale(1);
-    filter: blur(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1.28);
-    filter: blur(var(--bl));
-  }
-}
-.ch.away {
-  animation: smoke-away var(--dur, 0.52s) cubic-bezier(0.36, 0.02, 0.62, 0.3) forwards;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ch.away {
-    animation: none;
-  }
-}
-
 /* Sponsors — angel supporters thank-you band */
 .sponsors .sec-title {
   margin-bottom: 20px;

@@ -256,12 +256,12 @@ function pageHtml({ page, tree, language }) {
   const counterpartRoute = counterpartRouteFor(page, language);
   const languageLabel = language.id === 'zh' ? 'English' : '中文';
   const editLabel = language.id === 'zh' ? '在 GitHub 查看 Markdown' : 'View Markdown on GitHub';
-  const homeLabel = language.id === 'zh' ? '官网' : 'Home';
+  const themeLabel = language.id === 'zh' ? '切换深浅色' : 'Toggle dark mode';
   const title = `${page.title} · SyncNos Docs`;
   const canonical = `${SITE_ORIGIN}${BASE_PATH}${page.route}`;
   const sourceUrl = `${REPO}/blob/main/website/content/docs/${language.id}/${page.relativePath}`;
   return `<!doctype html>
-<html lang="${language.id === 'zh' ? 'zh-CN' : 'en'}">
+<html lang="${language.id === 'zh' ? 'zh-CN' : 'en'}" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -269,16 +269,31 @@ function pageHtml({ page, tree, language }) {
     <meta name="description" content="${escapeHtml(page.description)}" />
     <link rel="canonical" href="${canonical}" />
     <link rel="icon" href="${BASE_PATH}/assets/icon-128.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f141c" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <script src="${BASE_PATH}/theme.js"></script>
+    <link rel="stylesheet" href="${BASE_PATH}/styles.css" />
     <link rel="stylesheet" href="${BASE_PATH}/docs.css" />
   </head>
   <body>
-    <header class="docs-header">
-      <a class="docs-brand" href="${BASE_PATH}/"><img src="${BASE_PATH}/assets/icon-128.png" alt="" /> <span>SyncNos Docs</span></a>
-      <nav class="docs-header-links">
-        <a href="${BASE_PATH}/">${homeLabel}</a>
+    <header class="nav docs-header">
+      <a class="brand" href="${BASE_PATH}/"><img src="${BASE_PATH}/assets/icon-128.png" alt="SyncNos" width="30" height="30" /> <span>SyncNos Docs</span></a>
+      <nav class="nav-links docs-header-links">
         <a href="${REPO}">GitHub</a>
         <a href="${BASE_PATH}${counterpartRoute}">${languageLabel}</a>
       </nav>
+      <div class="nav-actions">
+        <button id="theme" class="ghost-btn" type="button" aria-label="${themeLabel}">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M12 3a9 9 0 000 18z" fill="currentColor" />
+          </svg>
+        </button>
+      </div>
     </header>
     ${mobileNavHtml(tree.items, page.route, language)}
     <div class="docs-layout">

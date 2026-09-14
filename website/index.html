@@ -15,17 +15,11 @@
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
     <script>
       document.documentElement.classList.add('js');
-      (function () {
-        try {
-          var t =
-            localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-          document.documentElement.setAttribute('data-theme', t);
-        } catch (e) {}
-      })();
     </script>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css" />
     <link rel="canonical" href="https://chiimagnus.github.io/SyncNos/" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="SyncNos" />
@@ -166,13 +160,6 @@
               <path d="M12 3a9 9 0 000 18z" fill="currentColor" />
             </svg>
           </button>
-          <a
-            class="btn btn-sm"
-            data-install="nav"
-            href="https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok"
-            data-en="Install"
-            >安装</a
-          >
         </div>
       </header>
 
