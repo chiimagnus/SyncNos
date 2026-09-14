@@ -25,7 +25,7 @@ import type {
   ArticleCommentsSidebarEnsureContextInput,
 } from '@services/comments/sidebar/article-comments-sidebar-adapter';
 
-export type ArticleCommentsSidebarControllerOpenInput = {
+type ArticleCommentsSidebarControllerOpenInput = {
   focusComposer?: boolean;
   source?: string;
   ensureContext?: boolean;
@@ -37,23 +37,11 @@ type ArticleCommentsSidebarControllerComposerSelectionPayload = {
   locator?: unknown;
 };
 
-export type ArticleCommentsSidebarLoadStatus = CommentSidebarLoadStatus;
-export type ArticleCommentsSidebarLoadError = CommentSidebarLoadError;
-
-export type ArticleCommentsSidebarLoadSnapshot = {
-  status: ArticleCommentsSidebarLoadStatus;
-  error: ArticleCommentsSidebarLoadError | null;
-  generation: number;
-  contextKey: string;
-};
-
 export type ArticleCommentsSidebarController = {
   open: (input?: ArticleCommentsSidebarControllerOpenInput) => Promise<void>;
   refresh: () => Promise<void>;
   getContext: () => ArticleCommentsSidebarContext | null;
   setContext: (context: ArticleCommentsSidebarContext | null) => void;
-  getLoadSnapshot: () => ArticleCommentsSidebarLoadSnapshot;
-  subscribeLoadState: (listener: () => void) => () => void;
   dispose: () => void;
 };
 
@@ -86,7 +74,7 @@ function normalizeContext(
   return normalizeCommentContextIdentity(next);
 }
 
-function toLoadError(error: unknown): ArticleCommentsSidebarLoadError {
+function toLoadError(error: unknown): CommentSidebarLoadError {
   const value = error as { code?: unknown; message?: unknown } | null;
   return {
     code: safeString(value?.code) || 'unknown',
@@ -143,43 +131,17 @@ export function createArticleCommentsSidebarController(input: {
   let identityAbortController: AbortController | null = null;
   let deferredArticleCommentsAfterIdentityFailure = false;
   let drainPendingRevisionBatch: () => void = () => {};
-  const loadListeners = new Set<() => void>();
-  let loadSnapshot: ArticleCommentsSidebarLoadSnapshot = {
-    status: 'idle',
-    error: null,
-    generation: 0,
-    contextKey: '',
-  };
-
   const getCanonicalUrl = () => canonicalizeArticleUrl(activeContext?.canonicalUrl);
   const getContextKey = () => buildCommentContextIdentityKey(activeContext);
 
-  const publishLoadState = (
-    status: ArticleCommentsSidebarLoadStatus,
-    operation: ControllerOperation | null,
-    error: ArticleCommentsSidebarLoadError | null = null,
-  ) => {
+  const publishLoadState = (status: CommentSidebarLoadStatus, error: CommentSidebarLoadError | null = null) => {
     if (disposed) return;
-    const generation = operation?.generation ?? operationGeneration;
-    loadSnapshot = {
-      status,
-      error,
-      generation,
-      contextKey: getContextKey(),
-    };
     session.updateHost({
       busy: status === 'loading',
       loadStatus: status,
       loadError: error,
-      contextKey: loadSnapshot.contextKey,
+      contextKey: getContextKey(),
     });
-    for (const listener of loadListeners) {
-      try {
-        listener();
-      } catch (_error) {
-        // A failed observer must not interrupt the controller state machine.
-      }
-    }
   };
 
   const abortActiveOperation = () => {
@@ -195,7 +157,7 @@ export function createArticleCommentsSidebarController(input: {
       abortController: new AbortController(),
     };
     activeOperation = operation;
-    publishLoadState('loading', operation);
+    publishLoadState('loading');
     return operation;
   };
 
@@ -209,12 +171,12 @@ export function createArticleCommentsSidebarController(input: {
 
   const finishOperation = (
     operation: ControllerOperation,
-    status: Exclude<ArticleCommentsSidebarLoadStatus, 'loading'>,
-    error: ArticleCommentsSidebarLoadError | null = null,
+    status: Exclude<CommentSidebarLoadStatus, 'loading'>,
+    error: CommentSidebarLoadError | null = null,
   ) => {
     if (!isCurrentOperation(operation)) return;
     activeOperation = null;
-    publishLoadState(status, operation, error);
+    publishLoadState(status, error);
     void Promise.resolve().then(() => drainPendingRevisionBatch());
   };
 
@@ -313,7 +275,7 @@ export function createArticleCommentsSidebarController(input: {
     if (!(await waitForCurrentActivationReadiness())) return;
     if (!normalizeContext(activeContext)) {
       abortActiveOperation();
-      publishLoadState('idle', null);
+      publishLoadState('idle');
       return;
     }
     const operation = beginOperation();
@@ -451,7 +413,7 @@ export function createArticleCommentsSidebarController(input: {
     operationGeneration += 1;
     mutationGeneration += 1;
     abortActiveOperation();
-    publishLoadState('idle', null);
+    publishLoadState('idle');
   };
 
   const activateRevisionActivation = () => {
@@ -608,7 +570,7 @@ export function createArticleCommentsSidebarController(input: {
     if (!shouldEnsureContext || typeof adapter.ensureContext !== 'function') {
       const context = normalizeContext(activeContext);
       if (!context) {
-        publishLoadState('idle', null);
+        publishLoadState('idle');
         return;
       }
       const operation = beginOperation();
@@ -630,7 +592,7 @@ export function createArticleCommentsSidebarController(input: {
         finishOperation(operation, 'idle');
         return;
       }
-      publishLoadState('loading', operation);
+      publishLoadState('loading');
       await migrateThenLoad(operation, classifyCommentContextTransition(lastLoadedContext, context));
     } catch (error) {
       if (error instanceof ControllerOperationAbortedError || !isCurrentOperation(operation)) return;
@@ -649,7 +611,7 @@ export function createArticleCommentsSidebarController(input: {
     operationGeneration += 1;
     abortActiveOperation();
     if (transition.kind === 'invalid') {
-      if (sessionOpen) publishLoadState('idle', null);
+      if (sessionOpen) publishLoadState('idle');
       return;
     }
     if (!sessionOpen) return;
@@ -680,7 +642,6 @@ export function createArticleCommentsSidebarController(input: {
     mutationGeneration += 1;
     operationGeneration += 1;
     abortActiveOperation();
-    loadListeners.clear();
   };
 
   return {
@@ -688,15 +649,6 @@ export function createArticleCommentsSidebarController(input: {
     refresh,
     getContext,
     setContext,
-    getLoadSnapshot: () => loadSnapshot,
-    subscribeLoadState: (listener) => {
-      if (disposed) return () => {};
-      if (typeof listener !== 'function') return () => {};
-      loadListeners.add(listener);
-      return () => {
-        loadListeners.delete(listener);
-      };
-    },
     dispose,
   };
 }

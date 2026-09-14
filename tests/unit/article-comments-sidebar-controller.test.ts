@@ -466,13 +466,13 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
 
     expect(seenSignals[0]?.aborted).toBe(true);
-    expect(controller.getLoadSnapshot().status).toBe('loading');
+    expect(session.getSnapshot().loadStatus).toBe('loading');
 
     deferredB.resolve([{ id: 2, parentId: null, commentText: 'B', quoteText: '', createdAt: 2 }]);
     await vi.waitFor(() => {
       expect(panel.getState().comments[0]?.commentText).toBe('B');
     });
-    expect(controller.getLoadSnapshot()).toMatchObject({ status: 'ready', error: null });
+    expect(session.getSnapshot()).toMatchObject({ loadStatus: 'ready', loadError: null });
 
     deferredA.resolve([{ id: 1, parentId: null, commentText: 'A', quoteText: '', createdAt: 1 }]);
     await Promise.resolve();
@@ -499,16 +499,16 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
 
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     expect(panel.getState().comments[0]?.commentText).toBe('Ready');
 
     await controller.refresh();
 
     expect(panel.getState().comments[0]?.commentText).toBe('Ready');
-    expect(controller.getLoadSnapshot()).toMatchObject({
-      status: 'stale_error',
-      error: { code: 'request_failed', message: 'background unavailable' },
+    expect(session.getSnapshot()).toMatchObject({
+      loadStatus: 'stale_error',
+      loadError: { code: 'request_failed', message: 'background unavailable' },
     });
     expect(panel.getState().busy).toBe(false);
   });
@@ -531,25 +531,25 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 9 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     expect(adapter.list).toHaveBeenCalledTimes(1);
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
     await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(1));
-    expect(controller.getLoadSnapshot().status).toBe('loading');
+    expect(session.getSnapshot().loadStatus).toBe('loading');
     expect(adapter.list).toHaveBeenCalledTimes(1);
     const migrationSignal = adapter.migrateCanonicalUrl.mock.calls[0]?.[0]?.signal as AbortSignal;
     expect(migrationSignal.aborted).toBe(false);
 
     migration.reject(Object.assign(new Error('migration failed'), { code: 'request_failed' }));
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('stale_error');
+      expect(session.getSnapshot().loadStatus).toBe('stale_error');
     });
 
     expect(panel.getState().comments[0]?.commentText).toBe('https://example.com/a');
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(controller.getLoadSnapshot().error).toEqual({
+    expect(session.getSnapshot().loadError).toEqual({
       code: 'request_failed',
       message: 'migration failed',
     });
@@ -576,7 +576,7 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 9 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
@@ -593,7 +593,7 @@ describe('article-comments-sidebar-controller', () => {
 
     migrationToC.resolve();
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
       expect(panel.getState().comments[0]?.commentText).toBe('https://example.com/c');
     });
     expect(adapter.list).toHaveBeenCalledTimes(2);
@@ -611,16 +611,20 @@ describe('article-comments-sidebar-controller', () => {
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
     await activateSession(session);
-    const states: string[] = [controller.getLoadSnapshot().status];
-    const unsubscribe = controller.subscribeLoadState(() => {
-      states.push(controller.getLoadSnapshot().status);
+    const states: string[] = [session.getSnapshot().loadStatus];
+    let lastStatus = states[0];
+    const unsubscribe = session.subscribe(() => {
+      const nextStatus = session.getSnapshot().loadStatus;
+      if (nextStatus === lastStatus) return;
+      lastStatus = nextStatus;
+      states.push(nextStatus);
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => expect(panel.getState().busy).toBe(true));
     deferred.resolve([]);
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     unsubscribe();
 
@@ -671,8 +675,6 @@ describe('article-comments-sidebar-controller', () => {
       delete: vi.fn(async () => {}),
     };
     const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
-    const listener = vi.fn();
-    controller.subscribeLoadState(listener);
     await activateSession(session);
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
@@ -692,7 +694,7 @@ describe('article-comments-sidebar-controller', () => {
     await Promise.resolve();
 
     expect(panel.getState().comments).toEqual([]);
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot()).toMatchObject({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '' });
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     await controller.open({ focusComposer: true });
@@ -715,7 +717,7 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
     session.setComposerAttachment({ quoteText: 'keep after dispose', locator: null });
     const handlers = panel.getState().handlers;
@@ -749,14 +751,14 @@ describe('article-comments-sidebar-controller', () => {
     await activateSession(session);
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot().status).toBe('ready');
+      expect(session.getSnapshot().loadStatus).toBe('ready');
     });
 
     const savePromise = panel.getState().handlers.onSave('obsolete save');
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     await vi.waitFor(() => {
-      expect(controller.getLoadSnapshot()).toMatchObject({
-        status: 'ready',
+      expect(session.getSnapshot()).toMatchObject({
+        loadStatus: 'ready',
         contextKey: expect.stringContaining('/b'),
       });
     });
@@ -793,7 +795,7 @@ describe('article-comments-sidebar-controller', () => {
 
     expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(controller.getLoadSnapshot().status).toBe('ready');
+    expect(session.getSnapshot().loadStatus).toBe('ready');
   });
 
   it('keeps closed setContext side-effect free and defers A-to-B migration until reopen', async () => {
@@ -885,13 +887,13 @@ describe('article-comments-sidebar-controller', () => {
     revisionMocks.requestDataRevisionRetry.mockClear();
 
     revisionListener?.(['article_comments']);
-    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('stale_error'));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('stale_error'));
     expect(panel.getState().comments[0]?.commentText).toBe('ready');
     expect(revisionMocks.requestDataRevisionRetry).toHaveBeenCalledWith(['article_comments']);
 
     revisionMocks.requestDataRevisionRetry.mockClear();
     revisionListener?.(['article_comments']);
-    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('ready'));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('ready'));
     expect(panel.getState().comments).toEqual([]);
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
   });
@@ -929,7 +931,7 @@ describe('article-comments-sidebar-controller', () => {
     await reopened;
     await Promise.resolve();
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
-    expect(controller.getLoadSnapshot().status).toBe('idle');
+    expect(session.getSnapshot().loadStatus).toBe('idle');
   });
 
   it('ignores conversations revisions for adapters without a readonly identity lookup', async () => {
@@ -1148,7 +1150,7 @@ describe('article-comments-sidebar-controller', () => {
     expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 7 });
     expect(revisionMocks.requestDataRevisionRetry).not.toHaveBeenCalled();
 
-    await vi.waitFor(() => expect(controller.getLoadSnapshot().status).toBe('ready'));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('ready'));
     adapter.list.mockClear();
     revisionListener?.(['conversations']);
     await vi.waitFor(() => expect(adapter.findExistingContext).toHaveBeenCalledTimes(2));
