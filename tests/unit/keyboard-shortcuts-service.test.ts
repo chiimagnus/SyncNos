@@ -81,14 +81,11 @@ describe('keyboard shortcuts service', () => {
     expect(snapshot.managerAccess).toBe('manual');
   });
 
-  it('converts manager open failures into stable manual or unsupported results', async () => {
+  it('maps platform manager results without adding a second failure contract', async () => {
     openShortcutSettings.mockResolvedValueOnce({ opened: false, access: 'manual' });
     await expect(openKeyboardShortcutSettings()).resolves.toBe('manual');
 
     openShortcutSettings.mockResolvedValueOnce({ opened: false, access: 'unsupported' });
     await expect(openKeyboardShortcutSettings()).resolves.toBe('unsupported');
-
-    openShortcutSettings.mockRejectedValueOnce(new Error('unexpected'));
-    await expect(openKeyboardShortcutSettings()).resolves.toBe('manual');
   });
 });

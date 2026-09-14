@@ -26,33 +26,22 @@ function normalizeCommands(value: unknown): WebExtensionCommand[] {
 
 export function commandsOnCommand(listener: (command: string) => void): boolean {
   const { browser, chrome } = webextApis();
-  if (browser?.commands?.onCommand?.addListener) {
-    try {
-      browser.commands.onCommand.addListener(listener);
-      return true;
-    } catch (_error) {
-      // Try the callback-style API below when both surfaces exist.
-    }
+  const onCommand = browser?.commands?.onCommand ?? chrome?.commands?.onCommand;
+  if (!onCommand?.addListener) return false;
+
+  try {
+    onCommand.addListener(listener);
+    return true;
+  } catch (_error) {
+    // Commands support is optional; listener failure must not block background startup.
+    return false;
   }
-  if (chrome?.commands?.onCommand?.addListener) {
-    try {
-      chrome.commands.onCommand.addListener(listener);
-      return true;
-    } catch (_error) {
-      // Missing or partially implemented Commands APIs must not block extension startup.
-    }
-  }
-  return false;
 }
 
 export async function commandsGetAll(): Promise<WebExtensionCommand[]> {
   const { browser, chrome } = webextApis();
   if (browser?.commands?.getAll) {
-    try {
-      return normalizeCommands(await Promise.resolve(browser.commands.getAll()));
-    } catch (error) {
-      if (!chrome?.commands?.getAll) throw error;
-    }
+    return normalizeCommands(await Promise.resolve(browser.commands.getAll()));
   }
 
   if (chrome?.commands?.getAll) {

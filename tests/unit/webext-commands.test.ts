@@ -60,7 +60,7 @@ describe('WebExtension commands adapter', () => {
     expect(chromeAddListener).toHaveBeenCalledWith(listener);
   });
 
-  it('falls back to chrome when browser listener registration throws', () => {
+  it('contains browser listener registration failures without retrying another namespace', () => {
     const chromeAddListener = vi.fn();
     const listener = vi.fn();
     (globalThis as any).browser = {
@@ -74,8 +74,8 @@ describe('WebExtension commands adapter', () => {
     };
     (globalThis as any).chrome = { commands: { onCommand: { addListener: chromeAddListener } } };
 
-    expect(commandsOnCommand(listener)).toBe(true);
-    expect(chromeAddListener).toHaveBeenCalledWith(listener);
+    expect(commandsOnCommand(listener)).toBe(false);
+    expect(chromeAddListener).not.toHaveBeenCalled();
   });
 
   it('returns false when the commands API is unavailable', () => {
@@ -96,7 +96,7 @@ describe('WebExtension commands adapter', () => {
     ]);
   });
 
-  it('falls back to the chrome callback getAll API', async () => {
+  it('falls back to the chrome callback getAll API when the browser API is absent', async () => {
     (globalThis as any).chrome = {
       runtime: {},
       commands: {
@@ -109,6 +109,20 @@ describe('WebExtension commands adapter', () => {
     await expect(commandsGetAll()).resolves.toEqual([
       { name: 'open-syncnos-app', description: 'Open', shortcut: 'Ctrl+Shift+Y' },
     ]);
+  });
+
+  it('propagates browser getAll failures without retrying the chrome alias', async () => {
+    const chromeGetAll = vi.fn();
+    (globalThis as any).browser = {
+      commands: { getAll: vi.fn().mockRejectedValue(new Error('browser commands failed')) },
+    };
+    (globalThis as any).chrome = {
+      runtime: {},
+      commands: { getAll: chromeGetAll },
+    };
+
+    await expect(commandsGetAll()).rejects.toThrow('browser commands failed');
+    expect(chromeGetAll).not.toHaveBeenCalled();
   });
 
   it('rejects chrome getAll when runtime.lastError is set', async () => {

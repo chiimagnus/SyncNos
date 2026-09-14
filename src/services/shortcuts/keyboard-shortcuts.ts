@@ -4,7 +4,11 @@ import {
   openShortcutSettings,
   type ShortcutSettingsAccess,
 } from '@platform/webext/commands';
-import { KEYBOARD_SHORTCUT_COMMAND_IDS } from '@services/shortcuts/keyboard-shortcut-contract';
+import {
+  KEYBOARD_SHORTCUT_COMMAND_IDS,
+  KEYBOARD_SHORTCUT_COMMAND_ORDER,
+  type KeyboardShortcutCommandId,
+} from '@services/shortcuts/keyboard-shortcut-contract';
 
 export type KeyboardShortcutAction = 'open-popup' | 'capture-current-page' | 'open-app';
 export type KeyboardShortcutManagerAccess = 'openable' | 'manual' | 'unsupported';
@@ -21,11 +25,16 @@ export type KeyboardShortcutSnapshot = {
   managerAccess: KeyboardShortcutManagerAccess;
 };
 
-const SHORTCUT_ACTIONS = [
-  { action: 'open-popup', command: KEYBOARD_SHORTCUT_COMMAND_IDS.openPopup },
-  { action: 'capture-current-page', command: KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage },
-  { action: 'open-app', command: KEYBOARD_SHORTCUT_COMMAND_IDS.openApp },
-] as const;
+const ACTION_BY_COMMAND: Record<KeyboardShortcutCommandId, KeyboardShortcutAction> = {
+  [KEYBOARD_SHORTCUT_COMMAND_IDS.openPopup]: 'open-popup',
+  [KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage]: 'capture-current-page',
+  [KEYBOARD_SHORTCUT_COMMAND_IDS.openApp]: 'open-app',
+};
+
+const SHORTCUT_ACTIONS = KEYBOARD_SHORTCUT_COMMAND_ORDER.map((command) => ({
+  action: ACTION_BY_COMMAND[command],
+  command,
+}));
 
 function mapManagerAccess(access: ShortcutSettingsAccess): KeyboardShortcutManagerAccess {
   if (access === 'api' || access === 'chromium-url') return 'openable';
@@ -59,11 +68,7 @@ export async function readKeyboardShortcutSnapshot(): Promise<KeyboardShortcutSn
 }
 
 export async function openKeyboardShortcutSettings(): Promise<KeyboardShortcutOpenResult> {
-  try {
-    const result = await openShortcutSettings();
-    if (result.opened) return 'opened';
-    return result.access === 'unsupported' ? 'unsupported' : 'manual';
-  } catch (_error) {
-    return 'manual';
-  }
+  const result = await openShortcutSettings();
+  if (result.opened) return 'opened';
+  return result.access === 'unsupported' ? 'unsupported' : 'manual';
 }
