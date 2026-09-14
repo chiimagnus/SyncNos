@@ -18,6 +18,8 @@ npm ci
 npm run dev
 ```
 
+所有 `dev*` 入口会先执行 `npm run cli:link`，把 `cli/` 以 npm link 方式注册为当前用户的全局 `syncnos`。因此开发期间直接运行 `syncnos ...` 就会使用当前工作区源码；不需要反复全局安装发布版 npm 包。
+
 其它开发目标：
 
 ```bash
@@ -30,6 +32,7 @@ CLI：
 
 ```bash
 npm run cli:dev -- --help
+npm run cli:link
 npm run cli:check
 npm run cli:pack
 ```
