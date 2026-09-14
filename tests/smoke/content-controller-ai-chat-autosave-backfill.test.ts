@@ -70,6 +70,7 @@ function createHarness(options: {
   };
 
   const collector = {
+    getCaptureReadiness: () => 'ready' as const,
     capture: () => {
       const index = Math.min(captureCount, Math.max(0, options.snapshots.length - 1));
       captureCount += 1;
@@ -78,7 +79,14 @@ function createHarness(options: {
   };
 
   const collectorsRegistry = {
-    pickActive: () => options.collectorResolver?.() || { id: options.collectorId || 'gemini', collector },
+    pickActive: () => {
+      const resolved = options.collectorResolver?.() || { id: options.collectorId || 'gemini', collector };
+      if (!resolved) return null;
+      return {
+        ...resolved,
+        collector: { getCaptureReadiness: () => 'ready' as const, ...resolved.collector },
+      };
+    },
     list: () => [],
   };
 
