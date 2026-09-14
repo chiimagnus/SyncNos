@@ -277,9 +277,11 @@ describe('inpage comments sidebar toggle', () => {
     api.dispose();
   });
 
-  it('captures a multi-line page range with a V2 locator and rejects iframe execution', () => {
-    document.body.innerHTML = '<main><article id="story">Line one\nLine two</article></main>';
+  it('captures a long multi-line page range without truncating the canonical quote and rejects iframe execution', () => {
+    document.body.innerHTML = '<main><article id="story"></article></main>';
     const story = document.getElementById('story')!;
+    const quoteText = `Line one\nLine two ${'x'.repeat(240)}`;
+    story.textContent = quoteText;
     const text = story.firstChild!;
     const range = document.createRange();
     range.setStart(text, 0);
@@ -291,12 +293,12 @@ describe('inpage comments sidebar toggle', () => {
     const topFrameSource = createInpageCommentsDomSource({ window, document });
     const captured = topFrameSource.resolveComposerSelection();
     expect(topFrameSource.isTopFrame()).toBe(true);
-    expect(captured.selectionText).toBe('Line one\nLine two');
+    expect(captured.selectionText).toBe(quoteText);
     expect(captured.locator).toMatchObject({
       v: 2,
       textModelVersion: 'dom-text-v2',
       surfaceHint: 'inpage',
-      quote: { exact: 'Line one\nLine two' },
+      quote: { exact: quoteText },
     });
 
     const frameWindow = {

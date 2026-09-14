@@ -49,7 +49,7 @@ export function ThreadedCommentsPanel({
   const busy = discussion.busy;
   const canSubmitHighlightOnly = hasValidArticleCommentContent({
     parentId: null,
-    quoteText: snapshot.composerAttachment.displayQuote,
+    quoteText: snapshot.composerAttachment.quoteText,
     commentText: '',
     locator: snapshot.composerAttachment.locator,
   });
@@ -253,7 +253,7 @@ export function ThreadedCommentsPanel({
     open: snapshot.open,
     busy,
     focusComposerSignal: snapshot.focusComposerSignal,
-    quoteText: snapshot.composerAttachment.displayQuote,
+    quoteText: snapshot.composerAttachment.quoteText,
     focusIntent: discussion.state.focusIntent,
     dispatch: discussion.dispatch,
     composerRef: composerTextareaRef,
@@ -301,7 +301,7 @@ export function ThreadedCommentsPanel({
         </div>
         <CommentQuotePreview
           variant="composer"
-          text={snapshot.composerAttachment.displayQuote}
+          text={snapshot.composerAttachment.quoteText}
           onClear={() => {
             selectionAttachment.resetDedupe();
             void Promise.resolve(actions.clearComposerAttachment()).catch(() => {});

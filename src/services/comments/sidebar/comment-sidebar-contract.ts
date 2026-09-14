@@ -57,7 +57,7 @@ export type CommentSidebarSession = CommentSidebarHost & {
   requestOpen: (input?: CommentSidebarOpenInput) => void;
   requestClose: () => void;
   setComposerAttachment: (input: {
-    displayQuote: string;
+    quoteText: string;
     locator?: ArticleCommentLocator | null;
   }) => CommentSidebarComposerAttachment;
   clearComposerAttachment: (expectedSelectionRevision?: number) => boolean;

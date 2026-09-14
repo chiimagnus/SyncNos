@@ -110,12 +110,12 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   }
 
   function setComposerAttachment(input: {
-    displayQuote: string;
+    quoteText: string;
     locator?: CommentSidebarComposerAttachment['locator'];
   }): CommentSidebarComposerAttachment {
     if (disposed) return snapshot.composerAttachment;
     const nextAttachment = {
-      displayQuote: normalizeCommentSidebarQuoteText(input.displayQuote),
+      quoteText: normalizeCommentSidebarQuoteText(input.quoteText),
       locator: normalizeArticleCommentLocator(input.locator),
       selectionRevision: snapshot.composerAttachment.selectionRevision + 1,
     };
@@ -133,7 +133,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     }
     publish({
       composerAttachment: {
-        displayQuote: '',
+        quoteText: '',
         locator: null,
         selectionRevision: snapshot.composerAttachment.selectionRevision + 1,
       },

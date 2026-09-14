@@ -22,7 +22,7 @@ function createMockPanel() {
   let snapshot = {
     open: false,
     busy: false,
-    composerAttachment: { displayQuote: '', locator: null, selectionRevision: 0 },
+    composerAttachment: { quoteText: '', locator: null, selectionRevision: 0 },
     comments: [] as any[],
     focusComposerSignal: 0,
     lastOpenSource: null as string | null,
@@ -66,7 +66,7 @@ function createMockPanel() {
     getState: () => ({
       open: snapshot.open,
       busy: snapshot.busy,
-      quoteText: snapshot.composerAttachment.displayQuote,
+      quoteText: snapshot.composerAttachment.quoteText,
       comments: snapshot.comments,
       handlers: handlers(),
       focusCount: snapshot.focusComposerSignal,
@@ -131,7 +131,7 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const snapshot = session.getSnapshot();
-    expect(snapshot.composerAttachment.displayQuote).toBe('Quoted');
+    expect(snapshot.composerAttachment.quoteText).toBe('Quoted');
     expect(snapshot.open).toBe(true);
     expect(snapshot.contextKey).toContain('/article');
     expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
@@ -161,7 +161,7 @@ describe('article-comments-sidebar-controller', () => {
     await controller.open({ ensureContext: true });
     adapter.list.mockClear();
 
-    session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
+    session.setComposerAttachment({ quoteText: 'Quoted', locator: null });
 
     const handlers = panel.getState().handlers;
     expect(typeof handlers.onSave).toBe('function');
@@ -176,7 +176,7 @@ describe('article-comments-sidebar-controller', () => {
       locator: null,
     });
     expect(adapter.list).toHaveBeenCalled();
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });
 
   it('saves an empty root only when the composer carries a valid quote locator', async () => {
@@ -200,7 +200,7 @@ describe('article-comments-sidebar-controller', () => {
     await controller.open({ ensureContext: true });
     const handlers = panel.getState().handlers;
 
-    session.setComposerAttachment({ displayQuote: 'Quoted', locator });
+    session.setComposerAttachment({ quoteText: 'Quoted', locator });
     expect(await handlers.onSave('')).toEqual({ ok: true, createdRootId: 92 });
     expect(adapter.addRoot).toHaveBeenCalledWith({
       canonicalUrl: 'https://example.com/article',
@@ -211,12 +211,12 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     adapter.addRoot.mockClear();
-    session.setComposerAttachment({ displayQuote: 'Quoted', locator: null });
+    session.setComposerAttachment({ quoteText: 'Quoted', locator: null });
     expect(await handlers.onSave('')).toBe(false);
     expect(adapter.addRoot).not.toHaveBeenCalled();
 
     session.setComposerAttachment({
-      displayQuote: 'Quoted',
+      quoteText: 'Quoted',
       locator: { ...locator, quote: { ...locator.quote, exact: 'Different quote' } },
     });
     expect(await handlers.onSave('')).toBe(false);
@@ -258,7 +258,7 @@ describe('article-comments-sidebar-controller', () => {
 
     await handlers.onComposerSelectionRequest({ trigger: 'button' });
     expect(resolveComposerSelection).toHaveBeenNthCalledWith(1, { trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Quoted from page');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('Quoted from page');
 
     await handlers.onSave('root comment');
     expect(adapter.addRoot).toHaveBeenLastCalledWith({
@@ -268,11 +268,11 @@ describe('article-comments-sidebar-controller', () => {
       commentText: 'root comment',
       locator,
     });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
 
     await handlers.onComposerSelectionRequest({ trigger: 'button' });
     expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });
 
   it('ignores stale composer selection responses and keeps latest result', async () => {
@@ -307,11 +307,11 @@ describe('article-comments-sidebar-controller', () => {
 
     fast.resolve({ selectionText: 'new quote', locator: null });
     await newRequest;
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('new quote');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('new quote');
 
     slow.resolve({ selectionText: 'old quote', locator: null });
     await oldRequest;
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('new quote');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('new quote');
   });
 
   it('preserves quote text when locator is missing and saves with null locator', async () => {
@@ -339,7 +339,7 @@ describe('article-comments-sidebar-controller', () => {
 
     const handlers = panel.getState().handlers;
     await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Selection text only');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('Selection text only');
 
     await handlers.onSave('comment');
     expect(adapter.addRoot).toHaveBeenLastCalledWith({
@@ -370,12 +370,12 @@ describe('article-comments-sidebar-controller', () => {
     };
 
     createArticleCommentsSidebarController({ session, adapter: adapter as any });
-    const first = session.setComposerAttachment({ displayQuote: 'first quote', locator: firstLocator });
+    const first = session.setComposerAttachment({ quoteText: 'first quote', locator: firstLocator });
     const savePromise = panel.getState().handlers.onSave('comment');
     await vi.waitFor(() => {
       expect(adapter.addRoot).toHaveBeenCalledTimes(1);
     });
-    const second = session.setComposerAttachment({ displayQuote: 'second quote', locator: null });
+    const second = session.setComposerAttachment({ quoteText: 'second quote', locator: null });
 
     save.resolve({ id: 7 });
     await savePromise;
@@ -423,10 +423,10 @@ describe('article-comments-sidebar-controller', () => {
 
     const handlers = panel.getState().handlers;
     await handlers.onComposerSelectionRequest({ trigger: 'button' });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Quote A');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('Quote A');
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
 
     await handlers.onSave('comment in b');
     expect(adapter.addRoot).toHaveBeenLastCalledWith({
@@ -690,14 +690,14 @@ describe('article-comments-sidebar-controller', () => {
     });
     expect(adapter.list).toHaveBeenCalledTimes(1);
 
-    session.setComposerAttachment({ displayQuote: 'keep draft', locator: null });
+    session.setComposerAttachment({ quoteText: 'keep draft', locator: null });
     controller.setContext({ canonicalUrl: 'https://linux.do/t/topic-slug/123/1', conversationId: 9 });
 
     await Promise.resolve();
     await Promise.resolve();
 
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('keep draft');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('keep draft');
     expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
   });
 
@@ -763,7 +763,7 @@ describe('article-comments-sidebar-controller', () => {
     await vi.waitFor(() => {
       expect(controller.getLoadSnapshot().status).toBe('ready');
     });
-    session.setComposerAttachment({ displayQuote: 'keep after dispose', locator: null });
+    session.setComposerAttachment({ quoteText: 'keep after dispose', locator: null });
     const handlers = panel.getState().handlers;
     const savePromise = handlers.onSave('late save');
     const deletePromise = handlers.onDelete(7);
@@ -779,7 +779,7 @@ describe('article-comments-sidebar-controller', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(session.getSnapshot().composerAttachment.displayQuote).toBe('keep after dispose');
+    expect(session.getSnapshot().composerAttachment.quoteText).toBe('keep after dispose');
     expect(adapter.list).toHaveBeenCalledTimes(1);
   });
 

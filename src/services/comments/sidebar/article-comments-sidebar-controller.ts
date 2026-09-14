@@ -235,7 +235,7 @@ export function createArticleCommentsSidebarController(input: {
     const quoteText = normalizeCommentSidebarQuoteText(payload?.selectionText);
     if (!quoteText) return;
     session.setComposerAttachment({
-      displayQuote: quoteText,
+      quoteText: quoteText,
       locator: normalizeArticleCommentLocator(payload?.locator),
     });
   };
@@ -542,7 +542,7 @@ export function createArticleCommentsSidebarController(input: {
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment save');
 
         const attachment = session.getSnapshot().composerAttachment;
-        const quoteText = normalizeCommentSidebarQuoteText(attachment.displayQuote);
+        const quoteText = normalizeCommentSidebarQuoteText(attachment.quoteText);
         const locator = quoteText ? attachment.locator : null;
         if (!hasValidArticleCommentContent({ parentId: null, quoteText, commentText: value, locator })) return false;
         const selectionRevision = attachment.selectionRevision;

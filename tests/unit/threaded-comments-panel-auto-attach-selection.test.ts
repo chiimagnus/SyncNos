@@ -122,7 +122,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const onSave = vi.fn(async () => ({ ok: true, createdRootId: 7 }));
     driver.replaceActionCallbacks({ onSave } as any);
     driver.session.setComposerAttachment({
-      displayQuote: 'Quoted text',
+      quoteText: 'Quoted text',
       locator: {
         v: 1,
         env: 'app',
@@ -151,7 +151,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const onSave = vi.fn(async () => ({ ok: true, createdRootId: 8 }));
     driver.replaceActionCallbacks({ onSave } as any);
     driver.session.setComposerAttachment({
-      displayQuote: 'Quoted text',
+      quoteText: 'Quoted text',
       locator: {
         v: 1,
         env: 'app',

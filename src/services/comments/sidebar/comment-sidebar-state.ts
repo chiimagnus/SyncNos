@@ -17,7 +17,7 @@ export type CommentSidebarComposerSelectionRequest = {
 };
 
 export type CommentSidebarComposerAttachment = {
-  displayQuote: string;
+  quoteText: string;
   locator: ArticleCommentLocator | null;
   selectionRevision: number;
 };
@@ -58,7 +58,7 @@ export function createCommentSidebarHostSnapshot(): CommentSidebarHostSnapshot {
   return {
     open: false,
     busy: false,
-    composerAttachment: { displayQuote: '', locator: null, selectionRevision: 0 },
+    composerAttachment: { quoteText: '', locator: null, selectionRevision: 0 },
     comments: [],
     focusComposerSignal: 0,
     lastOpenSource: null,

@@ -1,7 +1,7 @@
 import { mountThreadedCommentsPanel } from '@ui/comments';
 import type { CommentSidebarItem, CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import { createInpageCommentRootSource } from '@ui/comments/inpage-comment-root-source';
-import { toDisplayCommentQuote } from '@services/comments/locator/comment-quote-policy';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import type { InpageCommentsDomSource } from '@services/bootstrap/inpage-comments-panel-content-handlers';
 
 export type InpageCommentItem = CommentSidebarItem;
@@ -93,7 +93,7 @@ export function createInpageCommentsDomSource(input: {
         const roots = rootSource.capture(selection);
         if (!selection || selection.rangeCount !== 1 || !roots) return { selectionText: '', locator: null };
         const range = selection.getRangeAt(0);
-        const selectionText = toDisplayCommentQuote(range.toString());
+        const selectionText = toCanonicalCommentQuote(range.toString());
         if (!selectionText) return { selectionText: '', locator: null };
         const locator = rootSource.captureAnchor(selection);
         return { selectionText, locator };

@@ -1,3 +1,4 @@
+import { toDisplayCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 
 type CommentQuotePreviewProps = {
@@ -9,8 +10,8 @@ type CommentQuotePreviewProps = {
 };
 
 export function CommentQuotePreview({ text, variant, invalid = false, onClear, onLocate }: CommentQuotePreviewProps) {
-  const normalized = String(text || '').trim();
-  if (!normalized) return null;
+  const displayText = toDisplayCommentQuote(text);
+  if (!displayText.trim()) return null;
   const className =
     variant === 'composer'
       ? 'webclipper-inpage-comments-panel__quote'
@@ -21,7 +22,9 @@ export function CommentQuotePreview({ text, variant, invalid = false, onClear, o
       data-variant={variant}
       data-locator-invalid={invalid ? '1' : undefined}
     >
-      <div className="webclipper-inpage-comments-panel__text webclipper-inpage-comments-panel__quote-text">{text}</div>
+      <div className="webclipper-inpage-comments-panel__text webclipper-inpage-comments-panel__quote-text">
+        {displayText}
+      </div>
       {invalid ? <span className="webclipper-inpage-comments-panel__quote-status">Unavailable</span> : null}
       {onLocate ? (
         <button

@@ -103,27 +103,33 @@ describe('Threaded comments panel shortcuts', () => {
     mounted.cleanup();
   });
 
-  it('sends a highlight-only root on Cmd+Enter when quote and locator match', async () => {
+  it('submits a long multi-line highlight-only root while rendering only a preview', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
+    const quoteText = `first line\n${'x'.repeat(240)}`;
 
     const onSave = vi.fn().mockResolvedValue({ ok: true, createdRootId: 2 });
     const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     driver.replaceActionCallbacks({ onSave });
     driver.session.setComposerAttachment({
-      displayQuote: 'highlight',
+      quoteText,
       locator: {
         v: 1,
         env: 'app',
-        quote: { type: 'TextQuoteSelector', exact: 'highlight' },
-        position: { type: 'TextPositionSelector', start: 0, end: 9 },
+        quote: { type: 'TextQuoteSelector', exact: quoteText },
+        position: { type: 'TextPositionSelector', start: 0, end: quoteText.length },
       },
     });
     await flushReactScheduler();
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
-    const textarea = panel.shadowRoot!.querySelector(
+    const shadow = panel.shadowRoot!;
+    const preview = shadow.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent || '';
+    expect(preview).toMatch(/…$/);
+    expect(preview.length).toBeLessThan(quoteText.length);
+
+    const textarea = shadow.querySelector(
       '.webclipper-inpage-comments-panel__composer-textarea',
     ) as HTMLTextAreaElement;
     textarea.focus();
@@ -139,6 +145,7 @@ describe('Threaded comments panel shortcuts', () => {
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith('');
+    expect(driver.session.getSnapshot().composerAttachment.quoteText).toBe(quoteText);
     mounted.cleanup();
   });
 
