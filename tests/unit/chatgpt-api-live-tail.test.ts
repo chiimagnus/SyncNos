@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  augmentChatgptApiSnapshotWithLiveTurn,
-  CHATGPT_API_LIVE_TAIL_REASON,
-  CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON,
-} from '@services/integrations/chatgpt/api-live-tail';
+import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
+
+const LIVE_TAIL_REASON = 'chatgpt_api_live_tail_unconfirmed';
+const LIVE_TAIL_UNRESOLVED_REASON = 'chatgpt_api_live_tail_unresolved';
 
 function snapshot(messages: any[]) {
   return {
@@ -52,7 +51,7 @@ describe('ChatGPT API live-turn augmentation', () => {
     expect(result.captureMeta).toMatchObject({
       completeness: 'partial',
       identityVerified: true,
-      reasons: [CHATGPT_API_LIVE_TAIL_REASON],
+      reasons: [LIVE_TAIL_REASON],
     });
   });
 
@@ -65,7 +64,7 @@ describe('ChatGPT API live-turn augmentation', () => {
       'user-1',
       'assistant-1',
     ]);
-    expect(result.captureMeta.reasons).toContain(CHATGPT_API_LIVE_TAIL_REASON);
+    expect(result.captureMeta.reasons).toContain(LIVE_TAIL_REASON);
   });
 
   it('updates the same assistant key only when the visible content safely extends the backend content', () => {
@@ -81,7 +80,7 @@ describe('ChatGPT API live-turn augmentation', () => {
       contentMarkdown: 'hello world',
       sequence: 1,
     });
-    expect(result.captureMeta.reasons).toContain(CHATGPT_API_LIVE_TAIL_REASON);
+    expect(result.captureMeta.reasons).toContain(LIVE_TAIL_REASON);
   });
 
   it('leaves an already matching backend assistant canonical and complete', () => {
@@ -112,7 +111,7 @@ describe('ChatGPT API live-turn augmentation', () => {
     expect(result.messages[1].contentMarkdown).toBe('backend branch');
     expect(result.captureMeta).toMatchObject({
       completeness: 'partial',
-      reasons: [CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON],
+      reasons: [LIVE_TAIL_UNRESOLVED_REASON],
     });
   });
 
@@ -124,13 +123,13 @@ describe('ChatGPT API live-turn augmentation', () => {
     const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('question', 'visible branch'));
 
     expect(result.messages.map((message: any) => message.messageKey)).toEqual(['user-1', 'backend-assistant']);
-    expect(result.captureMeta.reasons).toContain(CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON);
+    expect(result.captureMeta.reasons).toContain(LIVE_TAIL_UNRESOLVED_REASON);
   });
 
   it('marks unsafe DOM identity partial and rejects conversation identity changes', () => {
     const api = snapshot([{ messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 }]);
     const unsafe = augmentChatgptApiSnapshotWithLiveTurn(api, { kind: 'unsafe' });
-    expect(unsafe.captureMeta.reasons).toContain(CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON);
+    expect(unsafe.captureMeta.reasons).toContain(LIVE_TAIL_UNRESOLVED_REASON);
 
     expect(() =>
       augmentChatgptApiSnapshotWithLiveTurn(api, {

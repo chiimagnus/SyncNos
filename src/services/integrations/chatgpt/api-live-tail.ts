@@ -1,9 +1,9 @@
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
-export const CHATGPT_API_LIVE_TAIL_REASON = 'chatgpt_api_live_tail_unconfirmed';
-export const CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON = 'chatgpt_api_live_tail_unresolved';
+const CHATGPT_API_LIVE_TAIL_REASON = 'chatgpt_api_live_tail_unconfirmed';
+const CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON = 'chatgpt_api_live_tail_unresolved';
 
-export type ChatgptApiLiveTurnCapture =
+type ChatgptApiLiveTurnCapture =
   | { kind: 'none' }
   | { kind: 'identity_changed' }
   | { kind: 'unsafe' }
