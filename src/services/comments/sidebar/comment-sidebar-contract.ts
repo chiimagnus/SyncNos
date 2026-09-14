@@ -1,4 +1,3 @@
-import type { CommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import type {
   CommentSidebarComposerAttachment,
   CommentSidebarHostActionCallbacks,
@@ -24,8 +23,6 @@ export type CommentSidebarOpenInput = {
   focusComposer?: boolean;
   source?: string;
 };
-
-export type CommentSidebarThreadGraph = CommentThreadGraph<CommentSidebarItem>;
 
 export type CommentSidebarHost = {
   getSnapshot: () => CommentSidebarHostSnapshot;
