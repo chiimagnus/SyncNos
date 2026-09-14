@@ -1,49 +1,26 @@
 ---
-title: Capture content
-description: Learn what SyncNos can save and when manual capture is needed.
+title: Capture overview
+description: Pick the right save method for each content type and see which sources support auto-save.
 ---
 
-## What you can save
+SyncNos saves content to the browser [local library](/docs/en/library/) first. No sync service is required.
 
-- AI conversations
-- Web articles
-- YouTube / Bilibili video content
+![SyncNos popup](/assets/product/popup-screenshots.png)
 
-Saved content goes to your [local library](/docs/en/library/) first.
+## Choose a content type
 
-## AI conversations
+- [AI conversations](/docs/en/capture-ai-chats/): ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai
+- [Web articles](/docs/en/capture-articles/): save readable article content and continue with highlights and comments
+- [Videos](/docs/en/capture-videos/): save YouTube / Bilibili subtitles and available video metadata
 
-| Platform | Save method |
-| --- | --- |
-| ChatGPT | Manual |
-| Gemini | Can auto-save |
-| Google AI Studio | Manual |
-| DeepSeek | Can auto-save |
-| Kimi | Can auto-save |
-| Doubao | Can auto-save |
-| Yuanbao | Can auto-save |
-| Poe | Can auto-save |
-| Notion AI | Can auto-save |
-| z.ai | Can auto-save |
+## Save entry points
 
-Use manual save for ChatGPT and Google AI Studio so older conversation history is not missed.
+Supported pages expose a current-page capture action in the SyncNos popup or in-page UI. After saving, return to the local library and confirm the result.
 
-ChatGPT also supports optional **Advanced capture**. If it stops working, turn it off and save again.
+Auto-save availability depends on the AI platform. Web articles and videos use manual capture.
 
-## Web articles
+## Images and text
 
-Open an article and save it manually. SyncNos keeps the readable text and tries to preserve useful details such as title, author, and publication time.
+AI conversations and web articles can cache content images locally. An image failure does not block the text from being saved.
 
-An image failure does not prevent the article text from being saved.
-
-## Video content
-
-YouTube and Bilibili can save subtitles already available on the page, including timing information when available.
-
-Videos can still be saved without subtitles. SyncNos does not download the audio or video file itself.
-
-## Images
-
-Images from AI conversations and web articles can be cached locally. Image failures do not affect text that has already been saved.
-
-To retry image caching for existing content, choose **Cache images** from the detail **More** menu.
+To retry images for an existing item, choose **Cache images** from the detail **More** menu.

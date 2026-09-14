@@ -1,33 +1,33 @@
 ---
-title: Use your library
-description: Read, search, comment on, and reuse content already saved in SyncNos.
+title: Use your local library
+description: Search, read, and continue working with content already saved in SyncNos.
 ---
 
 ## Browse and search
 
-Saved AI conversations, web articles, and videos all appear in your local library.
+Saved AI conversations, web articles, and videos all appear in the local library.
 
-Search for an item or open its details to keep reading.
+Use search to find an item, then open its detail view to read the full content.
 
-## Images
+## Detail actions
 
-The detail **More** menu shows the image cache status.
+The detail view exposes actions relevant to the current item, including:
 
-Choose **Cache images** when you want to save the remaining images locally.
+- **Copy full Markdown**
+- **Open original link**
+- Open a synced Notion, Obsidian, Feishu, or GitHub destination when available
+- Copy the remote page link for sync targets that expose one
 
-## Highlights and comments
+## Image cache
 
-Web articles support highlights, comments, and replies.
+The detail **More** menu shows image counts and cache status.
 
-You can also save a highlight without adding comment text.
+Choose **Cache images** to save remaining images locally. Image failures do not remove text that has already been saved.
 
-## Reuse content in AI
+## Keep using local content
 
-- Type `$` in a supported AI input to search your local library and insert saved content
-- Use **Chat with AI** to open your configured AI platform; you still decide whether to send anything
-
-These features use your local library directly and do not require an external sync service.
-
-## Insight
-
-Insight shows capture counts, source distribution, and trends from your local content.
+- [Highlights & comments](/docs/en/comments/)
+- [Reading, narration & outlines](/docs/en/reader/)
+- [$ Mention](/docs/en/dollar-mention/)
+- [Data overview](/docs/en/insights/)
+- [Export & backup](/docs/en/export-backup/)

@@ -89,7 +89,8 @@ Article discussion sidebar: exact quotes, compact threads, and one active reply 
 ## Documentation
 
 - [User docs: start here](https://chiimagnus.github.io/SyncNos/docs/en/)
-- [Capture content](https://chiimagnus.github.io/SyncNos/docs/en/capture/)
+- [Capture](https://chiimagnus.github.io/SyncNos/docs/en/capture/)
+- [Feature overview](https://chiimagnus.github.io/SyncNos/docs/en/features/)
 - [Sync to external services](https://chiimagnus.github.io/SyncNos/docs/en/sync/)
 - [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/)
 - [Privacy](PRIVACY.md)

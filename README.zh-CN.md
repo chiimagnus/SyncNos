@@ -89,7 +89,8 @@ WebClipper Popup：保存并浏览已采集内容。
 ## 文档
 
 - [用户文档：从这里开始](https://chiimagnus.github.io/SyncNos/docs/)
-- [采集内容](https://chiimagnus.github.io/SyncNos/docs/capture/)
+- [采集方式](https://chiimagnus.github.io/SyncNos/docs/capture/)
+- [功能总览](https://chiimagnus.github.io/SyncNos/docs/features/)
 - [同步到外部服务](https://chiimagnus.github.io/SyncNos/docs/sync/)
 - [导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/)
 - [隐私政策](PRIVACY.md)

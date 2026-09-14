@@ -1,49 +1,26 @@
 ---
-title: 采集内容
-description: 了解 SyncNos 能保存什么，以及什么时候需要手动保存。
+title: 采集总览
+description: 按内容类型选择正确的保存方式，并了解哪些来源支持自动保存。
 ---
 
-## 能保存什么
+SyncNos 先把内容保存到浏览器中的[本地库](/docs/library/)，不要求先连接任何同步服务。
 
-- AI 对话
-- 网页文章
-- YouTube / Bilibili 视频内容
+![SyncNos Popup](/assets/product/popup-screenshots.png)
 
-保存后的内容都会先进入[本地库](/docs/library/)。
+## 选择内容类型
 
-## AI 对话
+- [AI 对话](/docs/capture-ai-chats/)：ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai
+- [网页文章](/docs/capture-articles/)：保存正文、标题等可读内容，并可继续做划线和评论
+- [视频](/docs/capture-videos/)：保存 YouTube / Bilibili 字幕与可用的视频信息
 
-| 平台 | 保存方式 |
-| --- | --- |
-| ChatGPT | 手动保存 |
-| Gemini | 可自动保存 |
-| Google AI Studio | 手动保存 |
-| DeepSeek | 可自动保存 |
-| Kimi | 可自动保存 |
-| 豆包 | 可自动保存 |
-| 元宝 | 可自动保存 |
-| Poe | 可自动保存 |
-| Notion AI | 可自动保存 |
-| z.ai | 可自动保存 |
+## 保存入口
 
-ChatGPT 和 Google AI Studio 建议手动保存，避免遗漏未显示在页面上的历史内容。
+支持的页面会在 SyncNos Popup 或页内入口显示当前页采集操作。保存完成后回到本地库确认结果即可。
 
-ChatGPT 还可以开启**高级采集**。如果它失效，关闭高级采集后重新保存即可。
+AI 对话是否支持自动保存取决于具体平台；网页文章和视频使用手动保存。
 
-## 网页文章
+## 图片与正文
 
-打开文章后手动保存即可。SyncNos 会尽量保留正文、标题、作者和发布时间等信息。
+AI 对话和网页文章可以把内容图片缓存到本地。图片获取失败不会阻断正文保存。
 
-图片保存失败不会影响正文。
-
-## 视频内容
-
-YouTube 和 Bilibili 支持保存页面中已有的字幕，并尽量保留时间信息。
-
-没有字幕时仍可保存视频条目；SyncNos 不下载音视频文件。
-
-## 图片
-
-AI 对话和网页文章中的图片可以缓存到本地。图片失败不会影响已经保存的正文。
-
-已有内容需要重新缓存图片时，在详情页的**更多**菜单中选择**缓存图片**。
+已有条目的图片需要重试时，在详情页的**更多**菜单中选择**缓存图片**。

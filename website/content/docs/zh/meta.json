@@ -1,11 +1,13 @@
 {
   "title": "SyncNos 文档",
   "pages": [
-    { "title": "开始使用", "pages": ["index", "install", "capture"] },
+    { "title": "开始使用", "pages": ["index", "install"] },
+    { "title": "采集方式", "pages": ["capture", "capture-ai-chats", "capture-articles", "capture-videos"] },
     {
-      "title": "管理与流转",
-      "pages": ["library", "sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github", "export-backup"]
+      "title": "功能",
+      "pages": ["features", "library", "comments", "reader", "dollar-mention", "insights", "export-backup"]
     },
+    { "title": "同步", "pages": ["sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github"] },
     { "title": "高级与帮助", "pages": ["cli", "privacy", "faq"] }
   ]
 }

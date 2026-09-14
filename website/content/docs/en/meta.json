@@ -1,11 +1,13 @@
 {
   "title": "SyncNos Docs",
   "pages": [
-    { "title": "Getting started", "pages": ["index", "install", "capture"] },
+    { "title": "Getting started", "pages": ["index", "install"] },
+    { "title": "Capture", "pages": ["capture", "capture-ai-chats", "capture-articles", "capture-videos"] },
     {
-      "title": "Work with your data",
-      "pages": ["library", "sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github", "export-backup"]
+      "title": "Features",
+      "pages": ["features", "library", "comments", "reader", "dollar-mention", "insights", "export-backup"]
     },
+    { "title": "Sync", "pages": ["sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github"] },
     { "title": "Advanced & help", "pages": ["cli", "privacy", "faq"] }
   ]
 }

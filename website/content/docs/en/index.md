@@ -26,7 +26,8 @@ From there, you can:
 
 ## Learn more
 
-- [Use your library](/docs/en/library/): read, search, comment on, and reuse saved content
+- [Capture overview](/docs/en/capture/): see the exact save flow for AI chats, articles, and videos
+- [Feature overview](/docs/en/features/): highlights, narration, `$` insert, local stats, and more
+- [Sync](/docs/en/sync/): connect Notion, Obsidian, Feishu, or GitHub
 - [Automate with the CLI](/docs/en/cli/): let local tools or AI agents use SyncNos
-- [Privacy & data](/docs/en/privacy/): understand network access, credentials, and permissions
 - [Troubleshooting & FAQ](/docs/en/faq/): start here when something does not work

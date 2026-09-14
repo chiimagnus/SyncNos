@@ -7,6 +7,9 @@
 - **采集 AI 对话**：支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai；其中 ChatGPT 与 Google AI Studio 使用手动完整采集，其余支持站点可按设置自动保存。
 - **采集网页文章**：手动提取普通 http(s) 页面正文和可用元数据，并对部分站点使用专门处理。
 - **采集视频内容**：保存 YouTube、Bilibili 页面内容，并在页面已经加载字幕 / transcript 时一并采集时间信息；没有字幕时仍可保存 Video。
+- **本地阅读与整理**：搜索本地库；网页文章支持划线、评论和回复；文章与视频支持阅读排版、主题、朗读和大纲；AI 对话支持对话大纲。
+- **在 AI 中复用**：在支持的 AI 输入框中使用 `$` 搜索并插入本地条目；不会自动发送消息。
+- **数据概览**：从本地库查看采集数量、趋势、来源分布、最长对话和评论较多的条目。
 - **同步与导出**：Notion（OAuth）、Obsidian（Local REST API 本地直写）、飞书云文档（DocX）、GitHub 仓库；也可导出 Markdown / JSON，或创建 Backup ZIP。
 
 ## 安装
@@ -19,6 +22,9 @@
 
 - [官网](https://chiimagnus.github.io/SyncNos/)
 - [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
+- [采集方式](https://chiimagnus.github.io/SyncNos/docs/capture/)
+- [功能总览](https://chiimagnus.github.io/SyncNos/docs/features/)
+- [同步](https://chiimagnus.github.io/SyncNos/docs/sync/)
 - [导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/)
 - [源码 (GitHub)](https://github.com/chiimagnus/SyncNos)
 - [社区讨论 (linux.do)](https://linux.do/t/topic/1635410)

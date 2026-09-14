@@ -30,11 +30,6 @@ const LANGUAGES = [
   { id: 'en', source: path.join(CONTENT, 'en'), route: '/docs/en' },
 ];
 
-const ROUTE_REDIRECTS = [
-  ['/docs/features/', '/docs/library/'],
-  ['/docs/en/features/', '/docs/en/library/'],
-];
-
 function parseFrontmatter(source) {
   const normalized = String(source).replaceAll('\r\n', '\n');
   if (!normalized.startsWith('---\n')) return { data: {}, body: normalized };
@@ -242,19 +237,6 @@ async function copyProjectAssets() {
   }
 }
 
-async function writeRedirects() {
-  for (const [from, to] of ROUTE_REDIRECTS) {
-    const out = outputPathFor(from);
-    const target = `${BASE_PATH}${to}`;
-    const canonical = `${SITE_ORIGIN}${target}`;
-    await mkdir(path.dirname(out), { recursive: true });
-    await writeFile(
-      out,
-      `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${target}"><link rel="canonical" href="${canonical}"><title>Moved · SyncNos Docs</title></head><body><p>This page moved to <a href="${target}">${target}</a>.</p></body></html>`,
-    );
-  }
-}
-
 async function appendDocsToSitemap(pages) {
   const sitemapPath = path.join(OUTPUT, 'sitemap.xml');
   let sitemap = await readFile(sitemapPath, 'utf8');
@@ -310,7 +292,6 @@ async function main() {
     }
   }
 
-  await writeRedirects();
   await appendDocsToSitemap(allPages);
   console.log(`Built ${allPages.length} docs pages into ${path.relative(ROOT, OUTPUT)}`);
 }
