@@ -27,8 +27,13 @@ If you later change permissions, disconnect Feishu in SyncNos and connect again.
 
 Use one of these:
 
-- **Proxy**: deploy the repository's [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth), enter its **Proxy URL** in SyncNos, and leave Client Secret empty
-- **Direct**: enter the **Client Secret** in SyncNos and leave Proxy URL empty
+- **Proxy**
+  1. Deploy the repository's [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth)
+  2. Enter the **Proxy URL**
+  3. Leave Client Secret empty
+- **Direct**
+  1. Enter the **Client Secret**
+  2. Leave Proxy URL empty
 
 ## 3. Connect SyncNos
 

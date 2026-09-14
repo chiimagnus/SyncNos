@@ -25,4 +25,6 @@ description: 安装 SyncNos 浏览器扩展，并确认第一次采集可以正�
 
 ## 需要 CLI？
 
-普通使用不需要安装 CLI。只有希望让本机自动化或 AI Agent 访问正在运行的 SyncNos 浏览器数据时，才需要继续阅读[使用 CLI 自动化](/docs/cli/)。
+普通使用不需要安装 CLI。
+
+需要本机自动化或 AI Agent 时，再阅读[使用 CLI 自动化](/docs/cli/)。

@@ -27,8 +27,13 @@ drive:drive
 
 二选一即可：
 
-- **Proxy**：部署仓库提供的 [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth)，在 SyncNos 中填写 **Proxy URL**，Client Secret 留空
-- **Direct**：在 SyncNos 中填写 **Client Secret**，Proxy URL 留空
+- **Proxy**
+  1. 部署仓库提供的 [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth)
+  2. 填写 **Proxy URL**
+  3. Client Secret 留空
+- **Direct**
+  1. 填写 **Client Secret**
+  2. Proxy URL 留空
 
 ## 3. 连接 SyncNos
 

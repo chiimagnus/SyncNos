@@ -25,4 +25,6 @@ See [Capture content](/docs/en/capture/) for source-specific save behavior.
 
 ## Need the CLI?
 
-You do not need the CLI for ordinary browser use. Install it only if local automation or an AI agent needs access to a running SyncNos browser profile. See [Automate with the CLI](/docs/en/cli/).
+You do not need the CLI for ordinary browser use.
+
+For local automation or AI agents, see [Automate with the CLI](/docs/en/cli/).
