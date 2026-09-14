@@ -514,4 +514,22 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls.map((call) => call.type)).toEqual(['fetchActiveTabArticle']);
     expect(harness.capture).not.toHaveBeenCalled();
   });
+
+  it('reports unsupported-page errors through the same progress channel before rejecting', async () => {
+    const service = createCurrentPageCaptureService({
+      runtime: null,
+      collectorsRegistry: null,
+      videoCapture: { captureVideoTranscript: vi.fn() } as any,
+    });
+    const progress: any[] = [];
+
+    await expect(service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
+      t('currentPageCannotBeCaptured'),
+    );
+
+    expect(progress.at(-1)).toEqual({
+      message: t('currentPageCannotBeCaptured'),
+      kind: 'error',
+    });
+  });
 });

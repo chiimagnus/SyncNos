@@ -50,4 +50,29 @@ describe('background-router current page capture relay', () => {
     expect(response.data?.kind).toBe('unsupported');
     expect(tabsSendMessage).not.toHaveBeenCalled();
   });
+
+  it('relays shortcut capture with only the controlled shortcut source', async () => {
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 11, url: 'https://example.com/article' }] as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { title: 'Saved' }, error: null });
+
+    const router = createTestBackgroundRouter();
+    const response = await router.dispatch({ type: 'captureActiveTabCurrentPage', source: 'shortcut' });
+
+    expect(response.ok).toBe(true);
+    expect(tabsSendMessage).toHaveBeenCalledWith(11, {
+      type: 'captureCurrentPage',
+      payload: { source: 'shortcut' },
+    });
+  });
+
+  it('keeps capture messages without a source payload for existing callers', async () => {
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 12, url: 'https://example.com/article' }] as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { title: 'Saved' }, error: null });
+
+    const router = createTestBackgroundRouter();
+    const response = await router.dispatch({ type: 'captureActiveTabCurrentPage', source: 'unexpected' });
+
+    expect(response.ok).toBe(true);
+    expect(tabsSendMessage).toHaveBeenCalledWith(12, { type: 'captureCurrentPage' });
+  });
 });
