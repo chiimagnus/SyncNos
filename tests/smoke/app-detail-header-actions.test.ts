@@ -67,6 +67,9 @@ vi.mock('../../src/ui/i18n', () => ({
       saveButton: 'Save',
       cancelButton: 'Cancel',
       detailTextCountLabel: 'Words',
+      detailImageCountLabel: 'Images',
+      detailImageCachedLabel: 'Cached',
+      detailImageUncachedLabel: 'Uncached',
       videoDescriptionLabel: 'Description',
       videoChaptersLabel: 'Chapters',
     };
@@ -142,7 +145,7 @@ function findTextNodeContaining(root: ParentNode, needle: string): Text | null {
   return null;
 }
 
-async function openMoreAndReadTextCount(): Promise<string> {
+async function openMoreAndReadStatRow(selector: string): Promise<string> {
   const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
   expect(moreButton).toBeTruthy();
 
@@ -151,9 +154,13 @@ async function openMoreAndReadTextCount(): Promise<string> {
     await Promise.resolve();
   });
 
-  const countRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
-  expect(countRow).toBeTruthy();
-  return String(countRow?.textContent || '').trim();
+  const row = document.querySelector(selector) as HTMLElement | null;
+  expect(row).toBeTruthy();
+  return String(row?.textContent || '').trim();
+}
+
+async function openMoreAndReadTextCount(): Promise<string> {
+  return await openMoreAndReadStatRow('[data-detail-text-count-row="true"]');
 }
 
 describe('ConversationDetailPane header actions', () => {
@@ -889,7 +896,12 @@ describe('ConversationDetailPane header actions', () => {
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
     expect(moreMenu?.className || '').toContain('tw-w-[214px]');
-    expect(document.querySelector('[data-detail-text-count-row="true"]')).toBeTruthy();
+    const textCountRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
+    const imageCountRow = document.querySelector('[data-detail-image-count-row="true"]') as HTMLElement | null;
+    expect(textCountRow).toBeTruthy();
+    expect(imageCountRow?.textContent).toBe('Images 0 · Cached 0 · Uncached 0');
+    expect(textCountRow?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(imageCountRow?.getAttribute('data-tooltip-id')).toBeNull();
 
     await act(async () => {
       cacheButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -955,7 +967,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(await openMoreAndReadTextCount()).toBe('Words 2');
   });
 
-  it('keeps a pure-image Article count row visible at Words 0', async () => {
+  it('shows image totals and cached/uncached state for a pure-image Article', async () => {
     currentState.detailHeaderActions = [];
     currentState.selectedConversation = {
       id: 31,
@@ -974,7 +986,8 @@ describe('ConversationDetailPane header actions', () => {
           conversationId: 31,
           messageKey: 'article_body',
           role: 'article',
-          contentMarkdown: '![图片说明](https://example.com/image.png)',
+          contentMarkdown:
+            '![本地](syncnos-asset://31)\n![远程](https://example.com/image.png)\n![ChatGPT](chatgpt-file://file_abc123)',
         },
       ],
     } as any;
@@ -984,6 +997,15 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     expect(await openMoreAndReadTextCount()).toBe('Words 0');
+
+    await act(async () => {
+      const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement;
+      moreButton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(await openMoreAndReadStatRow('[data-detail-image-count-row="true"]')).toBe(
+      'Images 3 · Cached 1 · Uncached 2',
+    );
   });
 
   it('counts the saved Video transcript Markdown on demand', async () => {

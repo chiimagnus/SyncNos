@@ -501,6 +501,9 @@ export const en = {
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
   detailHeaderCacheImagesLabel: 'Cache images',
   detailTextCountLabel: 'Words',
+  detailImageCountLabel: 'Images',
+  detailImageCachedLabel: 'Cached',
+  detailImageUncachedLabel: 'Uncached',
   videoDescriptionLabel: 'Description',
   videoChaptersLabel: 'Chapters',
 
