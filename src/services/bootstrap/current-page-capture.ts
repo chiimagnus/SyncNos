@@ -158,16 +158,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       };
     }
 
-    if (collector.id === 'web') {
-      return {
-        readiness: 'ready' as const,
-        kind: 'article' as const,
-        label: t('fetchArticle'),
-        collectorId: 'web',
-        collector,
-      };
-    }
-
     const readiness = collector.getCaptureReadiness();
     if (readiness !== 'ready' && readiness !== 'waiting' && readiness !== 'unsupported') {
       throw new Error(`invalid capture readiness: ${String(readiness)}`);
@@ -180,6 +170,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         collectorId: collector.id,
         reason: t('currentPageCannotBeCaptured'),
         collector: null,
+      };
+    }
+    if (collector.id === 'web') {
+      return {
+        readiness,
+        kind: 'article' as const,
+        label: t('fetchArticle'),
+        collectorId: 'web',
+        ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage('web') } : null),
+        collector,
       };
     }
     return {

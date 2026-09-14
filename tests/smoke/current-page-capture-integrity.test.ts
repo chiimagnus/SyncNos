@@ -211,6 +211,18 @@ describe('current page capture integrity routing', () => {
     expect(progress.at(-1)).toEqual({ message: 'readiness failed', kind: 'error' });
   });
 
+  it('consumes the web collector readiness contract before routing to article capture', async () => {
+    const harness = createHarness({ collectorId: 'web', snapshot: null, readiness: 'unsupported' });
+
+    expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
+      readiness: 'unsupported',
+      kind: 'unsupported',
+      collectorId: 'web',
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow(t('currentPageCannotBeCaptured'));
+    expect(harness.calls).toEqual([]);
+  });
+
   it('keeps the existing DOM manual path when Advanced API is disabled', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({ collectorId: 'chatgpt', snapshot: chatSnapshot(), prepare });
