@@ -226,17 +226,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     onProgress?: (progress: CurrentPageCaptureProgress) => void;
   }): Promise<CurrentPageCaptureResult> {
     const onProgress = input?.onProgress;
-    const target = resolveCaptureTarget();
-
-    if (!target.available) {
-      throw new Error(target.reason || t('currentPageCannotBeCaptured'));
-    }
-
     const report = (message: string, kind?: 'default' | 'error') => {
       onProgress?.({ message, kind });
     };
 
     try {
+      const target = resolveCaptureTarget();
+      if (!target.available) {
+        throw new Error(target.reason || t('currentPageCannotBeCaptured'));
+      }
+
       if (target.kind === 'video') {
         const result = await videoCapture.captureVideoTranscript();
         report(

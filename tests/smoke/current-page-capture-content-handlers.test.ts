@@ -207,4 +207,107 @@ describe('current-page-capture content handlers', () => {
     expect(response?.ok).toBe(true);
     expect(response?.data).toEqual({ title: 'Fallback' });
   });
+
+  it('shows the same inpage progress for shortcut capture', async () => {
+    let registeredListener: any = null;
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            registeredListener = listener;
+          }),
+          removeListener: vi.fn(),
+        },
+      },
+    };
+
+    const captureCurrentPage = vi.fn(async (input?: any) => {
+      input?.onProgress?.({ message: 'Saved by shortcut', kind: 'default' });
+      return { title: 'Shortcut' };
+    });
+    const showSaveTip = vi.fn();
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+      inpageTip: { showSaveTip },
+    });
+
+    let response: any = null;
+    registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'shortcut' } }, {}, (value: any) => {
+      response = value;
+    });
+    await waitFor(() => response?.ok === true);
+
+    expect(showSaveTip).toHaveBeenCalledWith('Saved by shortcut', { kind: 'default' });
+    expect(response?.data).toEqual({ title: 'Shortcut' });
+  });
+
+  it('does not show an inpage tip for capture messages without an inpage source', async () => {
+    let registeredListener: any = null;
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            registeredListener = listener;
+          }),
+          removeListener: vi.fn(),
+        },
+      },
+    };
+
+    const captureCurrentPage = vi.fn(async (input?: any) => {
+      input?.onProgress?.({ message: 'Should stay hidden', kind: 'default' });
+      return { title: 'Popup' };
+    });
+    const showSaveTip = vi.fn();
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+      inpageTip: { showSaveTip },
+    });
+
+    let response: any = null;
+    registeredListener?.({ type: 'captureCurrentPage' }, {}, (value: any) => {
+      response = value;
+    });
+    await waitFor(() => response?.ok === true);
+
+    expect(captureCurrentPage).toHaveBeenCalledWith(undefined);
+    expect(showSaveTip).not.toHaveBeenCalled();
+  });
+
+  it('keeps the existing error envelope while surfacing shortcut capture errors', async () => {
+    let registeredListener: any = null;
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            registeredListener = listener;
+          }),
+          removeListener: vi.fn(),
+        },
+      },
+    };
+
+    const captureCurrentPage = vi.fn(async (input?: any) => {
+      input?.onProgress?.({ message: 'Cannot capture this page', kind: 'error' });
+      throw new Error('Cannot capture this page');
+    });
+    const showSaveTip = vi.fn();
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+      inpageTip: { showSaveTip },
+    });
+
+    let response: any = null;
+    registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'shortcut' } }, {}, (value: any) => {
+      response = value;
+    });
+    await waitFor(() => response?.ok === false);
+
+    expect(showSaveTip).toHaveBeenCalledWith('Cannot capture this page', { kind: 'error' });
+    expect(response).toEqual({
+      ok: false,
+      data: null,
+      error: { message: 'Cannot capture this page', extra: null },
+    });
+  });
 });

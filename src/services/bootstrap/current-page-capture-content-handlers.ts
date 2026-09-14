@@ -36,7 +36,8 @@ export function registerCurrentPageCaptureContentHandlers(
         .trim()
         .toLowerCase();
       const inpageTip = options?.inpageTip;
-      const showTip = source === 'contextmenu' && typeof inpageTip?.showSaveTip === 'function';
+      const showTip =
+        (source === 'contextmenu' || source === 'shortcut') && typeof inpageTip?.showSaveTip === 'function';
 
       Promise.resolve(localeReady)
         .catch(() => undefined)

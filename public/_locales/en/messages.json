@@ -14,5 +14,13 @@
   "description": {
     "message": "Local-first clipper for AI chats, articles, and video transcripts. Sync to Notion, Obsidian, Feishu, or GitHub.",
     "description": "App description for Safari"
+  },
+  "commandCaptureCurrentPageDescription": {
+    "message": "Save current page to SyncNos",
+    "description": "Description for the browser command that saves the active page"
+  },
+  "commandOpenSyncnosAppDescription": {
+    "message": "Open SyncNos app",
+    "description": "Description for the browser command that opens or focuses the SyncNos app"
   }
 }

@@ -16,6 +16,7 @@ import {
 import { AiChatsSection } from '../../src/ui/settings/sections/AiChatsSection';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
+import { KeyboardShortcutsSection } from '../../src/ui/settings/sections/KeyboardShortcutsSection';
 import { VideosSection } from '../../src/ui/settings/sections/VideosSection';
 import { ObsidianSettingsSection } from '../../src/ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '../../src/ui/settings/sections/GitHubSettingsSection';
@@ -25,6 +26,7 @@ describe('settings section definitions', () => {
   it('keeps the flattened settings navigation order stable', () => {
     expect(SETTINGS_SECTIONS.map((section) => section.key)).toEqual([
       'general',
+      'shortcuts',
       'articles',
       'ai_chats',
       'videos',
@@ -39,6 +41,7 @@ describe('settings section definitions', () => {
   });
 
   it('accepts only current settings section keys and drops retired deep-link aliases', () => {
+    expect(coerceSettingsSectionKey('shortcuts')).toBe('shortcuts');
     expect(coerceSettingsSectionKey('aboutyou')).toBe('aboutyou');
     expect(coerceSettingsSectionKey('aboutme')).toBe('aboutme');
     expect(coerceSettingsSectionKey('insight')).toBeNull();
@@ -59,7 +62,7 @@ describe('settings section definitions', () => {
 
   it('groups sections into integrations, behavior, and about areas', () => {
     expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
-      ['general', 'articles', 'ai_chats', 'videos'],
+      ['general', 'shortcuts', 'articles', 'ai_chats', 'videos'],
       ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
@@ -147,7 +150,10 @@ describe('settings section definitions', () => {
     const groupList = document.querySelector('nav')?.firstElementChild;
     const groups = groupList ? Array.from(groupList.children) : [];
     expect(groups).toHaveLength(3);
-    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([4, 5, 2]);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 5, 2]);
+    expect(Array.from(groups[0]?.querySelectorAll('button') || []).map((button) => button.textContent?.trim())).toEqual(
+      ['General', 'Keyboard shortcuts', 'Web article capture', 'AI chat capture', 'Video capture'],
+    );
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
     expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
       true,
@@ -595,6 +601,68 @@ describe('inpage anti-hotlink advanced editor', () => {
       root!.render(createElement(InpageSection, { ...baseProps, ...props }));
     });
   }
+
+  function renderShortcuts(props: Partial<Parameters<typeof KeyboardShortcutsSection>[0]> = {}) {
+    const baseProps: Parameters<typeof KeyboardShortcutsSection>[0] = {
+      status: 'ready',
+      items: [
+        { action: 'open-popup', shortcut: 'Ctrl+Shift+P' },
+        { action: 'capture-current-page', shortcut: '' },
+        { action: 'open-app', shortcut: '' },
+      ],
+      managerAccess: 'openable',
+      onOpenManager: () => {},
+    };
+
+    act(() => {
+      root!.render(createElement(KeyboardShortcutsSection, { ...baseProps, ...props }));
+    });
+  }
+
+  it('keeps keyboard shortcuts out of General settings', () => {
+    renderInpage();
+
+    expect(document.querySelector('section[aria-label="Keyboard shortcuts"]')).toBeNull();
+    expect(document.querySelector('section[aria-label="Language"]')).toBeTruthy();
+    expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeTruthy();
+  });
+
+  it('renders browser-managed keyboard shortcuts in the dedicated section', () => {
+    renderShortcuts();
+
+    const shortcutSection = document.querySelector('section[aria-label="Keyboard shortcuts"]');
+    expect(shortcutSection?.textContent).toContain('Open SyncNos popup');
+    expect(shortcutSection?.textContent).toContain('Save current page');
+    expect(shortcutSection?.textContent).toContain('Open SyncNos app');
+    expect(shortcutSection?.querySelector('kbd')?.textContent).toBe('Ctrl+Shift+P');
+    expect(shortcutSection?.textContent).toContain('Unassigned');
+  });
+
+  it('opens the native shortcut manager only from the dedicated section callback', () => {
+    const onOpenManager = vi.fn();
+    renderShortcuts({ onOpenManager });
+
+    const button = document.querySelector('button[aria-label="Manage shortcuts"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    act(() => button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onOpenManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows manual shortcut guidance without a dead manage button', () => {
+    renderShortcuts({ managerAccess: 'manual' });
+
+    expect(document.body.textContent || '').toContain(
+      'Configure these actions in your browser’s extension keyboard shortcut settings.',
+    );
+    expect(document.querySelector('button[aria-label="Manage shortcuts"]')).toBeNull();
+  });
+
+  it('shows unsupported shortcut discovery inside the dedicated page only', () => {
+    renderShortcuts({ status: 'unsupported', managerAccess: 'unsupported' });
+
+    expect(document.body.textContent || '').toContain('This browser cannot read extension keyboard shortcuts.');
+    expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
+  });
 
   it('renders Local CLI Integration and forwards the user toggle', () => {
     const onToggleCliIntegration = vi.fn();

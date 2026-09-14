@@ -1,31 +1,31 @@
-## Related issue
+## 关联问题（Issue）
 
 Closes #
 
-<!-- Use `N/A — <reason>` only when CONTRIBUTING allows a direct PR. -->
+<!-- 仅当 CONTRIBUTING 允许直接提交 PR 时，才使用 `N/A — <原因>`。 -->
 
-## Why and scope
+## 背景与范围
 
-<!-- What problem does this solve? State the intended behavior and important non-goals. -->
+<!-- 说明要解决的问题、预期行为，以及明确不在本 PR 范围内的内容。 -->
 
-## What changed
+## 改动内容
 
-<!-- Describe the behavior/architecture change. Mention any superseded path that was removed. -->
+<!-- 说明实际的行为或架构变化，并指出被替代或删除的旧路径。 -->
 
-## Risk
+## 风险
 
-<!-- Architecture/invariants, persisted data or migration, permissions/privacy, and compatibility. Use `N/A — <reason>` for unaffected areas. -->
+<!-- 说明架构与不变量、持久化数据或迁移、权限与隐私、兼容性影响。未受影响的项目使用 `N/A — <原因>`。 -->
 
-## Validation
+## 验证
 
-### Automated
+### 自动化验证
 
-<!-- Commands and targeted tests actually run. -->
+<!-- 列出实际运行过的命令和定向测试。 -->
 
-### Manual
+### 手动验证
 
-<!-- Real browser/site/OS/visual flow exercised. Use `N/A — <reason>` when not required. -->
+<!-- 记录实际走通的浏览器、站点、操作系统或视觉流程；无需手动验证时使用 `N/A — <原因>`。 -->
 
-## Documentation
+## 文档
 
-<!-- Canonical docs updated, or `N/A — <reason>` if none became stale. -->
+<!-- 说明已更新的长期文档；若没有文档因本次改动而过时，使用 `N/A — <原因>`。 -->

@@ -80,7 +80,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
     return router.ok(relayed.data);
   });
 
-  router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async () => {
+  router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async (msg: any) => {
     await waitLocale();
     const activeTab = await getActiveTab();
     if (!activeTab.ok) {
@@ -90,7 +90,11 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       });
     }
 
-    const relayed = await relayToActiveTab(activeTab.tab.id, CURRENT_PAGE_MESSAGE_TYPES.CAPTURE);
+    const relayed = await relayToActiveTab(
+      activeTab.tab.id,
+      CURRENT_PAGE_MESSAGE_TYPES.CAPTURE,
+      msg?.source === 'shortcut' ? { source: 'shortcut' } : undefined,
+    );
     if (!relayed.ok) {
       return router.err(relayed.message, {
         code: relayed.code,
@@ -133,9 +137,9 @@ async function getActiveTab() {
   return { ok: true as const, tab: { ...tab, id: tabId } };
 }
 
-async function relayToActiveTab(tabId: number, type: string) {
+async function relayToActiveTab(tabId: number, type: string, payload?: Record<string, unknown>) {
   try {
-    const response = await tabsSendMessage(tabId, { type });
+    const response = await tabsSendMessage(tabId, payload ? { type, payload } : { type });
     if (!response || typeof response !== 'object') {
       return {
         ok: false as const,

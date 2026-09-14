@@ -5,6 +5,7 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { headerButtonClassName } from '@ui/shared/button-styles';
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
+import { useKeyboardShortcutsController } from '@viewmodels/settings/useKeyboardShortcutsController';
 import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
 import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
 import { type SettingsSectionKey } from '@viewmodels/settings/types';
@@ -13,6 +14,7 @@ import { AiChatsSection } from '@ui/settings/sections/AiChatsSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { InsightSection } from '@ui/settings/sections/InsightSection';
 import { InpageSection } from '@ui/settings/sections/InpageSection';
+import { KeyboardShortcutsSection } from '@ui/settings/sections/KeyboardShortcutsSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
@@ -200,6 +202,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeAboutYouUserName,
     onSaveAboutYouUserName,
   } = useSettingsSceneController({ activeSection, focusKey });
+  const keyboardShortcuts = useKeyboardShortcutsController({ active: activeSection === 'shortcuts' });
 
   const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
 
@@ -507,6 +510,17 @@ export function SettingsScene(props: SettingsSceneProps) {
           aiChatDollarMentionEnabled={aiChatDollarMentionEnabled}
           onToggleAiChatDollarMentionEnabled={(next) => {
             void onToggleAiChatDollarMentionEnabled(next);
+          }}
+        />
+      ) : null}
+
+      {activeSection === 'shortcuts' ? (
+        <KeyboardShortcutsSection
+          status={keyboardShortcuts.status}
+          items={keyboardShortcuts.items}
+          managerAccess={keyboardShortcuts.managerAccess}
+          onOpenManager={() => {
+            void keyboardShortcuts.openManager();
           }}
         />
       ) : null}

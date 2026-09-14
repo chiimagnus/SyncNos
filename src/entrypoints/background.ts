@@ -31,6 +31,7 @@ import {
 import { startCliNativeBridge } from '@services/cli/native-bridge';
 import { registerPublicSettingsHandlers } from '@services/settings/background-handlers';
 import { registerOpenTargetHandlers } from '@services/integrations/openin/background-handlers';
+import { registerBackgroundKeyboardShortcuts } from '@services/bootstrap/background-keyboard-shortcuts';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -106,6 +107,10 @@ export default defineBackground(() => {
     obsidianSyncOrchestrator: services.obsidianSyncOrchestrator,
     feishuSyncOrchestrator: services.feishuSyncOrchestrator,
     githubSyncOrchestrator: services.githubSyncOrchestrator,
+  });
+  registerBackgroundKeyboardShortcuts({
+    dispatchMessage: (message) => router.dispatch(message),
+    openApp: () => openOrFocusExtensionAppTab({ route: '/' }),
   });
 
   router.start();
