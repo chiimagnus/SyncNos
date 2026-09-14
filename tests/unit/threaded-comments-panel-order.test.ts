@@ -62,7 +62,7 @@ describe('Threaded comments panel ordering', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, authorName: 'You', quoteText: '', commentText: 'root-old' },
       { id: 2, parentId: null, createdAt: 2000, authorName: 'You', quoteText: '', commentText: 'root-new' },
@@ -99,7 +99,7 @@ describe('Threaded comments panel ordering', () => {
   it('uses the canonical graph for orphan and nested reply placement', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 10, parentId: 999, createdAt: 1000, authorName: 'You', quoteText: '', commentText: 'orphan-root' },
       { id: 11, parentId: 10, createdAt: 1100, authorName: 'You', quoteText: '', commentText: 'nested-child' },

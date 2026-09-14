@@ -11,17 +11,7 @@ export type CommentLocatorSurfaceRoots = {
 };
 
 export type MountOptions = {
-  overlay?: boolean;
-  initiallyOpen?: boolean;
-  showHeader?: boolean;
-  showCollapseButton?: boolean;
-  surface?: 'app-wide' | 'app-narrow' | 'inpage';
-  fullWidth?: boolean;
-  surfaceBg?: string;
-  headerDivider?: boolean;
-  dockPage?: boolean;
-  locatorEnv?: 'inpage' | 'app' | null;
+  surface: 'app-wide' | 'app-narrow' | 'inpage';
   getLocatorSurfaceRoots?: () => CommentLocatorSurfaceRoots | null;
   getLocatorRoots?: (locator: ArticleCommentLocator) => readonly Element[];
-  deferReactUpdates?: boolean;
 };

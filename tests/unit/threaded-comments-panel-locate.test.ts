@@ -152,11 +152,10 @@ describe('Threaded comments panel locate', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const mounted = mountThreadedCommentsPanel(host, {
-      overlay: false,
-      showHeader: false,
-      locatorEnv: 'app',
+      surface: 'app-wide',
       getLocatorSurfaceRoots: () => ({ sourceRoot: article, scrollRoot }),
     });
+    await flushReactScheduler();
 
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       {
@@ -224,11 +223,10 @@ describe('Threaded comments panel locate', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const mounted = mountThreadedCommentsPanel(host, {
-      overlay: false,
-      showHeader: false,
-      locatorEnv: 'app',
+      surface: 'app-wide',
       getLocatorSurfaceRoots: () => ({ sourceRoot: article, scrollRoot }),
     });
+    await flushReactScheduler();
 
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       {
@@ -263,10 +261,10 @@ describe('Threaded comments panel locate', () => {
     document.body.appendChild(host);
 
     const mounted = mountThreadedCommentsPanel(host, {
-      overlay: false,
-      showHeader: false,
+      surface: 'app-wide',
       getLocatorSurfaceRoots: () => null,
     });
+    await flushReactScheduler();
 
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       {

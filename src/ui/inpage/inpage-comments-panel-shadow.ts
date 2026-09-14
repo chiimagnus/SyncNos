@@ -46,14 +46,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     getPanelRoot: () => singleton?.el || null,
   });
   const { el, api } = mountThreadedCommentsPanel(host, {
-    overlay: true,
-    dockPage: true,
-    initiallyOpen: false,
     surface: 'inpage',
-    surfaceBg: 'var(--bg-card)',
-    showHeader: true,
-    showCollapseButton: true,
-    locatorEnv: 'inpage',
     getLocatorSurfaceRoots: () => rootSource.capture(document.getSelection()),
     getLocatorRoots: (locator) => rootSource.locate(locator),
   });

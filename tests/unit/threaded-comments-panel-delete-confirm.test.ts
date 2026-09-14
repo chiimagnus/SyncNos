@@ -80,7 +80,7 @@ describe('Threaded comments panel delete confirmation', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onDelete });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'root' },
@@ -111,7 +111,7 @@ describe('Threaded comments panel delete confirmation', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const onDelete = vi.fn().mockRejectedValue(new Error('Delete failed.'));
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onDelete });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'root' },
@@ -137,7 +137,7 @@ describe('Threaded comments panel delete confirmation', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onDelete });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'root' },
@@ -175,7 +175,7 @@ describe('Threaded comments panel delete confirmation', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onDelete });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'root' },

@@ -42,7 +42,7 @@
   --comments-panel-body-padding-bottom: 20px;
 
   width: min(var(--webclipper-comments-panel-width, 420px), 92vw);
-  background: var(--webclipper-comments-panel-surface-bg, var(--bg-sunken, var(--panel-bg)));
+  background: var(--bg-card);
   border-left: 1px solid var(--panel-border);
   box-shadow: none;
 }
@@ -172,8 +172,8 @@
   gap: 8px;
   min-height: 48px;
   padding: 8px var(--comments-panel-body-padding-x);
-  border-bottom: var(--webclipper-comments-panel-header-divider, 1px solid var(--panel-border));
-  background: color-mix(in srgb, var(--webclipper-comments-panel-surface-bg, var(--panel-bg)) 96%, transparent);
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--bg-card) 96%, transparent);
   backdrop-filter: blur(10px);
 }
 
@@ -415,7 +415,7 @@
 }
 
 .webclipper-inpage-comments-panel__thread.is-active {
-  background: color-mix(in srgb, var(--panel-accent) 10%, var(--webclipper-comments-panel-surface-bg, var(--panel-bg)));
+  background: color-mix(in srgb, var(--panel-accent) 10%, var(--bg-card));
 }
 
 .webclipper-inpage-comments-panel__thread:focus-visible {

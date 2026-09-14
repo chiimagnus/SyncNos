@@ -139,7 +139,7 @@ describe('comment sidebar session handlers binding', () => {
 
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const panelLease = session.attachPanel(mounted.api as any);
     await flushReactScheduler();
 
@@ -162,7 +162,7 @@ describe('comment sidebar session handlers binding', () => {
 
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const panelLease = session.attachPanel(mounted.api as any);
 
     const onReply = vi.fn(async () => {});
@@ -187,7 +187,7 @@ describe('comment sidebar session handlers binding', () => {
 
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const panelLease = session.attachPanel(mounted.api as any);
     session.requestOpen({ focusComposer: true });
 

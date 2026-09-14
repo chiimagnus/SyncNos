@@ -70,7 +70,7 @@ describe('Threaded comments panel focus regression', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([]);
 
     let nextId = 1;
@@ -124,7 +124,7 @@ describe('Threaded comments panel focus regression', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([]);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;

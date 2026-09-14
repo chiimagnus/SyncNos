@@ -94,7 +94,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
@@ -116,7 +116,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     const onSave = vi.fn(async () => ({ ok: true, createdRootId: 7 }));
     driver.replaceActionCallbacks({ onSave } as any);
@@ -145,7 +145,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     const onSave = vi.fn(async () => ({ ok: true, createdRootId: 8 }));
     driver.replaceActionCallbacks({ onSave } as any);
@@ -179,7 +179,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(textNode);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const selectionMock = {
@@ -213,7 +213,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const selectionState = installMutableSelectionMock('Quoted text');
@@ -244,7 +244,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
@@ -296,7 +296,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
 
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({
       onComposerSelectionRequest,
@@ -341,7 +341,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;

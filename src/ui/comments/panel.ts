@@ -20,8 +20,6 @@ import type { MountOptions, ThreadedCommentsPanelApi } from './types';
 type ThreadedCommentsPanelReactBridgeProps = {
   store: ThreadedCommentsPanelStore;
   actions: CommentSidebarHostActions;
-  showHeader: boolean;
-  showCollapseButton: boolean;
   onRequestClose: () => void;
   locateThreadRoot?: (rootId: number) => Promise<ThreadLocateResult>;
   onActiveRootChange?: (rootId: number | null) => void;
@@ -33,8 +31,6 @@ type ThreadedCommentsPanelReactBridgeProps = {
 function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridgeProps) {
   const snapshot = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot, props.store.getSnapshot);
   return createElement(ThreadedCommentsPanel, {
-    showHeader: props.showHeader,
-    showCollapseButton: props.showCollapseButton,
     snapshot,
     actions: props.actions,
     onRequestClose: props.onRequestClose,
@@ -205,24 +201,20 @@ function locateFailureNotice(reason: string): string {
 
 export function mountThreadedCommentsPanel(
   host: HTMLElement,
-  options: MountOptions = {},
+  options: MountOptions,
 ): { el: HTMLElement; api: ThreadedCommentsPanelApi; cleanup: () => void } {
   const el = document.createElement('webclipper-threaded-comments-panel') as HTMLElement;
-  const isOverlay = options.overlay === true;
-  const isFullWidth = options.fullWidth === true;
-  const surface = options.surface || (isOverlay ? 'inpage' : isFullWidth ? 'app-narrow' : 'app-wide');
-  const showHeader = options.showHeader !== false;
-  const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
-  const dockPage = options.dockPage === true && options.overlay === true;
-  const surfaceBg = String(options.surfaceBg || '').trim();
+  const surface = options.surface;
+  const isOverlay = surface === 'inpage';
+  const isFullWidth = surface === 'app-narrow';
+  const deferReactUpdates = surface !== 'inpage';
   let disposed = false;
-  const runReactUpdate =
-    options.deferReactUpdates === true
-      ? (run: () => void) =>
-          asyncReactUpdate(() => {
-            if (!disposed) run();
-          })
-      : syncReactUpdate;
+  const runReactUpdate = deferReactUpdates
+    ? (run: () => void) =>
+        asyncReactUpdate(() => {
+          if (!disposed) run();
+        })
+    : syncReactUpdate;
   if (isOverlay) el.setAttribute('data-overlay', '1');
   el.setAttribute('data-variant', 'sidebar');
   el.setAttribute('data-surface', surface);
@@ -231,19 +223,9 @@ export function mountThreadedCommentsPanel(
     el.style.width = '100%';
     el.style.borderLeft = '0';
   }
-  if (options.initiallyOpen) el.setAttribute('data-open', '1');
-
-  const SURFACE_BG_CSS_VAR = '--webclipper-comments-panel-surface-bg';
-  if (surfaceBg) {
-    setImportantStyle(el, SURFACE_BG_CSS_VAR, surfaceBg);
-  }
-
-  const HEADER_DIVIDER_CSS_VAR = '--webclipper-comments-panel-header-divider';
-  const headerDivider = options.headerDivider === true;
-  setImportantStyle(el, HEADER_DIVIDER_CSS_VAR, headerDivider && showHeader ? '1px solid var(--panel-border)' : '0');
 
   const dockController = createDockController({
-    enabled: dockPage,
+    enabled: isOverlay,
     panelEl: el,
   });
 
@@ -259,7 +241,7 @@ export function mountThreadedCommentsPanel(
     document: panelDocument,
     window: panelDocument.defaultView || undefined,
     styleSource: el,
-    renderMode: options.locatorEnv === 'app' ? 'native' : 'overlay',
+    renderMode: surface === 'inpage' ? 'overlay' : 'native',
   });
   const anchorController = createCommentAnchorController({
     getRoots: (locator) => readLocatorRoots(options, locator),
@@ -338,8 +320,6 @@ export function mountThreadedCommentsPanel(
       createElement(ThreadedCommentsPanelReactBridge, {
         store: panelStore,
         actions: panelController.actions,
-        showHeader,
-        showCollapseButton,
         onRequestClose: () => panelController.actions.close(),
         locateThreadRoot: async (rootId) => {
           const root = panelStore
@@ -450,7 +430,7 @@ export function mountThreadedCommentsPanel(
             el.remove();
           }
         };
-        if (options.deferReactUpdates === true) asyncReactUpdate(unmountAndRemove);
+        if (deferReactUpdates) asyncReactUpdate(unmountAndRemove);
         else syncReactUpdate(unmountAndRemove);
       },
     ];

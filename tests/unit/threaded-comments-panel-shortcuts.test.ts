@@ -71,7 +71,7 @@ describe('Threaded comments panel shortcuts', () => {
     document.body.appendChild(host);
 
     const onSave = vi.fn().mockResolvedValue(undefined);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onSave });
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
@@ -109,7 +109,7 @@ describe('Threaded comments panel shortcuts', () => {
     const quoteText = `first line\n${'x'.repeat(240)}`;
 
     const onSave = vi.fn().mockResolvedValue({ ok: true, createdRootId: 2 });
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     driver.replaceActionCallbacks({ onSave });
     driver.session.setComposerAttachment({
@@ -154,7 +154,7 @@ describe('Threaded comments panel shortcuts', () => {
     document.body.appendChild(host);
 
     const onReply = vi.fn().mockResolvedValue(undefined);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onReply });
     getCommentSidebarPanelTestDriver(mounted.api).replaceComments([
       { id: 1, parentId: null, createdAt: 1000, commentText: 'root' },
@@ -196,7 +196,7 @@ describe('Threaded comments panel shortcuts', () => {
     document.body.appendChild(host);
 
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     driver.replaceActionCallbacks({ onDelete });
     driver.replaceComments([
@@ -254,7 +254,7 @@ describe('Threaded comments panel shortcuts', () => {
     document.body.appendChild(host);
 
     const onSave = vi.fn().mockResolvedValue(false);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onSave });
     const shadow = (host.querySelector('webclipper-threaded-comments-panel') as HTMLElement).shadowRoot!;
     const textarea = shadow.querySelector(
@@ -284,7 +284,7 @@ describe('Threaded comments panel shortcuts', () => {
     document.body.appendChild(host);
 
     const onReply = vi.fn().mockResolvedValue(false);
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     driver.replaceActionCallbacks({ onReply });
     driver.replaceComments([{ id: 1, parentId: null, createdAt: 1000, commentText: 'root' }]);

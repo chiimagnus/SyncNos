@@ -21,8 +21,6 @@ const DELETE_CONTROL_SELECTOR =
   '.webclipper-inpage-comments-panel__quote-delete, .webclipper-inpage-comments-panel__overflow-menu-item[data-destructive="1"]';
 
 export function ThreadedCommentsPanel({
-  showHeader,
-  showCollapseButton,
   snapshot,
   actions,
   onRequestClose,
@@ -278,14 +276,11 @@ export function ThreadedCommentsPanel({
         updateArmedDeleteId(null);
       }}
     >
-      {showHeader ? (
-        <CommentsSidebarHeader
-          title={t('articleCommentsHeading')}
-          showCollapseButton={Boolean(showCollapseButton)}
-          collapseLabel={t('closeCommentsSidebar')}
-          onCollapse={onRequestClose}
-        />
-      ) : null}
+      <CommentsSidebarHeader
+        title={t('articleCommentsHeading')}
+        collapseLabel={t('closeCommentsSidebar')}
+        onCollapse={onRequestClose}
+      />
       <div className="webclipper-inpage-comments-panel__body">
         <div
           className="webclipper-inpage-comments-panel__notice"

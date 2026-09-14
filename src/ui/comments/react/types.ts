@@ -11,8 +11,6 @@ export type ThreadedCommentsPanelSnapshot = CommentSidebarHostSnapshot & {
 export type ThreadLocateResult = { ok: true } | { ok: false; reason: string };
 
 export type ThreadedCommentsPanelProps = {
-  showHeader: boolean;
-  showCollapseButton: boolean;
   snapshot: ThreadedCommentsPanelSnapshot;
   actions: CommentSidebarHostActions;
   onRequestClose: () => void;
