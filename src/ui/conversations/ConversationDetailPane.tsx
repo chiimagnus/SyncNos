@@ -563,16 +563,8 @@ export function ConversationDetailPane({
                             .join(' ')}
                           data-detail-stats="true"
                         >
-                          {textCountText ? (
-                            <div data-detail-text-count-row="true" {...tooltipAttrs(textCountText)}>
-                              {textCountText}
-                            </div>
-                          ) : null}
-                          {imageCountText ? (
-                            <div data-detail-image-count-row="true" {...tooltipAttrs(imageCountText)}>
-                              {imageCountText}
-                            </div>
-                          ) : null}
+                          {textCountText ? <div data-detail-text-count-row="true">{textCountText}</div> : null}
+                          {imageCountText ? <div data-detail-image-count-row="true">{imageCountText}</div> : null}
                         </div>
                       ) : null}
                     </div>

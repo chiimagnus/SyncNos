@@ -896,10 +896,12 @@ describe('ConversationDetailPane header actions', () => {
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
     expect(moreMenu?.className || '').toContain('tw-w-[214px]');
-    expect(document.querySelector('[data-detail-text-count-row="true"]')).toBeTruthy();
-    expect(document.querySelector('[data-detail-image-count-row="true"]')?.textContent).toBe(
-      'Images 0 · Cached 0 · Uncached 0',
-    );
+    const textCountRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
+    const imageCountRow = document.querySelector('[data-detail-image-count-row="true"]') as HTMLElement | null;
+    expect(textCountRow).toBeTruthy();
+    expect(imageCountRow?.textContent).toBe('Images 0 · Cached 0 · Uncached 0');
+    expect(textCountRow?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(imageCountRow?.getAttribute('data-tooltip-id')).toBeNull();
 
     await act(async () => {
       cacheButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
