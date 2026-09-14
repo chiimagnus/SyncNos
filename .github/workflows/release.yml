@@ -48,7 +48,7 @@ jobs:
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          node scripts/cli-release.mjs metadata "$RELEASE_TAG" > "$RUNNER_TEMP/release-metadata.json"
+          node .github/scripts/cli/cli-release.mjs metadata "$RELEASE_TAG" > "$RUNNER_TEMP/release-metadata.json"
           node - "$RUNNER_TEMP/release-metadata.json" "$GITHUB_OUTPUT" <<'NODE'
           const fs = require('node:fs');
           const [metadataPath, outputPath] = process.argv.slice(2);
@@ -91,7 +91,7 @@ jobs:
             fi
             echo "npm_already_published=true" >> "$GITHUB_OUTPUT"
           else
-            node scripts/cli-release.mjs check-order "$RELEASE_VERSION" "$RUNNER_TEMP/npm-dist-tags.json"
+            node .github/scripts/cli/cli-release.mjs check-order "$RELEASE_VERSION" "$RUNNER_TEMP/npm-dist-tags.json"
             echo "npm_already_published=false" >> "$GITHUB_OUTPUT"
           fi
 

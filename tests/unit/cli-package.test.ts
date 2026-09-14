@@ -12,7 +12,7 @@ import {
   resolveCliPackageVersion,
   semverCore,
 } from '../../cli/package.mjs';
-import { assertReleaseOrder, parseReleaseTag } from '../../scripts/cli-release.mjs';
+import { assertReleaseOrder, parseReleaseTag } from '../../.github/scripts/cli/cli-release.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 
