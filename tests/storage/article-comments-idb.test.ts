@@ -140,6 +140,23 @@ describe('article comments storage-idb', () => {
     expect(highlight.commentText).toBe('');
     expect(highlight.locator).toEqual(locator);
 
+    const exactWhitespaceQuote = '  highlighted\r\nline  ';
+    const exactWhitespaceLocator = {
+      ...locator,
+      quote: { ...locator.quote, exact: '  highlighted\nline  ' },
+      position: { type: 'TextPositionSelector' as const, start: 0, end: 20 },
+    };
+    const whitespaceHighlight = await addArticleComment({
+      conversationId: 7,
+      canonicalUrl: 'https://example.com/highlight-only',
+      quoteText: exactWhitespaceQuote,
+      commentText: '',
+      locator: exactWhitespaceLocator,
+      createdAt: 101,
+    });
+    expect(whitespaceHighlight.quoteText).toBe('  highlighted\nline  ');
+    expect(whitespaceHighlight.locator?.quote.exact).toBe(whitespaceHighlight.quoteText);
+
     await expect(
       addArticleComment({
         conversationId: 7,

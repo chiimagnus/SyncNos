@@ -3,6 +3,7 @@ import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 export type ImportedArticleCommentInput = {
@@ -94,7 +95,7 @@ function toComment(row: any): ArticleComment {
     conversationId: normalizeConversationId(row?.conversationId),
     canonicalUrl: normalizeCanonicalUrl(row?.canonicalUrl),
     authorName: safeString(row?.authorName) || null,
-    quoteText: safeString(row?.quoteText),
+    quoteText: toCanonicalCommentQuote(row?.quoteText),
     commentText: normalizeCommentText(row?.commentText),
     locator: normalizeArticleCommentLocator(row?.locator),
     ...(importSource && importKey ? { importSource, importKey } : {}),
@@ -108,7 +109,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const now = Date.now();
   const canonicalUrl = normalizeCanonicalUrl(input?.canonicalUrl);
   const commentText = normalizeCommentText(input?.commentText);
-  const quoteText = safeString(input?.quoteText);
+  const quoteText = toCanonicalCommentQuote(input?.quoteText);
   const parentId = normalizeParentId(input?.parentId);
   const locator = normalizeArticleCommentLocator(input?.locator);
   if (!canonicalUrl) throw new Error('canonicalUrl required');
@@ -174,7 +175,7 @@ export async function syncImportedArticleComments(
       const importKey = safeString(item.importKey);
       const conversationId = normalizeConversationId(item.conversationId);
       const canonicalUrl = normalizeCanonicalUrl(item.canonicalUrl);
-      const quoteText = safeString(item.quoteText);
+      const quoteText = toCanonicalCommentQuote(item.quoteText);
       const commentText = normalizeCommentText(item.commentText);
       if (
         !importSource ||
@@ -272,7 +273,7 @@ export async function syncImportedArticleComments(
         };
         const changed =
           safeString(existing.authorName) !== next.authorName ||
-          safeString(existing.quoteText) !== next.quoteText ||
+          toCanonicalCommentQuote(existing.quoteText) !== next.quoteText ||
           normalizeCommentText(existing.commentText) !== next.commentText ||
           normalizeCanonicalUrl(existing.canonicalUrl) !== next.canonicalUrl ||
           Number(existing.createdAt) !== next.createdAt ||

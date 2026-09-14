@@ -5,7 +5,7 @@ import type {
   CommentSidebarLoadStatus,
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
-import { normalizeCommentSidebarQuoteText } from '@services/comments/sidebar/comment-sidebar-session';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { normalizePositiveInt } from '@services/shared/numbers';
@@ -232,7 +232,7 @@ export function createArticleCommentsSidebarController(input: {
 
   const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
     if (disposed) return;
-    const quoteText = normalizeCommentSidebarQuoteText(payload?.selectionText);
+    const quoteText = toCanonicalCommentQuote(payload?.selectionText);
     if (!quoteText) return;
     session.setComposerAttachment({
       quoteText: quoteText,
@@ -542,7 +542,7 @@ export function createArticleCommentsSidebarController(input: {
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment save');
 
         const attachment = session.getSnapshot().composerAttachment;
-        const quoteText = normalizeCommentSidebarQuoteText(attachment.quoteText);
+        const quoteText = toCanonicalCommentQuote(attachment.quoteText);
         const locator = quoteText ? attachment.locator : null;
         if (!hasValidArticleCommentContent({ parentId: null, quoteText, commentText: value, locator })) return false;
         const selectionRevision = attachment.selectionRevision;

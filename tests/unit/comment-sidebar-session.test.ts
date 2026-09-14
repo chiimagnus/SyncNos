@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  createCommentSidebarSession,
-  normalizeCommentSidebarQuoteText,
-} from '@services/comments/sidebar/comment-sidebar-session';
+import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type {
   CommentSidebarHost,
   CommentSidebarHostActionCallbacks,
@@ -145,11 +142,6 @@ describe('comment-sidebar-host-state', () => {
 });
 
 describe('comment-sidebar-session', () => {
-  it('normalizes quote text without destroying line breaks', () => {
-    expect(normalizeCommentSidebarQuoteText(null)).toBe('');
-    expect(normalizeCommentSidebarQuoteText('hello\r\nworld')).toBe('hello\nworld');
-  });
-
   it('publishes one atomic snapshot before and after a panel attaches', () => {
     const session = createCommentSidebarSession();
     const panel = createPanelMock();

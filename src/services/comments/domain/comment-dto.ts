@@ -1,6 +1,7 @@
 import type { ArticleComment, ArticleCommentLocator } from '@services/comments/domain/models';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 export type ArticleCommentDto = ArticleComment;
@@ -32,7 +33,7 @@ export function parseArticleCommentDto(value: unknown): ArticleCommentDto | null
   const id = positiveInt(row.id);
   const canonicalUrl = canonicalizeArticleUrl(row.canonicalUrl);
   const parentId = positiveInt(row.parentId);
-  const quoteText = String(row.quoteText ?? '');
+  const quoteText = toCanonicalCommentQuote(row.quoteText);
   const commentText = String(row.commentText ?? '').trim();
   const locator = normalizeArticleCommentLocator(row.locator);
   const createdAt = Number(row.createdAt);
@@ -84,7 +85,7 @@ export function parseArticleCommentAddRequest(value: unknown): ArticleCommentAdd
   const conversation = parseOptionalPositiveInt(row.conversationId);
   if (!parent.ok || !conversation.ok) return null;
   const parentId = parent.value;
-  const quoteText = parentId ? '' : String(row.quoteText ?? '');
+  const quoteText = parentId ? '' : toCanonicalCommentQuote(row.quoteText);
   const commentText = String(row.commentText ?? '').trim();
   const locator = parentId ? null : normalizeArticleCommentLocator(row.locator);
   if (!hasValidArticleCommentContent({ parentId, quoteText, commentText, locator })) return null;

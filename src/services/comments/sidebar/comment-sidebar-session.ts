@@ -1,4 +1,5 @@
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import type {
   CommentSidebarComposerAttachment,
   CommentSidebarHost,
@@ -14,10 +15,6 @@ import {
   createCommentSidebarHostActions,
   createCommentSidebarHostSnapshot,
 } from '@services/comments/sidebar/comment-sidebar-state';
-
-export function normalizeCommentSidebarQuoteText(text: unknown): string {
-  return String(text ?? '').replace(/\r\n?/g, '\n');
-}
 
 function normalizeSource(source: unknown): string | null {
   const text = String(source ?? '').trim();
@@ -115,7 +112,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   }): CommentSidebarComposerAttachment {
     if (disposed) return snapshot.composerAttachment;
     const nextAttachment = {
-      quoteText: normalizeCommentSidebarQuoteText(input.quoteText),
+      quoteText: toCanonicalCommentQuote(input.quoteText),
       locator: normalizeArticleCommentLocator(input.locator),
       selectionRevision: snapshot.composerAttachment.selectionRevision + 1,
     };
