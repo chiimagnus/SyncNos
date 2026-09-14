@@ -191,6 +191,65 @@ describe('Threaded comments panel shortcuts', () => {
     mounted.cleanup();
   });
 
+  it('renders replies at the root level and deletes a quoted thread through the existing two-step delete action', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const driver = getCommentSidebarPanelTestDriver(mounted.api);
+    driver.replaceActionCallbacks({ onDelete });
+    driver.replaceComments([
+      {
+        id: 1,
+        parentId: null,
+        createdAt: 1000,
+        quoteText: 'quoted root',
+        commentText: '',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'quoted root' },
+          position: { type: 'TextPositionSelector', start: 0, end: 11 },
+        },
+      },
+      { id: 2, parentId: 1, createdAt: 1100, commentText: 'reply' },
+    ]);
+    await flushReactScheduler();
+
+    const shadow = (host.querySelector('webclipper-threaded-comments-panel') as HTMLElement).shadowRoot!;
+    const reply = shadow.querySelector('[data-reply-id="2"]') as HTMLElement;
+    expect(reply).toBeTruthy();
+    expect(reply.querySelector('.webclipper-inpage-comments-panel__reply-connector')).toBeNull();
+    expect(reply.querySelector('.webclipper-inpage-comments-panel__avatar')?.classList.contains('is-small')).toBe(
+      false,
+    );
+
+    let deleteButton = shadow.querySelector(
+      '[data-thread-root-id="1"] .webclipper-inpage-comments-panel__quote-delete',
+    ) as HTMLButtonElement;
+    expect(deleteButton).toBeTruthy();
+    expect(deleteButton.dataset.webclipperCommentDeleteId).toBe('1');
+    expect(deleteButton.dataset.confirm).toBeUndefined();
+
+    deleteButton.click();
+    await flushReactScheduler();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    deleteButton = shadow.querySelector(
+      '[data-thread-root-id="1"] .webclipper-inpage-comments-panel__quote-delete',
+    ) as HTMLButtonElement;
+    expect(deleteButton.dataset.confirm).toBe('1');
+    expect(deleteButton.getAttribute('aria-label')).toBe('Confirm delete comment note');
+
+    deleteButton.click();
+    await flushReactScheduler();
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(1);
+
+    mounted.cleanup();
+  });
+
   it('preserves the root draft when the host reports a no-op save', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

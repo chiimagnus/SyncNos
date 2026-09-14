@@ -7,9 +7,23 @@ type CommentQuotePreviewProps = {
   invalid?: boolean;
   onClear?: () => void;
   onLocate?: () => void | Promise<void>;
+  deleteId?: number;
+  deleteConfirm?: boolean;
+  deleteDisabled?: boolean;
+  onDelete?: () => void | Promise<void>;
 };
 
-export function CommentQuotePreview({ text, variant, invalid = false, onClear, onLocate }: CommentQuotePreviewProps) {
+export function CommentQuotePreview({
+  text,
+  variant,
+  invalid = false,
+  onClear,
+  onLocate,
+  deleteId,
+  deleteConfirm = false,
+  deleteDisabled = false,
+  onDelete,
+}: CommentQuotePreviewProps) {
   const displayText = toDisplayCommentQuote(text);
   if (!displayText.trim()) return null;
   const className =
@@ -26,29 +40,56 @@ export function CommentQuotePreview({ text, variant, invalid = false, onClear, o
         {displayText}
       </div>
       {invalid ? <span className="webclipper-inpage-comments-panel__quote-status">Unavailable</span> : null}
-      {onLocate ? (
-        <button
-          type="button"
-          className="webclipper-inpage-comments-panel__quote-locate webclipper-btn webclipper-btn--tone-muted"
-          disabled={invalid}
-          aria-label="Locate quote"
-          onClick={() => void onLocate()}
-        >
-          Locate
-        </button>
-      ) : null}
-      {onClear ? (
-        <button
-          type="button"
-          className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
-          aria-label="Clear quote"
-          onClick={onClear}
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </button>
+      {onLocate || onClear || onDelete ? (
+        <div className="webclipper-inpage-comments-panel__quote-actions">
+          {onLocate ? (
+            <button
+              type="button"
+              className="webclipper-inpage-comments-panel__quote-locate webclipper-btn webclipper-btn--tone-muted"
+              disabled={invalid}
+              aria-label="Locate quote"
+              onClick={() => void onLocate()}
+            >
+              Locate
+            </button>
+          ) : null}
+          {onClear ? (
+            <button
+              type="button"
+              className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
+              aria-label="Clear quote"
+              onClick={onClear}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              className={[
+                'webclipper-inpage-comments-panel__quote-delete',
+                buttonIconCircleGhostClassName(),
+                deleteConfirm ? 'webclipper-btn--danger' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              data-confirm={deleteConfirm ? '1' : undefined}
+              data-webclipper-comment-delete-id={deleteId == null ? undefined : String(deleteId)}
+              disabled={deleteDisabled}
+              aria-label={deleteConfirm ? 'Confirm delete comment note' : 'Delete comment note'}
+              onClick={() => void onDelete()}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M3.5 5H12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <path d="M6 3.5H10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <path d="M5 5L5.5 12.5H10.5L11 5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

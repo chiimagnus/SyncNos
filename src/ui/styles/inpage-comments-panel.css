@@ -321,16 +321,15 @@
   font-size: 11px;
 }
 
-.webclipper-inpage-comments-panel__quote-clear {
+.webclipper-inpage-comments-panel__quote-actions {
   grid-column: 2;
-  grid-row: 1;
-  align-self: start;
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .webclipper-inpage-comments-panel__quote-locate {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
   min-height: 26px;
   padding: 0 7px;
   font-size: 11px;
@@ -388,12 +387,6 @@
   font-size: 10px;
   flex-shrink: 0;
   user-select: none;
-}
-
-.webclipper-inpage-comments-panel__avatar.is-small {
-  width: 22px;
-  height: 22px;
-  font-size: 9px;
 }
 
 .webclipper-inpage-comments-panel__threads {
@@ -495,40 +488,16 @@
 }
 
 .webclipper-inpage-comments-panel__replies {
-  position: relative;
-  margin: 9px 0 0 13px;
-  padding-left: 20px;
+  margin: 9px 0 0;
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
 
-.webclipper-inpage-comments-panel__replies::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 11px;
-  left: 0;
-  width: 1px;
-  background: color-mix(in srgb, var(--panel-border) 82%, transparent);
-}
-
 .webclipper-inpage-comments-panel__reply {
-  position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr);
   gap: 8px;
-}
-
-.webclipper-inpage-comments-panel__reply-connector {
-  position: absolute;
-  top: 11px;
-  left: -20px;
-  width: 13px;
-  height: 9px;
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 82%, transparent);
-  border-left: 1px solid color-mix(in srgb, var(--panel-border) 82%, transparent);
-  border-bottom-left-radius: var(--radius-inline);
 }
 
 .webclipper-inpage-comments-panel__icon-btn[data-confirm='1'] {

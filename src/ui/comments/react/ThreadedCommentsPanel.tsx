@@ -336,6 +336,10 @@ export function ThreadedCommentsPanel({
                       text={String(root.quoteText || '')}
                       invalid={!root.locator}
                       onLocate={() => runLocate(rootId)}
+                      deleteId={rootId}
+                      deleteConfirm={armedDeleteId === rootId}
+                      deleteDisabled={busy}
+                      onDelete={() => handleDelete(rootId)}
                     />
                   }
                   onActivate={(id) => {
