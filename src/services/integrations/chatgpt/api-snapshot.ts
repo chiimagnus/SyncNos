@@ -85,6 +85,10 @@ function isImagePart(part: unknown): part is Record<string, unknown> {
   return type === 'image_asset_pointer';
 }
 
+function isGeneratedImageToolResult(message: any): boolean {
+  return !!stableString(message?.metadata?.image_gen_title);
+}
+
 function currentParts(message: any, onSchemaDrift: SchemaDriftReporter): unknown[] {
   const raw = message?.content?.parts;
   if (raw == null) return [];
@@ -520,10 +524,10 @@ export function buildChatgptApiSnapshot(input: {
     }
 
     if (role === 'tool') {
-      // Ordinary tool results are execution-pipeline data. Ignore opaque tool schema completely;
-      // only a current image pointer makes the tool node relevant to visible conversation content.
+      // Tool-returned screenshots and other visual execution artifacts are model inputs, not conversation assets.
+      // ChatGPT currently marks user-visible generated images with image_gen_title; only those tool images are kept.
       const rawParts = message?.content?.parts;
-      if (!Array.isArray(rawParts) || !rawParts.some(isImagePart)) continue;
+      if (!Array.isArray(rawParts) || !rawParts.some(isImagePart) || !isGeneratedImageToolResult(message)) continue;
       startTurn(turnId);
       const images = collectMessageImages(message, markSchemaDrift);
       if (message.recipient !== 'all' || type !== 'multimodal_text') markSchemaDrift();

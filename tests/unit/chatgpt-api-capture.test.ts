@@ -29,13 +29,14 @@ type MessageInput = {
   hidden?: boolean;
   attachments?: any[];
   imageTitle?: string;
+  authorName?: string;
   status?: string;
 };
 
 function message(input: MessageInput) {
   return {
     id: input.id,
-    author: { role: input.role },
+    author: { role: input.role, ...(input.authorName ? { name: input.authorName } : null) },
     recipient: input.recipient ?? 'all',
     ...(input.channel ? { channel: input.channel } : null),
     content: {
@@ -362,6 +363,39 @@ describe('ChatGPT API snapshot', () => {
     ]);
   });
 
+  it('ignores tool-returned screenshots even when they use image_asset_pointer', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['inspect'] }),
+      message({
+        id: 'tool-call',
+        role: 'assistant',
+        recipient: 'api_tool.call_tool',
+        channel: 'commentary',
+        contentType: 'code',
+        parts: ['{}'],
+        turnId: 'turn-a',
+      }),
+      message({
+        id: 'tool-screenshot',
+        role: 'tool',
+        authorName: 'api_tool.call_tool',
+        channel: 'commentary',
+        contentType: 'multimodal_text',
+        parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_screenshot_1' }],
+        turnId: 'turn-a',
+      }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'inspect' }),
+      expect.objectContaining({ messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'answer' }),
+    ]);
+    expect(result.chatgptProtectedImages).toBeNull();
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
   it('handles long agentic tool pipelines without materializing internal tool nodes', () => {
     const messages: Array<ReturnType<typeof message>> = [message({ id: 'user-long', role: 'user', parts: ['q'] })];
     for (let index = 0; index < 300; index += 1) {
@@ -565,6 +599,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_generated_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
       message({
@@ -723,6 +758,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_only_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
       message({ id: 'user-2', role: 'user', parts: ['continue'] }),
@@ -760,6 +796,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_only_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
@@ -788,6 +825,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_only_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
       message({
@@ -815,6 +853,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_same_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-1',
       }),
       message({ id: 'user-2', role: 'user', parts: ['second'] }),
@@ -823,6 +862,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_same_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-2',
       }),
     ]);
@@ -857,6 +897,7 @@ describe('ChatGPT API snapshot', () => {
           { content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_only_1' },
           { content_type: 'image_asset_pointer', asset_pointer: 'https://legacy.invalid/file.png' },
         ],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
       message({
@@ -926,6 +967,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
@@ -941,6 +983,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
@@ -968,6 +1011,7 @@ describe('ChatGPT API snapshot', () => {
           { content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' },
           { content_type: 'execution_output', value: { opaque: true } },
         ],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
@@ -993,6 +1037,7 @@ describe('ChatGPT API snapshot', () => {
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
         attachments: [{ id: 'file_pdf_1', name: 'extra.pdf', mime_type: 'application/pdf', size: 10 }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
@@ -1030,6 +1075,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_image_1' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
@@ -1130,6 +1176,7 @@ describe('ChatGPT API snapshot', () => {
         role: 'tool',
         contentType: 'multimodal_text',
         parts: [{ content_type: 'image_asset_pointer', asset_pointer: 'https://legacy.invalid/file.png' }],
+        imageTitle: 'generated image',
         turnId: 'turn-image',
       }),
     ]);
