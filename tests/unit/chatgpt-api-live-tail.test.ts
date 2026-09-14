@@ -129,7 +129,7 @@ describe('ChatGPT API live-turn augmentation', () => {
 
   it('marks unsafe DOM identity partial and rejects conversation identity changes', () => {
     const api = snapshot([{ messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 }]);
-    const unsafe = augmentChatgptApiSnapshotWithLiveTurn(api, { kind: 'unsafe', conversationId: 'conversation-1' });
+    const unsafe = augmentChatgptApiSnapshotWithLiveTurn(api, { kind: 'unsafe' });
     expect(unsafe.captureMeta.reasons).toContain(CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON);
 
     expect(() =>

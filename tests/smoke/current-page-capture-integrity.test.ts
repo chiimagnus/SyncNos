@@ -300,7 +300,7 @@ describe('current page capture integrity routing', () => {
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
-      liveTurn: () => ({ kind: 'identity_changed', conversationId: 'conversation-2' }),
+      liveTurn: () => ({ kind: 'identity_changed' }),
       url: 'https://chatgpt.com/c/conversation-1',
     });
 

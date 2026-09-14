@@ -147,13 +147,9 @@ describe('chatgpt-collector', () => {
     });
     const def = createChatgptCollectorDef(env) as any;
 
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toEqual({
-      kind: 'unsafe',
-      conversationId: 'conversation-1',
-    });
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toEqual({ kind: 'unsafe' });
     expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-2' })).toEqual({
       kind: 'identity_changed',
-      conversationId: 'conversation-1',
     });
   });
 

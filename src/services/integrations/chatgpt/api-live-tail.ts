@@ -4,9 +4,9 @@ export const CHATGPT_API_LIVE_TAIL_REASON = 'chatgpt_api_live_tail_unconfirmed';
 export const CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON = 'chatgpt_api_live_tail_unresolved';
 
 export type ChatgptApiLiveTurnCapture =
-  | { kind: 'none'; conversationId: string }
-  | { kind: 'identity_changed'; conversationId: string }
-  | { kind: 'unsafe'; conversationId: string }
+  | { kind: 'none' }
+  | { kind: 'identity_changed' }
+  | { kind: 'unsafe' }
   | {
       kind: 'candidate';
       conversationId: string;

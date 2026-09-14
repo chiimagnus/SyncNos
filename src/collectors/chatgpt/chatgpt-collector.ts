@@ -812,12 +812,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const expectedConversationId = String(input.expectedConversationId || '').trim();
     const currentConversationId = String(findConversationIdFromUrl() || '').trim();
     if (!expectedConversationId || !currentConversationId || currentConversationId !== expectedConversationId) {
-      return { kind: 'identity_changed', conversationId: currentConversationId };
+      return { kind: 'identity_changed' };
     }
 
     try {
       const root = getConversationRoot();
-      if (!root) return { kind: 'none', conversationId: currentConversationId };
+      if (!root) return { kind: 'none' };
       const wrappers = getTurnWrappers(root);
       let lastUserIndex = -1;
       for (let index = wrappers.length - 1; index >= 0; index -= 1) {
@@ -826,7 +826,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           break;
         }
       }
-      if (lastUserIndex < 0) return { kind: 'none', conversationId: currentConversationId };
+      if (lastUserIndex < 0) return { kind: 'none' };
 
       const cotByOwner = buildCotAssociations(wrappers, true);
       let assistantWrapper: any = null;
@@ -846,12 +846,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         assistantWrapper = wrapper;
         break;
       }
-      if (!assistantWrapper) return { kind: 'none', conversationId: currentConversationId };
+      if (!assistantWrapper) return { kind: 'none' };
 
       const userWrapper = wrappers[lastUserIndex];
       const userKey = directMessageId(userWrapper);
       const assistantKey = directMessageId(assistantWrapper);
-      if (!userKey || !assistantKey) return { kind: 'unsafe', conversationId: currentConversationId };
+      if (!userKey || !assistantKey) return { kind: 'unsafe' };
 
       const userTurnKey = turnKeyOf(userWrapper);
       const assistantTurnKey = turnKeyOf(assistantWrapper);
@@ -874,7 +874,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         withinTurn: withinTurn(assistantIndex, assistantTurnKey),
         cot: cotByOwner.get(assistantWrapper) || null,
       });
-      if (!assistantInput.rendered) return { kind: 'unsafe', conversationId: currentConversationId };
+      if (!assistantInput.rendered) return { kind: 'unsafe' };
       // Generated images and deep-research frames have separate ownership/identity rules in the API snapshot.
       if (
         userInput.imageUrls.length > 0 ||
@@ -882,12 +882,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         assistantInput.hasDeepResearch ||
         assistantInput.iframeUrl
       ) {
-        return { kind: 'unsafe', conversationId: currentConversationId };
+        return { kind: 'unsafe' };
       }
 
       const userMessage = extractManualMessage(userInput, 0);
       const assistantMessage = extractManualMessage(assistantInput, 1);
-      if (!userMessage || !assistantMessage) return { kind: 'unsafe', conversationId: currentConversationId };
+      if (!userMessage || !assistantMessage) return { kind: 'unsafe' };
       return {
         kind: 'candidate',
         conversationId: currentConversationId,
@@ -895,7 +895,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         assistantMessage,
       };
     } catch (_error) {
-      return { kind: 'unsafe', conversationId: currentConversationId };
+      return { kind: 'unsafe' };
     }
   }
 
@@ -1089,8 +1089,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       sampleIdentityGuard,
       identityConversationKey,
       manualAdapter,
-      captureApiLiveTurn,
-      getRoot: getConversationRoot,
     },
   };
 
