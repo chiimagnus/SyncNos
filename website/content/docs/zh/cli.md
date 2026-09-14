@@ -37,6 +37,8 @@ syncnos instances
 syncnos list --limit 20
 syncnos search "keyword" --limit 20
 syncnos get <conversation-id>
+syncnos comments add <conversation-id> --text "一条评论"
+syncnos comments reply <conversation-id> <parent-comment-id> --text "一条回复"
 syncnos sync <conversation-id> --to notion
 syncnos export markdown <conversation-id> --output ./export
 syncnos backup export --output ./syncnos-backup.zip
@@ -47,5 +49,7 @@ syncnos backup export --output ./syncnos-backup.zip
 ## 给自动化使用
 
 CLI 默认输出 JSON，适合脚本和 AI Agent 读取。
+
+通过 CLI 为网页文章创建的评论和回复会显示为 `<About You 用户名>' CLI`；如果没有配置 About You 用户名，则显示为 `CLI`。这样可以和你在浏览器界面里直接写的评论区分开。
 
 `sync` 默认等待同步完成；需要异步执行时可以加 `--no-wait`。

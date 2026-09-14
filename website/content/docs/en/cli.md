@@ -37,6 +37,8 @@ syncnos instances
 syncnos list --limit 20
 syncnos search "keyword" --limit 20
 syncnos get <conversation-id>
+syncnos comments add <conversation-id> --text "A comment"
+syncnos comments reply <conversation-id> <parent-comment-id> --text "A reply"
 syncnos sync <conversation-id> --to notion
 syncnos export markdown <conversation-id> --output ./export
 syncnos backup export --output ./syncnos-backup.zip
@@ -47,5 +49,7 @@ Replace the sync destination with `notion`, `obsidian`, `feishu`, or `github`.
 ## For automation
 
 The CLI outputs JSON by default so scripts and AI agents can consume it directly.
+
+Comments and replies created through the CLI for web articles are displayed as `<About You name>' CLI`; when no About You name is configured, they are displayed as `CLI`. This keeps automation-authored notes distinct from comments you write directly in the browser UI.
 
 `sync` waits for completion by default. Add `--no-wait` when you want asynchronous execution.
