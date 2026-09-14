@@ -34,7 +34,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.72 var(--serif);
+  font: 17px/1.72 var(--serif);
 }
 a {
   color: var(--accent);
@@ -80,7 +80,7 @@ a:hover {
 }
 .docs-header-links a {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 .docs-layout {
   display: grid;
@@ -108,7 +108,7 @@ a:hover {
   padding: 6px 10px;
   border-radius: 8px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 .docs-sidebar a.active,
 .docs-mobile-nav a.active {
@@ -126,7 +126,7 @@ a:hover {
 .docs-nav-label {
   padding: 4px 10px 6px;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -141,15 +141,15 @@ a:hover {
 }
 .docs-heading h1 {
   margin: 0 0 8px;
-  font: 700 clamp(30px, 4vw, 42px)/1.15 var(--serif);
+  font: 700 clamp(32px, 4vw, 44px)/1.15 var(--serif);
 }
 .docs-heading p {
   margin: 0 0 12px;
   color: var(--muted);
-  font-size: 17px;
+  font-size: 18px;
 }
 .docs-source {
-  font-size: 13px;
+  font-size: 14px;
 }
 .docs-prose h2,
 .docs-prose h3,
@@ -159,11 +159,11 @@ a:hover {
 }
 .docs-prose h2 {
   margin: 46px 0 14px;
-  font-size: 25px;
+  font-size: 27px;
 }
 .docs-prose h3 {
   margin: 30px 0 10px;
-  font-size: 19px;
+  font-size: 20px;
 }
 .docs-prose p,
 .docs-prose ul,
@@ -241,7 +241,7 @@ a:hover {
 .docs-toc {
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .docs-toc-title {
   margin-bottom: 4px;
@@ -299,6 +299,6 @@ a:hover {
     display: block;
   }
   .docs-heading h1 {
-    font-size: 32px;
+    font-size: 34px;
   }
 }

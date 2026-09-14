@@ -71,6 +71,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--serif);
+  font-size: 18px;
   font-weight: 300;
   line-height: 1.72;
   -webkit-font-smoothing: antialiased;
@@ -109,7 +110,7 @@ b {
   align-items: center;
   gap: 10px;
   font-weight: 500;
-  font-size: 17px;
+  font-size: 18px;
 }
 .brand img {
   border-radius: 8px;
@@ -117,7 +118,7 @@ b {
 .nav-links {
   display: flex;
   gap: 28px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--muted);
 }
 .nav-links a:hover {
@@ -138,7 +139,7 @@ b {
   border-radius: 9px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -159,7 +160,7 @@ b {
   padding: 12px 22px;
   border-radius: 11px;
   font-weight: 400;
-  font-size: 15px;
+  font-size: 16px;
   cursor: pointer;
   transition:
     transform 0.2s,
@@ -173,7 +174,7 @@ b {
 }
 .btn-sm {
   padding: 8px 15px;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 9px;
 }
 .btn-ghost {
@@ -226,7 +227,7 @@ b {
   padding: 9px 14px;
   border-radius: 8px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 15px;
   white-space: nowrap;
 }
 .install-menu a:hover {
@@ -257,7 +258,7 @@ b {
   position: relative;
 }
 .eyebrow {
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--sky);
@@ -272,7 +273,7 @@ b {
   letter-spacing: -0.01em;
 }
 .lead {
-  font-size: clamp(17px, 2vw, 20px);
+  font-size: clamp(18px, 2vw, 21px);
   color: var(--muted);
   max-width: 54ch;
   margin: 0 0 34px;
@@ -287,7 +288,7 @@ section {
   padding: 92px 0;
 }
 .sec-eyebrow {
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--sky);
@@ -316,7 +317,7 @@ section {
   box-shadow: var(--card-shadow);
 }
 .card .tag {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sky);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -326,13 +327,13 @@ section {
 .card h3 {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 20px;
+  font-size: 21px;
   margin: 0 0 12px;
 }
 .card p {
   margin: 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 @media (max-width: 820px) {
   .bento {
@@ -358,7 +359,7 @@ section {
 }
 .alt-install {
   margin: 14px 0 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 .alt-install a {
   color: var(--muted);
@@ -374,18 +375,18 @@ section {
 .dest h3 {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 19px;
+  font-size: 20px;
   margin: 0 0 8px;
 }
 .dest p {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 .note {
   margin-top: 24px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .shots {
@@ -407,7 +408,7 @@ section {
 .shot figcaption {
   padding: 16px 22px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
   border-top: 1px solid var(--line);
 }
 @media (max-width: 820px) {
@@ -432,7 +433,7 @@ section {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 11px 18px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--muted);
   box-shadow: var(--card-shadow);
   transition:
@@ -443,7 +444,7 @@ section {
   max-width: 46ch;
   margin: 0 auto 18px;
   color: var(--muted);
-  font-size: 17px;
+  font-size: 18px;
 }
 .phase b {
   color: var(--ink);
@@ -461,7 +462,7 @@ section {
 .community {
   margin-top: 26px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .foot {
@@ -497,7 +498,7 @@ section {
 }
 .safari-note {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   margin: 0 0 44px;
 }
 .foot-links {
@@ -506,7 +507,7 @@ section {
   justify-content: center;
   flex-wrap: wrap;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
   border-top: 1px solid var(--line);
   padding-top: 32px;
 }
@@ -516,7 +517,7 @@ section {
 .copyright {
   margin-top: 22px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .js .reveal {
@@ -611,7 +612,7 @@ section {
 }
 .sponsors-lead {
   color: var(--muted);
-  font-size: clamp(16px, 1.8vw, 18px);
+  font-size: clamp(17px, 1.8vw, 19px);
   max-width: 52ch;
   margin: 0 0 44px;
 }
@@ -643,14 +644,14 @@ section {
 .sponsor blockquote {
   font-family: var(--serif);
   font-weight: 500;
-  font-size: 18px;
+  font-size: 19px;
   line-height: 1.55;
   color: var(--ink);
   margin: 0 0 18px;
   flex: 1;
 }
 .sponsor-note {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
   color: var(--muted);
   margin: 0 0 18px;
@@ -661,7 +662,7 @@ section {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.03em;
 }
 .sp-name {
@@ -686,13 +687,13 @@ a.sp-name:hover {
 .sponsors-total {
   margin: 28px 0 0;
   font-family: var(--serif);
-  font-size: clamp(16px, 1.9vw, 19px);
+  font-size: clamp(17px, 1.9vw, 20px);
   color: var(--ink);
 }
 .sponsors-names {
   margin-top: 14px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.95;
 }
 .sponsors-names a {
@@ -732,7 +733,7 @@ a.sp-name:hover {
   box-shadow: var(--card-shadow);
 }
 .feature .tag {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sky);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -748,7 +749,7 @@ a.sp-name:hover {
 .feature p {
   margin: 0;
   color: var(--muted);
-  font-size: 15.5px;
+  font-size: 16.5px;
   line-height: 1.85;
 }
 .numlist {
@@ -771,7 +772,7 @@ a.sp-name:hover {
 }
 .numlist .num {
   font-family: var(--serif);
-  font-size: 15px;
+  font-size: 16px;
   color: var(--sky);
   font-variant-numeric: tabular-nums;
   padding-top: 3px;
@@ -780,13 +781,13 @@ a.sp-name:hover {
 .numlist h3 {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 18px;
+  font-size: 19px;
   margin: 0 0 6px;
 }
 .numlist p {
   margin: 0;
   color: var(--muted);
-  font-size: 14.5px;
+  font-size: 15.5px;
 }
 @media (max-width: 820px) {
   .capture-lay {
@@ -819,11 +820,11 @@ a.sp-name:hover {
 .hub-name {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 20px;
+  font-size: 21px;
 }
 .hub-sub {
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 14.5px;
   margin-top: 2px;
 }
 .flow-tree {
