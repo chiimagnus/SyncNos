@@ -91,10 +91,11 @@ describe('settings section definitions', () => {
     expect(text).toContain('full current conversation branch');
     expect(text).toContain('Off by default');
     expect(text).toContain('non-public backend API');
-    expect(text).toContain('Tool, Agent, Deep Research');
+    expect(text).toContain('reported as partial');
+    expect(text).toContain('identity or tree-integrity failures');
     expect(text).toContain('does not silently fall back');
-    expect(text).toContain('Protected images');
-    expect(text).toContain('reported as incomplete');
+    expect(text).toContain('Automatic local caching follows the AI image-cache setting');
+    expect(text).toContain('Tool screenshots and visual execution artifacts are not saved');
 
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggle).toHaveBeenCalledWith(true);

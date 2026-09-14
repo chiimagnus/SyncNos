@@ -84,11 +84,11 @@ export const zh: { [K in TranslationKey]: string } = {
   chatgptApiCaptureAdvancedHint:
     '默认关闭。只有手动保存当前 ChatGPT 会话时，SyncNos 才会使用当前登录 Session 访问 ChatGPT 的未公开后端 API；ChatGPT 改版后可能失效。关闭后继续使用 DOM 手动采集。',
   chatgptApiCaptureAdvancedSupport:
-    '支持文本、可见 reasoning 和当前图片。Tool、Agent、Deep Research 等无法从后端安全等价还原的内容会明确失败，不会静默丢失。',
+    '支持文本、可见 reasoning 和对话图片。遇到未知后端结构时，会保留能够安全归属的内容并标记为部分结果；会话身份或消息树完整性无法确认时仍会停止采集。',
   chatgptApiCaptureAdvancedFallback:
     '高级模式失败时不会在同一次保存中静默回退。关闭此开关后再次保存，即可使用 DOM 路径。',
   chatgptApiCaptureAdvancedImages:
-    '高级模式会始终尝试把受保护图片缓存到本地，不受通用 AI 图片缓存开关影响；图片失败不会阻止正文保存，但本次采集会报告为不完整。',
+    '对话图片与图片下载分开保存。是否自动缓存到本地由 AI 图片缓存开关决定；关闭时，未缓存的 ChatGPT 图片仍可按需解析。普通工具截图和视觉执行产物不会作为对话图片保存。',
   aiChatsSectionHowToHeading: '如何抓取',
   aiChatsSectionHowToStep1: '打开 AI 对话页面，并切换到要保存的线程。',
   aiChatsSectionHowToStep2Prefix: '点击抓取按钮中的 ',

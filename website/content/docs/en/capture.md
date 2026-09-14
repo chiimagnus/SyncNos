@@ -32,7 +32,7 @@ Currently supported:
 
 **ChatGPT and Google AI Studio use virtualized lists.** Older turns can be removed from the live DOM when they leave the viewport, so SyncNos does not treat them as ordinary auto-save sources. Manual capture performs the preparation needed for a complete capture.
 
-ChatGPT also has optional **Advanced capture**. When explicitly enabled, manual capture can request the current conversation through the logged-in ChatGPT session. It still runs only when you save manually; it does not become background polling or automatic capture.
+ChatGPT also has optional **Advanced capture**. When explicitly enabled, manual capture can request the current conversation through the logged-in ChatGPT session. It still runs only when you save manually; it does not become background polling or automatic capture. If ChatGPT introduces an unfamiliar backend content shape, SyncNos keeps content it can safely assign to the conversation and marks the result partial. Identity or conversation-tree errors still fail instead of guessing. Advanced capture never silently falls back to DOM capture in the same save; turn it off and save again if you want the DOM path.
 
 ## Web articles
 
@@ -48,9 +48,13 @@ SyncNos does not generate missing subtitles and does not download audio or video
 
 ## Image caching
 
-AI conversations and web articles can cache images when enabled. When an anti-hotlink rule matches, SyncNos can adjust the Referer and try to fetch the original image. A cache failure does not block the text capture.
+AI conversations and web articles can cache images locally. Text is saved independently from image downloads, so an image failure does not turn a successful text capture into a failed save.
 
-When exporting Markdown / JSON, cached images that are actually referenced by the exported content can travel with the export. See [Export & backup](/docs/en/export-backup/).
+For ChatGPT, user-uploaded images and AI-generated images are treated as conversation content; ordinary tool screenshots and visual execution artifacts are not. With automatic AI image caching enabled, the conversation is saved first and images are cached afterward. With it disabled, uncached ChatGPT images can still be resolved on demand while your ChatGPT session allows access. Existing items can be localized later with **Cache images** in the detail More menu.
+
+For web articles, the article image-cache setting controls normal image caching. A matching anti-hotlink rule can force an image-cache attempt with the required Referer.
+
+Export and provider sync can also materialize an uncached ChatGPT image when needed without first making it part of the permanent local cache. See [Export & backup](/docs/en/export-backup/) and [Sync to external services](/docs/en/sync/).
 
 ## After capture
 

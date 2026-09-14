@@ -16,7 +16,7 @@ Supported non-virtualized AI sites can auto-save when AI auto-save is enabled. C
 
 Durable captured content is stored in browser IndexedDB. Extension local storage holds settings, OAuth/auth state, provider configuration, queues/jobs, and other small state.
 
-Selected Markdown/JSON exports are assembled locally from the selected items and referenced cached images that can be materialized from those items. They do not include sync mappings, article comments, settings, or provider credentials, and exporting does not trigger a new image download.
+Selected Markdown/JSON exports are assembled locally from the selected items. Referenced local image-cache assets are included when available. If selected ChatGPT content still references an uncached conversation image, export may temporarily resolve and download that image through the current signed-in ChatGPT session so it can be attached to the export; this does not add the image to the permanent local cache. If the image cannot be retrieved, the text still exports and the image is represented as unavailable. Exports do not include sync mappings, article comments, settings, or provider credentials.
 
 Backup ZIP is a separate recovery package. It may contain captured content, recoverable sync mappings, cached images, article comments, and non-sensitive settings. Authentication secrets are excluded, including provider access/refresh tokens, client secrets, the Obsidian API key, GitHub Device Flow credentials, and the Reader TTS AI API key. Machine/profile-specific CLI identity and opt-in state are also excluded.
 
@@ -36,9 +36,11 @@ External sync is optional. Each provider can be synchronized manually and may al
 
 ### ChatGPT Advanced capture
 
-When you explicitly enable ChatGPT Advanced capture and manually save the current conversation, SyncNos uses your current signed-in ChatGPT session to request that conversation from ChatGPT's non-public current-conversation backend API. If the conversation contains protected images, SyncNos also requests ChatGPT's file-resolution and image-content endpoints so those images can be cached locally. This mode does not add background polling or automatic ChatGPT capture.
+When you explicitly enable ChatGPT Advanced capture and manually save the current conversation, SyncNos uses your current signed-in ChatGPT session to request that conversation from ChatGPT's non-public current-conversation backend API. This mode does not add background polling or automatic ChatGPT capture. Backend content that can be assigned safely is preserved even when an unfamiliar schema shape makes the result partial; identity or conversation-tree integrity failures still stop the capture instead of guessing.
 
-ChatGPT session cookies and the access token obtained for these requests are used only at runtime. SyncNos does not write those authentication values, signed image download URLs, or raw backend responses to captured messages, browser local storage, or Backup ZIP files. Successfully downloaded protected-image blobs are stored in the existing local image cache. If an image cannot be downloaded or cached, SyncNos can still save the captured text and reports that capture as incomplete.
+Conversation text and durable image identity are saved independently from image downloads. Automatic local image caching follows the general AI image-cache setting and runs after the conversation save; when it is disabled, an uncached ChatGPT image may be resolved on demand for display, export, or provider sync. A failed image resolution/cache attempt does not turn successfully persisted text into a failed or incomplete capture. Ordinary tool screenshots and visual execution artifacts are not stored as conversation images.
+
+ChatGPT session cookies and access tokens are used only at runtime. SyncNos does not persist those authentication values, transient signed image download URLs, or raw backend responses in captured messages, browser local storage, or Backup ZIP files.
 
 ### Notion
 

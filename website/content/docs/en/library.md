@@ -11,6 +11,12 @@ AI conversations, web articles, and video content live in the same local content
 
 Reading themes and Markdown display preferences change presentation only; they do not rewrite the saved content.
 
+## Image status and local cache
+
+Open the detail **More** menu to see the saved text count plus image totals: **Images**, **Cached**, and **Uncached**. The count follows image occurrences in the saved Markdown, so the same image used twice counts twice.
+
+**Cache images** tries to localize the remaining images for the current item. This is useful for older items even when automatic image caching is off. An uncached ChatGPT image can still display on demand while your current ChatGPT session can resolve it; once cached, the saved item uses the local copy instead.
+
 ## Highlights, comments, and replies
 
 Saved web articles can have comments and replies attached to exact text references. A root annotation can also be highlight-only, without extra comment text.

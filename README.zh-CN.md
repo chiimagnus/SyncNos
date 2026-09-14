@@ -31,9 +31,7 @@
 
 ### 本机 CLI
 
-可选的 `syncnos` CLI 直接使用运行中的浏览器 Extension 作为数据和业务逻辑真源；它不是第二套数据库，也不是离线 daemon。
-
-直接从 npm 安装已发布的 CLI：
+可选的 `syncnos` CLI 让本机自动化和 AI Agent 访问正在运行的 SyncNos 浏览器 Profile。在目标 Profile 中开启 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**，并在使用 CLI 时保持浏览器运行。
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -41,11 +39,7 @@ syncnos install
 syncnos doctor
 ```
 
-每个 GitHub Release 仍会附带对应的 `chiimagnus-syncnos-<version>.tgz`，用于可复现或手动安装。
-
-在需要使用 CLI 的浏览器 Profile 中开启 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**。业务命令执行时，该浏览器 Profile 需要保持运行。
-
-`syncnos install` 只检查有限的已知浏览器位置并写入当前用户的 Native Messaging registration，不遍历磁盘，也不读取浏览器 Profile。当前系统支持的 browser ID 以 `syncnos install --help` 为准；`syncnos doctor` 用于区分安装状态和 Extension 连接状态。Safari 使用另一套原生桥，不由这个 installer 管理。
+安装、能力发现和命令使用见[使用 CLI 自动化](https://chiimagnus.github.io/SyncNos/docs/cli/)。
 
 ## 演示
 
@@ -59,7 +53,7 @@ syncnos doctor
 
 ChatGPT 与 Google AI Studio 使用虚拟列表，只支持手动抓取；其它受支持的 AI 对话在开启 AI 自动保存后可自动采集。
 
-ChatGPT 默认使用 DOM 采集；你也可以在 **设置 → AI 对话** 中显式开启仅针对当前会话的 **高级 API** 路径。它仍然只会在你手动保存时运行，并可能在 ChatGPT 调整未公开后端 API 后失效。
+ChatGPT 默认使用 DOM 采集，也提供可选的高级 API 路径用于手动采集当前会话。具体行为和限制见[采集内容](https://chiimagnus.github.io/SyncNos/docs/capture/)。
 
 ### 网页文章
 
@@ -77,7 +71,7 @@ SyncNos 支持 YouTube watch / youtu.be 页面和 Bilibili BV 播放页，也支
 | **Obsidian** | 通过 Local REST API 写入 Markdown 和本地图片附件。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/) |
 | **飞书** | OAuth 后同步到飞书 DocX。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/feishu/) |
 | **GitHub** | 通过 SyncNos GitHub App 写入已授权的 repository / branch。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/github/) |
-| **Markdown / JSON** | 在本机导出选中的条目和实际引用的缓存附件。[导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/) |
+| **Markdown / JSON** | 在本机导出选中的条目和可取得的引用图片附件。[导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/) |
 | **Backup ZIP** | 创建用于恢复 SyncNos 本地内容和可恢复状态的恢复包。[导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/) |
 
 每个 Provider 都可以手动同步，并可单独启用自动同步。

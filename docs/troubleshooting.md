@@ -14,6 +14,8 @@
 | Notion managed section 扫描遇到 5xx/retrieve 失败 | 按远端失败处理并重试；不要把读取失败当成“未找到”后创建重复 section。 |
 | GitHub 选中多条但 changed files 更少 | 未变化的受管路径可以参与 reconcile，但最终 tree diff 只包含真正变化的文件。 |
 | Article 只有文本没有图片 | 图片设置、anti-hotlink rule、Referer 和下载 warning；文本保存成功仍是成功。 |
+| ChatGPT Advanced 在后端改版后失败 | 先区分 identity/tree integrity hard failure 与 schema drift partial；同一次保存禁止静默回退 DOM。需要 DOM 路径时关闭 Advanced 后重新保存。 |
+| ChatGPT 正文已保存但图片未本地化 | 先区分未缓存的稳定远端引用、session/resolver 失败和 backfill warning；图片网络失败不能反向判定正文保存失败，也不要为此恢复同步阻塞保存。 |
 | Video 没有字幕 | 当前页没有可信字幕时仍保存 Video；字幕加载后再次保存即可补充 transcript。 |
 | Bilibili Watch Later 产生重复身份 | 只有带合法 `bvid` 的播放页按 BV identity 归一；旧版本误存的历史 Article 不会自动删除。 |
 | `syncnos install` → `browser_not_found` | 自动发现未命中已知标准位置；portable/自定义安装使用显式 `--browser <id>`，不要全盘扫描。 |

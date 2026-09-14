@@ -6,7 +6,7 @@
 
 | Field | Value |
 | --- | --- |
-| Commit hash | `6135434d489c05db86a9e12b95f00a499e6018ff` |
+| Commit hash | `d1a3072e0067b371bba399b661996f09c0edd8bc` |
 | Reconciled at | `2026-09-14` |
 
 该 commit 是本轮文档核对的源码基线。会频繁变化的版本号、权限列表、schema、默认路径和 browser target 继续由源码、配置和测试拥有。
@@ -32,4 +32,6 @@
 - 同一受众的同一长期事实只保留一个详细 owner；其它页面只导航或保留必要的一句高风险 guardrail。
 - Runtime 结构、符号、storage key、schema/index、默认目录和 browser 路径由源码/配置/测试回答，不镜像进长期 Markdown。
 - README 只做快速用户入口；详细用户操作与 Provider 配置归 `website/content/docs/**`，恢复边界归 storage，完整数据流归 Privacy，验证责任归 CONTRIBUTING。
+- 用户文档从“用户要做什么”出发，只保留最少步骤、可观察结果、必要限制与可执行排障；不把 storage key、内部 URI、RPC、类型名或实现流水线暴露成使用说明。维护者文档只保留长期不变量、失败语义、ownership、edit trigger 与验证入口，不逐步复述实现。
+- 同一事实只写一次。其它页面优先链接 owner；只有读者不在当前页面看到就会误操作的关键信息，才保留一句摘要。
 - 新页面是最后选项；新增时必须同时有长期消费者、明确 edit trigger 和真实导航入口。

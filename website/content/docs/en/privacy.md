@@ -16,8 +16,8 @@ Whether content is sent to an external service depends on the features you expli
 - **Notion** sends content you choose to sync to the Notion API and may process referenced images when needed.
 - **Feishu** sends content you choose to sync to the Feishu API; OAuth can use Proxy or Direct mode.
 - **GitHub** authorizes through GitHub App Device Flow and writes repository content through the GitHub API.
-- **ChatGPT Advanced capture** runs only when explicitly enabled and manually invoked for the current conversation; it can also fetch protected images.
-- **Image caching** can request images from their original sites / CDNs.
+- **ChatGPT Advanced capture** runs only when explicitly enabled and manually invoked for the current conversation.
+- **Images** may be requested from their original sites / CDNs when you cache them. An uncached ChatGPT image may also be resolved temporarily when you view, export, or sync content that references it.
 - **Obsidian** normally talks to a Local REST API on the same computer rather than a SyncNos cloud service.
 
 Once a third-party service receives data, that service's own privacy policy applies.

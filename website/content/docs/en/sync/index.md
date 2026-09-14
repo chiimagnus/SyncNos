@@ -20,6 +20,8 @@ You can configure only one destination or several. Each destination has its own 
 
 Every external destination supports manual sync and can enable automatic sync independently. Both modes use the same provider sync flow; automatic sync changes when work starts, not which system owns your data.
 
+When a ChatGPT item references an image that is not cached locally, SyncNos may retrieve it temporarily for the destination instead of forcing a permanent local cache first. If that image is unavailable, the local text remains intact and the destination degrades the image according to that provider's capabilities.
+
 ## Sync, export, and backup are different
 
 - **Sync** keeps a configured external service updated.

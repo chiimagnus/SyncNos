@@ -15,7 +15,7 @@ Export and Backup solve different problems: **exports are for people and other t
 
 Select content from the local library and export it as Markdown or JSON. The result is delivered as a ZIP containing files for the selected items.
 
-If the exported content references images that SyncNos has cached, the available referenced attachments are added to the ZIP and internal image references are rewritten to relative paths inside the export.
+Referenced images that are already cached locally are added to the ZIP when available. If a selected ChatGPT item still has an uncached image, SyncNos can try to retrieve that image at export time using your current ChatGPT session; this does not permanently add it to the local cache. If the image cannot be retrieved, the text still exports and that image is marked unavailable instead of leaking an internal reference.
 
 Markdown is convenient for direct reading and continued writing. JSON is better for programmatic processing and preserves structured type, source, time, and attachment information.
 

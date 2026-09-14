@@ -7,6 +7,8 @@ description: Incomplete captures, failed syncs, connection errors, browser compa
 
 For ChatGPT or Google AI Studio, use manual current-page capture. Both use virtualized lists, so older turns can be absent from the live DOM and are not treated as ordinary auto-save sources.
 
+If ChatGPT Advanced capture stops working after a ChatGPT backend change, turn **Advanced capture** off and save again to use the DOM path. The same save never silently switches capture methods. A missing image does not mean the already-saved text failed; use **Cache images** later if you want another local-cache attempt.
+
 For another supported AI site that should auto-save, first confirm auto-save is enabled, then try one manual capture to check whether the current page can be parsed. See [Capture content](/docs/en/capture/) for the complete support matrix.
 
 ## What if sync fails?

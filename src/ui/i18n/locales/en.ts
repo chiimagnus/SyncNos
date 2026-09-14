@@ -83,11 +83,11 @@ export const en = {
   chatgptApiCaptureAdvancedHint:
     'Off by default. Only when you manually save the current ChatGPT conversation, SyncNos uses your signed-in session with ChatGPT’s non-public backend API. It may stop working after ChatGPT changes. Turn it off to keep using manual DOM capture.',
   chatgptApiCaptureAdvancedSupport:
-    'Supports text, visible reasoning, and current images. Tool, Agent, Deep Research, or other content that cannot be reproduced safely from the backend fails explicitly instead of being silently dropped.',
+    'Supports text, visible reasoning, and conversation images. Unknown backend shapes keep content that can be assigned safely and are reported as partial; conversation identity or tree-integrity failures still stop the capture.',
   chatgptApiCaptureAdvancedFallback:
     'An Advanced failure does not silently fall back during the same save. Turn this setting off and save again to use the DOM path.',
   chatgptApiCaptureAdvancedImages:
-    'Protected images are always attempted for local caching in Advanced mode, independent of the general AI image-cache setting. An image failure does not block saving text, but the capture is reported as incomplete.',
+    'Conversation images are saved independently from image downloads. Automatic local caching follows the AI image-cache setting; when it is off, uncached ChatGPT images can be resolved on demand. Tool screenshots and visual execution artifacts are not saved as conversation images.',
   aiChatsSectionHowToHeading: 'How to fetch',
   aiChatsSectionHowToStep1: 'Open an AI chat page and switch to the thread you want.',
   aiChatsSectionHowToStep2Prefix: 'Click ',

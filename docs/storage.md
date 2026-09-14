@@ -11,6 +11,14 @@
 - 文章评论属于本地文章身份下的独立注释层。仅划线根评论需要可验证定位或稳定导入身份；reply 必须有正文并保持同一文章线程身份。
 - 图片缓存是增强数据；缓存失败不得阻断正文保存。
 
+## 图片引用与缓存
+
+- 对话正文和图片下载是两个持久化阶段。正文成功写入后，图片 resolver、下载、队列或缓存失败不得把这次正文保存改判为失败，也不得回滚正文。
+- ChatGPT 尚未本地化的内容图片必须保留可恢复的稳定身份；session token、临时 signed download URL 和原始 backend response 不进入持久消息或 Backup。
+- 用户上传图片与 AI 生成图片属于对话内容；普通 tool/MCP 截图和视觉执行产物不是 conversation asset，不进入图片缓存。
+- 自动图片缓存只决定是否在保存后后台本地化；手动 backfill 仍可处理已有条目。成功本地化只改写真正的 Markdown image target，local asset identity 继续受 owning conversation 约束。
+- 导出和 Provider 同步需要图片时，可以临时物化尚未本地缓存的 ChatGPT 图片，不以“先写入永久本地缓存”为前提。临时取图失败按目标能力降级图片，不能泄漏内部引用，也不能破坏已经保存的本地正文。
+
 ## 一致性与刷新
 
 - IndexedDB 业务层共用 canonical connection lifecycle，不维护第二套连接所有权。

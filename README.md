@@ -31,9 +31,7 @@ Captured content is stored locally before optional sync or export. External prov
 
 ### Local CLI
 
-The optional `syncnos` CLI uses the running browser Extension as its data and business-logic owner; it is not a second database or an offline daemon.
-
-Install the published CLI from npm:
+The optional `syncnos` CLI lets local automation and AI agents work with a running SyncNos browser profile. Install it from npm, enable **Settings → General → Local CLI Integration → SyncNos CLI** in that profile, and keep the browser running while using it.
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -41,11 +39,7 @@ syncnos install
 syncnos doctor
 ```
 
-The matching `chiimagnus-syncnos-<version>.tgz` remains attached to each GitHub Release for reproducible/manual installation.
-
-Enable **Settings → General → Local CLI Integration → SyncNos CLI** in each browser profile you want to expose. Business commands require that browser profile to remain running.
-
-`syncnos install` checks a finite set of known browser locations and writes user-level Native Messaging registrations; it does not crawl the disk or inspect browser profiles. Use `syncnos install --help` for the browser IDs supported on the current OS, and `syncnos doctor` to distinguish installation health from Extension connectivity. Safari uses a different native bridge and is not handled by this installer.
+See [Automate with the CLI](https://chiimagnus.github.io/SyncNos/docs/en/cli/) for setup, discovery, and command guidance.
 
 ## Demo
 
@@ -59,7 +53,7 @@ Supported: ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, P
 
 ChatGPT and Google AI Studio require manual capture because their virtualized conversation lists cannot be treated as complete automatically. Other supported AI chat collectors can auto-save when AI auto-save is enabled.
 
-ChatGPT uses DOM capture by default. In **Settings → AI Chats**, you can explicitly enable the current-conversation **Advanced API** path; it still runs only when you manually save, and it may stop working when ChatGPT changes its non-public backend API.
+ChatGPT uses DOM capture by default and also offers an optional Advanced API path for manual current-conversation capture. See [Capture content](https://chiimagnus.github.io/SyncNos/docs/en/capture/) for behavior and limitations.
 
 ### Web articles
 
@@ -77,7 +71,7 @@ SyncNos supports YouTube watch/youtu.be pages and Bilibili BV playback pages, in
 | **Obsidian** | Write Markdown and local image attachments through the Local REST API. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/) |
 | **Feishu (Lark)** | Sync local content to Feishu DocX after OAuth. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/) |
 | **GitHub** | Write the local projection to an authorized repository/branch through the SyncNos GitHub App. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/github/) |
-| **Markdown / JSON** | Export selected items and referenced cached attachments locally. [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/) |
+| **Markdown / JSON** | Export selected items and available referenced image attachments locally. [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/) |
 | **Backup ZIP** | Create a recovery package for SyncNos local content and recoverable state. [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/) |
 
 Provider sync can be run manually; optional auto-sync is available per provider.

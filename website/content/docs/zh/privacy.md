@@ -16,8 +16,8 @@ description: 内容默认保存在哪里，哪些功能会联网，以及凭据�
 - **Notion**：把你选择同步的内容发送到 Notion API；需要时会处理引用图片。
 - **飞书**：把你选择同步的内容发送到飞书 API；OAuth 可使用 Proxy 或 Direct。
 - **GitHub**：通过 GitHub App Device Flow 授权，并向 GitHub API 写入仓库内容。
-- **ChatGPT Advanced capture**：仅在显式开启后，用当前已登录 ChatGPT 会话执行手动当前对话采集，并可能获取受保护图片。
-- **图片缓存**：可能向原始站点 / CDN 请求图片。
+- **ChatGPT 高级采集**：仅在显式开启后，用当前已登录 ChatGPT 会话执行手动当前对话采集。
+- **图片**：缓存图片时可能请求原始站点 / CDN；查看、导出或同步仍引用未缓存 ChatGPT 图片的内容时，也可能临时解析并获取对应图片。
 - **Obsidian**：默认访问同一台电脑上的 Local REST API，而不是 SyncNos 云服务。
 
 第三方服务收到数据后，适用各自的隐私政策。
