@@ -15,7 +15,12 @@ vi.mock('@services/integrations/chatgpt/api-capture', () => ({
 import { t } from '@i18n';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 
-function chatSnapshot(options?: { completeness?: 'complete' | 'partial'; verified?: boolean; source?: string }) {
+function chatSnapshot(options?: {
+  completeness?: 'complete' | 'partial';
+  verified?: boolean;
+  source?: string;
+  markdown?: string;
+}) {
   return {
     conversation: {
       sourceType: 'chat',
@@ -24,7 +29,7 @@ function chatSnapshot(options?: { completeness?: 'complete' | 'partial'; verifie
       title: 'Conversation',
       url: 'https://chatgpt.com/c/conversation-1',
     },
-    messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0 }],
+    messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: options?.markdown || 'hello', sequence: 0 }],
     captureMeta: {
       completeness: options?.completeness || 'complete',
       identityVerified: options?.verified !== false,
@@ -157,21 +162,14 @@ describe('current page capture integrity routing', () => {
     expect(harness.capture).toHaveBeenCalledWith({ manual: true, preparedCapture: { prepared: true } });
   });
 
-  it('uses API snapshot exclusively for an enabled durable ChatGPT route and forwards the transient image sidecar', async () => {
+  it('uses API snapshot exclusively for an enabled durable ChatGPT route and persists stable image references directly', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const prepare = vi.fn();
-    const sidecar = {
-      conversationKey: 'conversation-1',
-      assets: [{ ref: 'file_1', fileId: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'm1', alt: '' }],
-    };
-    chatgptApiMocks.capture.mockResolvedValue({
-      applicable: true,
-      snapshot: chatSnapshot(),
-      chatgptProtectedImages: sidecar,
-    });
+    const snapshot = chatSnapshot({ markdown: 'hello\n\n![](chatgpt-file://file_1)' });
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
-      snapshot: chatSnapshot(),
+      snapshot,
       prepare,
       url: 'https://chatgpt.com/c/conversation-1',
     });
@@ -185,7 +183,7 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls[1].payload).toMatchObject({
       mode: 'snapshot',
       diff: null,
-      chatgptProtectedImages: sidecar,
+      messages: [expect.objectContaining({ contentMarkdown: 'hello\n\n![](chatgpt-file://file_1)' })],
     });
     expect(harness.calls[1].payload).not.toHaveProperty('conversationUrl');
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
@@ -250,7 +248,6 @@ describe('current page capture integrity routing', () => {
       return {
         applicable: true,
         snapshot: chatSnapshot(),
-        chatgptProtectedImages: null,
       };
     });
     const harness = createHarness({
@@ -263,35 +260,26 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
-  it('reports protected-image failure as partial without changing the structural snapshot persistence mode', async () => {
+  it('keeps ChatGPT image references independent from image-cache success during persistence', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    chatgptApiMocks.capture.mockResolvedValue({
-      applicable: true,
-      snapshot: chatSnapshot(),
-      chatgptProtectedImages: {
-        conversationKey: 'conversation-1',
-        assets: [
-          { ref: 'file_1', fileId: 'file_1', cacheKey: 'chatgpt-file://file_1', targetMessageKey: 'm1', alt: '' },
-        ],
-      },
-    });
+    const snapshot = chatSnapshot({ markdown: '![](chatgpt-file://file_1)' });
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
-      snapshot: chatSnapshot(),
+      snapshot,
       url: 'https://chatgpt.com/c/conversation-1',
-      syncResponse: {
-        ok: true,
-        data: { upserted: 1, deleted: 0, imageWarningFlags: ['protected_images_incomplete'] },
-      },
+      syncResponse: { ok: true, data: { upserted: 1, deleted: 0 } },
     });
 
     const result = await harness.service.captureCurrentPage();
 
-    expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
-    expect(result).toMatchObject({
-      captureCompleteness: 'partial',
-      captureReasons: ['chatgpt_api_images_incomplete'],
+    expect(harness.calls[1].payload).toMatchObject({
+      mode: 'snapshot',
+      diff: null,
+      messages: [expect.objectContaining({ contentMarkdown: '![](chatgpt-file://file_1)' })],
     });
+    expect(result).toMatchObject({ captureCompleteness: 'complete' });
+    expect(result.captureReasons).toBeUndefined();
   });
 
   it('rejects malformed upsert responses before message persistence', async () => {
@@ -310,7 +298,6 @@ describe('current page capture integrity routing', () => {
     chatgptApiMocks.capture.mockResolvedValue({
       applicable: true,
       snapshot: chatSnapshot(),
-      chatgptProtectedImages: null,
     });
     const harness = createHarness({
       collectorId: 'chatgpt',

@@ -91,6 +91,24 @@ describe('auto-sync-scheduler-core', () => {
     expect(infraPack.storage[QUEUE_KEY]).toEqual({ '1.5': infraPack.infra.now() - 1 });
   });
 
+  it('propagates queue persistence failures to the caller', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    infraPack.infra.storage.set = vi.fn().mockRejectedValue(new Error('storage write failed'));
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-storage-failure',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await expect(scheduler.enqueue(1, 'a')).rejects.toThrow('storage write failed');
+  });
+
   it('updates dueAt on repeated enqueue for same conversation', async () => {
     infraPack.storage[ENABLED_KEY] = true;
     const scheduler = createAutoSyncSchedulerCore({
@@ -308,6 +326,54 @@ describe('auto-sync-scheduler-core', () => {
     await scheduler.flush();
 
     expect(infraPack.storage[QUEUE_KEY]).toEqual({});
+  });
+
+  it('requeues only the successful-run subset explicitly requested for retry', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    const now = infraPack.infra.now();
+    infraPack.storage[QUEUE_KEY] = { '1': now - 1, '2': now - 1, '3': now + 30_000 };
+    syncConversations.mockResolvedValue({ retryConversationIds: [2], retryDelayMs: 120_000 });
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-partial-retry',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await scheduler.flush();
+
+    expect(syncConversations).toHaveBeenCalledWith([1, 2], 'i-partial-retry');
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '2': now + 120_000, '3': now + 30_000 });
+    expect(infraPack.alarm.when).toBe(now + 30_000);
+  });
+
+  it('can persist enqueue without synchronously flushing when alarms are unavailable', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    (infraPack.infra.alarms as any).isAvailable = () => false;
+    const now = infraPack.infra.now();
+    infraPack.storage[QUEUE_KEY] = { '1': now - 1 };
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 0,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-no-fallback',
+      isProviderEnabled,
+      syncConversations,
+      flushWhenAlarmsUnavailable: false,
+    });
+
+    await scheduler.enqueue(2, 'activity');
+
+    expect(syncConversations).not.toHaveBeenCalled();
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '1': now - 1, '2': now });
   });
 
   it('flushes due items on enqueue when alarms are unavailable (best-effort fallback)', async () => {

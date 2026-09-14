@@ -7,9 +7,13 @@ const storageMocks = vi.hoisted(() => ({
 const imageInlineMocks = vi.hoisted(() => ({
   inlineChatImagesInMessages: vi.fn(),
 }));
+const chatgptImageMocks = vi.hoisted(() => ({
+  downloadChatgptImagesForStoredConversation: vi.fn(),
+}));
 
 vi.mock('@services/conversations/data/storage-idb', () => storageMocks);
 vi.mock('@services/conversations/data/image-inline', () => imageInlineMocks);
+vi.mock('@services/integrations/chatgpt/conversation-image-assets', () => chatgptImageMocks);
 
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 
@@ -28,6 +32,7 @@ describe('image-backfill-job', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     storageMocks.patchConversationMessageMarkdownBatch.mockResolvedValue({ updated: 0, conflicts: 0 });
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([]);
   });
 
   it('builds one conditional Markdown batch and reports only durably patched rows', async () => {
@@ -48,6 +53,9 @@ describe('image-backfill-job', () => {
     expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith({
       conversationId: 42,
       messages: expect.any(Array),
+      enableHttpImages: true,
+      enableChatgptImages: true,
+      downloadChatgptImages: expect.any(Function),
     });
     expect(storageMocks.patchConversationMessageMarkdownBatch).toHaveBeenCalledTimes(1);
     expect(storageMocks.patchConversationMessageMarkdownBatch).toHaveBeenCalledWith(42, [
@@ -76,6 +84,24 @@ describe('image-backfill-job', () => {
 
     expect(storageMocks.patchConversationMessageMarkdownBatch).not.toHaveBeenCalled();
     expect(result.updatedMessages).toBe(0);
+  });
+
+  it('delegates ChatGPT file downloads through the stored-conversation resolver', async () => {
+    storageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: 'm1', contentMarkdown: '![](chatgpt-file://file_image_1)' },
+    ]);
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => {
+      await input.downloadChatgptImages(['file_image_1']);
+      return inlineResult(input.messages);
+    });
+
+    await backfillConversationImages({ conversationId: 42 });
+
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 42,
+      fileIds: ['file_image_1'],
+      concurrency: 4,
+    });
   });
 
   it('does not count conflict-only candidates as updated messages', async () => {

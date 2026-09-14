@@ -118,6 +118,7 @@ describe('Video Current Page persistence pipeline', () => {
     registerConversationHandlers(router, {
       onConversationChanged: async () => {},
       onRemoteCleanupPending: async () => {},
+      scheduleImageBackfill: async () => {},
     });
 
     const sentTypes: string[] = [];
@@ -305,6 +306,7 @@ describe('Video Current Page persistence pipeline', () => {
     registerConversationHandlers(router, {
       onConversationChanged: async () => {},
       onRemoteCleanupPending: async () => {},
+      scheduleImageBackfill: async () => {},
     });
     const runtime = {
       send: async (type: string, payload: Record<string, unknown> = {}) => {

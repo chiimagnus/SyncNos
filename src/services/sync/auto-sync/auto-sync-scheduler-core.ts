@@ -18,6 +18,11 @@ export type AutoSyncScheduler = {
   flush: () => Promise<void>;
 };
 
+export type AutoSyncSchedulerRunResult = void | {
+  retryConversationIds?: readonly number[];
+  retryDelayMs?: number;
+};
+
 type QueueMap = Record<string, number>;
 
 function normalizeQueue(value: unknown): QueueMap {
@@ -67,8 +72,9 @@ export function createAutoSyncSchedulerCore(config: {
   infra: AutoSyncSchedulerInfra;
   getInstanceId: () => string;
   isProviderEnabled: () => Promise<boolean>;
-  syncConversations: (conversationIds: number[], instanceId: string) => Promise<void>;
+  syncConversations: (conversationIds: number[], instanceId: string) => Promise<AutoSyncSchedulerRunResult>;
   getFailureRetryDelayMs?: (error: unknown) => number | null | undefined;
+  flushWhenAlarmsUnavailable?: boolean;
 }): AutoSyncScheduler {
   const {
     queueStorageKey,
@@ -81,6 +87,7 @@ export function createAutoSyncSchedulerCore(config: {
     isProviderEnabled,
     syncConversations,
     getFailureRetryDelayMs,
+    flushWhenAlarmsUnavailable = true,
   } = config;
 
   const readQueue = async (): Promise<QueueMap> => {
@@ -89,7 +96,7 @@ export function createAutoSyncSchedulerCore(config: {
   };
 
   const writeQueue = async (queue: QueueMap): Promise<void> => {
-    await infra.storage.set({ [queueStorageKey]: queue }).catch(() => {});
+    await infra.storage.set({ [queueStorageKey]: queue });
   };
 
   const scheduleNextAlarm = async (queue: QueueMap): Promise<void> => {
@@ -131,7 +138,7 @@ export function createAutoSyncSchedulerCore(config: {
     // Best-effort fallback when `alarms` API is unavailable: we cannot wake the
     // background to flush at `dueAt`, so we opportunistically flush any due
     // items whenever we have an activity signal (enqueue).
-    if (!infra.alarms.isAvailable()) {
+    if (!infra.alarms.isAvailable() && flushWhenAlarmsUnavailable) {
       await flush();
     }
   };
@@ -164,7 +171,18 @@ export function createAutoSyncSchedulerCore(config: {
     }
 
     try {
-      await syncConversations(dueConversationIds, instanceId);
+      const result = await syncConversations(dueConversationIds, instanceId);
+      const retryConversationIds = normalizeSyncConversationIds(result?.retryConversationIds || []);
+      const retryDelayMs = Number(result?.retryDelayMs);
+      if (retryConversationIds.length && Number.isFinite(retryDelayMs) && retryDelayMs > 0) {
+        const delayedQueue: QueueMap = { ...restQueue };
+        const delayedDueAt = now + Math.floor(retryDelayMs);
+        for (const conversationId of retryConversationIds) delayedQueue[String(conversationId)] = delayedDueAt;
+        const trimmed = trimQueue(delayedQueue, maxItems);
+        await writeQueue(trimmed);
+        await scheduleNextAlarm(trimmed);
+        return;
+      }
       await writeQueue(restQueue);
       await scheduleNextAlarm(restQueue);
     } catch (error) {

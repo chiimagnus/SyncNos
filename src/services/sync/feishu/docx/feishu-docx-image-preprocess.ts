@@ -1,9 +1,11 @@
 import { sha256Hex } from '@services/sync/shared/content-hash';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
+import { downloadChatgptImagesForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
 import {
   collectMarkdownImageReferences,
   replaceMarkdownImageReferences,
 } from '@services/shared/markdown-image-references';
+import { chatgptFileIdFromUrl, isChatgptFileUrl } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 function safeString(v: unknown) {
@@ -73,7 +75,7 @@ export type FeishuMarkdownImageSource = {
   blob?: Blob;
   contentType?: string;
   // For diagnostics only; never use for matching.
-  kind: 'http' | 'data' | 'syncnos_asset';
+  kind: 'http' | 'data' | 'syncnos_asset' | 'chatgpt';
 };
 
 export type FeishuMarkdownPreprocessResult = {
@@ -99,11 +101,19 @@ export async function preprocessFeishuDocxMarkdownImages(
 
   const localAssetIds: number[] = [];
   const seenLocalAssetIds = new Set<number>();
+  const chatgptFileIds: string[] = [];
+  const seenChatgptFileIds = new Set<string>();
   for (const reference of references) {
     const assetId = parseSyncnosAssetId(reference.target);
-    if (assetId == null || seenLocalAssetIds.has(assetId)) continue;
-    seenLocalAssetIds.add(assetId);
-    localAssetIds.push(assetId);
+    if (assetId != null && !seenLocalAssetIds.has(assetId)) {
+      seenLocalAssetIds.add(assetId);
+      localAssetIds.push(assetId);
+    }
+    const fileId = chatgptFileIdFromUrl(reference.target);
+    if (fileId && !seenChatgptFileIds.has(fileId)) {
+      seenChatgptFileIds.add(fileId);
+      chatgptFileIds.push(fileId);
+    }
   }
 
   const scopedConversationId = Number(conversationId);
@@ -114,6 +124,21 @@ export async function preprocessFeishuDocxMarkdownImages(
           () => new Map<number, ImageCacheAsset>(),
         )
       : new Map<number, ImageCacheAsset>();
+  const chatgptImagesByFileId = new Map<
+    string,
+    Awaited<ReturnType<typeof downloadChatgptImagesForStoredConversation>>[number]
+  >();
+  if (chatgptFileIds.length && canReadLocalAssets) {
+    const downloaded = await downloadChatgptImagesForStoredConversation({
+      conversationId: scopedConversationId,
+      fileIds: chatgptFileIds,
+      concurrency: 4,
+    });
+    chatgptFileIds.forEach((fileId, index) => {
+      const image = downloaded[index];
+      if (image) chatgptImagesByFileId.set(fileId, image);
+    });
+  }
 
   const sourceByTarget = new Map<string, Promise<FeishuMarkdownImageSource>>();
   const resolveSource = (rawTarget: string): Promise<FeishuMarkdownImageSource> => {
@@ -140,6 +165,20 @@ export async function preprocessFeishuDocxMarkdownImages(
           sourceUrl,
           urlForConvert,
           blob,
+          contentType: contentType || undefined,
+        };
+      }
+
+      if (isChatgptFileUrl(sourceUrl)) {
+        const fileId = chatgptFileIdFromUrl(sourceUrl);
+        const image = fileId ? chatgptImagesByFileId.get(fileId) : undefined;
+        const contentType = image?.ok ? safeString(image.contentType) : '';
+        const ext = extFromContentType(contentType || 'image/png');
+        return {
+          kind: 'chatgpt' as const,
+          sourceUrl,
+          urlForConvert: await toPlaceholderUrl('chatgpt', fileId || sourceUrl, ext),
+          blob: image?.ok ? image.blob : undefined,
           contentType: contentType || undefined,
         };
       }

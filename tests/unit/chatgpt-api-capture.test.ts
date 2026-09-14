@@ -277,7 +277,7 @@ describe('ChatGPT API snapshot', () => {
     expect(finalImageResult.snapshot.messages.at(-1)).toMatchObject({
       messageKey: finalImageKey,
       role: 'assistant',
-      contentMarkdown: 'answer',
+      contentMarkdown: 'answer\n\n![](chatgpt-file://file_image_1)',
     });
     expect(finalImageResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
 
@@ -392,7 +392,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'inspect' }),
       expect.objectContaining({ messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'answer' }),
     ]);
-    expect(result.chatgptProtectedImages).toBeNull();
+    expect(JSON.stringify(result.snapshot)).not.toContain('file_screenshot_1');
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
@@ -623,11 +623,8 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.messages.at(-1)).toMatchObject({
       messageKey: imageKey,
       role: 'assistant',
-      contentMarkdown: 'Generated the image.\n\nDone.',
+      contentMarkdown: 'Generated the image.\n\nDone.\n\n![generated image](chatgpt-file://file_generated_1)',
     });
-    expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ fileId: 'file_generated_1', targetMessageKey: imageKey }),
-    ]);
 
     const missingImage = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
@@ -655,7 +652,7 @@ describe('ChatGPT API snapshot', () => {
     });
   });
 
-  it('builds transient sidecars for user uploads and generated images without exposing raw pointers in the snapshot', () => {
+  it('persists stable ChatGPT file references for user uploads and generated images without raw pointers', () => {
     const data = mappingFrom([
       message({
         id: 'user-upload',
@@ -691,28 +688,14 @@ describe('ChatGPT API snapshot', () => {
     ]);
 
     const result = build(data);
-    expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({
-        fileId: 'file_user_1',
-        cacheKey: 'chatgpt-file://file_user_1',
-        targetMessageKey: 'user-upload',
-        alt: 'upload.png',
-        mimeType: 'image/png',
-        sizeBytes: 42,
-      }),
-      expect.objectContaining({
-        fileId: 'file_generated_1',
-        cacheKey: 'chatgpt-file://file_generated_1',
-        targetMessageKey: buildChatgptGeneratedImageMessageKey(['file_generated_1']),
-        alt: 'generated cube',
-      }),
-    ]);
+    expect(result.snapshot.messages[0].contentMarkdown).toBe('see image\n\n![upload.png](chatgpt-file://file_user_1)');
+    expect(result.snapshot.messages.at(-1)?.contentMarkdown).toBe(
+      'Done.\n\n![generated cube](chatgpt-file://file_generated_1)',
+    );
     expect(JSON.stringify(result.snapshot)).not.toContain('sediment://');
-    expect(JSON.stringify(result.snapshot)).not.toContain('file_user_1');
-    expect(JSON.stringify(result.snapshot)).not.toContain('file_generated_1');
   });
 
-  it('preserves distinct message bindings when the same protected file resource is referenced more than once', () => {
+  it('preserves the same stable file reference when one ChatGPT image appears in multiple messages', () => {
     const data = mappingFrom([
       message({
         id: 'user-1',
@@ -730,10 +713,8 @@ describe('ChatGPT API snapshot', () => {
     ]);
 
     const result = build(data);
-    expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ cacheKey: 'chatgpt-file://file_shared_1', targetMessageKey: 'user-1' }),
-      expect.objectContaining({ cacheKey: 'chatgpt-file://file_shared_1', targetMessageKey: 'user-2' }),
-    ]);
+    expect(result.snapshot.messages[0].contentMarkdown).toContain('chatgpt-file://file_shared_1');
+    expect(result.snapshot.messages.at(-1)?.contentMarkdown).toContain('chatgpt-file://file_shared_1');
   });
 
   it('keeps image-only turns when same-turn auxiliary output has no stable owner', () => {
@@ -769,7 +750,11 @@ describe('ChatGPT API snapshot', () => {
     const imageKey = buildChatgptGeneratedImageMessageKey(['file_only_1']);
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
-      expect.objectContaining({ messageKey: imageKey, role: 'assistant', contentMarkdown: '' }),
+      expect.objectContaining({
+        messageKey: imageKey,
+        role: 'assistant',
+        contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
+      }),
       expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'continue' }),
       expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'done' }),
     ]);
@@ -778,9 +763,6 @@ describe('ChatGPT API snapshot', () => {
       identityVerified: true,
       reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
     });
-    expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ fileId: 'file_only_1', targetMessageKey: imageKey }),
-    ]);
 
     const unfinishedAtBranchEnd = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
@@ -803,7 +785,11 @@ describe('ChatGPT API snapshot', () => {
     const unfinishedResult = build(unfinishedAtBranchEnd);
     expect(unfinishedResult.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
-      expect.objectContaining({ messageKey: imageKey, role: 'assistant', contentMarkdown: '' }),
+      expect.objectContaining({
+        messageKey: imageKey,
+        role: 'assistant',
+        contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
+      }),
     ]);
     expect(unfinishedResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
   });
@@ -840,7 +826,11 @@ describe('ChatGPT API snapshot', () => {
     const imageKey = buildChatgptGeneratedImageMessageKey(['file_only_1']);
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
-      expect.objectContaining({ messageKey: imageKey, role: 'assistant', contentMarkdown: '' }),
+      expect.objectContaining({
+        messageKey: imageKey,
+        role: 'assistant',
+        contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
+      }),
     ]);
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
   });
@@ -929,16 +919,9 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.messages.at(-1)).toMatchObject({
       messageKey: imageKey,
       role: 'assistant',
-      contentMarkdown: '',
+      contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
     });
-    expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ fileId: 'file_only_1', targetMessageKey: imageKey }),
-      expect.objectContaining({
-        fileId: '',
-        cacheKey: '',
-        targetMessageKey: imageKey,
-      }),
-    ]);
+    expect(JSON.stringify(result.snapshot)).not.toContain('legacy.invalid');
   });
 
   it('ignores repeated opaque tool-call nodes before a visible generated-image result', () => {
@@ -1056,7 +1039,10 @@ describe('ChatGPT API snapshot', () => {
       }),
     ]);
     const userResult = build(userTextImage);
-    expect(userResult.snapshot.messages[0]).toMatchObject({ messageKey: 'user-1', contentMarkdown: 'image' });
+    expect(userResult.snapshot.messages[0]).toMatchObject({
+      messageKey: 'user-1',
+      contentMarkdown: 'image\n\n![](chatgpt-file://file_image_1)',
+    });
     expect(userResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
     const toolTextImage = mappingFrom([
@@ -1111,8 +1097,8 @@ describe('ChatGPT API snapshot', () => {
       }),
     ]);
     const result = build(suffixedPointer);
-    expect(result.chatgptProtectedImages?.assets).toEqual([
-      expect.objectContaining({ fileId: '', cacheKey: '', targetMessageKey: 'user-1' }),
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: '' }),
     ]);
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
@@ -1131,7 +1117,6 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: '' }),
     ]);
     expect(userResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
-    expect(userResult.chatgptProtectedImages).toBeNull();
 
     const toolData = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
@@ -1185,7 +1170,6 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw' }),
     ]);
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
-    expect(result.chatgptProtectedImages).toBeNull();
   });
 
   it('keeps text when non-image or unmatched attachment metadata is unsupported', () => {

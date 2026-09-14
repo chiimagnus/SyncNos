@@ -1,17 +1,23 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
+import { downloadChatgptImages } from '@services/integrations/chatgpt/api-image-assets';
 import { sha256Hex } from '@services/sync/github/github-content-hash';
 import {
   githubOutputFolderForConversation,
   isGithubManagedPathOwnedByConversation,
 } from '@services/sync/github/github-managed-path-ownership';
+import { collectOrderedSyncnosAssetIds } from '@services/shared/markdown-asset-refs';
 import {
-  collectOrderedSyncnosAssetIds,
-  replaceSyncnosAssetImageReferences,
-} from '@services/shared/markdown-asset-refs';
-import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
-import { isSyncnosAssetUrl } from '@services/shared/syncnos-asset-uri';
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
+import {
+  buildChatgptFileCacheKey,
+  chatgptFileIdFromUrl,
+  isChatgptFileUrl,
+} from '@services/shared/chatgpt-image-identity';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { buildSyncnosObject } from '@services/sync/shared/remote-markdown-metadata';
 import { buildFullNoteMarkdown } from '@services/sync/shared/remote-markdown-writer';
 
@@ -38,7 +44,8 @@ type GithubProjectionAttachment = {
 
 type GithubProjectionWarning = {
   code: 'image_missing' | 'image_upload_failed';
-  assetId: number;
+  assetId?: number;
+  fileId?: string;
 };
 
 export type GithubMarkdownProjection = {
@@ -173,7 +180,11 @@ export async function buildGithubMarkdownProjection(input: {
     commentTimeZone: 'utc',
   });
 
+  const references = collectMarkdownImageReferences(rawMarkdown);
   const assetIds = collectOrderedSyncnosAssetIds(rawMarkdown);
+  const chatgptFileIds = Array.from(
+    new Set(references.map((reference) => chatgptFileIdFromUrl(reference.target)).filter(Boolean)),
+  );
   const conversationId = Number(conversation.id);
   if (assetIds.length && (!Number.isSafeInteger(conversationId) || conversationId <= 0)) {
     throw new Error('github_conversation_id_required');
@@ -181,14 +192,41 @@ export async function buildGithubMarkdownProjection(input: {
 
   const imageBatchLoader = input.imageBatchLoader ?? getImageCacheAssetsByIds;
   const blobUploader = input.blobUploader ?? null;
-  if (assetIds.length && !blobUploader) throw new Error('github_blob_uploader_required');
+  if ((assetIds.length || chatgptFileIds.length) && !blobUploader) throw new Error('github_blob_uploader_required');
 
   const assetsById = assetIds.length ? await imageBatchLoader({ ids: assetIds, conversationId }) : new Map();
   const remoteKey = String(input.remoteKey || '');
   const namespace = attachmentNamespace(markdownPath);
   const replacementByAssetId = new Map<number, string>();
+  const replacementByChatgptFileId = new Map<string, string>();
   const attachmentByPath = new Map<string, GithubProjectionAttachment>();
   const warnings: GithubProjectionWarning[] = [];
+
+  const stageAttachment = async (source: {
+    blob: Blob;
+    contentType: string;
+    url: string;
+  }): Promise<{ target: string | null; uploadFailed: boolean }> => {
+    const content = new Uint8Array(await source.blob.arrayBuffer());
+    const contentHash = await sha256Hex(content);
+    const ext = normalizeImageExt(source);
+    const relativeTarget = `${namespace.relativePrefix}/${contentHash}.${ext}`;
+    const path = `${namespace.fullPrefix}/${contentHash}.${ext}`;
+    const duplicate = attachmentByPath.get(path);
+    if (duplicate) return { target: duplicate.relativeTarget, uploadFailed: false };
+
+    let sha = findReusableAssetSha(input.continuity, remoteKey, path, contentHash, conversation);
+    if (!sha) {
+      try {
+        sha = requireBlobSha((await blobUploader!({ content })).sha);
+      } catch (_error) {
+        return { target: publicFallbackUrl(source.url), uploadFailed: true };
+      }
+    }
+
+    attachmentByPath.set(path, { path, relativeTarget, contentHash, sha });
+    return { target: relativeTarget, uploadFailed: false };
+  };
 
   for (const assetId of assetIds) {
     const asset = assetsById.get(assetId) || null;
@@ -196,41 +234,52 @@ export async function buildGithubMarkdownProjection(input: {
       warnings.push({ code: 'image_missing', assetId });
       continue;
     }
-
-    const content = new Uint8Array(await asset.blob.arrayBuffer());
-    const contentHash = await sha256Hex(content);
-    const ext = normalizeImageExt(asset);
-    const relativeTarget = `${namespace.relativePrefix}/${contentHash}.${ext}`;
-    const path = `${namespace.fullPrefix}/${contentHash}.${ext}`;
-    const duplicate = attachmentByPath.get(path);
-    if (duplicate) {
-      replacementByAssetId.set(assetId, duplicate.relativeTarget);
-      continue;
-    }
-
-    let sha = findReusableAssetSha(input.continuity, remoteKey, path, contentHash, conversation);
-    if (!sha) {
-      try {
-        sha = requireBlobSha((await blobUploader!({ content })).sha);
-      } catch (_error) {
-        const fallback = publicFallbackUrl(asset.url);
-        if (fallback) replacementByAssetId.set(assetId, fallback);
-        warnings.push({ code: 'image_upload_failed', assetId });
-        continue;
-      }
-    }
-
-    const attachment = { path, relativeTarget, contentHash, sha };
-    attachmentByPath.set(path, attachment);
-    replacementByAssetId.set(assetId, relativeTarget);
+    const staged = await stageAttachment({ blob: asset.blob, contentType: asset.contentType, url: asset.url });
+    if (staged.target) replacementByAssetId.set(assetId, staged.target);
+    if (staged.uploadFailed) warnings.push({ code: 'image_upload_failed', assetId });
   }
 
-  const markdownText = replaceSyncnosAssetImageReferences(rawMarkdown, ({ assetId }) => {
-    const target = replacementByAssetId.get(assetId);
-    return target ? { target } : null;
+  if (chatgptFileIds.length) {
+    const conversationKey =
+      String(conversation.source || '')
+        .trim()
+        .toLowerCase() === 'chatgpt'
+        ? String(conversation.conversationKey || '').trim()
+        : '';
+    if (!conversationKey) throw new Error('github_chatgpt_image_context_missing');
+    const downloaded = await downloadChatgptImages({ conversationKey, fileIds: chatgptFileIds, concurrency: 4 });
+    for (let index = 0; index < chatgptFileIds.length; index += 1) {
+      const fileId = chatgptFileIds[index]!;
+      const image = downloaded[index];
+      if (!image?.ok) {
+        warnings.push({ code: 'image_missing', fileId });
+        continue;
+      }
+      const staged = await stageAttachment({
+        blob: image.blob,
+        contentType: image.contentType,
+        url: buildChatgptFileCacheKey(fileId),
+      });
+      if (staged.target) replacementByChatgptFileId.set(fileId, staged.target);
+      if (staged.uploadFailed) warnings.push({ code: 'image_upload_failed', fileId });
+    }
+  }
+
+  const markdownText = replaceMarkdownImageReferences(rawMarkdown, references, (reference) => {
+    if (isSyncnosAssetUrl(reference.target)) {
+      const assetId = parseSyncnosAssetId(reference.target);
+      const target = assetId != null ? replacementByAssetId.get(assetId) : null;
+      return target ? { target } : null;
+    }
+    if (isChatgptFileUrl(reference.target)) {
+      const fileId = chatgptFileIdFromUrl(reference.target);
+      const target = fileId ? replacementByChatgptFileId.get(fileId) : null;
+      return target ? { target } : null;
+    }
+    return null;
   });
-  const hasUnresolvedInternalImage = collectMarkdownImageReferences(markdownText).some((reference) =>
-    isSyncnosAssetUrl(reference.target),
+  const hasUnresolvedInternalImage = collectMarkdownImageReferences(markdownText).some(
+    (reference) => isSyncnosAssetUrl(reference.target) || isChatgptFileUrl(reference.target),
   );
   if (hasUnresolvedInternalImage) throw new Error('github_internal_asset_ref_unresolved');
 

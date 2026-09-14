@@ -1,4 +1,5 @@
 import { getImageCacheAssetsByIds, type ImageCacheAsset } from '@services/conversations/data/image-cache-read';
+import { downloadChatgptImagesForStoredConversation } from '@services/integrations/chatgpt/conversation-image-assets';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import type { Conversation } from '@services/conversations/domain/models';
 import {
@@ -6,6 +7,7 @@ import {
   replaceMarkdownImageReferences,
   type MarkdownImageReference,
 } from '@services/shared/markdown-image-references';
+import { chatgptFileIdFromUrl, isChatgptFileUrl } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
 function normalizeImageExt(raw: string): string {
@@ -26,12 +28,16 @@ function resolveMediaType(asset: ImageCacheAsset): string {
   return normalizeMediaType(asset.contentType) || normalizeMediaType(asset.blob.type) || 'application/octet-stream';
 }
 
-function inferImageExt(asset: ImageCacheAsset): string {
-  const contentType = (asset.contentType || asset.blob.type).trim().toLowerCase();
-  if (contentType.startsWith('image/')) return normalizeImageExt(contentType.slice('image/'.length));
+function inferImageExtFromSource(contentType: unknown, sourceUrl: unknown): string {
+  const normalizedContentType = String(contentType || '')
+    .trim()
+    .toLowerCase();
+  if (normalizedContentType.startsWith('image/')) {
+    return normalizeImageExt(normalizedContentType.slice('image/'.length));
+  }
 
   try {
-    const url = new URL(asset.url);
+    const url = new URL(String(sourceUrl || ''));
     const filename = url.pathname.split('/').filter(Boolean).pop() || '';
     const dot = filename.lastIndexOf('.');
     if (dot >= 0 && dot < filename.length - 1) return normalizeImageExt(filename.slice(dot + 1));
@@ -39,6 +45,10 @@ function inferImageExt(asset: ImageCacheAsset): string {
     // Fall through to the stable default.
   }
   return 'png';
+}
+
+function inferImageExt(asset: ImageCacheAsset): string {
+  return inferImageExtFromSource(asset.contentType || asset.blob.type, asset.url);
 }
 
 export function claimUniqueConversationExportBasename(conversation: Conversation, usedBasenames: Set<string>): string {
@@ -69,15 +79,23 @@ export async function materializeConversationMarkdownAssets(input: {
   const referencesByMarkdown: MarkdownImageReference[][] = [];
   const orderedAssetIds: number[] = [];
   const seenAssetIds = new Set<number>();
+  const orderedChatgptFileIds: string[] = [];
+  const seenChatgptFileIds = new Set<string>();
 
   for (const source of input.markdown) {
     const references = collectMarkdownImageReferences(source);
     referencesByMarkdown.push(references);
     for (const reference of references) {
       const assetId = parseSyncnosAssetId(reference.target);
-      if (assetId == null || seenAssetIds.has(assetId)) continue;
-      seenAssetIds.add(assetId);
-      orderedAssetIds.push(assetId);
+      if (assetId != null && !seenAssetIds.has(assetId)) {
+        seenAssetIds.add(assetId);
+        orderedAssetIds.push(assetId);
+      }
+      const fileId = chatgptFileIdFromUrl(reference.target);
+      if (fileId && !seenChatgptFileIds.has(fileId)) {
+        seenChatgptFileIds.add(fileId);
+        orderedChatgptFileIds.push(fileId);
+      }
     }
   }
 
@@ -85,6 +103,7 @@ export async function materializeConversationMarkdownAssets(input: {
     ? await getImageCacheAssetsByIds({ ids: orderedAssetIds, conversationId: input.conversationId })
     : new Map<number, ImageCacheAsset>();
   const attachmentPathById = new Map<number, string>();
+  const attachmentPathByChatgptFileId = new Map<string, string>();
   const attachments: MaterializedExportAttachment[] = [];
 
   for (const assetId of orderedAssetIds) {
@@ -96,13 +115,37 @@ export async function materializeConversationMarkdownAssets(input: {
     attachments.push({ path, blob: asset.blob, mediaType: resolveMediaType(asset), byteSize: asset.blob.size });
   }
 
+  if (orderedChatgptFileIds.length) {
+    const downloaded = await downloadChatgptImagesForStoredConversation({
+      conversationId: input.conversationId,
+      fileIds: orderedChatgptFileIds,
+      concurrency: 4,
+    });
+    const downloadedByFileId = new Map(downloaded.map((item, index) => [orderedChatgptFileIds[index]!, item] as const));
+    for (const fileId of orderedChatgptFileIds) {
+      const item = downloadedByFileId.get(fileId);
+      if (!item?.ok) continue;
+      const index = input.nextAttachmentIndex();
+      const path = `attachments/${input.basename}-${String(index).padStart(4, '0')}.${inferImageExtFromSource(item.contentType, '')}`;
+      attachmentPathByChatgptFileId.set(fileId, path);
+      attachments.push({ path, blob: item.blob, mediaType: item.contentType, byteSize: item.byteSize });
+    }
+  }
+
   const rewritten = input.markdown.map((source, index) =>
     replaceMarkdownImageReferences(source, referencesByMarkdown[index]!, (reference) => {
-      if (!isSyncnosAssetUrl(reference.target)) return null;
-      const assetId = parseSyncnosAssetId(reference.target);
-      if (assetId == null) return { replacement: '[Image unavailable]' };
-      const target = attachmentPathById.get(assetId);
-      return target ? { target } : { replacement: '[Image unavailable]' };
+      if (isSyncnosAssetUrl(reference.target)) {
+        const assetId = parseSyncnosAssetId(reference.target);
+        if (assetId == null) return { replacement: '[Image unavailable]' };
+        const target = attachmentPathById.get(assetId);
+        return target ? { target } : { replacement: '[Image unavailable]' };
+      }
+      if (isChatgptFileUrl(reference.target)) {
+        const fileId = chatgptFileIdFromUrl(reference.target);
+        const target = fileId ? attachmentPathByChatgptFileId.get(fileId) : null;
+        return target ? { target } : { replacement: '[Image unavailable]' };
+      }
+      return null;
     }),
   );
 

@@ -9,6 +9,7 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   recordObsidianRemoteWrite: vi.fn(),
 }));
 const imageCacheMocks = vi.hoisted(() => ({ getImageCacheAssetsByIds: vi.fn() }));
+const chatgptImageMocks = vi.hoisted(() => ({ downloadChatgptImagesForStoredConversation: vi.fn() }));
 
 vi.mock('@services/conversations/background/storage', () => ({
   backgroundStorage: {
@@ -20,6 +21,7 @@ vi.mock('@services/conversations/background/storage', () => ({
   },
 }));
 vi.mock('@services/conversations/data/image-cache-read', () => imageCacheMocks);
+vi.mock('@services/integrations/chatgpt/conversation-image-assets', () => chatgptImageMocks);
 
 async function loadModule(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -61,6 +63,8 @@ function setupChromeStorage({ failSyncJobWrites = false }: { failSyncJobWrites?:
 
 beforeEach(() => {
   backgroundStorageMocks.recordObsidianRemoteWrite.mockResolvedValue({ generation: 1 });
+  chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockReset();
+  chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([]);
 });
 
 describe('obsidian-sync-orchestrator', () => {
@@ -346,6 +350,7 @@ describe('obsidian-sync-orchestrator', () => {
           '![diagram](<syncnos-asset://7> "caption")',
           '![again](syncnos-asset://7)',
           '![photo](syncnos-asset://8)',
+          '![generated](chatgpt-file://file_generated_1)',
           'after',
         ].join('\n\n'),
         updatedAt: 1,
@@ -377,6 +382,15 @@ describe('obsidian-sync-orchestrator', () => {
         ],
       ]),
     );
+    chatgptImageMocks.downloadChatgptImagesForStoredConversation.mockResolvedValue([
+      {
+        cacheKey: 'chatgpt-file://file_generated_1',
+        ok: true,
+        blob: new Blob([new Uint8Array([6, 7, 8])], { type: 'image/jpeg' }),
+        byteSize: 3,
+        contentType: 'image/jpeg',
+      },
+    ]);
 
     const seen: Array<{ method: string; url: string; body: unknown }> = [];
     // @ts-expect-error test global
@@ -403,10 +417,16 @@ describe('obsidian-sync-orchestrator', () => {
     expect(syncRes.results[0].ok).toBe(true);
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledTimes(1);
     expect(imageCacheMocks.getImageCacheAssetsByIds).toHaveBeenCalledWith({ ids: [7, 8], conversationId: 1 });
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).toHaveBeenCalledWith({
+      conversationId: 1,
+      fileIds: ['file_generated_1'],
+      concurrency: 4,
+    });
 
     const encodedAttachmentNames = [
       encodeURIComponent(`${noteBasename}-1.png`),
       encodeURIComponent(`${noteBasename}-2.webp`),
+      encodeURIComponent(`${noteBasename}-3.jpg`),
     ];
     const binaryPuts = seen.filter(
       (call) => call.method === 'PUT' && encodedAttachmentNames.some((name) => call.url.endsWith(name)),
@@ -417,11 +437,13 @@ describe('obsidian-sync-orchestrator', () => {
     expect(String(markdownPut?.body || '')).toContain(`![diagram](<${noteBasename}-1.png> "caption")`);
     expect(String(markdownPut?.body || '')).toContain(`![again](${noteBasename}-1.png)`);
     expect(String(markdownPut?.body || '')).toContain(`![photo](${noteBasename}-2.webp)`);
+    expect(String(markdownPut?.body || '')).toContain(`![generated](${noteBasename}-3.jpg)`);
     expect(String(markdownPut?.body || '')).toContain('`![inline](syncnos-asset://9)`');
     expect(String(markdownPut?.body || '')).toContain('![fenced](syncnos-asset://10)');
     expect(String(markdownPut?.body || '')).toContain('    ![indented](syncnos-asset://11)');
     expect(String(markdownPut?.body || '')).not.toContain('![diagram](<syncnos-asset://7>');
     expect(String(markdownPut?.body || '')).not.toContain('![photo](syncnos-asset://8)');
+    expect(String(markdownPut?.body || '')).not.toContain('chatgpt-file://');
   });
 
   it.each([

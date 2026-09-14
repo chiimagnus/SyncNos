@@ -56,6 +56,11 @@ import {
   type AutoSyncConversationChangedReason,
 } from '@services/sync/auto-sync/auto-sync-keys';
 import { storageGet } from '@services/shared/storage';
+import {
+  AI_CHAT_IMAGE_BACKFILL_ALARM_NAME,
+  createImageBackfillScheduler,
+  type ImageBackfillScheduler,
+} from '@services/conversations/background/image-backfill-scheduler';
 
 type ExclusiveMaintenance = <T>(mutation: () => Promise<T>) => Promise<T>;
 
@@ -108,6 +113,7 @@ export type BackgroundServices = {
     obsidianScheduler: ObsidianAutoSyncScheduler;
     feishuScheduler: FeishuAutoSyncScheduler;
     githubScheduler: GithubAutoSyncScheduler;
+    imageBackfillScheduler: ImageBackfillScheduler;
     onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => Promise<void>;
     onRemoteCleanupPending: () => Promise<void>;
     handleAlarm: (name: string) => Promise<void>;
@@ -156,6 +162,27 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
     feishuSyncOrchestrator,
   });
   const githubScheduler = createGithubAutoSyncScheduler({ getInstanceId: deps.getInstanceId, githubSyncOrchestrator });
+  const onConversationChanged = async (conversationId: number, reason: AutoSyncConversationChangedReason) => {
+    const local = await storageGet([
+      NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
+      OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
+      FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
+      GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
+    ]).catch(() => ({}));
+    if ((local as any)?.[NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
+      void notionScheduler.enqueue(conversationId, reason).catch(() => {});
+    }
+    if ((local as any)?.[OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
+      void obsidianScheduler.enqueue(conversationId, reason).catch(() => {});
+    }
+    if ((local as any)?.[FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
+      void feishuScheduler.enqueue(conversationId, reason).catch(() => {});
+    }
+    if ((local as any)?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
+      void githubScheduler.enqueue(conversationId, reason).catch(() => {});
+    }
+  };
+  const imageBackfillScheduler = createImageBackfillScheduler({ onConversationChanged });
 
   return {
     articleFetchService,
@@ -167,26 +194,8 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
       obsidianScheduler,
       feishuScheduler,
       githubScheduler,
-      onConversationChanged: async (conversationId: number, reason: AutoSyncConversationChangedReason) => {
-        const local = await storageGet([
-          NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
-          OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
-          FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
-          GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
-        ]).catch(() => ({}));
-        if ((local as any)?.[NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
-          void notionScheduler.enqueue(conversationId, reason);
-        }
-        if ((local as any)?.[OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
-          void obsidianScheduler.enqueue(conversationId, reason);
-        }
-        if ((local as any)?.[FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
-          void feishuScheduler.enqueue(conversationId, reason);
-        }
-        if ((local as any)?.[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY] === true) {
-          void githubScheduler.enqueue(conversationId, reason);
-        }
-      },
+      imageBackfillScheduler,
+      onConversationChanged,
       onRemoteCleanupPending: async () => {
         await githubScheduler.scheduleCleanup();
       },
@@ -210,6 +219,10 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
         }
         if (alarmName === GITHUB_AUTO_SYNC_CLEANUP_ALARM_NAME) {
           await githubScheduler.flushCleanup();
+          return;
+        }
+        if (alarmName === AI_CHAT_IMAGE_BACKFILL_ALARM_NAME) {
+          await imageBackfillScheduler.flush();
         }
       },
     },

@@ -1,8 +1,9 @@
 import MarkdownIt from 'markdown-it';
 import linkAttributes from 'markdown-it-link-attributes';
+import { chatgptFileIdFromUrl } from '@services/shared/chatgpt-image-identity';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 
-const SYNCNOS_ASSET_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+const INTERNAL_IMAGE_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 export type MarkdownRendererOptions = {
   /**
@@ -101,14 +102,24 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       const envMap = env && typeof env === 'object' ? (env as any).syncnosAssetSrcById : null;
       const resolved = envMap && (typeof envMap.get === 'function' ? envMap.get(assetId) : (envMap as any)[assetId]);
       const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
-      const finalSrc = safeResolved || SYNCNOS_ASSET_PLACEHOLDER_SRC;
+      const finalSrc = safeResolved || INTERNAL_IMAGE_PLACEHOLDER_SRC;
       const escapedFinal = inst.utils.escapeHtml(finalSrc);
       return `<img src="${escapedFinal}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
     }
 
     if (isSyncnosAssetUrl(safeSrc)) {
-      const escapedPlaceholder = inst.utils.escapeHtml(SYNCNOS_ASSET_PLACEHOLDER_SRC);
+      const escapedPlaceholder = inst.utils.escapeHtml(INTERNAL_IMAGE_PLACEHOLDER_SRC);
       return `<img src="${escapedPlaceholder}" alt="${escapedAlt}"${titleAttr}>`;
+    }
+
+    const chatgptFileId = chatgptFileIdFromUrl(safeSrc);
+    if (chatgptFileId) {
+      const envMap = env && typeof env === 'object' ? (env as any).chatgptFileSrcById : null;
+      const resolved =
+        envMap && (typeof envMap.get === 'function' ? envMap.get(chatgptFileId) : (envMap as any)[chatgptFileId]);
+      const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
+      const finalSrc = safeResolved || INTERNAL_IMAGE_PLACEHOLDER_SRC;
+      return `<img src="${inst.utils.escapeHtml(finalSrc)}" alt="${escapedAlt}" data-chatgpt-file-id="${inst.utils.escapeHtml(chatgptFileId)}"${titleAttr}>`;
     }
 
     const escapedSrc = inst.utils.escapeHtml(safeSrc);

@@ -140,6 +140,8 @@ async function removeRefererRule(ruleId: number): Promise<void> {
 export async function downloadImagePlain(input: {
   url: string;
   maxBytes?: number;
+  fetchFn?: typeof fetch;
+  timeoutMs?: number;
 }): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
   | { ok: false; reason: 'invalid_input' | 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
@@ -148,11 +150,16 @@ export async function downloadImagePlain(input: {
   const maxBytes = Number(input.maxBytes) || 2_000_000;
   if (!safeUrl) return { ok: false, reason: 'invalid_input' } as const;
 
+  const fetchFn = input.fetchFn || fetch;
+  const timeoutMs = Number(input.timeoutMs);
+  const controller = Number.isFinite(timeoutMs) && timeoutMs > 0 ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
-    const res = await fetch(safeUrl, {
+    const res = await fetchFn(safeUrl, {
       method: 'GET',
       credentials: 'include',
       redirect: 'follow',
+      ...(controller ? { signal: controller.signal } : null),
     });
     if (!res.ok) return { ok: false, reason: 'http' } as const;
 
@@ -167,6 +174,8 @@ export async function downloadImagePlain(input: {
     return { ok: true, blob, byteSize, contentType } as const;
   } catch (_e) {
     return { ok: false, reason: 'fetch' } as const;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

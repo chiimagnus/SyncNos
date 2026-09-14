@@ -77,6 +77,28 @@ describe('ChatMessageBubble', () => {
     expect(unresolved).toContain('data:image/gif;base64,');
   });
 
+  it('renders ChatGPT file references only from the transient resolver map', () => {
+    const resolved = renderToStaticMarkup(
+      createElement(ChatMessageBubble, {
+        markdown: '![generated](chatgpt-file://file_generated_1)',
+        chatgptFileSrcById: new Map([
+          ['file_generated_1', 'https://chatgpt.com/backend-api/estuary/content?id=file_generated_1&sig=test'],
+        ]),
+      }),
+    );
+    expect(resolved).toContain(
+      'src="https://chatgpt.com/backend-api/estuary/content?id=file_generated_1&amp;sig=test"',
+    );
+    expect(resolved).toContain('data-chatgpt-file-id="file_generated_1"');
+    expect(resolved).not.toContain('src="chatgpt-file://');
+
+    const unresolved = renderToStaticMarkup(
+      createElement(ChatMessageBubble, { markdown: '![generated](chatgpt-file://file_generated_1)' }),
+    );
+    expect(unresolved).toContain('data:image/gif;base64,');
+    expect(unresolved).not.toContain('src="chatgpt-file://');
+  });
+
   it('keeps core readability guard classes mounted on markdown container', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: '# t\n\ntext' }));
     const cls = extractMarkdownClass(html);

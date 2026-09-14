@@ -10,27 +10,14 @@ type ChatgptMappingNode = {
   message?: any;
 };
 
-export type ChatgptProtectedImageAsset = {
-  ref: string;
-  fileId: string;
-  cacheKey: string;
-  targetMessageKey: string;
-  alt: string;
-  mimeType: string;
-  sizeBytes: number | null;
-};
-
-export type ChatgptProtectedImages = {
-  conversationKey: string;
-  assets: ChatgptProtectedImageAsset[];
-};
-
 export type ChatgptApiSnapshotResult = {
   snapshot: any;
-  chatgptProtectedImages: ChatgptProtectedImages | null;
 };
 
-type PendingImage = Omit<ChatgptProtectedImageAsset, 'targetMessageKey'> & {
+type PendingImage = {
+  fileId: string;
+  cacheKey: string;
+  alt: string;
   turnId: string;
 };
 
@@ -249,26 +236,21 @@ function hasUnsupportedAttachmentMetadata(
 }
 
 function collectMessageImages(message: any, onSchemaDrift: SchemaDriftReporter): PendingImage[] {
-  const messageId = stableString(message?.id);
   const turnId = messageTurnId(message);
   const parts = currentParts(message, onSchemaDrift);
   const assets: PendingImage[] = [];
-  for (let index = 0; index < parts.length; index += 1) {
-    const part = parts[index];
+  for (const part of parts) {
     if (!isImagePart(part)) continue;
     const fileId = chatgptFileIdFromAssetPointer(part.asset_pointer);
-    if (!fileId) onSchemaDrift();
+    if (!fileId) {
+      onSchemaDrift();
+      continue;
+    }
     const attachment = matchingAttachment(message, fileId, onSchemaDrift);
-    const mimeType = stableString(part.mime_type) || stableString(attachment?.mime_type);
-    const sizeValue = Number(part.size_bytes ?? attachment?.size);
-    const ref = fileId || `${messageId || 'image'}:${index}`;
     assets.push({
-      ref,
       fileId,
       cacheKey: buildChatgptFileCacheKey(fileId),
       alt: imageAlt(message, attachment),
-      mimeType,
-      sizeBytes: Number.isFinite(sizeValue) && sizeValue > 0 ? sizeValue : null,
       turnId,
     });
   }
@@ -314,21 +296,25 @@ function appendBlocks(parts: string[]): string {
     .join('\n\n');
 }
 
-function assignAssets(
-  targetMessageKey: string,
-  pending: PendingImage[],
-  output: ChatgptProtectedImageAsset[],
-  seenBindings: Set<string>,
-): void {
-  for (const asset of pending) {
-    const resourceKey = asset.fileId || asset.ref;
-    if (!resourceKey) continue;
-    const bindingKey = `${targetMessageKey}\u0000${resourceKey}`;
-    if (seenBindings.has(bindingKey)) continue;
-    seenBindings.add(bindingKey);
-    const { turnId: _turnId, ...persistable } = asset;
-    output.push({ ...persistable, targetMessageKey });
+function safeImageAlt(value: unknown): string {
+  return String(value || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/]/g, '\\]')
+    .trim()
+    .slice(0, 200);
+}
+
+function renderImageBlocks(images: readonly PendingImage[]): string {
+  const seen = new Set<string>();
+  const blocks: string[] = [];
+  for (const image of images) {
+    const target = stableString(image.cacheKey);
+    if (!target || seen.has(target)) continue;
+    seen.add(target);
+    blocks.push(`![${safeImageAlt(image.alt)}](${target})`);
   }
+  return blocks.join('\n');
 }
 
 export function buildChatgptApiSnapshot(input: {
@@ -346,9 +332,7 @@ export function buildChatgptApiSnapshot(input: {
   const branch = currentBranchNodes(input.data?.mapping, input.data?.current_node);
   const capturedAt = Number.isFinite(input.capturedAt) ? Number(input.capturedAt) : Date.now();
   const messages: any[] = [];
-  const protectedAssets: ChatgptProtectedImageAsset[] = [];
   const seenMessageKeys = new Set<string>();
-  const seenAssetBindings = new Set<string>();
   const partialReasons = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
@@ -366,7 +350,6 @@ export function buildChatgptApiSnapshot(input: {
     }
     if (seenMessageKeys.has(key)) {
       markSchemaDrift();
-      assignAssets(key, pendingImages, protectedAssets, seenAssetBindings);
       pendingImages = [];
       return;
     }
@@ -374,11 +357,10 @@ export function buildChatgptApiSnapshot(input: {
     messages.push({
       messageKey: key,
       role: 'assistant',
-      contentMarkdown: '',
+      contentMarkdown: renderImageBlocks(pendingImages),
       sequence: messages.length,
       updatedAt: capturedAt,
     });
-    assignAssets(key, pendingImages, protectedAssets, seenAssetBindings);
     pendingImages = [];
   };
 
@@ -426,9 +408,9 @@ export function buildChatgptApiSnapshot(input: {
       const attachments = currentAttachments(message, markSchemaDrift);
       if ((images.length || attachments.length) && type !== 'multimodal_text') markSchemaDrift();
       if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
-      const markdown = renderTextParts(message, markSchemaDrift);
+      const markdown = appendBlocks([renderTextParts(message, markSchemaDrift), renderImageBlocks(images)]);
       const hasOpaquePayload = parts.length > 0 || attachments.length > 0;
-      if (!markdown && !images.length && !hasOpaquePayload) continue;
+      if (!markdown && !hasOpaquePayload) continue;
       if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
       seenMessageKeys.add(id);
       messages.push({
@@ -438,7 +420,6 @@ export function buildChatgptApiSnapshot(input: {
         sequence: messages.length,
         updatedAt: capturedAt,
       });
-      assignAssets(id, images, protectedAssets, seenAssetBindings);
       continue;
     }
 
@@ -458,6 +439,7 @@ export function buildChatgptApiSnapshot(input: {
         const markdown = appendBlocks([
           ...pendingAuxiliary.map((item) => item.markdown),
           renderTextParts(message, markSchemaDrift),
+          renderImageBlocks(pendingImages),
         ]);
         let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
         if (pendingImages.length && !imageOwnerKey) {
@@ -484,7 +466,6 @@ export function buildChatgptApiSnapshot(input: {
           sequence: messages.length,
           updatedAt: capturedAt,
         });
-        assignAssets(ownerKey, pendingImages, protectedAssets, seenAssetBindings);
         pendingAuxiliary = [];
         pendingImages = [];
         continue;
@@ -561,10 +542,5 @@ export function buildChatgptApiSnapshot(input: {
     },
   };
 
-  return {
-    snapshot,
-    chatgptProtectedImages: protectedAssets.length
-      ? { conversationKey: conversationId, assets: protectedAssets }
-      : null,
-  };
+  return { snapshot };
 }
