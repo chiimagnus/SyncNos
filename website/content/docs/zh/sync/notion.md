@@ -31,6 +31,6 @@ Notion token 保存在浏览器扩展的本地存储中，并从 SyncNos Backup 
 - 在 SyncNos 中 **Disconnect**：清理扩展本地的 Notion 连接状态。
 - 如需在 Notion 一侧撤销授权，请在 Notion 的连接设置中撤销 SyncNos 集成。
 
-## 同步失败时
+## 排障
 
 本地数据库始终是主记录。Notion API、图片上传或页面写入失败不会把本地原始内容替换成远端状态；修复连接后可以重新执行同步。

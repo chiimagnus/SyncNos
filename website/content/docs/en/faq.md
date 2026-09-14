@@ -1,40 +1,44 @@
 ---
-title: FAQ
-description: Common answers about capture, sync, browser support, privacy, and reporting issues.
+title: Troubleshooting & FAQ
+description: Incomplete captures, failed syncs, connection errors, browser compatibility, and support links.
 ---
 
-## Why is ChatGPT not an ordinary auto-save source?
+## What if a capture is incomplete?
 
-ChatGPT uses a virtualized list, so older turns can be unmounted outside the viewport. SyncNos defaults to an explicit complete-capture path instead of treating partial DOM as a complete conversation. When Advanced capture is explicitly enabled, manual capture can use the verified current-conversation backend mapping.
+For ChatGPT or Google AI Studio, use manual current-page capture. Both use virtualized lists, so older turns can be absent from the live DOM and are not treated as ordinary auto-save sources.
 
-Google AI Studio is also handled as manual complete capture because of its virtualized history.
+For another supported AI site that should auto-save, first confirm auto-save is enabled, then try one manual capture to check whether the current page can be parsed. See [Capture content](/docs/en/capture/) for the complete support matrix.
+
+## What if sync fails?
+
+A failed sync does not delete the original local content. Fix the destination's connection, permissions, or configuration, then retry.
+
+- [Notion setup](/docs/en/sync/notion/)
+- [Obsidian setup and `Failed to fetch` / `401` / `403` troubleshooting](/docs/en/sync/obsidian/)
+- [Feishu OAuth / scope / DocX troubleshooting](/docs/en/sync/feishu/)
+- [GitHub App / repository / branch setup](/docs/en/sync/github/)
 
 ## Will syncing the same item create endless duplicates?
 
-Provider sync keeps continuity / mapping state for incremental updates. Exact remote behavior differs by provider, but repeatedly creating a fresh duplicate on every sync is not the normal model.
+Each provider maintains continuity / mapping information for later updates to previously synced content. Creating a brand-new duplicate on every click is not the intended normal behavior.
 
-If a sync fails, local data remains available and can be synced again after fixing the provider configuration.
+If an operation's outcome is unknown, do not hammer retry. Check the current local and remote state first.
 
-## Can I use SyncNos without Notion?
+## Can I use SyncNos without Notion or another provider?
 
-Yes. Local capture does not depend on Notion or any other provider. You can use local reading, search, export, and Backup without connecting anything externally.
-
-## Can I use only Obsidian?
-
-Yes. Install Obsidian Local REST API and follow the [Obsidian guide](/docs/en/sync/obsidian/).
+Yes. Local capture, reading, search, export, and Backup do not depend on Notion or any other provider. You can also configure only one destination if that is all you need.
 
 ## Which browsers are supported?
 
-Chrome / Chromium-family browsers, Microsoft Edge, and Firefox have store builds. Safari (macOS / iOS) can be built from source with Xcode. See [Install](/docs/en/install/).
+Chrome / Chromium-based browsers, Microsoft Edge, and Firefox have store builds. Safari (macOS / iOS) can be built from source with Xcode. See [Install](/docs/en/install/).
 
-## Is my saved content automatically uploaded?
+## Is my content automatically uploaded?
 
-Local capture does not upload your entire library to a SyncNos server. External data flows come from features you configure or invoke, such as Notion, Feishu, GitHub, ChatGPT Advanced capture, or image caching. See [Privacy and data flows](/docs/en/privacy/).
+Saving something to the local library does not automatically upload the whole library to a SyncNos server. External data flows come from features you configure or explicitly invoke, such as provider sync, ChatGPT Advanced capture, or image caching. See [Privacy & data](/docs/en/privacy/).
 
-## Where is the changelog?
+## Where do I find updates or report a problem?
 
-[GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) is the current release record. The Docs intentionally do not maintain a second changelog.
+- Release history: [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases)
+- Bugs and feature requests: [GitHub Issues](https://github.com/chiimagnus/SyncNos/issues)
 
-## How do I report a bug or request a feature?
-
-Open a [GitHub Issue](https://github.com/chiimagnus/SyncNos/issues). Include your browser, SyncNos version, reproduction steps, and error details that do not contain sensitive data.
+When reporting a problem, include the browser, SyncNos version, reproduction steps, and error details that do not contain sensitive data.

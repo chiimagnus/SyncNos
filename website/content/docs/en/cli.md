@@ -1,11 +1,11 @@
 ---
-title: Local CLI
-description: Install the syncnos CLI so local automation and AI agents can work with a running browser profile.
+title: Automate with the CLI
+description: Install the syncnos CLI so local automation and AI agents can access a running browser profile.
 ---
 
-The `syncnos` CLI is an optional local entry point. The browser extension and IndexedDB remain the single business source of truth; the CLI does not maintain a second SyncNos database.
+The `syncnos` CLI is an optional local automation entry point. Ordinary browser use does not require it. The browser extension and IndexedDB remain the business source of truth; the CLI does not maintain a second SyncNos database.
 
-## Install
+## Install and connect a browser
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -13,15 +13,15 @@ syncnos install
 syncnos doctor
 ```
 
-In every browser profile you want to expose, enable:
+In the browser profile you want to expose to the CLI, enable:
 
-**Settings → General → Local CLI Integration → SyncNos CLI**
+**Settings → General → Local CLI integration → SyncNos CLI**
 
-That profile must remain running while business commands execute.
+That browser profile must remain running while operational commands execute.
 
-## Discover the current surface
+## Discover the current surface first
 
-Commands and options evolve, so this documentation intentionally does not duplicate the complete command reference. Treat the installed CLI as canonical:
+CLI commands and parameters can evolve. The Docs do not duplicate a complete command reference; use the installed version's own output as the source of truth:
 
 ```bash
 syncnos --help
@@ -43,20 +43,20 @@ syncnos export markdown <conversation-id> --output ./export
 syncnos backup export --output ./syncnos-backup.zip
 ```
 
-Provider targets are `notion`, `obsidian`, `feishu`, and `github`.
+Sync destinations can be `notion`, `obsidian`, `feishu`, or `github`.
 
 ## Agent-oriented output
 
-Operational commands use a stable machine-readable JSON envelope by default:
+Operational commands use a stable, machine-readable JSON envelope by default:
 
 ```json
 { "ok": true, "data": {}, "error": null }
 ```
 
-`--human` is secondary presentation for diagnostics. Automation should consume JSON instead of parsing ANSI output, tables, or prose.
+`--human` is only for diagnostics / human presentation. Automation should consume JSON rather than parsing ANSI, tables, or natural-language terminal output.
 
 ## Mutations and sync
 
-After state-changing commands, consume the returned business result. `sync` waits for its accepted job to reach a terminal state by default; use `--no-wait` only when the caller explicitly wants asynchronous behavior.
+After a state-changing command, read the returned business result. `sync` waits for the accepted job to reach a terminal state by default; use `--no-wait` only when the caller explicitly wants asynchronous behavior.
 
-If a mutation outcome is unknown, read back the current state before retrying instead of guessing and repeating the write.
+If a mutation outcome is unknown, read the current state before retrying instead of blindly repeating the write.

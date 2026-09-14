@@ -31,6 +31,6 @@ The Notion token is stored in extension-local storage and excluded from SyncNos 
 - **Disconnect** in SyncNos clears the extension's local Notion connection state.
 - To revoke authorization on the Notion side, remove SyncNos from Notion's connection settings.
 
-## Failed syncs
+## Troubleshooting
 
 The local database remains the primary record. Notion API, image-upload, or page-write failures do not replace the local source with remote state; fix the connection and sync again.

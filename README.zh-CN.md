@@ -73,12 +73,12 @@ SyncNos 支持 YouTube watch / youtu.be 页面和 Bilibili BV 播放页，也支
 
 | 目标 | 行为 |
 | --- | --- |
-| **Notion** | OAuth 后通过 Notion API 同步本地内容。 |
+| **Notion** | OAuth 后通过 Notion API 同步本地内容。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/notion/) |
 | **Obsidian** | 通过 Local REST API 写入 Markdown 和本地图片附件。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/) |
 | **飞书** | OAuth 后同步到飞书 DocX。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/feishu/) |
-| **GitHub** | 通过 SyncNos GitHub App 写入已授权的 repository / branch。 |
-| **Markdown / JSON** | 在本机导出选中的条目和实际引用的缓存附件。 |
-| **Backup ZIP** | 创建[本地数据、备份与恢复](docs/storage.md)中定义的恢复包。 |
+| **GitHub** | 通过 SyncNos GitHub App 写入已授权的 repository / branch。[配置指南](https://chiimagnus.github.io/SyncNos/docs/sync/github/) |
+| **Markdown / JSON** | 在本机导出选中的条目和实际引用的缓存附件。[导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/) |
+| **Backup ZIP** | 创建用于恢复 SyncNos 本地内容和可恢复状态的恢复包。[导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/) |
 
 每个 Provider 都可以手动同步，并可单独启用自动同步。
 
@@ -94,11 +94,11 @@ WebClipper Popup：保存并浏览已采集内容。
 
 ## 文档
 
-- [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
+- [用户文档：从这里开始](https://chiimagnus.github.io/SyncNos/docs/)
+- [采集内容](https://chiimagnus.github.io/SyncNos/docs/capture/)
+- [同步到外部服务](https://chiimagnus.github.io/SyncNos/docs/sync/)
+- [导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/)
 - [隐私政策](PRIVACY.md)
-- [本地数据、备份与恢复](docs/storage.md)
-- [飞书配置](https://chiimagnus.github.io/SyncNos/docs/sync/feishu/)
-- [Obsidian 配置](https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/)
 - [参与贡献](docs/CONTRIBUTING.md)
 
 ## 支持

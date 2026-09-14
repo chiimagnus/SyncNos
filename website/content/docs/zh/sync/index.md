@@ -1,27 +1,35 @@
 ---
-title: 同步目标
-description: 把本地内容同步到 Notion、Obsidian、飞书或 GitHub。
+title: 同步概览
+description: 选择 Notion、Obsidian、飞书或 GitHub，并决定手动同步还是自动同步。
 ---
 
-SyncNos 的同步建立在同一份本地数据之上。Provider 是派生目标，不是主数据库。
+同步是可选能力。即使一个外部服务都不连接，SyncNos 仍然可以本地采集、阅读、搜索、导出和备份。
 
-## 支持的目标
+## 选择目标
 
-| Provider | 适合场景 | 连接方式 |
+| 目标 | 适合场景 | 连接方式 |
 | --- | --- | --- |
 | [Notion](/docs/sync/notion/) | 数据库化归档与 Notion 页面 | OAuth |
 | [Obsidian](/docs/sync/obsidian/) | 本地 Markdown vault | Local REST API |
 | [飞书](/docs/sync/feishu/) | 飞书 DocX / 云文档 | OAuth（Proxy 或 Direct） |
 | [GitHub](/docs/sync/github/) | Markdown 仓库与 Git 工作流 | GitHub App Device Flow |
 
-各 Provider 可独立开启或关闭，也可以分别配置自动同步。手动同步与自动同步复用相同的 Provider 同步流程。
+可以只连接一个目标，也可以同时配置多个。每个目标都有独立的开关和配置。
 
-## 同步与导出不是一回事
+## 手动同步和自动同步
 
-同步会更新配置好的外部目标；导出则在本地生成 Markdown / JSON 等文件。Backup ZIP 是另一套完整恢复包，用于备份本地数据与可恢复状态。
+每个外部目标都支持手动同步，并可单独开启自动同步。两种方式使用同一套 Provider 同步流程；自动同步只是改变触发方式，不会把远端服务变成 SyncNos 的主数据库。
 
-如果你只需要可携带文件，不必配置任何 Provider。
+## 同步、导出和 Backup 的区别
 
-## 网络边界
+- **同步**：持续更新已经配置好的外部服务。
+- **Markdown / JSON 导出**：生成可以带走和阅读的本地文件。
+- **Backup ZIP**：保存用于恢复 SyncNos 本地状态的数据。
 
-连接外部 Provider 后，执行同步时对应内容会发送到该服务。详细数据流、凭据保存和 Backup 排除规则见[隐私与数据流](/docs/privacy/)。
+如果你只是想得到一份文件，不需要配置任何同步目标。详见[导出与备份](/docs/export-backup/)。
+
+## 同步失败时
+
+本地内容仍然保留。修复对应目标的连接或权限后，再重新同步即可。
+
+具体配置和排障步骤请进入对应目标页面；网络请求、凭据和授权边界见[隐私与数据](/docs/privacy/)。

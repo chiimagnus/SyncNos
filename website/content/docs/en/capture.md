@@ -1,47 +1,60 @@
 ---
-title: Capture
-description: Supported AI chats, web articles, and video transcripts, including manual and automatic capture boundaries.
+title: Capture content
+description: What SyncNos can save, and which sources should be captured manually or can auto-save.
 ---
+
+## Capture modes at a glance
+
+| Content | Default mode |
+| --- | --- |
+| AI conversations | Depends on the site: ChatGPT / Google AI Studio are manual; other supported sites can auto-save |
+| Web articles | Manual capture |
+| YouTube / Bilibili video content | Manual capture |
+
+Regardless of source, captured content is written to the SyncNos local library first.
 
 ## AI conversations
 
-Current supported AI sites are:
+Currently supported:
 
-| Platform | Default capture model |
+| Platform | Default capture mode |
 | --- | --- |
 | ChatGPT | Manual capture |
-| Gemini | Auto-save capable |
+| Gemini | Can auto-save |
 | Google AI Studio | Manual capture |
-| DeepSeek | Auto-save capable |
-| Kimi | Auto-save capable |
-| Doubao | Auto-save capable |
-| Yuanbao | Auto-save capable |
-| Poe | Auto-save capable |
-| Notion AI | Auto-save capable |
-| z.ai | Auto-save capable |
+| DeepSeek | Can auto-save |
+| Kimi | Can auto-save |
+| Doubao | Can auto-save |
+| Yuanbao | Can auto-save |
+| Poe | Can auto-save |
+| Notion AI | Can auto-save |
+| z.ai | Can auto-save |
 
-**ChatGPT and Google AI Studio use virtualized lists.** Older turns can be unmounted outside the viewport, so SyncNos deliberately excludes them from ordinary auto-save and prepares a complete capture only when you explicitly save.
+**ChatGPT and Google AI Studio use virtualized lists.** Older turns can be removed from the live DOM when they leave the viewport, so SyncNos does not treat them as ordinary auto-save sources. Manual capture performs the preparation needed for a complete capture.
 
-ChatGPT also has an optional **Advanced capture** mode. When explicitly enabled, a manual capture can use the current signed-in ChatGPT session to request the current conversation. This does not turn into background polling or automatic ChatGPT capture.
+ChatGPT also has optional **Advanced capture**. When explicitly enabled, manual capture can request the current conversation through the logged-in ChatGPT session. It still runs only when you save manually; it does not become background polling or automatic capture.
 
 ## Web articles
 
-Article capture is user-initiated. SyncNos attempts to extract the main content plus useful metadata such as title, URL, author, and publication time, then stores a Markdown-oriented representation locally.
+Web articles are captured manually. SyncNos tries to extract the readable body plus useful metadata such as title, URL, author, and publication time, then converts the result into Markdown suitable for local reading and export.
 
-Image caching is optional. Failure to download an image does not block saving the text; configured anti-hotlink rules can adjust the Referer header for selected image hosts.
+Some sites have dedicated handling. A failed image download does not make the text capture fail.
 
-## Video transcripts
+## Video content
 
-On YouTube and Bilibili, SyncNos can capture **already-loaded subtitles / transcripts**, preserving timing information when the source provides it.
+YouTube and Bilibili video pages can be saved together with subtitles / transcripts that the page has already loaded. Timing information is preserved when the source provides it.
 
-Availability depends on data actually loaded by the page. SyncNos does not promise to generate a transcript when the page has no transcript data available.
+SyncNos does not generate missing subtitles and does not download audio or video streams. A supported video can still be saved as a Video even when no transcript is currently available.
+
+## Image caching
+
+AI conversations and web articles can cache images when enabled. When an anti-hotlink rule matches, SyncNos can adjust the Referer and try to fetch the original image. A cache failure does not block the text capture.
+
+When exporting Markdown / JSON, cached images that are actually referenced by the exported content can travel with the export. See [Export & backup](/docs/en/export-backup/).
 
 ## After capture
 
-Captured content goes into the browser-local database first. From there you can:
-
-- read, search, and manage it in SyncNos;
-- add quotes and comments to articles;
-- [sync to an external provider](/docs/en/sync/);
-- export Markdown / JSON;
-- create a restorable Backup ZIP.
+- Read, search, and manage content in your [local library](/docs/en/library/).
+- Add highlights, comments, and replies to articles.
+- [Sync to external services](/docs/en/sync/).
+- [Export Markdown / JSON or create a backup](/docs/en/export-backup/).

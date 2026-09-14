@@ -1,4 +1,11 @@
 {
   "title": "SyncNos Docs",
-  "pages": ["index", "install", "capture", "sync", "features", "cli", "privacy", "faq"]
+  "pages": [
+    { "title": "Getting started", "pages": ["index", "install", "capture"] },
+    {
+      "title": "Work with your data",
+      "pages": ["library", "sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github", "export-backup"]
+    },
+    { "title": "Advanced & help", "pages": ["cli", "privacy", "faq"] }
+  ]
 }

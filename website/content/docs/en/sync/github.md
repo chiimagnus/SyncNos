@@ -31,3 +31,12 @@ Local sync mappings identify files managed by SyncNos and support later incremen
 GitHub Device Flow access / refresh tokens and pending credentials are stored in extension-local storage and excluded from Backup ZIP.
 
 **Disconnect** only clears SyncNos's local GitHub authentication state. Revoking authorization or uninstalling the GitHub App is a separate action on GitHub.
+
+## Troubleshooting
+
+- **Repository is missing from the list**: confirm that the SyncNos GitHub App is installed for the account / organization and has access to the target repository, then refresh the repository list.
+- **Write permission is missing**: both the GitHub App Contents permission and the current user's repository permission must allow writes.
+- **An empty repository cannot be tested**: use **Initialize repository**, then test again.
+- **Branch not found**: choose an existing branch or use the repository's default branch.
+
+A failed sync does not delete the original local content. Check the current remote state and permissions before retrying.

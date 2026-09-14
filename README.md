@@ -73,12 +73,12 @@ SyncNos supports YouTube watch/youtu.be pages and Bilibili BV playback pages, in
 
 | Target | Behavior |
 | --- | --- |
-| **Notion** | Sync local content through the Notion API after OAuth. |
+| **Notion** | Sync local content through the Notion API after OAuth. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/notion/) |
 | **Obsidian** | Write Markdown and local image attachments through the Local REST API. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/) |
 | **Feishu (Lark)** | Sync local content to Feishu DocX after OAuth. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/) |
-| **GitHub** | Write the local projection to an authorized repository/branch through the SyncNos GitHub App. |
-| **Markdown / JSON** | Export selected items and referenced cached attachments locally. |
-| **Backup ZIP** | Create the local recovery package described in [storage and recovery](docs/storage.md). |
+| **GitHub** | Write the local projection to an authorized repository/branch through the SyncNos GitHub App. [Setup guide](https://chiimagnus.github.io/SyncNos/docs/en/sync/github/) |
+| **Markdown / JSON** | Export selected items and referenced cached attachments locally. [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/) |
+| **Backup ZIP** | Create a recovery package for SyncNos local content and recoverable state. [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/) |
 
 Provider sync can be run manually; optional auto-sync is available per provider.
 
@@ -94,11 +94,11 @@ Article discussion sidebar: exact quotes, compact threads, and one active reply 
 
 ## Documentation
 
-- [User documentation](https://chiimagnus.github.io/SyncNos/docs/en/)
+- [User docs: start here](https://chiimagnus.github.io/SyncNos/docs/en/)
+- [Capture content](https://chiimagnus.github.io/SyncNos/docs/en/capture/)
+- [Sync to external services](https://chiimagnus.github.io/SyncNos/docs/en/sync/)
+- [Export & backup](https://chiimagnus.github.io/SyncNos/docs/en/export-backup/)
 - [Privacy](PRIVACY.md)
-- [Storage, backup, and recovery](docs/storage.md)
-- [Feishu setup](https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/)
-- [Obsidian setup](https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/)
 - [Contributing](docs/CONTRIBUTING.md)
 
 ## Support

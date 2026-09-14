@@ -1,9 +1,9 @@
 ---
 title: 安装
-description: 安装 SyncNos 浏览器扩展，并按需启用本机 CLI。
+description: 安装 SyncNos 浏览器扩展，并确认第一次采集可以正常保存到本地。
 ---
 
-## 浏览器扩展
+## 选择浏览器
 
 | 浏览器 | 安装方式 |
 | --- | --- |
@@ -12,27 +12,17 @@ description: 安装 SyncNos 浏览器扩展，并按需启用本机 CLI。
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari（macOS / iOS） | 从 [SyncNos 源码](https://github.com/chiimagnus/SyncNos)使用 Xcode 构建 |
 
-安装完成后即可进行本地采集，不要求先连接任何外部同步服务。
+安装完成后即可本地采集，不要求先连接任何外部同步服务。
 
-## 第一次使用
+## 确认安装成功
 
 1. 打开 SyncNos 扩展。
-2. 访问一个支持的 AI 对话、网页文章或 YouTube / Bilibili 视频页。
-3. 使用 Popup 或页内入口执行当前页采集。
-4. 在 SyncNos 中打开已保存内容确认结果。
+2. 访问一个要保存的 AI 对话、网页文章或 YouTube / Bilibili 视频页面。
+3. 使用 Popup 或页内入口执行一次当前页采集。
+4. 在 SyncNos 中打开已保存内容，确认标题和正文 / 对话 / 字幕符合预期。
 
-不同来源的自动/手动采集边界见[采集内容](/docs/capture/)。
+不同来源并不都使用同一种采集方式。ChatGPT、Google AI Studio、网页文章和视频内容使用手动采集；部分其它 AI 对话站点可按设置自动保存。详见[采集内容](/docs/capture/)。
 
-## 可选：安装本机 CLI
+## 需要 CLI？
 
-CLI 面向自动化和 AI Agent，不是使用浏览器扩展的必需项。
-
-```bash
-npm install -g @chiimagnus/syncnos@latest
-syncnos install
-syncnos doctor
-```
-
-随后在需要暴露给 CLI 的浏览器 Profile 中开启 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**。执行 CLI 业务命令时，对应浏览器 Profile 需要保持运行。
-
-完整说明见[本机 CLI](/docs/cli/)。
+普通使用不需要安装 CLI。只有希望让本机自动化或 AI Agent 访问正在运行的 SyncNos 浏览器数据时，才需要继续阅读[使用 CLI 自动化](/docs/cli/)。

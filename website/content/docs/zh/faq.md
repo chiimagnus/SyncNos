@@ -1,40 +1,44 @@
 ---
-title: 常见问题
-description: 采集、同步、浏览器兼容、隐私和问题反馈的常见答案。
+title: 排障与常见问题
+description: 采集不完整、同步失败、连接错误、浏览器兼容和反馈入口。
 ---
 
-## ChatGPT 为什么不是普通自动保存？
+## 采集结果不完整怎么办？
 
-ChatGPT 使用虚拟列表，离开视口的历史轮次可能被卸载。SyncNos 默认使用手动完整采集路径，避免把局部 DOM 错当完整对话。显式开启 Advanced capture 后，手动采集可以使用已验证的当前对话 backend mapping。
+如果是 ChatGPT 或 Google AI Studio，请使用手动当前页采集。它们使用虚拟列表，离开视口的历史轮次可能不在当前 DOM 中，因此 SyncNos 不把它们当作普通自动保存来源。
 
-Google AI Studio 也因为虚拟列表采用手动完整采集。
+其它支持自动保存的 AI 站点如果没有持续保存，先确认自动保存设置已开启，再尝试一次手动采集以确认当前页面是否能正常解析。完整支持范围见[采集内容](/docs/capture/)。
+
+## 同步失败怎么办？
+
+同步失败不会删除本地原始内容。先修复对应目标的连接、权限或配置，再重新执行同步。
+
+- [Notion 配置](/docs/sync/notion/)
+- [Obsidian 配置与 `Failed to fetch` / `401` / `403` 排障](/docs/sync/obsidian/)
+- [飞书 OAuth / scope / DocX 排障](/docs/sync/feishu/)
+- [GitHub App / 仓库 / 分支配置](/docs/sync/github/)
 
 ## 同步同一个条目会不会不断重复？
 
-Provider 同步维护自己的连续性 / mapping，用于增量更新已同步内容。实际远端语义因 Provider 而异，但不会把“每次点击都新建一份重复内容”作为正常设计。
+Provider 同步维护自己的 continuity / mapping，用于后续更新已经同步的内容。正常设计不是“每次点击都新建一份重复内容”。
 
-如果一次同步失败，本地数据仍然保留，可以在修复 Provider 配置后重新执行。
+如果一次结果未知，不要盲目连续重试；先检查当前本地和远端状态，再决定下一步。
 
-## 不连接 Notion 还能用吗？
+## 不连接 Notion 或其它 Provider 还能用吗？
 
-可以。SyncNos 的本地采集不依赖 Notion，也不依赖任何其它 Provider。你可以只使用本地阅读、搜索、导出和 Backup。
-
-## 可以只用 Obsidian 吗？
-
-可以。安装 Obsidian Local REST API 后，按 [Obsidian 配置指南](/docs/sync/obsidian/)连接即可。
+可以。SyncNos 的本地采集、阅读、搜索、导出和 Backup 都不依赖 Notion，也不要求连接其它 Provider。你也可以只使用其中一个同步目标。
 
 ## 支持哪些浏览器？
 
 Chrome / Chromium 系、Microsoft Edge 和 Firefox 有商店版本；Safari（macOS / iOS）可从源码通过 Xcode 构建。详见[安装](/docs/install/)。
 
-## 我的数据会不会自动上传？
+## 我的内容会自动上传吗？
 
-本地采集本身不会把所有保存内容上传到 SyncNos 服务器。外部数据流来自你配置或主动调用的功能，例如 Notion、飞书、GitHub、ChatGPT Advanced capture 或图片缓存。详见[隐私与数据流](/docs/privacy/)。
+不会因为“保存到本地库”这一动作就自动把所有内容上传到 SyncNos 服务器。外部数据流来自你配置或主动调用的功能，例如 Provider 同步、ChatGPT Advanced capture 或图片缓存。详见[隐私与数据](/docs/privacy/)。
 
-## 在哪里看更新日志？
+## 在哪里看更新和反馈问题？
 
-以 [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) 为当前发布记录，不在 Docs 里维护第二份 ChangeLog。
+- 发布记录：[GitHub Releases](https://github.com/chiimagnus/SyncNos/releases)
+- Bug 与功能建议：[GitHub Issues](https://github.com/chiimagnus/SyncNos/issues)
 
-## 如何反馈 Bug 或功能建议？
-
-请在 [GitHub Issues](https://github.com/chiimagnus/SyncNos/issues) 提交。尽量包含浏览器、SyncNos 版本、复现步骤以及不含敏感数据的错误信息。
+提交问题时尽量包含浏览器、SyncNos 版本、复现步骤，以及不含敏感数据的错误信息。

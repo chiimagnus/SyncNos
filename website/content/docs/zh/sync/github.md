@@ -31,3 +31,12 @@ GitHub 同步支持手动与自动模式。同步时 SyncNos 会计算本地内�
 GitHub Device Flow 的 access / refresh token 和 pending 凭据保存在 extension-local storage，并从 Backup ZIP 中排除。
 
 **Disconnect** 只清理 SyncNos 扩展中的本地 GitHub 认证状态。要撤销 GitHub 授权或卸载 GitHub App，需要在 GitHub 一侧完成。
+
+## 排障
+
+- **看不到仓库**：确认 SyncNos GitHub App 已安装到对应账号 / 组织，并授予了目标仓库访问权限，然后刷新仓库列表。
+- **提示没有写权限**：GitHub App 的 Contents 权限和当前用户对目标仓库都需要具备写入能力。
+- **空仓库无法测试**：使用 **Initialize repository** 初始化，再重新测试。
+- **找不到分支**：选择仓库中已经存在的分支，或使用仓库的默认分支。
+
+同步失败不会删除本地原始内容。先确认远端当前状态和权限，再重试。

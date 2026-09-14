@@ -1,36 +1,41 @@
 ---
-title: Getting started
-description: Install SyncNos, capture your first item, then sync or back it up.
+title: Start here
+description: Save your first item, then choose whether to read, sync, export, or back it up.
 ---
 
-SyncNos is a local-first browser clipper. AI conversations, web articles, and video transcripts are saved in the browser first; you decide whether to sync them to Notion, Obsidian, Feishu, or GitHub.
+SyncNos is a local-first browser clipper. AI conversations, web articles, and video content enter your local browser library first. You then decide whether to sync, export, or back them up.
 
-## Start in three steps
+## Save one thing first
 
-1. [Install the extension](/docs/en/install/) and open a supported page.
-2. Capture the current content. Most non-virtualized AI sites can auto-save when enabled; ChatGPT, Google AI Studio, web articles, and video content use manual capture.
-3. Connect a [sync target](/docs/en/sync/) in Settings, or export Markdown / JSON and create a Backup ZIP instead.
+1. [Install SyncNos](/docs/en/install/).
+2. Open an AI conversation, web article, or YouTube / Bilibili video you want to save.
+3. Capture the current page from the popup or in-page entry point.
+4. Return to SyncNos and confirm the item appears in your local library.
 
-## What you can save
+Capture behavior differs by source. See [Capture content](/docs/en/capture/) for manual and automatic capture rules. You do not need to connect Notion, Obsidian, Feishu, or GitHub before your first save.
 
-- **AI conversations**: ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai.
-- **Web articles**: extracted main content plus available metadata, with optional image caching.
-- **Video transcripts**: already-loaded subtitles or transcripts on YouTube / Bilibili, with timestamps when available.
+## How data moves through SyncNos
 
-See [Capture](/docs/en/capture/) for the exact manual and automatic boundaries.
+```text
+Browser page
+    ↓
+SyncNos local library
+    ├─→ Optional: Notion / Obsidian / Feishu / GitHub
+    ├─→ Optional: Markdown / JSON export
+    └─→ Optional: Backup ZIP
+```
 
-## Where the data starts
+The local library is the primary record. Sync targets, exported files, and backups are derived from it; none of them is required to use SyncNos.
 
-The browser-local database is the primary SyncNos record. External providers and exported files are derived copies.
+## What do you want to do next?
 
-You can therefore use SyncNos only as a local clipping library, or connect one or more providers when you need them. External sync is not required for local capture.
-
-## Next
-
-- [Install and browser support](/docs/en/install/)
-- [Capture](/docs/en/capture/)
-- [Configure sync targets](/docs/en/sync/)
-- [Core features](/docs/en/features/)
-- [Local CLI](/docs/en/cli/)
-- [Privacy and data flows](/docs/en/privacy/)
-- [FAQ](/docs/en/faq/)
+| Goal | Go to |
+| --- | --- |
+| Install SyncNos or check browser support | [Install](/docs/en/install/) |
+| Learn what can be captured and what can auto-save | [Capture content](/docs/en/capture/) |
+| Read, search, comment on, and reuse saved content | [Use your library](/docs/en/library/) |
+| Keep an external service updated | [Sync to external services](/docs/en/sync/) |
+| Export readable files or create a recovery backup | [Export & backup](/docs/en/export-backup/) |
+| Let local automation or an AI agent use SyncNos | [Automate with the CLI](/docs/en/cli/) |
+| Understand network requests, credentials, and permissions | [Privacy & data](/docs/en/privacy/) |
+| Fix capture, sync, or connection problems | [Troubleshooting & FAQ](/docs/en/faq/) |

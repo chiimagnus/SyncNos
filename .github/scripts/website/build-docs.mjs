@@ -29,6 +29,11 @@ const LANGUAGES = [
   { id: 'en', source: path.join(CONTENT, 'en'), route: '/docs/en' },
 ];
 
+const ROUTE_REDIRECTS = [
+  ['/docs/features/', '/docs/library/'],
+  ['/docs/en/features/', '/docs/en/library/'],
+];
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -95,36 +100,76 @@ async function isDirectory(filePath) {
 }
 
 async function loadTree(language) {
-  async function loadDirectory(dir, relativeDir = '') {
-    const meta = JSON.parse(await readFile(path.join(dir, 'meta.json'), 'utf8'));
+  async function loadEntries(dir, relativeDir, entries) {
     const items = [];
-    for (const entry of meta.pages || []) {
-      const childDir = path.join(dir, entry);
-      if (await isDirectory(childDir)) {
-        const child = await loadDirectory(childDir, path.join(relativeDir, entry));
-        items.push({ type: 'group', title: child.title || entry, items: child.items });
+    for (const entry of entries || []) {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+        const pages = Array.isArray(entry.pages) ? entry.pages : [];
+        if (!title || !pages.length) throw new Error(`Invalid docs group in ${dir}`);
+        items.push({ type: 'group', title, items: await loadEntries(dir, relativeDir, pages) });
         continue;
       }
-      const relativePath = path.join(relativeDir, `${entry}.md`);
+      if (typeof entry !== 'string' || !entry.trim()) throw new Error(`Invalid docs page in ${dir}`);
+      const name = entry.trim();
+      const childDir = path.join(dir, name);
+      if (await isDirectory(childDir)) {
+        const child = await loadDirectory(childDir, path.join(relativeDir, name));
+        items.push({ type: 'group', title: child.title || name, items: child.items });
+        continue;
+      }
+      const relativePath = path.join(relativeDir, `${name}.md`);
       const source = await readFile(path.join(language.source, relativePath), 'utf8');
       const { data, body } = parseFrontmatter(source);
       const route = routeFor(language.route, relativePath);
       items.push({
         type: 'page',
-        title: data.title || entry,
+        title: data.title || name,
         description: data.description || '',
         relativePath: relativePath.replaceAll(path.sep, '/'),
         route,
         body,
       });
     }
-    return { title: meta.title || '', items };
+    return items;
   }
+
+  async function loadDirectory(dir, relativeDir = '') {
+    const meta = JSON.parse(await readFile(path.join(dir, 'meta.json'), 'utf8'));
+    return { title: meta.title || '', items: await loadEntries(dir, relativeDir, meta.pages) };
+  }
+
   return loadDirectory(language.source);
 }
 
 function flattenPages(items) {
   return items.flatMap((item) => (item.type === 'page' ? [item] : flattenPages(item.items)));
+}
+
+async function listMarkdownFiles(dir, relativeDir = '') {
+  const files = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const relativePath = path.join(relativeDir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listMarkdownFiles(path.join(dir, entry.name), relativePath)));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith('.md')) files.push(relativePath.replaceAll(path.sep, '/'));
+  }
+  return files.sort();
+}
+
+function assertSamePageSet(label, expected, actual) {
+  const expectedSet = new Set(expected);
+  const actualSet = new Set(actual);
+  const missing = expected.filter((item) => !actualSet.has(item));
+  const extra = actual.filter((item) => !expectedSet.has(item));
+  const duplicates = actual.filter((item, index) => actual.indexOf(item) !== index);
+  if (missing.length || extra.length || duplicates.length) {
+    throw new Error(
+      `${label}: missing=${missing.join(',') || '-'} extra=${extra.join(',') || '-'} duplicate=${[...new Set(duplicates)].join(',') || '-'}`,
+    );
+  }
 }
 
 function navHtml(items, currentRoute) {
@@ -270,6 +315,19 @@ async function copyProjectAssets() {
   }
 }
 
+async function writeRedirects() {
+  for (const [from, to] of ROUTE_REDIRECTS) {
+    const out = outputPathFor(from);
+    const target = `${BASE_PATH}${to}`;
+    const canonical = `${SITE_ORIGIN}${target}`;
+    await mkdir(path.dirname(out), { recursive: true });
+    await writeFile(
+      out,
+      `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${target}"><link rel="canonical" href="${canonical}"><title>Moved · SyncNos Docs</title></head><body><p>This page moved to <a href="${target}">${target}</a>.</p></body></html>`,
+    );
+  }
+}
+
 async function appendDocsToSitemap(pages) {
   const sitemapPath = path.join(OUTPUT, 'sitemap.xml');
   let sitemap = await readFile(sitemapPath, 'utf8');
@@ -283,10 +341,28 @@ async function appendDocsToSitemap(pages) {
 async function main() {
   await copyStaticWebsite();
   await copyProjectAssets();
-  const allPages = [];
+
+  const builds = [];
   for (const language of LANGUAGES) {
     const tree = await loadTree(language);
     const pages = flattenPages(tree.items);
+    const navigated = pages.map((page) => page.relativePath).sort();
+    const sourceFiles = await listMarkdownFiles(language.source);
+    assertSamePageSet(`${language.id} docs navigation`, sourceFiles, navigated);
+    builds.push({ language, tree, pages });
+  }
+
+  const canonicalPageSet = builds[0].pages.map((page) => page.relativePath).sort();
+  for (const build of builds.slice(1)) {
+    assertSamePageSet(
+      `${build.language.id} docs parity`,
+      canonicalPageSet,
+      build.pages.map((page) => page.relativePath).sort(),
+    );
+  }
+
+  const allPages = [];
+  for (const { language, tree, pages } of builds) {
     allPages.push(...pages);
     for (const page of pages) {
       const out = outputPathFor(page.route);
@@ -294,6 +370,8 @@ async function main() {
       await writeFile(out, pageHtml({ page, tree, language }));
     }
   }
+
+  await writeRedirects();
   await appendDocsToSitemap(allPages);
   console.log(`Built ${allPages.length} docs pages into ${path.relative(ROOT, OUTPUT)}`);
 }

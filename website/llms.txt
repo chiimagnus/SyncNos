@@ -5,9 +5,9 @@
 ## 能做什么
 
 - **采集 AI 对话**：支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai；其中 ChatGPT 与 Google AI Studio 使用手动完整采集，其余支持站点可按设置自动保存。
-- **采集网页文章**：提取任意网页正文（含标题、作者、时间），已专适配微信公众号与小红书。
-- **采集视频字幕**：抓取 YouTube、Bilibili 字幕，保留时间戳。
-- **同步去向**：Notion（OAuth）、Obsidian（Local REST API 本地直写）、飞书云文档（DocX）、GitHub 仓库；也可导出 Markdown / Zip。
+- **采集网页文章**：手动提取普通 http(s) 页面正文和可用元数据，并对部分站点使用专门处理。
+- **采集视频内容**：保存 YouTube、Bilibili 页面内容，并在页面已经加载字幕 / transcript 时一并采集时间信息；没有字幕时仍可保存 Video。
+- **同步与导出**：Notion（OAuth）、Obsidian（Local REST API 本地直写）、飞书云文档（DocX）、GitHub 仓库；也可导出 Markdown / JSON，或创建 Backup ZIP。
 
 ## 安装
 
@@ -19,10 +19,11 @@
 
 - [官网](https://chiimagnus.github.io/SyncNos/)
 - [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
+- [导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/)
 - [源码 (GitHub)](https://github.com/chiimagnus/SyncNos)
 - [社区讨论 (linux.do)](https://linux.do/t/topic/1635410)
 
 ## 特点
 
 - 开源,AGPL-3.0 许可证
-- 本地优先，隐私至上，数据不出本机（除非你授权同步）
+- 本地优先；只有你启用同步、图片缓存、Advanced capture 等联网功能时，相关数据才会发送到对应服务

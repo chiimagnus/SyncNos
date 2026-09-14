@@ -1,41 +1,39 @@
 ---
-title: Privacy and data flows
-description: Local-first boundaries, optional external requests, credentials, and Backup exclusions.
+title: Privacy & data
+description: Where content is stored by default, which features use the network, and how credentials and backups are handled.
 ---
 
 This page is a user-facing summary. The complete and continuously maintained policy is [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).
 
-## Local-first does not mean offline-only
+## Where your content is stored by default
 
-Captured content is stored locally in the browser first. Whether any content is sent to an external service depends on features you configure or invoke.
+Captured content is saved locally in the browser first. SyncNos does not require uploading your local library to a SyncNos cloud content service before you can use it.
 
-SyncNos does not operate a SyncNos cloud relay for your clipped content, and your data is not sold.
+Whether content is sent to an external service depends on the features you explicitly configure or invoke.
 
 ## Features that use the network
 
-- **Notion**: sends selected content to the Notion API; referenced images may be processed when needed.
-- **Feishu**: sends selected content to Feishu APIs; OAuth can use Proxy or Direct mode.
-- **GitHub**: uses GitHub App Device Flow and GitHub APIs to write repository content.
-- **ChatGPT Advanced capture**: when explicitly enabled, uses the current signed-in ChatGPT session for a manual current-conversation capture and may resolve protected images.
-- **Image caching**: may request the original site or CDN image URLs.
-- **Obsidian**: normally talks to a Local REST API on the same computer, not a SyncNos cloud service.
+- **Notion** sends content you choose to sync to the Notion API and may process referenced images when needed.
+- **Feishu** sends content you choose to sync to the Feishu API; OAuth can use Proxy or Direct mode.
+- **GitHub** authorizes through GitHub App Device Flow and writes repository content through the GitHub API.
+- **ChatGPT Advanced capture** runs only when explicitly enabled and manually invoked for the current conversation; it can also fetch protected images.
+- **Image caching** can request images from their original sites / CDNs.
+- **Obsidian** normally talks to a Local REST API on the same computer rather than a SyncNos cloud service.
 
-Once data is sent to a third-party service, that service's own privacy policy applies.
+Once a third-party service receives data, that service's own privacy policy applies.
 
-## Credential storage
+## Credentials stay local
 
-Provider tokens, API keys, client secrets, and other required credentials are stored in extension-local storage. Provider authorization mechanisms differ, but these authentication secrets are not written into ordinary captured content.
+Required provider tokens, API keys, and client secrets are stored in browser-extension local storage. Authentication secrets are not written into ordinary captured content.
 
-## Backup exclusions
-
-Backup ZIP excludes authentication secrets such as provider access / refresh tokens, client secrets, the Obsidian API key, GitHub Device Flow credentials, and other sensitive authentication state.
+Backup ZIPs exclude those authentication secrets as well. See [Export & backup](/docs/en/export-backup/) for what a Backup contains and when to use one.
 
 ## Remote code
 
-Executable extension code is packaged with SyncNos. The extension does not download and execute remote code.
+Executable extension code ships with SyncNos. The extension does not download and execute remote code from the network.
 
-## Permissions
+## Browser permissions
 
-Browser host access is used to capture pages you request and to reach configured OAuth, sync, and image endpoints. Broad host access does not mean page content is uploaded by default.
+Browser host permissions allow capture on pages you request and access to configured OAuth, sync, and image endpoints. Broad host access does not mean page content is uploaded by default.
 
-For exact data flows, permissions, and credential boundaries, read the full [Privacy Policy](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).
+For exact data-flow, permission, and credential boundaries, read the full [Privacy Policy](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).

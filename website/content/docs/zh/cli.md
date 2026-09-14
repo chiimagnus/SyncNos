@@ -1,11 +1,11 @@
 ---
-title: 本机 CLI
+title: 使用 CLI 自动化
 description: 安装 syncnos CLI，让本机自动化和 AI Agent 访问正在运行的浏览器 Profile。
 ---
 
-`syncnos` CLI 是可选的本机入口。浏览器扩展和 IndexedDB 仍然是唯一业务真源；CLI 不维护第二套 SyncNos 数据库。
+`syncnos` CLI 是可选的本机自动化入口。普通浏览器使用不需要安装它；浏览器扩展和 IndexedDB 仍然是业务真源，CLI 不维护第二套 SyncNos 数据库。
 
-## 安装
+## 安装并连接浏览器
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -19,9 +19,9 @@ syncnos doctor
 
 业务命令执行时，该 Profile 需要保持运行。
 
-## 先发现能力
+## 先发现当前能力
 
-CLI 的命令和参数会持续演进，不要依赖文档复制一份完整命令表。以当前安装版本自己的输出为真源：
+CLI 的命令和参数会持续演进，不在 Docs 复制一份完整命令表。以当前安装版本自己的输出为准：
 
 ```bash
 syncnos --help
@@ -43,9 +43,9 @@ syncnos export markdown <conversation-id> --output ./export
 syncnos backup export --output ./syncnos-backup.zip
 ```
 
-Provider 目标可为 `notion`、`obsidian`、`feishu` 或 `github`。
+同步目标可以是 `notion`、`obsidian`、`feishu` 或 `github`。
 
-## 面向 Agent 的输出契约
+## 面向 Agent 的输出
 
 默认 operational command 使用稳定、可机器解析的 JSON envelope：
 
