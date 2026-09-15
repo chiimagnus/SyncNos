@@ -92,10 +92,6 @@ function buildState() {
         updatedAt: 0,
         summary: null,
       },
-      syncingNotion: false,
-      syncingObsidian: false,
-      syncingFeishu: false,
-      syncingGithub: false,
       enabledSyncProviders: ['notion'],
       deleting: false,
       listSourceFilterKey: 'all',
@@ -113,10 +109,7 @@ function buildState() {
       copyConversationMarkdown: vi.fn().mockResolvedValue(undefined),
       exportSelectedMarkdown: vi.fn(),
       exportSelectedJson: vi.fn(),
-      syncSelectedNotion: vi.fn().mockResolvedValue(undefined),
-      syncSelectedObsidian: vi.fn().mockResolvedValue(undefined),
-      syncSelectedFeishu: vi.fn().mockResolvedValue(undefined),
-      syncSelectedGithub: vi.fn().mockResolvedValue(undefined),
+      syncSelected: vi.fn().mockResolvedValue(undefined),
       clearSyncFeedback: vi.fn(),
       deleteSelected: vi.fn(),
       refreshList: vi.fn(async () => {}),
@@ -347,7 +340,7 @@ describe('ConversationListPane row actions', () => {
     });
 
     expect(preSync).toHaveBeenCalledWith('github');
-    expect(currentState.syncSelectedGithub).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).not.toHaveBeenCalled();
 
     await act(async () => {
       releasePreSync();
@@ -355,8 +348,8 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
-    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).toHaveBeenCalledTimes(1);
+    expect(currentState.syncSelected).toHaveBeenCalledWith('github');
   });
 
   it('does not start the provider sync when popup pre-sync fails', async () => {
@@ -373,7 +366,7 @@ describe('ConversationListPane row actions', () => {
     });
 
     expect(preSync).toHaveBeenCalledWith('github');
-    expect(currentState.syncSelectedGithub).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).not.toHaveBeenCalled();
   });
 
   it('dispatches the GitHub sync menu item to the real GitHub context callback', async () => {
@@ -402,10 +395,8 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
-    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
-    expect(currentState.syncSelectedObsidian).not.toHaveBeenCalled();
-    expect(currentState.syncSelectedFeishu).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).toHaveBeenCalledTimes(1);
+    expect(currentState.syncSelected).toHaveBeenCalledWith('github');
   });
 
   it('offers only Markdown and JSON export formats and dispatches them independently', async () => {
@@ -440,7 +431,7 @@ describe('ConversationListPane row actions', () => {
     expect(currentState.exportSelectedJson).toHaveBeenCalledTimes(1);
     expect(currentState.exportSelectedMarkdown).toHaveBeenCalledTimes(1);
     expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
-    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).not.toHaveBeenCalled();
   });
 
   it('reports clipboard failure without showing a copied state', async () => {

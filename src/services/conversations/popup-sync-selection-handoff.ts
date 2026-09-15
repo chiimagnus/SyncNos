@@ -4,19 +4,14 @@ import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-i
 export const POPUP_SYNC_SELECTION_HANDOFF_KEY = 'webclipper_popup_sync_selection_handoff_v1';
 const POPUP_SYNC_SELECTION_HANDOFF_TTL_MS = 60_000;
 
-type PopupSyncSelectionHandoff = {
-  conversationIds: number[];
-  createdAt: number;
-};
-
-function parsePopupSyncSelectionHandoff(value: unknown, now: number): PopupSyncSelectionHandoff | null {
+function parsePopupSyncSelectionHandoff(value: unknown, now: number): number[] | null {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
   const conversationIds = normalizeSyncConversationIds(row.conversationIds);
   const createdAt = Number(row.createdAt);
   if (!conversationIds.length || !Number.isFinite(createdAt) || createdAt <= 0) return null;
   if (Math.abs(now - createdAt) > POPUP_SYNC_SELECTION_HANDOFF_TTL_MS) return null;
-  return { conversationIds, createdAt };
+  return conversationIds;
 }
 
 export async function publishPopupSyncSelectionHandoff(conversationIds: readonly number[]): Promise<void> {
@@ -32,7 +27,7 @@ export async function publishPopupSyncSelectionHandoff(conversationIds: readonly
 
 export async function readPopupSyncSelectionHandoff(): Promise<number[] | null> {
   const stored = await storageGet([POPUP_SYNC_SELECTION_HANDOFF_KEY]);
-  return parsePopupSyncSelectionHandoff(stored[POPUP_SYNC_SELECTION_HANDOFF_KEY], Date.now())?.conversationIds ?? null;
+  return parsePopupSyncSelectionHandoff(stored[POPUP_SYNC_SELECTION_HANDOFF_KEY], Date.now());
 }
 
 export function subscribePopupSyncSelectionHandoff(listener: (conversationIds: number[]) => void): () => void {
@@ -40,7 +35,7 @@ export function subscribePopupSyncSelectionHandoff(listener: (conversationIds: n
     if (areaName !== 'local') return;
     const change = changes?.[POPUP_SYNC_SELECTION_HANDOFF_KEY];
     if (!change) return;
-    const parsed = parsePopupSyncSelectionHandoff(change.newValue, Date.now());
-    if (parsed) listener(parsed.conversationIds);
+    const conversationIds = parsePopupSyncSelectionHandoff(change.newValue, Date.now());
+    if (conversationIds) listener(conversationIds);
   });
 }

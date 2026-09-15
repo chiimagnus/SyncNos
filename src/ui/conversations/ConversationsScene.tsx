@@ -18,8 +18,8 @@ import type { SyncProvider } from '@services/sync/models';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
-export type ConversationsSceneListShellConfig = {
-  rightSlot?: ReactNode;
+type ConversationsSceneListShellConfig = {
+  rightSlot: ReactNode;
 };
 
 export type ConversationsSceneWideChrome = 'card' | 'none';

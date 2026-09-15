@@ -795,9 +795,5 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     feedback,
     clearFeedback,
     startSync,
-    syncingNotion: feedback.phase === 'running' && feedback.provider === 'notion',
-    syncingObsidian: feedback.phase === 'running' && feedback.provider === 'obsidian',
-    syncingFeishu: feedback.phase === 'running' && feedback.provider === 'feishu',
-    syncingGithub: feedback.phase === 'running' && feedback.provider === 'github',
   };
 }

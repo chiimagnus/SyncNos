@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 
 import { getURL as runtimeGetURL } from '@services/shared/runtime';
 
-export type CapturedListPaneShellProps = {
-  rightSlot?: ReactNode;
+type CapturedListPaneShellProps = {
+  rightSlot: ReactNode;
   children: ReactNode;
 };
 
@@ -32,7 +32,7 @@ export function CapturedListPaneShell({ rightSlot, children }: CapturedListPaneS
             )}
           </div>
 
-          {rightSlot ? <div className="tw-flex tw-items-center tw-gap-2">{rightSlot}</div> : null}
+          <div className="tw-flex tw-items-center tw-gap-2">{rightSlot}</div>
         </div>
       </div>
 

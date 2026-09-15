@@ -39,7 +39,6 @@ import type { DataRevisionScope } from '@services/data-revisions/client';
 import { storageOnChanged } from '@services/shared/storage';
 import { getEnabledSyncProviders, hasSyncProviderEnabledStorageChange } from '@services/sync/sync-provider-gate';
 import type { SyncProvider } from '@services/sync/models';
-import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import { t } from '@i18n';
 import {
   useConversationSyncFeedback,
@@ -248,10 +247,6 @@ type ConversationsAppState = {
 
   exporting: boolean;
   syncFeedback: ConversationSyncFeedbackState;
-  syncingNotion: boolean;
-  syncingObsidian: boolean;
-  syncingFeishu: boolean;
-  syncingGithub: boolean;
   deleting: boolean;
 
   listSourceFilterKey: string;
@@ -282,10 +277,7 @@ type ConversationsAppState = {
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
   exportSelectedMarkdown: () => Promise<void>;
   exportSelectedJson: () => Promise<void>;
-  syncSelectedNotion: () => Promise<void>;
-  syncSelectedObsidian: () => Promise<void>;
-  syncSelectedFeishu: () => Promise<void>;
-  syncSelectedGithub: () => Promise<void>;
+  syncSelected: (provider: SyncProvider) => Promise<void>;
   clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
 
@@ -378,15 +370,7 @@ export function ConversationsProvider({
 
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const {
-    feedback: syncFeedback,
-    clearFeedback: clearSyncFeedback,
-    startSync,
-    syncingNotion,
-    syncingObsidian,
-    syncingFeishu,
-    syncingGithub,
-  } = useConversationSyncFeedback();
+  const { feedback: syncFeedback, clearFeedback: clearSyncFeedback, startSync } = useConversationSyncFeedback();
 
   const selectedConversation = useMemo(() => {
     const selectedId = Number(activeId);
@@ -1193,7 +1177,7 @@ export function ConversationsProvider({
 
   const clearSelected = useCallback(() => setSelectedIds([]), []);
   const replaceSelectedIds = useCallback((ids: readonly number[]) => {
-    setSelectedIds(normalizeSyncConversationIds(ids));
+    setSelectedIds(Array.from(ids));
   }, []);
 
   const copyConversationMarkdown = useCallback(async (conversationId: number) => {
@@ -1238,29 +1222,13 @@ export function ConversationsProvider({
   );
   const exportSelectedJson = useCallback(() => exportSelected(buildConversationsJsonZipExport), [exportSelected]);
 
-  const syncSelectedNotion = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('notion', ids);
-  }, [selectedIds, startSync]);
-
-  const syncSelectedObsidian = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('obsidian', ids);
-  }, [selectedIds, startSync]);
-
-  const syncSelectedFeishu = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('feishu', ids);
-  }, [selectedIds, startSync]);
-
-  const syncSelectedGithub = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('github', ids);
-  }, [selectedIds, startSync]);
+  const syncSelected = useCallback(
+    async (provider: SyncProvider) => {
+      if (!selectedIds.length) return;
+      await startSync(provider, selectedIds);
+    },
+    [selectedIds, startSync],
+  );
 
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
@@ -1299,10 +1267,6 @@ export function ConversationsProvider({
     enabledSyncProviders,
     exporting,
     syncFeedback,
-    syncingNotion,
-    syncingObsidian,
-    syncingFeishu,
-    syncingGithub,
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
@@ -1329,10 +1293,7 @@ export function ConversationsProvider({
     copyConversationMarkdown,
     exportSelectedMarkdown,
     exportSelectedJson,
-    syncSelectedNotion,
-    syncSelectedObsidian,
-    syncSelectedFeishu,
-    syncSelectedGithub,
+    syncSelected,
     clearSyncFeedback,
     deleteSelected,
     updateSelectedConversationUrl,

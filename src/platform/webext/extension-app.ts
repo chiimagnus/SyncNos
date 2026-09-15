@@ -38,7 +38,7 @@ async function focusTabWindow(windowId: unknown): Promise<void> {
 
 async function findExtensionAppTab() {
   const tabs = await tabsQuery({});
-  return Array.isArray(tabs) ? (tabs.find((tab) => isExtensionAppUrl(tab?.url)) ?? null) : null;
+  return tabs.find((tab) => isExtensionAppUrl(tab?.url)) ?? null;
 }
 
 export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOptions = {}) {

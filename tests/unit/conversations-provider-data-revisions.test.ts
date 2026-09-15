@@ -85,10 +85,6 @@ vi.mock('@viewmodels/conversations/useConversationSyncFeedback', () => ({
     },
     clearFeedback: vi.fn(),
     startSync: vi.fn(),
-    syncingNotion: false,
-    syncingObsidian: false,
-    syncingFeishu: false,
-    syncingGithub: false,
   }),
 }));
 

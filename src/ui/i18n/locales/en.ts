@@ -591,23 +591,18 @@ export const en = {
   syncStagePreparingQueue: 'Preparing queue',
   syncStagePreparingSync: 'Preparing sync',
 
-  // Popup Notion sync nudge
+  // Popup sync nudge
+  popupSyncNudgeTitle: 'Open the tab view for syncing',
+  popupSyncNudgeDontShowAria: 'Do not show this reminder again',
+  popupSyncNudgeDontShowLabel: 'Do not show this reminder again',
+  popupSyncNudgeDismiss: 'Not now',
+  popupSyncNudgeConfirm: 'Got it, open tab',
   popupNotionSyncNudgeAria: 'Sync to Notion tip',
-  popupNotionSyncNudgeTitle: 'Open the tab view for syncing',
   popupNotionSyncNudgeBody:
     'Syncing to Notion can take a while. Opening the tab view helps the extension keep running in the background and avoids interrupted sync jobs.',
-  popupNotionSyncNudgeDontShowAria: 'Do not show this reminder again',
-  popupNotionSyncNudgeDontShowLabel: 'Do not show this reminder again',
-  popupNotionSyncNudgeDismiss: 'Not now',
-  popupNotionSyncNudgeConfirm: 'Got it, open tab',
   popupFeishuSyncNudgeAria: 'Sync to Feishu tip',
-  popupFeishuSyncNudgeTitle: 'Open the tab view for syncing',
   popupFeishuSyncNudgeBody:
     'Syncing to Feishu can take a while. Opening the tab view helps the extension keep running in the background and avoids interrupted sync jobs.',
-  popupFeishuSyncNudgeDontShowAria: 'Do not show this reminder again',
-  popupFeishuSyncNudgeDontShowLabel: 'Do not show this reminder again',
-  popupFeishuSyncNudgeDismiss: 'Not now',
-  popupFeishuSyncNudgeConfirm: 'Got it, open tab',
 
   // AboutSection
   aboutSectionAria: 'About SyncNos WebClipper',
