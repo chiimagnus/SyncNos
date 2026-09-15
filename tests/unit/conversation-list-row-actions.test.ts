@@ -155,9 +155,9 @@ describe('ConversationListPane row actions', () => {
     cleanupDom();
   });
 
-  async function renderPane() {
+  async function renderPane(props: Record<string, unknown> = {}) {
     await act(async () => {
-      root!.render(createElement(ConversationListPane, { onOpenConversation }));
+      root!.render(createElement(ConversationListPane, { onOpenConversation, ...props }));
       await flushMicrotasks();
     });
   }
@@ -325,10 +325,17 @@ describe('ConversationListPane row actions', () => {
     expect(onOpenConversation).toHaveBeenCalledWith(11);
   });
 
-  it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
+  it('awaits popup pre-sync before dispatching a provider sync', async () => {
     currentState.selectedIds = [11];
     currentState.enabledSyncProviders = ['github'];
-    await renderPane();
+    let releasePreSync!: () => void;
+    const preSync = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releasePreSync = resolve;
+        }),
+    );
+    await renderPane({ onPopupSyncStarted: preSync });
 
     const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement | null;
     expect(githubShortcut).toBeTruthy();
@@ -339,8 +346,34 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
+    expect(preSync).toHaveBeenCalledWith('github');
+    expect(currentState.syncSelectedGithub).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releasePreSync();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
     expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
     expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+  });
+
+  it('does not start the provider sync when popup pre-sync fails', async () => {
+    currentState.selectedIds = [11];
+    currentState.enabledSyncProviders = ['github'];
+    const preSync = vi.fn().mockRejectedValue(new Error('app tab unavailable'));
+    await renderPane({ onPopupSyncStarted: preSync });
+
+    const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement;
+    await act(async () => {
+      githubShortcut.click();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(preSync).toHaveBeenCalledWith('github');
+    expect(currentState.syncSelectedGithub).not.toHaveBeenCalled();
   });
 
   it('dispatches the GitHub sync menu item to the real GitHub context callback', async () => {

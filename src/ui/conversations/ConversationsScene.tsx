@@ -26,7 +26,7 @@ export type ConversationsSceneWideChrome = 'card' | 'none';
 
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupSyncStarted?: (provider: SyncProvider) => void;
+  onPopupSyncStarted?: (provider: SyncProvider) => void | Promise<void>;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   onOpenCommentsExternally?: () => void;

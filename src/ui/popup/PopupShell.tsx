@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquareText, Settings as SettingsIcon } from 'lucide-react';
 
-import { openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
 import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { publishPopupSyncSelectionHandoff } from '@services/conversations/popup-sync-selection-handoff';
@@ -186,17 +186,11 @@ function PopupShellFrame() {
     window.close();
   }, []);
 
-  const onPopupNotionSyncStarted = () => {
-    void (async () => {
-      const dismissed = await getPopupNotionSyncNudgeDismissed().catch(() => false);
-      if (dismissed) {
-        await openOrFocusExtensionAppTab({ route: '/' });
-        window.close();
-        return;
-      }
-      setNotionSyncNudgeDontShowAgain(false);
-      setNotionSyncNudgeOpen(true);
-    })();
+  const onPopupNotionSyncStarted = async () => {
+    const dismissed = await getPopupNotionSyncNudgeDismissed().catch(() => false);
+    if (dismissed) return;
+    setNotionSyncNudgeDontShowAgain(false);
+    setNotionSyncNudgeOpen(true);
   };
 
   const persistNotionNudgeIfNeeded = async () => {
@@ -220,17 +214,11 @@ function PopupShellFrame() {
     })();
   };
 
-  const onPopupFeishuSyncStarted = () => {
-    void (async () => {
-      const dismissed = await getPopupFeishuSyncNudgeDismissed().catch(() => false);
-      if (dismissed) {
-        await openOrFocusExtensionAppTab({ route: '/' });
-        window.close();
-        return;
-      }
-      setFeishuSyncNudgeDontShowAgain(false);
-      setFeishuSyncNudgeOpen(true);
-    })();
+  const onPopupFeishuSyncStarted = async () => {
+    const dismissed = await getPopupFeishuSyncNudgeDismissed().catch(() => false);
+    if (dismissed) return;
+    setFeishuSyncNudgeDontShowAgain(false);
+    setFeishuSyncNudgeOpen(true);
   };
 
   const persistFeishuNudgeIfNeeded = async () => {
@@ -254,12 +242,12 @@ function PopupShellFrame() {
     })();
   };
 
-  const onPopupSyncStarted = (provider: SyncProvider) => {
-    void (async () => {
-      await publishPopupSyncSelectionHandoff(selectedIds);
-      if (provider === 'notion') onPopupNotionSyncStarted();
-      else if (provider === 'feishu') onPopupFeishuSyncStarted();
-    })().catch(() => {});
+  const onPopupSyncStarted = async (provider: SyncProvider) => {
+    await publishPopupSyncSelectionHandoff(selectedIds).catch(() => {});
+    const appTab = await ensureExtensionAppTab();
+    if (!appTab) throw new Error('extension_app_tab_unavailable');
+    if (provider === 'notion') await onPopupNotionSyncStarted();
+    else if (provider === 'feishu') await onPopupFeishuSyncStarted();
   };
 
   return (

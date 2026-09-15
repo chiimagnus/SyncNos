@@ -5,8 +5,12 @@ import { JSDOM } from 'jsdom';
 import type { ReactNode } from 'react';
 
 const sendMock = vi.fn();
+const ensureExtensionAppTabMock = vi.fn();
 const openOrFocusExtensionAppTabMock = vi.fn();
 const publishPopupSyncSelectionHandoffMock = vi.fn();
+const storageGetMock = vi.fn();
+const storageSetMock = vi.fn();
+const storageOnChangedMock = vi.fn();
 
 vi.mock('../../src/platform/runtime/runtime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/platform/runtime/runtime')>();
@@ -25,7 +29,14 @@ vi.mock('../../src/services/shared/runtime', () => ({
 }));
 
 vi.mock('../../src/services/shared/webext', () => ({
+  ensureExtensionAppTab: (...args: any[]) => ensureExtensionAppTabMock(...args),
   openOrFocusExtensionAppTab: (...args: any[]) => openOrFocusExtensionAppTabMock(...args),
+}));
+
+vi.mock('../../src/services/shared/storage', () => ({
+  storageGet: (...args: any[]) => storageGetMock(...args),
+  storageSet: (...args: any[]) => storageSetMock(...args),
+  storageOnChanged: (...args: any[]) => storageOnChangedMock(...args),
 }));
 
 vi.mock('../../src/services/conversations/popup-sync-selection-handoff', () => ({
@@ -99,7 +110,7 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
     listShell?: { rightSlot?: ReactNode };
-    onPopupSyncStarted?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void;
+    onPopupSyncStarted?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void | Promise<void>;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
@@ -148,6 +159,8 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         'show-detail-menu',
       ),
       createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('github') }, 'sync-github'),
+      createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('notion') }, 'sync-notion'),
+      createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('feishu') }, 'sync-feishu'),
       mode === 'detail' ? createElement('button', { 'aria-label': 'Open in Notion' }, 'open-in-notion') : null,
       mode === 'detail-menu' ? createElement('button', { 'aria-label': 'Open destinations' }, 'open-menu') : null,
     );
@@ -212,9 +225,17 @@ describe('PopupShell header actions', () => {
   beforeEach(() => {
     setupDom();
     sendMock.mockReset();
+    ensureExtensionAppTabMock.mockReset();
     openOrFocusExtensionAppTabMock.mockReset();
     publishPopupSyncSelectionHandoffMock.mockReset();
+    storageGetMock.mockReset();
+    storageSetMock.mockReset();
+    storageOnChangedMock.mockReset();
+    ensureExtensionAppTabMock.mockResolvedValue({ id: 9, url: 'chrome-extension://syncnos/app.html#/' });
     publishPopupSyncSelectionHandoffMock.mockResolvedValue(undefined);
+    storageGetMock.mockResolvedValue({});
+    storageSetMock.mockResolvedValue(undefined);
+    storageOnChangedMock.mockReturnValue(() => {});
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -297,7 +318,7 @@ describe('PopupShell header actions', () => {
     expect(document.body.textContent).not.toContain('ChatGPT · Waiting for messages…');
   });
 
-  it('publishes the selected conversation ids for popup syncs', async () => {
+  it('publishes the selection and ensures a background App tab for popup syncs', async () => {
     act(() => {
       root!.render(createElement(PopupShell));
     });
@@ -309,7 +330,49 @@ describe('PopupShell header actions', () => {
 
     await vi.waitFor(() => {
       expect(publishPopupSyncSelectionHandoffMock).toHaveBeenCalledWith([41, 42]);
+      expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
     });
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Notion sync nudge while background App-tab ensure does not foreground automatically', async () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const syncButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'sync-notion',
+    ) as HTMLButtonElement;
+    act(() => syncButton.click());
+
+    await vi.waitFor(() => {
+      expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
+      expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    });
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+  });
+
+  it('uses the Notion dont-show key only to hide the nudge, not to foreground or skip App-tab ensure', async () => {
+    storageGetMock.mockImplementation(async (keys: string[]) =>
+      keys.includes('webclipper_popup_notion_sync_open_tab_dont_show_v1')
+        ? { webclipper_popup_notion_sync_open_tab_dont_show_v1: true }
+        : {},
+    );
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const syncButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'sync-notion',
+    ) as HTMLButtonElement;
+    act(() => syncButton.click());
+
+    await vi.waitFor(() => {
+      expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
+      expect(storageGetMock).toHaveBeenCalledWith(['webclipper_popup_notion_sync_open_tab_dont_show_v1']);
+    });
+    expect(document.querySelector('[role="dialog"]')).toBeFalsy();
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
   });
 
   it('opens the inpage comments sidebar from the popup comments button', async () => {
