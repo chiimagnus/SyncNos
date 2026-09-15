@@ -63,8 +63,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
       updatedAt: 0,
       summary: null,
     },
-    syncingNotion: false,
-    syncingObsidian: false,
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
@@ -73,8 +71,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     pendingListLocateId: null,
     consumeListLocate: vi.fn(),
     exportSelectedMarkdown: vi.fn(),
-    syncSelectedNotion: vi.fn(),
-    syncSelectedObsidian: vi.fn(),
+    syncSelected: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
   }),
@@ -85,7 +82,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 }));
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
-  ConversationsScene: (props: { listShell?: { rightSlot?: ReactNode } }) => {
+  ConversationsScene: (props: { listShell?: { rightSlot: ReactNode } }) => {
     const [mode, setMode] = useState<'list' | 'detail'>('list');
     const toList = () => {
       setMode('list');

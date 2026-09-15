@@ -1465,7 +1465,6 @@ describe('Conversations sync feedback', () => {
     await renderFeedbackProbe();
 
     expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
-    expect(latestFeedback?.syncingNotion).toBe(false);
   });
 
   it('shows generic running feedback when ownership is active before a durable running snapshot exists', async () => {
@@ -1486,7 +1485,6 @@ describe('Conversations sync feedback', () => {
       currentConversationTitle: '',
       currentStage: '',
     });
-    expect(latestFeedback?.syncingNotion).toBe(true);
   });
 
   it('keeps a terminal snapshot non-dismissible while ownership is active and exposes it only after settle', async () => {
@@ -1558,7 +1556,6 @@ describe('Conversations sync feedback', () => {
       await flushMicrotasks();
     });
     expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'running' });
-    expect(latestFeedback?.syncingNotion).toBe(true);
 
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
@@ -1571,7 +1568,6 @@ describe('Conversations sync feedback', () => {
       await flushMicrotasks();
     });
     expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
-    expect(latestFeedback?.syncingNotion).toBe(false);
   });
 
   it('drops an older mount observation after a local start failure advances the observation generation', async () => {
@@ -1597,7 +1593,6 @@ describe('Conversations sync feedback', () => {
     });
 
     expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'failed', summary: null });
-    expect(latestFeedback?.syncingNotion).toBe(false);
   });
 
   it('hydrates a reload-aborted notion job instead of keeping the running progress visible', async () => {
@@ -1937,13 +1932,12 @@ describe('Conversations sync feedback', () => {
       await flushMicrotasks();
     });
     await act(async () => {
-      await latestApp!.syncSelectedGithub();
+      await latestApp!.syncSelected('github');
       await flushMicrotasks();
     });
 
     expect(syncGithubConversations).toHaveBeenCalledWith([11]);
-    expect(latestApp!.syncFeedback.provider).toBe('github');
-    expect(latestApp!.syncingGithub).toBe(true);
+    expect(latestApp!.syncFeedback).toMatchObject({ provider: 'github', phase: 'running' });
   });
 
   it('rejects a synthetic unknown provider without falling back to the Notion starter', async () => {

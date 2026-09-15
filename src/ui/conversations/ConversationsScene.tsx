@@ -14,20 +14,19 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
+import type { SyncProvider } from '@services/sync/models';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
-export type ConversationsSceneListShellConfig = {
-  rightSlot?: ReactNode;
-  belowHeader?: ReactNode;
+type ConversationsSceneListShellConfig = {
+  rightSlot: ReactNode;
 };
 
 export type ConversationsSceneWideChrome = 'card' | 'none';
 
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupNotionSyncStarted?: () => void;
-  onPopupFeishuSyncStarted?: () => void;
+  onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   onOpenCommentsExternally?: () => void;
@@ -44,8 +43,7 @@ export type ConversationsSceneProps = {
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
-  onPopupNotionSyncStarted,
-  onPopupFeishuSyncStarted,
+  onPopupSyncPreparing,
   onOpenInsightsSection,
   onOpenSettingsSection,
   onOpenCommentsExternally,
@@ -111,8 +109,7 @@ export function ConversationsScene({
       initialScrollTop={listScrollTop}
       scrollRestoreKey={listRestoreKey}
       onListScrollTopChange={setListScrollTop}
-      onPopupNotionSyncStarted={onPopupNotionSyncStarted}
-      onPopupFeishuSyncStarted={onPopupFeishuSyncStarted}
+      onPopupSyncPreparing={onPopupSyncPreparing}
       onOpenConversation={
         isNarrow
           ? () => {
@@ -125,9 +122,7 @@ export function ConversationsScene({
     />
   );
   const list = listShell ? (
-    <CapturedListPaneShell rightSlot={listShell.rightSlot} belowHeader={listShell.belowHeader}>
-      {listPane}
-    </CapturedListPaneShell>
+    <CapturedListPaneShell rightSlot={listShell.rightSlot}>{listPane}</CapturedListPaneShell>
   ) : (
     listPane
   );

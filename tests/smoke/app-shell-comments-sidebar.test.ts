@@ -86,8 +86,6 @@ const currentState = {
     updatedAt: 0,
     summary: null,
   },
-  syncingNotion: false,
-  syncingObsidian: false,
   deleting: false,
   listSourceFilterKey: 'all',
   listSiteFilterKey: 'all',
@@ -96,8 +94,7 @@ const currentState = {
   pendingListLocateId: null,
   consumeListLocate: vi.fn(),
   exportSelectedMarkdown: vi.fn(),
-  syncSelectedNotion: vi.fn(),
-  syncSelectedObsidian: vi.fn(),
+  syncSelected: vi.fn(),
   clearSyncFeedback: vi.fn(),
   deleteSelected: vi.fn(),
   selectedConversation: {

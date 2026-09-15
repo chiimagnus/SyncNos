@@ -92,10 +92,6 @@ function buildState() {
         updatedAt: 0,
         summary: null,
       },
-      syncingNotion: false,
-      syncingObsidian: false,
-      syncingFeishu: false,
-      syncingGithub: false,
       enabledSyncProviders: ['notion'],
       deleting: false,
       listSourceFilterKey: 'all',
@@ -113,10 +109,7 @@ function buildState() {
       copyConversationMarkdown: vi.fn().mockResolvedValue(undefined),
       exportSelectedMarkdown: vi.fn(),
       exportSelectedJson: vi.fn(),
-      syncSelectedNotion: vi.fn().mockResolvedValue(undefined),
-      syncSelectedObsidian: vi.fn().mockResolvedValue(undefined),
-      syncSelectedFeishu: vi.fn().mockResolvedValue(undefined),
-      syncSelectedGithub: vi.fn().mockResolvedValue(undefined),
+      syncSelected: vi.fn().mockResolvedValue(undefined),
       clearSyncFeedback: vi.fn(),
       deleteSelected: vi.fn(),
       refreshList: vi.fn(async () => {}),
@@ -155,9 +148,9 @@ describe('ConversationListPane row actions', () => {
     cleanupDom();
   });
 
-  async function renderPane() {
+  async function renderPane(props: Record<string, unknown> = {}) {
     await act(async () => {
-      root!.render(createElement(ConversationListPane, { onOpenConversation }));
+      root!.render(createElement(ConversationListPane, { onOpenConversation, ...props }));
       await flushMicrotasks();
     });
   }
@@ -325,10 +318,17 @@ describe('ConversationListPane row actions', () => {
     expect(onOpenConversation).toHaveBeenCalledWith(11);
   });
 
-  it('dispatches a single enabled GitHub provider shortcut to the GitHub context callback', async () => {
+  it('awaits popup pre-sync before dispatching a provider sync', async () => {
     currentState.selectedIds = [11];
     currentState.enabledSyncProviders = ['github'];
-    await renderPane();
+    let releasePreSync!: () => void;
+    const preSync = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releasePreSync = resolve;
+        }),
+    );
+    await renderPane({ onPopupSyncPreparing: preSync });
 
     const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement | null;
     expect(githubShortcut).toBeTruthy();
@@ -339,8 +339,34 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
-    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+    expect(preSync).toHaveBeenCalledWith('github');
+    expect(currentState.syncSelected).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releasePreSync();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(currentState.syncSelected).toHaveBeenCalledTimes(1);
+    expect(currentState.syncSelected).toHaveBeenCalledWith('github');
+  });
+
+  it('does not start the provider sync when popup pre-sync fails', async () => {
+    currentState.selectedIds = [11];
+    currentState.enabledSyncProviders = ['github'];
+    const preSync = vi.fn().mockRejectedValue(new Error('app tab unavailable'));
+    await renderPane({ onPopupSyncPreparing: preSync });
+
+    const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement;
+    await act(async () => {
+      githubShortcut.click();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(preSync).toHaveBeenCalledWith('github');
+    expect(currentState.syncSelected).not.toHaveBeenCalled();
   });
 
   it('dispatches the GitHub sync menu item to the real GitHub context callback', async () => {
@@ -369,10 +395,8 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.syncSelectedGithub).toHaveBeenCalledTimes(1);
-    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
-    expect(currentState.syncSelectedObsidian).not.toHaveBeenCalled();
-    expect(currentState.syncSelectedFeishu).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).toHaveBeenCalledTimes(1);
+    expect(currentState.syncSelected).toHaveBeenCalledWith('github');
   });
 
   it('offers only Markdown and JSON export formats and dispatches them independently', async () => {
@@ -407,7 +431,7 @@ describe('ConversationListPane row actions', () => {
     expect(currentState.exportSelectedJson).toHaveBeenCalledTimes(1);
     expect(currentState.exportSelectedMarkdown).toHaveBeenCalledTimes(1);
     expect(currentState.activateLoadedConversation).not.toHaveBeenCalled();
-    expect(currentState.syncSelectedNotion).not.toHaveBeenCalled();
+    expect(currentState.syncSelected).not.toHaveBeenCalled();
   });
 
   it('reports clipboard failure without showing a copied state', async () => {

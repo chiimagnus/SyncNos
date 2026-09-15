@@ -49,6 +49,7 @@ describe('backup backup-utils', () => {
       },
       github_auth_state_v2: { deviceCode: 'DEVICE_SENTINEL_SECRET' },
       [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
+      webclipper_popup_sync_selection_handoff_v1: { conversationIds: [1, 2], createdAt: Date.now() },
       syncnos_cli_instance_id_v1: 'profile-instance',
       syncnos_cli_integration_enabled_v1: true,
       chatgpt_api_capture_enabled: true,
@@ -69,6 +70,7 @@ describe('backup backup-utils', () => {
       github_branch: 'main',
       chatgpt_api_capture_enabled: true,
     });
+    expect(filtered.webclipper_popup_sync_selection_handoff_v1).toBeUndefined();
     expect(JSON.stringify(filtered)).not.toMatch(
       /ACCESS_SENTINEL_SECRET|REFRESH_SENTINEL_SECRET|DEVICE_SENTINEL_SECRET|FEISHU_SECRET_SENTINEL|FEISHU_ACCESS_SENTINEL|FEISHU_REFRESH_SENTINEL|FEISHU_PENDING_SENTINEL|FEISHU_ERROR_SENTINEL/,
     );

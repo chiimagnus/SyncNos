@@ -19,7 +19,7 @@ vi.mock('@platform/webext/windows', () => ({
   windowsUpdate: (...args: any[]) => windowsUpdate(...args),
 }));
 
-import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
+import { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 
 describe('extension app tab routing', () => {
   beforeEach(() => {
@@ -95,6 +95,33 @@ describe('extension app tab routing', () => {
 
     expect(tabsCreate).toHaveBeenCalledWith({
       active: true,
+      url: 'chrome-extension://syncnos/app.html#/',
+    });
+  });
+
+  it('reuses an existing app tab without focusing, activating, or changing its route', async () => {
+    const existing = {
+      id: 7,
+      windowId: 12,
+      url: 'chrome-extension://syncnos/app.html#/settings?section=github',
+      active: false,
+    };
+    tabsQuery.mockResolvedValue([existing]);
+
+    await expect(ensureExtensionAppTab()).resolves.toBe(existing);
+
+    expect(windowsUpdate).not.toHaveBeenCalled();
+    expect(tabsUpdate).not.toHaveBeenCalled();
+    expect(tabsCreate).not.toHaveBeenCalled();
+  });
+
+  it('creates a missing app tab in the background', async () => {
+    await ensureExtensionAppTab();
+
+    expect(windowsUpdate).not.toHaveBeenCalled();
+    expect(tabsUpdate).not.toHaveBeenCalled();
+    expect(tabsCreate).toHaveBeenCalledWith({
+      active: false,
       url: 'chrome-extension://syncnos/app.html#/',
     });
   });

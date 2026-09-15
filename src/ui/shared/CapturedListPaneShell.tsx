@@ -2,13 +2,12 @@ import type { ReactNode } from 'react';
 
 import { getURL as runtimeGetURL } from '@services/shared/runtime';
 
-export type CapturedListPaneShellProps = {
-  rightSlot?: ReactNode;
-  belowHeader?: ReactNode;
+type CapturedListPaneShellProps = {
+  rightSlot: ReactNode;
   children: ReactNode;
 };
 
-export function CapturedListPaneShell({ rightSlot, belowHeader, children }: CapturedListPaneShellProps) {
+export function CapturedListPaneShell({ rightSlot, children }: CapturedListPaneShellProps) {
   const logoUrl = runtimeGetURL('icons/icon-128.png');
 
   return (
@@ -33,11 +32,10 @@ export function CapturedListPaneShell({ rightSlot, belowHeader, children }: Capt
             )}
           </div>
 
-          {rightSlot ? <div className="tw-flex tw-items-center tw-gap-2">{rightSlot}</div> : null}
+          <div className="tw-flex tw-items-center tw-gap-2">{rightSlot}</div>
         </div>
       </div>
 
-      {belowHeader ?? null}
       {children}
     </div>
   );

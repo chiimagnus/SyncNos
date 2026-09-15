@@ -36,12 +36,16 @@ async function focusTabWindow(windowId: unknown): Promise<void> {
   await windowsUpdate(id, { focused: true });
 }
 
+async function findExtensionAppTab() {
+  const tabs = await tabsQuery({});
+  return tabs.find((tab) => isExtensionAppUrl(tab?.url)) ?? null;
+}
+
 export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOptions = {}) {
   const targetUrl = buildExtensionAppUrl(options.route);
   if (!targetUrl) return null;
 
-  const tabs = await tabsQuery({});
-  const existing = Array.isArray(tabs) ? tabs.find((tab) => isExtensionAppUrl(tab?.url)) : null;
+  const existing = await findExtensionAppTab();
   const existingId = Number(existing?.id);
 
   if (existing && Number.isFinite(existingId) && existingId > 0) {
@@ -54,4 +58,14 @@ export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOpt
   }
 
   return await tabsCreate({ url: targetUrl, active: true });
+}
+
+export async function ensureExtensionAppTab() {
+  const targetUrl = buildExtensionAppUrl('/');
+  if (!targetUrl) return null;
+
+  const existing = await findExtensionAppTab();
+  if (existing) return existing;
+
+  return await tabsCreate({ url: targetUrl, active: false });
 }

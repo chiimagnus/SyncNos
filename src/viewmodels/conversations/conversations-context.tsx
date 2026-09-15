@@ -247,10 +247,6 @@ type ConversationsAppState = {
 
   exporting: boolean;
   syncFeedback: ConversationSyncFeedbackState;
-  syncingNotion: boolean;
-  syncingObsidian: boolean;
-  syncingFeishu: boolean;
-  syncingGithub: boolean;
   deleting: boolean;
 
   listSourceFilterKey: string;
@@ -276,14 +272,12 @@ type ConversationsAppState = {
   toggleSelected: (id: number) => void;
   toggleAll: (scopeIds?: number[]) => void;
   clearSelected: () => void;
+  replaceSelectedIds: (ids: readonly number[]) => void;
 
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
   exportSelectedMarkdown: () => Promise<void>;
   exportSelectedJson: () => Promise<void>;
-  syncSelectedNotion: () => Promise<void>;
-  syncSelectedObsidian: () => Promise<void>;
-  syncSelectedFeishu: () => Promise<void>;
-  syncSelectedGithub: () => Promise<void>;
+  syncSelected: (provider: SyncProvider) => Promise<void>;
   clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
 
@@ -376,15 +370,7 @@ export function ConversationsProvider({
 
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const {
-    feedback: syncFeedback,
-    clearFeedback: clearSyncFeedback,
-    startSync,
-    syncingNotion,
-    syncingObsidian,
-    syncingFeishu,
-    syncingGithub,
-  } = useConversationSyncFeedback();
+  const { feedback: syncFeedback, clearFeedback: clearSyncFeedback, startSync } = useConversationSyncFeedback();
 
   const selectedConversation = useMemo(() => {
     const selectedId = Number(activeId);
@@ -1190,6 +1176,9 @@ export function ConversationsProvider({
   );
 
   const clearSelected = useCallback(() => setSelectedIds([]), []);
+  const replaceSelectedIds = useCallback((ids: readonly number[]) => {
+    setSelectedIds(Array.from(ids));
+  }, []);
 
   const copyConversationMarkdown = useCallback(async (conversationId: number) => {
     const id = Number(conversationId);
@@ -1233,29 +1222,13 @@ export function ConversationsProvider({
   );
   const exportSelectedJson = useCallback(() => exportSelected(buildConversationsJsonZipExport), [exportSelected]);
 
-  const syncSelectedNotion = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('notion', ids);
-  }, [selectedIds, startSync]);
-
-  const syncSelectedObsidian = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('obsidian', ids);
-  }, [selectedIds, startSync]);
-
-  const syncSelectedFeishu = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('feishu', ids);
-  }, [selectedIds, startSync]);
-
-  const syncSelectedGithub = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('github', ids);
-  }, [selectedIds, startSync]);
+  const syncSelected = useCallback(
+    async (provider: SyncProvider) => {
+      if (!selectedIds.length) return;
+      await startSync(provider, selectedIds);
+    },
+    [selectedIds, startSync],
+  );
 
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
@@ -1294,10 +1267,6 @@ export function ConversationsProvider({
     enabledSyncProviders,
     exporting,
     syncFeedback,
-    syncingNotion,
-    syncingObsidian,
-    syncingFeishu,
-    syncingGithub,
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
@@ -1320,13 +1289,11 @@ export function ConversationsProvider({
     toggleSelected,
     toggleAll,
     clearSelected,
+    replaceSelectedIds,
     copyConversationMarkdown,
     exportSelectedMarkdown,
     exportSelectedJson,
-    syncSelectedNotion,
-    syncSelectedObsidian,
-    syncSelectedFeishu,
-    syncSelectedGithub,
+    syncSelected,
     clearSyncFeedback,
     deleteSelected,
     updateSelectedConversationUrl,

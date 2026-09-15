@@ -81,8 +81,7 @@ type ConversationListPaneProps = {
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   activeRowId?: number | null;
-  onPopupNotionSyncStarted?: () => void;
-  onPopupFeishuSyncStarted?: () => void;
+  onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
   initialScrollTop?: number;
   scrollRestoreKey?: number;
   onListScrollTopChange?: (scrollTop: number) => void;
@@ -93,8 +92,7 @@ export function ConversationListPane({
   onOpenInsightsSection,
   onOpenSettingsSection,
   activeRowId,
-  onPopupNotionSyncStarted,
-  onPopupFeishuSyncStarted,
+  onPopupSyncPreparing,
   initialScrollTop = 0,
   scrollRestoreKey = 0,
   onListScrollTopChange,
@@ -111,10 +109,6 @@ export function ConversationListPane({
     exporting,
     listError,
     syncFeedback,
-    syncingNotion,
-    syncingObsidian,
-    syncingFeishu,
-    syncingGithub,
     enabledSyncProviders,
     deleting,
     listSourceFilterKey,
@@ -132,10 +126,7 @@ export function ConversationListPane({
     copyConversationMarkdown,
     exportSelectedMarkdown,
     exportSelectedJson,
-    syncSelectedNotion,
-    syncSelectedObsidian,
-    syncSelectedFeishu,
-    syncSelectedGithub,
+    syncSelected,
     clearSyncFeedback,
     deleteSelected,
     refreshList,
@@ -276,13 +267,9 @@ export function ConversationListPane({
 
   const hasSelection = selectedTotalCount > 0;
   const actionBusy = exporting || deleting;
-  const providerSyncing: Record<SyncProvider, boolean> = {
-    notion: syncingNotion,
-    obsidian: syncingObsidian,
-    feishu: syncingFeishu,
-    github: syncingGithub,
-  };
-  const syncingAny = Object.values(providerSyncing).some(Boolean);
+  const syncingProvider = syncFeedback.phase === 'running' ? syncFeedback.provider : null;
+  const syncingAny = syncingProvider != null;
+  const isProviderSyncing = (provider: SyncProvider) => syncingProvider === provider;
 
   useEffect(() => {
     return () => {
@@ -301,14 +288,9 @@ export function ConversationListPane({
   }, [deleteConfirm, hasSelection]);
 
   useEffect(() => {
-    if (!syncingAny) return;
+    if (!actionBusy && !syncingAny) return;
     deleteConfirm.clear();
-  }, [deleteConfirm, syncingAny]);
-
-  useEffect(() => {
-    if (!actionBusy) return;
-    deleteConfirm.clear();
-  }, [actionBusy, deleteConfirm]);
+  }, [actionBusy, deleteConfirm, syncingAny]);
 
   useEffect(() => {
     if (syncFeedback.phase !== 'success') return;
@@ -531,25 +513,15 @@ export function ConversationListPane({
       : providerButtonLabel(singleSyncProvider)
     : '';
 
-  const syncProviderActions: Record<SyncProvider, () => void> = {
-    obsidian: () => {
-      void syncSelectedObsidian().catch(() => {});
-    },
-    notion: () => {
-      void syncSelectedNotion().catch(() => {});
-      onPopupNotionSyncStarted?.();
-    },
-    feishu: () => {
-      void syncSelectedFeishu().catch(() => {});
-      onPopupFeishuSyncStarted?.();
-    },
-    github: () => {
-      void syncSelectedGithub().catch(() => {});
-    },
-  };
-
   const startSyncProvider = (provider: SyncProvider) => {
-    syncProviderActions[provider]();
+    if (!onPopupSyncPreparing) {
+      void syncSelected(provider).catch(() => {});
+      return;
+    }
+    void (async () => {
+      await onPopupSyncPreparing(provider);
+      await syncSelected(provider);
+    })().catch(() => {});
   };
 
   const onNoticeJumpToConversation = (conversationId: number) => {
@@ -974,9 +946,7 @@ export function ConversationListPane({
                     id="btnSyncProvider"
                     className={actionButton}
                     type="button"
-                    disabled={
-                      !hasSelection || exporting || deleting || actionBusy || providerSyncing[singleSyncProvider]
-                    }
+                    disabled={!hasSelection || actionBusy || isProviderSyncing(singleSyncProvider)}
                     onClick={() => startSyncProvider(singleSyncProvider)}
                   >
                     <span className="tw-leading-none">{singleSyncLabel}</span>
@@ -986,9 +956,7 @@ export function ConversationListPane({
                 <MenuPopover
                   open={syncOpen}
                   onOpenChange={setSyncOpen}
-                  disabled={
-                    enabledSyncProviders.length === 0 ? exporting || deleting : !hasSelection || exporting || deleting
-                  }
+                  disabled={actionBusy || (enabledSyncProviders.length > 0 && !hasSelection)}
                   ariaLabel={syncMenuBaseLabel}
                   side="top"
                   align="end"
@@ -1018,9 +986,9 @@ export function ConversationListPane({
                         setSyncOpen(false);
                         startSyncProvider(provider);
                       }}
-                      disabled={actionBusy || providerSyncing[provider]}
+                      disabled={actionBusy || isProviderSyncing(provider)}
                     >
-                      {syncMenuItemLabel(provider, providerSyncing[provider])}
+                      {syncMenuItemLabel(provider, isProviderSyncing(provider))}
                     </button>
                   ))}
                   {enabledSyncProviders.length === 0 ? (
@@ -1045,7 +1013,7 @@ export function ConversationListPane({
                           }
                         }
                       }}
-                      disabled={exporting || deleting}
+                      disabled={actionBusy}
                     >
                       {t('syncAllProvidersDisabledMenuItem')}
                     </button>

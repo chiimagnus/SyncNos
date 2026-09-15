@@ -46,8 +46,6 @@ vi.mock('../../src/viewmodels/conversations/useConversationSyncFeedback', () => 
     },
     clearFeedback,
     startSync,
-    syncingNotion: false,
-    syncingObsidian: false,
   }),
 }));
 
