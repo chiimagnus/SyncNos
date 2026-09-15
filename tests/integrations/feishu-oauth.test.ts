@@ -179,6 +179,9 @@ describe('Feishu OAuth owner', () => {
     const opened = new URL(chromeMock.__tabsCreated[0].url);
     expect(opened.searchParams.get('client_id')).toBe('app-id');
     expect(opened.searchParams.get('app_id')).toBe('app-id');
+    expect(opened.searchParams.get('redirect_uri')).toBe(
+      'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/',
+    );
     expect(opened.searchParams.get('state')).toBe(started.state);
   });
 
@@ -340,7 +343,12 @@ describe('Feishu OAuth owner', () => {
     const { state } = await startFeishuOAuthAttempt();
     const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body || '{}'));
-      expect(body).toMatchObject({ client_id: 'app-id', client_secret: 'app-secret', code: 'code-1' });
+      expect(body).toMatchObject({
+        client_id: 'app-id',
+        client_secret: 'app-secret',
+        code: 'code-1',
+        redirect_uri: 'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/',
+      });
       await saveFeishuOAuthConfig(authConfig({ clientId: 'new-app', clientSecret: 'new-secret' }));
       return jsonResponse({ access_token: 'stale-token', refresh_token: 'stale-refresh', expires_in: 60 });
     });

@@ -124,7 +124,7 @@ module.exports = [
   },
 
   {
-    files: ['website/*.js'],
+    files: ['website/**/*.js'],
     languageOptions: {
       sourceType: 'script',
       globals: {
@@ -134,6 +134,9 @@ module.exports = [
         navigator: 'readonly',
         window: 'readonly',
         IntersectionObserver: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        location: 'readonly',
         setTimeout: 'readonly',
       },
     },

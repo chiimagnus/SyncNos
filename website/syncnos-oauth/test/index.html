@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SyncNos OAuth Callback Test</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="../../assets/icon-128.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="../../theme.js"></script>
+    <link rel="stylesheet" href="../../styles.css" />
+  </head>
+  <body data-oauth-page="test">
+    <main class="oauth-page">
+      <section class="oauth-card oauth-test-card">
+        <a class="oauth-brand" href="../../">
+          <img src="../../assets/icon-128.png" alt="" width="32" height="32" />
+          <span>SyncNos OAuth 回调测试</span>
+        </a>
+        <div class="oauth-test-grid">
+          <label class="oauth-field">
+            <span>Authorization Code</span>
+            <input data-test-code type="text" value="test_code_12345" />
+          </label>
+          <div class="oauth-test-actions">
+            <button class="btn" type="button" data-test-webclipper>测试 WebClipper 回调</button>
+            <button class="ghost-btn" type="button" data-test-ios>测试 iOS App 回调</button>
+          </div>
+          <label class="oauth-field">
+            <span>Error Code</span>
+            <input data-test-error type="text" value="access_denied" />
+          </label>
+          <label class="oauth-field">
+            <span>Error Description</span>
+            <input data-test-error-description type="text" value="User denied access" />
+          </label>
+          <button class="ghost-btn" type="button" data-test-error-button>测试错误回调</button>
+        </div>
+      </section>
+    </main>
+    <script src="../oauth.js"></script>
+  </body>
+</html>

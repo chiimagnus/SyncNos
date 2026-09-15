@@ -4,7 +4,7 @@ export interface Env {
 }
 
 const NOTION_TOKEN_URL = 'https://api.notion.com/v1/oauth/token';
-const REDIRECT_URI = 'https://chiimagnus.github.io/syncnos-oauth/callback';
+const REDIRECT_URI = 'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

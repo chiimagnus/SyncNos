@@ -151,6 +151,9 @@ describe('notion oauth (ts)', () => {
     expect(opened.origin + opened.pathname).toBe('https://api.notion.com/v1/oauth/authorize');
     expect(opened.searchParams.get('client_id')).toBe('2a8d872b-594c-8060-9a2b-00377c27ec32');
     expect(opened.searchParams.get('client_id')).not.toBe('legacy-ignored');
+    expect(opened.searchParams.get('redirect_uri')).toBe(
+      'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/',
+    );
     expect(opened.searchParams.get('state')).toBe(started.state);
     randomSpy.mockRestore();
   });
@@ -185,9 +188,9 @@ describe('notion oauth (ts)', () => {
     const chromeMock = installChrome({ notion_oauth_pending_state: 's1' });
     const urls = [
       'not a url',
-      'https://chiimagnus.github.io.evil.example/syncnos-oauth/callback?code=c&state=s1',
-      'https://chiimagnus.github.io/syncnos-oauth/callback-extra?code=c&state=s1',
-      'https://chiimagnus.github.io/syncnos-oauth/callback/child?code=c&state=s1',
+      'https://chiimagnus.github.io.evil.example/SyncNos/syncnos-oauth/callback/?code=c&state=s1',
+      'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback-extra?code=c&state=s1',
+      'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/child?code=c&state=s1',
     ];
 
     for (const url of urls) {

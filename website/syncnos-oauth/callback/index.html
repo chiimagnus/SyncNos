@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SyncNos OAuth Callback</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="../../assets/icon-128.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="../../theme.js"></script>
+    <link rel="stylesheet" href="../../styles.css" />
+  </head>
+  <body data-oauth-page="callback">
+    <main class="oauth-page">
+      <section class="oauth-card" data-oauth-app>
+        <a class="oauth-brand" href="../../">
+          <img src="../../assets/icon-128.png" alt="" width="32" height="32" />
+          <span>SyncNos</span>
+        </a>
+        <div class="oauth-status-icon oauth-status-icon-loading" data-status-icon aria-hidden="true"></div>
+        <h1 data-status-title>正在处理授权回调...</h1>
+        <p class="oauth-subtitle" data-status-subtitle>请稍候</p>
+        <div class="oauth-actions" data-close-actions hidden>
+          <button class="btn" type="button" data-close-page>关闭此页</button>
+          <a class="ghost-btn" href="../../">返回 SyncNos</a>
+        </div>
+        <div class="oauth-fallback" data-app-fallback hidden>
+          <strong>如果 SyncNos 应用没有自动打开</strong>
+          <p>请确认应用已安装并已正确配置 URL scheme，然后尝试手动打开 SyncNos。</p>
+        </div>
+      </section>
+    </main>
+    <script src="../oauth.js"></script>
+  </body>
+</html>

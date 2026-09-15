@@ -10,7 +10,7 @@ description: 配置飞书应用，并把 SyncNos 内容同步到飞书云文档�
 把 OAuth 重定向地址设置为：
 
 ```text
-https://chiimagnus.github.io/syncnos-oauth/callback
+https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/
 ```
 
 为应用添加以下权限：

@@ -10,7 +10,7 @@ Create an **enterprise self-built app** in the Feishu Open Platform and note its
 Set the OAuth redirect URI to:
 
 ```text
-https://chiimagnus.github.io/syncnos-oauth/callback
+https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/
 ```
 
 Add these permissions:

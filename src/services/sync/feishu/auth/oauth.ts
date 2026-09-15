@@ -56,7 +56,7 @@ export type FeishuOAuthConfigSummary = {
 export function getFeishuOAuthDefaults(): FeishuOAuthDefaults {
   return {
     authorizationUrl: 'https://accounts.feishu.cn/open-apis/authen/v1/authorize',
-    redirectUri: 'https://chiimagnus.github.io/syncnos-oauth/callback',
+    redirectUri: 'https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/',
     responseType: 'code',
     scope: 'docx:document docx:document.block:convert drive:drive',
   };
