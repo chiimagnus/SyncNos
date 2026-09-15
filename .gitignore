@@ -1,53 +1,30 @@
+# Dependencies
 node_modules/
+
+# Extension build and release artifacts
+.output/
+.wxt/
+.safari-xcode/
+.vite/
 dist/
 dist-firefox/
 dist-edge/
 *.xpi
 *.zip
-.DS_Store
-features/
-archived_features/
-build/
-
-demo/
-/Backend/.venv
-*.db
-Backend/.env
-.kiro/
-.specify/
-.github/*.md
-.cursorignore
-.github/hooks/
-.githooks/
-webclipper/.tmp-wxt-spike/
-
-# Notion OAuth 配置文件（包含敏感信息）
-notion_auth.env
-**/notion_auth.env
-*.env
-!*.env.example
-
-# 本地 Notion OAuth Swift 配置文件（只在开发者本机存在）
-NotionConfig.swift
-
-## User settings
-xcuserdata/
-
-
-.build/
-.swiftpm/
-
-node_modules/
-.output/
-.wxt/
-.safari-xcode/
-.vite/
 stats.html
 stats-*.json
 web-ext.config.ts
 
-.codex/
+# Local environment / secrets
+*.env
+!*.env.example
 
+# Local AI / developer tooling
+.codex/
 .codegraph/
-metadata/
-_temp/
+
+# Local feature plans
+/.github/features/
+
+# OS files
+.DS_Store
