@@ -81,7 +81,7 @@ type ConversationListPaneProps = {
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   activeRowId?: number | null;
-  onPopupSyncStarted?: (provider: SyncProvider) => void | Promise<void>;
+  onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
   initialScrollTop?: number;
   scrollRestoreKey?: number;
   onListScrollTopChange?: (scrollTop: number) => void;
@@ -92,7 +92,7 @@ export function ConversationListPane({
   onOpenInsightsSection,
   onOpenSettingsSection,
   activeRowId,
-  onPopupSyncStarted,
+  onPopupSyncPreparing,
   initialScrollTop = 0,
   scrollRestoreKey = 0,
   onListScrollTopChange,
@@ -537,12 +537,12 @@ export function ConversationListPane({
   };
 
   const startSyncProvider = (provider: SyncProvider) => {
-    if (!onPopupSyncStarted) {
+    if (!onPopupSyncPreparing) {
       void syncProviderActions[provider]().catch(() => {});
       return;
     }
     void (async () => {
-      await onPopupSyncStarted(provider);
+      await onPopupSyncPreparing(provider);
       await syncProviderActions[provider]();
     })().catch(() => {});
   };

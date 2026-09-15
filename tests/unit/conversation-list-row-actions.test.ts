@@ -335,7 +335,7 @@ describe('ConversationListPane row actions', () => {
           releasePreSync = resolve;
         }),
     );
-    await renderPane({ onPopupSyncStarted: preSync });
+    await renderPane({ onPopupSyncPreparing: preSync });
 
     const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement | null;
     expect(githubShortcut).toBeTruthy();
@@ -363,7 +363,7 @@ describe('ConversationListPane row actions', () => {
     currentState.selectedIds = [11];
     currentState.enabledSyncProviders = ['github'];
     const preSync = vi.fn().mockRejectedValue(new Error('app tab unavailable'));
-    await renderPane({ onPopupSyncStarted: preSync });
+    await renderPane({ onPopupSyncPreparing: preSync });
 
     const githubShortcut = document.getElementById('btnSyncProvider') as HTMLButtonElement;
     await act(async () => {

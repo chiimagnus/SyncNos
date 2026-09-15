@@ -26,7 +26,7 @@ export type ConversationsSceneWideChrome = 'card' | 'none';
 
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupSyncStarted?: (provider: SyncProvider) => void | Promise<void>;
+  onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   onOpenCommentsExternally?: () => void;
@@ -43,7 +43,7 @@ export type ConversationsSceneProps = {
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
-  onPopupSyncStarted,
+  onPopupSyncPreparing,
   onOpenInsightsSection,
   onOpenSettingsSection,
   onOpenCommentsExternally,
@@ -109,7 +109,7 @@ export function ConversationsScene({
       initialScrollTop={listScrollTop}
       scrollRestoreKey={listRestoreKey}
       onListScrollTopChange={setListScrollTop}
-      onPopupSyncStarted={onPopupSyncStarted}
+      onPopupSyncPreparing={onPopupSyncPreparing}
       onOpenConversation={
         isNarrow
           ? () => {

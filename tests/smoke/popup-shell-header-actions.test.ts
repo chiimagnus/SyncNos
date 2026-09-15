@@ -110,7 +110,7 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
     listShell?: { rightSlot?: ReactNode };
-    onPopupSyncStarted?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void | Promise<void>;
+    onPopupSyncPreparing?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void | Promise<void>;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
@@ -158,9 +158,9 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         },
         'show-detail-menu',
       ),
-      createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('github') }, 'sync-github'),
-      createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('notion') }, 'sync-notion'),
-      createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('feishu') }, 'sync-feishu'),
+      createElement('button', { type: 'button', onClick: () => props.onPopupSyncPreparing?.('github') }, 'sync-github'),
+      createElement('button', { type: 'button', onClick: () => props.onPopupSyncPreparing?.('notion') }, 'sync-notion'),
+      createElement('button', { type: 'button', onClick: () => props.onPopupSyncPreparing?.('feishu') }, 'sync-feishu'),
       mode === 'detail' ? createElement('button', { 'aria-label': 'Open in Notion' }, 'open-in-notion') : null,
       mode === 'detail-menu' ? createElement('button', { 'aria-label': 'Open destinations' }, 'open-menu') : null,
     );
@@ -370,6 +370,47 @@ describe('PopupShell header actions', () => {
     await vi.waitFor(() => {
       expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
       expect(storageGetMock).toHaveBeenCalledWith(['webclipper_popup_notion_sync_open_tab_dont_show_v1']);
+    });
+    expect(document.querySelector('[role="dialog"]')).toBeFalsy();
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Feishu sync nudge while background App-tab ensure does not foreground automatically', async () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const syncButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'sync-feishu',
+    ) as HTMLButtonElement;
+    act(() => syncButton.click());
+
+    await vi.waitFor(() => {
+      expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
+      expect(storageGetMock).toHaveBeenCalledWith(['webclipper_popup_feishu_sync_open_tab_dont_show_v1']);
+      expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    });
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+  });
+
+  it('uses the Feishu dont-show key only to hide the nudge, not to foreground or skip App-tab ensure', async () => {
+    storageGetMock.mockImplementation(async (keys: string[]) =>
+      keys.includes('webclipper_popup_feishu_sync_open_tab_dont_show_v1')
+        ? { webclipper_popup_feishu_sync_open_tab_dont_show_v1: true }
+        : {},
+    );
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const syncButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'sync-feishu',
+    ) as HTMLButtonElement;
+    act(() => syncButton.click());
+
+    await vi.waitFor(() => {
+      expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
+      expect(storageGetMock).toHaveBeenCalledWith(['webclipper_popup_feishu_sync_open_tab_dont_show_v1']);
     });
     expect(document.querySelector('[role="dialog"]')).toBeFalsy();
     expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();

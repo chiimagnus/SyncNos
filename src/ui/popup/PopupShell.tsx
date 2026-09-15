@@ -242,7 +242,7 @@ function PopupShellFrame() {
     })();
   };
 
-  const onPopupSyncStarted = async (provider: SyncProvider) => {
+  const onPopupSyncPreparing = async (provider: SyncProvider) => {
     await publishPopupSyncSelectionHandoff(selectedIds).catch(() => {});
     const appTab = await ensureExtensionAppTab();
     if (!appTab) throw new Error('extension_app_tab_unavailable');
@@ -309,7 +309,7 @@ function PopupShellFrame() {
                   </>
                 ),
               }}
-              onPopupSyncStarted={onPopupSyncStarted}
+              onPopupSyncPreparing={onPopupSyncPreparing}
               onOpenInsightsSection={() => {
                 void onOpenInsightSettings().catch(() => {});
               }}
