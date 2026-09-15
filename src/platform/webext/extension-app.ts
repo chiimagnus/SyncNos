@@ -6,6 +6,10 @@ type OpenExtensionAppTabOptions = {
   route?: string;
 };
 
+type EnsureExtensionAppTabOptions = {
+  foreground?: boolean;
+};
+
 const EXTENSION_APP_PATH = '/app.html';
 
 function normalizeRoute(route?: string): string {
@@ -36,12 +40,16 @@ async function focusTabWindow(windowId: unknown): Promise<void> {
   await windowsUpdate(id, { focused: true });
 }
 
+async function findExtensionAppTab() {
+  const tabs = await tabsQuery({});
+  return Array.isArray(tabs) ? (tabs.find((tab) => isExtensionAppUrl(tab?.url)) ?? null) : null;
+}
+
 export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOptions = {}) {
   const targetUrl = buildExtensionAppUrl(options.route);
   if (!targetUrl) return null;
 
-  const tabs = await tabsQuery({});
-  const existing = Array.isArray(tabs) ? tabs.find((tab) => isExtensionAppUrl(tab?.url)) : null;
+  const existing = await findExtensionAppTab();
   const existingId = Number(existing?.id);
 
   if (existing && Number.isFinite(existingId) && existingId > 0) {
@@ -54,4 +62,23 @@ export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOpt
   }
 
   return await tabsCreate({ url: targetUrl, active: true });
+}
+
+export async function ensureExtensionAppTab(options: EnsureExtensionAppTabOptions = {}) {
+  const foreground = options.foreground === true;
+  const targetUrl = buildExtensionAppUrl('/');
+  if (!targetUrl) return null;
+
+  const existing = await findExtensionAppTab();
+  const existingId = Number(existing?.id);
+
+  if (existing && Number.isFinite(existingId) && existingId > 0) {
+    if (foreground) {
+      await focusTabWindow(existing.windowId).catch(() => {});
+      await tabsUpdate(existingId, { active: true });
+    }
+    return existing;
+  }
+
+  return await tabsCreate({ url: targetUrl, active: foreground });
 }

@@ -34,9 +34,12 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'obsidian_api_key',
   // GitHub Device Flow/auth state contains access/refresh/device secrets.
   'github_auth_state_v1',
-  // Runtime-only cross-context invalidation metadata and popup UI handoff state.
+  // Runtime-only cross-context invalidation metadata and popup UI state.
   DATA_REVISION_WAKE_STORAGE_KEY,
   POPUP_SYNC_SELECTION_HANDOFF_KEY,
+  'webclipper_popup_sync_app_foregrounded_v1',
+  'webclipper_popup_notion_sync_open_tab_dont_show_v1',
+  'webclipper_popup_feishu_sync_open_tab_dont_show_v1',
   // CLI identity/opt-in are local to one browser profile and must never migrate through Backup.
   CLI_INSTANCE_ID_STORAGE_KEY,
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,
