@@ -143,7 +143,7 @@ describe('ReaderToolbar', () => {
     expect(getPanel()).toBeTruthy();
 
     const stripButton = document.querySelector(
-      '[data-reader-rail-wrap="outline"] > nav button[data-reader-outline-level="lvl-2"]',
+      '[data-reader-rail-wrap="outline"] [data-reader-rail-trigger-shell="outline"] nav button[data-reader-outline-level="lvl-2"]',
     ) as HTMLButtonElement | null;
     expect(stripButton).toBeTruthy();
     act(() => {
@@ -207,7 +207,7 @@ describe('ReaderToolbar', () => {
     const panel = getPanel();
     expect(panel).toBeTruthy();
     expect(panel?.style.right).toBe('0px');
-    expect(panel?.style.top).toBe('calc(100% + 10px)');
+    expect(panel?.style.top).toBe('0px');
     expect(panel?.style.width).toBe('300px');
     expect(panel?.style.maxWidth).toBe('calc(100vw - 28px)');
     expect(panel?.style.maxHeight).toBe('70vh');

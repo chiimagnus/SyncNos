@@ -88,7 +88,7 @@ describe('ChatOutlinePanel', () => {
     expect(document.getElementById('root')?.innerHTML).toBe('');
   });
 
-  it('uses the shared rail panel without visible chat-specific directory copy', () => {
+  it('uses the shared rail panel without visible chat-specific directory copy', async () => {
     const onPickEntry = vi.fn();
     const longPreview = '请总结这篇文章的核心观点，并按照背景、论点、证据、结论四个部分展开说明';
     const panelEntries = [{ ...entries[0], previewText: longPreview }, entries[1]];
@@ -108,7 +108,13 @@ describe('ChatOutlinePanel', () => {
     });
 
     const panel = document.querySelector('[data-reader-rail-panel="chat-outline"]') as HTMLElement | null;
+    const triggerShell = wrap?.querySelector('[data-reader-rail-trigger-shell="chat-outline"]') as HTMLElement | null;
     expect(panel).toBeTruthy();
+    expect(panel?.style.right).toBe('0px');
+    expect(panel?.style.top).toBe('0px');
+    expect(triggerShell?.getAttribute('aria-hidden')).toBe('true');
+    expect(triggerShell?.style.visibility).toBe('hidden');
+    expect(triggerShell?.style.pointerEvents).toBe('none');
     expect(document.body.textContent).not.toContain('目录');
     expect(document.body.textContent).not.toContain('用户消息');
     expect(panel?.querySelector('[data-chat-outline-active="true"]')?.textContent).toBe('2. 给我一个行动清单');
@@ -129,6 +135,20 @@ describe('ChatOutlinePanel', () => {
       firstEntry!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     expect(onPickEntry).toHaveBeenCalledWith(panelEntries[0]);
+
+    act(() => {
+      wrap!.dispatchEvent(
+        new window.MouseEvent('mouseout', { bubbles: true, cancelable: true, relatedTarget: document.body }),
+      );
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
+    expect(triggerShell?.getAttribute('aria-hidden')).toBeNull();
+    expect(triggerShell?.style.visibility).toBe('');
+    expect(triggerShell?.style.pointerEvents).toBe('');
   });
 
   it('keeps the trigger visible for large chat outlines while preserving the active marker', () => {
