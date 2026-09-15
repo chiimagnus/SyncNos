@@ -1,4 +1,5 @@
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
+import { POPUP_SYNC_SELECTION_HANDOFF_KEY } from '@services/conversations/popup-sync-selection-handoff';
 import { CLI_INSTANCE_ID_STORAGE_KEY, CLI_INTEGRATION_ENABLED_STORAGE_KEY } from '@services/cli/cli-integration';
 import {
   normalizeCanonicalVideoChapters,
@@ -33,8 +34,9 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'obsidian_api_key',
   // GitHub Device Flow/auth state contains access/refresh/device secrets.
   'github_auth_state_v1',
-  // Runtime-only cross-context invalidation metadata.
+  // Runtime-only cross-context invalidation metadata and popup UI handoff state.
   DATA_REVISION_WAKE_STORAGE_KEY,
+  POPUP_SYNC_SELECTION_HANDOFF_KEY,
   // CLI identity/opt-in are local to one browser profile and must never migrate through Backup.
   CLI_INSTANCE_ID_STORAGE_KEY,
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,

@@ -4,6 +4,8 @@ import { MessageSquareText, Settings as SettingsIcon } from 'lucide-react';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
 import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
+import { publishPopupSyncSelectionHandoff } from '@services/conversations/popup-sync-selection-handoff';
+import type { SyncProvider } from '@services/sync/models';
 
 import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
@@ -138,7 +140,7 @@ export default function PopupShell() {
 }
 
 function PopupShellFrame() {
-  const { refreshList, refreshActiveDetail, selectedConversation } = useConversationsApp();
+  const { refreshList, refreshActiveDetail, selectedConversation, selectedIds } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
   const [feishuSyncNudgeOpen, setFeishuSyncNudgeOpen] = useState(false);
@@ -252,6 +254,14 @@ function PopupShellFrame() {
     })();
   };
 
+  const onPopupSyncStarted = (provider: SyncProvider) => {
+    void (async () => {
+      await publishPopupSyncSelectionHandoff(selectedIds);
+      if (provider === 'notion') onPopupNotionSyncStarted();
+      else if (provider === 'feishu') onPopupFeishuSyncStarted();
+    })().catch(() => {});
+  };
+
   return (
     <div
       className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]"
@@ -328,8 +338,7 @@ function PopupShellFrame() {
                   </div>
                 ) : null,
               }}
-              onPopupNotionSyncStarted={onPopupNotionSyncStarted}
-              onPopupFeishuSyncStarted={onPopupFeishuSyncStarted}
+              onPopupSyncStarted={onPopupSyncStarted}
               onOpenInsightsSection={() => {
                 void onOpenInsightSettings().catch(() => {});
               }}

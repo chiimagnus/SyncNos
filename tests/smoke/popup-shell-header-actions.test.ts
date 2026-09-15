@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 
 const sendMock = vi.fn();
 const openOrFocusExtensionAppTabMock = vi.fn();
+const publishPopupSyncSelectionHandoffMock = vi.fn();
 
 vi.mock('../../src/platform/runtime/runtime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/platform/runtime/runtime')>();
@@ -27,6 +28,10 @@ vi.mock('../../src/services/shared/webext', () => ({
   openOrFocusExtensionAppTab: (...args: any[]) => openOrFocusExtensionAppTabMock(...args),
 }));
 
+vi.mock('../../src/services/conversations/popup-sync-selection-handoff', () => ({
+  publishPopupSyncSelectionHandoff: (...args: any[]) => publishPopupSyncSelectionHandoffMock(...args),
+}));
+
 vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/ui/shared/AppTooltip')>();
   return {
@@ -40,7 +45,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => ({
     items: [],
     activeId: null,
-    selectedIds: [],
+    selectedIds: [41, 42],
     toggleAll: vi.fn(),
     toggleSelected: vi.fn(),
     setActiveId: vi.fn(),
@@ -92,7 +97,10 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 }));
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
-  ConversationsScene: (props: { listShell?: { rightSlot?: ReactNode; belowHeader?: ReactNode } }) => {
+  ConversationsScene: (props: {
+    listShell?: { rightSlot?: ReactNode; belowHeader?: ReactNode };
+    onPopupSyncStarted?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void;
+  }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
       setMode('list');
@@ -139,6 +147,7 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         },
         'show-detail-menu',
       ),
+      createElement('button', { type: 'button', onClick: () => props.onPopupSyncStarted?.('github') }, 'sync-github'),
       mode === 'detail' ? createElement('button', { 'aria-label': 'Open in Notion' }, 'open-in-notion') : null,
       mode === 'detail-menu' ? createElement('button', { 'aria-label': 'Open destinations' }, 'open-menu') : null,
     );
@@ -204,6 +213,8 @@ describe('PopupShell header actions', () => {
     setupDom();
     sendMock.mockReset();
     openOrFocusExtensionAppTabMock.mockReset();
+    publishPopupSyncSelectionHandoffMock.mockReset();
+    publishPopupSyncSelectionHandoffMock.mockResolvedValue(undefined);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -275,6 +286,21 @@ describe('PopupShell header actions', () => {
 
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('publishes the selected conversation ids for popup syncs', async () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const syncButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'sync-github',
+    ) as HTMLButtonElement;
+    act(() => syncButton.click());
+
+    await vi.waitFor(() => {
+      expect(publishPopupSyncSelectionHandoffMock).toHaveBeenCalledWith([41, 42]);
+    });
   });
 
   it('opens the inpage comments sidebar from the popup comments button', async () => {

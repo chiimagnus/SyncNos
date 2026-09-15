@@ -14,6 +14,7 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
+import type { SyncProvider } from '@services/sync/models';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
@@ -26,8 +27,7 @@ export type ConversationsSceneWideChrome = 'card' | 'none';
 
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupNotionSyncStarted?: () => void;
-  onPopupFeishuSyncStarted?: () => void;
+  onPopupSyncStarted?: (provider: SyncProvider) => void;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   onOpenCommentsExternally?: () => void;
@@ -44,8 +44,7 @@ export type ConversationsSceneProps = {
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
-  onPopupNotionSyncStarted,
-  onPopupFeishuSyncStarted,
+  onPopupSyncStarted,
   onOpenInsightsSection,
   onOpenSettingsSection,
   onOpenCommentsExternally,
@@ -111,8 +110,7 @@ export function ConversationsScene({
       initialScrollTop={listScrollTop}
       scrollRestoreKey={listRestoreKey}
       onListScrollTopChange={setListScrollTop}
-      onPopupNotionSyncStarted={onPopupNotionSyncStarted}
-      onPopupFeishuSyncStarted={onPopupFeishuSyncStarted}
+      onPopupSyncStarted={onPopupSyncStarted}
       onOpenConversation={
         isNarrow
           ? () => {

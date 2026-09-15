@@ -39,6 +39,7 @@ import type { DataRevisionScope } from '@services/data-revisions/client';
 import { storageOnChanged } from '@services/shared/storage';
 import { getEnabledSyncProviders, hasSyncProviderEnabledStorageChange } from '@services/sync/sync-provider-gate';
 import type { SyncProvider } from '@services/sync/models';
+import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import { t } from '@i18n';
 import {
   useConversationSyncFeedback,
@@ -276,6 +277,7 @@ type ConversationsAppState = {
   toggleSelected: (id: number) => void;
   toggleAll: (scopeIds?: number[]) => void;
   clearSelected: () => void;
+  replaceSelectedIds: (ids: readonly number[]) => void;
 
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
   exportSelectedMarkdown: () => Promise<void>;
@@ -1190,6 +1192,9 @@ export function ConversationsProvider({
   );
 
   const clearSelected = useCallback(() => setSelectedIds([]), []);
+  const replaceSelectedIds = useCallback((ids: readonly number[]) => {
+    setSelectedIds(normalizeSyncConversationIds(ids));
+  }, []);
 
   const copyConversationMarkdown = useCallback(async (conversationId: number) => {
     const id = Number(conversationId);
@@ -1320,6 +1325,7 @@ export function ConversationsProvider({
     toggleSelected,
     toggleAll,
     clearSelected,
+    replaceSelectedIds,
     copyConversationMarkdown,
     exportSelectedMarkdown,
     exportSelectedJson,

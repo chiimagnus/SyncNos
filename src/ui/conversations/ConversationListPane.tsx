@@ -81,8 +81,7 @@ type ConversationListPaneProps = {
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   activeRowId?: number | null;
-  onPopupNotionSyncStarted?: () => void;
-  onPopupFeishuSyncStarted?: () => void;
+  onPopupSyncStarted?: (provider: SyncProvider) => void;
   initialScrollTop?: number;
   scrollRestoreKey?: number;
   onListScrollTopChange?: (scrollTop: number) => void;
@@ -93,8 +92,7 @@ export function ConversationListPane({
   onOpenInsightsSection,
   onOpenSettingsSection,
   activeRowId,
-  onPopupNotionSyncStarted,
-  onPopupFeishuSyncStarted,
+  onPopupSyncStarted,
   initialScrollTop = 0,
   scrollRestoreKey = 0,
   onListScrollTopChange,
@@ -531,25 +529,16 @@ export function ConversationListPane({
       : providerButtonLabel(singleSyncProvider)
     : '';
 
-  const syncProviderActions: Record<SyncProvider, () => void> = {
-    obsidian: () => {
-      void syncSelectedObsidian().catch(() => {});
-    },
-    notion: () => {
-      void syncSelectedNotion().catch(() => {});
-      onPopupNotionSyncStarted?.();
-    },
-    feishu: () => {
-      void syncSelectedFeishu().catch(() => {});
-      onPopupFeishuSyncStarted?.();
-    },
-    github: () => {
-      void syncSelectedGithub().catch(() => {});
-    },
+  const syncProviderActions: Record<SyncProvider, () => Promise<void>> = {
+    obsidian: syncSelectedObsidian,
+    notion: syncSelectedNotion,
+    feishu: syncSelectedFeishu,
+    github: syncSelectedGithub,
   };
 
   const startSyncProvider = (provider: SyncProvider) => {
-    syncProviderActions[provider]();
+    void syncProviderActions[provider]().catch(() => {});
+    onPopupSyncStarted?.(provider);
   };
 
   const onNoticeJumpToConversation = (conversationId: number) => {
