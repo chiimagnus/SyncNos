@@ -23,8 +23,21 @@
 - 不使用内部模块名、commit 术语或开发流水账表达
 - 不夸大，不写实际没有交付的能力
 - 按用户价值排序
-- 使用简洁英文，与 GitHub Release 页面保持一致
+- 同时输出中文和英文，两种语言表达同一组变更，不增删事实
+- 中文在前，英文在后；两部分都保持简洁自然
 
-保留现有商店 badge 和 `<details><summary>Full changelog</summary>...</details>` 原样不动；只在它们之间插入或更新用户摘要。不要删除或改写 `Full changelog` 中 GitHub 自动生成的原始记录。
+Release 顶部摘要使用以下结构：
+
+```md
+## 中文
+
+- ...
+
+## English
+
+- ...
+```
+
+保留现有商店 badge 和 `<details><summary>Full changelog</summary>...</details>` 原样不动；只在它们之间插入或更新中英文用户摘要。不要删除或改写 `Full changelog` 中 GitHub 自动生成的原始记录。
 
 直接完成 Release 编辑，不输出分析过程。
