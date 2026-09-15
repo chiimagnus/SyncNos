@@ -320,23 +320,6 @@ function PopupShellFrame() {
                     </button>
                   </>
                 ),
-                belowHeader: status?.message ? (
-                  <div
-                    className={[
-                      'tw-border-b tw-px-3 tw-py-2 tw-text-[11px] tw-font-semibold',
-                      status.kind === 'error'
-                        ? 'tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--error)]'
-                        : status.kind === 'warning'
-                          ? 'tw-border-[color-mix(in_srgb,var(--warning)_58%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-card))] tw-text-[var(--text-primary)]'
-                          : status.kind === 'info'
-                            ? 'tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)]'
-                            : 'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--success)]',
-                    ].join(' ')}
-                    role={status.kind === 'error' ? 'alert' : 'status'}
-                  >
-                    {status.message}
-                  </div>
-                ) : null,
               }}
               onPopupSyncStarted={onPopupSyncStarted}
               onOpenInsightsSection={() => {

@@ -92,13 +92,13 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
     checking: false,
     fetching: false,
     refreshState: vi.fn(),
-    status: null,
+    status: { kind: 'info', message: 'ChatGPT · Waiting for messages…' },
   }),
 }));
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
-    listShell?: { rightSlot?: ReactNode; belowHeader?: ReactNode };
+    listShell?: { rightSlot?: ReactNode };
     onPopupSyncStarted?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
@@ -286,6 +286,15 @@ describe('PopupShell header actions', () => {
 
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('keeps current-page capture status in the button without rendering a duplicate header banner', () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('ChatGPT · Waiting for messages…');
   });
 
   it('publishes the selected conversation ids for popup syncs', async () => {

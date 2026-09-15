@@ -20,7 +20,6 @@ type NarrowRoute = 'list' | 'detail' | 'comments';
 
 export type ConversationsSceneListShellConfig = {
   rightSlot?: ReactNode;
-  belowHeader?: ReactNode;
 };
 
 export type ConversationsSceneWideChrome = 'card' | 'none';
@@ -123,9 +122,7 @@ export function ConversationsScene({
     />
   );
   const list = listShell ? (
-    <CapturedListPaneShell rightSlot={listShell.rightSlot} belowHeader={listShell.belowHeader}>
-      {listPane}
-    </CapturedListPaneShell>
+    <CapturedListPaneShell rightSlot={listShell.rightSlot}>{listPane}</CapturedListPaneShell>
   ) : (
     listPane
   );
