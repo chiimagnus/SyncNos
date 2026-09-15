@@ -179,7 +179,7 @@ jobs:
           NPM_DIST_TAG: ${{ steps.metadata.outputs.npm_dist_tag }}
         run: |
           set -euo pipefail
-          cli_tgz="release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz"
+          cli_tgz="$PWD/release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz"
           npm publish "$cli_tgz" --access public --tag "$NPM_DIST_TAG"
 
       - name: Verify npm publication
