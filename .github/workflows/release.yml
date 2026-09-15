@@ -117,7 +117,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
         run: |
           set -euo pipefail
-          cli_tgz="release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz"
+          cli_tgz="$PWD/release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz"
           test -f "$cli_tgz"
           prefix="$(mktemp -d)"
           npm install -g "$cli_tgz" --prefix "$prefix" --ignore-scripts
