@@ -19,7 +19,7 @@ vi.mock('@platform/webext/windows', () => ({
   windowsUpdate: (...args: any[]) => windowsUpdate(...args),
 }));
 
-import { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
+import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 
 describe('extension app tab routing', () => {
   beforeEach(() => {
@@ -92,57 +92,6 @@ describe('extension app tab routing', () => {
 
   it('opens the hash-router root when no route is provided', async () => {
     await openOrFocusExtensionAppTab();
-
-    expect(tabsCreate).toHaveBeenCalledWith({
-      active: true,
-      url: 'chrome-extension://syncnos/app.html#/',
-    });
-  });
-
-  it('keeps an existing app tab untouched when ensuring it in the background', async () => {
-    tabsQuery.mockResolvedValue([
-      {
-        id: 1,
-        windowId: 10,
-        url: 'chrome-extension://syncnos/app.html#/settings',
-      },
-    ]);
-
-    const tab = await ensureExtensionAppTab();
-
-    expect(tab?.id).toBe(1);
-    expect(windowsUpdate).not.toHaveBeenCalled();
-    expect(tabsUpdate).not.toHaveBeenCalled();
-    expect(tabsCreate).not.toHaveBeenCalled();
-  });
-
-  it('creates an inactive app tab when ensuring it in the background and none exists', async () => {
-    await ensureExtensionAppTab();
-
-    expect(tabsCreate).toHaveBeenCalledWith({
-      active: false,
-      url: 'chrome-extension://syncnos/app.html#/',
-    });
-  });
-
-  it('foregrounds an existing app tab without changing its current route', async () => {
-    tabsQuery.mockResolvedValue([
-      {
-        id: 1,
-        windowId: 10,
-        url: 'chrome-extension://syncnos/app.html#/settings',
-      },
-    ]);
-
-    await ensureExtensionAppTab({ foreground: true });
-
-    expect(windowsUpdate).toHaveBeenCalledWith(10, { focused: true });
-    expect(tabsUpdate).toHaveBeenCalledWith(1, { active: true });
-    expect(tabsCreate).not.toHaveBeenCalled();
-  });
-
-  it('creates an active app tab when the first popup sync needs foregrounding', async () => {
-    await ensureExtensionAppTab({ foreground: true });
 
     expect(tabsCreate).toHaveBeenCalledWith({
       active: true,

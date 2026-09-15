@@ -1,29 +1,131 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquareText, Settings as SettingsIcon } from 'lucide-react';
 
-import { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
 import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { publishPopupSyncSelectionHandoff } from '@services/conversations/popup-sync-selection-handoff';
+import type { SyncProvider } from '@services/sync/models';
 
 import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
-import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
+import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 import { usePopupOpenCurrentTabInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenCurrentTabInpageCommentsSidebar';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
 
-const POPUP_SYNC_APP_FOREGROUNDED_KEY = 'webclipper_popup_sync_app_foregrounded_v1';
+const POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_notion_sync_open_tab_dont_show_v1';
+const POPUP_FEISHU_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_feishu_sync_open_tab_dont_show_v1';
 
-async function ensurePopupSyncAppTab(): Promise<boolean> {
-  const stored = await storageGet([POPUP_SYNC_APP_FOREGROUNDED_KEY]).catch(() => ({}));
-  const foreground = !(stored as Record<string, unknown>)[POPUP_SYNC_APP_FOREGROUNDED_KEY];
-  const tab = await ensureExtensionAppTab({ foreground });
-  if (!tab) return false;
-  if (foreground) await storageSet({ [POPUP_SYNC_APP_FOREGROUNDED_KEY]: true }).catch(() => {});
-  return foreground;
+async function getPopupNotionSyncNudgeDismissed(): Promise<boolean> {
+  const res = await storageGet([POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY]).catch(() => ({}));
+  return Boolean((res as any)?.[POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY]);
+}
+
+async function setPopupNotionSyncNudgeDismissed(next: boolean): Promise<void> {
+  await storageSet({ [POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY]: Boolean(next) });
+}
+
+async function getPopupFeishuSyncNudgeDismissed(): Promise<boolean> {
+  const res = await storageGet([POPUP_FEISHU_SYNC_NUDGE_DISMISSED_KEY]).catch(() => ({}));
+  return Boolean((res as any)?.[POPUP_FEISHU_SYNC_NUDGE_DISMISSED_KEY]);
+}
+
+async function setPopupFeishuSyncNudgeDismissed(next: boolean): Promise<void> {
+  await storageSet({ [POPUP_FEISHU_SYNC_NUDGE_DISMISSED_KEY]: Boolean(next) });
+}
+
+type PopupSyncNudgeDialogProps = {
+  open: boolean;
+  ariaLabel: string;
+  title: string;
+  body: string;
+  dontShowAriaLabel: string;
+  dontShowLabel: string;
+  dismissLabel: string;
+  confirmLabel: string;
+  dontShowAgain: boolean;
+  onDontShowAgainChange: (next: boolean) => void;
+  onDismiss: () => void;
+  onConfirm: () => void;
+};
+
+function PopupSyncNudgeDialog(props: PopupSyncNudgeDialogProps) {
+  const {
+    open,
+    ariaLabel,
+    title,
+    body,
+    dontShowAriaLabel,
+    dontShowLabel,
+    dismissLabel,
+    confirmLabel,
+    dontShowAgain,
+    onDontShowAgainChange,
+    onDismiss,
+    onConfirm,
+  } = props;
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const cancelButtonClassName = buttonTintClassName();
+  const confirmButtonClassName = buttonFilledClassName();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onDismiss();
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [onDismiss, open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-bg-[var(--bg-overlay)] tw-p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+      onMouseDown={(event) => {
+        const target = event.target as Node | null;
+        if (target && panelRef.current?.contains(target)) return;
+        onDismiss();
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="tw-w-full tw-max-w-[420px] tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-4 tw-text-[var(--text-primary)]"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="tw-text-sm tw-font-extrabold">{title}</div>
+        <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{body}</div>
+
+        <label className="tw-mt-3 tw-flex tw-cursor-pointer tw-select-none tw-items-start tw-gap-2 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2.5">
+          <input
+            type="checkbox"
+            checked={dontShowAgain}
+            onChange={(event) => onDontShowAgainChange(event.target.checked)}
+            className="tw-mt-0.5 tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+            aria-label={dontShowAriaLabel}
+          />
+          <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]">{dontShowLabel}</span>
+        </label>
+
+        <div className="tw-mt-4 tw-flex tw-justify-end tw-gap-2">
+          <button type="button" className={cancelButtonClassName} onClick={onDismiss}>
+            {dismissLabel}
+          </button>
+          <button type="button" className={confirmButtonClassName} onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function PopupShell() {
@@ -39,6 +141,10 @@ export default function PopupShell() {
 
 function PopupShellFrame() {
   const { refreshList, refreshActiveDetail, selectedConversation, selectedIds } = useConversationsApp();
+  const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
+  const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
+  const [feishuSyncNudgeOpen, setFeishuSyncNudgeOpen] = useState(false);
+  const [feishuSyncNudgeDontShowAgain, setFeishuSyncNudgeDontShowAgain] = useState(false);
   const commentsButton = usePopupOpenCurrentTabInpageCommentsSidebar();
   const { buttonDisabled, buttonLabel, capture, status } = usePopupCurrentPageCapture({
     onCaptured: async () => {
@@ -80,10 +186,79 @@ function PopupShellFrame() {
     window.close();
   }, []);
 
-  const onPopupSyncStarted = () => {
+  const onPopupNotionSyncStarted = () => {
+    void (async () => {
+      const dismissed = await getPopupNotionSyncNudgeDismissed().catch(() => false);
+      if (dismissed) {
+        await openOrFocusExtensionAppTab({ route: '/' });
+        window.close();
+        return;
+      }
+      setNotionSyncNudgeDontShowAgain(false);
+      setNotionSyncNudgeOpen(true);
+    })();
+  };
+
+  const persistNotionNudgeIfNeeded = async () => {
+    if (!notionSyncNudgeDontShowAgain) return;
+    await setPopupNotionSyncNudgeDismissed(true);
+  };
+
+  const onConfirmNotionSyncNudge = () => {
+    void (async () => {
+      setNotionSyncNudgeOpen(false);
+      await persistNotionNudgeIfNeeded();
+      await openOrFocusExtensionAppTab({ route: '/' });
+      window.close();
+    })();
+  };
+
+  const onDismissNotionSyncNudge = () => {
+    void (async () => {
+      setNotionSyncNudgeOpen(false);
+      await persistNotionNudgeIfNeeded();
+    })();
+  };
+
+  const onPopupFeishuSyncStarted = () => {
+    void (async () => {
+      const dismissed = await getPopupFeishuSyncNudgeDismissed().catch(() => false);
+      if (dismissed) {
+        await openOrFocusExtensionAppTab({ route: '/' });
+        window.close();
+        return;
+      }
+      setFeishuSyncNudgeDontShowAgain(false);
+      setFeishuSyncNudgeOpen(true);
+    })();
+  };
+
+  const persistFeishuNudgeIfNeeded = async () => {
+    if (!feishuSyncNudgeDontShowAgain) return;
+    await setPopupFeishuSyncNudgeDismissed(true);
+  };
+
+  const onConfirmFeishuSyncNudge = () => {
+    void (async () => {
+      setFeishuSyncNudgeOpen(false);
+      await persistFeishuNudgeIfNeeded();
+      await openOrFocusExtensionAppTab({ route: '/' });
+      window.close();
+    })();
+  };
+
+  const onDismissFeishuSyncNudge = () => {
+    void (async () => {
+      setFeishuSyncNudgeOpen(false);
+      await persistFeishuNudgeIfNeeded();
+    })();
+  };
+
+  const onPopupSyncStarted = (provider: SyncProvider) => {
     void (async () => {
       await publishPopupSyncSelectionHandoff(selectedIds);
-      if (await ensurePopupSyncAppTab()) window.close();
+      if (provider === 'notion') onPopupNotionSyncStarted();
+      else if (provider === 'feishu') onPopupFeishuSyncStarted();
     })().catch(() => {});
   };
 
@@ -159,6 +334,36 @@ function PopupShellFrame() {
           </div>
         </section>
       </main>
+
+      <PopupSyncNudgeDialog
+        open={notionSyncNudgeOpen}
+        ariaLabel={t('popupNotionSyncNudgeAria')}
+        title={t('popupNotionSyncNudgeTitle')}
+        body={t('popupNotionSyncNudgeBody')}
+        dontShowAriaLabel={t('popupNotionSyncNudgeDontShowAria')}
+        dontShowLabel={t('popupNotionSyncNudgeDontShowLabel')}
+        dismissLabel={t('popupNotionSyncNudgeDismiss')}
+        confirmLabel={t('popupNotionSyncNudgeConfirm')}
+        dontShowAgain={notionSyncNudgeDontShowAgain}
+        onDontShowAgainChange={setNotionSyncNudgeDontShowAgain}
+        onDismiss={onDismissNotionSyncNudge}
+        onConfirm={onConfirmNotionSyncNudge}
+      />
+
+      <PopupSyncNudgeDialog
+        open={feishuSyncNudgeOpen}
+        ariaLabel={t('popupFeishuSyncNudgeAria')}
+        title={t('popupFeishuSyncNudgeTitle')}
+        body={t('popupFeishuSyncNudgeBody')}
+        dontShowAriaLabel={t('popupFeishuSyncNudgeDontShowAria')}
+        dontShowLabel={t('popupFeishuSyncNudgeDontShowLabel')}
+        dismissLabel={t('popupFeishuSyncNudgeDismiss')}
+        confirmLabel={t('popupFeishuSyncNudgeConfirm')}
+        dontShowAgain={feishuSyncNudgeDontShowAgain}
+        onDontShowAgainChange={setFeishuSyncNudgeDontShowAgain}
+        onDismiss={onDismissFeishuSyncNudge}
+        onConfirm={onConfirmFeishuSyncNudge}
+      />
     </div>
   );
 }

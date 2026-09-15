@@ -1,4 +1,4 @@
-export { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
+export { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 export { tabsCreate } from '@platform/webext/tabs';
 
 export function downloadBlobFile(blob: Blob, filename: string): void {

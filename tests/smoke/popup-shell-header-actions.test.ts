@@ -6,9 +6,6 @@ import type { ReactNode } from 'react';
 
 const sendMock = vi.fn();
 const openOrFocusExtensionAppTabMock = vi.fn();
-const ensureExtensionAppTabMock = vi.fn();
-const storageGetMock = vi.fn();
-const storageSetMock = vi.fn();
 const publishPopupSyncSelectionHandoffMock = vi.fn();
 
 vi.mock('../../src/platform/runtime/runtime', async (importOriginal) => {
@@ -29,13 +26,6 @@ vi.mock('../../src/services/shared/runtime', () => ({
 
 vi.mock('../../src/services/shared/webext', () => ({
   openOrFocusExtensionAppTab: (...args: any[]) => openOrFocusExtensionAppTabMock(...args),
-  ensureExtensionAppTab: (...args: any[]) => ensureExtensionAppTabMock(...args),
-}));
-
-vi.mock('../../src/services/shared/storage', () => ({
-  storageGet: (...args: any[]) => storageGetMock(...args),
-  storageSet: (...args: any[]) => storageSetMock(...args),
-  storageOnChanged: vi.fn(() => () => {}),
 }));
 
 vi.mock('../../src/services/conversations/popup-sync-selection-handoff', () => ({
@@ -223,14 +213,7 @@ describe('PopupShell header actions', () => {
     setupDom();
     sendMock.mockReset();
     openOrFocusExtensionAppTabMock.mockReset();
-    ensureExtensionAppTabMock.mockReset();
-    storageGetMock.mockReset();
-    storageSetMock.mockReset();
     publishPopupSyncSelectionHandoffMock.mockReset();
-    openOrFocusExtensionAppTabMock.mockResolvedValue({ id: 1 });
-    ensureExtensionAppTabMock.mockResolvedValue({ id: 1 });
-    storageGetMock.mockResolvedValue({});
-    storageSetMock.mockResolvedValue(undefined);
     publishPopupSyncSelectionHandoffMock.mockResolvedValue(undefined);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
@@ -314,8 +297,7 @@ describe('PopupShell header actions', () => {
     expect(document.body.textContent).not.toContain('ChatGPT · Waiting for messages…');
   });
 
-  it('publishes the selection and foregrounds the App only for the first popup sync', async () => {
-    (window as any).close = vi.fn();
+  it('publishes the selected conversation ids for popup syncs', async () => {
     act(() => {
       root!.render(createElement(PopupShell));
     });
@@ -327,31 +309,7 @@ describe('PopupShell header actions', () => {
 
     await vi.waitFor(() => {
       expect(publishPopupSyncSelectionHandoffMock).toHaveBeenCalledWith([41, 42]);
-      expect(storageGetMock).toHaveBeenCalledWith(['webclipper_popup_sync_app_foregrounded_v1']);
-      expect(ensureExtensionAppTabMock).toHaveBeenCalledWith({ foreground: true });
-      expect(storageSetMock).toHaveBeenCalledWith({ webclipper_popup_sync_app_foregrounded_v1: true });
-      expect((window as any).close).toHaveBeenCalledTimes(1);
     });
-  });
-
-  it('keeps later popup syncs in the popup while ensuring a background App tab exists', async () => {
-    storageGetMock.mockResolvedValue({ webclipper_popup_sync_app_foregrounded_v1: true });
-    (window as any).close = vi.fn();
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
-
-    const syncButton = Array.from(document.querySelectorAll('button')).find(
-      (el) => el.textContent === 'sync-github',
-    ) as HTMLButtonElement;
-    act(() => syncButton.click());
-
-    await vi.waitFor(() => {
-      expect(publishPopupSyncSelectionHandoffMock).toHaveBeenCalledWith([41, 42]);
-      expect(ensureExtensionAppTabMock).toHaveBeenCalledWith({ foreground: false });
-    });
-    expect(storageSetMock).not.toHaveBeenCalled();
-    expect((window as any).close).not.toHaveBeenCalled();
   });
 
   it('opens the inpage comments sidebar from the popup comments button', async () => {
