@@ -16,6 +16,7 @@ Backend/.env
 .kiro/
 .specify/
 .github/*.md
+!.github/release-notes.md
 .cursorignore
 .github/hooks/
 .githooks/

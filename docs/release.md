@@ -35,7 +35,7 @@ release workflow 依次：
 6. bounded read-back 验证 exact version + dist-tag；
 7. npm 可验证后才创建 GitHub Release，并上传同一个 CLI tarball 与浏览器 assets；stable Release 的 GitHub 自动生成变更记录默认折叠在 `Full changelog` 中。
 
-stable Release 发布后，由 AI 按 [`release-notes-prompt.md`](release-notes-prompt.md) 核对 commits 与 merged PR description，在 Release 顶部同时补充中文与英文的普通用户摘要；不得改写折叠区中的原始 GitHub 变更记录。
+stable Release 发布后，由 AI 按 [`.github/release-notes.md`](../.github/release-notes.md) 核对 commits 与 merged PR description，在 Release 顶部同时补充中文与英文的普通用户摘要；不得改写折叠区中的原始 GitHub 变更记录。
 
 npm tarball 包含项目根目录的 `README.md`、`README.zh-CN.md` 与 `LICENSE`。npm package 页面以 tarball 内的 `README.md` 为默认 README。
 
