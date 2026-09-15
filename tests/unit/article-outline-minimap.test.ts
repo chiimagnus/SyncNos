@@ -250,7 +250,7 @@ describe('ArticleOutlineMinimap', () => {
     expect(activeStripButton?.dataset.readerOutlineActive).toBe('true');
 
     const stripButton = document.querySelector(
-      '[data-reader-rail-wrap="outline"] > nav button[data-reader-outline-level="lvl-1"]',
+      '[data-reader-rail-wrap="outline"] [data-reader-rail-trigger-shell="outline"] nav button[data-reader-outline-level="lvl-1"]',
     ) as HTMLButtonElement | null;
     expect(stripButton).toBeTruthy();
 
@@ -266,7 +266,12 @@ describe('ArticleOutlineMinimap', () => {
     await flushDom();
 
     const panel = document.querySelector('[data-reader-rail-panel="outline"]') as HTMLElement | null;
+    const triggerShell = strip?.querySelector('[data-reader-rail-trigger-shell="outline"]') as HTMLElement | null;
     expect(panel).toBeTruthy();
+    expect(panel?.style.right).toBe('0px');
+    expect(panel?.style.top).toBe('0px');
+    expect(triggerShell?.getAttribute('aria-hidden')).toBe('true');
+    expect(triggerShell?.style.visibility).toBe('hidden');
     expect(panel?.querySelectorAll('[data-reader-outline-entry]')).toHaveLength(3);
     const activePanelItem = panel?.querySelector(
       '[data-reader-outline-active="true"][data-reader-outline-level="lvl-2"]',

@@ -28,20 +28,19 @@ const PANEL_TITLE_CLASS =
 const PANEL_CONTENT_CLASS = 'tw-flex tw-flex-col tw-gap-1';
 
 function getPanelStyle(narrow: boolean): CSSProperties {
-  if (narrow) {
-    return {
-      right: 0,
-      top: 'calc(100% + 10px)',
-      width: '300px',
-      maxWidth: 'calc(100vw - 28px)',
-      maxHeight: '70vh',
-      overflow: 'auto',
-    };
-  }
+  const anchored: CSSProperties = {
+    right: 0,
+    top: 0,
+  };
+
+  if (!narrow) return anchored;
 
   return {
-    right: 'calc(100% + 10px)',
-    top: 0,
+    ...anchored,
+    width: '300px',
+    maxWidth: 'calc(100vw - 28px)',
+    maxHeight: '70vh',
+    overflow: 'auto',
   };
 }
 
@@ -65,7 +64,14 @@ export function ReaderRailPanel({
       onMouseLeave={onMouseLeave}
       data-reader-rail-wrap={id}
     >
-      {trigger}
+      <div
+        className="tw-contents"
+        aria-hidden={open ? 'true' : undefined}
+        style={open ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
+        data-reader-rail-trigger-shell={id}
+      >
+        {trigger}
+      </div>
 
       {open ? (
         <div
