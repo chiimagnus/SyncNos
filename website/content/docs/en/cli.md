@@ -46,6 +46,10 @@ syncnos backup export --output ./syncnos-backup.zip
 
 Replace the sync destination with `notion`, `obsidian`, `feishu`, or `github`.
 
+## AI-agent Skill
+
+The repository ships ready-to-use CLI Skills at `skills/syncnos/` (English) and `skills/syncnos-zh/` (中文). They use the installed CLI as the command source of truth and diagnose recoverable CLI / Native Messaging failures with `syncnos doctor` before escalating to manual browser steps.
+
 ## For automation
 
 The CLI outputs JSON by default so scripts and AI agents can consume it directly.

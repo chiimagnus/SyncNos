@@ -46,6 +46,10 @@ syncnos backup export --output ./syncnos-backup.zip
 
 同步目标可以换成 `notion`、`obsidian`、`feishu` 或 `github`。
 
+## AI Agent Skill
+
+仓库自带可直接使用的 CLI Skill：`skills/syncnos-zh/`（中文）和 `skills/syncnos/`（English）。Skill 以本机已安装 CLI 为命令真源，CLI / Native Messaging 出错时会先用 `syncnos doctor` 自主诊断并处理可恢复问题，再决定是否需要浏览器侧人工步骤。
+
 ## 给自动化使用
 
 CLI 默认输出 JSON，适合脚本和 AI Agent 读取。

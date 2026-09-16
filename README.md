@@ -39,7 +39,7 @@ syncnos install
 syncnos doctor
 ```
 
-See [Automate with the CLI](https://chiimagnus.github.io/SyncNos/docs/en/cli/) for setup, discovery, and command guidance.
+See [Automate with the CLI](https://chiimagnus.github.io/SyncNos/docs/en/cli/) for setup, discovery, and command guidance. AI-agent Skills ship in [`skills/syncnos/`](skills/syncnos/) (English) and [`skills/syncnos-zh/`](skills/syncnos-zh/) (中文).
 
 ## Demo
 

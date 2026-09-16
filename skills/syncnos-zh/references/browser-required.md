@@ -4,7 +4,7 @@
 
 ## Local CLI Integration 权限
 
-registration 健康但 `doctor` 仍为 `extension_unreachable` 时，在目标浏览器/Profile 的 SyncNos **Settings → General → Local CLI Integration** 由用户动作启用权限，再运行 `syncnos status` / `syncnos doctor`。不要修改 Profile、Preferences、Secure Preferences 或私有 storage 绕过 `nativeMessaging` user gesture。
+registration 健康但 `doctor` 仍为 `extension_unreachable` 时，用浏览器 Skill 检查目标浏览器/Profile，不要让用户重复确认已经明确提供的事实。若 Local CLI Integration 未开启，或 `nativeMessaging` 权限确实需要重新授予，就通过 SyncNos 可见的 **设置 → 通用 → 本地 CLI 集成** 控件完成所需 user gesture，再运行 `syncnos status` / `syncnos doctor`。不要修改 Profile、Preferences、Secure Preferences 或私有 storage 绕过权限手势。
 
 ## 网页上下文
 
