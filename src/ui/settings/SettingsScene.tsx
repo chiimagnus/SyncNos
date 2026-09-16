@@ -10,7 +10,6 @@ import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
 import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
 import { type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
-import { AiChatsSection } from '@ui/settings/sections/AiChatsSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { InsightSection } from '@ui/settings/sections/InsightSection';
 import { InpageSection } from '@ui/settings/sections/InpageSection';
@@ -466,6 +465,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           onToggleAiChatAutoSaveEnabled={(next) => {
             void onToggleAiChatAutoSaveEnabled(next);
           }}
+          chatgptApiCaptureEnabled={chatgptApiCaptureEnabled}
+          onToggleChatgptApiCaptureEnabled={(next) => {
+            void onToggleChatgptApiCaptureEnabled(next);
+          }}
           aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
           onToggleAiChatCacheImagesEnabled={(next) => {
             void onToggleAiChatCacheImagesEnabled(next);
@@ -512,16 +515,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           cliIntegrationEnabled={cliIntegrationEnabled}
           onToggleCliIntegration={(next) => {
             void onToggleCliIntegration(next);
-          }}
-        />
-      ) : null}
-
-      {activeSection === 'ai_chats' ? (
-        <AiChatsSection
-          busy={busy}
-          chatgptApiCaptureEnabled={chatgptApiCaptureEnabled}
-          onToggleChatgptApiCaptureEnabled={(next) => {
-            void onToggleChatgptApiCaptureEnabled(next);
           }}
         />
       ) : null}

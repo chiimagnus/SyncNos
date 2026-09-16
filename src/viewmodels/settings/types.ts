@@ -8,7 +8,6 @@ export type SettingsSectionKey =
   | 'general'
   | 'shortcuts'
   | 'cli'
-  | 'ai_chats'
   | 'aboutme';
 
 export type SettingsSectionGroup = {
@@ -17,7 +16,7 @@ export type SettingsSectionGroup = {
 
 export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   {
-    sections: [{ key: 'general' }, { key: 'shortcuts' }, { key: 'cli' }, { key: 'ai_chats' }],
+    sections: [{ key: 'general' }, { key: 'shortcuts' }, { key: 'cli' }],
   },
   {
     sections: [{ key: 'backup' }, { key: 'notion' }, { key: 'feishu' }, { key: 'obsidian' }, { key: 'github' }],

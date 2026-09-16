@@ -13,7 +13,6 @@ import {
   coerceSettingsSectionKey,
   readStoredSettingsSection,
 } from '../../src/viewmodels/settings/types';
-import { AiChatsSection } from '../../src/ui/settings/sections/AiChatsSection';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 import { KeyboardShortcutsSection } from '../../src/ui/settings/sections/KeyboardShortcutsSection';
@@ -36,7 +35,6 @@ describe('settings section definitions', () => {
       'general',
       'shortcuts',
       'cli',
-      'ai_chats',
       'backup',
       'notion',
       'feishu',
@@ -54,6 +52,7 @@ describe('settings section definitions', () => {
     expect(coerceSettingsSectionKey('aboutme')).toBe('aboutme');
     expect(coerceSettingsSectionKey('videos')).toBeNull();
     expect(coerceSettingsSectionKey('articles')).toBeNull();
+    expect(coerceSettingsSectionKey('ai_chats')).toBeNull();
     expect(coerceSettingsSectionKey('insight')).toBeNull();
     expect(coerceSettingsSectionKey('about')).toBeNull();
   });
@@ -69,6 +68,8 @@ describe('settings section definitions', () => {
       expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
       window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'articles');
       expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
+      window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'ai_chats');
+      expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
     } finally {
       cleanupDom();
     }
@@ -76,46 +77,10 @@ describe('settings section definitions', () => {
 
   it('groups sections into integrations, behavior, and about areas', () => {
     expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
-      ['general', 'shortcuts', 'cli', 'ai_chats'],
+      ['general', 'shortcuts', 'cli'],
       ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
-  });
-
-  it('shows the ChatGPT Advanced API toggle only as an explicit default-off capable AI Chats control', () => {
-    setupDom();
-    const root = ReactDOM.createRoot(document.getElementById('root')!);
-    const onToggle = vi.fn();
-
-    act(() => {
-      root.render(
-        createElement(AiChatsSection, {
-          busy: false,
-          chatgptApiCaptureEnabled: false,
-          onToggleChatgptApiCaptureEnabled: onToggle,
-        }),
-      );
-    });
-
-    const toggle = document.querySelector(
-      'input[aria-label="Use the ChatGPT API for the current conversation"]',
-    ) as HTMLInputElement | null;
-    expect(toggle).toBeTruthy();
-    expect(toggle?.checked).toBe(false);
-    const text = document.body.textContent || '';
-    expect(text).toContain('ChatGPT Advanced capture');
-    expect(text).toContain('Off by default');
-    expect(text).toContain('no same-save DOM fallback');
-    expect(text).not.toContain('How to fetch');
-    expect(text).not.toContain('Troubleshooting');
-    const helpLink = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]');
-    expect(helpLink?.textContent).toContain('Help docs');
-
-    act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
-    expect(onToggle).toHaveBeenCalledWith(true);
-
-    act(() => root.unmount());
-    cleanupDom();
   });
 
   it('hides group titles and separates sidebar groups', () => {
@@ -129,9 +94,9 @@ describe('settings section definitions', () => {
     const groupList = document.querySelector('nav')?.firstElementChild;
     const groups = groupList ? Array.from(groupList.children) : [];
     expect(groups).toHaveLength(3);
-    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([4, 5, 2]);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([3, 5, 2]);
     expect(Array.from(groups[0]?.querySelectorAll('button') || []).map((button) => button.textContent?.trim())).toEqual(
-      ['General', 'Keyboard shortcuts', 'CLI', 'AI chat capture'],
+      ['General', 'Keyboard shortcuts', 'CLI'],
     );
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
     expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
@@ -552,6 +517,8 @@ describe('inpage anti-hotlink advanced editor', () => {
       onChangeLocalePreference: () => {},
       aiChatAutoSaveEnabled: true,
       onToggleAiChatAutoSaveEnabled: () => {},
+      chatgptApiCaptureEnabled: false,
+      onToggleChatgptApiCaptureEnabled: () => {},
       aiChatCacheImagesEnabled: true,
       onToggleAiChatCacheImagesEnabled: () => {},
       webArticleCacheImagesEnabled: true,
@@ -610,6 +577,26 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.querySelector('section[aria-label="Keyboard shortcuts"]')).toBeNull();
     expect(document.querySelector('section[aria-label="Language"]')).toBeTruthy();
     expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
+  });
+
+  it('keeps ChatGPT Advanced capture in General settings', () => {
+    const onToggleChatgptApiCaptureEnabled = vi.fn();
+    renderInpage({ onToggleChatgptApiCaptureEnabled });
+
+    const section = document.querySelector('section[aria-label="ChatGPT Advanced capture"]');
+    const toggle = section?.querySelector(
+      'input[aria-label="Use the ChatGPT API for the current conversation"]',
+    ) as HTMLInputElement | null;
+    expect(toggle).toBeTruthy();
+    expect(toggle?.checked).toBe(false);
+    expect(section?.textContent).toContain('Off by default');
+    expect(section?.textContent).toContain('no same-save DOM fallback');
+    expect(
+      section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]')?.textContent,
+    ).toContain('Help docs');
+
+    act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onToggleChatgptApiCaptureEnabled).toHaveBeenCalledWith(true);
   });
 
   it('renders browser-managed keyboard shortcuts in the dedicated section', () => {

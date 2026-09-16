@@ -30,7 +30,7 @@ For platforms that support auto-save, enable it under **Settings → General →
 
 ## ChatGPT Advanced capture
 
-Under **Settings → AI chat capture → ChatGPT Advanced capture**, manual save treats ChatGPT's current backend branch as the canonical history. If the last assistant reply is still streaming and the page is temporarily ahead of the backend, SyncNos may add only that current visible tail when it has stable message identity, and marks the save as awaiting confirmation. Saving again after generation finishes lets the backend final content reconcile into the same message instead of creating a duplicate.
+Under **Settings → General → ChatGPT Advanced capture**, manual save treats ChatGPT's current backend branch as the canonical history. If the last assistant reply is still streaming and the page is temporarily ahead of the backend, SyncNos may add only that current visible tail when it has stable message identity, and marks the save as awaiting confirmation. Saving again after generation finishes lets the backend final content reconcile into the same message instead of creating a duplicate.
 
 If Advanced capture fails, the same save does not silently fall back to full-page DOM capture. Turn the setting off and save again to use the default page path.
 

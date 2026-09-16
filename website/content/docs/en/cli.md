@@ -48,7 +48,7 @@ Replace the sync destination with `notion`, `obsidian`, `feishu`, or `github`.
 
 ## AI-agent Skill
 
-The repository ships ready-to-use CLI Skills at `skills/syncnos/` (English) and `skills/syncnos-zh/` (中文). They use the installed CLI as the command source of truth and diagnose recoverable CLI / Native Messaging failures with `syncnos doctor` before escalating to manual browser steps.
+The repository ships ready-to-use CLI Skills at [`skills/syncnos/`](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos) (English) and [`skills/syncnos-zh/`](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos-zh) (中文). They use the installed CLI as the command source of truth and diagnose recoverable CLI / Native Messaging failures with `syncnos doctor` before escalating to manual browser steps.
 
 ## For automation
 

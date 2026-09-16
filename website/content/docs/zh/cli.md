@@ -48,7 +48,7 @@ syncnos backup export --output ./syncnos-backup.zip
 
 ## AI Agent Skill
 
-仓库自带可直接使用的 CLI Skill：`skills/syncnos-zh/`（中文）和 `skills/syncnos/`（English）。Skill 以本机已安装 CLI 为命令真源，CLI / Native Messaging 出错时会先用 `syncnos doctor` 自主诊断并处理可恢复问题，再决定是否需要浏览器侧人工步骤。
+仓库自带可直接使用的 CLI Skill：[`skills/syncnos-zh/`](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos-zh)（中文）和 [`skills/syncnos/`](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos)（English）。Skill 以本机已安装 CLI 为命令真源，CLI / Native Messaging 出错时会先用 `syncnos doctor` 自主诊断并处理可恢复问题，再决定是否需要浏览器侧人工步骤。
 
 ## 给自动化使用
 

@@ -1,5 +1,6 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
@@ -50,6 +51,8 @@ export function InpageSection(props: {
   onChangeLocalePreference: (next: LocalePreference) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
+  chatgptApiCaptureEnabled: boolean;
+  onToggleChatgptApiCaptureEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
@@ -77,6 +80,8 @@ export function InpageSection(props: {
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    chatgptApiCaptureEnabled,
+    onToggleChatgptApiCaptureEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
@@ -171,6 +176,29 @@ export function InpageSection(props: {
             {dollarMentionSitesLabel}
           </div>
         )}
+      </section>
+
+      <section className={cardClassName} aria-label={t('chatgptApiCaptureAdvancedHeading')}>
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('chatgptApiCaptureAdvancedHeading')}
+          </h2>
+          <SettingsDocsLink path="capture-ai-chats" />
+        </div>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={chatgptApiCaptureEnabled}
+            disabled={busy}
+            onChange={(event) => onToggleChatgptApiCaptureEnabled(event.target.checked)}
+            className={checkboxClassName}
+            aria-label={t('chatgptApiCaptureAdvancedLabel')}
+          />
+          {t('chatgptApiCaptureAdvancedLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('chatgptApiCaptureAdvancedHint')}
+        </div>
       </section>
 
       <section className={cardClassName} aria-label={t('aiChatAutoSaveHeading')}>
