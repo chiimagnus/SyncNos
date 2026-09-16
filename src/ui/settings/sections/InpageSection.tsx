@@ -1,6 +1,5 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
@@ -47,9 +46,6 @@ export function InpageSection(props: {
   onSaveUserName: () => void;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
-  cliIntegrationAvailable: boolean;
-  cliIntegrationEnabled: boolean;
-  onToggleCliIntegration: (next: boolean) => void;
   localePreference: LocalePreference;
   onChangeLocalePreference: (next: LocalePreference) => void;
   aiChatAutoSaveEnabled: boolean;
@@ -58,8 +54,6 @@ export function InpageSection(props: {
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
   onToggleWebArticleCacheImagesEnabled: (next: boolean) => void;
-  xiaohongshuCommentsCaptureEnabled: boolean;
-  onToggleXiaohongshuCommentsCaptureEnabled: (next: boolean) => void;
   antiHotlinkAdvancedOpen: boolean;
   onToggleAntiHotlinkAdvancedOpen: () => void;
   antiHotlinkRules: AntiHotlinkRuleEditorRow[];
@@ -79,9 +73,6 @@ export function InpageSection(props: {
     onSaveUserName,
     displayMode,
     onChangeDisplayMode,
-    cliIntegrationAvailable,
-    cliIntegrationEnabled,
-    onToggleCliIntegration,
     localePreference,
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
@@ -90,8 +81,6 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
-    xiaohongshuCommentsCaptureEnabled,
-    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -137,30 +126,6 @@ export function InpageSection(props: {
         </div>
       </section>
 
-      <section className={cardClassName} aria-label={t('localCliIntegrationHeading')}>
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-            {t('localCliIntegrationHeading')}
-          </h2>
-          <SettingsDocsLink path="cli" />
-        </div>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={cliIntegrationEnabled}
-            disabled={busy || !cliIntegrationAvailable}
-            onChange={(e) => onToggleCliIntegration(!!e.target.checked)}
-            className={checkboxClassName}
-          />
-          {t('localCliIntegrationLabel')}
-        </label>
-        {!cliIntegrationAvailable ? (
-          <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-            {t('localCliIntegrationUnavailable')}
-          </div>
-        ) : null}
-      </section>
-
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
           {t('inpageButtonHeading')}
@@ -184,25 +149,6 @@ export function InpageSection(props: {
               ]}
             />
           </div>
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('xiaohongshuCommentsHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('xiaohongshuCommentsHeading')}
-        </h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={xiaohongshuCommentsCaptureEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleXiaohongshuCommentsCaptureEnabled(!!e.target.checked)}
-            className={checkboxClassName}
-          />
-          {t('xiaohongshuCommentsLabel')}
-        </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('xiaohongshuCommentsHint')}
         </div>
       </section>
 

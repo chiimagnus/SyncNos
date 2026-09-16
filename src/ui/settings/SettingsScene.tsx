@@ -15,12 +15,12 @@ import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { InsightSection } from '@ui/settings/sections/InsightSection';
 import { InpageSection } from '@ui/settings/sections/InpageSection';
 import { KeyboardShortcutsSection } from '@ui/settings/sections/KeyboardShortcutsSection';
+import { CliIntegrationSection } from '@ui/settings/sections/CliIntegrationSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '@ui/settings/sections/GitHubSettingsSection';
 import { WebArticlesSection } from '@ui/settings/sections/WebArticlesSection';
-import { VideosSection } from '@ui/settings/sections/VideosSection';
 
 export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
@@ -461,11 +461,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);
           }}
-          cliIntegrationAvailable={cliIntegrationAvailable}
-          cliIntegrationEnabled={cliIntegrationEnabled}
-          onToggleCliIntegration={(next) => {
-            void onToggleCliIntegration(next);
-          }}
           localePreference={localePreference}
           onChangeLocalePreference={(next) => {
             void onChangeLocalePreference(next);
@@ -481,10 +476,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           webArticleCacheImagesEnabled={webArticleCacheImagesEnabled}
           onToggleWebArticleCacheImagesEnabled={(next) => {
             void onToggleWebArticleCacheImagesEnabled(next);
-          }}
-          xiaohongshuCommentsCaptureEnabled={xiaohongshuCommentsCaptureEnabled}
-          onToggleXiaohongshuCommentsCaptureEnabled={(next) => {
-            void onToggleXiaohongshuCommentsCaptureEnabled(next);
           }}
           antiHotlinkAdvancedOpen={antiHotlinkAdvancedOpen}
           onToggleAntiHotlinkAdvancedOpen={onToggleAntiHotlinkAdvancedOpen}
@@ -517,7 +508,26 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'articles' ? <WebArticlesSection /> : null}
+      {activeSection === 'cli' ? (
+        <CliIntegrationSection
+          busy={busy}
+          cliIntegrationAvailable={cliIntegrationAvailable}
+          cliIntegrationEnabled={cliIntegrationEnabled}
+          onToggleCliIntegration={(next) => {
+            void onToggleCliIntegration(next);
+          }}
+        />
+      ) : null}
+
+      {activeSection === 'articles' ? (
+        <WebArticlesSection
+          busy={busy}
+          xiaohongshuCommentsCaptureEnabled={xiaohongshuCommentsCaptureEnabled}
+          onToggleXiaohongshuCommentsCaptureEnabled={(next) => {
+            void onToggleXiaohongshuCommentsCaptureEnabled(next);
+          }}
+        />
+      ) : null}
 
       {activeSection === 'ai_chats' ? (
         <AiChatsSection
@@ -528,8 +538,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           }}
         />
       ) : null}
-
-      {activeSection === 'videos' ? <VideosSection /> : null}
 
       {activeSection === 'aboutme' ? <AboutSection /> : null}
     </section>

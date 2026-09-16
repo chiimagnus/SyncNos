@@ -31,7 +31,7 @@ Captured content is stored locally before optional sync or export. External prov
 
 ### Local CLI
 
-The optional `syncnos` CLI lets local automation and AI agents work with a running SyncNos browser profile. Install it from npm, enable **Settings → General → Local CLI Integration → SyncNos CLI** in that profile, and keep the browser running while using it.
+The optional `syncnos` CLI lets local automation and AI agents work with a running SyncNos browser profile. Install it from npm, enable **Settings → CLI → Local CLI Integration → SyncNos CLI** in that profile, and keep the browser running while using it.
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest

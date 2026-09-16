@@ -15,7 +15,7 @@ syncnos doctor
 
 Then enable this in the browser profile you want to use:
 
-**Settings → General → Local CLI integration → SyncNos CLI**
+**Settings → CLI → Local CLI integration → SyncNos CLI**
 
 Keep that browser profile running while using CLI commands.
 

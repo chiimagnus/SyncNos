@@ -31,7 +31,7 @@
 
 ### 本机 CLI
 
-可选的 `syncnos` CLI 让本机自动化和 AI Agent 访问正在运行的 SyncNos 浏览器 Profile。在目标 Profile 中开启 **设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**，并在使用 CLI 时保持浏览器运行。
+可选的 `syncnos` CLI 让本机自动化和 AI Agent 访问正在运行的 SyncNos 浏览器 Profile。在目标 Profile 中开启 **设置 → CLI → 本地 CLI 集成 → SyncNos CLI**，并在使用 CLI 时保持浏览器运行。
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest

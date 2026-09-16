@@ -15,7 +15,7 @@ syncnos doctor
 
 然后在要使用的浏览器 Profile 中开启：
 
-**设置 → 通用 → 本地 CLI 集成 → SyncNos CLI**
+**设置 → CLI → 本地 CLI 集成 → SyncNos CLI**
 
 执行 CLI 命令时，这个浏览器 Profile 需要保持运行。
 
