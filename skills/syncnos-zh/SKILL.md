@@ -10,7 +10,7 @@ description: "使用 `syncnos` CLI 与 SyncNos 浏览器插件交互：采集、
 ## 工作流
 
 1. 命令或能力不确定时运行 `syncnos --help` / `syncnos capabilities`，以当前输出为准，不在 Skill 维护命令副本。
-2. 安装、卸载、`doctor`，或 `native_host_*` / `browser_not_found` / `package_invalid` 问题：读取 `references/installation.md`。
+2. 普通命令失败时先按 CLI JSON `error.code` 分流。安装、卸载、`doctor`，或 `extension_unreachable` / `native_host_*` / `browser_not_found` / `package_invalid` 问题：读取 `references/installation.md`，继续诊断和修复，不停在 `doctor` 的 candidate reasons。
 3. 任务需要网页选区、OAuth 用户批准、Local CLI Integration 权限 user gesture，或真实 active tab/composer：读取 `references/browser-required.md`，并使用现有浏览器 Skill。
 4. 以 CLI JSON、稳定 error code 和最终业务状态为准。写操作结果不确定时先用 CLI read-back，不盲目重复 mutation。
 
@@ -18,7 +18,7 @@ description: "使用 `syncnos` CLI 与 SyncNos 浏览器插件交互：采集、
 
 - 普通业务命令需要至少一个在线且启用 Local CLI Integration 的浏览器实例；`install` / `uninstall` / `doctor` 不需要在线实例。
 - 实例选择：显式 `--instance` > 在线 preferred instance > 唯一在线 instance > `instance_ambiguous`；歧义时查看 `syncnos instances`，不按最近启动猜。仅在用户要长期改变默认实例时设置 default。
-- `extension_unreachable` 时先运行 `doctor`；candidate reasons 只是候选，不当作已证实根因。
+- `extension_unreachable` 时先运行 `doctor`；candidate reasons 只是候选，不当作已证实根因。若 `doctor` 已定位到 SyncNos 自己拥有、可修复的安装/注册问题，且当前任务已授权修复，就走正式修复路径并 read-back，不把诊断结果原样甩给用户。
 
 ## 关键操作
 

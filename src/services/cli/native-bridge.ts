@@ -65,6 +65,7 @@ const NATIVE_HOST_NAME = contract.nativeHostName;
 const HOST_TO_EXTENSION_MAX_BYTES = contract.nativeMessaging.hostToExtensionMaxBytes;
 const EXTENSION_TO_HOST_MAX_BYTES = contract.nativeMessaging.extensionToHostMaxBytes;
 const PUBLIC_METHODS = new Set<string>(contract.publicMethods);
+const NATIVE_RECONNECT_DELAY_MS = 5_000;
 const COMMENT_INVARIANT_CODES = new Set([
   'parent_not_found',
   'parent_not_root',
@@ -146,6 +147,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
   let stopped = false;
   let port: NativeMessagingPort | null = null;
   let connectGeneration = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   const disconnectCurrentPort = () => {
     const current = port;
@@ -157,6 +159,25 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     } catch (_error) {
       // ignore
     }
+  };
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimer == null) return;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  };
+
+  const scheduleReconnect = () => {
+    if (stopped || port || reconnectTimer != null) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      void reconcile().catch(() => scheduleReconnect());
+    }, NATIVE_RECONNECT_DELAY_MS);
+  };
+
+  const recoverConnection = () => {
+    disconnectCurrentPort();
+    scheduleReconnect();
   };
 
   const handleRpcRequest = async (
@@ -825,7 +846,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       if (stopped || port !== nextPort) return;
       const frame = message as any;
       if (frame?.kind !== FRAMES.rpcRequest) {
-        void fileTransfer.handleFrame(frame).catch(() => disconnectCurrentPort());
+        void fileTransfer.handleFrame(frame).catch(() => recoverConnection());
         return;
       }
       void handleRpcRequest(nextPort, frame, seenRequestIds, fileTransfer).catch((error) => {
@@ -844,7 +865,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
             ),
           );
         } catch (_postError) {
-          disconnectCurrentPort();
+          recoverConnection();
         }
       });
     };
@@ -853,6 +874,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       if (port === nextPort) {
         port = null;
         connectGeneration += 1;
+        scheduleReconnect();
       }
     };
 
@@ -872,7 +894,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     });
   };
 
-  const reconcile = async () => {
+  async function reconcile() {
     if (stopped || port) return;
     const generation = connectGeneration;
     const status = await deps.readCliIntegrationStatus();
@@ -887,6 +909,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     try {
       nextPort = deps.connectNativeHost(NATIVE_HOST_NAME);
     } catch (_error) {
+      scheduleReconnect();
       return;
     }
     if (stopped || generation !== connectGeneration) {
@@ -898,28 +921,31 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       return;
     }
     port = nextPort;
-    void attachPort(nextPort, generation).catch(() => disconnectCurrentPort());
-  };
+    void attachPort(nextPort, generation).catch(() => recoverConnection());
+  }
 
   const removeStorageListener = deps.storageOnChanged((changes, areaName) => {
     if (stopped || areaName !== 'local' || !changes || typeof changes !== 'object') return;
     if (!Object.prototype.hasOwnProperty.call(changes, CLI_INTEGRATION_ENABLED_STORAGE_KEY)) return;
     const enabled = changes[CLI_INTEGRATION_ENABLED_STORAGE_KEY]?.newValue === true;
     if (!enabled) {
+      clearReconnectTimer();
       disconnectCurrentPort();
       return;
     }
-    void reconcile().catch(() => {});
+    clearReconnectTimer();
+    void reconcile().catch(() => scheduleReconnect());
   });
 
   const removePermissionListener = deps.permissionsOnRemoved((change) => {
     if (stopped || !Array.isArray(change?.permissions) || !change.permissions.includes(NATIVE_MESSAGING_PERMISSION))
       return;
+    clearReconnectTimer();
     disconnectCurrentPort();
     void deps.disableCliIntegrationAfterPermissionRemoval().catch(() => {});
   });
 
-  void reconcile().catch(() => {});
+  void reconcile().catch(() => scheduleReconnect());
 
   return {
     stop() {
@@ -927,6 +953,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       stopped = true;
       removeStorageListener();
       removePermissionListener();
+      clearReconnectTimer();
       disconnectCurrentPort();
     },
   };

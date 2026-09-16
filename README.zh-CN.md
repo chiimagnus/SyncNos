@@ -39,7 +39,7 @@ syncnos install
 syncnos doctor
 ```
 
-安装、能力发现和命令使用见[使用 CLI 自动化](https://chiimagnus.github.io/SyncNos/docs/cli/)。
+安装、能力发现和命令使用见[使用 CLI 自动化](https://chiimagnus.github.io/SyncNos/docs/cli/)。仓库同时提供给 AI Agent 使用的 Skill：[`skills/syncnos-zh/`](skills/syncnos-zh/)（中文）和 [`skills/syncnos/`](skills/syncnos/)（English）。
 
 ## 演示
 

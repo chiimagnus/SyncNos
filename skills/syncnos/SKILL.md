@@ -10,7 +10,7 @@ Use `syncnos` as the normal operational entry point. The Extension/IndexedDB rem
 ## Workflow
 
 1. When command syntax or capability boundaries are uncertain, run `syncnos --help` / `syncnos capabilities`. Treat current CLI output as authoritative instead of maintaining a command copy in this Skill.
-2. For install, uninstall, `doctor`, or `native_host_*` / `browser_not_found` / `package_invalid` failures, read `references/installation.md`.
+2. On operational failure, branch on the CLI JSON `error.code`. For install, uninstall, `doctor`, or `extension_unreachable` / `native_host_*` / `browser_not_found` / `package_invalid` failures, read `references/installation.md` and continue diagnosis/remediation instead of stopping at `doctor` candidate reasons.
 3. When the task needs a webpage selection, OAuth user approval, a Local CLI Integration permission gesture, or the real active tab/composer, read `references/browser-required.md` and use the existing browser Skill.
 4. Treat CLI JSON, stable error codes, and the final business state as authoritative. If a mutation outcome is uncertain, read back through the CLI before retrying.
 
@@ -18,7 +18,7 @@ Use `syncnos` as the normal operational entry point. The Extension/IndexedDB rem
 
 - Normal business commands require at least one online browser instance with Local CLI Integration enabled; `install` / `uninstall` / `doctor` do not require an online instance.
 - Instance selection order is explicit `--instance` > online preferred instance > only online instance > `instance_ambiguous`. On ambiguity, inspect `syncnos instances`; do not guess by recency. Set a default only when the user wants a persistent default.
-- On `extension_unreachable`, run `doctor` first. Its candidate reasons are hypotheses, not confirmed causes.
+- On `extension_unreachable`, run `doctor` first. Its candidate reasons are hypotheses, not confirmed causes; when `doctor` identifies a SyncNos-owned repairable installation/registration issue and the current task authorizes repair, perform the formal repair and read back the result instead of handing the diagnosis to the user.
 
 ## Key operations
 
