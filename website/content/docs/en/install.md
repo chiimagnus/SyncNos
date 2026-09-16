@@ -25,8 +25,8 @@ In browsers that expose a native extension Options / Preferences entry, that ent
 
 See [Capture content](/docs/en/capture/) for source-specific save behavior.
 
-## Need the CLI?
+## Need AI-agent access?
 
 You do not need the CLI for ordinary browser use.
 
-For local automation or AI agents, see [Automate with the CLI](/docs/en/cli/).
+When you want an AI agent to use SyncNos, see [CLI & AI SKILL](/docs/en/cli/).

@@ -29,9 +29,9 @@ Captured content is stored locally before optional sync or export. External prov
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari (macOS / iOS) | Build from source with Xcode |
 
-### Local CLI
+### CLI & AI SKILL
 
-The optional `syncnos` CLI lets local automation and AI agents work with a running SyncNos browser profile. Install it from npm, enable **Settings → CLI → Local CLI Integration → SyncNos CLI** in that profile, and keep the browser running while using it.
+The optional `syncnos` CLI lets AI agents work with a running SyncNos browser profile. Install it from npm, enable **Settings → CLI & AI SKILL → Local CLI Integration → SyncNos CLI** in that profile, and keep the browser running while the agent uses it.
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -39,7 +39,7 @@ syncnos install
 syncnos doctor
 ```
 
-See [Automate with the CLI](https://chiimagnus.github.io/SyncNos/docs/en/cli/) for setup, discovery, and command guidance. AI-agent Skills ship in [`skills/syncnos/`](skills/syncnos/) (English) and [`skills/syncnos-zh/`](skills/syncnos-zh/) (中文).
+See [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/en/cli/) for setup. AI-agent Skills ship in [`skills/syncnos/`](skills/syncnos/) (English) and [`skills/syncnos-zh/`](skills/syncnos-zh/) (中文).
 
 ## Demo
 

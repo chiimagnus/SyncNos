@@ -29,9 +29,9 @@
 | Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Safari（macOS / iOS） | 使用 Xcode 从源码构建 |
 
-### 本机 CLI
+### CLI & AI SKILL
 
-可选的 `syncnos` CLI 让本机自动化和 AI Agent 访问正在运行的 SyncNos 浏览器 Profile。在目标 Profile 中开启 **设置 → CLI → 本地 CLI 集成 → SyncNos CLI**，并在使用 CLI 时保持浏览器运行。
+可选的 `syncnos` CLI 让 AI Agent 访问正在运行的 SyncNos 浏览器 Profile。在目标 Profile 中开启 **设置 → CLI & AI SKILL → 本地 CLI 集成 → SyncNos CLI**，并在使用时保持浏览器运行。
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -39,7 +39,7 @@ syncnos install
 syncnos doctor
 ```
 
-安装、能力发现和命令使用见[使用 CLI 自动化](https://chiimagnus.github.io/SyncNos/docs/cli/)。仓库同时提供给 AI Agent 使用的 Skill：[`skills/syncnos-zh/`](skills/syncnos-zh/)（中文）和 [`skills/syncnos/`](skills/syncnos/)（English）。
+安装方式见 [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/cli/)。仓库同时提供给 AI Agent 使用的 Skill：[`skills/syncnos-zh/`](skills/syncnos-zh/)（中文）和 [`skills/syncnos/`](skills/syncnos/)（English）。
 
 ## 演示
 

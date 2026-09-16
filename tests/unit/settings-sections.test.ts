@@ -96,7 +96,7 @@ describe('settings section definitions', () => {
     expect(groups).toHaveLength(3);
     expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([3, 5, 2]);
     expect(Array.from(groups[0]?.querySelectorAll('button') || []).map((button) => button.textContent?.trim())).toEqual(
-      ['General', 'Keyboard shortcuts', 'CLI'],
+      ['General', 'Keyboard shortcuts', 'CLI & AI SKILL'],
     );
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
     expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
@@ -646,7 +646,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/cli/"]')).toBeTruthy();
     expect(checkbox).toBeTruthy();
     expect(checkbox?.disabled).toBe(false);
-    expect(document.body.textContent || '').toContain('~/.codex/skills/');
+    expect(document.body.textContent || '').toContain('Skills directory used by your AI agent');
+    expect(document.body.textContent || '').not.toContain('Codex');
+    expect(document.body.textContent || '').not.toContain('~/.codex');
     expect(
       document.querySelector('a[href="https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos"]'),
     ).toBeTruthy();

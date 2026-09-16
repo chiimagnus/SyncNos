@@ -4,10 +4,6 @@ import { cardClassName, checkboxClassName } from '@ui/settings/ui';
 
 const SKILL_REPOSITORY_BASE_URL = 'https://github.com/chiimagnus/SyncNos/tree/main/skills';
 
-function Mono(props: { children: string }) {
-  return <span className="tw-font-mono tw-text-[0.92em]">{props.children}</span>;
-}
-
 function SkillLink(props: { href: string; children: string }) {
   return (
     <a
@@ -58,9 +54,7 @@ export function CliIntegrationSection(props: {
       <section className={cardClassName} aria-label={t('cliSkillHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('cliSkillHeading')}</h2>
         <p className="tw-mb-0 tw-mt-2.5 tw-text-sm tw-font-semibold tw-leading-6 tw-text-[var(--text-secondary)]">
-          {t('cliSkillInstallPrefix')} <Mono>skills/syncnos-zh/</Mono> {t('cliSkillInstallOr')}{' '}
-          <Mono>skills/syncnos/</Mono> {t('cliSkillInstallSuffix')} <Mono>~/.codex/skills/</Mono>
-          {t('cliSkillInstallEnd')}
+          {t('cliSkillInstallHint')}
         </p>
         <div className="tw-mt-2.5 tw-flex tw-flex-wrap tw-gap-x-4 tw-gap-y-2 tw-text-sm">
           <SkillLink href={`${SKILL_REPOSITORY_BASE_URL}/syncnos-zh`}>{t('cliSkillChineseLink')}</SkillLink>
