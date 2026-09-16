@@ -1,7 +1,14 @@
 import { t } from '@i18n';
 import type { KeyboardEvent } from 'react';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName, cardClassName, checkboxClassName, settingsTextInputClassName } from '@ui/settings/ui';
+import {
+  buttonClassName,
+  cardClassName,
+  checkboxClassName,
+  dangerButtonClassName,
+  primaryButtonClassName,
+  settingsTextInputClassName,
+} from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function FeishuOAuthSection(props: {
@@ -94,7 +101,7 @@ export function FeishuOAuthSection(props: {
             onClick={onConnectOrDisconnect}
             disabled={busy || (!feishuConnected && pollingFeishu)}
             type="button"
-            className={buttonClassName}
+            className={feishuConnected ? dangerButtonClassName : primaryButtonClassName}
           >
             {feishuConnected ? t('disconnect') : pollingFeishu ? t('connectingDots') : t('connect')}
           </button>

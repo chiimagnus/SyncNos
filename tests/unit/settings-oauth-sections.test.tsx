@@ -161,6 +161,24 @@ describe('Settings OAuth sections', () => {
     expect(button.textContent).toBe('disconnect');
   });
 
+  it('matches GitHub connection button emphasis for Notion and Feishu', async () => {
+    await render(createElement(NotionOAuthSection, notionProps()));
+    let button = document.querySelector('section[aria-label="notionOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--filled');
+
+    await render(createElement(NotionOAuthSection, notionProps({ notionConnected: true })));
+    button = document.querySelector('section[aria-label="notionOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--danger-tint');
+
+    await render(createElement(FeishuOAuthSection, feishuProps()));
+    button = document.querySelector('section[aria-label="feishuOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--filled');
+
+    await render(createElement(FeishuOAuthSection, feishuProps({ feishuConnected: true })));
+    button = document.querySelector('section[aria-label="feishuOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--danger-tint');
+  });
+
   it('uses the unified Feishu help docs link', async () => {
     await render(createElement(FeishuOAuthSection, feishuProps()));
     expect(document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/"]')).toBeTruthy();

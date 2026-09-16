@@ -6,6 +6,8 @@ import {
   buttonClassName,
   cardClassName,
   checkboxClassName,
+  dangerButtonClassName,
+  primaryButtonClassName,
   settingsControlWidthClassName,
   settingsTextInputClassName,
 } from '@ui/settings/ui';
@@ -100,7 +102,7 @@ export function NotionOAuthSection(props: {
           onClick={onConnectOrDisconnect}
           disabled={busy || (!notionConnected && pollingNotion)}
           type="button"
-          className={buttonClassName}
+          className={notionConnected ? dangerButtonClassName : primaryButtonClassName}
         >
           {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
         </button>
