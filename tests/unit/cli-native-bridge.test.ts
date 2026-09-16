@@ -1092,7 +1092,7 @@ describe('CLI Native Messaging bridge', () => {
     harness.controller.stop();
   });
 
-  it('disconnects on permission removal and does not auto-reconnect after port disconnect', async () => {
+  it('disconnects on permission removal and reconnects after an unexpected port disconnect', async () => {
     const harness = createHarness();
     await waitForPosted(harness, 1);
     harness.removePermission(['nativeMessaging']);
@@ -1101,18 +1101,30 @@ describe('CLI Native Messaging bridge', () => {
 
     const second = createHarness();
     await waitForPosted(second, 1);
-    second.fakePort.emitDisconnect();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(second.connectNativeHost).toHaveBeenCalledTimes(1);
-    second.controller.stop();
-    harness.controller.stop();
+    vi.useFakeTimers();
+    try {
+      second.fakePort.emitDisconnect();
+      expect(second.connectNativeHost).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(second.connectNativeHost).toHaveBeenCalledTimes(2);
+    } finally {
+      second.controller.stop();
+      vi.useRealTimers();
+      harness.controller.stop();
+    }
   });
 
-  it('isolates a missing native host from the background router', async () => {
+  it('retries a missing native host without involving the background router', async () => {
     const router = { dispatch: vi.fn() };
-    const connectNativeHost = vi.fn(() => {
-      throw new Error('host not found');
-    });
+    const recoveredPort = createPort();
+    const connectNativeHost = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('host not found');
+      })
+      .mockReturnValue(recoveredPort.port);
+
+    vi.useFakeTimers();
     const controller = startCliNativeBridge(router, {
       connectNativeHost,
       readExtensionRuntimeMetadata: () => ({ runtimeId: '', extensionVersion: '', browserFamily: 'unknown' }),
@@ -1122,8 +1134,18 @@ describe('CLI Native Messaging bridge', () => {
       storageOnChanged: () => () => {},
       permissionsOnRemoved: () => () => {},
     });
-    await vi.waitFor(() => expect(connectNativeHost).toHaveBeenCalledTimes(1));
-    expect(router.dispatch).not.toHaveBeenCalled();
-    controller.stop();
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(connectNativeHost).toHaveBeenCalledTimes(1);
+      expect(router.dispatch).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(connectNativeHost).toHaveBeenCalledTimes(2);
+      expect(recoveredPort.posted[0]).toMatchObject({ kind: 'hello', cliInstanceId: 'instance-1' });
+      expect(router.dispatch).not.toHaveBeenCalled();
+    } finally {
+      controller.stop();
+      vi.useRealTimers();
+    }
   });
 });
