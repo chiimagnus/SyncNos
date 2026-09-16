@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName, settingsTextInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
@@ -119,7 +119,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="http://127.0.0.1:27123"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('baseUrl')}
             />
           </SettingsFormRow>
@@ -135,7 +135,7 @@ export function ObsidianSettingsSection(props: {
               onKeyDown={(e) => onEnterToSave(e, 'apiKey')}
               disabled={busy}
               placeholder={apiKeyPresent ? apiKeyMasked : ''}
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('apiKey')}
             />
           </SettingsFormRow>
@@ -149,7 +149,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="Authorization"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('authHeader')}
             />
           </SettingsFormRow>
@@ -173,7 +173,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="SyncNos-AIChats"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('aiChatsFolder')}
             />
           </SettingsFormRow>
@@ -187,7 +187,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="SyncNos-WebArticles"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('webClipperFolder')}
             />
           </SettingsFormRow>
@@ -201,7 +201,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="SyncNos-Videos"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('videoScriptsFolder')}
             />
           </SettingsFormRow>

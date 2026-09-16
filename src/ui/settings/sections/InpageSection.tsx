@@ -1,7 +1,13 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import {
+  buttonClassName,
+  cardClassName,
+  checkboxClassName,
+  settingsControlWidthClassName,
+  settingsTextInputClassName,
+} from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import {
@@ -20,7 +26,7 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void; 
         {t('aboutYouUserNameSectionTitle')}
       </h2>
       <input
-        className={`${textInputClassName} tw-mt-3 tw-w-full tw-px-3 tw-py-2 tw-font-semibold`}
+        className={`${settingsTextInputClassName} tw-mt-3 tw-px-3 tw-py-2 tw-font-semibold`}
         value={value}
         onChange={(e) => onChange(String((e.target as any)?.value || ''))}
         onBlur={onSave}
@@ -119,8 +125,9 @@ export function InpageSection(props: {
               disabled={busy}
               ariaLabel={t('languageLabel')}
               minWidth={180}
+              className={settingsControlWidthClassName}
               buttonId="interface-locale"
-              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
+              buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
               options={[
                 { value: 'system', label: t('localeSystem') },
                 { value: 'en', label: t('localeEnglish') },
@@ -146,7 +153,8 @@ export function InpageSection(props: {
               disabled={busy}
               ariaLabel={t('inpageDisplayModeLabel')}
               minWidth={180}
-              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
+              className={settingsControlWidthClassName}
+              buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
               options={[
                 { value: 'supported', label: t('inpageDisplayModeSupported') },
                 { value: 'all', label: t('inpageDisplayModeAll') },

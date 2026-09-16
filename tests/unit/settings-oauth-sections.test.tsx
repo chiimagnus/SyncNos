@@ -122,6 +122,23 @@ afterEach(() => {
 });
 
 describe('Settings OAuth sections', () => {
+  it('keeps provider text fields and select triggers on the compact settings control width', async () => {
+    await render(
+      createElement(
+        NotionOAuthSection,
+        notionProps({ notionConnected: true, notionPageOptions: [{ id: 'page-1', title: 'Page' }] }),
+      ),
+    );
+    const notionPageTrigger = document.querySelector('button#notionPages') as HTMLButtonElement | null;
+    expect(notionPageTrigger?.parentElement?.className || '').toContain('tw-max-w-[180px]');
+
+    await render(createElement(FeishuOAuthSection, feishuProps()));
+    const clientIdInput = document.querySelector(
+      'input[aria-label="feishuOAuthClientIdLabel"]',
+    ) as HTMLInputElement | null;
+    expect(clientIdInput?.className || '').toContain('tw-max-w-[180px]');
+  });
+
   it('disables disconnected Connect while the current surface is waiting, but never locks connected Disconnect', async () => {
     await render(createElement(NotionOAuthSection, notionProps({ pollingNotion: true })));
     let button = document.querySelector('section[aria-label="notionOAuth"] button') as HTMLButtonElement;

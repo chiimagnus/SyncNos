@@ -1,7 +1,7 @@
 import { t } from '@i18n';
 import type { KeyboardEvent } from 'react';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName, settingsTextInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function FeishuOAuthSection(props: {
@@ -151,7 +151,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="cli_xxx"
               aria-label={t('feishuOAuthClientIdLabel')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
 
@@ -167,7 +167,7 @@ export function FeishuOAuthSection(props: {
                 type="password"
                 placeholder={feishuClientSecretPresent ? '••••••••' : ''}
                 aria-label={t('feishuOAuthClientSecretLabel')}
-                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                className={settingsTextInputClassName}
               />
               {feishuClientSecretPresent ? (
                 <button
@@ -192,7 +192,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="https://.../feishu/oauth/exchange"
               aria-label={t('feishuTokenExchangeProxyUrlLabel')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
         </div>
@@ -212,7 +212,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="SyncNos-AIChats"
               aria-label={t('aiChatsFolder')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
 
@@ -226,7 +226,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="SyncNos-WebArticles"
               aria-label={t('webClipperFolder')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
 
@@ -240,7 +240,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="SyncNos-Videos"
               aria-label={t('videoScriptsFolder')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
         </div>

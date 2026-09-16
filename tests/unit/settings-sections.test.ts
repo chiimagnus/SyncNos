@@ -255,6 +255,7 @@ describe('settings section definitions', () => {
     const branchInput = document.querySelector('input[aria-label="Branch"]') as HTMLInputElement | null;
     expect(branchInput).toBeTruthy();
     expect(branchInput?.className || '').toContain('webclipper-field');
+    expect(branchInput?.className || '').toContain('tw-max-w-[180px]');
     expect(document.querySelector('input[aria-label="AI Chats Folder"]')).toBeNull();
     expect(document.querySelector('input[aria-label="Web Clipper Folder"]')).toBeNull();
     expect(document.querySelector('input[aria-label="Video Scripts Folder"]')).toBeNull();
@@ -266,6 +267,7 @@ describe('settings section definitions', () => {
     expect(document.querySelector('a[href="https://github.com/apps/syncnos"]')).toBeTruthy();
 
     const repositoryTrigger = document.querySelector('button#githubRepository') as HTMLButtonElement | null;
+    expect(repositoryTrigger?.parentElement?.className || '').toContain('tw-max-w-[180px]');
     act(() => repositoryTrigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     const repositoryOptions = Array.from(document.querySelectorAll('button[role="menuitemradio"]'));
     expect(repositoryOptions.some((button) => button.textContent?.includes('owner/not-authorized'))).toBe(false);
@@ -457,6 +459,8 @@ describe('settings section definitions', () => {
 
     const helpLink = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/"]');
     expect(helpLink?.textContent).toContain('Help docs');
+    const baseUrlInput = document.querySelector('input[aria-label="Base URL"]') as HTMLInputElement | null;
+    expect(baseUrlInput?.className || '').toContain('tw-max-w-[180px]');
     const section = document.querySelector('section[aria-label="Obsidian"]');
     const header = section?.firstElementChild;
     const testButton = Array.from(header?.querySelectorAll('button') || []).find(
@@ -744,6 +748,7 @@ describe('inpage anti-hotlink advanced editor', () => {
     const trigger = document.querySelector('button#interface-locale') as HTMLButtonElement | null;
     expect(trigger).toBeTruthy();
     expect(trigger?.textContent).toContain('Follow system');
+    expect(trigger?.parentElement?.className || '').toContain('tw-max-w-[180px]');
 
     act(() => {
       trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -766,6 +771,7 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(input).toBeTruthy();
     expect(input?.value).toBe('Ada');
     expect(input?.className || '').toContain('webclipper-field');
+    expect(input?.className || '').toContain('tw-max-w-[180px]');
 
     act(() => {
       input!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
