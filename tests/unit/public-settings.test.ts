@@ -82,7 +82,6 @@ const EXPECTED_KEYS = [
   'capture.ai-chat-auto-save',
   'capture.ai-chat-cache-images',
   'capture.web-article-cache-images',
-  'capture.xiaohongshu-comments',
   'mention.enabled',
   'anti-hotlink.rules',
   'theme.mode',
@@ -141,7 +140,6 @@ describe('public settings facade', () => {
     expect(snapshot['capture.ai-chat-auto-save']).toBe(true);
     expect(snapshot['capture.ai-chat-cache-images']).toBe(false);
     expect(snapshot['capture.web-article-cache-images']).toBe(false);
-    expect(snapshot['capture.xiaohongshu-comments']).toBe(false);
     expect(snapshot['mention.enabled']).toBe(true);
     expect(snapshot['theme.mode']).toBe('system');
     expect(snapshot['markdown.reading-profile']).toBe('medium');
@@ -234,7 +232,12 @@ describe('public settings facade', () => {
   });
 
   it('fails closed for unknown/raw keys and invalid typed values', async () => {
-    for (const key of ['cli-integration-enabled', 'reader_prefs_v1', 'feishu_oauth_client_secret']) {
+    for (const key of [
+      'cli-integration-enabled',
+      'reader_prefs_v1',
+      'feishu_oauth_client_secret',
+      'capture.xiaohongshu-comments',
+    ]) {
       await expect(setPublicSetting(key, true)).rejects.toSatisfy((error: unknown) => {
         expectPublicSettingsError(error, 'settings_unknown_key');
         return true;

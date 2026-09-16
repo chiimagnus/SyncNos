@@ -20,7 +20,6 @@ import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '@ui/settings/sections/GitHubSettingsSection';
-import { WebArticlesSection } from '@ui/settings/sections/WebArticlesSection';
 
 export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
@@ -175,8 +174,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
-    xiaohongshuCommentsCaptureEnabled,
-    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -515,16 +512,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           cliIntegrationEnabled={cliIntegrationEnabled}
           onToggleCliIntegration={(next) => {
             void onToggleCliIntegration(next);
-          }}
-        />
-      ) : null}
-
-      {activeSection === 'articles' ? (
-        <WebArticlesSection
-          busy={busy}
-          xiaohongshuCommentsCaptureEnabled={xiaohongshuCommentsCaptureEnabled}
-          onToggleXiaohongshuCommentsCaptureEnabled={(next) => {
-            void onToggleXiaohongshuCommentsCaptureEnabled(next);
           }}
         />
       ) : null}

@@ -43,7 +43,6 @@ const DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS = 10_000;
 const ARTICLE_STABILIZATION_TIMEOUT_MS = 10_000;
 const ARTICLE_STABILIZATION_MIN_TEXT_LENGTH = 240;
 const CONTENT_MESSAGE_RETRY_DELAY_MS = 320;
-const XIAOHONGSHU_COMMENTS_CAPTURE_ENABLED_STORAGE_KEY = 'xiaohongshu_comments_capture_enabled';
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
@@ -129,13 +128,12 @@ function isMissingContentReceiverError(error: unknown): boolean {
   return /receiving end does not exist|no receiving end/i.test(message);
 }
 
-async function extractArticleOnTab(tabId: number, includeXiaohongshuComments: boolean) {
+async function extractArticleOnTab(tabId: number) {
   const payload = {
     type: CONTENT_MESSAGE_TYPES.EXTRACT_WEB_ARTICLE,
     payload: {
       stabilizationTimeoutMs: ARTICLE_STABILIZATION_TIMEOUT_MS,
       stabilizationMinTextLength: ARTICLE_STABILIZATION_MIN_TEXT_LENGTH,
-      includeXiaohongshuComments,
     },
   };
 
@@ -167,25 +165,12 @@ async function extractArticleOnTab(tabId: number, includeXiaohongshuComments: bo
   return apiResponse.data as any;
 }
 
-async function extractArticleOnTabWithReadabilityFallback(
-  tabId: number,
-  includeXiaohongshuComments: boolean,
-  ensureReadabilityOnce: () => Promise<void>,
-) {
+async function extractArticleOnTabWithReadabilityFallback(tabId: number, ensureReadabilityOnce: () => Promise<void>) {
   try {
-    return await extractArticleOnTab(tabId, includeXiaohongshuComments);
+    return await extractArticleOnTab(tabId);
   } catch (_error) {
     await ensureReadabilityOnce();
-    return await extractArticleOnTab(tabId, includeXiaohongshuComments);
-  }
-}
-
-async function shouldCaptureXiaohongshuComments(): Promise<boolean> {
-  try {
-    const local = await storageGet([XIAOHONGSHU_COMMENTS_CAPTURE_ENABLED_STORAGE_KEY]);
-    return local?.[XIAOHONGSHU_COMMENTS_CAPTURE_ENABLED_STORAGE_KEY] === true;
-  } catch (_error) {
-    return false;
+    return await extractArticleOnTab(tabId);
   }
 }
 
@@ -237,7 +222,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const discourseTopic = parseDiscourseTopicUrl(normalizedUrl);
   const articleIdentity = buildCanonicalWebArticleIdentity(normalizedUrl)!;
   const canonicalUrl = articleIdentity.url;
-  const includeXiaohongshuComments = await shouldCaptureXiaohongshuComments();
 
   let readabilityInjected = false;
   const ensureReadabilityOnce = async () => {
@@ -245,11 +229,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     readabilityInjected = true;
     await ensureReadability(targetTabId);
   };
-  let extracted = await extractArticleOnTabWithReadabilityFallback(
-    targetTabId,
-    includeXiaohongshuComments,
-    ensureReadabilityOnce,
-  );
+  let extracted = await extractArticleOnTabWithReadabilityFallback(targetTabId, ensureReadabilityOnce);
 
   const shouldFallbackToFirstFloor =
     discourseTopic &&
@@ -261,11 +241,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     const firstFloorUrl = buildDiscourseTopicFloorUrl(discourseTopic, 1);
     await tabsUpdate(targetTabId, { url: firstFloorUrl });
     await waitForTabUrl(targetTabId, firstFloorUrl, DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS);
-    extracted = await extractArticleOnTabWithReadabilityFallback(
-      targetTabId,
-      includeXiaohongshuComments,
-      ensureReadabilityOnce,
-    );
+    extracted = await extractArticleOnTabWithReadabilityFallback(targetTabId, ensureReadabilityOnce);
   }
 
   if (discourseTopic && hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)) {

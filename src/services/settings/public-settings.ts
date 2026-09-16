@@ -63,7 +63,6 @@ export type PublicSettingKey =
   | 'capture.ai-chat-auto-save'
   | 'capture.ai-chat-cache-images'
   | 'capture.web-article-cache-images'
-  | 'capture.xiaohongshu-comments'
   | 'mention.enabled'
   | 'anti-hotlink.rules'
   | 'theme.mode'
@@ -301,10 +300,6 @@ const descriptors: Record<PublicSettingKey, Descriptor> = {
   }),
   'capture.web-article-cache-images': booleanStorageDescriptor({
     key: 'web_article_cache_images_enabled',
-    defaultValue: false,
-  }),
-  'capture.xiaohongshu-comments': booleanStorageDescriptor({
-    key: 'xiaohongshu_comments_capture_enabled',
     defaultValue: false,
   }),
   'mention.enabled': booleanStorageDescriptor({ key: 'ai_chat_dollar_mention_enabled', defaultValue: true }),

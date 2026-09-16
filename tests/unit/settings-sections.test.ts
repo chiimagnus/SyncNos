@@ -18,7 +18,6 @@ import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 import { KeyboardShortcutsSection } from '../../src/ui/settings/sections/KeyboardShortcutsSection';
 import { CliIntegrationSection } from '../../src/ui/settings/sections/CliIntegrationSection';
-import { WebArticlesSection } from '../../src/ui/settings/sections/WebArticlesSection';
 import { ObsidianSettingsSection } from '../../src/ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '../../src/ui/settings/sections/GitHubSettingsSection';
 import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
@@ -37,7 +36,6 @@ describe('settings section definitions', () => {
       'general',
       'shortcuts',
       'cli',
-      'articles',
       'ai_chats',
       'backup',
       'notion',
@@ -55,6 +53,7 @@ describe('settings section definitions', () => {
     expect(coerceSettingsSectionKey('aboutyou')).toBe('aboutyou');
     expect(coerceSettingsSectionKey('aboutme')).toBe('aboutme');
     expect(coerceSettingsSectionKey('videos')).toBeNull();
+    expect(coerceSettingsSectionKey('articles')).toBeNull();
     expect(coerceSettingsSectionKey('insight')).toBeNull();
     expect(coerceSettingsSectionKey('about')).toBeNull();
   });
@@ -68,6 +67,8 @@ describe('settings section definitions', () => {
       expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
       window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'videos');
       expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
+      window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'articles');
+      expect(readStoredSettingsSection()).toBe(DEFAULT_SETTINGS_SECTION_KEY);
     } finally {
       cleanupDom();
     }
@@ -75,7 +76,7 @@ describe('settings section definitions', () => {
 
   it('groups sections into integrations, behavior, and about areas', () => {
     expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
-      ['general', 'shortcuts', 'cli', 'articles', 'ai_chats'],
+      ['general', 'shortcuts', 'cli', 'ai_chats'],
       ['backup', 'notion', 'feishu', 'obsidian', 'github'],
       ['aboutyou', 'aboutme'],
     ]);
@@ -128,9 +129,9 @@ describe('settings section definitions', () => {
     const groupList = document.querySelector('nav')?.firstElementChild;
     const groups = groupList ? Array.from(groupList.children) : [];
     expect(groups).toHaveLength(3);
-    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([5, 5, 2]);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([4, 5, 2]);
     expect(Array.from(groups[0]?.querySelectorAll('button') || []).map((button) => button.textContent?.trim())).toEqual(
-      ['General', 'Keyboard shortcuts', 'CLI', 'Web capture', 'AI chat capture'],
+      ['General', 'Keyboard shortcuts', 'CLI', 'AI chat capture'],
     );
     expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
     expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
@@ -586,18 +587,6 @@ describe('inpage anti-hotlink advanced editor', () => {
     });
   }
 
-  function renderWebArticles(props: Partial<Parameters<typeof WebArticlesSection>[0]> = {}) {
-    const baseProps: Parameters<typeof WebArticlesSection>[0] = {
-      busy: false,
-      xiaohongshuCommentsCaptureEnabled: false,
-      onToggleXiaohongshuCommentsCaptureEnabled: () => {},
-    };
-
-    act(() => {
-      root!.render(createElement(WebArticlesSection, { ...baseProps, ...props }));
-    });
-  }
-
   function renderShortcuts(props: Partial<Parameters<typeof KeyboardShortcutsSection>[0]> = {}) {
     const baseProps: Parameters<typeof KeyboardShortcutsSection>[0] = {
       status: 'ready',
@@ -621,7 +610,6 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.querySelector('section[aria-label="Keyboard shortcuts"]')).toBeNull();
     expect(document.querySelector('section[aria-label="Language"]')).toBeTruthy();
     expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
-    expect(document.querySelector('section[aria-label="Xiaohongshu notes"]')).toBeNull();
   });
 
   it('renders browser-managed keyboard shortcuts in the dedicated section', () => {
@@ -691,21 +679,6 @@ describe('inpage anti-hotlink advanced editor', () => {
     const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
     expect(checkbox?.disabled).toBe(true);
     expect(section?.textContent).toContain('Native Messaging is unavailable');
-  });
-
-  it('keeps Xiaohongshu comment capture inside Web capture', () => {
-    const onToggleXiaohongshuCommentsCaptureEnabled = vi.fn();
-    renderWebArticles({ onToggleXiaohongshuCommentsCaptureEnabled });
-
-    const section = document.querySelector('section[aria-label="Xiaohongshu notes"]');
-    const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-    expect(section?.textContent).toContain('Capture source comments');
-    expect(checkbox?.checked).toBe(false);
-
-    act(() => {
-      checkbox!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    });
-    expect(onToggleXiaohongshuCommentsCaptureEnabled).toHaveBeenCalledWith(true);
   });
 
   it('renders advanced toggle button and triggers callback', () => {

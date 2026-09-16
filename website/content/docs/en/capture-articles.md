@@ -1,6 +1,6 @@
 ---
 title: Capture web articles
-description: Save readable article text, content images, and optional source comments from Xiaohongshu notes.
+description: Save readable article text, content images, and loaded source comments from Xiaohongshu notes.
 ---
 
 ## Save an article
@@ -23,6 +23,6 @@ If an image CDN requires a specific Referer, add the domain and Referer under th
 
 ## Xiaohongshu note comments
 
-To save source comments with Xiaohongshu notes, enable **Capture source comments** under **Settings → General → Xiaohongshu notes**.
+When capturing a Xiaohongshu note, SyncNos also saves comments and replies that are already loaded and expanded on the current page.
 
-Only comments and replies that are already loaded and expanded on the current page are saved. SyncNos does not automatically expand the entire comment thread.
+SyncNos does not automatically scroll or expand the entire comment thread.
