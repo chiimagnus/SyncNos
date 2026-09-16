@@ -26,6 +26,12 @@ describe('settings section definitions', () => {
   it('builds localized website docs URLs for settings links', () => {
     expect(buildSettingsDocsUrl('cli', 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/cli/');
     expect(buildSettingsDocsUrl('cli', 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/cli/');
+    expect(buildSettingsDocsUrl('dollar-mention', 'en')).toBe(
+      'https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/',
+    );
+    expect(buildSettingsDocsUrl('dollar-mention', 'zh')).toBe(
+      'https://chiimagnus.github.io/SyncNos/docs/dollar-mention/',
+    );
     expect(buildSettingsDocsUrl('sync/github', 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/sync/github/');
     expect(buildSettingsDocsUrl('sync/github', 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/sync/github/');
   });
@@ -577,6 +583,15 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.querySelector('section[aria-label="Keyboard shortcuts"]')).toBeNull();
     expect(document.querySelector('section[aria-label="Language"]')).toBeTruthy();
     expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
+  });
+
+  it('links the $ mention setting to its help docs', () => {
+    renderInpage();
+
+    const section = document.querySelector('section[aria-label="$ Mention"]');
+    expect(
+      section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]')?.textContent,
+    ).toContain('Help docs');
   });
 
   it('keeps ChatGPT Advanced capture in General settings', () => {

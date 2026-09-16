@@ -2,6 +2,7 @@ import { getCurrentLocale, t, type Locale } from '@i18n';
 
 export type SettingsDocsPath =
   | 'capture-ai-chats'
+  | 'dollar-mention'
   | 'cli'
   | 'sync/notion'
   | 'sync/feishu'
