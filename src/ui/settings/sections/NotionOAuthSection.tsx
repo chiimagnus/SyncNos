@@ -1,6 +1,7 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
 import type { KeyboardEvent } from 'react';
 import { t } from '@i18n';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 import { SelectMenu } from '@ui/shared/SelectMenu';
@@ -88,6 +89,7 @@ export function NotionOAuthSection(props: {
           </span>
           <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{notionStatusText}</span>
         </div>
+        <SettingsDocsLink path="sync/notion" />
         <button
           onClick={onConnectOrDisconnect}
           disabled={busy || (!notionConnected && pollingNotion)}

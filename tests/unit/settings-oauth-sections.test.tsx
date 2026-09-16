@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 
-vi.mock('@i18n', () => ({ t: (key: string) => key }));
+vi.mock('@i18n', () => ({
+  t: (key: string) => key,
+  getCurrentLocale: () => 'en',
+}));
 
 type NotionProps = Parameters<typeof NotionOAuthSection>[0];
 type FeishuProps = Parameters<typeof FeishuOAuthSection>[0];
@@ -88,7 +91,6 @@ function feishuProps(overrides: Partial<FeishuProps> = {}): FeishuProps {
     feishuArticleFolder: 'WebArticles',
     feishuVideoFolder: 'Videos',
     feishuLogoUrl: 'https://example.com/feishu.png',
-    setupGuideUrl: 'https://example.com/guide',
     onToggleSyncEnabled: noOp,
     onToggleAutoSyncEnabled: noOp,
     onConnectOrDisconnect: noOp,
@@ -100,7 +102,6 @@ function feishuProps(overrides: Partial<FeishuProps> = {}): FeishuProps {
     onChangeVideoFolder: noOp,
     onSavePaths: noOp,
     onSaveAdvanced: noOp,
-    onOpenSetupGuide: noOp,
     ...overrides,
   };
 }
@@ -141,6 +142,11 @@ describe('Settings OAuth sections', () => {
     button = document.querySelector('section[aria-label="feishuOAuth"] button') as HTMLButtonElement;
     expect(button.disabled).toBe(false);
     expect(button.textContent).toBe('disconnect');
+  });
+
+  it('uses the unified Feishu help docs link', async () => {
+    await render(createElement(FeishuOAuthSection, feishuProps()));
+    expect(document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/"]')).toBeTruthy();
   });
 
   it('disables Feishu auth config inputs while the current surface is waiting', async () => {

@@ -98,8 +98,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveFeishuPaths,
     onSaveFeishuAdvancedSettings,
     onFeishuConnectOrDisconnect,
-    onOpenFeishuSetupGuide,
-    feishuSetupGuideUrl,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,
@@ -123,8 +121,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,
-    onOpenObsidianSetupGuide,
-    obsidianSetupGuideUrl,
 
     githubAuth,
     githubAccount,
@@ -298,7 +294,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           feishuArticleFolder={feishuArticleFolder}
           feishuVideoFolder={feishuVideoFolder}
           feishuLogoUrl={getURL('icons/feishu.svg' as any)}
-          setupGuideUrl={feishuSetupGuideUrl}
           onToggleSyncEnabled={(enabled) => {
             void onToggleFeishuSyncEnabled(enabled);
           }}
@@ -323,7 +318,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onConnectOrDisconnect={() => {
             void onFeishuConnectOrDisconnect();
           }}
-          onOpenSetupGuide={onOpenFeishuSetupGuide}
         />
       ) : null}
 
@@ -342,7 +336,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           videoFolder={obsidianVideoFolder}
           statusText={obsidianStatus}
           obsidianLogoUrl={getURL('icons/obsidian.svg' as any)}
-          setupGuideUrl={obsidianSetupGuideUrl}
           onChangeApiBaseUrl={setObsidianApiBaseUrl}
           onChangeAuthHeaderName={setObsidianAuthHeaderName}
           onChangeApiKeyDraft={setObsidianApiKeyDraft}
@@ -364,7 +357,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onTest={() => {
             void onTestObsidianConnection();
           }}
-          onOpenSetupGuide={onOpenObsidianSetupGuide}
         />
       ) : null}
 

@@ -21,8 +21,16 @@ import { VideosSection } from '../../src/ui/settings/sections/VideosSection';
 import { ObsidianSettingsSection } from '../../src/ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '../../src/ui/settings/sections/GitHubSettingsSection';
 import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
+import { buildSettingsDocsUrl } from '../../src/ui/settings/SettingsDocsLink';
 
 describe('settings section definitions', () => {
+  it('builds localized website docs URLs for settings links', () => {
+    expect(buildSettingsDocsUrl('cli', 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/cli/');
+    expect(buildSettingsDocsUrl('cli', 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/cli/');
+    expect(buildSettingsDocsUrl('sync/github', 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/sync/github/');
+    expect(buildSettingsDocsUrl('sync/github', 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/sync/github/');
+  });
+
   it('keeps the flattened settings navigation order stable', () => {
     expect(SETTINGS_SECTIONS.map((section) => section.key)).toEqual([
       'general',
@@ -90,16 +98,12 @@ describe('settings section definitions', () => {
     expect(toggle?.checked).toBe(false);
     const text = document.body.textContent || '';
     expect(text).toContain('ChatGPT Advanced capture');
-    expect(text).toContain('Default page capture uses content that is already loaded/visible');
-    expect(text).toContain('current backend branch as canonical history');
-    expect(text).toContain('current visible reply that has not reached the backend yet');
     expect(text).toContain('Off by default');
-    expect(text).toContain('non-public backend API');
-    expect(text).toContain('reported as partial');
-    expect(text).toContain('identity or tree-integrity failures');
-    expect(text).toContain('does not silently fall back');
-    expect(text).toContain('Automatic local caching follows the AI image-cache setting');
-    expect(text).toContain('Tool screenshots and visual execution artifacts are not saved');
+    expect(text).toContain('no same-save DOM fallback');
+    expect(text).not.toContain('How to fetch');
+    expect(text).not.toContain('Troubleshooting');
+    const helpLink = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]');
+    expect(helpLink?.textContent).toContain('Help docs');
 
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggle).toHaveBeenCalledWith(true);
@@ -125,14 +129,10 @@ describe('settings section definitions', () => {
     ]);
     expect(monoTokens).not.toContain('bilibili.com/video');
     const text = document.body.textContent || '';
-    expect(text).toContain('chapters/highlights');
-    expect(text).toContain('when available');
-    expect(text).toContain('videos without subtitles can still save');
-    expect(text).toContain('Save video');
-    expect(text).not.toContain('Save video transcript');
-    expect(text).not.toContain('No subtitles detected (not saved)');
-    expect(text).toContain('Bilibili av');
-    expect(text).toContain('YouTube Shorts');
+    expect(text).toContain('loaded chapters');
+    expect(text).toContain('official and auto-generated captions');
+    expect(text).not.toContain('How to fetch');
+    expect(text).not.toContain('Troubleshooting');
     expect(text.toLowerCase()).not.toContain('chapter images');
     expect(text.toLowerCase()).not.toContain('click chapter');
 
@@ -434,10 +434,9 @@ describe('settings section definitions', () => {
     cleanupDom();
   });
 
-  it('uses the supplied Obsidian setup guide URL', () => {
+  it('uses the unified Obsidian help docs link', () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
-    const setupGuideUrl = 'https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/';
     const onTest = vi.fn();
 
     act(() => {
@@ -456,7 +455,6 @@ describe('settings section definitions', () => {
           videoFolder: 'SyncNos-Videos',
           statusText: '',
           obsidianLogoUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
-          setupGuideUrl,
           onChangeApiBaseUrl: () => {},
           onChangeAuthHeaderName: () => {},
           onChangeApiKeyDraft: () => {},
@@ -468,12 +466,12 @@ describe('settings section definitions', () => {
           onSave: () => {},
           onSaveApiKey: () => {},
           onTest,
-          onOpenSetupGuide: () => {},
         }),
       );
     });
 
-    expect(document.querySelector(`a[href="${setupGuideUrl}"]`)).toBeTruthy();
+    const helpLink = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/"]');
+    expect(helpLink?.textContent).toContain('Help docs');
     const section = document.querySelector('section[aria-label="Obsidian"]');
     const header = section?.firstElementChild;
     const testButton = Array.from(header?.querySelectorAll('button') || []).find(
@@ -672,6 +670,7 @@ describe('inpage anti-hotlink advanced editor', () => {
     const section = document.querySelector('section[aria-label="Local CLI Integration"]');
     const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
     expect(section?.textContent).toContain('Enable SyncNos CLI');
+    expect(section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/cli/"]')).toBeTruthy();
     expect(checkbox).toBeTruthy();
     expect(checkbox?.disabled).toBe(false);
 

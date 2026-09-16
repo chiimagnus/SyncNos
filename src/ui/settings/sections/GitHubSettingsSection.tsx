@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 import {
   buttonClassName,
@@ -146,6 +147,7 @@ export function GitHubSettingsSection(props: {
                   : t('statusNotConnected')}
             </div>
           </div>
+          <SettingsDocsLink path="sync/github" />
           {auth.state === 'disconnected' ? (
             <button type="button" className={primaryButtonClassName} onClick={onConnect} disabled={busy}>
               {t('githubConnect')}

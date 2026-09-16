@@ -47,15 +47,9 @@ import {
   type InsightTimeRange,
 } from '@viewmodels/settings/insight-stats';
 
-import {
-  formatProgress,
-  openHttpUrl,
-  unwrap,
-  type ApiResponse,
-  type NotionPageOption,
-} from '@viewmodels/settings/utils';
+import { formatProgress, unwrap, type ApiResponse, type NotionPageOption } from '@viewmodels/settings/utils';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
-import { getCurrentLocale, getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
+import { getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
 import {
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,
@@ -2108,24 +2102,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     }
   }, [busy, openExtensionAppSettings, useAppImport]);
 
-  const guideLocale = getCurrentLocale();
-  const obsidianSetupGuideUrl =
-    guideLocale === 'zh'
-      ? 'https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/'
-      : 'https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/';
-  const feishuSetupGuideUrl =
-    guideLocale === 'zh'
-      ? 'https://chiimagnus.github.io/SyncNos/docs/sync/feishu/'
-      : 'https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/';
-
-  const onOpenObsidianSetupGuide = useCallback(() => {
-    openHttpUrl(obsidianSetupGuideUrl);
-  }, [obsidianSetupGuideUrl]);
-
-  const onOpenFeishuSetupGuide = useCallback(() => {
-    openHttpUrl(feishuSetupGuideUrl);
-  }, [feishuSetupGuideUrl]);
-
   const notionStatusText = useMemo(() => {
     if (notionConnected == null) return t('statusUnknown');
     if (notionConnected) {
@@ -2218,8 +2194,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onSaveFeishuPaths,
     onSaveFeishuAdvancedSettings,
     onFeishuConnectOrDisconnect,
-    onOpenFeishuSetupGuide,
-    feishuSetupGuideUrl,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,
@@ -2243,8 +2217,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,
-    onOpenObsidianSetupGuide,
-    obsidianSetupGuideUrl,
 
     githubAuth,
     githubAccount,

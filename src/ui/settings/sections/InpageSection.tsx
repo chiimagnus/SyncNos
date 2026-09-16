@@ -1,5 +1,6 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
@@ -137,9 +138,12 @@ export function InpageSection(props: {
       </section>
 
       <section className={cardClassName} aria-label={t('localCliIntegrationHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('localCliIntegrationHeading')}
-        </h2>
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('localCliIntegrationHeading')}
+          </h2>
+          <SettingsDocsLink path="cli" />
+        </div>
         <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
           <input
             type="checkbox"
@@ -150,9 +154,11 @@ export function InpageSection(props: {
           />
           {t('localCliIntegrationLabel')}
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {cliIntegrationAvailable ? t('localCliIntegrationHint') : t('localCliIntegrationUnavailable')}
-        </div>
+        {!cliIntegrationAvailable ? (
+          <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {t('localCliIntegrationUnavailable')}
+          </div>
+        ) : null}
       </section>
 
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
@@ -214,9 +220,6 @@ export function InpageSection(props: {
           />
           {t('aiChatDollarMentionLabel')}
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatDollarMentionHint')}
-        </div>
         {!!dollarMentionSitesLabel && (
           <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
             {dollarMentionSitesLabel}

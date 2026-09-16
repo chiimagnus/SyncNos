@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { cardClassName, checkboxClassName } from '@ui/settings/ui';
 
 function Mono(props: { children: string }) {
@@ -13,15 +14,6 @@ export function AiChatsSection(props: {
   const { busy, chatgptApiCaptureEnabled, onToggleChatgptApiCaptureEnabled } = props;
   return (
     <div className="tw-grid tw-gap-4">
-      <section className={cardClassName} aria-label={t('aiChatsSectionHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatsSectionHeading')}
-        </h2>
-        <div className="tw-mt-2.5 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatsSectionIntro')}
-        </div>
-      </section>
-
       <section className={cardClassName} aria-label={t('aiChatsSectionSupportedHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
           {t('aiChatsSectionSupportedHeading')}
@@ -33,14 +25,16 @@ export function AiChatsSection(props: {
             <Mono>Notion AI</Mono> / <Mono>Z.ai</Mono>
             {t('aiChatsSectionSupportedListSuffix')}
           </li>
-          <li>{t('aiChatsSectionSupportedNote')}</li>
         </ul>
       </section>
 
       <section className={cardClassName} aria-label={t('chatgptApiCaptureAdvancedHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('chatgptApiCaptureAdvancedHeading')}
-        </h2>
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('chatgptApiCaptureAdvancedHeading')}
+          </h2>
+          <SettingsDocsLink path="capture-ai-chats" />
+        </div>
         <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
           <input
             type="checkbox"
@@ -55,42 +49,6 @@ export function AiChatsSection(props: {
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('chatgptApiCaptureAdvancedHint')}
         </div>
-        <ul className="tw-mt-2.5 tw-list-disc tw-pl-5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          <li>{t('chatgptApiCaptureAdvancedSupport')}</li>
-          <li>{t('chatgptApiCaptureAdvancedFallback')}</li>
-          <li>{t('chatgptApiCaptureAdvancedImages')}</li>
-        </ul>
-      </section>
-
-      <section className={cardClassName} aria-label={t('aiChatsSectionHowToHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatsSectionHowToHeading')}
-        </h2>
-        <ol className="tw-mt-2.5 tw-list-decimal tw-pl-5 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          <li>{t('aiChatsSectionHowToStep1')}</li>
-          <li>
-            {t('aiChatsSectionHowToStep2Prefix')} <Mono>{t('fetchAiChat')}</Mono>
-            {t('aiChatsSectionHowToStep2Suffix')}
-          </li>
-          <li>
-            {t('aiChatsSectionHowToStep3Prefix')} <Mono>{t('contextMenuSaveCurrentAiChat')}</Mono>
-            {t('aiChatsSectionHowToStep3Suffix')}
-          </li>
-          <li>{t('aiChatsSectionHowToStep4')}</li>
-        </ol>
-      </section>
-
-      <section className={cardClassName} aria-label={t('aiChatsSectionTroubleshootingHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatsSectionTroubleshootingHeading')}
-        </h2>
-        <ul className="tw-mt-2.5 tw-list-disc tw-pl-5 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          <li>{t('aiChatsSectionTroubleshootingNoVisibleConversation')}</li>
-          <li>
-            {t('aiChatsSectionTroubleshootingAutoSavePrefix')} <Mono>{t('aiChatAutoSaveLabel')}</Mono>
-            {t('aiChatsSectionTroubleshootingAutoSaveSuffix')}
-          </li>
-        </ul>
       </section>
     </div>
   );
