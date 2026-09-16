@@ -21,7 +21,6 @@ import { normalizeText } from '@collectors/web/article-extract/url';
 type ExtractOptions = {
   stabilizationTimeoutMs?: number;
   stabilizationMinTextLength?: number;
-  includeXiaohongshuComments?: boolean;
 };
 
 function escapeHtml(value: unknown) {
@@ -432,11 +431,11 @@ function appendHtmlBeforeBody(contentHTML: string, addition: string) {
   return contentHTML.replace(/<\/body>\s*<\/html>\s*$/i, `${addition}</body></html>`);
 }
 
-function extractBySiteSpecs(baseHref: string, includeXiaohongshuComments: boolean) {
+function extractBySiteSpecs(baseHref: string) {
   for (const spec of ARTICLE_FETCH_SITE_SPECS) {
     const payload = extractBySiteSpec(spec, baseHref);
     if (!payload) continue;
-    if (spec.id === 'xiaohongshu_note' && includeXiaohongshuComments) {
+    if (spec.id === 'xiaohongshu_note') {
       const comments = extractXiaohongshuComments();
       if (comments) {
         return {
@@ -535,7 +534,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   prepareWechatRichMediaDom();
 
-  const sitePayload = extractBySiteSpecs(baseHref, options.includeXiaohongshuComments === true);
+  const sitePayload = extractBySiteSpecs(baseHref);
   if (sitePayload) {
     const markdown =
       htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) || normalizeText(sitePayload.textContent);

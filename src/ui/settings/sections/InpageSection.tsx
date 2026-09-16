@@ -1,6 +1,13 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
+import {
+  buttonClassName,
+  cardClassName,
+  checkboxClassName,
+  settingsControlWidthClassName,
+  settingsTextInputClassName,
+} from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import {
@@ -19,7 +26,7 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void; 
         {t('aboutYouUserNameSectionTitle')}
       </h2>
       <input
-        className={`${textInputClassName} tw-mt-3 tw-w-full tw-px-3 tw-py-2 tw-font-semibold`}
+        className={`${settingsTextInputClassName} tw-mt-3 tw-px-3 tw-py-2 tw-font-semibold`}
         value={value}
         onChange={(e) => onChange(String((e.target as any)?.value || ''))}
         onBlur={onSave}
@@ -46,19 +53,16 @@ export function InpageSection(props: {
   onSaveUserName: () => void;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
-  cliIntegrationAvailable: boolean;
-  cliIntegrationEnabled: boolean;
-  onToggleCliIntegration: (next: boolean) => void;
   localePreference: LocalePreference;
   onChangeLocalePreference: (next: LocalePreference) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
+  chatgptApiCaptureEnabled: boolean;
+  onToggleChatgptApiCaptureEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
   onToggleWebArticleCacheImagesEnabled: (next: boolean) => void;
-  xiaohongshuCommentsCaptureEnabled: boolean;
-  onToggleXiaohongshuCommentsCaptureEnabled: (next: boolean) => void;
   antiHotlinkAdvancedOpen: boolean;
   onToggleAntiHotlinkAdvancedOpen: () => void;
   antiHotlinkRules: AntiHotlinkRuleEditorRow[];
@@ -78,19 +82,16 @@ export function InpageSection(props: {
     onSaveUserName,
     displayMode,
     onChangeDisplayMode,
-    cliIntegrationAvailable,
-    cliIntegrationEnabled,
-    onToggleCliIntegration,
     localePreference,
     onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    chatgptApiCaptureEnabled,
+    onToggleChatgptApiCaptureEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
-    xiaohongshuCommentsCaptureEnabled,
-    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -124,8 +125,9 @@ export function InpageSection(props: {
               disabled={busy}
               ariaLabel={t('languageLabel')}
               minWidth={180}
+              className={settingsControlWidthClassName}
               buttonId="interface-locale"
-              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
+              buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
               options={[
                 { value: 'system', label: t('localeSystem') },
                 { value: 'en', label: t('localeEnglish') },
@@ -133,25 +135,6 @@ export function InpageSection(props: {
               ]}
             />
           </div>
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('localCliIntegrationHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('localCliIntegrationHeading')}
-        </h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={cliIntegrationEnabled}
-            disabled={busy || !cliIntegrationAvailable}
-            onChange={(e) => onToggleCliIntegration(!!e.target.checked)}
-            className={checkboxClassName}
-          />
-          {t('localCliIntegrationLabel')}
-        </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {cliIntegrationAvailable ? t('localCliIntegrationHint') : t('localCliIntegrationUnavailable')}
         </div>
       </section>
 
@@ -170,7 +153,8 @@ export function InpageSection(props: {
               disabled={busy}
               ariaLabel={t('inpageDisplayModeLabel')}
               minWidth={180}
-              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
+              className={settingsControlWidthClassName}
+              buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
               options={[
                 { value: 'supported', label: t('inpageDisplayModeSupported') },
                 { value: 'all', label: t('inpageDisplayModeAll') },
@@ -181,29 +165,13 @@ export function InpageSection(props: {
         </div>
       </section>
 
-      <section className={cardClassName} aria-label={t('xiaohongshuCommentsHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('xiaohongshuCommentsHeading')}
-        </h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={xiaohongshuCommentsCaptureEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleXiaohongshuCommentsCaptureEnabled(!!e.target.checked)}
-            className={checkboxClassName}
-          />
-          {t('xiaohongshuCommentsLabel')}
-        </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('xiaohongshuCommentsHint')}
-        </div>
-      </section>
-
       <section className={cardClassName} aria-label={t('aiChatDollarMentionHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatDollarMentionHeading')}
-        </h2>
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('aiChatDollarMentionHeading')}
+          </h2>
+          <SettingsDocsLink path="dollar-mention" />
+        </div>
         <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
           <input
             type="checkbox"
@@ -214,14 +182,34 @@ export function InpageSection(props: {
           />
           {t('aiChatDollarMentionLabel')}
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatDollarMentionHint')}
-        </div>
         {!!dollarMentionSitesLabel && (
           <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
             {dollarMentionSitesLabel}
           </div>
         )}
+      </section>
+
+      <section className={cardClassName} aria-label={t('chatgptApiCaptureAdvancedHeading')}>
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('chatgptApiCaptureAdvancedHeading')}
+          </h2>
+          <SettingsDocsLink path="capture-ai-chats" />
+        </div>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={chatgptApiCaptureEnabled}
+            disabled={busy}
+            onChange={(event) => onToggleChatgptApiCaptureEnabled(event.target.checked)}
+            className={checkboxClassName}
+            aria-label={t('chatgptApiCaptureAdvancedLabel')}
+          />
+          {t('chatgptApiCaptureAdvancedLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('chatgptApiCaptureAdvancedHint')}
+        </div>
       </section>
 
       <section className={cardClassName} aria-label={t('aiChatAutoSaveHeading')}>

@@ -25,8 +25,8 @@ description: 安装 SyncNos 浏览器扩展，并确认第一次采集可以正�
 
 不同来源的保存方式见[采集内容](/docs/capture/)。
 
-## 需要 CLI？
+## 需要 AI Agent 使用 SyncNos？
 
 普通使用不需要安装 CLI。
 
-需要本机自动化或 AI Agent 时，再阅读[使用 CLI 自动化](/docs/cli/)。
+需要 AI Agent 使用 SyncNos 时，再阅读 [CLI & AI SKILL](/docs/cli/)。

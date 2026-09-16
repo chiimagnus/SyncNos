@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 
-vi.mock('@i18n', () => ({ t: (key: string) => key }));
+vi.mock('@i18n', () => ({
+  t: (key: string) => key,
+  getCurrentLocale: () => 'en',
+}));
 
 type NotionProps = Parameters<typeof NotionOAuthSection>[0];
 type FeishuProps = Parameters<typeof FeishuOAuthSection>[0];
@@ -88,7 +91,6 @@ function feishuProps(overrides: Partial<FeishuProps> = {}): FeishuProps {
     feishuArticleFolder: 'WebArticles',
     feishuVideoFolder: 'Videos',
     feishuLogoUrl: 'https://example.com/feishu.png',
-    setupGuideUrl: 'https://example.com/guide',
     onToggleSyncEnabled: noOp,
     onToggleAutoSyncEnabled: noOp,
     onConnectOrDisconnect: noOp,
@@ -100,7 +102,6 @@ function feishuProps(overrides: Partial<FeishuProps> = {}): FeishuProps {
     onChangeVideoFolder: noOp,
     onSavePaths: noOp,
     onSaveAdvanced: noOp,
-    onOpenSetupGuide: noOp,
     ...overrides,
   };
 }
@@ -121,6 +122,23 @@ afterEach(() => {
 });
 
 describe('Settings OAuth sections', () => {
+  it('keeps provider text fields and select triggers on the compact settings control width', async () => {
+    await render(
+      createElement(
+        NotionOAuthSection,
+        notionProps({ notionConnected: true, notionPageOptions: [{ id: 'page-1', title: 'Page' }] }),
+      ),
+    );
+    const notionPageTrigger = document.querySelector('button#notionPages') as HTMLButtonElement | null;
+    expect(notionPageTrigger?.parentElement?.className || '').toContain('tw-max-w-[180px]');
+
+    await render(createElement(FeishuOAuthSection, feishuProps()));
+    const clientIdInput = document.querySelector(
+      'input[aria-label="feishuOAuthClientIdLabel"]',
+    ) as HTMLInputElement | null;
+    expect(clientIdInput?.className || '').toContain('tw-max-w-[180px]');
+  });
+
   it('disables disconnected Connect while the current surface is waiting, but never locks connected Disconnect', async () => {
     await render(createElement(NotionOAuthSection, notionProps({ pollingNotion: true })));
     let button = document.querySelector('section[aria-label="notionOAuth"] button') as HTMLButtonElement;
@@ -141,6 +159,29 @@ describe('Settings OAuth sections', () => {
     button = document.querySelector('section[aria-label="feishuOAuth"] button') as HTMLButtonElement;
     expect(button.disabled).toBe(false);
     expect(button.textContent).toBe('disconnect');
+  });
+
+  it('matches GitHub connection button emphasis for Notion and Feishu', async () => {
+    await render(createElement(NotionOAuthSection, notionProps()));
+    let button = document.querySelector('section[aria-label="notionOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--filled');
+
+    await render(createElement(NotionOAuthSection, notionProps({ notionConnected: true })));
+    button = document.querySelector('section[aria-label="notionOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--danger-tint');
+
+    await render(createElement(FeishuOAuthSection, feishuProps()));
+    button = document.querySelector('section[aria-label="feishuOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--filled');
+
+    await render(createElement(FeishuOAuthSection, feishuProps({ feishuConnected: true })));
+    button = document.querySelector('section[aria-label="feishuOAuth"] button') as HTMLButtonElement;
+    expect(button.className).toContain('webclipper-btn--danger-tint');
+  });
+
+  it('uses the unified Feishu help docs link', async () => {
+    await render(createElement(FeishuOAuthSection, feishuProps()));
+    expect(document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/"]')).toBeTruthy();
   });
 
   it('disables Feishu auth config inputs while the current surface is waiting', async () => {

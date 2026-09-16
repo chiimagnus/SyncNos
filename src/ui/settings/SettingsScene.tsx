@@ -10,17 +10,15 @@ import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
 import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
 import { type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
-import { AiChatsSection } from '@ui/settings/sections/AiChatsSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { InsightSection } from '@ui/settings/sections/InsightSection';
 import { InpageSection } from '@ui/settings/sections/InpageSection';
 import { KeyboardShortcutsSection } from '@ui/settings/sections/KeyboardShortcutsSection';
+import { CliIntegrationSection } from '@ui/settings/sections/CliIntegrationSection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { FeishuOAuthSection } from '@ui/settings/sections/FeishuOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
 import { GitHubSettingsSection } from '@ui/settings/sections/GitHubSettingsSection';
-import { WebArticlesSection } from '@ui/settings/sections/WebArticlesSection';
-import { VideosSection } from '@ui/settings/sections/VideosSection';
 
 export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
@@ -98,8 +96,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveFeishuPaths,
     onSaveFeishuAdvancedSettings,
     onFeishuConnectOrDisconnect,
-    onOpenFeishuSetupGuide,
-    feishuSetupGuideUrl,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,
@@ -123,8 +119,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,
-    onOpenObsidianSetupGuide,
-    obsidianSetupGuideUrl,
 
     githubAuth,
     githubAccount,
@@ -179,8 +173,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
-    xiaohongshuCommentsCaptureEnabled,
-    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -298,7 +290,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           feishuArticleFolder={feishuArticleFolder}
           feishuVideoFolder={feishuVideoFolder}
           feishuLogoUrl={getURL('icons/feishu.svg' as any)}
-          setupGuideUrl={feishuSetupGuideUrl}
           onToggleSyncEnabled={(enabled) => {
             void onToggleFeishuSyncEnabled(enabled);
           }}
@@ -323,7 +314,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onConnectOrDisconnect={() => {
             void onFeishuConnectOrDisconnect();
           }}
-          onOpenSetupGuide={onOpenFeishuSetupGuide}
         />
       ) : null}
 
@@ -342,7 +332,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           videoFolder={obsidianVideoFolder}
           statusText={obsidianStatus}
           obsidianLogoUrl={getURL('icons/obsidian.svg' as any)}
-          setupGuideUrl={obsidianSetupGuideUrl}
           onChangeApiBaseUrl={setObsidianApiBaseUrl}
           onChangeAuthHeaderName={setObsidianAuthHeaderName}
           onChangeApiKeyDraft={setObsidianApiKeyDraft}
@@ -364,7 +353,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onTest={() => {
             void onTestObsidianConnection();
           }}
-          onOpenSetupGuide={onOpenObsidianSetupGuide}
         />
       ) : null}
 
@@ -469,11 +457,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);
           }}
-          cliIntegrationAvailable={cliIntegrationAvailable}
-          cliIntegrationEnabled={cliIntegrationEnabled}
-          onToggleCliIntegration={(next) => {
-            void onToggleCliIntegration(next);
-          }}
           localePreference={localePreference}
           onChangeLocalePreference={(next) => {
             void onChangeLocalePreference(next);
@@ -482,6 +465,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           onToggleAiChatAutoSaveEnabled={(next) => {
             void onToggleAiChatAutoSaveEnabled(next);
           }}
+          chatgptApiCaptureEnabled={chatgptApiCaptureEnabled}
+          onToggleChatgptApiCaptureEnabled={(next) => {
+            void onToggleChatgptApiCaptureEnabled(next);
+          }}
           aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
           onToggleAiChatCacheImagesEnabled={(next) => {
             void onToggleAiChatCacheImagesEnabled(next);
@@ -489,10 +476,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           webArticleCacheImagesEnabled={webArticleCacheImagesEnabled}
           onToggleWebArticleCacheImagesEnabled={(next) => {
             void onToggleWebArticleCacheImagesEnabled(next);
-          }}
-          xiaohongshuCommentsCaptureEnabled={xiaohongshuCommentsCaptureEnabled}
-          onToggleXiaohongshuCommentsCaptureEnabled={(next) => {
-            void onToggleXiaohongshuCommentsCaptureEnabled(next);
           }}
           antiHotlinkAdvancedOpen={antiHotlinkAdvancedOpen}
           onToggleAntiHotlinkAdvancedOpen={onToggleAntiHotlinkAdvancedOpen}
@@ -525,19 +508,16 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'articles' ? <WebArticlesSection /> : null}
-
-      {activeSection === 'ai_chats' ? (
-        <AiChatsSection
+      {activeSection === 'cli' ? (
+        <CliIntegrationSection
           busy={busy}
-          chatgptApiCaptureEnabled={chatgptApiCaptureEnabled}
-          onToggleChatgptApiCaptureEnabled={(next) => {
-            void onToggleChatgptApiCaptureEnabled(next);
+          cliIntegrationAvailable={cliIntegrationAvailable}
+          cliIntegrationEnabled={cliIntegrationEnabled}
+          onToggleCliIntegration={(next) => {
+            void onToggleCliIntegration(next);
           }}
         />
       ) : null}
-
-      {activeSection === 'videos' ? <VideosSection /> : null}
 
       {activeSection === 'aboutme' ? <AboutSection /> : null}
     </section>

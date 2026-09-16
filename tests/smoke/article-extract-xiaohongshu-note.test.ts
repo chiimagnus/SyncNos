@@ -66,7 +66,7 @@ describe('article-extract xiaohongshu note', () => {
     expect(markdown).toContain('https://sns-webpic-qc.xhscdn.com/20260406/demo/xhs-note-2.jpg');
   });
 
-  it('appends loaded comments and expanded replies only when requested', async () => {
+  it('always appends loaded comments and expanded replies for Xiaohongshu notes', async () => {
     const dom = new JSDOM(
       `<body>
         <div id="noteContainer" class="note-container">
@@ -100,25 +100,18 @@ describe('article-extract xiaohongshu note', () => {
     );
 
     setDomGlobals(dom);
-    const withoutComments = await extractWebArticleFromCurrentPage({
+    const extracted = await extractWebArticleFromCurrentPage({
       stabilizationTimeoutMs: 1,
       stabilizationMinTextLength: 1,
     });
-    expect(withoutComments.contentMarkdown).not.toContain('父评论内容');
 
-    const withComments = await extractWebArticleFromCurrentPage({
-      stabilizationTimeoutMs: 1,
-      stabilizationMinTextLength: 1,
-      includeXiaohongshuComments: true,
-    });
-
-    expect(withComments.contentMarkdown).toContain('评论区');
-    expect(withComments.contentMarkdown).toContain('父评论用户');
-    expect(withComments.contentMarkdown).toContain('08-09');
-    expect(withComments.contentMarkdown).toContain('父评论内容');
-    expect(withComments.contentMarkdown).toContain('回复用户');
-    expect(withComments.contentMarkdown).toContain('已展开回复内容');
-    expect(withComments.contentMarkdown).not.toContain('上海');
-    expect(withComments.contentMarkdown).not.toContain('北京');
+    expect(extracted.contentMarkdown).toContain('评论区');
+    expect(extracted.contentMarkdown).toContain('父评论用户');
+    expect(extracted.contentMarkdown).toContain('08-09');
+    expect(extracted.contentMarkdown).toContain('父评论内容');
+    expect(extracted.contentMarkdown).toContain('回复用户');
+    expect(extracted.contentMarkdown).toContain('已展开回复内容');
+    expect(extracted.contentMarkdown).not.toContain('上海');
+    expect(extracted.contentMarkdown).not.toContain('北京');
   });
 });

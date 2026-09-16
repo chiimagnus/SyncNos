@@ -32,10 +32,6 @@ export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
         {t('keyboardShortcutsHeading')}
       </h2>
-      <p className="tw-mb-0 tw-mt-1.5 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)] tw-opacity-90">
-        {t('keyboardShortcutsDescription')}
-      </p>
-
       <div className="tw-mt-3 tw-grid tw-divide-y tw-divide-[var(--border)]">
         {ACTION_ROWS.map(({ action, labelKey }) => {
           const shortcut = shortcutByAction.get(action) || '';

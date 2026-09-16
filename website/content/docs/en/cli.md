@@ -1,11 +1,11 @@
 ---
-title: Automate with the CLI
-description: Install the syncnos CLI so local tools or AI agents can use SyncNos data from your browser.
+title: CLI & AI SKILL
+description: Let AI agents use SyncNos through the local CLI.
 ---
 
-You do not need the CLI for ordinary browser use. Install it only when you want local automation.
+You do not need the CLI for ordinary browser use. Set it up when you want an AI agent to use SyncNos.
 
-## Install
+## 1. Install the CLI
 
 ```bash
 npm install -g @chiimagnus/syncnos@latest
@@ -13,47 +13,19 @@ syncnos install
 syncnos doctor
 ```
 
-Then enable this in the browser profile you want to use:
+Then enable it in the browser profile you want to use:
 
-**Settings → General → Local CLI integration → SyncNos CLI**
+**Settings → CLI & AI SKILL → Local CLI Integration → SyncNos CLI**
 
-Keep that browser profile running while using CLI commands.
+Keep that browser profile running while the agent uses SyncNos.
 
-## See the current commands
+## 2. Install the AI SKILL
 
-Use the installed version as the command reference:
+Choose the language you want:
 
-```bash
-syncnos --help
-syncnos capabilities
-syncnos settings schema
-syncnos doctor
-```
+- [`skills/syncnos/`](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos): English
+- [`skills/syncnos-zh/`](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos-zh): 中文
 
-## Common examples
+Install the selected Skill in the Skills directory used by your AI agent. The exact location depends on the agent.
 
-```bash
-syncnos instances
-syncnos list --limit 20
-syncnos search "keyword" --limit 20
-syncnos get <conversation-id>
-syncnos comments add <conversation-id> --text "A comment"
-syncnos comments reply <conversation-id> <parent-comment-id> --text "A reply"
-syncnos sync <conversation-id> --to notion
-syncnos export markdown <conversation-id> --output ./export
-syncnos backup export --output ./syncnos-backup.zip
-```
-
-Replace the sync destination with `notion`, `obsidian`, `feishu`, or `github`.
-
-## AI-agent Skill
-
-The repository ships ready-to-use CLI Skills at `skills/syncnos/` (English) and `skills/syncnos-zh/` (中文). They use the installed CLI as the command source of truth and diagnose recoverable CLI / Native Messaging failures with `syncnos doctor` before escalating to manual browser steps.
-
-## For automation
-
-The CLI outputs JSON by default so scripts and AI agents can consume it directly.
-
-Comments and replies created through the CLI for web articles are displayed as `<About You name>' CLI`; when no About You name is configured, they are displayed as `CLI`. This keeps automation-authored notes distinct from comments you write directly in the browser UI.
-
-`sync` waits for completion by default. Add `--no-wait` when you want asynchronous execution.
+After that, ask the agent to use SyncNos directly. The Skill treats the installed CLI as the command source of truth and uses `syncnos doctor` first when the local connection needs diagnosis.

@@ -11,5 +11,9 @@ export const dangerButtonClassName = buttonDangerTintClassName();
 
 export const textInputClassName = 'webclipper-field tw-min-h-9 tw-px-2.5 tw-text-sm tw-text-[var(--text-primary)]';
 
+export const settingsControlWidthClassName = 'tw-w-full tw-max-w-[180px]';
+
+export const settingsTextInputClassName = `${textInputClassName} ${settingsControlWidthClassName}`;
+
 export const checkboxClassName =
   'tw-size-[18px] tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]';

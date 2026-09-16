@@ -1,7 +1,8 @@
 import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
+import { buttonClassName, cardClassName, checkboxClassName, settingsTextInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
@@ -18,7 +19,6 @@ export function ObsidianSettingsSection(props: {
   videoFolder: string;
   statusText: string;
   obsidianLogoUrl: string;
-  setupGuideUrl: string;
   onChangeApiBaseUrl: (v: string) => void;
   onChangeAuthHeaderName: (v: string) => void;
   onChangeApiKeyDraft: (v: string) => void;
@@ -30,7 +30,6 @@ export function ObsidianSettingsSection(props: {
   onSave: () => void;
   onSaveApiKey: () => void;
   onTest: () => void;
-  onOpenSetupGuide: () => void;
 }) {
   const {
     busy,
@@ -46,7 +45,6 @@ export function ObsidianSettingsSection(props: {
     videoFolder,
     statusText,
     obsidianLogoUrl,
-    setupGuideUrl,
     onChangeApiBaseUrl,
     onChangeAuthHeaderName,
     onChangeApiKeyDraft,
@@ -58,7 +56,6 @@ export function ObsidianSettingsSection(props: {
     onSave,
     onSaveApiKey,
     onTest,
-    onOpenSetupGuide,
   } = props;
 
   const onEnterToSave = (e: KeyboardEvent<HTMLInputElement>, mode: 'default' | 'apiKey' = 'default') => {
@@ -80,6 +77,7 @@ export function ObsidianSettingsSection(props: {
           <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
             {t('obsidianLocalRestApi')}
           </h2>
+          <SettingsDocsLink path="sync/obsidian" />
           <button className={buttonClassName} onClick={onTest} disabled={busy} type="button">
             {t('test')}
           </button>
@@ -121,7 +119,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="http://127.0.0.1:27123"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('baseUrl')}
             />
           </SettingsFormRow>
@@ -137,7 +135,7 @@ export function ObsidianSettingsSection(props: {
               onKeyDown={(e) => onEnterToSave(e, 'apiKey')}
               disabled={busy}
               placeholder={apiKeyPresent ? apiKeyMasked : ''}
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('apiKey')}
             />
           </SettingsFormRow>
@@ -151,31 +149,13 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="Authorization"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('authHeader')}
             />
           </SettingsFormRow>
 
           <SettingsFormRow label={t('status')} align="start">
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{statusText}</div>
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-              {t('obsidianInstallNote')}{' '}
-              <a
-                className="tw-underline hover:tw-opacity-80"
-                href={setupGuideUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onOpenSetupGuide();
-                }}
-              >
-                {t('openSetupGuide')}
-              </a>
-            </div>
           </SettingsFormRow>
         </div>
       </section>
@@ -193,7 +173,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="SyncNos-AIChats"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('aiChatsFolder')}
             />
           </SettingsFormRow>
@@ -207,7 +187,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="SyncNos-WebArticles"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('webClipperFolder')}
             />
           </SettingsFormRow>
@@ -221,13 +201,9 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               spellCheck={false}
               placeholder="SyncNos-Videos"
-              className={textInputClassName}
+              className={settingsTextInputClassName}
               aria-label={t('videoScriptsFolder')}
             />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('obsidianPathsNote')}</div>
           </SettingsFormRow>
         </div>
       </section>

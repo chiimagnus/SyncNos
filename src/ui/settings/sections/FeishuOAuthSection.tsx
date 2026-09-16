@@ -1,6 +1,14 @@
 import { t } from '@i18n';
 import type { KeyboardEvent } from 'react';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
+import {
+  buttonClassName,
+  cardClassName,
+  checkboxClassName,
+  dangerButtonClassName,
+  primaryButtonClassName,
+  settingsTextInputClassName,
+} from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function FeishuOAuthSection(props: {
@@ -20,7 +28,6 @@ export function FeishuOAuthSection(props: {
   feishuArticleFolder: string;
   feishuVideoFolder: string;
   feishuLogoUrl: string;
-  setupGuideUrl: string;
   onToggleSyncEnabled: (enabled: boolean) => void;
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
   onConnectOrDisconnect: () => void;
@@ -33,7 +40,6 @@ export function FeishuOAuthSection(props: {
   onChangeVideoFolder: (value: string) => void;
   onSavePaths: () => void;
   onSaveAdvanced: () => void;
-  onOpenSetupGuide: () => void;
 }) {
   const {
     busy,
@@ -52,7 +58,6 @@ export function FeishuOAuthSection(props: {
     feishuArticleFolder,
     feishuVideoFolder,
     feishuLogoUrl,
-    setupGuideUrl,
     onToggleSyncEnabled,
     onToggleAutoSyncEnabled,
     onConnectOrDisconnect,
@@ -65,7 +70,6 @@ export function FeishuOAuthSection(props: {
     onChangeVideoFolder,
     onSavePaths,
     onSaveAdvanced,
-    onOpenSetupGuide,
   } = props;
 
   const onEnterToSavePaths = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -92,11 +96,12 @@ export function FeishuOAuthSection(props: {
             </span>
             <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{feishuStatusText}</span>
           </div>
+          <SettingsDocsLink path="sync/feishu" />
           <button
             onClick={onConnectOrDisconnect}
             disabled={busy || (!feishuConnected && pollingFeishu)}
             type="button"
-            className={buttonClassName}
+            className={feishuConnected ? dangerButtonClassName : primaryButtonClassName}
           >
             {feishuConnected ? t('disconnect') : pollingFeishu ? t('connectingDots') : t('connect')}
           </button>
@@ -153,7 +158,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="cli_xxx"
               aria-label={t('feishuOAuthClientIdLabel')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
 
@@ -169,7 +174,7 @@ export function FeishuOAuthSection(props: {
                 type="password"
                 placeholder={feishuClientSecretPresent ? '••••••••' : ''}
                 aria-label={t('feishuOAuthClientSecretLabel')}
-                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                className={settingsTextInputClassName}
               />
               {feishuClientSecretPresent ? (
                 <button
@@ -194,27 +199,8 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="https://.../feishu/oauth/exchange"
               aria-label={t('feishuTokenExchangeProxyUrlLabel')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-              {t('feishuAdvancedHint')}{' '}
-              <a
-                className="tw-underline hover:tw-opacity-80"
-                href={setupGuideUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onOpenSetupGuide();
-                }}
-              >
-                {t('openSetupGuide')}
-              </a>
-              {t('feishuReauthorizeHint')}
-            </div>
           </SettingsFormRow>
         </div>
       </section>
@@ -233,7 +219,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="SyncNos-AIChats"
               aria-label={t('aiChatsFolder')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
 
@@ -247,7 +233,7 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="SyncNos-WebArticles"
               aria-label={t('webClipperFolder')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
           </SettingsFormRow>
 
@@ -261,12 +247,8 @@ export function FeishuOAuthSection(props: {
               spellCheck={false}
               placeholder="SyncNos-Videos"
               aria-label={t('videoScriptsFolder')}
-              className={`${textInputClassName} tw-w-full`}
+              className={settingsTextInputClassName}
             />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('feishuPathsNote')}</div>
           </SettingsFormRow>
         </div>
       </section>

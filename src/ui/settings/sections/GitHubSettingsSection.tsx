@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 import {
   buttonClassName,
@@ -8,7 +9,8 @@ import {
   checkboxClassName,
   dangerButtonClassName,
   primaryButtonClassName,
-  textInputClassName,
+  settingsControlWidthClassName,
+  settingsTextInputClassName,
 } from '@ui/settings/ui';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 
@@ -146,6 +148,7 @@ export function GitHubSettingsSection(props: {
                   : t('statusNotConnected')}
             </div>
           </div>
+          <SettingsDocsLink path="sync/github" />
           {auth.state === 'disconnected' ? (
             <button type="button" className={primaryButtonClassName} onClick={onConnect} disabled={busy}>
               {t('githubConnect')}
@@ -241,12 +244,13 @@ export function GitHubSettingsSection(props: {
                 <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
                   <SelectMenu<string>
                     buttonId="githubRepository"
-                    className="tw-min-w-0 tw-flex-1"
+                    className={`${settingsControlWidthClassName} tw-min-w-0`}
                     buttonClassName={`${buttonClassName} tw-w-full`}
                     value={repository}
                     options={repositoryOptions}
                     disabled={busy || repositoriesLoading || repositoryStatus !== 'ready'}
                     ariaLabel={t('githubRepositoryLabel')}
+                    minWidth={180}
                     maxHeight={360}
                     onChange={onChangeRepository}
                   />
@@ -289,7 +293,7 @@ export function GitHubSettingsSection(props: {
                   disabled={busy || !repository || targetUnavailable}
                   spellCheck={false}
                   placeholder="main"
-                  className={textInputClassName}
+                  className={settingsTextInputClassName}
                   aria-label={t('githubBranchLabel')}
                 />
               </SettingsFormRow>

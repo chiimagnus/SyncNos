@@ -1,7 +1,7 @@
 import { getManifest, getURL } from '@services/shared/runtime';
-import { tabsCreate } from '@services/shared/webext';
 
 import { t } from '@i18n';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { buttonClassName, cardClassName } from '@ui/settings/ui';
 
 export function AboutSection() {
@@ -14,14 +14,10 @@ export function AboutSection() {
     }
   })();
 
-  const openUrl = async (url: string) => {
-    await tabsCreate({ url });
-  };
-
   return (
     <>
       <section className={cardClassName} aria-label={t('aboutSectionAria')}>
-        <div className="tw-flex tw-items-center tw-gap-3">
+        <div className="tw-flex tw-items-start tw-gap-3">
           <img
             className="tw-size-10 tw-rounded-2xl tw-object-contain"
             src={getURL('icons/icon-128.png' as any)}
@@ -34,25 +30,28 @@ export function AboutSection() {
               {version ? `${t('versionPrefix')} ${version}` : t('versionPrefix')}
             </div>
           </div>
+          <SettingsDocsLink />
         </div>
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label={t('linksAria')}>
-          <button
-            id="btnAboutSource"
+          <a
+            id="linkAboutSource"
             className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos').catch(() => {})}
+            href="https://github.com/chiimagnus/SyncNos"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('sourceCode')}
-          </button>
-          <button
-            id="btnAboutChangelog"
+          </a>
+          <a
+            id="linkAboutChangelog"
             className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/releases').catch(() => {})}
+            href="https://github.com/chiimagnus/SyncNos/releases"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('changelog')}
-          </button>
+          </a>
         </div>
       </section>
 
@@ -76,22 +75,24 @@ export function AboutSection() {
         </div>
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
-          <button
-            id="btnAboutGitHub"
+          <a
+            id="linkAboutGitHub"
             className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/issues').catch(() => {})}
+            href="https://github.com/chiimagnus/SyncNos/issues"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('githubFeedback')}
-          </button>
-          <button
-            id="btnAboutAngels"
+          </a>
+          <a
+            id="linkAboutAngels"
             className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://chiimagnus.github.io/SyncNos/#sponsors').catch(() => {})}
+            href="https://chiimagnus.github.io/SyncNos/#sponsors"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('angelsLinkLabel')}
-          </button>
+          </a>
         </div>
       </section>
 

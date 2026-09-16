@@ -1,7 +1,16 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
 import type { KeyboardEvent } from 'react';
 import { t } from '@i18n';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
+import {
+  buttonClassName,
+  cardClassName,
+  checkboxClassName,
+  dangerButtonClassName,
+  primaryButtonClassName,
+  settingsControlWidthClassName,
+  settingsTextInputClassName,
+} from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 
@@ -88,11 +97,12 @@ export function NotionOAuthSection(props: {
           </span>
           <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{notionStatusText}</span>
         </div>
+        <SettingsDocsLink path="sync/notion" />
         <button
           onClick={onConnectOrDisconnect}
           disabled={busy || (!notionConnected && pollingNotion)}
           type="button"
-          className={buttonClassName}
+          className={notionConnected ? dangerButtonClassName : primaryButtonClassName}
         >
           {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
         </button>
@@ -133,11 +143,12 @@ export function NotionOAuthSection(props: {
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             <SelectMenu<string>
               buttonId="notionPages"
-              className="tw-flex-1 tw-min-w-0"
+              className={`${settingsControlWidthClassName} tw-min-w-0`}
               buttonClassName={`${buttonClassName} tw-w-full`}
               value={String(notionParentPageId || '')}
               disabled={busy || !notionConnected || loadingNotionPages}
               ariaLabel={t('parentPage')}
+              minWidth={180}
               maxHeight={320}
               onChange={(next) => onSaveNotionParentPage(next)}
               options={[
@@ -193,7 +204,7 @@ export function NotionOAuthSection(props: {
                 spellCheck={false}
                 placeholder={notionChatDatabaseLabel}
                 aria-label={t('notionDbIdAiChats')}
-                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                className={settingsTextInputClassName}
               />
               <button
                 type="button"
@@ -217,7 +228,7 @@ export function NotionOAuthSection(props: {
                 spellCheck={false}
                 placeholder={notionArticleDatabaseLabel}
                 aria-label={t('notionDbIdWebArticles')}
-                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                className={settingsTextInputClassName}
               />
               <button
                 type="button"
@@ -241,7 +252,7 @@ export function NotionOAuthSection(props: {
                 spellCheck={false}
                 placeholder={notionVideoDatabaseLabel}
                 aria-label={t('notionDbIdVideos')}
-                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                className={settingsTextInputClassName}
               />
               <button
                 type="button"

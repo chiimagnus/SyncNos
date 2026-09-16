@@ -47,15 +47,9 @@ import {
   type InsightTimeRange,
 } from '@viewmodels/settings/insight-stats';
 
-import {
-  formatProgress,
-  openHttpUrl,
-  unwrap,
-  type ApiResponse,
-  type NotionPageOption,
-} from '@viewmodels/settings/utils';
+import { formatProgress, unwrap, type ApiResponse, type NotionPageOption } from '@viewmodels/settings/utils';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
-import { getCurrentLocale, getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
+import { getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
 import {
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,
@@ -342,7 +336,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [chatgptApiCaptureEnabled, setChatgptApiCaptureEnabled] = useState<boolean>(false);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
-  const [xiaohongshuCommentsCaptureEnabled, setXiaohongshuCommentsCaptureEnabled] = useState<boolean>(false);
   const [antiHotlinkAdvancedOpen, setAntiHotlinkAdvancedOpen] = useState<boolean>(false);
   const [antiHotlinkRules, setAntiHotlinkRules] = useState<AntiHotlinkRuleDraft[]>(() =>
     getDefaultAntiHotlinkRulesForSettings(),
@@ -721,7 +714,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY,
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
-        'xiaohongshu_comments_capture_enabled',
         'ai_chat_dollar_mention_enabled',
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
         LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
@@ -789,7 +781,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setChatgptApiCaptureEnabled(local?.[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY] === true);
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
-    setXiaohongshuCommentsCaptureEnabled(local?.xiaohongshu_comments_capture_enabled === true);
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
     setAntiHotlinkRuleErrors([]);
     if (aiChatDollarMentionObservationRevisionRef.current === aiChatDollarMentionObservationAtStart) {
@@ -911,9 +902,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
               if (inpageDisplayObservationRevisionRef.current === revision) setInpageDisplayMode('all');
             });
         }
-      }
-      if (Object.prototype.hasOwnProperty.call(changes, 'xiaohongshu_comments_capture_enabled')) {
-        setXiaohongshuCommentsCaptureEnabled(changes.xiaohongshu_comments_capture_enabled?.newValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY)) {
         void loadAntiHotlinkRulesForSettings({ forceRefresh: true })
@@ -1768,16 +1756,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
-  const onToggleXiaohongshuCommentsCaptureEnabled = useCallback(
-    async (next: boolean) => {
-      await runTask(async () => {
-        await storageSet({ xiaohongshu_comments_capture_enabled: next === true });
-        setXiaohongshuCommentsCaptureEnabled(next === true);
-      });
-    },
-    [runTask],
-  );
-
   const onToggleAntiHotlinkAdvancedOpen = useCallback(() => {
     setAntiHotlinkAdvancedOpen((open) => !open);
   }, []);
@@ -2108,24 +2086,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     }
   }, [busy, openExtensionAppSettings, useAppImport]);
 
-  const guideLocale = getCurrentLocale();
-  const obsidianSetupGuideUrl =
-    guideLocale === 'zh'
-      ? 'https://chiimagnus.github.io/SyncNos/docs/sync/obsidian/'
-      : 'https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/';
-  const feishuSetupGuideUrl =
-    guideLocale === 'zh'
-      ? 'https://chiimagnus.github.io/SyncNos/docs/sync/feishu/'
-      : 'https://chiimagnus.github.io/SyncNos/docs/en/sync/feishu/';
-
-  const onOpenObsidianSetupGuide = useCallback(() => {
-    openHttpUrl(obsidianSetupGuideUrl);
-  }, [obsidianSetupGuideUrl]);
-
-  const onOpenFeishuSetupGuide = useCallback(() => {
-    openHttpUrl(feishuSetupGuideUrl);
-  }, [feishuSetupGuideUrl]);
-
   const notionStatusText = useMemo(() => {
     if (notionConnected == null) return t('statusUnknown');
     if (notionConnected) {
@@ -2218,8 +2178,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onSaveFeishuPaths,
     onSaveFeishuAdvancedSettings,
     onFeishuConnectOrDisconnect,
-    onOpenFeishuSetupGuide,
-    feishuSetupGuideUrl,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,
@@ -2243,8 +2201,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,
-    onOpenObsidianSetupGuide,
-    obsidianSetupGuideUrl,
 
     githubAuth,
     githubAccount,
@@ -2299,8 +2255,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
-    xiaohongshuCommentsCaptureEnabled,
-    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,

@@ -67,12 +67,7 @@ describe('article-fetch-service', () => {
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
     storageMocks.upsertConversation.mockImplementation(upsertConversation);
     storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
-    settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
-      if (keys.includes('xiaohongshu_comments_capture_enabled')) {
-        return { xiaohongshu_comments_capture_enabled: true };
-      }
-      return { web_article_cache_images_enabled: true };
-    });
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
     imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => ({
       messages: (Array.isArray(input?.messages) ? input.messages : []).map((message: any) => ({
         ...message,
@@ -135,9 +130,7 @@ describe('article-fetch-service', () => {
     expect(data.url).toBe('https://example.com/post');
     expect(data.title).toBe('Readability Title');
 
-    expect(sendMessage.mock.calls[0][1]).toMatchObject({
-      payload: { includeXiaohongshuComments: true },
-    });
+    expect(sendMessage.mock.calls[0][1]?.payload).not.toHaveProperty('includeXiaohongshuComments');
 
     expect(executeScript).toHaveBeenCalledTimes(0);
     expect(upsertConversation).toHaveBeenCalledTimes(1);
