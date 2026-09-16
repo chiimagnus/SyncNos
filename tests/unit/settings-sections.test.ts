@@ -22,8 +22,18 @@ import { ObsidianSettingsSection } from '../../src/ui/settings/sections/Obsidian
 import { GitHubSettingsSection } from '../../src/ui/settings/sections/GitHubSettingsSection';
 import { SettingsSidebarNav } from '../../src/ui/settings/SettingsSidebarNav';
 import { buildSettingsDocsUrl } from '../../src/ui/settings/SettingsDocsLink';
+import { navItemClassName } from '../../src/ui/shared/nav-styles';
 
 describe('settings section definitions', () => {
+  it('keeps shared selectable nav items discrete instead of cross-fading accent state', () => {
+    for (const active of [false, true]) {
+      const classes = navItemClassName(active);
+      expect(classes).not.toContain('tw-transition-colors');
+      expect(classes).not.toContain('tw-duration-150');
+      expect(classes).toContain('focus-visible:tw-outline');
+    }
+  });
+
   it('builds localized website docs URLs for settings links', () => {
     expect(buildSettingsDocsUrl(undefined, 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/');
     expect(buildSettingsDocsUrl(undefined, 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/');
