@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
+import { DEDAO_COURSE_ARTICLE_SITE_SPEC } from '@collectors/web/article-fetch-sites/dedao-course-article';
 import { DEDAO_NOTE_DETAIL_SITE_SPEC } from '@collectors/web/article-fetch-sites/dedao-note-detail';
 import { DEDAO_SHARE_SITE_SPEC } from '@collectors/web/article-fetch-sites/dedao-share';
 import { buildDedaoNoteInnerHtml } from '../helpers/dedao-note-fixture';
@@ -39,6 +40,59 @@ describe('article-extract dedao site spec', () => {
     expect(markdown).toContain('正文段落一：这是用于抽取回归测试的示例内容。');
     expect(markdown).not.toContain('* * *');
     expect(markdown).not.toContain('\n---\n');
+  });
+
+  it('keeps reader questions and reply attribution in course Q&A articles', () => {
+    document.title = '问答：设计结构矩阵和甘特图的区别是什么？ - 得到APP';
+    document.body.innerHTML = `
+      <div class="editor-show">
+        <div class="dd-audio" data-module-type="custom">
+          <div class="dd-audio-player">
+            <span class="audio-title">问答：设计结构矩阵和甘特图的区别是什么？</span>
+            <span class="audio-duration">11分58秒</span>
+          </div>
+          <div class="audio-tips">转述：怀沙AI</div>
+        </div>
+        <p data-module-type="internal"><a data-link="igetapp://class/article?id=1">来自《脆弱和反脆弱》</a></p>
+        <div class="tag-module lineable" data-module-type="custom">
+          <div class="tag-content"><div class="tag"><span>读者 刘福起：</span></div></div>
+          <blockquote><span>请教万老师：每个月五天禁食，只喝水，这个事情是属于反脆弱，激活好细胞吗？</span></blockquote>
+        </div>
+        <div class="quoted" data-module-type="custom">
+          <div class="author"><img src="https://example.com/avatar.jpg" /><p>万维钢</p></div>
+          <blockquote><p>回复——</p></blockquote>
+        </div>
+        <p data-module-type="internal">给身体一个可承受的小压力，然后能恢复回来。</p>
+        <svg><text>笔记</text></svg>
+        <div><div class="em-menu">写笔记 划线 删除划线 复制</div></div>
+      </div>
+    `;
+
+    const res = extractBySiteSpec(
+      DEDAO_COURSE_ARTICLE_SITE_SPEC,
+      'https://www.dedao.cn/course/article?id=qzNakylrn9WVaZWMjGJ7DOop10vZwL',
+    );
+
+    expect(res?.title).toBe('问答：设计结构矩阵和甘特图的区别是什么？ - 得到APP');
+    expect(String(res?.textContent || '')).toContain('读者 刘福起：');
+    expect(String(res?.textContent || '')).toContain(
+      '请教万老师：每个月五天禁食，只喝水，这个事情是属于反脆弱，激活好细胞吗？',
+    );
+    expect(String(res?.textContent || '')).toContain('万维钢');
+    expect(String(res?.textContent || '')).not.toContain('写笔记 划线 删除划线 复制');
+    expect(String(res?.textContent || '')).not.toContain('笔记');
+    expect(String(res?.contentHTML || '')).not.toContain('avatar.jpg');
+
+    const markdown = htmlToMarkdownTurndown(
+      String(res?.contentHTML || ''),
+      'https://www.dedao.cn/course/article?id=qzNakylrn9WVaZWMjGJ7DOop10vZwL',
+    );
+    expect(markdown).toContain('读者 刘福起：');
+    expect(markdown).toContain('> 请教万老师：每个月五天禁食，只喝水，这个事情是属于反脆弱，激活好细胞吗？');
+    expect(markdown).toContain('万维钢');
+    expect(markdown).toContain('> 回复——');
+    expect(markdown).not.toContain('avatar.jpg');
+    expect(markdown).not.toContain('写笔记');
   });
 
   it('extracts a share article title and body without the player or user messages', () => {
