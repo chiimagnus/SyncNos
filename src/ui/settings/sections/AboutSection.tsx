@@ -1,8 +1,11 @@
 import { getManifest, getURL } from '@services/shared/runtime';
-import { tabsCreate } from '@services/shared/webext';
 
 import { t } from '@i18n';
-import { buttonClassName, cardClassName } from '@ui/settings/ui';
+import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
+import { cardClassName } from '@ui/settings/ui';
+
+const externalLinkClassName =
+  'tw-inline-flex tw-items-center tw-gap-1 tw-text-sm tw-font-bold tw-text-[var(--accent)] hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
 
 export function AboutSection() {
   const version = (() => {
@@ -14,14 +17,10 @@ export function AboutSection() {
     }
   })();
 
-  const openUrl = async (url: string) => {
-    await tabsCreate({ url });
-  };
-
   return (
     <>
       <section className={cardClassName} aria-label={t('aboutSectionAria')}>
-        <div className="tw-flex tw-items-center tw-gap-3">
+        <div className="tw-flex tw-items-start tw-gap-3">
           <img
             className="tw-size-10 tw-rounded-2xl tw-object-contain"
             src={getURL('icons/icon-128.png' as any)}
@@ -34,25 +33,30 @@ export function AboutSection() {
               {version ? `${t('versionPrefix')} ${version}` : t('versionPrefix')}
             </div>
           </div>
+          <SettingsDocsLink />
         </div>
 
-        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label={t('linksAria')}>
-          <button
-            id="btnAboutSource"
-            className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos').catch(() => {})}
+        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-x-4 tw-gap-y-2" aria-label={t('linksAria')}>
+          <a
+            id="linkAboutSource"
+            className={externalLinkClassName}
+            href="https://github.com/chiimagnus/SyncNos"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('sourceCode')}
-          </button>
-          <button
-            id="btnAboutChangelog"
-            className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/releases').catch(() => {})}
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a
+            id="linkAboutChangelog"
+            className={externalLinkClassName}
+            href="https://github.com/chiimagnus/SyncNos/releases"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('changelog')}
-          </button>
+            <span aria-hidden="true">↗</span>
+          </a>
         </div>
       </section>
 
@@ -75,23 +79,27 @@ export function AboutSection() {
           </div>
         </div>
 
-        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
-          <button
-            id="btnAboutGitHub"
-            className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/issues').catch(() => {})}
+        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-x-4 tw-gap-y-2">
+          <a
+            id="linkAboutGitHub"
+            className={externalLinkClassName}
+            href="https://github.com/chiimagnus/SyncNos/issues"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('githubFeedback')}
-          </button>
-          <button
-            id="btnAboutAngels"
-            className={buttonClassName}
-            type="button"
-            onClick={() => openUrl('https://chiimagnus.github.io/SyncNos/#sponsors').catch(() => {})}
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a
+            id="linkAboutAngels"
+            className={externalLinkClassName}
+            href="https://chiimagnus.github.io/SyncNos/#sponsors"
+            target="_blank"
+            rel="noreferrer"
           >
             {t('angelsLinkLabel')}
-          </button>
+            <span aria-hidden="true">↗</span>
+          </a>
         </div>
       </section>
 

@@ -13,6 +13,7 @@ import {
   coerceSettingsSectionKey,
   readStoredSettingsSection,
 } from '../../src/viewmodels/settings/types';
+import { AboutSection } from '../../src/ui/settings/sections/AboutSection';
 import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 import { KeyboardShortcutsSection } from '../../src/ui/settings/sections/KeyboardShortcutsSection';
@@ -24,6 +25,8 @@ import { buildSettingsDocsUrl } from '../../src/ui/settings/SettingsDocsLink';
 
 describe('settings section definitions', () => {
   it('builds localized website docs URLs for settings links', () => {
+    expect(buildSettingsDocsUrl(undefined, 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/');
+    expect(buildSettingsDocsUrl(undefined, 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/');
     expect(buildSettingsDocsUrl('cli', 'en')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/cli/');
     expect(buildSettingsDocsUrl('cli', 'zh')).toBe('https://chiimagnus.github.io/SyncNos/docs/cli/');
     expect(buildSettingsDocsUrl('dollar-mention', 'en')).toBe(
@@ -109,6 +112,29 @@ describe('settings section definitions', () => {
       true,
     );
     expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
+
+    act(() => root.unmount());
+    cleanupDom();
+  });
+
+  it('renders About destinations as real links and exposes the help docs', () => {
+    setupDom();
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+    act(() => {
+      root.render(createElement(AboutSection));
+    });
+
+    expect(document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/"]')?.textContent).toContain(
+      'Help docs',
+    );
+    const externalLinks = document.querySelectorAll(
+      '#linkAboutSource, #linkAboutChangelog, #linkAboutGitHub, #linkAboutAngels',
+    );
+    expect(externalLinks).toHaveLength(4);
+    expect(Array.from(externalLinks).every((link) => link.tagName === 'A')).toBe(true);
+    expect(Array.from(externalLinks).every((link) => link.getAttribute('target') === '_blank')).toBe(true);
+    expect(document.querySelector('[id^="btnAbout"]')).toBeNull();
 
     act(() => root.unmount());
     cleanupDom();

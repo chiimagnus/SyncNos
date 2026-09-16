@@ -9,13 +9,13 @@ export type SettingsDocsPath =
   | 'sync/obsidian'
   | 'sync/github';
 
-export function buildSettingsDocsUrl(path: SettingsDocsPath, locale: Locale): string {
+export function buildSettingsDocsUrl(path: SettingsDocsPath | undefined, locale: Locale): string {
   const prefix =
     locale === 'zh' ? 'https://chiimagnus.github.io/SyncNos/docs' : 'https://chiimagnus.github.io/SyncNos/docs/en';
-  return `${prefix}/${path}/`;
+  return path ? `${prefix}/${path}/` : `${prefix}/`;
 }
 
-export function SettingsDocsLink(props: { path: SettingsDocsPath }) {
+export function SettingsDocsLink(props: { path?: SettingsDocsPath }) {
   const href = buildSettingsDocsUrl(props.path, getCurrentLocale());
   return (
     <a
