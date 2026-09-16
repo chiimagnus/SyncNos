@@ -2,10 +2,7 @@ import { getManifest, getURL } from '@services/shared/runtime';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { cardClassName } from '@ui/settings/ui';
-
-const externalLinkClassName =
-  'tw-inline-flex tw-items-center tw-gap-1 tw-text-sm tw-font-bold tw-text-[var(--accent)] hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
+import { buttonClassName, cardClassName } from '@ui/settings/ui';
 
 export function AboutSection() {
   const version = (() => {
@@ -36,26 +33,24 @@ export function AboutSection() {
           <SettingsDocsLink />
         </div>
 
-        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-x-4 tw-gap-y-2" aria-label={t('linksAria')}>
+        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label={t('linksAria')}>
           <a
             id="linkAboutSource"
-            className={externalLinkClassName}
+            className={buttonClassName}
             href="https://github.com/chiimagnus/SyncNos"
             target="_blank"
             rel="noreferrer"
           >
             {t('sourceCode')}
-            <span aria-hidden="true">↗</span>
           </a>
           <a
             id="linkAboutChangelog"
-            className={externalLinkClassName}
+            className={buttonClassName}
             href="https://github.com/chiimagnus/SyncNos/releases"
             target="_blank"
             rel="noreferrer"
           >
             {t('changelog')}
-            <span aria-hidden="true">↗</span>
           </a>
         </div>
       </section>
@@ -79,26 +74,24 @@ export function AboutSection() {
           </div>
         </div>
 
-        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-x-4 tw-gap-y-2">
+        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
           <a
             id="linkAboutGitHub"
-            className={externalLinkClassName}
+            className={buttonClassName}
             href="https://github.com/chiimagnus/SyncNos/issues"
             target="_blank"
             rel="noreferrer"
           >
             {t('githubFeedback')}
-            <span aria-hidden="true">↗</span>
           </a>
           <a
             id="linkAboutAngels"
-            className={externalLinkClassName}
+            className={buttonClassName}
             href="https://chiimagnus.github.io/SyncNos/#sponsors"
             target="_blank"
             rel="noreferrer"
           >
             {t('angelsLinkLabel')}
-            <span aria-hidden="true">↗</span>
           </a>
         </div>
       </section>
