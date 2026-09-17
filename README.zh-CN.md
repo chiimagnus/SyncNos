@@ -100,6 +100,10 @@ WebClipper Popup：保存并浏览已采集内容。
 
 ## 支持
 
+欢迎加入 SyncNos 用户 QQ 群（1027609452）交流使用体验、反馈问题和建议。
+
+<img src="docs/assets/qq-group.jpg" alt="SyncNos 用户 QQ 群二维码" width="220" />
+
 SyncNos 由一人维护。如果你愿意赞助，也欢迎留一句你为什么使用 SyncNos，或希望它接下来解决什么问题。
 
 <img src="public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="180" />

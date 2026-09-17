@@ -100,6 +100,10 @@ Article discussion sidebar: exact quotes, compact threads, and one active reply 
 
 ## Support
 
+Join the SyncNos QQ user group (1027609452) for usage discussion and feedback.
+
+<img src="docs/assets/qq-group.jpg" alt="SyncNos QQ user group QR code" width="220" />
+
 SyncNos is maintained by one person. If you would like to sponsor the project, leave a note about why you use SyncNos or what you hope it will solve next.
 
 <img src="public/icons/buymeacoffee1.jpg" alt="Chii Magnus tip jar QR" width="180" />
