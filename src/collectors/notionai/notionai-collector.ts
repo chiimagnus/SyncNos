@@ -2,15 +2,20 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
 import notionAiMarkdown from '@collectors/notionai/notionai-markdown.ts';
+import {
+  buildNotionAiTranscriptSnapshot,
+  createNotionAiTranscriptBridge,
+} from '@collectors/notionai/notionai-transcript.ts';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
 export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefinition {
   const window = env.window;
   const document = env.document;
   const location = env.location;
+  const transcriptBridge = createNotionAiTranscriptBridge({ window });
 
   const NOTION_AI_CHAT_CHROME_SELECTOR =
-    '[data-testid="agent-send-message-button"], [data-testid="unified-chat-model-button"]';
+    '[data-testid="agent-send-message-button"], [data-testid="agent-chat-send-button"], [data-testid="unified-chat-model-button"]';
   const NOTION_AI_COMPOSER_LEAF_SELECTOR =
     'div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]';
   const NOTION_AI_HISTORY_SELECTOR = 'div[role="button"][aria-label="history"]';
@@ -52,22 +57,28 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     return !!s.querySelector('[data-agent-chat-user-step-id]');
   }
 
-  function matches(loc: any): any {
-    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+  function isNotionAiChatRoute(loc?: any): boolean {
+    const hostname = loc?.hostname || location.hostname;
     if (!isNotionWebHost(hostname)) return false;
-    // Important: do not activate on normal Notion pages, otherwise we can capture page blocks as "assistant" turns.
-    return hasChatSignals(document);
+    const href = loc?.href || location.href;
+    return !!findChatThreadIdFromHref(href);
+  }
+
+  function matches(loc: any): any {
+    if (!isNotionWebHost(loc?.hostname || location.hostname)) return false;
+    // The new Agent Service UI no longer exposes `data-agent-chat-user-step-id`.
+    // A durable `/chat?t=<thread>` route is enough to activate the transcript-backed collector;
+    // legacy embedded/side-panel chats still use the old DOM signal as a fallback.
+    return isNotionAiChatRoute(loc) || hasChatSignals(document);
   }
 
   function inpageMatches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
-    // UI eligibility: show the inpage button on Notion pages even before chat turns render.
-    // Actual capture is still guarded by `isNotionAiPage()`.
     return isNotionWebHost(hostname);
   }
 
   function isNotionAiPage(): any {
-    return isNotionWebHost(location.hostname) && hasChatSignals(document);
+    return isNotionAiChatRoute() || (isNotionWebHost(location.hostname) && hasChatSignals(document));
   }
 
   function getAnyUserStepEl(scope?: any): any {
@@ -626,8 +637,33 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     return title || 'NotionAI Chat';
   }
 
-  function capture(): any {
+  async function capture(options: any = {}): Promise<any> {
     if (!isNotionAiPage()) return null;
+
+    const routeThreadId = findChatThreadIdFromHref(location.href);
+    if (routeThreadId) {
+      const prepared = options?.preparedCapture?.__notionAiTranscript === true ? options.preparedCapture.state : null;
+      const cached = prepared || transcriptBridge.get(routeThreadId);
+      // Legacy Notion AI surfaces still expose complete DOM turn markers. Keep that DOM path as a fallback for
+      // autosave when the MAIN-world transcript interceptor has not observed a request yet; manual capture always
+      // prepares the transcript first, and the new /chat UI has no legacy markers so it waits for the canonical API.
+      if (prepared || cached || !hasChatSignals(document)) {
+        const transcriptState =
+          prepared ||
+          (cached?.complete
+            ? await transcriptBridge.requestLatest(routeThreadId)
+            : await transcriptBridge.requestFull(routeThreadId));
+        const apiSnapshot = transcriptState
+          ? buildNotionAiTranscriptSnapshot({
+              ...transcriptState,
+              threadId: routeThreadId,
+              title: document.title,
+              document,
+            })
+          : null;
+        if (apiSnapshot) return apiSnapshot;
+      }
+    }
     const candidates = findCandidateRoots();
     const picked = pickBestRoot(candidates);
     const root = picked.root;
@@ -796,19 +832,34 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     };
   }
 
+  async function prepareManualCapture(): Promise<any | null> {
+    const threadId = findChatThreadIdFromHref(location.href);
+    if (!threadId) return null;
+    const state = await transcriptBridge.requestFull(threadId);
+    return state ? { __notionAiTranscript: true, state } : null;
+  }
+
   const collector: any = {
     capture,
-    getCaptureReadiness: () => (hasChatSignals(document) ? 'ready' : 'waiting'),
+    prepareManualCapture,
+    getCaptureReadiness: () =>
+      isNotionAiPage() && (hasChatSignals(document) || !!document.querySelector(NOTION_AI_CHAT_CHROME_SELECTOR))
+        ? 'ready'
+        : 'waiting',
     getRoot: () => {
       if (!isNotionAiPage()) return null;
       const seed = getLastUserStepEl(document) || getAnyUserStepEl(document);
-      if (!seed) return null;
-      const boundaryRoot = findChatBoundaryRootFromUserStep(seed);
-      if (boundaryRoot) return boundaryRoot;
-      const candidates = findCandidateRoots();
-      const picked = pickBestRoot(candidates);
-      const observedRoot = picked.root && picked.root !== document ? picked.root : null;
-      return observedRoot || document.scrollingElement || document.documentElement || document.body;
+      if (seed) {
+        const boundaryRoot = findChatBoundaryRootFromUserStep(seed);
+        if (boundaryRoot) return boundaryRoot;
+        const candidates = findCandidateRoots();
+        const picked = pickBestRoot(candidates);
+        const observedRoot = picked.root && picked.root !== document ? picked.root : null;
+        if (observedRoot) return observedRoot;
+      }
+      return (
+        document.querySelector('.layout-chat') || document.scrollingElement || document.documentElement || document.body
+      );
     },
     __test: {
       matches,
