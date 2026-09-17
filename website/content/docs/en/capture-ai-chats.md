@@ -30,13 +30,23 @@ For platforms that support auto-save, enable it under **Settings → General →
 
 ## ChatGPT Advanced capture
 
-Under **Settings → General → ChatGPT Advanced capture**, manual save treats ChatGPT's current backend branch as the canonical history. Citations are converted into readable Markdown links, while rich widgets such as charts keep only durable titles and descriptions instead of leaking ChatGPT's internal transport markup or component payloads.
+ChatGPT uses **page capture** by default. Advanced capture is optional and can be enabled under **Settings → General → ChatGPT Advanced capture**.
 
-If the current turn is still reasoning or generating, reasoning summaries, progress text, and the visible reply are preserved as an awaiting-confirmation partial result when they have stable turn identity. Saving again after generation finishes reconciles that provisional content with the backend final reply instead of leaving a duplicate temporary message. If a turn never emits a final reply but a later user message has already started, its visible reasoning and progress are still kept as history when the turn identity is stable.
+It is not a “more complete” mode. It uses a different source:
 
-If Advanced capture fails, the same save does not silently fall back to full-page DOM capture. Turn the setting off and save again to use the default page path.
+|  | Default page capture | Advanced capture |
+| --- | --- | --- |
+| Reads from | Content currently loaded and rendered in the page | The current conversation branch saved by ChatGPT |
+| Best for | Preserving expanded thinking and progress shown in the page | Stable branch and message identity, especially in long conversations |
+| Main limitation | Content that has not been loaded or expanded may be missed | ChatGPT may no longer retain all thinking or progress that was previously shown in the page |
 
-When a supported chat surface is recognized but has no capturable messages yet, the popup shows a neutral “waiting for messages” state instead of treating it as a capture error. Partial saves also distinguish reasons such as unconfirmed history and a still-changing live reply.
+If preserving the **most complete thinking process** matters more, leave Advanced capture off and expand the thinking you want to keep before saving.
+
+If preserving a **stable conversation structure and current branch** matters more, enable Advanced capture. Citations are converted into readable links, and rich widgets such as charts keep only useful long-term text.
+
+A reply that is still generating can be saved as a partial result and updated by saving again after it finishes. If Advanced capture fails, SyncNos does not silently switch to page capture; turn it off and save again instead.
+
+If the page has no capturable messages yet, SyncNos shows “waiting for messages” instead of treating it as an error.
 
 ## Images and local reuse
 
