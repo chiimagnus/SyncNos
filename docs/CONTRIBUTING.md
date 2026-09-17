@@ -63,7 +63,8 @@ PR 应让不掌握作者本地上下文的人也能判断改动是否正确：
 | 改动 | 最低验证 |
 | --- | --- |
 | 仅 Markdown / GitHub 模板 | `npm run format:check`，并检查修改过的本地链接 |
-| 用户 Docs 内容 / 导航（`website/content/docs/**`） | `npm run website:build`；在真实浏览器渲染所有修改页面。涉及导航/信息架构时，逐个走完所有受影响的中英文正式 route，并核对重要功能仍有可发现入口 |
+| 用户 Docs 纯内容 / 文案（`website/content/docs/**`，不涉及导航、布局、样式、交互或信息架构） | `npm run website:build` + `npm run format:check`；无需真实浏览器验证 |
+| 用户 Docs 导航 / 信息架构 | `npm run website:build`；在真实浏览器逐个走完所有受影响的中英文正式 route，并核对重要功能仍有可发现入口 |
 | 常规代码 PR | `npm run gate:ci` |
 | production build、manifest、权限、打包或发布 | `npm run gate` |
 | CLI package / installer / Native Messaging | `npm run gate` + `npm run cli:check`；对受影响 OS 验证 manifest/Registry/IPC 契约，并在可用平台做真实 discovery/read-back |
