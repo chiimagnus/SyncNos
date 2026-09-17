@@ -43,7 +43,7 @@ syncnos doctor
 
 ## 演示
 
-[![SyncNos 操作演示视频](docs/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
+<a href="https://www.bilibili.com/video/BV1gjwQznEx7/"><img src="docs/assets/syncnos-demo-video.svg" alt="SyncNos 操作演示视频" width="760" /></a>
 
 ## 采集
 
@@ -82,11 +82,11 @@ SyncNos 支持 YouTube watch / youtu.be 页面和 Bilibili BV 播放页，也支
 
 WebClipper Popup：保存并浏览已采集内容。
 
-![WebClipper Popup](docs/assets/popup-screenshots.png)
+<img src="docs/assets/popup-screenshots.png" alt="WebClipper Popup" width="760" />
 
 文章讨论侧栏：精确引用、紧凑线程和单 active reply composer。
 
-![文章讨论侧栏](docs/assets/comments-discussion.png)
+<img src="docs/assets/comments-discussion.png" alt="文章讨论侧栏" width="760" />
 
 ## 文档
 

@@ -43,7 +43,7 @@ See [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/en/cli/) for setu
 
 ## Demo
 
-[![SyncNos demo video](docs/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
+<a href="https://www.bilibili.com/video/BV1gjwQznEx7/"><img src="docs/assets/syncnos-demo-video.svg" alt="SyncNos demo video" width="760" /></a>
 
 ## Capture
 
@@ -82,11 +82,11 @@ Provider sync can be run manually; optional auto-sync is available per provider.
 
 WebClipper Popup: save and browse captured content.
 
-![WebClipper Popup](docs/assets/popup-screenshots.png)
+<img src="docs/assets/popup-screenshots.png" alt="WebClipper Popup" width="760" />
 
 Article discussion sidebar: exact quotes, compact threads, and one active reply composer.
 
-![Article discussion sidebar](docs/assets/comments-discussion.png)
+<img src="docs/assets/comments-discussion.png" alt="Article discussion sidebar" width="760" />
 
 ## Documentation
 
