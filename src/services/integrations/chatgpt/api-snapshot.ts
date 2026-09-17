@@ -506,7 +506,7 @@ export function buildChatgptApiSnapshot(input: {
     }
   };
 
-  const flushPendingAtBranchEnd = () => {
+  const flushPendingStableTurn = (unfinished: boolean) => {
     flushPendingImages();
     if (!pendingAuxiliary.length) return;
     const turnId = pendingAuxiliary[0]?.turnId || '';
@@ -531,7 +531,7 @@ export function buildChatgptApiSnapshot(input: {
       sequence: messages.length,
       updatedAt: capturedAt,
     });
-    partialReasons.add(UNFINISHED_TURN_REASON);
+    if (unfinished) partialReasons.add(UNFINISHED_TURN_REASON);
   };
 
   const pendingMatchesTurn = (turnId: string): boolean => {
@@ -559,7 +559,9 @@ export function buildChatgptApiSnapshot(input: {
     if (INTERNAL_CONTENT_TYPES.has(type)) continue;
 
     if (role === 'user') {
-      flushPendingWithoutOwner();
+      // A later user message proves the preceding assistant turn is closed even when ChatGPT never emitted a final node.
+      // Keep its visible reasoning/progress under the stable turn id instead of discarding it.
+      flushPendingStableTurn(false);
       if (!id) {
         markSchemaDrift();
         continue;
@@ -683,7 +685,7 @@ export function buildChatgptApiSnapshot(input: {
     markSchemaDrift();
   }
 
-  flushPendingAtBranchEnd();
+  flushPendingStableTurn(true);
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
 
   const title = stableString(input.data?.title) || stableString(input.fallbackTitle) || 'ChatGPT';

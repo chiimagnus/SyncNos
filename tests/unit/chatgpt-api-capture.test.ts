@@ -551,22 +551,22 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
-  it('drops unowned auxiliary execution state at the next user boundary', () => {
+  it('preserves an auxiliary-only assistant turn when the next user message closes it', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['first'] }),
       message({
-        id: 'thoughts-orphan',
+        id: 'thoughts-only',
         role: 'assistant',
         contentType: 'thoughts',
-        thoughts: [{ summary: 'internal', content: 'not owned by a visible assistant message' }],
-        turnId: 'turn-orphan',
+        thoughts: [{ summary: 'visible progress', content: 'reasoning without a final message' }],
+        turnId: 'turn-aux-only',
       }),
       message({
-        id: 'commentary-orphan',
+        id: 'commentary-only',
         role: 'assistant',
         channel: 'commentary',
-        parts: ['progress only'],
-        turnId: 'turn-orphan',
+        parts: ['tool progress'],
+        turnId: 'turn-aux-only',
       }),
       message({ id: 'user-2', role: 'user', parts: ['second'] }),
       message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-2' }),
@@ -575,9 +575,32 @@ describe('ChatGPT API snapshot', () => {
     const result = build(data);
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'first' }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-aux-only',
+        role: 'assistant',
+        contentMarkdown: '**visible progress**\n\nreasoning without a final message\n\ntool progress',
+      }),
       expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'second' }),
       expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'answer' }),
     ]);
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('still omits auxiliary text at a user boundary when no stable turn identity exists', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['first'] }),
+      message({
+        id: 'commentary-unowned',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['cannot be safely owned'],
+      }),
+      message({ id: 'user-2', role: 'user', parts: ['second'] }),
+      message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-2' }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages.map((entry: any) => entry.messageKey)).toEqual(['user-1', 'user-2', 'assistant-2']);
     expect(result.snapshot.captureMeta).toEqual({
       completeness: 'partial',
       identityVerified: true,
@@ -849,7 +872,7 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.messages.at(-1)?.contentMarkdown).toContain('chatgpt-file://file_shared_1');
   });
 
-  it('keeps image-only turns when same-turn auxiliary output has no stable owner', () => {
+  it('keeps image-only turns and their stable auxiliary-only assistant output', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
       message({
@@ -887,14 +910,15 @@ describe('ChatGPT API snapshot', () => {
         role: 'assistant',
         contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
       }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-image',
+        role: 'assistant',
+        contentMarkdown: 'working\n\n**Plan**\n\nGenerate image.',
+      }),
       expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'continue' }),
       expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'done' }),
     ]);
-    expect(result.snapshot.captureMeta).toEqual({
-      completeness: 'partial',
-      identityVerified: true,
-      reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
-    });
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
 
     const unfinishedAtBranchEnd = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),

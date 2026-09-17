@@ -32,7 +32,7 @@ For platforms that support auto-save, enable it under **Settings → General →
 
 Under **Settings → General → ChatGPT Advanced capture**, manual save treats ChatGPT's current backend branch as the canonical history. Citations are converted into readable Markdown links, while rich widgets such as charts keep only durable titles and descriptions instead of leaking ChatGPT's internal transport markup or component payloads.
 
-If the current turn is still reasoning or generating, reasoning summaries, progress text, and the visible reply are preserved as an awaiting-confirmation partial result when they have stable turn identity. Saving again after generation finishes reconciles that provisional content with the backend final reply instead of leaving a duplicate temporary message.
+If the current turn is still reasoning or generating, reasoning summaries, progress text, and the visible reply are preserved as an awaiting-confirmation partial result when they have stable turn identity. Saving again after generation finishes reconciles that provisional content with the backend final reply instead of leaving a duplicate temporary message. If a turn never emits a final reply but a later user message has already started, its visible reasoning and progress are still kept as history when the turn identity is stable.
 
 If Advanced capture fails, the same save does not silently fall back to full-page DOM capture. Turn the setting off and save again to use the default page path.
 
