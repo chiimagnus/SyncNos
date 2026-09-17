@@ -1,5 +1,4 @@
-import type { CSSProperties } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 
 import type { ChatOutlineEntry } from '@ui/conversations/chat-outline/outline-entries';
 import { readerOutlineLevelToMinimapWidth } from '@services/protocols/reader-outline';
@@ -16,10 +15,9 @@ import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 export type ChatOutlinePanelProps = {
   entries: ChatOutlineEntry[];
   activeIndex?: number | null;
-  onPickEntry?: (entry: ChatOutlineEntry) => void;
+  onPickEntry: (entry: ChatOutlineEntry) => void;
 };
 
-const CLOSE_DELAY_MS = 160;
 const OUTLINE_LABEL = 'Outline';
 const TRIGGER_MAX_BARS = 7;
 const PANEL_LIST_CLASS = 'tw-flex tw-max-h-[60vh] tw-flex-col tw-gap-1 tw-overflow-auto';
@@ -71,61 +69,23 @@ function pickTriggerEntries(entries: ChatOutlineEntry[], activeIndex: number | n
 }
 
 export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: ChatOutlinePanelProps) {
-  const safeEntries = useMemo(() => (Array.isArray(entries) ? entries : []), [entries]);
-  const triggerEntries = useMemo(() => pickTriggerEntries(safeEntries, activeIndex), [activeIndex, safeEntries]);
-  const [open, setOpen] = useState(false);
-  const firstTriggerButtonRef = useRef<HTMLButtonElement | null>(null);
-  const closeTimerRef = useRef<number | null>(null);
+  const triggerEntries = useMemo(() => pickTriggerEntries(entries, activeIndex), [activeIndex, entries]);
 
-  const cancelClose = useCallback(() => {
-    if (closeTimerRef.current == null) return;
-    globalThis.window?.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = null;
-  }, []);
-  const openPanel = useCallback(() => {
-    cancelClose();
-    setOpen(true);
-  }, [cancelClose]);
-  const scheduleClose = useCallback(() => {
-    cancelClose();
-    closeTimerRef.current = globalThis.window?.setTimeout(() => {
-      closeTimerRef.current = null;
-      setOpen(false);
-    }, CLOSE_DELAY_MS);
-  }, [cancelClose]);
-  const closePanelAndFocusHandle = useCallback(() => {
-    cancelClose();
-    setOpen(false);
-    const focusHandle = () => {
-      firstTriggerButtonRef.current?.focus();
-    };
-    if (typeof globalThis.window?.requestAnimationFrame === 'function') {
-      globalThis.window.requestAnimationFrame(focusHandle);
-      return;
-    }
-    focusHandle();
-  }, [cancelClose]);
-
-  useEffect(() => {
-    return () => cancelClose();
-  }, [cancelClose]);
-
-  if (!safeEntries.length) return null;
+  if (!entries.length) return null;
 
   const trigger = (
-    <nav className={OUTLINE_STRIP_CLASS} aria-label={OUTLINE_LABEL} data-chat-outline-trigger-bars={safeEntries.length}>
-      {triggerEntries.map((entry, index) => {
-        const isActive = Number(activeIndex) === entry.index;
+    <nav className={OUTLINE_STRIP_CLASS} aria-label={OUTLINE_LABEL} data-chat-outline-trigger-bars={entries.length}>
+      {triggerEntries.map((entry) => {
+        const isActive = activeIndex === entry.index;
         const label = toLabel(entry);
         return (
           <button
             key={entry.messageKey}
-            ref={index === 0 ? firstTriggerButtonRef : undefined}
             type="button"
             aria-label={label}
             title={label}
             className={OUTLINE_STRIP_BUTTON_CLASS}
-            onClick={() => onPickEntry?.(entry)}
+            onClick={() => onPickEntry(entry)}
           >
             <span
               className={outlineStripBarClassName(isActive)}
@@ -143,17 +103,13 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
     <ReaderRailPanel
       id="chat-outline"
       label={OUTLINE_LABEL}
-      open={open}
       narrow={false}
-      className="tw-absolute tw-right-0 tw-top-2 tw-z-30"
+      className="tw-absolute tw-right-0 tw-top-2"
       trigger={trigger}
-      onMouseEnter={openPanel}
-      onMouseLeave={scheduleClose}
-      onEscape={closePanelAndFocusHandle}
     >
       <div className={PANEL_LIST_CLASS}>
-        {safeEntries.map((entry) => {
-          const isActive = Number(activeIndex) === entry.index;
+        {entries.map((entry) => {
+          const isActive = activeIndex === entry.index;
           const label = toLabel(entry);
           return (
             <button
@@ -162,7 +118,7 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
               className={toItemClass(isActive)}
               title={label}
               aria-checked={isActive ? 'true' : undefined}
-              onClick={() => onPickEntry?.(entry)}
+              onClick={() => onPickEntry(entry)}
               data-chat-outline-entry={entry.messageKey}
               data-chat-outline-active={isActive ? 'true' : 'false'}
             >

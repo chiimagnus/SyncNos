@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { t } from '@i18n';
+import type { ConversationKindDefinition } from '@services/protocols/conversation-kind-contract';
 import { readerPrefsToCssVars } from '@services/protocols/reader-prefs';
 import { buildSentences, type ReaderTtsSentence } from '@services/reader/tts/reader-tts-engine';
 import type { DetailViewSharedProps } from '@ui/conversations/views/detail-view-props';
@@ -35,13 +36,11 @@ import { useReaderPrefs } from '@viewmodels/reader/useReaderPrefs';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
-export type ReaderFeatures = { textLayout: boolean; theme: boolean; narration: boolean };
-
-// readerFeatures is wired in for the P4 toolbar button visibility; the text-layout
+// readerFeatures is wired in for the toolbar button visibility; the text-layout
 // piece itself is always active via the `--reader-*` variables below.
 export type ArticleReaderViewProps = DetailViewSharedProps & {
   metadata?: ReactNode;
-  readerFeatures?: ReaderFeatures;
+  readerFeatures?: ConversationKindDefinition['view']['readerFeatures'];
   readerToolbarPortalTarget?: HTMLElement | null;
   outlineScrollRoot?: Element | null;
 };

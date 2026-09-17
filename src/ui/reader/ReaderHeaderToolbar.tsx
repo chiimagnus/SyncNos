@@ -12,19 +12,25 @@ import { MenuPopover } from '@ui/shared/MenuPopover';
 import { NarrationPanel } from '@ui/reader/NarrationPanel';
 import { TextLayoutPanel } from '@ui/reader/TextLayoutPanel';
 import { ThemePanel } from '@ui/reader/ThemePanel';
-import type { ReaderToolbarFeatures, ReaderToolbarNarration } from '@ui/reader/ReaderToolbar';
+import type { ConversationKindDefinition } from '@services/protocols/conversation-kind-contract';
 import type { ReaderPrefs, ReaderPrefsPatch } from '@services/protocols/reader-prefs';
 import type { AppThemeMode } from '@services/protocols/app-theme';
+import type { UseReaderNarrationResult } from '@viewmodels/reader/useReaderNarration';
+
+type ReaderHeaderNarration = Pick<
+  UseReaderNarrationResult,
+  'state' | 'isPlaying' | 'error' | 'webSpeechAvailable' | 'stop' | 'toggle'
+>;
 
 type ReaderHeaderToolbarProps = {
-  features: ReaderToolbarFeatures;
+  features: ConversationKindDefinition['view']['readerFeatures'];
   prefs: ReaderPrefs;
   update: (patch: ReaderPrefsPatch) => void | Promise<void>;
   preview: (patch: ReaderPrefsPatch) => void;
   commitPreview: () => Promise<void>;
   themeMode: AppThemeMode;
   updateThemeMode: (mode: AppThemeMode) => void | Promise<void>;
-  narration: ReaderToolbarNarration;
+  narration: ReaderHeaderNarration;
   className?: string;
 };
 
@@ -175,7 +181,7 @@ export function ReaderHeaderToolbar({
                 aria-label={narrationActionLabel}
                 title={narrationActionLabel}
                 aria-pressed={narration.isPlaying || narration.state === 'loading'}
-                onClick={narration.toggle}
+                onClick={() => narration.toggle()}
               >
                 <NarrationActionIcon size={18} strokeWidth={2.25} />
               </button>

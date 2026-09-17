@@ -1,6 +1,5 @@
-/* eslint-disable react/prop-types */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement, useState } from 'react';
+import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
@@ -134,22 +133,16 @@ describe('ArticleOutlineMinimap', () => {
     onPickStripEntry: (entry: ReaderOutlineDomEntry) => void;
     onPickPanelEntry: (entry: ReaderOutlineDomEntry) => void;
   }) {
-    function Harness() {
-      const [open, setOpen] = useState(false);
-      return createElement(ArticleOutlineMinimap, {
-        entries: props.entries,
-        activeIndex: props.activeIndex,
-        open,
-        narrow: false,
-        onMouseEnter: () => setOpen(true),
-        onMouseLeave: () => setOpen(false),
-        onPickStripEntry: props.onPickStripEntry,
-        onPickPanelEntry: props.onPickPanelEntry,
-      });
-    }
-
     act(() => {
-      root!.render(createElement(Harness));
+      root!.render(
+        createElement(ArticleOutlineMinimap, {
+          entries: props.entries,
+          activeIndex: props.activeIndex,
+          narrow: false,
+          onPickStripEntry: props.onPickStripEntry,
+          onPickPanelEntry: props.onPickPanelEntry,
+        }),
+      );
     });
   }
 
@@ -297,6 +290,7 @@ describe('ArticleOutlineMinimap', () => {
     expect(onPickStripEntry).toHaveBeenCalledTimes(1);
     expect(onPickPanelEntry).toHaveBeenCalledTimes(1);
     expect(entries[1]?.element.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(document.querySelector('[data-reader-rail-panel="outline"]')).toBeNull();
   });
 
   it('returns null when no headings are available', () => {

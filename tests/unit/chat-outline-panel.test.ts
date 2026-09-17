@@ -81,7 +81,7 @@ describe('ChatOutlinePanel', () => {
 
   it('does not render an outline entry point when there are no entries', () => {
     act(() => {
-      root!.render(createElement(ChatOutlinePanel, { entries: [] }));
+      root!.render(createElement(ChatOutlinePanel, { entries: [], onPickEntry: vi.fn() }));
     });
 
     expect(document.querySelector('[data-reader-rail-wrap="chat-outline"]')).toBeNull();
@@ -135,6 +135,7 @@ describe('ChatOutlinePanel', () => {
       firstEntry!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     expect(onPickEntry).toHaveBeenCalledWith(panelEntries[0]);
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
 
     act(() => {
       wrap!.dispatchEvent(
@@ -153,7 +154,7 @@ describe('ChatOutlinePanel', () => {
 
   it('consumes Escape while the hover outline is open instead of leaking it to the popup', async () => {
     act(() => {
-      root!.render(createElement(ChatOutlinePanel, { entries, activeIndex: 1 }));
+      root!.render(createElement(ChatOutlinePanel, { entries, activeIndex: 1, onPickEntry: vi.fn() }));
     });
 
     const wrap = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;
@@ -177,7 +178,7 @@ describe('ChatOutlinePanel', () => {
   it('keeps the trigger visible for large chat outlines while preserving the active marker', () => {
     const manyEntries = makeEntries(50);
     act(() => {
-      root!.render(createElement(ChatOutlinePanel, { entries: manyEntries, activeIndex: 37 }));
+      root!.render(createElement(ChatOutlinePanel, { entries: manyEntries, activeIndex: 37, onPickEntry: vi.fn() }));
     });
 
     const wrap = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;
