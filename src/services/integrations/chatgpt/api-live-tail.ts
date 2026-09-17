@@ -1,3 +1,4 @@
+import { CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX } from '@services/integrations/chatgpt/api-snapshot';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
 const CHATGPT_API_LIVE_TAIL_REASON = 'chatgpt_api_live_tail_unconfirmed';
@@ -66,12 +67,37 @@ function appendMessage(messages: any[], incoming: any): any[] {
   return [...messages, { ...incoming, sequence: messages.length }];
 }
 
+function isProvisionalTurnMessage(message: any): boolean {
+  return message?.role === 'assistant' && messageKey(message).startsWith(CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX);
+}
+
+function mergeProvisionalWithLive(provisional: any, incoming: any): any {
+  const provisionalMarkdown = String(provisional?.contentMarkdown || '').trim();
+  const liveMarkdown = String(incoming?.contentMarkdown || '').trim();
+  const provisionalSemantic = semanticMarkdown(provisionalMarkdown);
+  const liveSemantic = semanticMarkdown(liveMarkdown);
+  let contentMarkdown = liveMarkdown;
+  if (provisionalSemantic && !liveSemantic.includes(provisionalSemantic)) {
+    contentMarkdown = liveMarkdown ? `${provisionalMarkdown}\n\n${liveMarkdown}` : provisionalMarkdown;
+  }
+  return {
+    ...incoming,
+    messageKey: messageKey(provisional),
+    contentMarkdown,
+    sequence: Number.isFinite(provisional?.sequence) ? provisional.sequence : incoming.sequence,
+  };
+}
+
 /**
  * Overlay only the current DOM turn on top of the canonical backend snapshot.
  * The DOM candidate is accepted only when every message has a stable backend id and
  * the current user message anchors to the backend branch (or can itself be appended).
  */
-export function augmentChatgptApiSnapshotWithLiveTurn(snapshot: any, live: ChatgptApiLiveTurnCapture): any {
+export function augmentChatgptApiSnapshotWithLiveTurn(
+  snapshot: any,
+  live: ChatgptApiLiveTurnCapture,
+  options?: { currentTurnState?: 'finalized' | 'open' | 'unknown'; currentTurnId?: string },
+): any {
   if (live.kind === 'none') return snapshot;
   if (live.kind === 'identity_changed') {
     throw Object.assign(new Error('chatgpt_api_navigation_changed'), { code: 'chatgpt_api_navigation_changed' });
@@ -103,14 +129,32 @@ export function augmentChatgptApiSnapshotWithLiveTurn(snapshot: any, live: Chatg
   }
 
   const anchoredUserIndex = messages.findIndex((message) => messageKey(message) === userKey);
+  if (
+    options?.currentTurnState === 'finalized' &&
+    userIndex >= 0 &&
+    messages.slice(anchoredUserIndex + 1).some((message) => message?.role === 'assistant')
+  ) {
+    return snapshot;
+  }
+
   const assistantIndex = messages.findIndex((message) => messageKey(message) === assistantKey);
   if (assistantIndex < 0) {
-    // Do not append a competing branch when the backend already owns any visible message after this user turn.
-    if (anchoredUserIndex !== messages.length - 1) {
-      return withPartialReason(snapshot, CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON);
+    const trailing = messages.slice(anchoredUserIndex + 1);
+    if (trailing.length === 1 && isProvisionalTurnMessage(trailing[0])) {
+      messages[anchoredUserIndex + 1] = mergeProvisionalWithLive(trailing[0], live.assistantMessage);
+      changed = true;
+    } else {
+      // Do not append a competing branch when the backend already owns any visible message after this user turn.
+      if (anchoredUserIndex !== messages.length - 1) {
+        return withPartialReason(snapshot, CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON);
+      }
+      const provisionalTurnId = options?.currentTurnState === 'open' ? stableString(options.currentTurnId) : '';
+      const assistantMessage = provisionalTurnId
+        ? { ...live.assistantMessage, messageKey: `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${provisionalTurnId}` }
+        : live.assistantMessage;
+      messages = appendMessage(messages, assistantMessage);
+      changed = true;
     }
-    messages = appendMessage(messages, live.assistantMessage);
-    changed = true;
   } else {
     if (
       assistantIndex <= anchoredUserIndex ||

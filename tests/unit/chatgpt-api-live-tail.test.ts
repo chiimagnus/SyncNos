@@ -35,14 +35,17 @@ function live(userMarkdown: string, assistantMarkdown: string, assistantKey = 'a
 }
 
 describe('ChatGPT API live-turn augmentation', () => {
-  it('appends the current assistant when the backend branch ends at the current user', () => {
+  it('uses the stable turn key for a live assistant while the backend current turn is still open', () => {
     const api = snapshot([{ messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 }]);
-    const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('question', 'streaming answer'));
+    const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('question', 'streaming answer'), {
+      currentTurnState: 'open',
+      currentTurnId: 'turn-a',
+    });
 
     expect(result.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 }),
       expect.objectContaining({
-        messageKey: 'assistant-1',
+        messageKey: 'chatgpt-turn:turn-a',
         role: 'assistant',
         contentMarkdown: 'streaming answer',
         sequence: 1,
@@ -55,6 +58,13 @@ describe('ChatGPT API live-turn augmentation', () => {
     });
   });
 
+  it('appends the stable live assistant id when the backend has no current turn id', () => {
+    const api = snapshot([{ messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 }]);
+    const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('question', 'streaming answer'));
+
+    expect(result.messages.at(-1)).toMatchObject({ messageKey: 'assistant-1', contentMarkdown: 'streaming answer' });
+  });
+
   it('appends the current user and assistant together when the backend has not materialized either yet', () => {
     const api = snapshot([{ messageKey: 'old-assistant', role: 'assistant', contentMarkdown: 'old', sequence: 0 }]);
     const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('new question', 'new streaming answer'));
@@ -64,6 +74,34 @@ describe('ChatGPT API live-turn augmentation', () => {
       'user-1',
       'assistant-1',
     ]);
+    expect(result.captureMeta.reasons).toContain(LIVE_TAIL_REASON);
+  });
+
+  it('folds branch-end reasoning into the live reply while keeping one provisional key until finalization', () => {
+    const api = snapshot([
+      { messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 },
+      {
+        messageKey: 'chatgpt-turn:turn-a',
+        role: 'assistant',
+        contentMarkdown: '**Plan**\n\nInspect first.',
+        sequence: 1,
+      },
+    ]);
+    api.captureMeta = {
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_unfinished_turn_partial'],
+    };
+
+    const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('question', 'Final answer.'));
+
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[1]).toMatchObject({
+      messageKey: 'chatgpt-turn:turn-a',
+      role: 'assistant',
+      contentMarkdown: '**Plan**\n\nInspect first.\n\nFinal answer.',
+      sequence: 1,
+    });
     expect(result.captureMeta.reasons).toContain(LIVE_TAIL_REASON);
   });
 

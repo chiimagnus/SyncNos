@@ -15,7 +15,8 @@
 | GitHub 选中多条但 changed files 更少 | 未变化的受管路径可以参与 reconcile，但最终 tree diff 只包含真正变化的文件。 |
 | Article 只有文本没有图片 | 图片设置、anti-hotlink rule、Referer 和下载 warning；文本保存成功仍是成功。 |
 | ChatGPT Advanced 在后端改版后失败 | 先区分 identity/tree integrity hard failure 与 schema drift partial；同一次保存禁止静默回退 DOM。需要 DOM 路径时关闭 Advanced 后重新保存。 |
-| ChatGPT 正在回复时显示“待确认” | Advanced 仍以后端分支为历史真源；若稳定的当前可见回复领先后端，会以 live-tail partial 保存且不删除历史。生成结束后再次保存，应由同一 message identity 收敛到后端 final；若显示 live-tail unresolved，先检查 message/turn identity 与当前 route，禁止猜测合并。 |
+| ChatGPT 正在回复时显示“待确认” | Advanced 仍以后端分支为历史真源；当前分支末尾已有稳定 `turn_id` 的思考/进度可先按 provisional turn 保存，稳定的当前可见回复再与它合并。若下一条 user 已开始而上一轮始终没有 final，则上一轮稳定 `turn_id` 的可见思考/进度应作为历史消息保留，而不是按 unowned auxiliary 丢弃。生成结束后再次保存，应由 backend final 的 message identity 收敛并清掉 provisional key；若显示 live-tail unresolved，先检查 message/turn identity 与当前 route，禁止猜测合并。 |
+| ChatGPT Advanced 导出出现 `cite` / `genui` 等内部标记 | 检查 backend message 的 `metadata.content_references` 是否仍能把 transport token 映射到可读引用或 widget 摘要；未知 shape 应降级为 partial 并移除内部 token，不要在 Export 层堆字符串特判。 |
 | ChatGPT 正文已保存但图片未本地化 | 先区分未缓存的稳定远端引用、session/resolver 失败和 backfill warning；图片网络失败不能反向判定正文保存失败，也不要为此恢复同步阻塞保存。 |
 | Video 没有字幕 | 当前页没有可信字幕时仍保存 Video；字幕加载后再次保存即可补充 transcript。 |
 | Bilibili Watch Later 产生重复身份 | 只有带合法 `bvid` 的播放页按 BV identity 归一；旧版本误存的历史 Article 不会自动删除。 |

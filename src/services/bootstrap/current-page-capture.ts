@@ -317,7 +317,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           const liveTurn = target.collector.captureApiLiveTurn({
             expectedConversationId: expectedChatgptConversationId,
           });
-          snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn);
+          snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn, {
+            currentTurnState: apiCapture.currentTurnState,
+            currentTurnId: apiCapture.currentTurnId,
+          });
         }
       }
 
