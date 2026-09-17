@@ -383,49 +383,52 @@ describe('content-controller inpage combo', () => {
     vi.useRealTimers();
   });
 
-  it('proactively captures notionai after clicking send before observer mutations settle', async () => {
-    setupDom();
-    vi.useFakeTimers();
+  it.each(['agent-send-message-button', 'agent-chat-send-button'])(
+    'proactively captures notionai after clicking %s before observer mutations settle',
+    async (sendButtonTestId) => {
+      setupDom();
+      vi.useFakeTimers();
 
-    const snapshot = {
-      conversation: { source: 'notionai', conversationKey: 'notionai_t_1' },
-      messages: [{ messageKey: 'user_u1', sequence: 1, role: 'user', contentMarkdown: 'just sent' }],
-    };
+      const snapshot = {
+        conversation: { source: 'notionai', conversationKey: 'notionai_t_1' },
+        messages: [{ messageKey: 'user_u1', sequence: 1, role: 'user', contentMarkdown: 'just sent' }],
+      };
 
-    const harness = createHarness({
-      collectorId: 'notionai',
-      captureImpl: () => snapshot,
-      incrementalImpl: (snap) => ({
-        changed: true,
-        snapshot: snap,
-        diff: { added: ['user_u1'], updated: [], removed: [] },
-      }),
-      sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 31, __isNew: true } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
-        return { ok: true, data: {} };
-      },
-    });
+      const harness = createHarness({
+        collectorId: 'notionai',
+        captureImpl: () => snapshot,
+        incrementalImpl: (snap) => ({
+          changed: true,
+          snapshot: snap,
+          diff: { added: ['user_u1'], updated: [], removed: [] },
+        }),
+        sendImpl: async (type: string) => {
+          if (type === 'upsertConversation') return { ok: true, data: { id: 31, __isNew: true } };
+          if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+          return { ok: true, data: {} };
+        },
+      });
 
-    // T2 starts resident autosave only after the first authoritative settings observation.
-    // This harness has no storage API, so wait for the intentional fail-open observation before simulating a real user click.
-    await Promise.resolve();
-    await Promise.resolve();
+      // T2 starts resident autosave only after the first authoritative settings observation.
+      // This harness has no storage API, so wait for the intentional fail-open observation before simulating a real user click.
+      await Promise.resolve();
+      await Promise.resolve();
 
-    const button = document.createElement('div');
-    button.setAttribute('role', 'button');
-    button.setAttribute('data-testid', 'agent-send-message-button');
-    document.body.appendChild(button);
+      const button = document.createElement('div');
+      button.setAttribute('role', 'button');
+      button.setAttribute('data-testid', sendButtonTestId);
+      document.body.appendChild(button);
 
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    await vi.runAllTimersAsync();
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await vi.runAllTimersAsync();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
+      expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
+      expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
 
-    button.remove();
-    vi.useRealTimers();
-  });
+      button.remove();
+      vi.useRealTimers();
+    },
+  );
 
   it('does not proactively capture notionai on Shift+Enter draft newlines', async () => {
     setupDom();

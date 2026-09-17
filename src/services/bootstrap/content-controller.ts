@@ -16,7 +16,8 @@ import {
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 const STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED = 'ai_chat_dollar_mention_enabled';
-const NOTION_AI_SEND_BUTTON_SELECTOR = 'div[role="button"][data-testid="agent-send-message-button"]';
+const NOTION_AI_SEND_BUTTON_SELECTOR =
+  '[data-testid="agent-send-message-button"], [data-testid="agent-chat-send-button"]';
 const NOTION_AI_COMPOSER_SELECTOR = 'div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]';
 
 type RuntimeClient = {

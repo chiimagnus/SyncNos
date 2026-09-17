@@ -18,6 +18,7 @@
 | ChatGPT 正在回复时显示“待确认” | Advanced 仍以后端分支为历史真源；当前分支末尾已有稳定 `turn_id` 的思考/进度可先按 provisional turn 保存，稳定的当前可见回复再与它合并。若下一条 user 已开始而上一轮始终没有 final，则上一轮稳定 `turn_id` 的可见思考/进度应作为历史消息保留，而不是按 unowned auxiliary 丢弃。生成结束后再次保存，应由 backend final 的 message identity 收敛并清掉 provisional key；若显示 live-tail unresolved，先检查 message/turn identity 与当前 route，禁止猜测合并。 |
 | ChatGPT Advanced 导出出现 `cite` / `genui` 等内部标记 | 检查 backend message 的 `metadata.content_references` 是否仍能把 transport token 映射到可读引用或 widget 摘要；未知 shape 应降级为 partial 并移除内部 token，不要在 Export 层堆字符串特判。 |
 | ChatGPT 正文已保存但图片未本地化 | 先区分未缓存的稳定远端引用、session/resolver 失败和 backfill warning；图片网络失败不能反向判定正文保存失败，也不要为此恢复同步阻塞保存。 |
+| Notion AI `/chat` 改版后抓不到消息 | 先检查页面自己的 `/api/v3/getThreadTranscript` 是否仍返回当前 thread 的结构化历史。当前 Chat 不应重新堆 DOM selector；MAIN-world interceptor 只复用页面已经建立的认证请求并把净化后的 transcript 数据交给 collector，认证 header/session 与 raw thinking/tool payload 不得跨出页面 world。旧版或嵌入式聊天在没有可复用 transcript request 时才走 DOM fallback。 |
 | Video 没有字幕 | 当前页没有可信字幕时仍保存 Video；字幕加载后再次保存即可补充 transcript。 |
 | Bilibili Watch Later 产生重复身份 | 只有带合法 `bvid` 的播放页按 BV identity 归一；旧版本误存的历史 Article 不会自动删除。 |
 | `syncnos install` → `browser_not_found` | 自动发现未命中已知标准位置；portable/自定义安装使用显式 `--browser <id>`，不要全盘扫描。 |
