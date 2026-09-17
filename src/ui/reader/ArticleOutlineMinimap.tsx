@@ -22,11 +22,7 @@ export type ArticleOutlineMinimapState = {
 };
 
 export type ArticleOutlineMinimapProps = ArticleOutlineMinimapState & {
-  open: boolean;
   narrow: boolean;
-  className?: string;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
   onPickStripEntry: (entry: ReaderOutlineDomEntry) => void;
   onPickPanelEntry: (entry: ReaderOutlineDomEntry) => void;
 };
@@ -272,38 +268,24 @@ export function useArticleOutlineMinimap(
 export function ArticleOutlineMinimap({
   entries,
   activeIndex,
-  open,
   narrow,
-  className,
-  onMouseEnter,
-  onMouseLeave,
   onPickStripEntry,
   onPickPanelEntry,
 }: ArticleOutlineMinimapProps) {
-  const safeEntries = useMemo(() => (Array.isArray(entries) ? entries : []), [entries]);
   const outlineTrigger = useMemo(() => {
     return (
       <nav className={OUTLINE_STRIP_CLASS} aria-label={OUTLINE_LABEL}>
-        {safeEntries.map((entry) => renderOutlineItem(entry, activeIndex, onPickStripEntry, onPickPanelEntry, 'strip'))}
+        {entries.map((entry) => renderOutlineItem(entry, activeIndex, onPickStripEntry, onPickPanelEntry, 'strip'))}
       </nav>
     );
-  }, [activeIndex, onPickPanelEntry, onPickStripEntry, safeEntries]);
+  }, [activeIndex, entries, onPickPanelEntry, onPickStripEntry]);
 
-  if (!safeEntries.length) return null;
+  if (!entries.length) return null;
 
   return (
-    <ReaderRailPanel
-      id="outline"
-      label={OUTLINE_LABEL}
-      open={open}
-      narrow={narrow}
-      className={className}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      trigger={outlineTrigger}
-    >
+    <ReaderRailPanel id="outline" label={OUTLINE_LABEL} narrow={narrow} trigger={outlineTrigger}>
       <div className={PANEL_LIST_CLASS}>
-        {safeEntries.map((entry) => renderOutlineItem(entry, activeIndex, onPickStripEntry, onPickPanelEntry, 'panel'))}
+        {entries.map((entry) => renderOutlineItem(entry, activeIndex, onPickStripEntry, onPickPanelEntry, 'panel'))}
       </div>
     </ReaderRailPanel>
   );

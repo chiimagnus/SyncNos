@@ -81,7 +81,7 @@ describe('ChatOutlinePanel', () => {
 
   it('does not render an outline entry point when there are no entries', () => {
     act(() => {
-      root!.render(createElement(ChatOutlinePanel, { entries: [] }));
+      root!.render(createElement(ChatOutlinePanel, { entries: [], onPickEntry: vi.fn() }));
     });
 
     expect(document.querySelector('[data-reader-rail-wrap="chat-outline"]')).toBeNull();
@@ -135,6 +135,7 @@ describe('ChatOutlinePanel', () => {
       firstEntry!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     expect(onPickEntry).toHaveBeenCalledWith(panelEntries[0]);
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
 
     act(() => {
       wrap!.dispatchEvent(
@@ -151,10 +152,33 @@ describe('ChatOutlinePanel', () => {
     expect(triggerShell?.style.pointerEvents).toBe('');
   });
 
+  it('consumes Escape while the hover outline is open instead of leaking it to the popup', async () => {
+    act(() => {
+      root!.render(createElement(ChatOutlinePanel, { entries, activeIndex: 1, onPickEntry: vi.fn() }));
+    });
+
+    const wrap = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;
+    expect(wrap).toBeTruthy();
+
+    act(() => {
+      wrap!.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+    });
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeTruthy();
+
+    const escape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => {
+      document.dispatchEvent(escape);
+      await Promise.resolve();
+    });
+
+    expect(escape.defaultPrevented).toBe(true);
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
+  });
+
   it('keeps the trigger visible for large chat outlines while preserving the active marker', () => {
     const manyEntries = makeEntries(50);
     act(() => {
-      root!.render(createElement(ChatOutlinePanel, { entries: manyEntries, activeIndex: 37 }));
+      root!.render(createElement(ChatOutlinePanel, { entries: manyEntries, activeIndex: 37, onPickEntry: vi.fn() }));
     });
 
     const wrap = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;

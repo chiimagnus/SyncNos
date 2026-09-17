@@ -1,30 +1,23 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import { menuPopoverPanelClassName } from '@ui/shared/button-styles';
+import { useDismissableLayer } from '@ui/shared/useDismissableLayer';
 
 type ReaderRailPanelProps = {
   id: string;
   label: string;
-  open: boolean;
   narrow: boolean;
   trigger: ReactNode;
   children: ReactNode;
-  panelTitle?: ReactNode;
   className?: string;
-  panelClassName?: string;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
 };
 
+const CLOSE_DELAY_MS = 160;
 const PANEL_BASE_CLASS = [
-  'tw-absolute tw-z-30 tw-text-[var(--text-primary)]',
+  'tw-absolute tw-text-[var(--text-primary)]',
   menuPopoverPanelClassName(170),
   'tw-w-[300px] tw-max-w-[78vw]',
 ].join(' ');
-
-const PANEL_TITLE_CLASS =
-  'tw-mb-3 tw-flex tw-items-center tw-justify-between tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]';
-
 const PANEL_CONTENT_CLASS = 'tw-flex tw-flex-col tw-gap-1';
 
 function getPanelStyle(narrow: boolean): CSSProperties {
@@ -44,24 +37,50 @@ function getPanelStyle(narrow: boolean): CSSProperties {
   };
 }
 
-export function ReaderRailPanel({
-  id,
-  label,
-  open,
-  narrow,
-  trigger,
-  children,
-  panelTitle,
-  className,
-  panelClassName,
-  onMouseEnter,
-  onMouseLeave,
-}: ReaderRailPanelProps) {
+export function ReaderRailPanel({ id, label, narrow, trigger, children, className }: ReaderRailPanelProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current === null) return;
+    clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
+
+  const openNow = useCallback(() => {
+    clearCloseTimer();
+    setOpen(true);
+  }, [clearCloseTimer]);
+
+  const closeNow = useCallback(() => {
+    clearCloseTimer();
+    setOpen(false);
+  }, [clearCloseTimer]);
+
+  const scheduleClose = useCallback(() => {
+    clearCloseTimer();
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setOpen(false);
+    }, CLOSE_DELAY_MS);
+  }, [clearCloseTimer]);
+
+  useEffect(
+    () => () => {
+      clearCloseTimer();
+    },
+    [clearCloseTimer],
+  );
+
+  useDismissableLayer({ open, containerRef, onDismiss: closeNow });
+
   return (
     <div
+      ref={containerRef}
       className={['tw-relative tw-flex tw-flex-col tw-items-start', className || ''].join(' ').trim()}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onMouseEnter={openNow}
+      onMouseLeave={scheduleClose}
       data-reader-rail-wrap={id}
     >
       <div
@@ -78,10 +97,10 @@ export function ReaderRailPanel({
           role="menu"
           aria-label={label}
           data-reader-rail-panel={id}
-          className={[PANEL_BASE_CLASS, panelClassName || ''].join(' ').trim()}
+          className={PANEL_BASE_CLASS}
           style={getPanelStyle(narrow)}
+          onClick={closeNow}
         >
-          {panelTitle ? <h3 className={PANEL_TITLE_CLASS}>{panelTitle}</h3> : null}
           <div className={PANEL_CONTENT_CLASS}>{children}</div>
         </div>
       ) : null}

@@ -211,6 +211,46 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(secondEscape.defaultPrevented).toBe(false);
   });
 
+  it('lets the hover outline consume Escape before popup detail navigation', async () => {
+    await act(async () => {
+      root!.render(createElement(ConversationsScene));
+      await flushImmediate();
+    });
+
+    const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
+    expect(row).toBeTruthy();
+    await act(async () => {
+      row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await flushImmediate();
+    });
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+
+    const outline = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;
+    expect(outline).toBeTruthy();
+    await act(async () => {
+      outline!.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+      await flushImmediate();
+    });
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeTruthy();
+
+    const outlineEscape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => {
+      document.dispatchEvent(outlineEscape);
+      await flushImmediate();
+    });
+    expect(outlineEscape.defaultPrevented).toBe(true);
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+
+    const routeEscape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => {
+      document.dispatchEvent(routeEscape);
+      await flushImmediate();
+    });
+    expect(routeEscape.defaultPrevented).toBe(true);
+    expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
+  });
+
   it('consumes pending-open source/key target and opens detail via precise API', () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,

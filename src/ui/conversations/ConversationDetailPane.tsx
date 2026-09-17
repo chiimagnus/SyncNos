@@ -418,7 +418,7 @@ export function ConversationDetailPane({
     <section className="tw-min-h-full tw-bg-[var(--bg-card)]">
       <section className="tw-flex tw-flex-col tw-bg-[var(--bg-card)]" aria-label={t('conversationDetailAria')}>
         <div
-          className="tw-sticky tw-top-0 tw-z-20 tw-min-h-14 tw-pointer-events-none"
+          className="tw-sticky tw-top-0 tw-z-40 tw-min-h-14 tw-pointer-events-none"
           data-detail-floating-layer="true"
         >
           {onExpandSidebar || onBack ? (
