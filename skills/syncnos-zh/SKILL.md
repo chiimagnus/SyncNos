@@ -1,6 +1,6 @@
 ---
 name: syncnos-zh
-description: "使用 `syncnos` CLI 与 SyncNos 浏览器插件交互：采集、查询和管理内容，处理评论与设置，同步 Provider，以及打开、导出和备份数据。"
+description: "使用 SyncNos Web Clipper（网页剪藏器）及其 `syncnos` CLI 与浏览器插件交互：采集、查询和管理内容，处理评论与设置，同步 Provider，以及打开、导出和备份数据。"
 ---
 
 # SyncNos
