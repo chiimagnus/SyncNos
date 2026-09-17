@@ -31,12 +31,12 @@ release workflow 只构建一次发布产物，然后由独立 job 消费同一�
 2. 一次性构建并保存 CLI tarball、Chrome zip、Edge zip、Firefox XPI 与 AMO source zip；CLI tarball 先做全局安装 smoke-test；
 3. `publish_cli` 通过 npm Trusted Publishing/OIDC 发布同一个 CLI tarball；`npm publish` 正常返回成功即视为该渠道成功，不再因为 registry 传播延迟做发布后的轮询 read-back；
 4. stable tag 的 Chrome / Edge / Firefox job 从同一 build artifact 独立发布，prerelease 不进入正式浏览器商店；浏览器渠道失败不会阻止 npm 成功后创建 GitHub Release；
-5. `github_release` 只依赖 build 与 `publish_cli`，上传同一份 CLI tarball 与浏览器 assets；stable Release 的 GitHub 自动生成变更记录默认折叠在 `Full changelog` 中；
+5. `github_release` 只依赖 build 与 `publish_cli`，上传同一份 CLI tarball 与浏览器 assets；stable Release 直接展示 GitHub 自动生成的变更记录；
 6. workflow summary 汇总 npm、GitHub Release 与三个浏览器商店渠道的独立结果。
 
 如果一次 `npm publish` 的执行结果本身不确定，应先查询 exact version 再决定是否重试；正常成功路径不额外 read-back。重新执行尚未完成的 release 时，preflight 仍会查询 npm 现有状态，避免重复发布不可覆盖的 exact version。
 
-stable Release 发布后，由 AI 按 [`.github/release-notes.md`](../.github/release-notes.md) 核对 commits 与 merged PR description，在 Release 顶部同时补充中文与英文的普通用户摘要；不得改写折叠区中的原始 GitHub 变更记录。
+stable Release 发布后，由 AI 按 [`.github/release-notes.md`](../.github/release-notes.md) 核对 commits 与 merged PR description，在 Release 顶部同时补充中文与英文的普通用户摘要；不得改写 GitHub 自动生成的原始变更记录。
 
 npm tarball 包含项目根目录的 `README.md`、`README.zh-CN.md` 与 `LICENSE`。npm package 页面以 tarball 内的 `README.md` 为默认 README。
 

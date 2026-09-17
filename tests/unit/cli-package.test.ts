@@ -111,6 +111,11 @@ describe('CLI package staging', () => {
     expect(source).toContain('npm publish "$cli_tgz" --access public --tag "$NPM_DIST_TAG"');
     expect(source).toContain("if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}");
     expect(source).toContain('needs: [prepare_release, publish_cli]');
+    expect(source).toContain('--generate-notes');
+    expect(source).toContain('--notes-start-tag "$PREVIOUS_TAG"');
+    expect(source).not.toContain('<details>');
+    expect(source).not.toContain('<summary>');
+    expect(source).not.toContain('releases/generate-notes');
     expect(source).toContain('npm_already_published=true');
     expect(source).not.toContain('name: Verify npm publication');
     expect(source).not.toContain('while [[ "$attempt"');

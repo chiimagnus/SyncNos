@@ -38,6 +38,6 @@ Release 顶部摘要使用以下结构：
 - ...
 ```
 
-保留现有商店 badge 和 `<details><summary>Full changelog</summary>...</details>` 原样不动；只在它们之间插入或更新中英文用户摘要。不要删除或改写 `Full changelog` 中 GitHub 自动生成的原始记录。
+保留现有商店 badge 和 GitHub 自动生成的变更记录原样不动；只在它们之间插入或更新中英文用户摘要。不要删除或改写 GitHub 自动生成的原始记录。
 
 直接完成 Release 编辑，不输出分析过程。
