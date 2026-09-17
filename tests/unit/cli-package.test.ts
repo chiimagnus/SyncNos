@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -93,30 +93,36 @@ describe('CLI package staging', () => {
     expect(() => parseReleaseTag('v1.16.0-dev1')).toThrow(/unsupported release version/);
   });
 
-  it('publishes npm from the canonical tag release workflow before creating GitHub Release', async () => {
-    const source = await readFile(join(REPO_ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+  it('uses one tag release orchestrator with one build and independent publish jobs', async () => {
+    const workflowDir = join(REPO_ROOT, '.github', 'workflows');
+    const source = await readFile(join(workflowDir, 'release.yml'), 'utf8');
     expect(source).toMatch(
       /uses: actions\/checkout@v7\s+with:\s+ref: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.tag \|\| github\.ref \}\}/,
     );
-    expect(source).toContain('id-token: write');
-    expect(source).toContain('uses: actions/setup-node@v7');
-    expect(source).toContain("node-version: '24'");
-    expect(source).toContain("registry-url: 'https://registry.npmjs.org'");
-    expect(source).toContain('package-manager-cache: false');
+    expect(source).toContain('prepare_release:');
+    expect(source).toContain('publish_cli:');
+    expect(source).toContain('publish_chrome:');
+    expect(source).toContain('publish_edge:');
+    expect(source).toContain('publish_firefox:');
+    expect(source).toContain('github_release:');
+    expect(source).toContain('uses: actions/upload-artifact@v4');
+    expect(source).toContain('uses: actions/download-artifact@v4');
     expect(source).toContain('name: Publish SyncNos CLI to npm');
     expect(source).toContain('npm publish "$cli_tgz" --access public --tag "$NPM_DIST_TAG"');
-    expect(source).toContain('name: Verify npm publication');
+    expect(source).toContain("if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}");
+    expect(source).toContain('needs: [prepare_release, publish_cli]');
     expect(source).toContain('npm_already_published=true');
+    expect(source).not.toContain('name: Verify npm publication');
+    expect(source).not.toContain('while [[ "$attempt"');
     expect(source).not.toContain('NPM_TOKEN');
-    expect(source.indexOf('name: Smoke install packaged SyncNos CLI')).toBeLessThan(
-      source.indexOf('name: Publish SyncNos CLI to npm'),
-    );
-    expect(source.indexOf('name: Publish SyncNos CLI to npm')).toBeLessThan(
-      source.indexOf('name: Verify npm publication'),
-    );
-    expect(source.indexOf('name: Verify npm publication')).toBeLessThan(
-      source.indexOf('name: Publish stable GitHub Release'),
-    );
+
+    for (const legacyWorkflow of [
+      'webclipper-cws-publish.yml',
+      'webclipper-edge-publish.yml',
+      'webclipper-amo-publish.yml',
+    ]) {
+      await expect(access(join(workflowDir, legacyWorkflow))).rejects.toThrow();
+    }
   });
 
   it('copies the canonical RPC contract byte-for-byte into an isolated staging package', async () => {

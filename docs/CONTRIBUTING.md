@@ -77,7 +77,7 @@ PR 应让不掌握作者本地上下文的人也能判断改动是否正确：
 
 ## 发布
 
-CLI 与 Extension 共用同一个 release tag/version。正常 release 由 Git tag 触发 `.github/workflows/release.yml`：完成 preflight、canonical gate、CLI tarball install smoke 后，通过 npm Trusted Publishing/OIDC 自动发布 `@chiimagnus/syncnos`，read-back exact version + dist-tag 成功后才创建 GitHub Release。完整 version/channel、恢复与 publication ordering 契约见 [`release.md`](release.md)。
+CLI 与 Extension 共用同一个 release tag/version。正常 release 只由 Git tag 触发 `.github/workflows/release.yml`：单次验证并构建 release artifacts，再由独立 job 发布 npm、Chrome、Edge、Firefox 与 GitHub Release；npm 正常发布成功不再等待 registry 传播 read-back。完整 version/channel、恢复与 publication ordering 契约见 [`release.md`](release.md)。
 
 ## 数据、权限与隐私
 

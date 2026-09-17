@@ -15,25 +15,26 @@ CLI 源 package 保持 `0.0.0-dev` + `private: true`；release staging 由 tag �
 
 ## Preflight
 
-`.github/workflows/release.yml` 是唯一 release workflow。tag push 后先确认：
+`.github/workflows/release.yml` 是唯一 release workflow，也是唯一 `v*` tag 发布入口。tag push 后先确认：
 
 1. tag 指向 `main` 历史中的 commit；
 2. 同名 GitHub Release 尚不存在；
-3. exact npm version 尚未发布，或已发布且目标 dist-tag 已指向该 exact version（用于 npm 已成功但 GitHub Release 尚未完成的恢复）；
+3. exact npm version 尚未发布，或已发布且目标 dist-tag 已指向该 exact version（仅用于 npm 已成功但 GitHub Release 尚未完成的恢复）；
 4. 新版本严格晚于 npm 现有 `latest` / `alpha` / `beta` / `rc`；
 5. release checkout 通过 canonical gate、CLI package check 和真实 tarball install smoke。
 
 ## Publication ordering
 
-release workflow 依次：
+release workflow 只构建一次发布产物，然后由独立 job 消费同一组 artifact：
 
-1. 解析 tag/channel 并做 preflight；
-2. `npm run gate` + `npm run cli:check`；
-3. 构建 `chiimagnus-syncnos-<version>.tgz` 并从该 tarball 全局安装 smoke-test；
-4. 构建 Chrome / Edge / Firefox release assets；
-5. 通过 npm Trusted Publishing/OIDC 将同一个 CLI tarball 发布到对应 dist-tag；
-6. bounded read-back 验证 exact version + dist-tag；
-7. npm 可验证后才创建 GitHub Release，并上传同一个 CLI tarball 与浏览器 assets；stable Release 的 GitHub 自动生成变更记录默认折叠在 `Full changelog` 中。
+1. 解析 tag/channel、preflight，并运行 `npm run gate` + `npm run cli:check`；
+2. 一次性构建并保存 CLI tarball、Chrome zip、Edge zip、Firefox XPI 与 AMO source zip；CLI tarball 先做全局安装 smoke-test；
+3. `publish_cli` 通过 npm Trusted Publishing/OIDC 发布同一个 CLI tarball；`npm publish` 正常返回成功即视为该渠道成功，不再因为 registry 传播延迟做发布后的轮询 read-back；
+4. stable tag 的 Chrome / Edge / Firefox job 从同一 build artifact 独立发布，prerelease 不进入正式浏览器商店；浏览器渠道失败不会阻止 npm 成功后创建 GitHub Release；
+5. `github_release` 只依赖 build 与 `publish_cli`，上传同一份 CLI tarball 与浏览器 assets；stable Release 的 GitHub 自动生成变更记录默认折叠在 `Full changelog` 中；
+6. workflow summary 汇总 npm、GitHub Release 与三个浏览器商店渠道的独立结果。
+
+如果一次 `npm publish` 的执行结果本身不确定，应先查询 exact version 再决定是否重试；正常成功路径不额外 read-back。重新执行尚未完成的 release 时，preflight 仍会查询 npm 现有状态，避免重复发布不可覆盖的 exact version。
 
 stable Release 发布后，由 AI 按 [`.github/release-notes.md`](../.github/release-notes.md) 核对 commits 与 merged PR description，在 Release 顶部同时补充中文与英文的普通用户摘要；不得改写折叠区中的原始 GitHub 变更记录。
 

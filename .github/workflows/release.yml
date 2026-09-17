@@ -12,18 +12,24 @@ on:
         type: string
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Publish tagged release
+  prepare_release:
+    name: Validate and build release artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      version: ${{ steps.metadata.outputs.version }}
+      channel: ${{ steps.metadata.outputs.channel }}
+      npm_dist_tag: ${{ steps.metadata.outputs.npm_dist_tag }}
+      github_prerelease: ${{ steps.metadata.outputs.github_prerelease }}
+      npm_already_published: ${{ steps.preflight.outputs.npm_already_published }}
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v7
@@ -32,11 +38,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup Node and npm registry
+      - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
       - name: Install dependencies
@@ -132,7 +137,7 @@ jobs:
             });
           '
 
-      - name: Build WebClipper Chrome zip
+      - name: Build browser release artifacts
         env:
           RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
         run: |
@@ -141,82 +146,215 @@ jobs:
             --target=chrome \
             --zip \
             --zip-name="syncnos-webclipper-chrome-${RELEASE_TAG}.zip"
-
-      - name: Build WebClipper Edge zip
-        env:
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
-        run: |
-          set -euo pipefail
-          node .github/scripts/webclipper/package-release-assets.mjs \
-            --target=edge \
-            --out=dist-edge \
-            --zip \
-            --zip-name="syncnos-webclipper-edge-${RELEASE_TAG}.zip"
-
-      - name: Build WebClipper Firefox XPI
-        env:
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
-        run: |
-          set -euo pipefail
+          cp "syncnos-webclipper-chrome-${RELEASE_TAG}.zip" "syncnos-webclipper-edge-${RELEASE_TAG}.zip"
           node .github/scripts/webclipper/package-release-assets.mjs \
             --target=firefox \
             --zip \
             --zip-name="syncnos-webclipper-firefox-${RELEASE_TAG}.xpi"
+          node .github/scripts/webclipper/package-amo-source.mjs
 
-      - name: Prepare browser release assets
-        env:
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
-        run: |
-          set -euo pipefail
-          cp "syncnos-webclipper-chrome-${RELEASE_TAG}.zip" "release-artifacts/syncnos-webclipper-chrome-${RELEASE_TAG}.zip"
-          cp "syncnos-webclipper-edge-${RELEASE_TAG}.zip" "release-artifacts/syncnos-webclipper-edge-${RELEASE_TAG}.zip"
-          cp "syncnos-webclipper-firefox-${RELEASE_TAG}.xpi" "release-artifacts/syncnos-webclipper-firefox-${RELEASE_TAG}.xpi"
+          cp "syncnos-webclipper-chrome-${RELEASE_TAG}.zip" release-artifacts/
+          cp "syncnos-webclipper-edge-${RELEASE_TAG}.zip" release-artifacts/
+          cp "syncnos-webclipper-firefox-${RELEASE_TAG}.xpi" release-artifacts/
+          cp SyncNos-WebClipper-amo-source.zip "release-artifacts/syncnos-webclipper-amo-source-${RELEASE_TAG}.zip"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+          if-no-files-found: error
+          compression-level: 0
+
+  publish_cli:
+    name: Publish CLI to npm
+    needs: prepare_release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Setup Node and npm registry
+        if: ${{ needs.prepare_release.outputs.npm_already_published != 'true' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Download release artifacts
+        if: ${{ needs.prepare_release.outputs.npm_already_published != 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts
 
       - name: Publish SyncNos CLI to npm
-        if: ${{ steps.preflight.outputs.npm_already_published != 'true' }}
+        if: ${{ needs.prepare_release.outputs.npm_already_published != 'true' }}
         env:
-          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
-          NPM_DIST_TAG: ${{ steps.metadata.outputs.npm_dist_tag }}
+          RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+          NPM_DIST_TAG: ${{ needs.prepare_release.outputs.npm_dist_tag }}
         run: |
           set -euo pipefail
           cli_tgz="$PWD/release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz"
           npm publish "$cli_tgz" --access public --tag "$NPM_DIST_TAG"
 
-      - name: Verify npm publication
+      - name: Reuse existing npm publication
+        if: ${{ needs.prepare_release.outputs.npm_already_published == 'true' }}
+        run: echo "npm version already published with the expected dist-tag; continuing recovery"
+
+  publish_chrome:
+    name: Publish Chrome Web Store
+    needs: prepare_release
+    if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare_release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts
+
+      - name: Upload and publish Chrome Web Store artifact
+        run: node .github/scripts/webclipper/publish-cws.mjs
         env:
-          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
-          NPM_DIST_TAG: ${{ steps.metadata.outputs.npm_dist_tag }}
-        run: |
-          set -euo pipefail
-          attempt=1
-          while [[ "$attempt" -le 24 ]]; do
-            published_version="$(npm view "@chiimagnus/syncnos@${RELEASE_VERSION}" version 2>/dev/null || true)"
-            dist_tag_version="$(npm view @chiimagnus/syncnos "dist-tags.${NPM_DIST_TAG}" 2>/dev/null || true)"
-            if [[ "$published_version" == "$RELEASE_VERSION" && "$dist_tag_version" == "$RELEASE_VERSION" ]]; then
-              echo "npm publication visible: ${RELEASE_VERSION} (${NPM_DIST_TAG})"
-              exit 0
-            fi
-            if [[ "$attempt" -lt 24 ]]; then sleep 5; fi
-            attempt=$((attempt + 1))
-          done
-          echo "npm publication is not visible after bounded verification: version=${published_version} ${NPM_DIST_TAG}=${dist_tag_version}" >&2
-          exit 1
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_ZIP_PATH: ${{ github.workspace }}/release-artifacts/syncnos-webclipper-chrome-${{ needs.prepare_release.outputs.tag }}.zip
+          CWS_PUBLISH: 'true'
+          CWS_PUBLISH_TARGET: default
+
+  publish_edge:
+    name: Publish Edge Add-ons
+    needs: prepare_release
+    if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare_release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts
+
+      - name: Upload and publish Edge Add-ons artifact
+        run: node .github/scripts/webclipper/publish-edge.mjs
+        env:
+          EDGE_ADDONS_CLIENT_ID: ${{ secrets.EDGE_ADDONS_CLIENT_ID }}
+          EDGE_ADDONS_API_KEY: ${{ secrets.EDGE_ADDONS_API_KEY }}
+          EDGE_ADDONS_PRODUCT_ID: ${{ secrets.EDGE_ADDONS_PRODUCT_ID }}
+          EDGE_ZIP_PATH: ${{ github.workspace }}/release-artifacts/syncnos-webclipper-edge-${{ needs.prepare_release.outputs.tag }}.zip
+          EDGE_ADDONS_PUBLISH: 'true'
+          EDGE_ADDONS_PUBLISH_NOTES: SyncNos WebClipper ${{ needs.prepare_release.outputs.tag }}
+
+  publish_firefox:
+    name: Publish Firefox AMO
+    needs: prepare_release
+    if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare_release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts
+
+      - name: Submit Firefox artifact to AMO
+        run: node .github/scripts/webclipper/publish-amo.mjs
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          AMO_ADDON_ID: ${{ secrets.AMO_ADDON_ID }}
+          AMO_CHANNEL: listed
+          AMO_ADDON_SUMMARY: ${{ vars.AMO_ADDON_SUMMARY }}
+          AMO_ADDON_SUMMARY_LOCALE: ${{ vars.AMO_ADDON_SUMMARY_LOCALE }}
+          AMO_XPI_PATH: ${{ github.workspace }}/release-artifacts/syncnos-webclipper-firefox-${{ needs.prepare_release.outputs.tag }}.xpi
+          AMO_SOURCE_ZIP_PATH: ${{ github.workspace }}/release-artifacts/syncnos-webclipper-amo-source-${{ needs.prepare_release.outputs.tag }}.zip
+
+  github_release:
+    name: Create GitHub Release
+    needs: [prepare_release, publish_cli]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare_release.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts
 
       - name: Resolve previous stable tag
-        if: ${{ steps.metadata.outputs.github_prerelease == 'false' }}
+        if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}
         id: previous
         env:
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.tag }}
         run: |
           set -euo pipefail
           previous="$(git tag --list 'v*' --sort=-v:refname | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | grep -Fxv "$RELEASE_TAG" | head -n 1 || true)"
           echo "tag=$previous" >> "$GITHUB_OUTPUT"
 
       - name: Publish stable GitHub Release
-        if: ${{ steps.metadata.outputs.github_prerelease == 'false' }}
+        if: ${{ needs.prepare_release.outputs.github_prerelease == 'false' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
           PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
         run: |
           set -euo pipefail
@@ -237,13 +375,62 @@ jobs:
             printf '\n\n%s\n' '</details>'
           } > "$release_notes"
 
-          gh release create "$RELEASE_TAG" release-artifacts/* --verify-tag --title "$RELEASE_TAG" --latest --notes-file "$release_notes"
+          gh release create "$RELEASE_TAG" \
+            "release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz" \
+            "release-artifacts/syncnos-webclipper-chrome-${RELEASE_TAG}.zip" \
+            "release-artifacts/syncnos-webclipper-edge-${RELEASE_TAG}.zip" \
+            "release-artifacts/syncnos-webclipper-firefox-${RELEASE_TAG}.xpi" \
+            --verify-tag \
+            --title "$RELEASE_TAG" \
+            --latest \
+            --notes-file "$release_notes"
 
       - name: Publish GitHub Pre-release
-        if: ${{ steps.metadata.outputs.github_prerelease == 'true' }}
+        if: ${{ needs.prepare_release.outputs.github_prerelease == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
         run: |
           set -euo pipefail
-          gh release create "$RELEASE_TAG" release-artifacts/* --verify-tag --title "$RELEASE_TAG" --prerelease --latest=false --notes ''
+          gh release create "$RELEASE_TAG" \
+            "release-artifacts/chiimagnus-syncnos-${RELEASE_VERSION}.tgz" \
+            "release-artifacts/syncnos-webclipper-chrome-${RELEASE_TAG}.zip" \
+            "release-artifacts/syncnos-webclipper-edge-${RELEASE_TAG}.zip" \
+            "release-artifacts/syncnos-webclipper-firefox-${RELEASE_TAG}.xpi" \
+            --verify-tag \
+            --title "$RELEASE_TAG" \
+            --prerelease \
+            --latest=false \
+            --notes ''
+
+  release_summary:
+    name: Release summary
+    if: ${{ always() }}
+    needs: [prepare_release, publish_cli, publish_chrome, publish_edge, publish_firefox, github_release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Summarize channel results
+        env:
+          TAG: ${{ needs.prepare_release.outputs.tag }}
+          PREPARE_RESULT: ${{ needs.prepare_release.result }}
+          CLI_RESULT: ${{ needs.publish_cli.result }}
+          CHROME_RESULT: ${{ needs.publish_chrome.result }}
+          EDGE_RESULT: ${{ needs.publish_edge.result }}
+          FIREFOX_RESULT: ${{ needs.publish_firefox.result }}
+          GITHUB_RELEASE_RESULT: ${{ needs.github_release.result }}
+        run: |
+          {
+            echo "## Release ${TAG:-unknown}"
+            echo
+            echo "| Channel | Result |"
+            echo "| --- | --- |"
+            echo "| Validate + build | ${PREPARE_RESULT} |"
+            echo "| npm CLI | ${CLI_RESULT} |"
+            echo "| GitHub Release | ${GITHUB_RELEASE_RESULT} |"
+            echo "| Chrome Web Store | ${CHROME_RESULT} |"
+            echo "| Edge Add-ons | ${EDGE_RESULT} |"
+            echo "| Firefox AMO | ${FIREFOX_RESULT} |"
+          } >> "$GITHUB_STEP_SUMMARY"
