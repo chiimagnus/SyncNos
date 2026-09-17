@@ -57,6 +57,11 @@ export function ReaderToolbar({ outline, className }: ReaderToolbarProps) {
     setOpenPanel(true);
   }, [clearCloseTimer]);
 
+  const closeNow = useCallback(() => {
+    clearCloseTimer();
+    setOpenPanel(false);
+  }, [clearCloseTimer]);
+
   const scheduleClose = useCallback(() => {
     clearCloseTimer();
     closeTimerRef.current = setTimeout(() => {
@@ -72,25 +77,11 @@ export function ReaderToolbar({ outline, className }: ReaderToolbarProps) {
     [clearCloseTimer],
   );
 
-  useEffect(() => {
-    if (!openPanel) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      clearCloseTimer();
-      setOpenPanel(false);
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [clearCloseTimer, openPanel]);
-
   if (!outline?.entries.length) return null;
 
   const handleOutlinePanelPick = (entry: ReaderOutlineDomEntry) => {
     outline.onPickPanelEntry(entry);
-    setOpenPanel(false);
+    closeNow();
   };
 
   return (
@@ -109,6 +100,7 @@ export function ReaderToolbar({ outline, className }: ReaderToolbarProps) {
         narrow={narrow}
         onMouseEnter={openNow}
         onMouseLeave={scheduleClose}
+        onEscape={closeNow}
         onPickStripEntry={outline.onPickStripEntry}
         onPickPanelEntry={handleOutlinePanelPick}
       />

@@ -27,6 +27,7 @@ export type ArticleOutlineMinimapProps = ArticleOutlineMinimapState & {
   className?: string;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onEscape: () => void;
   onPickStripEntry: (entry: ReaderOutlineDomEntry) => void;
   onPickPanelEntry: (entry: ReaderOutlineDomEntry) => void;
 };
@@ -277,6 +278,7 @@ export function ArticleOutlineMinimap({
   className,
   onMouseEnter,
   onMouseLeave,
+  onEscape,
   onPickStripEntry,
   onPickPanelEntry,
 }: ArticleOutlineMinimapProps) {
@@ -300,6 +302,7 @@ export function ArticleOutlineMinimap({
       className={className}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onEscape={onEscape}
       trigger={outlineTrigger}
     >
       <div className={PANEL_LIST_CLASS}>

@@ -151,6 +151,29 @@ describe('ChatOutlinePanel', () => {
     expect(triggerShell?.style.pointerEvents).toBe('');
   });
 
+  it('consumes Escape while the hover outline is open instead of leaking it to the popup', async () => {
+    act(() => {
+      root!.render(createElement(ChatOutlinePanel, { entries, activeIndex: 1 }));
+    });
+
+    const wrap = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;
+    expect(wrap).toBeTruthy();
+
+    act(() => {
+      wrap!.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+    });
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeTruthy();
+
+    const escape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => {
+      document.dispatchEvent(escape);
+      await Promise.resolve();
+    });
+
+    expect(escape.defaultPrevented).toBe(true);
+    expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
+  });
+
   it('keeps the trigger visible for large chat outlines while preserving the active marker', () => {
     const manyEntries = makeEntries(50);
     act(() => {

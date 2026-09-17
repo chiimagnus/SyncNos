@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ReactNode } from 'react';
 
 import { menuPopoverPanelClassName } from '@ui/shared/button-styles';
 
@@ -14,6 +14,7 @@ type ReaderRailPanelProps = {
   panelClassName?: string;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onEscape: () => void;
 };
 
 const PANEL_BASE_CLASS = [
@@ -56,7 +57,22 @@ export function ReaderRailPanel({
   panelClassName,
   onMouseEnter,
   onMouseLeave,
+  onEscape,
 }: ReaderRailPanelProps) {
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      onEscape();
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [onEscape, open]);
+
   return (
     <div
       className={['tw-relative tw-flex tw-flex-col tw-items-start', className || ''].join(' ').trim()}

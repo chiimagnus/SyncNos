@@ -185,10 +185,12 @@ describe('ReaderToolbar', () => {
     expect(getPanel()).toBeNull();
 
     await hoverOpen();
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     await act(async () => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      document.dispatchEvent(escape);
       await Promise.resolve();
     });
+    expect(escape.defaultPrevented).toBe(true);
     expect(getPanel()).toBeNull();
   });
 

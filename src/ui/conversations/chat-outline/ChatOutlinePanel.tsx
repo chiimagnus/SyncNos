@@ -126,11 +126,6 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
             title={label}
             className={OUTLINE_STRIP_BUTTON_CLASS}
             onClick={() => onPickEntry?.(entry)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Escape') return;
-              event.preventDefault();
-              closePanelAndFocusHandle();
-            }}
           >
             <span
               className={outlineStripBarClassName(isActive)}
@@ -154,6 +149,7 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
       trigger={trigger}
       onMouseEnter={openPanel}
       onMouseLeave={scheduleClose}
+      onEscape={closePanelAndFocusHandle}
     >
       <div className={PANEL_LIST_CLASS}>
         {safeEntries.map((entry) => {
