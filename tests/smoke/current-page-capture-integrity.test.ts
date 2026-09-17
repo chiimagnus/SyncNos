@@ -261,6 +261,47 @@ describe('current page capture integrity routing', () => {
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
   });
 
+  it('keeps an explicitly finalized backend turn canonical when the DOM is the same turn', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    snapshot.messages.push({
+      messageKey: 'assistant-backend',
+      role: 'assistant',
+      contentMarkdown: 'canonical backend answer',
+      sequence: 1,
+    });
+    const liveTurn = vi.fn(() => ({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0, updatedAt: 1 },
+      assistantMessage: {
+        messageKey: 'assistant-live',
+        role: 'assistant',
+        contentMarkdown: 'different DOM rendering',
+        sequence: 1,
+        updatedAt: 2,
+      },
+    }));
+    chatgptApiMocks.capture.mockResolvedValue({
+      applicable: true,
+      snapshot,
+      currentTurnState: 'finalized',
+      currentTurnId: 'turn-backend',
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      liveTurn,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    const result = await harness.service.captureCurrentPage();
+
+    expect(liveTurn).toHaveBeenCalledWith({ expectedConversationId: 'conversation-1' });
+    expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
+    expect(result).toMatchObject({ captureCompleteness: 'complete' });
+  });
+
   it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();

@@ -10,8 +10,12 @@ type ChatgptMappingNode = {
   message?: any;
 };
 
+export type ChatgptApiCurrentTurnState = 'finalized' | 'open' | 'unknown';
+
 export type ChatgptApiSnapshotResult = {
   snapshot: any;
+  currentTurnState: ChatgptApiCurrentTurnState;
+  currentTurnId: string;
 };
 
 type PendingImage = {
@@ -28,6 +32,8 @@ type PendingAuxiliary = {
 const INTERNAL_CONTENT_TYPES = new Set(['model_editable_context']);
 const SCHEMA_DRIFT_REASON = 'chatgpt_api_schema_drift_partial';
 const UNOWNED_AUXILIARY_REASON = 'chatgpt_api_unowned_auxiliary_omitted';
+const UNFINISHED_TURN_REASON = 'chatgpt_api_unfinished_turn_partial';
+export const CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX = 'chatgpt-turn:';
 type SchemaDriftReporter = () => void;
 
 function apiSnapshotError(code: string): Error & { code: string } {
@@ -90,6 +96,103 @@ function currentAttachments(message: any, onSchemaDrift: SchemaDriftReporter): a
   return [];
 }
 
+function stableHttpUrl(value: unknown): string {
+  const raw = stableString(value);
+  if (!/^https?:\/\//i.test(raw)) return '';
+  return raw;
+}
+
+function markdownReferenceAlt(value: unknown): string {
+  const raw = stableString(value);
+  const wrapped = raw.match(/^\((\[[\s\S]+\]\(https?:\/\/[\s\S]+\))\)$/i);
+  return wrapped?.[1] || raw;
+}
+
+function groupedWebpageReference(reference: any, onSchemaDrift: SchemaDriftReporter): string {
+  const items = Array.isArray(reference?.items) ? reference.items : [];
+  const first = items.find((item: any) => item && typeof item === 'object' && !Array.isArray(item)) || null;
+  const safeUrls = Array.isArray(reference?.safe_urls) ? reference.safe_urls : [];
+  const url = stableHttpUrl(first?.url) || safeUrls.map(stableHttpUrl).find(Boolean) || '';
+  const label = stableString(first?.attribution) || stableString(first?.title);
+  const supporting = Array.isArray(first?.supporting_websites) ? first.supporting_websites.length : 0;
+  const extraCount = supporting + Math.max(0, items.length - 1);
+  if (url && label) return `[${label}${extraCount ? `+${extraCount}` : ''}](${url})`;
+
+  const alt = markdownReferenceAlt(reference?.alt);
+  if (alt) return alt;
+  if (url) return url;
+  onSchemaDrift();
+  return '';
+}
+
+function clientWidgetReference(reference: any, onSchemaDrift: SchemaDriftReporter): string {
+  const matched = stableString(reference?.matched_text);
+  const prefix = 'genui';
+  if (!matched.startsWith(prefix) || !matched.endsWith('')) {
+    onSchemaDrift();
+    return '';
+  }
+  try {
+    const payload = JSON.parse(matched.slice(prefix.length, -1));
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid widget payload');
+    const candidate = Object.values(payload).find(
+      (value) => value && typeof value === 'object' && !Array.isArray(value),
+    ) as Record<string, any> | undefined;
+    const meta =
+      candidate?.meta && typeof candidate.meta === 'object' && !Array.isArray(candidate.meta) ? candidate.meta : {};
+    const title = stableString(meta.title) || stableString(candidate?.title);
+    const description = stableString(meta.description) || stableString(candidate?.description);
+    if (title && description) return `${title} — ${description}`;
+    if (title || description) return title || description;
+  } catch (_error) {
+    onSchemaDrift();
+    return '';
+  }
+  onSchemaDrift();
+  return '';
+}
+
+function renderContentReferences(message: any, text: string, onSchemaDrift: SchemaDriftReporter): string {
+  let output = text;
+  const rawReferences = message?.metadata?.content_references;
+  if (rawReferences != null && !Array.isArray(rawReferences)) {
+    onSchemaDrift();
+  }
+  const references = Array.isArray(rawReferences) ? rawReferences : [];
+  const replaced = new Set<string>();
+
+  for (const reference of references) {
+    if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+      onSchemaDrift();
+      continue;
+    }
+    const type = stableString(reference.type).toLowerCase();
+    const matched = stableString(reference.matched_text);
+    if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
+
+    let replacement = '';
+    if (type === 'grouped_webpages') {
+      replacement = groupedWebpageReference(reference, onSchemaDrift);
+    } else if (type === 'client_defined_widget') {
+      replacement = clientWidgetReference(reference, onSchemaDrift);
+    } else if (type === 'hidden') {
+      replacement = '';
+    } else {
+      replacement = markdownReferenceAlt(reference.alt);
+      if (!replacement) onSchemaDrift();
+    }
+    output = output.split(matched).join(replacement);
+    replaced.add(matched);
+  }
+
+  const internalTokens = /[^]*/g;
+  if (internalTokens.test(output)) {
+    onSchemaDrift();
+    output = output.replace(internalTokens, '');
+  }
+  return output;
+}
+
 function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
   const parts = currentParts(message, onSchemaDrift);
   const output: string[] = [];
@@ -102,7 +205,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
     }
     if (part != null && typeof part === 'object') onSchemaDrift();
   }
-  if (output.length) return output.join('\n');
+  if (output.length) return renderContentReferences(message, output.join('\n'), onSchemaDrift);
 
   const content = message?.content;
   if (content && typeof content === 'object' && !Array.isArray(content)) {
@@ -110,7 +213,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
       const fallback = stableString(content[key]);
       if (!fallback) continue;
       onSchemaDrift();
-      return fallback;
+      return renderContentReferences(message, fallback, onSchemaDrift);
     }
   }
   return '';
@@ -282,6 +385,38 @@ function currentBranchNodes(mapping: unknown, currentNode: unknown): ChatgptMapp
   return branch;
 }
 
+function currentTurnInfo(branch: ChatgptMappingNode[]): {
+  state: ChatgptApiCurrentTurnState;
+  turnId: string;
+} {
+  let executionTurnId = '';
+  for (let index = branch.length - 1; index >= 0; index -= 1) {
+    const message = branch[index]?.message;
+    if (!message || isHidden(message) || INTERNAL_CONTENT_TYPES.has(contentType(message))) continue;
+    const role = messageRole(message);
+    if (role === 'system' || role === 'developer') continue;
+    const turnId = messageTurnId(message);
+
+    // Tool pipeline nodes can trail a user-visible turn without proving that the turn is still open.
+    if (role === 'tool' || (role === 'assistant' && message.recipient !== 'all')) {
+      if (!executionTurnId && turnId) executionTurnId = turnId;
+      continue;
+    }
+    if (role === 'user') {
+      return executionTurnId ? { state: 'unknown', turnId: executionTurnId } : { state: 'open', turnId };
+    }
+    if (role !== 'assistant') return { state: 'unknown', turnId: turnId || executionTurnId };
+
+    if (message.channel !== 'final') return { state: 'open', turnId: turnId || executionTurnId };
+    const status = stableString(message.status).toLowerCase();
+    const isComplete = message?.metadata?.is_complete;
+    if (isComplete === true || status === 'finished_successfully') return { state: 'finalized', turnId };
+    if (isComplete === false || status === 'in_progress' || status === 'streaming') return { state: 'open', turnId };
+    return { state: 'unknown', turnId };
+  }
+  return { state: 'unknown', turnId: executionTurnId };
+}
+
 function responseConversationId(data: any): string {
   return stableString(data?.conversation_id);
 }
@@ -327,6 +462,7 @@ export function buildChatgptApiSnapshot(input: {
   if (responseId && responseId !== conversationId) throw apiSnapshotError('conversation_identity_mismatch');
 
   const branch = currentBranchNodes(input.data?.mapping, input.data?.current_node);
+  const backendCurrentTurn = currentTurnInfo(branch);
   const capturedAt = Number.isFinite(input.capturedAt) ? Number(input.capturedAt) : Date.now();
   const messages: any[] = [];
   const seenMessageKeys = new Set<string>();
@@ -336,6 +472,7 @@ export function buildChatgptApiSnapshot(input: {
 
   const markSchemaDrift = () => partialReasons.add(SCHEMA_DRIFT_REASON);
   const markUnownedAuxiliary = () => partialReasons.add(UNOWNED_AUXILIARY_REASON);
+  if (backendCurrentTurn.state === 'open' && backendCurrentTurn.turnId) partialReasons.add(UNFINISHED_TURN_REASON);
 
   const flushPendingImages = () => {
     if (!pendingImages.length) return;
@@ -367,6 +504,34 @@ export function buildChatgptApiSnapshot(input: {
       markUnownedAuxiliary();
       pendingAuxiliary = [];
     }
+  };
+
+  const flushPendingAtBranchEnd = () => {
+    flushPendingImages();
+    if (!pendingAuxiliary.length) return;
+    const turnId = pendingAuxiliary[0]?.turnId || '';
+    const ownsOneStableTurn = !!turnId && pendingAuxiliary.every((item) => item.turnId === turnId);
+    const markdown = appendBlocks(pendingAuxiliary.map((item) => item.markdown));
+    pendingAuxiliary = [];
+    if (!ownsOneStableTurn || !markdown) {
+      markUnownedAuxiliary();
+      return;
+    }
+
+    const key = `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${turnId}`;
+    if (seenMessageKeys.has(key)) {
+      markSchemaDrift();
+      return;
+    }
+    seenMessageKeys.add(key);
+    messages.push({
+      messageKey: key,
+      role: 'assistant',
+      contentMarkdown: markdown,
+      sequence: messages.length,
+      updatedAt: capturedAt,
+    });
+    partialReasons.add(UNFINISHED_TURN_REASON);
   };
 
   const pendingMatchesTurn = (turnId: string): boolean => {
@@ -444,7 +609,11 @@ export function buildChatgptApiSnapshot(input: {
           pendingImages = [];
           imageOwnerKey = '';
         }
-        const ownerKey = imageOwnerKey || id;
+        const ownerKey =
+          imageOwnerKey ||
+          (backendCurrentTurn.state === 'open' && turnId && turnId === backendCurrentTurn.turnId
+            ? `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${turnId}`
+            : id);
         if (!ownerKey) {
           markSchemaDrift();
           flushPendingWithoutOwner();
@@ -514,7 +683,7 @@ export function buildChatgptApiSnapshot(input: {
     markSchemaDrift();
   }
 
-  flushPendingWithoutOwner();
+  flushPendingAtBranchEnd();
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
 
   const title = stableString(input.data?.title) || stableString(input.fallbackTitle) || 'ChatGPT';
@@ -535,5 +704,9 @@ export function buildChatgptApiSnapshot(input: {
     },
   };
 
-  return { snapshot };
+  return {
+    snapshot,
+    currentTurnState: backendCurrentTurn.state,
+    currentTurnId: backendCurrentTurn.turnId,
+  };
 }

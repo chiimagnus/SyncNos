@@ -28,6 +28,7 @@ type MessageInput = {
   turnId?: string;
   hidden?: boolean;
   attachments?: any[];
+  contentReferences?: any[];
   imageTitle?: string;
   authorName?: string;
   status?: string;
@@ -50,6 +51,7 @@ function message(input: MessageInput) {
       ...(input.turnId ? { turn_id: input.turnId } : null),
       ...(input.hidden ? { is_visually_hidden_from_conversation: true } : null),
       ...(input.attachments ? { attachments: input.attachments } : null),
+      ...(input.contentReferences ? { content_references: input.contentReferences } : null),
       ...(input.imageTitle ? { image_gen_title: input.imageTitle } : null),
     },
   };
@@ -140,6 +142,126 @@ describe('ChatGPT API snapshot', () => {
     delete data.conversation_id;
     data.id = 'other';
     expect(build(data).snapshot.messages.map((entry: any) => entry.messageKey)).toEqual(['user-1']);
+  });
+
+  it('renders backend rich references as readable Markdown instead of leaking transport tokens', () => {
+    const cite = 'citeturn1search0turn1search1';
+    const widget =
+      'genui{"chart":{"meta":{"title":"Price history","description":"Standard price, not sale price"},"data":[{"x":1,"y":2}]}}';
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'assistant-1',
+        role: 'assistant',
+        channel: 'final',
+        parts: [`Answer ${cite}\n\n${widget}`],
+        contentReferences: [
+          {
+            type: 'grouped_webpages',
+            matched_text: cite,
+            alt: '([Primary](https://example.com/primary))',
+            safe_urls: ['https://example.com/primary'],
+            items: [
+              {
+                attribution: 'Primary',
+                title: 'Primary source',
+                url: 'https://example.com/primary',
+                supporting_websites: [{ attribution: 'Supporting', url: 'https://example.com/supporting' }],
+              },
+            ],
+          },
+          { type: 'client_defined_widget', matched_text: widget },
+        ],
+      }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages[1].contentMarkdown).toBe(
+      'Answer [Primary+1](https://example.com/primary)\n\nPrice history — Standard price, not sale price',
+    );
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('omits hidden reference tokens and fails soft on unknown internal rich tokens', () => {
+    const hidden = 'fileciteturn1file0L1-L2';
+    const unknown = 'future-widgetopaque';
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'assistant-1',
+        role: 'assistant',
+        channel: 'final',
+        parts: [`before ${hidden} middle ${unknown} after`],
+        contentReferences: [{ type: 'hidden', matched_text: hidden, invalid: true }],
+      }),
+    ]);
+
+    const result = build(data);
+    expect(result.snapshot.messages[1].contentMarkdown).toBe('before  middle  after');
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+  });
+
+  it('classifies whether the backend current turn is finalized before live-tail reconciliation', () => {
+    const finalized = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'assistant-1',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['answer'],
+        turnId: 'turn-a',
+        status: 'finished_successfully',
+      }),
+    ]);
+    expect(build(finalized)).toMatchObject({ currentTurnState: 'finalized', currentTurnId: 'turn-a' });
+
+    const openReasoning = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({
+        id: 'thought-1',
+        role: 'assistant',
+        contentType: 'thoughts',
+        thoughts: [{ summary: 'Working', content: 'Still reasoning.' }],
+        turnId: 'turn-a',
+      }),
+    ]);
+    expect(build(openReasoning)).toMatchObject({ currentTurnState: 'open', currentTurnId: 'turn-a' });
+
+    const userOnly = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    expect(build(userOnly)).toMatchObject({ currentTurnState: 'open', currentTurnId: '' });
+
+    const legacyFinal = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['q'] }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
+    ]);
+    expect(build(legacyFinal)).toMatchObject({ currentTurnState: 'unknown', currentTurnId: 'turn-a' });
+  });
+
+  it('keeps an explicitly unfinished final under the turn key until the backend marks it finalized', () => {
+    const data = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['question'], turnId: 'turn-a' }),
+      message({
+        id: 'assistant-streaming',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['partial answer'],
+        turnId: 'turn-a',
+        status: 'in_progress',
+      }),
+    ]);
+
+    const result = build(data);
+    expect(result.currentTurnState).toBe('open');
+    expect(result.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'chatgpt-turn:turn-a',
+      role: 'assistant',
+      contentMarkdown: 'partial answer',
+    });
+    expect(result.snapshot.captureMeta).toEqual({
+      completeness: 'partial',
+      identityVerified: true,
+      reasons: ['chatgpt_api_unfinished_turn_partial'],
+    });
   });
 
   it('keeps only the current branch and preserves stable DOM-compatible message ids', () => {
@@ -463,7 +585,7 @@ describe('ChatGPT API snapshot', () => {
     });
   });
 
-  it('drops a completed auxiliary-only turn at branch end when every node is explicitly finished', () => {
+  it('preserves a branch-end auxiliary-only turn under a stable provisional turn key', () => {
     const data = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
@@ -487,11 +609,16 @@ describe('ChatGPT API snapshot', () => {
     const result = build(data);
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-a',
+        role: 'assistant',
+        contentMarkdown: '**done**\n\ncompleted execution-only turn\n\ncompleted progress',
+      }),
     ]);
     expect(result.snapshot.captureMeta).toEqual({
       completeness: 'partial',
       identityVerified: true,
-      reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
+      reasons: ['chatgpt_api_unfinished_turn_partial'],
     });
   });
 
@@ -557,8 +684,13 @@ describe('ChatGPT API snapshot', () => {
     const auxiliaryResult = build(unfinishedAuxiliary);
     expect(auxiliaryResult.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-a',
+        role: 'assistant',
+        contentMarkdown: 'unfinished',
+      }),
     ]);
-    expect(auxiliaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
+    expect(auxiliaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unfinished_turn_partial']);
   });
 
   it('does not attach pending auxiliary content when a later owner loses its turn id', () => {
@@ -790,8 +922,13 @@ describe('ChatGPT API snapshot', () => {
         role: 'assistant',
         contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
       }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-image',
+        role: 'assistant',
+        contentMarkdown: 'working',
+      }),
     ]);
-    expect(unfinishedResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
+    expect(unfinishedResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unfinished_turn_partial']);
   });
 
   it('separates image and auxiliary state when their turn ids diverge', () => {
@@ -831,8 +968,13 @@ describe('ChatGPT API snapshot', () => {
         role: 'assistant',
         contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
       }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-other',
+        role: 'assistant',
+        contentMarkdown: 'belongs elsewhere',
+      }),
     ]);
-    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unowned_auxiliary_omitted']);
+    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unfinished_turn_partial']);
   });
 
   it('dedupes repeated image-only keys as partial instead of throwing or duplicating content', () => {
@@ -916,11 +1058,19 @@ describe('ChatGPT API snapshot', () => {
 
     const result = build(data);
     const imageKey = buildChatgptGeneratedImageMessageKey(['file_only_1']);
-    expect(result.snapshot.messages.at(-1)).toMatchObject({
-      messageKey: imageKey,
-      role: 'assistant',
-      contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
-    });
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'draw it' }),
+      expect.objectContaining({
+        messageKey: imageKey,
+        role: 'assistant',
+        contentMarkdown: '![generated image](chatgpt-file://file_only_1)',
+      }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:turn-image',
+        role: 'assistant',
+        contentMarkdown: 'backend recap not rendered as a DOM message for the image-only turn',
+      }),
+    ]);
     expect(JSON.stringify(result.snapshot)).not.toContain('legacy.invalid');
   });
 
