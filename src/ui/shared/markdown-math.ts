@@ -5,8 +5,6 @@ import {
   type MarkdownMathRuntime,
   type MarkdownRendererOptions,
 } from '@ui/shared/markdown-core';
-import 'katex/dist/katex.min.css';
-
 const katexMathRuntime: MarkdownMathRuntime = {
   texmathPlugin: texmath as any,
   katexEngine: {
