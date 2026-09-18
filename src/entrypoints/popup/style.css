@@ -29,3 +29,25 @@ body {
   width: min(420px, 100vw);
   height: min(600px, 100vh);
 }
+
+.webclipper-popup-bootstrap {
+  display: grid;
+  gap: 10px;
+  height: 100%;
+  padding: 12px;
+  background: var(--bg-primary);
+}
+
+.webclipper-popup-bootstrap__header,
+.webclipper-popup-bootstrap__row {
+  border-radius: var(--radius-card);
+  background: var(--bg-sunken);
+}
+
+.webclipper-popup-bootstrap__header {
+  height: 36px;
+}
+
+.webclipper-popup-bootstrap__row {
+  height: 72px;
+}
