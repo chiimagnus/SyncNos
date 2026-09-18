@@ -893,7 +893,8 @@ describe('obsidian-sync-orchestrator', () => {
         conversationId: 1,
         canonicalUrl: 'https://example.com',
         quoteText: 'Quoted',
-        commentText: 'Root',
+        commentText:
+          'Root\n\n![Comment image](syncnos-asset://7)\n\n![Remote](https://example.com/comment.png)\n\n`![Code](syncnos-asset://8)`',
         createdAt: 1,
         updatedAt: 1,
       },
@@ -941,6 +942,11 @@ describe('obsidian-sync-orchestrator', () => {
     expect(putCount).toBe(1);
     expect(putBody).toContain('## Article');
     expect(putBody).toContain('## Comments');
+    expect(putBody).toContain('  Comment image');
+    expect(putBody).toContain('  [Remote](https://example.com/comment.png)');
+    expect(putBody).toContain('  `![Code](syncnos-asset://8)`');
+    expect(putBody).not.toContain('![Comment image](syncnos-asset://7)');
+    expect(imageCacheMocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
     expect(backgroundStorageMocks.getConversationById).toHaveBeenCalledTimes(1);
   });
 

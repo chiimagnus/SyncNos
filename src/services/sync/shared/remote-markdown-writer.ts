@@ -1,6 +1,10 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import {
+  collectMarkdownImageReferences,
+  replaceMarkdownImageReferences,
+} from '@services/shared/markdown-image-references';
 import { formatVideoContentMarkdown } from '@services/conversations/domain/markdown';
 
 const MESSAGES_HEADING = 'Conversations';
@@ -158,14 +162,23 @@ function buildListItemHead(metaLine: string, indentLevel: number) {
   return `${indent}- ${meta}`.trimEnd();
 }
 
-function buildListItemParagraph(text: string, indentLevel: number): string[] {
+function degradeCommentImages(markdown: string): string {
+  const references = collectMarkdownImageReferences(markdown);
+  if (!references.length) return markdown;
+  return replaceMarkdownImageReferences(markdown, references, (reference) => {
+    const alt = String(reference.alt || '').trim();
+    if (/^https?:\/\//i.test(reference.target)) {
+      return { replacement: alt ? reference.full.slice(1) : `[Image](${reference.rawTarget}${reference.title})` };
+    }
+    return { replacement: alt || 'Image' };
+  });
+}
+
+function indentMarkdownUnderListItem(text: string, indentLevel: number): string[] {
   const src = normalizeNewlines(text).trim();
   if (!src) return [];
-  const indent = '  '.repeat(Math.max(0, indentLevel));
-  return src
-    .split('\n')
-    .map((line) => `${indent}  ${line}`.trimEnd())
-    .filter((x) => !!x);
+  const indent = '  '.repeat(Math.max(0, indentLevel) + 1);
+  return src.split('\n').map((line) => (line ? `${indent}${line}` : ''));
 }
 
 function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentTimeZone) {
@@ -179,7 +192,7 @@ function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentT
       buildCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt, timeZone }),
       0,
     );
-    return [head, ...buildListItemParagraph(text, 0)].filter(Boolean).join('\n').trim();
+    return [head, ...indentMarkdownUnderListItem(degradeCommentImages(text), 0)].join('\n').trim();
   };
 
   for (const thread of graph.threads) {
