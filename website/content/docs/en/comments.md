@@ -27,4 +27,8 @@ If you save a quote and comment text together, SyncNos stores them as two indepe
 
 Later comments require text; `Ctrl/⌘ + Enter` submits them.
 
+Comments and replies support Markdown, including lists, quotes, code blocks, tables, inline math with `$...$`, and block math with `$$...$$`. The composer remains a plain text field rather than a rich-text editor.
+
+Markdown images in comments are not loaded or synced as images. Raw HTML is not executed as HTML in the SyncNos comments UI.
+
 Comments and highlights are stored locally and are included in SyncNos backups.

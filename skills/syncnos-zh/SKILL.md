@@ -23,7 +23,7 @@ description: "使用 SyncNos Web Clipper（网页剪藏器）及其 `syncnos` CL
 ## 关键操作
 
 - `capture` 处理当前 active page；若目标页未激活，只用浏览器能力切换 tab，不重写 collector。
-- 评论 root/reply/delete 走 CLI。CLI 创建的 root/reply 作者自动记为 `<About You 用户名>' CLI`，未配置用户名时记为 `CLI`，不接受调用方覆盖作者；网页选区评论走 browser-required 流程，不伪造 locator。
+- 评论 root/reply/delete 走 CLI。root/reply 正文可以直接传 Markdown 和 `$...$` / `$$...$$` 数学公式源码；Markdown 图片语法不代表评论附件能力。CLI 创建的 root/reply 作者自动记为 `<About You 用户名>' CLI`，未配置用户名时记为 `CLI`，不接受调用方覆盖作者；网页选区评论走 browser-required 流程，不伪造 locator。
 - 修改设置前先运行 `settings schema`，只操作 public key。
 - Provider 认证/配置只走 CLI 暴露接口，不直接读取底层凭据。
 - 用户要求“同步并确认完成”时保留默认等待语义；仅在明确需要异步时使用 `--no-wait`。`sync_wait_timeout` 不等于远端任务已取消。
