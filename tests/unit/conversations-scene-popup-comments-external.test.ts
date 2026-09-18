@@ -93,20 +93,25 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
+function flushImmediate(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 describe('ConversationsScene (popup) comments external override', () => {
-  it('prefers onOpenCommentsExternally over narrow comments route', () => {
+  it('prefers onOpenCommentsExternally over narrow comments route', async () => {
     setupDom();
     openCommentsMock.mockReset();
     openExternalMock.mockReset();
     sidebarOpenMock.mockReset();
 
     const root = ReactDOM.createRoot(document.getElementById('root')!);
-    act(() => {
+    await act(async () => {
       root.render(
         createElement(ConversationsScene, {
           onOpenCommentsExternally: () => openExternalMock(),
         } as any),
       );
+      await flushImmediate();
     });
 
     const commentBtn = document.querySelector('[data-detail-comment="1"]') as HTMLButtonElement | null;
@@ -126,14 +131,14 @@ describe('ConversationsScene (popup) comments external override', () => {
     cleanupDom();
   });
 
-  it('forwards narrow route actions without mutating the comments context', () => {
+  it('forwards narrow route actions without mutating the comments context', async () => {
     setupDom();
     openCommentsMock.mockReset();
     sidebarOpenMock.mockReset();
     const setContext = vi.fn();
 
     const root = ReactDOM.createRoot(document.getElementById('root')!);
-    act(() => {
+    await act(async () => {
       root.render(
         createElement(ConversationsScene, {
           commentsSidebarRuntime: {
@@ -147,6 +152,7 @@ describe('ConversationsScene (popup) comments external override', () => {
           },
         } as any),
       );
+      await flushImmediate();
     });
 
     expect(setContext).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
@@ -7,14 +7,19 @@ import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArti
 
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
-import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
-import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import type { SyncProvider } from '@services/sync/models';
+
+const ConversationDetailPane = lazy(() =>
+  import('@ui/conversations/ConversationDetailPane').then((module) => ({ default: module.ConversationDetailPane })),
+);
+const ArticleCommentsSection = lazy(() =>
+  import('@ui/conversations/ArticleCommentsSection').then((module) => ({ default: module.ArticleCommentsSection })),
+);
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
@@ -131,29 +136,31 @@ export function ConversationsScene({
     if (narrowRoute === 'detail') {
       return (
         <div className="route-scroll webclipper-detail-route-scroll tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]">
-          <ConversationDetailPane
-            onBack={returnToList}
-            onTriggerCommentsSidebar={
-              canOpenCommentsFromDetail
-                ? () => {
-                    if (typeof onOpenCommentsExternally === 'function') {
-                      onOpenCommentsExternally();
-                      return;
+          <Suspense fallback={null}>
+            <ConversationDetailPane
+              onBack={returnToList}
+              onTriggerCommentsSidebar={
+                canOpenCommentsFromDetail
+                  ? () => {
+                      if (typeof onOpenCommentsExternally === 'function') {
+                        onOpenCommentsExternally();
+                        return;
+                      }
+                      if (!commentsSidebarRuntime) return;
+                      openComments();
+                      void commentsSidebarRuntime.sidebarController.open({
+                        focusComposer: true,
+                        source: narrowCommentsOpenSource,
+                        ensureContext: false,
+                      });
                     }
-                    if (!commentsSidebarRuntime) return;
-                    openComments();
-                    void commentsSidebarRuntime.sidebarController.open({
-                      focusComposer: true,
-                      source: narrowCommentsOpenSource,
-                      ensureContext: false,
-                    });
-                  }
-                : undefined
-            }
-            onCommentsLocatorRootsChange={(roots) => {
-              onCommentsLocatorSurfaceRootsChange?.(roots);
-            }}
-          />
+                  : undefined
+              }
+              onCommentsLocatorRootsChange={(roots) => {
+                onCommentsLocatorSurfaceRootsChange?.(roots);
+              }}
+            />
+          </Suspense>
         </div>
       );
     }
@@ -161,13 +168,15 @@ export function ConversationsScene({
     if (narrowRoute === 'comments' && commentsSidebarRuntime) {
       return (
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]">
-          <ArticleCommentsSection
-            sidebarSession={commentsSidebarRuntime.sidebarSession}
-            containerClassName="tw-h-full tw-min-h-0"
-            getLocatorSurfaceRoots={() => getCommentsLocatorSurfaceRoots?.() || null}
-            subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
-            fullWidth
-          />
+          <Suspense fallback={null}>
+            <ArticleCommentsSection
+              sidebarSession={commentsSidebarRuntime.sidebarSession}
+              containerClassName="tw-h-full tw-min-h-0"
+              getLocatorSurfaceRoots={() => getCommentsLocatorSurfaceRoots?.() || null}
+              subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
+              fullWidth
+            />
+          </Suspense>
         </div>
       );
     }
@@ -192,7 +201,11 @@ export function ConversationsScene({
         </aside>
       )}
       <main className="route-scroll webclipper-detail-route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-card)] tw-overflow-auto tw-overflow-x-hidden">
-        {wideDetail ?? <ConversationDetailPane />}
+        {wideDetail ?? (
+          <Suspense fallback={null}>
+            <ConversationDetailPane />
+          </Suspense>
+        )}
       </main>
     </div>
   );

@@ -96,10 +96,8 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
     buttonDisabled: false,
     buttonLabel: 'Fetch AI Chat',
     capture: vi.fn(),
-    captureState: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
-    checking: false,
-    fetching: false,
-    refreshState: vi.fn(),
+    currentPageState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
+    checkingCurrentPageState: false,
     status: { kind: 'info', message: 'ChatGPT · Waiting for messages…' },
   }),
 }));
@@ -485,9 +483,9 @@ describe('PopupShell header actions', () => {
       root!.render(createElement(PopupShell));
     });
 
-    await vi.waitFor(() => {
-      expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
-    });
+    expect(sendMock.mock.calls.filter(([type]) => type === UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)).toHaveLength(
+      0,
+    );
 
     const commentsBtn = document.querySelector(
       '[aria-label="Open in-page comments sidebar"]',

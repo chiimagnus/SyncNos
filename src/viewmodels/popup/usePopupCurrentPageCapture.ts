@@ -148,6 +148,8 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     buttonDisabled: checking || fetching || captureState?.readiness !== 'ready',
     buttonLabel,
     capture,
+    currentPageState: captureState,
+    checkingCurrentPageState: checking,
     status,
   };
 }

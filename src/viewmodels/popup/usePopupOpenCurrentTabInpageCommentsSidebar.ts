@@ -27,7 +27,10 @@ function hasRuntimeSendMessage(): boolean {
   return typeof chromeSend === 'function';
 }
 
-export function usePopupOpenCurrentTabInpageCommentsSidebar() {
+export function usePopupOpenCurrentTabInpageCommentsSidebar(input: {
+  currentPageState: CurrentPageCaptureState | null;
+  checkingCurrentPageState: boolean;
+}) {
   const runtimeAvailable = useMemo(() => hasRuntimeSendMessage(), []);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -37,64 +40,17 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     };
   }, []);
 
-  const [checking, setChecking] = useState(() => runtimeAvailable);
   const [opening, setOpening] = useState(false);
-  const [eligible, setEligible] = useState(false);
-  const [disabledReason, setDisabledReason] = useState<string>(() =>
-    runtimeAvailable ? t('checkingDots') : t('commentsSidebarUnavailableHint'),
-  );
-
-  const refreshEligibility = useCallback(async () => {
-    if (!runtimeAvailable) return;
-    if (mountedRef.current) setChecking(true);
-    try {
-      const response = await send<ApiResponse<CurrentPageCaptureState>>(
-        UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE,
-        {},
-      );
-      const state = unwrap(response);
-
-      if (state.readiness !== 'ready') {
-        if (!mountedRef.current) return;
-        setEligible(false);
-        setDisabledReason(t('commentsSidebarUnavailableHint'));
-        return;
-      }
-
-      if (state.kind !== 'article') {
-        if (!mountedRef.current) return;
-        setEligible(false);
-        setDisabledReason(t('commentsSidebarArticleOnlyHint'));
-        return;
-      }
-
-      if (!mountedRef.current) return;
-      setEligible(true);
-      setDisabledReason(t('openInpageCommentsSidebar'));
-    } catch (error) {
-      const message = (error as any)?.message ?? String(error ?? '');
-      if (!mountedRef.current) return;
-      setEligible(false);
-      setDisabledReason(message || t('commentsSidebarUnavailableHint'));
-    } finally {
-      if (mountedRef.current) setChecking(false);
-    }
-  }, [runtimeAvailable]);
-
-  useEffect(() => {
-    if (!runtimeAvailable) return;
-    void refreshEligibility();
-  }, [refreshEligibility, runtimeAvailable]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!runtimeAvailable) return;
-    const onFocus = () => {
-      void refreshEligibility();
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [refreshEligibility, runtimeAvailable]);
+  const checking = runtimeAvailable && input.checkingCurrentPageState;
+  const eligible =
+    runtimeAvailable && input.currentPageState?.readiness === 'ready' && input.currentPageState.kind === 'article';
+  const disabledReason = useMemo(() => {
+    if (!runtimeAvailable) return t('commentsSidebarUnavailableHint');
+    if (checking) return t('checkingDots');
+    if (input.currentPageState?.readiness !== 'ready') return t('commentsSidebarUnavailableHint');
+    if (input.currentPageState.kind !== 'article') return t('commentsSidebarArticleOnlyHint');
+    return t('openInpageCommentsSidebar');
+  }, [checking, input.currentPageState, runtimeAvailable]);
 
   const open = useCallback(async () => {
     if (!runtimeAvailable) return false;

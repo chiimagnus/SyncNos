@@ -127,6 +127,10 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
+function flushImmediate(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 describe('ConversationsScene narrow detail scroll root', () => {
   let root: ReactDOM.Root | null = null;
 
@@ -207,9 +211,10 @@ describe('ConversationsScene narrow detail scroll root', () => {
     cleanupDom();
   });
 
-  it('puts the detail route scroll root on the scene wrapper, not inside ConversationDetailPane', () => {
-    act(() => {
+  it('puts the detail route scroll root on the scene wrapper, not inside ConversationDetailPane', async () => {
+    await act(async () => {
       root!.render(createElement(ConversationsScene));
+      await flushImmediate();
     });
 
     const routeScrollRoots = document.querySelectorAll('.route-scroll');

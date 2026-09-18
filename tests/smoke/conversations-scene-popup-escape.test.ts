@@ -189,7 +189,9 @@ describe('ConversationsScene popup Escape behavior', () => {
     });
 
     expect(activateLoadedConversation).toHaveBeenCalledWith(11);
-    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    });
 
     const event = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     await act(async () => {
@@ -223,7 +225,9 @@ describe('ConversationsScene popup Escape behavior', () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
       await flushImmediate();
     });
-    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    });
 
     const outline = document.querySelector('[data-reader-rail-wrap="chat-outline"]') as HTMLElement | null;
     expect(outline).toBeTruthy();
@@ -251,19 +255,22 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
   });
 
-  it('consumes pending-open source/key target and opens detail via precise API', () => {
+  it('consumes pending-open source/key target and opens detail via precise API', async () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,
       source: 'chatgpt',
       conversationKey: 'conv-99',
     });
 
-    act(() => {
+    await act(async () => {
       root!.render(createElement(ConversationsScene));
+      await flushImmediate();
     });
 
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');
     expect(openConversationExternalById).not.toHaveBeenCalled();
-    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    });
   });
 });

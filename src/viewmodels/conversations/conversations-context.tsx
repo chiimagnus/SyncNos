@@ -10,9 +10,7 @@ import type {
 } from '@services/conversations/domain/models';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
-import { buildConversationsJsonZipExport } from '@services/sync/local/json-export';
-import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
+import type { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { downloadBlobFile } from '@services/shared/webext';
 import {
@@ -1193,6 +1191,7 @@ export function ConversationsProvider({
       throw new Error('conversation detail returned a mismatched id');
     }
 
+    const { formatConversationMarkdownForExternalOutput } = await import('@services/conversations/external-markdown');
     const markdown = await formatConversationMarkdownForExternalOutput(conversation, freshDetail);
     if (!(await writeTextToClipboard(markdown))) throw new Error(t('copyFailed'));
   }, []);
@@ -1216,11 +1215,14 @@ export function ConversationsProvider({
     [items, selectedIds],
   );
 
-  const exportSelectedMarkdown = useCallback(
-    () => exportSelected(buildConversationsMarkdownZipExport),
-    [exportSelected],
-  );
-  const exportSelectedJson = useCallback(() => exportSelected(buildConversationsJsonZipExport), [exportSelected]);
+  const exportSelectedMarkdown = useCallback(async () => {
+    const { buildConversationsMarkdownZipExport } = await import('@services/sync/local/markdown-export');
+    await exportSelected(buildConversationsMarkdownZipExport);
+  }, [exportSelected]);
+  const exportSelectedJson = useCallback(async () => {
+    const { buildConversationsJsonZipExport } = await import('@services/sync/local/json-export');
+    await exportSelected(buildConversationsJsonZipExport);
+  }, [exportSelected]);
 
   const syncSelected = useCallback(
     async (provider: SyncProvider) => {

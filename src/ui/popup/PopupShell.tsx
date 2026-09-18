@@ -134,12 +134,16 @@ function PopupShellFrame() {
   const { refreshList, refreshActiveDetail, selectedConversation, selectedIds } = useConversationsApp();
   const [syncNudgeProvider, setSyncNudgeProvider] = useState<PopupSyncNudgeProvider | null>(null);
   const [syncNudgeDontShowAgain, setSyncNudgeDontShowAgain] = useState(false);
-  const commentsButton = usePopupOpenCurrentTabInpageCommentsSidebar();
-  const { buttonDisabled, buttonLabel, capture, status } = usePopupCurrentPageCapture({
-    onCaptured: async () => {
-      await refreshList();
-      await refreshActiveDetail();
-    },
+  const { buttonDisabled, buttonLabel, capture, currentPageState, checkingCurrentPageState, status } =
+    usePopupCurrentPageCapture({
+      onCaptured: async () => {
+        await refreshList();
+        await refreshActiveDetail();
+      },
+    });
+  const commentsButton = usePopupOpenCurrentTabInpageCommentsSidebar({
+    currentPageState,
+    checkingCurrentPageState,
   });
 
   const onOpenSelectedConversationComments = useCallback(() => {

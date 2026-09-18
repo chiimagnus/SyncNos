@@ -216,7 +216,7 @@ describe('ConversationsScene narrow comments flow', () => {
     cleanupDom();
   });
 
-  it('goes list -> detail -> comments, ignores Escape there, and returns via close', () => {
+  it('goes list -> detail -> comments, ignores Escape there, and returns via close', async () => {
     const commentsSidebarRuntime = {
       sidebarSession: {
         attachPanel,
@@ -245,10 +245,14 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
     expect(row).toBeTruthy();
-    act(() => {
+    await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await flushImmediate();
     });
 
+    await vi.waitFor(() => {
+      expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    });
     const detail = document.querySelector('[aria-label="Conversation detail"]');
     expect(detail).toBeTruthy();
 
@@ -265,7 +269,9 @@ describe('ConversationsScene narrow comments flow', () => {
       source: 'popup',
       ensureContext: false,
     });
-    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
     const commentsPanel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(commentsPanel?.getAttribute('data-layout')).toBe('full-width');
     expect(commentsPanel?.getAttribute('data-surface')).toBe('app-narrow');
@@ -316,7 +322,9 @@ describe('ConversationsScene narrow comments flow', () => {
     act(() => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
     });
-    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    });
 
     const moreButton = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement | null;
     expect(moreButton).toBeTruthy();
@@ -338,7 +346,7 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
   });
 
-  it('opens detail via pending source/key and then enters comments route', () => {
+  it('opens detail via pending source/key and then enters comments route', async () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,
       source: 'chatgpt',
@@ -359,18 +367,21 @@ describe('ConversationsScene narrow comments flow', () => {
       subscribeSidebarClose,
     };
 
-    act(() => {
+    await act(async () => {
       root!.render(
         createElement(ConversationsScene, {
           commentsSidebarRuntime,
           narrowCommentsOpenSource: 'popup',
         }),
       );
+      await flushImmediate();
     });
 
     expect(setContext).not.toHaveBeenCalled();
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');
-    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    });
 
     const commentBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(commentBtn).toBeTruthy();
@@ -385,7 +396,9 @@ describe('ConversationsScene narrow comments flow', () => {
       source: 'popup',
       ensureContext: false,
     });
-    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
     const commentsPanel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(commentsPanel?.getAttribute('data-layout')).toBe('full-width');
     expect(commentsPanel?.getAttribute('data-surface')).toBe('app-narrow');
