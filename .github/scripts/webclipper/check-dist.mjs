@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TextDecoder } from 'node:util';
 import { resolveRepoRoot, resolveWebclipperRoot } from './script-utils.mjs';
 
 function extractManifestMsgKey(value) {
