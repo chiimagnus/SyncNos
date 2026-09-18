@@ -571,15 +571,22 @@
   outline-offset: 2px;
 }
 
-.webclipper-inpage-comments-panel__markdown .katex-display {
+.webclipper-inpage-comments-panel__markdown eq {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+
+.webclipper-inpage-comments-panel__markdown eqn {
+  display: block;
   max-width: 100%;
   margin: 6px 0;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.webclipper-inpage-comments-panel__markdown .katex,
-.webclipper-inpage-comments-panel__markdown math {
+.webclipper-inpage-comments-panel__markdown .katex {
   max-width: 100%;
 }
 

@@ -118,6 +118,7 @@ describe('comment markdown rendering', () => {
       await Promise.resolve();
     });
     expect(host.querySelectorAll('math').length).toBeGreaterThanOrEqual(2);
+    expect(host.querySelector('eqn math[display="block"]')).toBeTruthy();
     expect(host.querySelector('.katex-html')).toBeNull();
   });
 
@@ -184,7 +185,9 @@ describe('comment markdown rendering', () => {
     expect(markdownRule).not.toMatch(/white-space\s*:\s*pre-wrap/);
     expect(css).toContain('.webclipper-inpage-comments-panel__markdown pre {');
     expect(css).toContain('.webclipper-inpage-comments-panel__markdown table {');
-    expect(css).toContain('.webclipper-inpage-comments-panel__markdown .katex-display {');
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown eq {');
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown eqn {');
+    expect(css).not.toContain('.webclipper-inpage-comments-panel__markdown .katex-display {');
     expect(css).toContain('.webclipper-inpage-comments-panel__markdown a:focus-visible {');
     expect(css).not.toContain(
       '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text',
