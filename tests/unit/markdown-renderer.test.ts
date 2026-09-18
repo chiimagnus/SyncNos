@@ -5,9 +5,10 @@ import { createKatexMarkdownRenderer } from '@ui/shared/markdown-math';
 describe('createMarkdownRenderer', () => {
   it('renders common markdown features', () => {
     const md = createMarkdownRenderer();
-    const html = md.render('# Title\n\nhello\nworld\n\n|a|b|\n|-|-|\n|1|2|');
+    const html = md.render('# Title\n\nhello\nworld\n\n~~gone~~\n\n|a|b|\n|-|-|\n|1|2|');
     expect(html).toContain('<h1>');
     expect(html).toContain('<br>');
+    expect(html).toContain('<s>gone</s>');
     expect(html).toContain('<table>');
   });
 

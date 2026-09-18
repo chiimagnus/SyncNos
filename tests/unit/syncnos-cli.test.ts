@@ -791,19 +791,21 @@ describe('syncnos CLI instance selection', () => {
       },
     });
     try {
-      const add = await run(['comments', 'add', '7', '--text', 'plain root'], runtimeRoot, homeDir);
+      const rootMarkdown = '**root** with $E=mc^2$';
+      const add = await run(['comments', 'add', '7', '--text', `  ${rootMarkdown}  `], runtimeRoot, homeDir);
       expect(add.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({
         method: 'comments.add',
-        params: { conversationId: 7, text: 'plain root' },
+        params: { conversationId: 7, text: rootMarkdown },
       });
       expect(JSON.stringify(instance.requests.at(-1))).not.toContain('locator');
 
-      const reply = await run(['comments', 'reply', '7', '3', '--text', 'plain reply'], runtimeRoot, homeDir);
+      const replyMarkdown = 'reply\n\n- item\n\n$$x^2$$';
+      const reply = await run(['comments', 'reply', '7', '3', '--text', replyMarkdown], runtimeRoot, homeDir);
       expect(reply.exitCode).toBe(0);
       expect(instance.requests.at(-1)).toEqual({
         method: 'comments.reply',
-        params: { conversationId: 7, parentId: 3, text: 'plain reply' },
+        params: { conversationId: 7, parentId: 3, text: replyMarkdown },
       });
       expect(JSON.stringify(instance.requests.at(-1))).not.toContain('locator');
 

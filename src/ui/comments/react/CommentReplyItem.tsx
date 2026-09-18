@@ -1,5 +1,6 @@
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Ref } from 'react';
+import { CommentMarkdown } from './CommentMarkdown';
 import { CommentOverflowMenu, type CommentOverflowAction } from './CommentOverflowMenu';
 import { commentAuthorLabel, commentAvatarLabel, formatCommentTime } from './comment-display';
 
@@ -46,7 +47,7 @@ export function CommentReplyItem({
             />
           </div>
         </div>
-        <div className="webclipper-inpage-comments-panel__text">{String(reply.commentText || '')}</div>
+        <CommentMarkdown markdown={reply.commentText} />
       </div>
     </div>
   );
