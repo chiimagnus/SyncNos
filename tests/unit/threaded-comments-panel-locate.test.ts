@@ -200,7 +200,7 @@ describe('Threaded comments panel locate', () => {
 
     const beforeReplyClick = (resolveCommentAnchor as any).mock.calls.length;
     const replyBody = panel.shadowRoot!.querySelector(
-      '.webclipper-inpage-comments-panel__reply-main > .webclipper-inpage-comments-panel__text',
+      '.webclipper-inpage-comments-panel__reply-main > .webclipper-inpage-comments-panel__markdown',
     ) as HTMLElement;
     replyBody.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     await flushReactScheduler();

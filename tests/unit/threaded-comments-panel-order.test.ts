@@ -81,14 +81,14 @@ describe('Threaded comments panel ordering', () => {
 
     const rootBodies = threads.map((t) =>
       t
-        .querySelector('.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text')
+        .querySelector('.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__markdown')
         ?.textContent?.trim(),
     );
     expect(rootBodies).toEqual(['root-new', 'root-old']);
 
     const replies = Array.from(
       threads[0].querySelectorAll(
-        '.webclipper-inpage-comments-panel__reply-main > .webclipper-inpage-comments-panel__text',
+        '.webclipper-inpage-comments-panel__reply-main > .webclipper-inpage-comments-panel__markdown',
       ),
     ).map((x) => x.textContent?.trim());
     expect(replies).toEqual(['reply-old', 'reply-new']);
