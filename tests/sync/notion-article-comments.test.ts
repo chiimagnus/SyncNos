@@ -75,6 +75,73 @@ describe('notion article comments blocks', () => {
     expect(replyBullet).toBeTruthy();
   });
 
+  it('projects comment Markdown and math through the shared Notion converter without image blocks', async () => {
+    const renderer = await loadNotionCommentsRenderer();
+    const commentText = [
+      '**bold** *italic* ~~strike~~ [link](https://example.com) `inline` $E=mc^2$',
+      '',
+      '# Heading',
+      '',
+      '- item',
+      '',
+      '> quote',
+      '',
+      '```ts',
+      'const x = 1;',
+      '```',
+      '',
+      '$$x^2$$',
+      '',
+      '| a | b |',
+      '| --- | --- |',
+      '| 1 | 2 |',
+      '',
+      '![Remote](https://example.com/a.png)',
+    ].join('\n');
+    const res = renderer.buildNotionCommentsBlocks([
+      {
+        id: 1,
+        parentId: null,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        quoteText: '',
+        commentText,
+        createdAt: 100,
+        updatedAt: 100,
+      },
+    ]);
+
+    expect(res.threads).toBe(1);
+    expect(res.items).toBe(1);
+    const children = res.blocks[0]?.bulleted_list_item?.children || [];
+    expect(children.some((block: any) => block?.type === 'heading_1')).toBe(true);
+    expect(children.some((block: any) => block?.type === 'bulleted_list_item')).toBe(true);
+    expect(children.some((block: any) => block?.type === 'quote')).toBe(true);
+    expect(children.some((block: any) => block?.type === 'code')).toBe(true);
+    expect(children.some((block: any) => block?.type === 'equation')).toBe(true);
+    expect(children.some((block: any) => block?.type === 'image')).toBe(false);
+    expect(children.some((block: any) => block?.type === 'table')).toBe(false);
+
+    const firstParagraph = children.find((block: any) => block?.type === 'paragraph');
+    const rich = firstParagraph?.paragraph?.rich_text || [];
+    expect(rich.some((item: any) => item?.annotations?.bold === true)).toBe(true);
+    expect(rich.some((item: any) => item?.annotations?.italic === true)).toBe(true);
+    expect(rich.some((item: any) => item?.annotations?.strikethrough === true)).toBe(true);
+    expect(rich.some((item: any) => item?.annotations?.code === true)).toBe(true);
+    expect(rich.some((item: any) => item?.text?.link?.url === 'https://example.com')).toBe(true);
+    const richAcrossParagraphs = children
+      .filter((block: any) => block?.type === 'paragraph')
+      .flatMap((block: any) => block?.paragraph?.rich_text || []);
+    expect(
+      richAcrossParagraphs.some((item: any) => item?.type === 'equation' && item?.equation?.expression === 'E=mc^2'),
+    ).toBe(true);
+
+    const serialized = JSON.stringify(children);
+    expect(serialized).toContain('| a | b |');
+    expect(serialized).toContain('| 1 | 2 |');
+    expect(serialized).toContain('Remote');
+    expect(serialized).toContain('https://example.com/a.png');
+  });
   it('keeps highlight-only roots as quote + metadata without inventing comment text', async () => {
     const renderer = await loadNotionCommentsRenderer();
     const res = renderer.buildNotionCommentsBlocks([

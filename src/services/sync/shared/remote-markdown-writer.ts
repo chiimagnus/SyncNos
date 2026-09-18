@@ -1,10 +1,7 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
-import {
-  collectMarkdownImageReferences,
-  replaceMarkdownImageReferences,
-} from '@services/shared/markdown-image-references';
+import { degradeMarkdownImagesToLinks } from '@services/shared/markdown-image-references';
 import { formatVideoContentMarkdown } from '@services/conversations/domain/markdown';
 
 const MESSAGES_HEADING = 'Conversations';
@@ -162,18 +159,6 @@ function buildListItemHead(metaLine: string, indentLevel: number) {
   return `${indent}- ${meta}`.trimEnd();
 }
 
-function degradeCommentImages(markdown: string): string {
-  const references = collectMarkdownImageReferences(markdown);
-  if (!references.length) return markdown;
-  return replaceMarkdownImageReferences(markdown, references, (reference) => {
-    const alt = String(reference.alt || '').trim();
-    if (/^https?:\/\//i.test(reference.target)) {
-      return { replacement: alt ? reference.full.slice(1) : `[Image](${reference.rawTarget}${reference.title})` };
-    }
-    return { replacement: alt || 'Image' };
-  });
-}
-
 function indentMarkdownUnderListItem(text: string, indentLevel: number): string[] {
   const src = normalizeNewlines(text).trim();
   if (!src) return [];
@@ -192,7 +177,7 @@ function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentT
       buildCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt, timeZone }),
       0,
     );
-    return [head, ...indentMarkdownUnderListItem(degradeCommentImages(text), 0)].join('\n').trim();
+    return [head, ...indentMarkdownUnderListItem(degradeMarkdownImagesToLinks(text), 0)].join('\n').trim();
   };
 
   for (const thread of graph.threads) {

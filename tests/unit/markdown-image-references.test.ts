@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   collectMarkdownImageReferences,
+  degradeMarkdownImagesToLinks,
   replaceMarkdownImageReferences,
 } from '@services/shared/markdown-image-references';
 
@@ -27,6 +28,25 @@ describe('markdown image references', () => {
       'syncnos-asset://8',
       'syncnos-asset://9',
     ]);
+  });
+
+  it('degrades real images to links/text without touching code-like image syntax', () => {
+    const markdown = [
+      '![Remote](https://example.com/a.png)',
+      '![Asset](syncnos-asset://7)',
+      '`![Inline](syncnos-asset://8)`',
+      '```md',
+      '![Fenced](syncnos-asset://9)',
+      '```',
+    ].join('\n');
+
+    const degraded = degradeMarkdownImagesToLinks(markdown);
+    expect(degraded).toContain('[Remote](https://example.com/a.png)');
+    expect(degraded).toContain('Asset');
+    expect(degraded).not.toContain('![Remote](https://example.com/a.png)');
+    expect(degraded).not.toContain('![Asset](syncnos-asset://7)');
+    expect(degraded).toContain('`![Inline](syncnos-asset://8)`');
+    expect(degraded).toContain('![Fenced](syncnos-asset://9)');
   });
 
   it('preserves source formatting while replacing only the target or whole image', () => {

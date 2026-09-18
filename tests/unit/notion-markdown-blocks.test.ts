@@ -34,6 +34,36 @@ describe('notion-markdown-blocks', () => {
     }
   });
 
+  it('can disable real image blocks while preserving code-like image syntax', () => {
+    const blocks = markdownToNotionBlocks(
+      [
+        '![Remote](https://example.com/a.png)',
+        '![Asset](syncnos-asset://42)',
+        '`![Inline](syncnos-asset://43)`',
+        '```md',
+        '![Fenced](syncnos-asset://44)',
+        '```',
+      ].join('\n\n'),
+      { renderImages: false },
+    );
+
+    expect(blocks.some((block: any) => block?.type === 'image')).toBe(false);
+    const serialized = JSON.stringify(blocks);
+    expect(serialized).toContain('Remote');
+    expect(serialized).toContain('https://example.com/a.png');
+    expect(serialized).toContain('Asset');
+    expect(serialized).toContain('![Inline](syncnos-asset://43)');
+    expect(serialized).toContain('![Fenced](syncnos-asset://44)');
+  });
+
+  it('keeps markdown tables as readable text instead of inventing unsupported Notion table blocks', () => {
+    const blocks = markdownToNotionBlocks('| a | b |\n| --- | --- |\n| 1 | 2 |', { renderImages: false });
+    expect(blocks.some((block: any) => block?.type === 'table')).toBe(false);
+    const serialized = JSON.stringify(blocks);
+    expect(serialized).toContain('| a | b |');
+    expect(serialized).toContain('| 1 | 2 |');
+  });
+
   it('splits standalone image lines with trailing caption text into image + paragraph blocks', () => {
     const blocks = markdownToNotionBlocks(
       '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)CleanShot 828×1194 84 KB',

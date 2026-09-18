@@ -102,3 +102,16 @@ export function replaceMarkdownImageReferences(
   }
   return output;
 }
+
+export function degradeMarkdownImagesToLinks(markdown: unknown): string {
+  const source = String(markdown || '');
+  const references = collectMarkdownImageReferences(source);
+  if (!references.length) return source;
+  return replaceMarkdownImageReferences(source, references, (reference) => {
+    const alt = String(reference.alt || '').trim();
+    if (/^https?:\/\//i.test(reference.target)) {
+      return { replacement: alt ? reference.full.slice(1) : `[Image](${reference.rawTarget}${reference.title})` };
+    }
+    return { replacement: alt || 'Image' };
+  });
+}
