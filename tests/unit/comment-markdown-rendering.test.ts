@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
+import { readFileSync } from 'node:fs';
 
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
 import { CommentMarkdown } from '@ui/comments/react/CommentMarkdown';
@@ -174,6 +175,22 @@ describe('comment markdown rendering', () => {
     const body = host.querySelector<HTMLElement>('.webclipper-inpage-comments-panel__comment strong')!;
     act(() => body.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onActivate).toHaveBeenCalledWith(7);
+  });
+
+  it('keeps markdown layout inside the shadow stylesheet without reusing quote pre-wrap rules', () => {
+    const css = readFileSync(new URL('../../src/ui/styles/inpage-comments-panel.css', import.meta.url), 'utf8');
+    const markdownRule = css.match(/\.webclipper-inpage-comments-panel__markdown\s*\{([\s\S]*?)\}/)?.[1];
+    expect(markdownRule).toBeTruthy();
+    expect(markdownRule).not.toMatch(/white-space\s*:\s*pre-wrap/);
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown pre {');
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown table {');
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown .katex-display {');
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown a:focus-visible {');
+    expect(css).not.toContain(
+      '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text',
+    );
+    expect(css).toContain('.webclipper-inpage-comments-panel__text {');
+    expect(css).toMatch(/\.webclipper-inpage-comments-panel__text\s*\{[\s\S]*?white-space:\s*pre-wrap/);
   });
 
   it('keeps quote previews as literal source text', () => {

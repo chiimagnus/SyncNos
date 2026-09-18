@@ -447,6 +447,142 @@
   min-width: 0;
 }
 
+.webclipper-inpage-comments-panel__markdown {
+  min-width: 0;
+  margin-top: 3px;
+  color: var(--panel-text);
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.webclipper-inpage-comments-panel__markdown > :first-child {
+  margin-top: 0;
+}
+
+.webclipper-inpage-comments-panel__markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.webclipper-inpage-comments-panel__markdown p {
+  margin: 0 0 8px;
+}
+
+.webclipper-inpage-comments-panel__markdown h1,
+.webclipper-inpage-comments-panel__markdown h2,
+.webclipper-inpage-comments-panel__markdown h3,
+.webclipper-inpage-comments-panel__markdown h4,
+.webclipper-inpage-comments-panel__markdown h5,
+.webclipper-inpage-comments-panel__markdown h6 {
+  margin: 10px 0 6px;
+  color: var(--panel-text);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.webclipper-inpage-comments-panel__markdown strong {
+  font-weight: 750;
+}
+
+.webclipper-inpage-comments-panel__markdown s,
+.webclipper-inpage-comments-panel__markdown del {
+  color: var(--panel-text-muted);
+}
+
+.webclipper-inpage-comments-panel__markdown ul,
+.webclipper-inpage-comments-panel__markdown ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.webclipper-inpage-comments-panel__markdown li + li {
+  margin-top: 2px;
+}
+
+.webclipper-inpage-comments-panel__markdown blockquote {
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 2px solid var(--panel-border);
+  color: var(--panel-text-muted);
+}
+
+.webclipper-inpage-comments-panel__markdown code {
+  padding: 1px 4px;
+  border-radius: var(--radius-inline);
+  background: color-mix(in srgb, var(--panel-text) 9%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.webclipper-inpage-comments-panel__markdown pre {
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 7px 8px;
+  overflow-x: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-inline);
+  background: color-mix(in srgb, var(--panel-bg) 82%, var(--panel-border));
+}
+
+.webclipper-inpage-comments-panel__markdown pre > code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  white-space: pre;
+}
+
+.webclipper-inpage-comments-panel__markdown table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.webclipper-inpage-comments-panel__markdown th,
+.webclipper-inpage-comments-panel__markdown td {
+  padding: 4px 6px;
+  border: 1px solid var(--panel-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.webclipper-inpage-comments-panel__markdown th {
+  font-weight: 700;
+}
+
+.webclipper-inpage-comments-panel__markdown a {
+  color: var(--panel-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--panel-text) 45%, transparent);
+  text-underline-offset: 2px;
+}
+
+.webclipper-inpage-comments-panel__markdown a:hover {
+  text-decoration-color: currentColor;
+}
+
+.webclipper-inpage-comments-panel__markdown a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.webclipper-inpage-comments-panel__markdown .katex-display {
+  max-width: 100%;
+  margin: 6px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.webclipper-inpage-comments-panel__markdown .katex,
+.webclipper-inpage-comments-panel__markdown math {
+  max-width: 100%;
+}
+
 .webclipper-inpage-comments-panel__comment-header,
 .webclipper-inpage-comments-panel__reply-header {
   display: flex;
@@ -492,11 +628,6 @@
   .webclipper-inpage-comments-panel__comment-actions,
 .webclipper-inpage-comments-panel__reply:is(:hover, :focus-within) .webclipper-inpage-comments-panel__comment-actions {
   opacity: 1;
-}
-
-.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text,
-.webclipper-inpage-comments-panel__reply-main > .webclipper-inpage-comments-panel__text {
-  margin-top: 3px;
 }
 
 .webclipper-inpage-comments-panel__replies {
