@@ -49,7 +49,7 @@ Popup 冷启动分四层排查，不要把它们混成一个“启动慢”：
 
 Provider/image queue 非空时只交回既有 scheduler，由 scheduler 重新读取当前 queue 并决定立即执行还是重建 alarm；GitHub cleanup 的 remoteKey/due 语义也继续由原 scheduler 拥有。完全 idle 的 worker 不应做 Provider reconcile、provider/image queue flush 或 menu rebuild。
 
-background import 合法性跟随最终 manifest：classic background 必须是 self-contained script；显式 `type: "module"` 才允许本地 static ESM closure。两种模式都禁止 runtime `import()`。若 production artifact guard 报错，应修正构建/架构，不放宽检查绕过平台限制。
+background import 合法性跟随最终 manifest：classic background 必须是 self-contained script；显式 `type: "module"` 才允许本地 static ESM closure。两种模式都禁止 runtime `import()`。所有 HTML module entry 都必须保持依赖图根节点，shared/lazy chunk 不得反向 import `app` / `popup` 等 entry 并执行其顶层启动副作用。若 production artifact guard 报错，应修正构建/架构，不放宽检查绕过平台限制。
 
 ## 评论定位
 
