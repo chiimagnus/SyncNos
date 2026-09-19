@@ -1565,6 +1565,7 @@ async function hydrateConversationListArticleCommentThreadCounts(
   const keyRangeApi = globalThis.IDBKeyRange;
   const byConversation = articleCommentsStore.index('by_conversationId_createdAt');
   const byCanonicalUrl = articleCommentsStore.index('by_canonicalUrl_createdAt');
+  const emptyRows = Promise.resolve<any[]>([]);
   const orphanRowsByCanonicalUrl = new Map<string, Promise<any[]>>();
   const reads: Array<{
     item: Conversation;
@@ -1584,11 +1585,11 @@ async function hydrateConversationListArticleCommentThreadCounts(
               keyRangeApi.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any),
             ) as any,
           )
-        : Promise.resolve([]);
+        : emptyRows;
 
-    let orphanRows = Promise.resolve<any[]>([]);
+    let orphanRows = emptyRows;
     if (canonicalUrl) {
-      orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || Promise.resolve([]);
+      orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || emptyRows;
       if (!orphanRowsByCanonicalUrl.has(canonicalUrl)) {
         orphanRows = reqToPromise<any[]>(
           byCanonicalUrl.getAll(
