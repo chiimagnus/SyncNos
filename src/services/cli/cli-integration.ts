@@ -18,7 +18,7 @@ export type CliIntegrationCapability = {
 
 let instanceIdPromise: Promise<string> | null = null;
 
-export function isCliIntegrationAvailable(): boolean {
+function isCliIntegrationAvailable(): boolean {
   // Chromium-derived browsers may hide runtime.connectNative until the optional
   // nativeMessaging permission is granted. Availability must describe whether
   // the permission can be requested, not whether the gated API is visible yet.
