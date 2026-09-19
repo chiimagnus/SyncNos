@@ -38,6 +38,19 @@
 - **message port closed**：已经建立的 port 因导航/reload/teardown 关闭，不等于 missing receiver。
 - **Extension context invalidated**：旧页面脚本属于旧 Extension 生命周期，应走 invalidated-context 处理。
 
+## 启动性能边界
+
+Popup 冷启动分四层排查，不要把它们混成一个“启动慢”：
+
+1. **document surface**：`popup.html` + 直连 CSS 先形成固定 surface，不等待 storage、background 或 React。
+2. **immediate UI**：Popup bootstrap 同时启动 locale storage 与 React render chunk；locale 确定后只 mount 一次。production guard 分别检查 bootstrap static JS、immediate render JS closure 与 HTML 直连 startup CSS；startup CSS 不允许残留 `@import`，`modulepreload` 只能指向 bootstrap static closure。
+3. **list/detail readiness**：list-only 不读取隐藏 detail/header；revision baseline 用单个 multi-store readonly transaction，首轮 list 未完成时保持 loading，不伪装为空库。
+4. **background work**：background 仍是静态 worker bundle，优化的是 worker 唤醒后实际执行的 I/O。locale 只在真实 fallback/menu 事件按需初始化；Context Menu 结构只在 extension install/update 创建或刷新；durable recovery probe 只唤醒确有 running job、queue、image backfill 或 GitHub cleanup 条件的 owner。
+
+Provider/image queue 非空时只交回既有 scheduler，由 scheduler 重新读取当前 queue 并决定立即执行还是重建 alarm；GitHub cleanup 的 remoteKey/due 语义也继续由原 scheduler 拥有。完全 idle 的 worker 不应做 Provider reconcile、provider/image queue flush 或 menu rebuild。
+
+background import 合法性跟随最终 manifest：classic background 必须是 self-contained script；显式 `type: "module"` 才允许本地 static ESM closure。两种模式都禁止 runtime `import()`。所有 HTML module entry 都必须保持依赖图根节点，shared/lazy chunk 不得反向 import `app` / `popup` 等 entry 并执行其顶层启动副作用。若 production artifact guard 报错，应修正构建/架构，不放宽检查绕过平台限制。
+
 ## 评论定位
 
 定位失败时检查 `resolveCommentAnchor()` 的 `reason`、候选 surface root、root evidence、exact quote/context 和当前 generation。失败必须保留明确 reason，不增加模糊匹配或滚动兜底。

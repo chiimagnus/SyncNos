@@ -42,6 +42,6 @@ Backup 可以包含本地采集内容、可恢复 sync mapping、图片缓存、
 - restore / migration 不得用导入时刻伪造 `lastActivityAt`。
 - manifest、schema 和 ZIP 路径必须在写入前验证；缺失或危险 entry 直接拒绝，不猜测替代路径。
 - 图片 asset identity 只在 owning conversation 内有效。导入 remap 不能跨 conversation 复用 local ID/blob/fallback URL；只改写真正的 Markdown image target，不修改普通文本或 code。
-- Provider 只有在远端结果明确成功后才能推进本地 continuity。远端失败或 mapping 更新失败不得伪造成功，更不能回滚已保存的本地内容。
+- Provider 只有在远端结果明确成功后才能推进本地 continuity。普通 manual/auto conversation sync 必须先持久化 initial running SyncJob，再开始 Provider 远端副作用；initial claim 失败不得触发远端写入，auto-sync 保留本地 queue 并按既有 cadence 重试。GitHub cleanup 可先做只读 target preflight，但真正 remote cleanup 与 outbox ack/defer 前必须完成 durable claim。远端失败或 mapping 更新失败不得伪造成功，更不能回滚已保存的本地内容。
 
 权限、OAuth 和外部网络边界见 [Privacy](../PRIVACY.md)。

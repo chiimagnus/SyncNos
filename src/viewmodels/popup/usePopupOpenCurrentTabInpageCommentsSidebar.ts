@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
 import type { CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
+import type { PopupCaptureStatus } from '@viewmodels/popup/usePopupCurrentPageCapture';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -19,87 +20,18 @@ function unwrap<T>(response: ApiResponse<T>): T {
   throw new Error(response.error?.message || 'unknown error');
 }
 
-function hasRuntimeSendMessage(): boolean {
-  const anyGlobal = globalThis as any;
-  const browserSend = anyGlobal.browser?.runtime?.sendMessage;
-  if (typeof browserSend === 'function') return true;
-  const chromeSend = anyGlobal.chrome?.runtime?.sendMessage;
-  return typeof chromeSend === 'function';
-}
-
-export function usePopupOpenCurrentTabInpageCommentsSidebar() {
-  const runtimeAvailable = useMemo(() => hasRuntimeSendMessage(), []);
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const [checking, setChecking] = useState(() => runtimeAvailable);
+export function usePopupOpenCurrentTabInpageCommentsSidebar(input: {
+  captureState: CurrentPageCaptureState | null;
+  checking: boolean;
+  status: PopupCaptureStatus | null;
+}) {
+  const { captureState, checking, status } = input;
   const [opening, setOpening] = useState(false);
-  const [eligible, setEligible] = useState(false);
-  const [disabledReason, setDisabledReason] = useState<string>(() =>
-    runtimeAvailable ? t('checkingDots') : t('commentsSidebarUnavailableHint'),
-  );
-
-  const refreshEligibility = useCallback(async () => {
-    if (!runtimeAvailable) return;
-    if (mountedRef.current) setChecking(true);
-    try {
-      const response = await send<ApiResponse<CurrentPageCaptureState>>(
-        UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE,
-        {},
-      );
-      const state = unwrap(response);
-
-      if (state.readiness !== 'ready') {
-        if (!mountedRef.current) return;
-        setEligible(false);
-        setDisabledReason(t('commentsSidebarUnavailableHint'));
-        return;
-      }
-
-      if (state.kind !== 'article') {
-        if (!mountedRef.current) return;
-        setEligible(false);
-        setDisabledReason(t('commentsSidebarArticleOnlyHint'));
-        return;
-      }
-
-      if (!mountedRef.current) return;
-      setEligible(true);
-      setDisabledReason(t('openInpageCommentsSidebar'));
-    } catch (error) {
-      const message = (error as any)?.message ?? String(error ?? '');
-      if (!mountedRef.current) return;
-      setEligible(false);
-      setDisabledReason(message || t('commentsSidebarUnavailableHint'));
-    } finally {
-      if (mountedRef.current) setChecking(false);
-    }
-  }, [runtimeAvailable]);
-
-  useEffect(() => {
-    if (!runtimeAvailable) return;
-    void refreshEligibility();
-  }, [refreshEligibility, runtimeAvailable]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!runtimeAvailable) return;
-    const onFocus = () => {
-      void refreshEligibility();
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [refreshEligibility, runtimeAvailable]);
+  const eligible = captureState?.readiness === 'ready' && captureState.kind === 'article';
 
   const open = useCallback(async () => {
-    if (!runtimeAvailable) return false;
     if (checking || opening || !eligible) return false;
-    if (mountedRef.current) setOpening(true);
+    setOpening(true);
     try {
       const response = await send<ApiResponse<{ opened: boolean }>>(
         UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
@@ -112,9 +44,9 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     } catch (_error) {
       return false;
     } finally {
-      if (mountedRef.current) setOpening(false);
+      setOpening(false);
     }
-  }, [checking, eligible, opening, runtimeAvailable]);
+  }, [checking, eligible, opening]);
 
   const disabled = checking || opening || !eligible;
   const ariaLabel = t('openInpageCommentsSidebar');
@@ -122,8 +54,10 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     if (opening) return t('fetchingDots');
     if (checking) return t('checkingDots');
     if (eligible) return t('openInpageCommentsSidebarTooltip');
-    return disabledReason || t('commentsSidebarUnavailableHint');
-  }, [checking, disabledReason, eligible, opening]);
+    if (!captureState && status?.kind === 'error') return status.message || t('commentsSidebarUnavailableHint');
+    if (captureState?.readiness === 'ready') return t('commentsSidebarArticleOnlyHint');
+    return t('commentsSidebarUnavailableHint');
+  }, [captureState, checking, eligible, opening, status]);
 
   return { disabled, tooltip, open, ariaLabel };
 }

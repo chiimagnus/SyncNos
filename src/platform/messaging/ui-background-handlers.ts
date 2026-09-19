@@ -13,13 +13,13 @@ type AnyRouter = {
 };
 
 type UiMessageHandlersOptions = {
-  localeReady?: Promise<unknown>;
+  ensureLocaleReady: () => Promise<unknown>;
 };
 
-export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions = {}) {
-  const localeReady = options.localeReady || Promise.resolve();
-  const waitLocale = async () => {
-    await localeReady.catch(() => undefined);
+export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions) {
+  const ensureLocaleReady = options.ensureLocaleReady;
+  const ensureFallbackLocaleReady = async () => {
+    await ensureLocaleReady().catch(() => undefined);
   };
   router.register(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, async (msg: any, sender: any) => {
     const explicitTabId = Number((msg as any)?.tabId);
@@ -32,8 +32,8 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
           : 0;
 
     if (!Number.isFinite(tabId) || tabId <= 0) {
-      const active = await getActiveTab();
-      if (active.ok) tabId = active.tab.id;
+      const active = await getActiveTabRaw();
+      if (active.kind === 'tab') tabId = active.tab.id;
     }
 
     if (!Number.isFinite(tabId) || tabId <= 0) {
@@ -61,7 +61,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       return router.err('open popup is not supported in this browser', { code: 'OPEN_POPUP_UNSUPPORTED' });
     }
     try {
-      await Promise.resolve(actionApi.openPopup());
+      await actionApi.openPopup();
       return router.ok({ opened: true });
     } catch (e) {
       const message = (e as any)?.message ?? String(e ?? 'open popup failed');
@@ -70,23 +70,34 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
   });
 
   router.register(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, async () => {
-    await waitLocale();
-    const activeTab = await getActiveTab();
-    if (!activeTab.ok) return router.ok(activeTab.state);
+    const activeTab = await getActiveTabRaw();
+    if (activeTab.kind !== 'tab') {
+      await ensureFallbackLocaleReady();
+      return router.ok(
+        unsupportedState(activeTab.kind === 'missing' ? t('activeTabNotFound') : t('currentPageCannotBeCaptured')),
+      );
+    }
 
     const relayed = await relayToActiveTab(activeTab.tab.id, CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE);
-    if (!relayed.ok) return router.err(relayed.message, { code: relayed.code });
+    if (!relayed.ok) {
+      if (relayed.message) return router.err(relayed.message, { code: relayed.code });
+      await ensureFallbackLocaleReady();
+      return router.err(t('currentPageCannotBeCaptured'), { code: relayed.code });
+    }
 
     return router.ok(relayed.data);
   });
 
   router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async (msg: any) => {
-    await waitLocale();
-    const activeTab = await getActiveTab();
-    if (!activeTab.ok) {
-      return router.err(activeTab.state.reason || t('currentPageCannotBeCaptured'), {
+    const activeTab = await getActiveTabRaw();
+    if (activeTab.kind !== 'tab') {
+      await ensureFallbackLocaleReady();
+      const state = unsupportedState(
+        activeTab.kind === 'missing' ? t('activeTabNotFound') : t('currentPageCannotBeCaptured'),
+      );
+      return router.err(state.reason || t('currentPageCannotBeCaptured'), {
         code: 'CAPTURE_UNAVAILABLE',
-        state: activeTab.state,
+        state,
       });
     }
 
@@ -96,7 +107,13 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       msg?.source === 'shortcut' ? { source: 'shortcut' } : undefined,
     );
     if (!relayed.ok) {
-      return router.err(relayed.message, {
+      if (relayed.message) {
+        return router.err(relayed.message, {
+          code: relayed.code,
+        });
+      }
+      await ensureFallbackLocaleReady();
+      return router.err(t('currentPageCannotBeCaptured'), {
         code: relayed.code,
       });
     }
@@ -120,20 +137,20 @@ function unsupportedState(reason: string) {
   };
 }
 
-async function getActiveTab() {
+async function getActiveTabRaw() {
   const tabs = await tabsQuery({ active: true, currentWindow: true });
   const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
   const tabId = Number(tab?.id);
 
   if (!tab || !Number.isFinite(tabId) || tabId <= 0) {
-    return { ok: false as const, state: unsupportedState(t('activeTabNotFound')) };
+    return { kind: 'missing' as const };
   }
 
   if (!isHttpUrl(tab.url)) {
-    return { ok: false as const, state: unsupportedState(t('currentPageCannotBeCaptured')) };
+    return { kind: 'unsupported-url' as const };
   }
 
-  return { ok: true as const, tab: { ...tab, id: tabId } };
+  return { kind: 'tab' as const, tab: { ...tab, id: tabId } };
 }
 
 async function relayToActiveTab(tabId: number, type: string, payload?: Record<string, unknown>) {
@@ -143,7 +160,7 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
       return {
         ok: false as const,
         code: 'CAPTURE_UNAVAILABLE',
-        message: t('currentPageCannotBeCaptured'),
+        message: '',
       };
     }
 
@@ -156,7 +173,7 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
       return { ok: true as const, data: apiResponse.data };
     }
 
-    const message = String(apiResponse.error?.message || t('currentPageCannotBeCaptured'));
+    const message = String(apiResponse.error?.message || '').trim();
     return {
       ok: false as const,
       code: 'CAPTURE_FAILED',
@@ -166,7 +183,7 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
     return {
       ok: false as const,
       code: 'CAPTURE_UNAVAILABLE',
-      message: t('currentPageCannotBeCaptured'),
+      message: '',
     };
   }
 }

@@ -85,8 +85,8 @@ function holdRevisionWrite(scope: DataRevisionScope, revision: number) {
 }
 
 type RevisionReadObserver = {
-  waitForPass: (passNumber: number) => Promise<void>;
-  getCount: (scope: DataRevisionScope) => number;
+  waitForTransactionCount: (count: number) => Promise<void>;
+  getReadCount: (scope: DataRevisionScope) => number;
   readonlyRevisionTransactions: Array<{ stores: string[]; mode: IDBTransactionMode | undefined }>;
   restore: () => void;
 };
@@ -96,7 +96,7 @@ function observeRevisionReads(db: IDBDatabase): RevisionReadObserver {
   const scopeByStore = new Map(
     DATA_REVISION_SCOPES.map((scope) => [DATA_REVISION_STORE_BY_SCOPE[scope], scope] as const),
   );
-  const counts = new Map<DataRevisionScope, number>(DATA_REVISION_SCOPES.map((scope) => [scope, 0]));
+  const readCounts = new Map<DataRevisionScope, number>(DATA_REVISION_SCOPES.map((scope) => [scope, 0]));
   const waiters = new Set<() => void>();
   const readonlyRevisionTransactions: Array<{ stores: string[]; mode: IDBTransactionMode | undefined }> = [];
   const original = db.transaction.bind(db);
@@ -115,31 +115,31 @@ function observeRevisionReads(db: IDBDatabase): RevisionReadObserver {
     const stores = (Array.isArray(storeNames) ? storeNames : [storeNames]).map(String);
     if (mode === 'readonly' && stores.some((storeName) => revisionStoreNames.has(storeName))) {
       readonlyRevisionTransactions.push({ stores, mode });
-      for (const storeName of stores) {
-        const scope = scopeByStore.get(storeName);
-        if (scope) counts.set(scope, (counts.get(scope) || 0) + 1);
-      }
+      const originalObjectStore = transaction.objectStore.bind(transaction);
+      (transaction as any).objectStore = (storeName: string) => {
+        const scope = scopeByStore.get(String(storeName));
+        if (scope) readCounts.set(scope, (readCounts.get(scope) || 0) + 1);
+        return originalObjectStore(storeName);
+      };
       notify();
     }
     return transaction;
   }) as any);
 
-  const hasPass = (passNumber: number) => DATA_REVISION_SCOPES.every((scope) => (counts.get(scope) || 0) >= passNumber);
-
   return {
-    waitForPass(passNumber) {
-      if (hasPass(passNumber)) return Promise.resolve();
+    waitForTransactionCount(count) {
+      if (readonlyRevisionTransactions.length >= count) return Promise.resolve();
       return new Promise<void>((resolve) => {
         const check = () => {
-          if (!hasPass(passNumber)) return;
+          if (readonlyRevisionTransactions.length < count) return;
           waiters.delete(check);
           resolve();
         };
         waiters.add(check);
       });
     },
-    getCount(scope) {
-      return counts.get(scope) || 0;
+    getReadCount(scope) {
+      return readCounts.get(scope) || 0;
     },
     readonlyRevisionTransactions,
     restore() {
@@ -1021,6 +1021,13 @@ describe('data revision storage', () => {
 
   it('reads missing and malformed records as revision zero', async () => {
     for (const scope of DATA_REVISION_SCOPES) await expect(readDataRevision(scope)).resolves.toBe(0);
+    await expect(readDataRevisionSnapshot()).resolves.toEqual({
+      conversations: 0,
+      messages: 0,
+      sync_mappings: 0,
+      article_comments: 0,
+      image_cache: 0,
+    });
 
     const db = await openDb();
     const storeName = DATA_REVISION_STORE_BY_SCOPE.conversations;
@@ -1031,12 +1038,14 @@ describe('data revision storage', () => {
     );
     await done;
     await expect(readDataRevision('conversations')).resolves.toBe(0);
+    await expect(readDataRevisionSnapshot()).resolves.toMatchObject({ conversations: 0 });
 
     await writeRevision('conversations', 7, 999);
     await expect(readDataRevision('conversations')).resolves.toBe(7);
+    await expect(readDataRevisionSnapshot()).resolves.toMatchObject({ conversations: 7 });
   });
 
-  it('returns a stable A/B snapshot using only single-scope readonly transactions', async () => {
+  it('reads one atomic snapshot with one multi-store readonly transaction and one read per scope', async () => {
     await writeRevision('conversations', 2);
     await writeRevision('messages', 3);
     await writeRevision('sync_mappings', 4);
@@ -1053,15 +1062,19 @@ describe('data revision storage', () => {
         article_comments: 5,
         image_cache: 6,
       });
-      for (const scope of DATA_REVISION_SCOPES) expect(observer.getCount(scope)).toBe(2);
-      expect(observer.readonlyRevisionTransactions).toHaveLength(DATA_REVISION_SCOPES.length * 2);
-      expect(observer.readonlyRevisionTransactions.every((entry) => entry.stores.length === 1)).toBe(true);
+      expect(observer.readonlyRevisionTransactions).toHaveLength(1);
+      expect(observer.readonlyRevisionTransactions[0]?.stores.slice().sort()).toEqual(
+        Object.values(DATA_REVISION_STORE_BY_SCOPE).slice().sort(),
+      );
+      for (const scope of DATA_REVISION_SCOPES) expect(observer.getReadCount(scope)).toBe(1);
     } finally {
       observer.restore();
     }
   });
 
-  it('discards a torn A pass, confirms B/C, and does not block independent revision writers', async () => {
+  it('returns a transaction-consistent vector when writers queue on both sides of the snapshot', async () => {
+    await writeRevision('conversations', 2);
+
     const db = await openDb();
     const observer = observeRevisionReads(db);
     const heldMessages = holdRevisionWrite('messages', 1);
@@ -1073,63 +1086,26 @@ describe('data revision storage', () => {
     });
 
     try {
-      await observer.waitForPass(1);
-      await Promise.all([writeRevision('sync_mappings', 1), writeRevision('image_cache', 1)]);
+      await observer.waitForTransactionCount(1);
+      const laterSyncMappingWrite = writeRevision('sync_mappings', 1);
+      await Promise.resolve();
       expect(settled).toBe(false);
 
       heldMessages.release();
       await heldMessages.completed();
 
       await expect(snapshotPromise).resolves.toEqual({
-        conversations: 0,
+        conversations: 2,
         messages: 1,
-        sync_mappings: 1,
+        sync_mappings: 0,
         article_comments: 0,
-        image_cache: 1,
+        image_cache: 0,
       });
-      for (const scope of DATA_REVISION_SCOPES) expect(observer.getCount(scope)).toBe(3);
+      await laterSyncMappingWrite;
+      expect(observer.readonlyRevisionTransactions).toHaveLength(1);
+      for (const scope of DATA_REVISION_SCOPES) expect(observer.getReadCount(scope)).toBe(1);
     } finally {
       heldMessages.release();
-      observer.restore();
-    }
-  });
-
-  it('throws snapshot_unstable when A, B, and C keep changing', async () => {
-    const db = await openDb();
-    const observer = observeRevisionReads(db);
-    const firstHold = holdRevisionWrite('messages', 1);
-    await firstHold.acquired;
-    const snapshotPromise = readDataRevisionSnapshot();
-
-    let secondHold: ReturnType<typeof holdRevisionWrite> | null = null;
-    let thirdHold: ReturnType<typeof holdRevisionWrite> | null = null;
-    try {
-      await observer.waitForPass(1);
-      secondHold = holdRevisionWrite('messages', 2);
-      await writeRevision('sync_mappings', 1);
-      firstHold.release();
-      await firstHold.completed();
-
-      await secondHold.acquired;
-      await observer.waitForPass(2);
-      thirdHold = holdRevisionWrite('messages', 3);
-      await writeRevision('sync_mappings', 2);
-      secondHold.release();
-      await secondHold.completed();
-
-      await thirdHold.acquired;
-      await observer.waitForPass(3);
-      thirdHold.release();
-      await thirdHold.completed();
-
-      await expect(snapshotPromise).rejects.toMatchObject({
-        message: 'snapshot_unstable',
-        code: 'snapshot_unstable',
-      });
-    } finally {
-      firstHold.release();
-      secondHold?.release();
-      thirdHold?.release();
       observer.restore();
     }
   });

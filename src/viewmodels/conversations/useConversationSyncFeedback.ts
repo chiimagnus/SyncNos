@@ -14,7 +14,12 @@ import {
   syncNotionConversations as defaultSyncNotionConversations,
   syncObsidianConversations as defaultSyncObsidianConversations,
 } from '@services/sync/repo';
-import { normalizeSyncJobSnapshot, SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
+import {
+  normalizeSyncJobSnapshot,
+  readSyncJobSnapshots as defaultReadSyncJobSnapshots,
+  SYNC_JOB_STORAGE_KEYS,
+  type SyncJobSnapshots,
+} from '@services/sync/sync-job-store';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
 import { storageOnChanged } from '@services/shared/storage';
 import type {
@@ -59,6 +64,7 @@ type UseConversationSyncFeedbackDeps = {
   syncGithubConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
   syncNotionConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
   syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
+  readSyncJobSnapshots?: () => Promise<SyncJobSnapshots>;
 };
 
 type ActiveRun = {
@@ -306,6 +312,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const syncGithubConversations = deps.syncGithubConversations ?? defaultSyncGithubConversations;
   const syncNotionConversations = deps.syncNotionConversations ?? defaultSyncNotionConversations;
   const syncObsidianConversations = deps.syncObsidianConversations ?? defaultSyncObsidianConversations;
+  const readSyncJobSnapshots = deps.readSyncJobSnapshots ?? defaultReadSyncJobSnapshots;
 
   const [feedback, setFeedback] = useState<ConversationSyncFeedbackState>(IDLE_FEEDBACK);
   const [activeRun, setActiveRun] = useState<ActiveRun | null>(null);
@@ -512,20 +519,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
     [advanceObservationGeneration, commitLiveObservation, readProviderStatus, startHandoff],
   );
 
-  useEffect(() => {
-    disposedRef.current = false;
-    void runFullScan();
-    return () => {
-      disposedRef.current = true;
-      observationGenerationRef.current += 1;
-      handoffInFlightRef.current = null;
-      activePollInFlightRef.current = null;
-    };
-  }, [runFullScan]);
-
-  useEffect(() => {
-    return storageOnChanged((changes, areaName) => {
-      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
+  const handleSyncJobStorageChanged = useCallback(
+    (changes: Record<string, unknown>, areaName: string) => {
+      if (disposedRef.current || areaName !== 'local' || !changes || typeof changes !== 'object') return;
 
       const changedByProvider = new Map<SyncProvider, SyncJobSnapshot | null>();
       for (const [key, change] of Object.entries(changes as Record<string, any>)) {
@@ -595,8 +591,80 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       ) {
         void startHandoff({ preferredProvider: current.provider });
       }
-    });
-  }, [advanceObservationGeneration, commitFeedback, ensureActiveRun, startHandoff]);
+    },
+    [advanceObservationGeneration, commitFeedback, ensureActiveRun, startHandoff],
+  );
+
+  useEffect(() => {
+    disposedRef.current = false;
+    const initialGeneration = advanceObservationGeneration();
+    const isCurrentInitialization = () =>
+      !disposedRef.current && observationGenerationRef.current === initialGeneration;
+    const unsubscribe = storageOnChanged(handleSyncJobStorageChanged);
+
+    void (async () => {
+      let snapshots: SyncJobSnapshots;
+      try {
+        snapshots = await readSyncJobSnapshots();
+      } catch (_error) {
+        if (isCurrentInitialization()) await runFullScan();
+        return;
+      }
+      if (!isCurrentInitialization()) return;
+
+      const observations: StatusObservation[] = [];
+      const runningProviders: SyncProvider[] = [];
+      for (const provider of SYNC_PROVIDER_SCAN_ORDER) {
+        const job = snapshots[provider];
+        if (!job) continue;
+        if (job.status === 'running') runningProviders.push(provider);
+        else observations.push({ provider, active: false, job });
+      }
+
+      const runningOutcomes = await Promise.all(runningProviders.map((provider) => readProviderStatus(provider)));
+      if (!isCurrentInitialization()) return;
+      if (runningOutcomes.some((outcome) => !outcome.ok)) {
+        await runFullScan();
+        return;
+      }
+      observations.push(
+        ...runningOutcomes
+          .filter((outcome): outcome is Extract<StatusReadOutcome, { ok: true }> => outcome.ok)
+          .map((outcome) => outcome.observation),
+      );
+
+      const selected = pickPrimaryObservation(observations);
+      if (selected?.active) {
+        commitLiveObservation(selected);
+        return;
+      }
+      if (selected?.job && selected.job.status !== 'running') {
+        clearActiveRun();
+        commitFeedback(toFeedbackFromJob(selected.job));
+        return;
+      }
+
+      if (activeRunRef.current) clearActiveRun();
+      commitFeedback(IDLE_FEEDBACK);
+    })();
+
+    return () => {
+      unsubscribe();
+      disposedRef.current = true;
+      observationGenerationRef.current += 1;
+      handoffInFlightRef.current = null;
+      activePollInFlightRef.current = null;
+    };
+  }, [
+    advanceObservationGeneration,
+    clearActiveRun,
+    commitFeedback,
+    commitLiveObservation,
+    handleSyncJobStorageChanged,
+    readProviderStatus,
+    readSyncJobSnapshots,
+    runFullScan,
+  ]);
 
   useEffect(() => {
     if (!activeRun) return;

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sha256Hex } from '@services/sync/shared/content-hash';
 
@@ -76,6 +76,11 @@ async function loadModule(rel: string) {
   return (mod as any).default || mod;
 }
 
+beforeEach(() => {
+  jobStoreMocks.setJob.mockResolvedValue(true);
+  jobStoreMocks.getJob.mockResolvedValue(null);
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   // @ts-expect-error cleanup
@@ -96,37 +101,21 @@ describe('feishu skip unchanged', () => {
     expect(fetchFeishuJsonMock).not.toHaveBeenCalled();
   });
 
-  it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
+  it('fails before remote work when the initial running snapshot cannot be persisted', async () => {
     setupChromeStorage();
     authMocks.resolveFeishuAccessToken.mockResolvedValue('t');
     jobStoreMocks.setJob.mockResolvedValue(false);
-    jobStoreMocks.getJob.mockResolvedValue(null);
-
-    const hash = await sha256Hex('# same content');
-    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
-      conversation: { id: 1, title: 't' },
-      mapping: { feishuDocId: 'doc1', feishuLastContentHash: hash },
-    });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
-
-    let releaseRemote!: () => void;
-    const remoteGate = new Promise<void>((resolve) => {
-      releaseRemote = resolve;
-    });
-    fetchFeishuJsonMock.mockImplementationOnce(async () => {
-      await remoteGate;
-      return { document: { document_id: 'doc1', revision_id: 1, title: 't' } };
-    });
 
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
-    const firstRun = orch.syncConversations({
-      conversationIds: [1],
-      instanceId: 'first',
-      jobId: 'feishu-accepted-job',
-    });
-    await vi.waitFor(() => expect(fetchFeishuJsonMock).toHaveBeenCalledTimes(1));
 
-    expect(orch.isRunActive()).toBe(true);
+    await expect(
+      orch.syncConversations({
+        conversationIds: [1],
+        instanceId: 'first',
+        jobId: 'feishu-accepted-job',
+      }),
+    ).rejects.toMatchObject({ code: 'feishu_sync_job_persist_failed' });
+
     expect(jobStoreMocks.setJob.mock.calls[0]?.[0]).toMatchObject({
       id: 'feishu-accepted-job',
       provider: 'feishu',
@@ -135,49 +124,10 @@ describe('feishu skip unchanged', () => {
       conversationIds: [],
       perConversation: [],
     });
-    expect(jobStoreMocks.setJob.mock.invocationCallOrder[0]).toBeLessThan(
-      fetchFeishuJsonMock.mock.invocationCallOrder[0],
-    );
-
-    let conflict: unknown = null;
-    try {
-      orch.syncConversations({ conversationIds: [2], instanceId: 'second' });
-    } catch (error) {
-      conflict = error;
-    }
-    expect(conflict).toMatchObject({ code: 'sync_already_running' });
-    expect(fetchFeishuJsonMock).toHaveBeenCalledTimes(1);
-
-    releaseRemote();
-    const result = await firstRun;
-    expect(result.okCount).toBe(1);
-    const attemptedJobs = jobStoreMocks.setJob.mock.calls.map(([job]) => job).filter(Boolean);
-    const runningJobs = attemptedJobs.filter((job: any) => job.status === 'running');
-    expect(
-      runningJobs.every(
-        (job: any) =>
-          job.totalCount === 1 &&
-          Array.isArray(job.conversationIds) &&
-          job.conversationIds.length === 0 &&
-          Array.isArray(job.perConversation) &&
-          job.perConversation.length === 0,
-      ),
-    ).toBe(true);
-    expect(
-      runningJobs.filter((job: any) => job.currentConversationId === 1 && job.currentStage === 'preparing_sync'),
-    ).toHaveLength(1);
-    expect(runningJobs.filter((job: any) => Number(job.okCount || 0) + Number(job.failCount || 0) === 1)).toEqual([
-      expect.objectContaining({ okCount: 1, failCount: 0, currentConversationId: undefined }),
-    ]);
-    expect(attemptedJobs.at(-1)).toMatchObject({
-      status: 'done',
-      conversationIds: [1],
-      okCount: 1,
-      failCount: 0,
-      perConversation: [expect.objectContaining({ conversationId: 1, ok: true })],
-    });
+    expect(authMocks.resolveFeishuAccessToken).not.toHaveBeenCalled();
+    expect(backgroundStorageMocks.getSyncMappingByConversation).not.toHaveBeenCalled();
+    expect(fetchFeishuJsonMock).not.toHaveBeenCalled();
     expect(orch.isRunActive()).toBe(false);
-    expect(await orch.getSyncStatus()).toMatchObject({ provider: 'feishu', job: null });
   });
 
   it('skips syncing when content hash unchanged and docId exists', async () => {

@@ -36,17 +36,6 @@ type ReaderHeaderToolbarProps = {
 
 type OpenPanel = 'text' | 'theme' | 'narration' | null;
 
-const LABELS = {
-  toolbarAria: t('readerToolbarAria'),
-  text: t('readerTextLayoutButton'),
-  theme: t('readerThemeButton'),
-  narration: t('readerNarrationButton'),
-  play: t('readerNarrationPlay'),
-  reading: t('readerNarrationReading'),
-  pause: t('readerNarrationPause'),
-  stop: t('readerNarrationStop'),
-} as const;
-
 const PANEL_CLASS = 'tw-w-[300px] tw-max-w-[min(300px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
 const PANEL_CONTENT_CLASS = 'tw-flex tw-flex-col tw-gap-3';
 const readerTriggerClassName = () =>
@@ -66,6 +55,16 @@ export function ReaderHeaderToolbar({
   className,
 }: ReaderHeaderToolbarProps) {
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
+  const labels = {
+    toolbarAria: t('readerToolbarAria'),
+    text: t('readerTextLayoutButton'),
+    theme: t('readerThemeButton'),
+    narration: t('readerNarrationButton'),
+    play: t('readerNarrationPlay'),
+    reading: t('readerNarrationReading'),
+    pause: t('readerNarrationPause'),
+    stop: t('readerNarrationStop'),
+  } as const;
   const transitionPanel = (next: OpenPanel) => {
     if ((openPanel === 'text' || openPanel === 'narration') && next !== openPanel) {
       void commitPreview().catch(() => {});
@@ -76,13 +75,13 @@ export function ReaderHeaderToolbar({
   if (!features.textLayout && !features.theme && !features.narration) return null;
 
   const narrationActionLabel =
-    narration.state === 'loading' ? LABELS.reading : narration.isPlaying ? LABELS.pause : LABELS.play;
+    narration.state === 'loading' ? labels.reading : narration.isPlaying ? labels.pause : labels.play;
   const NarrationActionIcon = narration.state === 'loading' || narration.isPlaying ? Pause : Play;
 
   return (
     <div
       role="group"
-      aria-label={LABELS.toolbarAria}
+      aria-label={labels.toolbarAria}
       className={['tw-flex tw-flex-col tw-gap-1', className || ''].join(' ').trim()}
       data-reader-header-toolbar="true"
     >
@@ -90,7 +89,7 @@ export function ReaderHeaderToolbar({
         <MenuPopover
           open={openPanel === 'text'}
           onOpenChange={(next) => transitionPanel(next ? 'text' : null)}
-          ariaLabel={LABELS.text}
+          ariaLabel={labels.text}
           side="bottom"
           align="end"
           panelMinWidth={300}
@@ -100,12 +99,12 @@ export function ReaderHeaderToolbar({
             <button
               {...triggerProps}
               data-reader-header-trigger="text"
-              aria-label={LABELS.text}
+              aria-label={labels.text}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
                 <Type size={16} strokeWidth={2.2} aria-hidden="true" />
-                <span>{LABELS.text}</span>
+                <span>{labels.text}</span>
               </span>
               <ChevronRight size={14} strokeWidth={2.2} aria-hidden="true" className={menuChevronClassName()} />
             </button>
@@ -121,7 +120,7 @@ export function ReaderHeaderToolbar({
         <MenuPopover
           open={openPanel === 'theme'}
           onOpenChange={(next) => transitionPanel(next ? 'theme' : null)}
-          ariaLabel={LABELS.theme}
+          ariaLabel={labels.theme}
           side="bottom"
           align="end"
           panelMinWidth={300}
@@ -131,12 +130,12 @@ export function ReaderHeaderToolbar({
             <button
               {...triggerProps}
               data-reader-header-trigger="theme"
-              aria-label={LABELS.theme}
+              aria-label={labels.theme}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
                 <Palette size={16} strokeWidth={2.2} aria-hidden="true" />
-                <span>{LABELS.theme}</span>
+                <span>{labels.theme}</span>
               </span>
               <ChevronRight size={14} strokeWidth={2.2} aria-hidden="true" className={menuChevronClassName()} />
             </button>
@@ -152,7 +151,7 @@ export function ReaderHeaderToolbar({
         <MenuPopover
           open={openPanel === 'narration'}
           onOpenChange={(next) => transitionPanel(next ? 'narration' : null)}
-          ariaLabel={LABELS.narration}
+          ariaLabel={labels.narration}
           side="bottom"
           align="end"
           panelMinWidth={300}
@@ -162,12 +161,12 @@ export function ReaderHeaderToolbar({
             <button
               {...triggerProps}
               data-reader-header-trigger="narration"
-              aria-label={LABELS.narration}
+              aria-label={labels.narration}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
                 <Volume2 size={16} strokeWidth={2.2} aria-hidden="true" />
-                <span>{LABELS.narration}</span>
+                <span>{labels.narration}</span>
               </span>
               <ChevronRight size={14} strokeWidth={2.2} aria-hidden="true" className={menuChevronClassName()} />
             </button>
@@ -188,8 +187,8 @@ export function ReaderHeaderToolbar({
               <button
                 type="button"
                 className={headerNarrationTransportButtonClassName(false)}
-                aria-label={LABELS.stop}
-                title={LABELS.stop}
+                aria-label={labels.stop}
+                title={labels.stop}
                 onClick={narration.stop}
                 disabled={narration.state === 'idle'}
               >

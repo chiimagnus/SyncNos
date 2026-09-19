@@ -172,22 +172,13 @@ export function ArticleReaderView({
     (node: HTMLDivElement | null) => {
       narrationRootRef.current = node;
       setOutlineRoot(node);
-      const ref = setMessagesRootRef as unknown;
-      if (typeof ref === 'function') {
-        (ref as (value: HTMLDivElement | null) => void)(node);
-      } else if (ref && typeof ref === 'object') {
-        (ref as { current: HTMLDivElement | null }).current = node;
-      }
+      setMessagesRootRef(node);
     },
     [setMessagesRootRef],
   );
 
   const handleOutlinePick = useCallback((entry: ReaderOutlineDomEntry) => {
-    try {
-      entry.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (_error) {
-      entry.element.scrollIntoView();
-    }
+    entry.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
   const outlinePayload = useMemo(
@@ -550,7 +541,7 @@ export function ArticleReaderView({
                 );
               })}
             </div>
-          ) : activeId && !isVideoReader ? (
+          ) : activeId && !isVideoReader && !loadingDetail && !detailError ? (
             <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
           ) : !activeId ? (
             <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">

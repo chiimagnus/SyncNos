@@ -113,8 +113,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   }),
 }));
 
-vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
-  ConversationDetailPane: ({ onExpandSidebar }: { onExpandSidebar?: () => void }) =>
+vi.mock('../../src/ui/conversations/LazyConversationSurfaces', () => ({
+  LazyConversationDetailPane: ({ onExpandSidebar }: { onExpandSidebar?: () => void }) =>
     createElement(
       'div',
       null,
@@ -131,6 +131,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
       ),
       createElement('div', null, 'detail-pane'),
     ),
+  LazyArticleCommentsSection: () => null,
 }));
 
 import AppShell from '../../src/ui/app/AppShell';

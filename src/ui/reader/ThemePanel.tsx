@@ -8,15 +8,14 @@ export type ThemePanelProps = {
   className?: string;
 };
 
-const THEME_LABELS: Record<AppThemeMode, string> = {
-  system: t('readerThemeSystem'),
-  light: t('readerThemeLight'),
-  sepia: t('readerThemeSepia'),
-  dark: t('readerThemeDark'),
-  black: t('readerThemeBlack'),
-};
-
 export function ThemePanel({ mode, update, className }: ThemePanelProps) {
+  const themeLabels: Record<AppThemeMode, string> = {
+    system: t('readerThemeSystem'),
+    light: t('readerThemeLight'),
+    sepia: t('readerThemeSepia'),
+    dark: t('readerThemeDark'),
+    black: t('readerThemeBlack'),
+  };
   const selectTheme = (themeMode: AppThemeMode) => {
     if (themeMode === mode) return;
     void update(themeMode);
@@ -36,7 +35,7 @@ export function ThemePanel({ mode, update, className }: ThemePanelProps) {
               className={[active ? buttonFilledClassName() : buttonTintClassName(), 'tw-flex-1'].join(' ')}
               onClick={() => selectTheme(themeMode)}
             >
-              {THEME_LABELS[themeMode]}
+              {themeLabels[themeMode]}
             </button>
           );
         })}

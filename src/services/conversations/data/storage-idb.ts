@@ -1663,6 +1663,11 @@ async function readConversationListPageItems(input: {
   };
 }
 
+function buildListCompoundPrefixRange(prefix: readonly IDBValidKey[]): IDBKeyRange {
+  if (!prefix.length) throw new Error('list compound prefix is required');
+  return globalThis.IDBKeyRange.bound(prefix as any, [...prefix, []] as any, false, true);
+}
+
 async function readConversationListSummaryAndFacets(input: {
   store: IDBObjectStore;
   query: ReturnType<typeof normalizeConversationListQuery>;
@@ -1689,45 +1694,63 @@ async function readConversationListSummaryAndFacets(input: {
   );
   const todayCountPromise = reqToPromise<number>(summaryIndex.count(todayRange as any));
 
-  const sourceFacetRequest = store.index('by_listSourceKey_lastActivityAt_id').openKeyCursor();
+  const sourceFacetIndex = store.index('by_listSourceKey_lastActivityAt_id');
+  const sourceFacetCounts: Array<Promise<{ key: string; label: string; count: number }>> = [];
+  const sourceFacetRequest = sourceFacetIndex.openKeyCursor();
   const sourceFacetsPromise = new Promise<void>((resolve, reject) => {
     sourceFacetRequest.onerror = () => reject(sourceFacetRequest.error || new Error('source facet cursor failed'));
     sourceFacetRequest.onsuccess = () => {
       const cursor = sourceFacetRequest.result;
       if (!cursor) return resolve();
+
       const key = Array.isArray(cursor.key) ? cursor.key : [];
       const rowSourceKey = typeof key[0] === 'string' ? key[0] : '';
-      if (rowSourceKey) {
-        const facet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
-        facet.count += 1;
-        sourceFacetMap.set(rowSourceKey, facet);
+      const validNumericTail =
+        typeof key[1] === 'number' && Number.isFinite(key[1]) && typeof key[2] === 'number' && Number.isFinite(key[2]);
+      if (!rowSourceKey || !validNumericTail) {
+        cursor.continue();
+        return;
       }
-      cursor.continue();
+
+      const countPromise = reqToPromise<number>(
+        sourceFacetIndex.count(buildListCompoundPrefixRange([rowSourceKey]) as any),
+      ).then((count) => ({ key: rowSourceKey, label: rowSourceKey, count: Number(count) || 0 }));
+      sourceFacetCounts.push(countPromise);
+      cursor.continue([rowSourceKey, []] as any);
     };
+  }).then(async () => {
+    for (const facet of await Promise.all(sourceFacetCounts)) sourceFacetMap.set(facet.key, facet);
   });
 
   const siteFacetIndex = store.index('by_listSourceKey_listSiteKey_lastActivityAt_id');
-  const siteFacetRange = globalThis.IDBKeyRange.bound(
-    [siteFacetSourceScope, '', 0, 0] as any,
-    [siteFacetSourceScope, '\uffff', Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] as any,
-  );
+  const siteFacetCounts: Array<Promise<{ key: string; label: string; count: number }>> = [];
+  const siteFacetRange = buildListCompoundPrefixRange([siteFacetSourceScope]);
   const siteFacetRequest = siteFacetIndex.openKeyCursor(siteFacetRange as any);
   const siteFacetsPromise = new Promise<void>((resolve, reject) => {
     siteFacetRequest.onerror = () => reject(siteFacetRequest.error || new Error('site facet cursor failed'));
     siteFacetRequest.onsuccess = () => {
       const cursor = siteFacetRequest.result;
       if (!cursor) return resolve();
+
       const key = Array.isArray(cursor.key) ? cursor.key : [];
       const rowSourceKey = typeof key[0] === 'string' ? key[0] : '';
       const rowSiteKey = typeof key[1] === 'string' ? key[1] : '';
-      if (rowSourceKey === siteFacetSourceScope && rowSiteKey) {
-        const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
-        const facet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteLabel, count: 0 };
-        facet.count += 1;
-        siteFacetMap.set(rowSiteKey, facet);
+      const validNumericTail =
+        typeof key[2] === 'number' && Number.isFinite(key[2]) && typeof key[3] === 'number' && Number.isFinite(key[3]);
+      if (rowSourceKey !== siteFacetSourceScope || !rowSiteKey || !validNumericTail) {
+        cursor.continue();
+        return;
       }
-      cursor.continue();
+
+      const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
+      const countPromise = reqToPromise<number>(
+        siteFacetIndex.count(buildListCompoundPrefixRange([siteFacetSourceScope, rowSiteKey]) as any),
+      ).then((count) => ({ key: rowSiteKey, label: rowSiteLabel, count: Number(count) || 0 }));
+      siteFacetCounts.push(countPromise);
+      cursor.continue([siteFacetSourceScope, rowSiteKey, []] as any);
     };
+  }).then(async () => {
+    for (const facet of await Promise.all(siteFacetCounts)) siteFacetMap.set(facet.key, facet);
   });
 
   const [totalCount, todayCount] = await Promise.all([
@@ -2039,10 +2062,7 @@ export async function getMessagesByConversationId(conversationId: number): Promi
   return items as any;
 }
 
-export async function getMessagesTailByConversationId(
-  conversationId: number,
-  limit: number,
-): Promise<ConversationMessage[]> {
+async function getMessagesTailByConversationId(conversationId: number, limit: number): Promise<ConversationMessage[]> {
   const normalizedConversationId = Number(conversationId);
   const normalizedLimit = Number(limit);
   if (!Number.isFinite(normalizedConversationId) || normalizedConversationId <= 0) return [];

@@ -1,21 +1,14 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import AppShell from '@ui/app/AppShell';
-import { initializeLocale } from '@i18n';
+import { initializeLocale } from '@i18n/locale-runtime';
 import '@ui/styles/tokens.css';
 import '@ui/styles/buttons.css';
-import 'react-tooltip/dist/react-tooltip.css';
-import '@ui/styles/tooltip.css';
 import '@ui/styles/tailwind.css';
 import '@entrypoints/app/style.css';
 
+const renderModulePromise = import('./render');
+
 async function main() {
-  await initializeLocale();
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <AppShell />
-    </React.StrictMode>,
-  );
+  const [, { mountApp }] = await Promise.all([initializeLocale(), renderModulePromise]);
+  mountApp();
 }
 
 void main();

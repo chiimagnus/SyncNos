@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 const state = vi.hoisted(() => ({
-  loadingInitialList: false,
+  loadingInitialList: true,
   replaceSelectedIds: vi.fn(),
   read: vi.fn(),
   subscribe: vi.fn(),
@@ -56,7 +56,7 @@ describe('usePopupSyncSelectionHandoff', () => {
 
   beforeEach(() => {
     setupDom();
-    state.loadingInitialList = false;
+    state.loadingInitialList = true;
     state.replaceSelectedIds.mockReset();
     state.read.mockReset();
     state.subscribe.mockReset();
@@ -86,8 +86,6 @@ describe('usePopupSyncSelectionHandoff', () => {
     expect(state.subscribe).toHaveBeenCalledTimes(1);
     expect(state.replaceSelectedIds).not.toHaveBeenCalled();
 
-    state.loadingInitialList = true;
-    act(() => root!.render(createElement(Probe)));
     state.loadingInitialList = false;
     act(() => root!.render(createElement(Probe)));
     expect(state.replaceSelectedIds).toHaveBeenCalledTimes(1);
@@ -114,8 +112,7 @@ describe('usePopupSyncSelectionHandoff', () => {
       await Promise.resolve();
     });
 
-    state.loadingInitialList = true;
-    act(() => root!.render(createElement(Probe)));
+    expect(state.replaceSelectedIds).not.toHaveBeenCalled();
     state.loadingInitialList = false;
     act(() => root!.render(createElement(Probe)));
     expect(state.replaceSelectedIds).toHaveBeenCalledTimes(1);

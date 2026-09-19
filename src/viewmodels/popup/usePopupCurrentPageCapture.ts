@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
@@ -16,7 +16,7 @@ type ApiResponse<T> = {
   error: { message: string; extra: unknown } | null;
 };
 
-type PopupCaptureStatus = {
+export type PopupCaptureStatus = {
   kind: 'info' | 'success' | 'warning' | 'error';
   message: string;
 };
@@ -35,16 +35,22 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
   const [checking, setChecking] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [status, setStatus] = useState<PopupCaptureStatus | null>(null);
+  const refreshStateInFlightRef = useRef<Promise<CurrentPageCaptureState> | null>(null);
 
   const refreshState = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent === true;
     if (!silent) setChecking(true);
-    try {
-      const response = await send<ApiResponse<CurrentPageCaptureState>>(
-        UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE,
-        {},
+
+    let request = refreshStateInFlightRef.current;
+    if (!request) {
+      request = send<ApiResponse<CurrentPageCaptureState>>(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {}).then(
+        unwrap,
       );
-      const nextState = unwrap(response);
+      refreshStateInFlightRef.current = request;
+    }
+
+    try {
+      const nextState = await request;
       setCaptureState(nextState);
       if (nextState.readiness === 'waiting') {
         setStatus({
@@ -64,6 +70,7 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
       setCaptureState(null);
       setStatus({ kind: 'error', message });
     } finally {
+      if (refreshStateInFlightRef.current === request) refreshStateInFlightRef.current = null;
       if (!silent) setChecking(false);
     }
   }, []);
@@ -148,6 +155,10 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     buttonDisabled: checking || fetching || captureState?.readiness !== 'ready',
     buttonLabel,
     capture,
+    captureState,
+    checking,
+    fetching,
+    refreshState,
     status,
   };
 }

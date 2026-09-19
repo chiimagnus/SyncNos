@@ -157,47 +157,52 @@ vi.mock('@services/comments/client/repo', () => ({
   listArticleCommentsByConversationId: listArticleCommentsByConversationIdMock,
 }));
 
-vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
-  ConversationDetailPane: ({
-    onTriggerCommentsSidebar,
-    commentsSidebarOpen,
-    onCommentsLocatorRootsChange,
-  }: {
-    onTriggerCommentsSidebar?: (input: any) => void;
-    commentsSidebarOpen?: boolean;
-    onCommentsLocatorRootsChange?: (roots: { sourceRoot: Element; scrollRoot: Element } | null) => void;
-  }) =>
-    createElement(
-      'div',
-      null,
-      createElement(
-        'button',
-        {
-          type: 'button',
-          onClick: () => onTriggerCommentsSidebar?.({ quoteText: 'Selected quote', locator: null } as any),
-          'aria-label': 'Comment',
-          'aria-pressed': commentsSidebarOpen ? 'true' : 'false',
-          'data-can-trigger': onTriggerCommentsSidebar ? '1' : '0',
-        },
-        'open-comments',
-      ),
+vi.mock('../../src/ui/conversations/LazyConversationSurfaces', async () => {
+  const { createElement } = await import('react');
+  const { ArticleCommentsSection } = await import('../../src/ui/conversations/ArticleCommentsSection');
+  return {
+    LazyConversationDetailPane: ({
+      onTriggerCommentsSidebar,
+      commentsSidebarOpen,
+      onCommentsLocatorRootsChange,
+    }: {
+      onTriggerCommentsSidebar?: (input: any) => void;
+      commentsSidebarOpen?: boolean;
+      onCommentsLocatorRootsChange?: (roots: { sourceRoot: Element; scrollRoot: Element } | null) => void;
+    }) =>
       createElement(
         'div',
-        {
-          ref: (el: HTMLDivElement | null) => {
-            if (!detailPaneMockState.provideLocatorRoot) {
-              onCommentsLocatorRootsChange?.(null);
-              return;
-            }
-            onCommentsLocatorRootsChange?.({ sourceRoot: el, scrollRoot: el });
+        null,
+        createElement(
+          'button',
+          {
+            type: 'button',
+            onClick: () => onTriggerCommentsSidebar?.({ quoteText: 'Selected quote', locator: null } as any),
+            'aria-label': 'Comment',
+            'aria-pressed': commentsSidebarOpen ? 'true' : 'false',
+            'data-can-trigger': onTriggerCommentsSidebar ? '1' : '0',
           },
-          'data-mock-locator-root': '1',
-        },
-        'Selectable quote from mock detail pane',
+          'open-comments',
+        ),
+        createElement(
+          'div',
+          {
+            ref: (el: HTMLDivElement | null) => {
+              if (!detailPaneMockState.provideLocatorRoot) {
+                onCommentsLocatorRootsChange?.(null);
+                return;
+              }
+              onCommentsLocatorRootsChange?.({ sourceRoot: el, scrollRoot: el });
+            },
+            'data-mock-locator-root': '1',
+          },
+          'Selectable quote from mock detail pane',
+        ),
+        createElement('div', null, 'detail-pane'),
       ),
-      createElement('div', null, 'detail-pane'),
-    ),
-}));
+    LazyArticleCommentsSection: ArticleCommentsSection,
+  };
+});
 
 import AppShell from '../../src/ui/app/AppShell';
 

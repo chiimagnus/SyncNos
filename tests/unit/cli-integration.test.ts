@@ -6,7 +6,8 @@ import {
   disableCliIntegration,
   enableCliIntegration,
   getCliInstanceId,
-  readCliIntegrationStatus,
+  readCliIntegrationCapability,
+  readCliIntegrationEnabled,
 } from '@services/cli/cli-integration';
 
 const originalChrome = (globalThis as any).chrome;
@@ -26,6 +27,9 @@ function installChrome(
   const remove = vi.fn((_query: unknown, callback: (removed: boolean) => void) => {
     permissionGranted = false;
     callback(true);
+  });
+  const contains = vi.fn((_query: unknown, callback: (granted: boolean) => void) => {
+    callback(permissionGranted);
   });
 
   (globalThis as any).browser = undefined;
@@ -53,15 +57,13 @@ function installChrome(
         if (granted) permissionGranted = true;
         callback(granted);
       },
-      contains(_query: unknown, callback: (granted: boolean) => void) {
-        callback(permissionGranted);
-      },
+      contains,
       remove,
       onRemoved: { addListener() {}, removeListener() {} },
     },
   };
 
-  return { store, remove, requestCalled: () => requestCalled };
+  return { store, remove, contains, requestCalled: () => requestCalled };
 }
 
 afterEach(() => {
@@ -92,9 +94,9 @@ describe('CLI integration preference', () => {
     expect(granted.requestCalled()).toBe(true);
     await expect(grantedPromise).resolves.toBe(true);
     expect(granted.store[CLI_INTEGRATION_ENABLED_STORAGE_KEY]).toBe(true);
-    await expect(readCliIntegrationStatus()).resolves.toEqual({
+    await expect(readCliIntegrationEnabled()).resolves.toBe(true);
+    await expect(readCliIntegrationCapability()).resolves.toEqual({
       available: true,
-      enabled: true,
       permissionGranted: true,
     });
   });
@@ -106,13 +108,21 @@ describe('CLI integration preference', () => {
       value: { userAgent: 'Mozilla/5.0 Version/18.6 Safari/605.1.15' },
     });
 
-    await expect(readCliIntegrationStatus()).resolves.toEqual({
+    await expect(readCliIntegrationEnabled()).resolves.toBe(false);
+    await expect(readCliIntegrationCapability()).resolves.toEqual({
       available: false,
-      enabled: false,
       permissionGranted: false,
     });
     await expect(enableCliIntegration()).resolves.toBe(false);
     expect(chrome.requestCalled()).toBe(false);
+  });
+
+  it('reads the durable opt-in without probing nativeMessaging permission', async () => {
+    const chrome = installChrome({ permissionGranted: true });
+    chrome.store[CLI_INTEGRATION_ENABLED_STORAGE_KEY] = false;
+
+    await expect(readCliIntegrationEnabled()).resolves.toBe(false);
+    expect(chrome.contains).not.toHaveBeenCalled();
   });
 
   it('persists disabled before removing the optional permission', async () => {

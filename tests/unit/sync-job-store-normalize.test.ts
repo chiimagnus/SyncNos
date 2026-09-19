@@ -77,6 +77,8 @@ describe('normalizeSyncJobSnapshot', () => {
     storageMocks.set.mockImplementation(async (patch: Record<string, unknown>) => {
       Object.assign(storageState, patch || {});
     });
+    storageMocks.get.mockClear();
+    storageMocks.set.mockClear();
   });
 
   it('reads only the current v2 provider-owned SyncJob contract', async () => {
@@ -90,6 +92,25 @@ describe('normalizeSyncJobSnapshot', () => {
 
     storageState[SYNC_JOB_STORAGE_KEYS.notion] = runningJob();
     await expect(createSyncJobStore('notion').getJob()).resolves.toEqual(runningJob());
+  });
+
+  it('reads all provider snapshots in one storage read and reuses canonical normalization', async () => {
+    const { readSyncJobSnapshots, SYNC_JOB_STORAGE_KEYS } = await import('@services/sync/sync-job-store');
+    storageState[SYNC_JOB_STORAGE_KEYS.notion] = runningJob();
+    storageState[SYNC_JOB_STORAGE_KEYS.github] = terminalJob({
+      id: 'github-terminal',
+      provider: 'github',
+      instanceId: 'github-background',
+    });
+
+    await expect(readSyncJobSnapshots()).resolves.toMatchObject({
+      notion: { provider: 'notion', status: 'running' },
+      obsidian: null,
+      feishu: null,
+      github: { provider: 'github', status: 'done', id: 'github-terminal' },
+    });
+    expect(storageMocks.get).toHaveBeenCalledTimes(1);
+    expect(storageMocks.get).toHaveBeenCalledWith(Object.values(SYNC_JOB_STORAGE_KEYS));
   });
 
   it('does not read or migrate a legacy v1 SyncJob key', async () => {

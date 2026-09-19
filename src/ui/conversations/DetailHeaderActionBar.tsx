@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, ImageDown } from 'lucide-react';
 
-import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
+import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
 import { t } from '@i18n';
 import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
@@ -90,11 +90,7 @@ export function DetailHeaderActionBar({
     } catch (error) {
       const message =
         error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-      if (typeof globalThis.window?.alert === 'function') {
-        globalThis.window.alert(message);
-      } else {
-        console.error(message);
-      }
+      window.alert(message);
     } finally {
       setBusy(false);
     }

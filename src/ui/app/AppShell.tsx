@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
 import { ConversationsProvider, useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
-import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
-import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
+import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { createAppCommentSelectionSource } from '@ui/comments/app-comment-selection-source';
 import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
@@ -162,11 +161,7 @@ export default function AppShell() {
           commentsSidebarController.dispose();
           commentsSidebarSession.dispose();
         };
-        if (typeof globalThis.queueMicrotask === 'function') {
-          globalThis.queueMicrotask(dispose);
-        } else {
-          void Promise.resolve().then(dispose);
-        }
+        queueMicrotask(dispose);
       };
     }, [commentsSidebarController, commentsSidebarSession]);
     const pendingExternalLocRef = useRef<string | null>(null);
@@ -388,11 +383,7 @@ export default function AppShell() {
       settingsLastActiveElementRef.current = null;
       if (!lastActive) return;
       if (!document.contains(lastActive)) return;
-      try {
-        lastActive.focus({ preventScroll: true });
-      } catch (e) {
-        void e;
-      }
+      lastActive.focus({ preventScroll: true });
     }, [showSettingsSheet]);
 
     useEffect(() => {
@@ -422,13 +413,9 @@ export default function AppShell() {
 
       processedLocRef.current = loc;
       pendingExternalLocRef.current = loc;
-      void Promise.resolve(
-        openConversationExternalByLoc({
-          source: decoded.source,
-          conversationKey: decoded.conversationKey,
-        }),
-      ).catch(() => {
-        if (pendingExternalLocRef.current === loc) pendingExternalLocRef.current = null;
+      void openConversationExternalByLoc({
+        source: decoded.source,
+        conversationKey: decoded.conversationKey,
       });
     }, [location.pathname, location.search, openConversationExternalByLoc]);
 
@@ -526,12 +513,14 @@ export default function AppShell() {
                         wideChrome="none"
                         wideHideList={wideHideList}
                         wideDetail={
-                          <ConversationDetailPane
-                            onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
-                            onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
-                            onCommentsLocatorRootsChange={setCommentsLocatorSurfaceRoots}
-                            commentsSidebarOpen={showCommentsSidebar}
-                          />
+                          <Suspense fallback={null}>
+                            <LazyConversationDetailPane
+                              onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
+                              onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
+                              onCommentsLocatorRootsChange={setCommentsLocatorSurfaceRoots}
+                              commentsSidebarOpen={showCommentsSidebar}
+                            />
+                          </Suspense>
                         }
                         listShell={{
                           rightSlot: (
@@ -584,12 +573,14 @@ export default function AppShell() {
 
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0">
-                  <ArticleCommentsSection
-                    sidebarSession={commentsSidebarSession}
-                    containerClassName="tw-h-full tw-min-h-0"
-                    getLocatorSurfaceRoots={getCommentsLocatorSurfaceRoots}
-                    subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
-                  />
+                  <Suspense fallback={null}>
+                    <LazyArticleCommentsSection
+                      sidebarSession={commentsSidebarSession}
+                      containerClassName="tw-h-full tw-min-h-0"
+                      getLocatorSurfaceRoots={getCommentsLocatorSurfaceRoots}
+                      subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
             </div>

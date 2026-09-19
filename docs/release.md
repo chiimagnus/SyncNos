@@ -28,7 +28,7 @@ CLI 源 package 保持 `0.0.0-dev` + `private: true`；release staging 由 tag �
 release workflow 只构建一次发布产物，然后由独立 job 消费同一组 artifact：
 
 1. 解析 tag/channel、preflight，并运行 `npm run gate` + `npm run cli:check`；
-2. 一次性构建并保存 CLI tarball、Chrome zip、Edge zip、Firefox XPI 与 AMO source zip；CLI tarball 先做全局安装 smoke-test；
+2. 一次性构建并保存 CLI tarball、Chrome zip、Edge zip、Firefox XPI 与 AMO source zip；CLI tarball 先做全局安装 smoke-test；Chrome/Firefox 的最终 dist 必须在 target manifest patch 完成后、压缩前通过 canonical `check-dist`，Edge 复用已检查的 Chrome artifact；
 3. `publish_cli` 通过 npm Trusted Publishing/OIDC 发布同一个 CLI tarball；`npm publish` 正常返回成功即视为该渠道成功，不再因为 registry 传播延迟做发布后的轮询 read-back；
 4. stable tag 的 Chrome / Edge / Firefox job 从同一 build artifact 独立发布，prerelease 不进入正式浏览器商店；浏览器渠道失败不会阻止 npm 成功后创建 GitHub Release；
 5. `github_release` 只依赖 build 与 `publish_cli`，上传同一份 CLI tarball 与浏览器 assets；stable Release 直接展示 GitHub 自动生成的变更记录；

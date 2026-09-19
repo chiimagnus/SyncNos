@@ -1,6 +1,7 @@
-import { Tooltip } from 'react-tooltip';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 const WEBCLIPPER_TOOLTIP_ID = 'webclipper-tooltip';
+const LazyAppTooltipImpl = lazy(() => import('./AppTooltipImpl'));
 
 type TooltipPlace = 'top' | 'right' | 'bottom' | 'left';
 
@@ -21,15 +22,17 @@ export function tooltipAttrs(content: string | null | undefined, place: TooltipP
 }
 
 export function AppTooltipHost() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  if (!ready) return null;
+
   return (
-    <Tooltip
-      id={WEBCLIPPER_TOOLTIP_ID}
-      delayShow={120}
-      delayHide={40}
-      opacity={1}
-      noArrow
-      positionStrategy="fixed"
-      className="webclipper-tooltip"
-    />
+    <Suspense fallback={null}>
+      <LazyAppTooltipImpl id={WEBCLIPPER_TOOLTIP_ID} />
+    </Suspense>
   );
 }

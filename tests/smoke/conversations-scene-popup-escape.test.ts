@@ -59,7 +59,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
-    listCursor: null,
     listHasMore: false,
     listSummary: { totalCount: 1, todayCount: 1 },
     listFacets: {
@@ -71,7 +70,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
     pendingListLocateId: null,
-    requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
@@ -81,7 +79,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     syncSelected: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
-    loadingList: false,
     loadingDetail: false,
     detailError: null,
     detail: {
@@ -96,7 +93,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     detailHeaderActions: [],
     refreshList: vi.fn(),
-    refreshActiveDetail: vi.fn(),
+    setDetailSurfaceActive: vi.fn(),
   }),
 }));
 
@@ -185,6 +182,7 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(row).toBeTruthy();
     await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await import('../../src/ui/conversations/ConversationDetailPane');
       await flushImmediate();
     });
 
@@ -251,15 +249,17 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
   });
 
-  it('consumes pending-open source/key target and opens detail via precise API', () => {
+  it('consumes pending-open source/key target and opens detail via precise API', async () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,
       source: 'chatgpt',
       conversationKey: 'conv-99',
     });
 
-    act(() => {
+    await act(async () => {
       root!.render(createElement(ConversationsScene));
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
 
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');

@@ -55,7 +55,7 @@ export function createTestBackgroundRouter(
     runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
   });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
-  registerUiMessageHandlers(router);
+  registerUiMessageHandlers(router, { ensureLocaleReady: async () => undefined });
   registerSyncHandlers(router, {
     getInstanceId: () => instanceId,
     notionSyncOrchestrator,

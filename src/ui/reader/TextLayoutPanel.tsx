@@ -23,16 +23,6 @@ export type TextLayoutPanelProps = {
   className?: string;
 };
 
-const FONT_FAMILY_LABELS: Record<ReaderFontFamily, string> = {
-  serif: t('readerFontSerif'),
-  sans: t('readerFontSans'),
-  mono: t('readerFontMono'),
-};
-const TEXT_ALIGN_LABELS: Record<ReaderTextAlign, string> = {
-  left: t('readerAlignLeft'),
-  justify: t('readerAlignJustify'),
-};
-
 // READER_PREFS_LIMITS only exposes min/max; step granularity is a UI concern.
 const STEP = { fontSize: 1, lineHeight: 0.05, contentWidth: 10, letterSpacing: 0.005 } as const;
 
@@ -73,6 +63,15 @@ const RANGE_COMMIT_KEYS = new Set([
 ]);
 
 export function TextLayoutPanel({ prefs, update, preview, commitPreview, className }: TextLayoutPanelProps) {
+  const fontFamilyLabels: Record<ReaderFontFamily, string> = {
+    serif: t('readerFontSerif'),
+    sans: t('readerFontSans'),
+    mono: t('readerFontMono'),
+  };
+  const textAlignLabels: Record<ReaderTextAlign, string> = {
+    left: t('readerAlignLeft'),
+    justify: t('readerAlignJustify'),
+  };
   const commitPreviewBestEffort = () => {
     void commitPreview().catch(() => {});
   };
@@ -96,7 +95,7 @@ export function TextLayoutPanel({ prefs, update, preview, commitPreview, classNa
           ariaLabel={t('readerFontAria')}
           value={prefs.fontFamily}
           onChange={(next) => void update({ fontFamily: next })}
-          options={READER_FONT_FAMILIES.map((id) => ({ value: id, label: FONT_FAMILY_LABELS[id] }))}
+          options={READER_FONT_FAMILIES.map((id) => ({ value: id, label: fontFamilyLabels[id] }))}
         />
       </Row>
 
@@ -105,7 +104,7 @@ export function TextLayoutPanel({ prefs, update, preview, commitPreview, classNa
           ariaLabel={t('readerAlignAria')}
           value={prefs.textAlign}
           onChange={(next) => void update({ textAlign: next })}
-          options={READER_TEXT_ALIGNS.map((id) => ({ value: id, label: TEXT_ALIGN_LABELS[id] }))}
+          options={READER_TEXT_ALIGNS.map((id) => ({ value: id, label: textAlignLabels[id] }))}
         />
       </Row>
 

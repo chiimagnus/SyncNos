@@ -89,7 +89,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
-    listCursor: null,
     listHasMore: false,
     listSummary: { totalCount: 1, todayCount: 1 },
     listFacets: {
@@ -101,7 +100,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
     pendingListLocateId: null,
-    requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
@@ -111,7 +109,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     syncSelected: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
-    loadingList: false,
     loadingDetail: false,
     detailError: null,
     detail: {
@@ -128,7 +125,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     detailHeaderActions: [],
     refreshList: vi.fn(),
-    refreshActiveDetail: vi.fn(),
+    setDetailSurfaceActive: vi.fn(),
   }),
 }));
 
@@ -245,8 +242,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
     expect(row).toBeTruthy();
-    act(() => {
+    await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
 
     const detail = document.querySelector('[aria-label="Conversation detail"]');
@@ -257,6 +256,7 @@ describe('ConversationsScene narrow comments flow', () => {
     await act(async () => {
       commentBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await import('../../src/ui/conversations/ArticleCommentsSection');
       await flushImmediate();
     });
 
@@ -317,8 +317,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
     expect(row).toBeTruthy();
-    act(() => {
+    await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 
@@ -363,13 +365,15 @@ describe('ConversationsScene narrow comments flow', () => {
       subscribeSidebarClose,
     };
 
-    act(() => {
+    await act(async () => {
       root!.render(
         createElement(ConversationsScene, {
           commentsSidebarRuntime,
           narrowCommentsOpenSource: 'popup',
         }),
       );
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
 
     expect(setContext).not.toHaveBeenCalled();
@@ -381,6 +385,7 @@ describe('ConversationsScene narrow comments flow', () => {
     await act(async () => {
       commentBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await import('../../src/ui/conversations/ArticleCommentsSection');
       await flushImmediate();
     });
 

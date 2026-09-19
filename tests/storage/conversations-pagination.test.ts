@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { IDBCursor, IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { closeDbForTests, openDb } from '@platform/idb/schema';
 import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
 import {
@@ -326,6 +326,65 @@ describe('conversations pagination storage-idb', () => {
     const chatgpt = await getConversationListBootstrap({ sourceKey: 'chatgpt', siteKey: 'all', limit: 20 });
     expect(chatgpt.summary).toEqual({ totalCount: 1, todayCount: 1 });
     expect(chatgpt.facets.sites).toEqual([{ key: 'domain:chatgpt.com', label: 'chatgpt.com', count: 1 }]);
+  });
+
+  it('jumps facet cursors by distinct compound prefixes instead of scanning every row', async () => {
+    const now = Date.now();
+    for (let index = 0; index < 240; index += 1) {
+      const web = index < 180;
+      const firstWebSite = index < 120;
+      await upsertConversation({
+        sourceType: web ? 'article' : 'chat',
+        source: web ? 'web' : 'chatgpt',
+        conversationKey: web
+          ? `article:https://${firstWebSite ? 'example.com' : 'other.example'}/facet-${index}`
+          : `chatgpt-facet-${index}`,
+        title: `facet ${index}`,
+        url: web
+          ? `https://${firstWebSite ? 'example.com' : 'other.example'}/facet-${index}`
+          : `https://chatgpt.com/c/facet-${index}`,
+        lastActivityAt: now - index,
+      });
+    }
+
+    const continueCounts = new Map<string, number>();
+    const originalContinue = IDBCursor.prototype.continue;
+    const continueSpy = vi.spyOn(IDBCursor.prototype, 'continue').mockImplementation(function (
+      this: IDBCursor,
+      key?: IDBValidKey,
+    ) {
+      const indexName = String((this.source as any)?.name || '');
+      if (
+        indexName === 'by_listSourceKey_lastActivityAt_id' ||
+        indexName === 'by_listSourceKey_listSiteKey_lastActivityAt_id'
+      ) {
+        continueCounts.set(indexName, (continueCounts.get(indexName) || 0) + 1);
+      }
+      return originalContinue.call(this, key as any);
+    });
+
+    try {
+      const page = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 100 });
+
+      expect(page.items).toHaveLength(100);
+      expect(page.summary.totalCount).toBe(240);
+      expect(new Map(page.facets.sources.map((item) => [item.key, item.count]))).toEqual(
+        new Map([
+          ['web', 180],
+          ['chatgpt', 60],
+        ]),
+      );
+      expect(new Map(page.facets.sites.map((item) => [item.key, item.count]))).toEqual(
+        new Map([
+          ['domain:example.com', 120],
+          ['domain:other.example', 60],
+        ]),
+      );
+      expect(continueCounts.get('by_listSourceKey_lastActivityAt_id')).toBe(2);
+      expect(continueCounts.get('by_listSourceKey_listSiteKey_lastActivityAt_id')).toBe(2);
+    } finally {
+      continueSpy.mockRestore();
+    }
   });
 
   it('counts today from inclusive local midnight to exclusive next local midnight', async () => {

@@ -30,15 +30,13 @@ vi.mock('@services/conversations/data/storage-idb', () => ({
   getSyncMappingByConversation: (...args: any[]) => getSyncMappingByConversationMock(...args),
 }));
 
-vi.mock('@services/sync/sync-provider-gate', () => ({
-  isSyncProviderEnabled: (...args: any[]) => isSyncProviderEnabledMock(...args),
-  getSyncProviderEnabledStorageKeys: () => [
-    'webclipper_sync_provider_obsidian_enabled',
-    'webclipper_sync_provider_notion_enabled',
-    'webclipper_sync_provider_feishu_enabled',
-    'webclipper_sync_provider_github_enabled',
-  ],
-}));
+vi.mock('@services/sync/sync-provider-gate', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@services/sync/sync-provider-gate')>();
+  return {
+    ...actual,
+    isSyncProviderEnabled: (...args: any[]) => isSyncProviderEnabledMock(...args),
+  };
+});
 
 vi.mock('@services/shared/clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),
@@ -56,14 +54,11 @@ vi.mock('@services/shared/storage', () => ({
 import { t } from '@i18n';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY } from '@services/integrations/detail-header-copy-link-preference';
-import {
-  DETAIL_HEADER_ACTION_LABELS,
-  getDetailHeaderActionStorageDependencyKeys,
-  hasDetailHeaderActionStorageDependencyChange,
-  resolveDetailHeaderActions,
-} from '@services/integrations/detail-header-actions';
-import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/openin-detail-header-actions';
+import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
+import { hasDetailHeaderActionStorageDependencyChange } from '@services/integrations/detail-header-action-dependencies';
+import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/notion-openin';
 import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
+import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 
 const NOTION_PAGE_ID = '01234567-89ab-cdef-0123-456789abcdef';
 const OTHER_NOTION_PAGE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -156,20 +151,10 @@ describe('detail-header-actions', () => {
     storageSetMock.mockResolvedValue(undefined);
   });
 
-  it('owns exactly the storage keys read by detail header resolution', () => {
-    expect(getDetailHeaderActionStorageDependencyKeys()).toEqual([
-      'webclipper_sync_provider_obsidian_enabled',
-      'webclipper_sync_provider_notion_enabled',
-      'webclipper_sync_provider_feishu_enabled',
-      'webclipper_sync_provider_github_enabled',
-      OBSIDIAN_STORAGE_KEYS.apiBaseUrl,
-      OBSIDIAN_STORAGE_KEYS.apiKey,
-      OBSIDIAN_STORAGE_KEYS.authHeaderName,
-      OBSIDIAN_STORAGE_KEYS.chatFolder,
-      OBSIDIAN_STORAGE_KEYS.articleFolder,
-      OBSIDIAN_STORAGE_KEYS.videoFolder,
-      DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY,
-    ]);
+  it('tracks the storage owners that can change detail header actions', () => {
+    expect(
+      hasDetailHeaderActionStorageDependencyChange({ [syncProviderEnabledStorageKey('github')]: {} }, 'local'),
+    ).toBe(true);
     expect(hasDetailHeaderActionStorageDependencyChange({ [OBSIDIAN_STORAGE_KEYS.videoFolder]: {} }, 'local')).toBe(
       true,
     );
@@ -249,7 +234,7 @@ describe('detail-header-actions', () => {
     const copyAction = byId(actions, 'copy-notion-link');
     expect(bySlot(actions, 'open')).toHaveLength(1);
     expect(bySlot(actions, 'copy')).toHaveLength(1);
-    expect(openAction?.label).toBe(DETAIL_HEADER_ACTION_LABELS.openInNotion);
+    expect(openAction?.label).toBe(t('detailHeaderOpenInNotion'));
     expect(openAction?.href).toBe('https://app.notion.com/p/chiimagnus/0123456789abcdef0123456789abcdef');
     expect(copyAction?.href).toBe(openAction?.href);
     expect(copyAction?.afterTriggerLabel).toBe('Copied');
@@ -303,7 +288,7 @@ describe('detail-header-actions', () => {
       .join('/');
     const expectedUrl = `https://github.com/octocat/sync-notes/blob/feature/github-links/${encodedPath}`;
 
-    expect(openAction?.label).toBe(DETAIL_HEADER_ACTION_LABELS.openInGithub);
+    expect(openAction?.label).toBe(t('detailHeaderOpenInGithub'));
     expect(openAction?.provider).toBe('github');
     expect(openAction?.href).toBe(expectedUrl);
     expect(copyAction?.provider).toBe('github');

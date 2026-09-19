@@ -98,6 +98,9 @@ vi.mock('@services/comments/client/repo', () => ({
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: (...args: any[]) => resolveDetailHeaderActions(...args),
+}));
+
+vi.mock('@services/integrations/detail-header-action-dependencies', () => ({
   hasDetailHeaderActionStorageDependencyChange: (changes: unknown, areaName: string) =>
     hasLocalStorageChange(changes, areaName, DETAIL_HEADER_CONFIG_KEYS),
 }));
@@ -250,6 +253,14 @@ describe('ConversationsProvider data revisions', () => {
     });
   }
 
+  async function activateDetailSurface() {
+    await act(async () => {
+      latestState.setDetailSurfaceActive(true);
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+  }
+
   it('subscribes before the first list read and allows a degraded readiness baseline', async () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();
     whenDataRevisionObserverReady.mockReturnValue(readiness.promise);
@@ -257,6 +268,7 @@ describe('ConversationsProvider data revisions', () => {
 
     await renderProvider();
     expect(subscribeDataRevisionChanges).toHaveBeenCalledTimes(1);
+    expect(latestState.loadingInitialList).toBe(true);
     expect(getConversationListBootstrap).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -265,6 +277,7 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect(getConversationListBootstrap).toHaveBeenCalledTimes(1);
+    expect(latestState.loadingInitialList).toBe(false);
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([1]);
   });
 
@@ -349,6 +362,37 @@ describe('ConversationsProvider data revisions', () => {
     expect(resolveDetailHeaderActions).toHaveBeenCalledTimes(headerCalls);
   });
 
+  it('skips hidden detail and Header work for message, mapping, and config changes', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1)]));
+    getConversationById.mockResolvedValue(makeConversation(1));
+    getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
+    resolveDetailHeaderActions.mockResolvedValue([{ id: 'hidden-action', slot: 'open' } as any]);
+
+    await renderProvider();
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(getConversationById).not.toHaveBeenCalled();
+    expect(getConversationDetail).not.toHaveBeenCalled();
+    expect(resolveDetailHeaderActions).not.toHaveBeenCalled();
+
+    await act(async () => {
+      revisionListener?.(['messages', 'sync_mappings']);
+      storageChangeListener?.({ obsidian_video_folder: { newValue: 'Videos' } }, 'local');
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(getConversationById).not.toHaveBeenCalled();
+    expect(getConversationDetail).not.toHaveBeenCalled();
+    expect(resolveDetailHeaderActions).not.toHaveBeenCalled();
+
+    await activateDetailSurface();
+
+    expect(getConversationById).toHaveBeenCalledTimes(1);
+    expect(getConversationDetail).toHaveBeenCalledTimes(1);
+    expect(resolveDetailHeaderActions.mock.calls.length).toBeGreaterThan(0);
+  });
+
   it('keeps the committed list bundle on a same-scope revision read failure and replays the next revision', async () => {
     whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
     getConversationListBootstrap
@@ -374,11 +418,21 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([1]);
-    expect(latestState.listCursor).toEqual({ lastActivityAt: 10, id: 1 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 7, todayCount: 3 });
     expect(latestState.listFacets).toEqual({ sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] });
     expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+
+    getConversationListPage.mockResolvedValue(makePage([]));
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+    expect(getConversationListPage).toHaveBeenCalledWith(
+      expect.any(Object),
+      { lastActivityAt: 10, id: 1 },
+      expect.any(Number),
+    );
 
     await act(async () => {
       revisionListener?.(['conversations']);
@@ -411,11 +465,16 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect(latestState.items).toEqual([]);
-    expect(latestState.listCursor).toBeNull();
     expect(latestState.listHasMore).toBe(false);
     expect(latestState.listSummary).toEqual({ totalCount: 0, todayCount: 0 });
     expect(latestState.listFacets).toEqual({ sources: [], sites: [] });
     expect(latestState.listError).toBe('web read failed');
+
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+    expect(getConversationListPage).not.toHaveBeenCalled();
   });
 
   it('does not register a retry for a stale rejected list request', async () => {
@@ -452,13 +511,13 @@ describe('ConversationsProvider data revisions', () => {
     getConversationById.mockImplementationOnce(() => pointRead.promise).mockResolvedValueOnce(fresh);
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-    });
     expect(Number(latestState.activeId)).toBe(1);
     expect(String(latestState.selectedConversation?.author || '')).toBe('stale author');
+    expect(getConversationById).not.toHaveBeenCalled();
 
     await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
       pointRead.reject(new Error('temporary point read failure'));
       await flushMicrotasks();
     });
@@ -481,7 +540,11 @@ describe('ConversationsProvider data revisions', () => {
     getConversationById.mockResolvedValue(null);
 
     await renderProvider();
+    expect(Number(latestState.activeId)).toBe(1);
+
     await act(async () => {
+      revisionListener?.(['conversations']);
+      await flushMicrotasks();
       await flushMicrotasks();
     });
 
@@ -573,8 +636,8 @@ describe('ConversationsProvider data revisions', () => {
     );
 
     await renderProvider();
+    await activateDetailSurface();
     await act(async () => {
-      await flushMicrotasks();
       latestState.setActiveId(2);
       await flushMicrotasks();
       firstRead.resolve(null);
@@ -602,8 +665,8 @@ describe('ConversationsProvider data revisions', () => {
     getConversationById.mockResolvedValueOnce(firstPoint).mockResolvedValueOnce(freshPoint);
 
     await renderProvider();
+    await activateDetailSurface();
     await act(async () => {
-      await flushMicrotasks();
       revisionListener?.(['conversations']);
       await flushMicrotasks();
     });
@@ -717,9 +780,7 @@ describe('ConversationsProvider data revisions', () => {
     resolveDetailHeaderActions.mockResolvedValue([{ id: 'old-header-action', slot: 'open' } as any]);
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await activateDetailSurface();
     expect(latestState.detail?.messages).toEqual(['old']);
     expect(latestState.detailHeaderActions.some((action: any) => action.id === 'old-header-action')).toBe(true);
 
@@ -749,8 +810,8 @@ describe('ConversationsProvider data revisions', () => {
       .mockResolvedValue([{ id: 'fresh-header-action', slot: 'open' } as any]);
 
     await renderProvider();
+    await activateDetailSurface();
     await act(async () => {
-      await flushMicrotasks();
       revisionListener?.(['messages']);
       await flushMicrotasks();
     });
@@ -776,9 +837,7 @@ describe('ConversationsProvider data revisions', () => {
     resolveDetailHeaderActions.mockResolvedValue([{ id: 'old-header-action', slot: 'open' } as any]);
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await activateDetailSurface();
     const resolvesBefore = resolveDetailHeaderActions.mock.calls.length;
 
     await act(async () => {
@@ -799,9 +858,7 @@ describe('ConversationsProvider data revisions', () => {
     resolveDetailHeaderActions.mockResolvedValue([]);
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await activateDetailSurface();
     const listCalls = getConversationListBootstrap.mock.calls.length;
     const detailCalls = getConversationDetail.mock.calls.length;
     requestDataRevisionRetry.mockClear();
@@ -825,9 +882,7 @@ describe('ConversationsProvider data revisions', () => {
     resolveDetailHeaderActions.mockResolvedValue([]);
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await activateDetailSurface();
     requestDataRevisionRetry.mockClear();
     resolveDetailHeaderActions.mockRejectedValueOnce(new Error('config resolve failed'));
 
@@ -864,9 +919,7 @@ describe('ConversationsProvider data revisions', () => {
     getConversationById.mockResolvedValue(makeConversation(1));
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await activateDetailSurface();
 
     const staleResolve = deferred<any[]>();
     const staleAction = { id: 'stale-header-action', slot: 'open' } as any;

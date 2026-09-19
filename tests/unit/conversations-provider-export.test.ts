@@ -85,6 +85,9 @@ vi.mock('@services/comments/client/repo', () => ({
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: (...args: any[]) => mocks.resolveDetailHeaderActions(...args),
+}));
+
+vi.mock('@services/integrations/detail-header-action-dependencies', () => ({
   hasDetailHeaderActionStorageDependencyChange: () => false,
 }));
 

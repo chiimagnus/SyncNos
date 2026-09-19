@@ -1,15 +1,13 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { resolveRepoRoot, resolveWebclipperRoot, run } from './script-utils.mjs';
 
 function parseArgs(argv) {
   const args = {
-    target: 'chrome',
+    target: null,
     outDir: null,
     zip: false,
     zipName: null,
-    geckoId: null,
-    geckoMinVersion: null,
   };
   for (const raw of argv) {
     if (raw === '--zip') {
@@ -28,14 +26,6 @@ function parseArgs(argv) {
       args.zipName = raw.slice('--zip-name='.length) || args.zipName;
       continue;
     }
-    if (raw.startsWith('--gecko-id=')) {
-      args.geckoId = raw.slice('--gecko-id='.length) || args.geckoId;
-      continue;
-    }
-    if (raw.startsWith('--gecko-min-version=')) {
-      args.geckoMinVersion = raw.slice('--gecko-min-version='.length) || args.geckoMinVersion;
-      continue;
-    }
   }
   return args;
 }
@@ -48,7 +38,7 @@ function writeText(p, text) {
   writeFileSync(p, text, 'utf-8');
 }
 
-function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion }) {
+function applyTargetManifestPatches(manifest, { target, geckoId }) {
   if (target !== 'firefox') return manifest;
 
   const next = { ...manifest };
@@ -71,10 +61,7 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
   const existingGecko = existingBss.gecko && typeof existingBss.gecko === 'object' ? existingBss.gecko : {};
   const resolvedGeckoId =
     geckoId && String(geckoId).trim() ? String(geckoId).trim() : existingGecko.id || 'syncnos-webclipper@syncnos.app';
-  const resolvedMinVersion =
-    geckoMinVersion && String(geckoMinVersion).trim()
-      ? String(geckoMinVersion).trim()
-      : existingGecko.strict_min_version || '142.0';
+  const resolvedMinVersion = existingGecko.strict_min_version || '142.0';
 
   next.browser_specific_settings = {
     ...existingBss,
@@ -96,8 +83,11 @@ const repoRoot = resolveRepoRoot(import.meta.url);
 const webclipperRoot = resolveWebclipperRoot(repoRoot);
 
 const cli = parseArgs(process.argv.slice(2));
-const target = String(cli.target || 'chrome');
-const distDirName = cli.outDir || (target === 'firefox' ? 'dist-firefox' : target === 'edge' ? 'dist-edge' : 'dist');
+const target = String(cli.target || '');
+if (target !== 'chrome' && target !== 'firefox') {
+  throw new Error(`unsupported release target: ${target}`);
+}
+const distDirName = cli.outDir || (target === 'firefox' ? 'dist-firefox' : 'dist');
 const dist = join(webclipperRoot, distDirName);
 
 const wxtScript = target === 'firefox' ? 'build:firefox' : 'build';
@@ -116,19 +106,15 @@ if (!existsSync(manifestPath)) throw new Error(`dist manifest missing: ${manifes
 let manifest = JSON.parse(readText(manifestPath));
 manifest = applyTargetManifestPatches(manifest, {
   target,
-  geckoId: cli.geckoId || process.env.FIREFOX_EXTENSION_ID || null,
-  geckoMinVersion: cli.geckoMinVersion || process.env.FIREFOX_MIN_VERSION || null,
+  geckoId: process.env.FIREFOX_EXTENSION_ID || null,
 });
 writeText(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
+const distRelativeToRepo = relative(repoRoot, dist);
+run('node', ['.github/scripts/webclipper/check-dist.mjs', `--root=${distRelativeToRepo}`], webclipperRoot);
+
 if (cli.zip) {
-  const zipName =
-    cli.zipName ||
-    (target === 'firefox'
-      ? 'SyncNos-WebClipper-firefox.xpi'
-      : target === 'edge'
-        ? 'SyncNos-WebClipper-edge.zip'
-        : 'SyncNos-WebClipper.zip');
+  const zipName = cli.zipName || (target === 'firefox' ? 'SyncNos-WebClipper-firefox.xpi' : 'SyncNos-WebClipper.zip');
   const zipOut = join(webclipperRoot, zipName);
   rmSync(zipOut, { force: true });
 

@@ -139,11 +139,9 @@ function buildState(overrides: Record<string, unknown> = {}) {
     },
     enabledSyncProviders: ['notion'],
     deleting: false,
-    loadingList: false,
     loadingInitialList: false,
     loadingMoreList: false,
     listError: null,
-    listCursor: { lastActivityAt: Date.now() - 9999, id: 1 },
     listHasMore: true,
     listSummary: { totalCount: items.length, todayCount: items.length },
     listFacets: {
@@ -155,14 +153,13 @@ function buildState(overrides: Record<string, unknown> = {}) {
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
     pendingListLocateId: null,
-    requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),
     exportSelectedMarkdown: vi.fn(),
     syncSelected: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
     refreshList: vi.fn(async () => {}),
-    refreshActiveDetail: vi.fn(async () => {}),
+    setDetailSurfaceActive: vi.fn(),
     ...overrides,
   };
 }
@@ -203,6 +200,57 @@ describe('ConversationListPane pagination behaviors', () => {
       await flushMicrotasks();
     });
   }
+
+  it('distinguishes initial loading, failure, and authoritative empty states', async () => {
+    currentState = buildState({
+      items: [],
+      loadingInitialList: true,
+      listError: null,
+      listHasMore: false,
+      listSummary: { totalCount: 0, todayCount: 0 },
+      listFacets: { sources: [], sites: [] },
+    });
+    await renderPane();
+    expect(document.body.textContent).toContain('fetchingDots');
+    expect(document.body.textContent).not.toContain('noConversations');
+
+    const refreshList = vi.fn(async () => {});
+    currentState = buildState({
+      items: [],
+      loadingInitialList: false,
+      listError: 'initial read failed',
+      listHasMore: false,
+      listSummary: { totalCount: 0, todayCount: 0 },
+      listFacets: { sources: [], sites: [] },
+      refreshList,
+    });
+    await renderPane();
+    expect(document.body.textContent).toContain('actionFailedFallback');
+    expect(document.body.textContent).toContain('initial read failed');
+    expect(document.body.textContent).not.toContain('noConversations');
+
+    const retryButton = document.querySelector(
+      'button[aria-label="paginationRetryLoadMore"]',
+    ) as HTMLButtonElement | null;
+    expect(retryButton).toBeTruthy();
+    await act(async () => {
+      retryButton!.click();
+      await flushMicrotasks();
+    });
+    expect(refreshList).toHaveBeenCalledTimes(1);
+
+    currentState = buildState({
+      items: [],
+      loadingInitialList: false,
+      listError: null,
+      listHasMore: false,
+      listSummary: { totalCount: 0, todayCount: 0 },
+      listFacets: { sources: [], sites: [] },
+    });
+    await renderPane();
+    expect(document.body.textContent).toContain('noConversations');
+    expect(document.body.textContent).not.toContain('fetchingDots');
+  });
 
   it('triggers auto pagination near bottom and respects gate conditions', async () => {
     const loadMoreList = vi.fn(async () => {});

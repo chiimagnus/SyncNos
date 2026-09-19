@@ -4,17 +4,12 @@ import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAsset
 import { useChatgptFileSrcMap } from '@viewmodels/conversations/useChatgptFileSrcMap';
 import type { DetailViewSharedProps } from '@ui/conversations/views/detail-view-props';
 
-export type ChatDetailViewProps = DetailViewSharedProps & {
-  listError?: string | null;
+type ChatDetailViewProps = DetailViewSharedProps & {
   outlineIndexByMessageId: Map<number, number>;
   getUserMessageRefSetter: (messageId: number) => (node: HTMLDivElement | null) => void;
 };
 
-/**
- * ChatDetailView renders the chat-detail message list.
- * The prop bag is still the legacy one for now; renderer-specific prop cleanup
- * happens in the next task after the chat/article split is isolated.
- */
+/** ChatDetailView renders the chat-detail message list. */
 export function ChatDetailView({
   selected,
   activeId,
@@ -87,7 +82,7 @@ export function ChatDetailView({
               );
             })}
           </div>
-        ) : activeId ? (
+        ) : activeId && !loadingDetail && !detailError ? (
           <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
         ) : (
           <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">

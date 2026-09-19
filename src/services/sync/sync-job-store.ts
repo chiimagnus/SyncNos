@@ -82,6 +82,8 @@ function parsePerConversation(value: unknown): SyncPerConversationResult[] | nul
   return rows;
 }
 
+export type SyncJobSnapshots = Record<SyncProvider, SyncJobSnapshot | null>;
+
 export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): SyncJobSnapshot | null {
   if (!isRecord(job) || job.provider !== provider) return null;
   const status = job.status;
@@ -134,6 +136,25 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
     perConversation,
     abortedReason: job.abortedReason,
   };
+}
+
+export function normalizeSyncJobSnapshotsFromStorage(
+  values: Record<string, unknown> | null | undefined,
+): SyncJobSnapshots {
+  const source = values ?? {};
+  return (Object.keys(SYNC_JOB_STORAGE_KEYS) as SyncProvider[]).reduce<SyncJobSnapshots>(
+    (snapshots, provider) => {
+      const key = SYNC_JOB_STORAGE_KEYS[provider];
+      snapshots[provider] = normalizeSyncJobSnapshot(provider, source[key] ?? null);
+      return snapshots;
+    },
+    { notion: null, obsidian: null, feishu: null, github: null },
+  );
+}
+
+export async function readSyncJobSnapshots(): Promise<SyncJobSnapshots> {
+  const values = await storageGet(Object.values(SYNC_JOB_STORAGE_KEYS));
+  return normalizeSyncJobSnapshotsFromStorage(values);
 }
 
 async function getSyncJob(provider: SyncProvider): Promise<SyncJobSnapshot | null> {

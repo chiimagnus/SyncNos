@@ -16,13 +16,9 @@ export type CliIntegrationCapability = {
   permissionGranted: boolean;
 };
 
-export type CliIntegrationStatus = CliIntegrationCapability & {
-  enabled: boolean;
-};
-
 let instanceIdPromise: Promise<string> | null = null;
 
-export function isCliIntegrationAvailable(): boolean {
+function isCliIntegrationAvailable(): boolean {
   // Chromium-derived browsers may hide runtime.connectNative until the optional
   // nativeMessaging permission is granted. Availability must describe whether
   // the permission can be requested, not whether the gated API is visible yet.
@@ -37,15 +33,9 @@ export async function readCliIntegrationCapability(): Promise<CliIntegrationCapa
   return { available, permissionGranted };
 }
 
-export async function readCliIntegrationStatus(): Promise<CliIntegrationStatus> {
-  const [stored, capability] = await Promise.all([
-    storageGet([CLI_INTEGRATION_ENABLED_STORAGE_KEY]),
-    readCliIntegrationCapability(),
-  ]);
-  return {
-    ...capability,
-    enabled: stored[CLI_INTEGRATION_ENABLED_STORAGE_KEY] === true,
-  };
+export async function readCliIntegrationEnabled(): Promise<boolean> {
+  const stored = await storageGet([CLI_INTEGRATION_ENABLED_STORAGE_KEY]);
+  return stored[CLI_INTEGRATION_ENABLED_STORAGE_KEY] === true;
 }
 
 export function enableCliIntegration(): Promise<boolean> {

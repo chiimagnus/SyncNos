@@ -18,17 +18,17 @@ const mocks = vi.hoisted(() => ({
   registerOpenTargetHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
-  ensureDefaultFeishuOAuthConfig: vi.fn(),
   registerClipperContextMenu: vi.fn(),
+  installContextMenus: vi.fn(),
   onInstalled: vi.fn(),
   onAlarm: vi.fn(),
   storageOnChanged: vi.fn(),
   openOrFocusExtensionAppTab: vi.fn(),
   reconcileStartupSyncJob: vi.fn(),
-  ensureDisplayMode: vi.fn(),
   readDisplayMode: vi.fn(),
   setDisplayMode: vi.fn(),
   startCliNativeBridge: vi.fn(),
+  readBackgroundRecoveryProbe: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -76,7 +76,6 @@ vi.mock('@services/sync/notion/auth/oauth', () => ({
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
 }));
 vi.mock('@services/sync/feishu/auth/oauth', () => ({
-  ensureDefaultFeishuOAuthConfig: mocks.ensureDefaultFeishuOAuthConfig,
   setupFeishuOAuthNavigationListener: mocks.setupFeishuOAuthNavigationListener,
 }));
 vi.mock('@platform/runtime/runtime', () => ({ onInstalled: mocks.onInstalled }));
@@ -87,11 +86,14 @@ vi.mock('@platform/context-menus/clipper-context-menu', () => ({
 vi.mock('@platform/alarms/alarms', () => ({ onAlarm: mocks.onAlarm }));
 vi.mock('@platform/storage/local', () => ({ storageOnChanged: mocks.storageOnChanged }));
 vi.mock('@services/shared/inpage-display-mode', () => ({
-  ensureCanonicalInpageDisplayMode: mocks.ensureDisplayMode,
+  INPAGE_DISPLAY_MODE_STORAGE_KEY: 'inpage_display_mode',
   readEffectiveInpageDisplayMode: mocks.readDisplayMode,
   setCanonicalInpageDisplayMode: mocks.setDisplayMode,
 }));
 vi.mock('@services/cli/native-bridge', () => ({ startCliNativeBridge: mocks.startCliNativeBridge }));
+vi.mock('@services/bootstrap/background-recovery-probe', () => ({
+  readBackgroundRecoveryProbe: mocks.readBackgroundRecoveryProbe,
+}));
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -116,27 +118,48 @@ function createServices() {
         flushCleanup: vi.fn().mockResolvedValue(undefined),
         scheduleCleanup: vi.fn().mockResolvedValue(undefined),
       },
+      imageBackfillScheduler: { flush: vi.fn().mockResolvedValue(undefined) },
       onRemoteCleanupPending: vi.fn().mockResolvedValue(undefined),
     },
-    conversationKinds: {},
     notionSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('notion'),
     },
     obsidianSyncOrchestrator: {
       testConnection: vi.fn(),
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('obsidian'),
     },
     feishuSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('feishu'),
     },
     githubSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('github'),
     },
   };
+}
+
+function idleRecoveryProbe() {
+  return {
+    providers: {
+      notion: { runningJob: null, hasQueuedWork: false },
+      obsidian: { runningJob: null, hasQueuedWork: false },
+      feishu: { runningJob: null, hasQueuedWork: false },
+      github: { runningJob: null, hasQueuedWork: false },
+    },
+    imageBackfillHasQueuedWork: false,
+    githubCleanupEnabled: false,
+  };
+}
+
+function recoveryRunningJob(provider: string, instanceId: string) {
+  return { id: `${provider}-job`, provider, instanceId, status: 'running' };
 }
 
 async function flushMicrotasks() {
@@ -157,15 +180,16 @@ async function loadBackground() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  mocks.ensureDefaultFeishuOAuthConfig.mockResolvedValue(undefined);
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);
-  mocks.ensureDisplayMode.mockResolvedValue('all');
+  mocks.installContextMenus.mockResolvedValue(undefined);
+  mocks.registerClipperContextMenu.mockReturnValue({ installOrRefresh: mocks.installContextMenus });
   mocks.readDisplayMode.mockResolvedValue('all');
   mocks.setDisplayMode.mockImplementation(async (mode: unknown) => {
     if (mode === 'supported' || mode === 'all' || mode === 'off') return mode;
     throw new Error('invalid inpage display mode');
   });
   mocks.storageOnChanged.mockImplementation(() => () => {});
+  mocks.readBackgroundRecoveryProbe.mockResolvedValue(idleRecoveryProbe());
   mocks.createBackgroundServices.mockReturnValue(createServices());
   // @ts-expect-error test global cleanup
   delete globalThis.browser;
@@ -174,21 +198,15 @@ beforeEach(() => {
 });
 
 describe('background entrypoint cold start', () => {
-  it('runs auth bootstrap cleanup/defaults only once when onInstalled fires', async () => {
+  it('registers auth navigation listeners without a Feishu startup-defaulting path', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
-    let installedListener: ((details?: { reason?: string }) => void) | null = null;
-    mocks.onInstalled.mockImplementationOnce((listener: any) => {
-      installedListener = listener;
-    });
 
     const callback = await loadBackground();
     expect(callback()).toBeUndefined();
     await flushMicrotasks();
-    expect(mocks.ensureDefaultFeishuOAuthConfig).toHaveBeenCalledTimes(1);
 
-    installedListener?.({ reason: 'update' });
-    await flushMicrotasks();
-    expect(mocks.ensureDefaultFeishuOAuthConfig).toHaveBeenCalledTimes(1);
+    expect(mocks.setupNotionOAuthNavigationListener).toHaveBeenCalledTimes(1);
+    expect(mocks.setupFeishuOAuthNavigationListener).toHaveBeenCalledTimes(1);
   });
 
   it('registers runtime and browser listeners before locale readiness settles', async () => {
@@ -220,12 +238,20 @@ describe('background entrypoint cold start', () => {
     expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
     expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
-    expect(mocks.registerUiMessageHandlers.mock.calls[0]?.[1]?.localeReady).toBe(locale.promise);
+    const uiMessageOptions = mocks.registerUiMessageHandlers.mock.calls[0]?.[1];
+    expect(uiMessageOptions).not.toHaveProperty('localeReady');
+    expect(uiMessageOptions?.ensureLocaleReady).toEqual(expect.any(Function));
+    expect(mocks.initializeLocale).not.toHaveBeenCalled();
+    expect(uiMessageOptions.ensureLocaleReady()).toBe(locale.promise);
+    expect(mocks.initializeLocale).toHaveBeenCalledTimes(1);
     const menuOptions = mocks.registerClipperContextMenu.mock.calls[0]?.[0];
     expect(menuOptions).not.toHaveProperty('localeReady');
+    expect(menuOptions).not.toHaveProperty('ready');
+    expect(menuOptions.ensureReady).toEqual(expect.any(Function));
     expect(menuOptions.readDisplayMode).toBe(mocks.readDisplayMode);
     expect(menuOptions.setDisplayMode).toBe(mocks.setDisplayMode);
-    expect(menuOptions.ready).toBeInstanceOf(Promise);
+    expect(menuOptions.ensureReady()).toBe(locale.promise);
+    expect(mocks.initializeLocale).toHaveBeenCalledTimes(2);
     expect(mocks.registerGithubSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerPublicSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerOpenTargetHandlers).toHaveBeenCalledTimes(1);
@@ -235,9 +261,14 @@ describe('background entrypoint cold start', () => {
 
     const services = mocks.createBackgroundServices.mock.results[0]?.value;
     await flushMicrotasks();
-    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledWith('github');
-    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(mocks.readBackgroundRecoveryProbe).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+    expect(services.autoSync.notionScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.obsidianScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.feishuScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flushCleanup).not.toHaveBeenCalled();
+    expect(services.autoSync.imageBackfillScheduler.flush).not.toHaveBeenCalled();
 
     expect(runtimeMessageListener).not.toBeNull();
     const sendResponse = vi.fn();
@@ -250,66 +281,209 @@ describe('background entrypoint cold start', () => {
     });
   });
 
-  it('display migration failure does not block router or context-menu startup', async () => {
+  it('serves the core router while the recovery probe is still pending', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
-    mocks.ensureDisplayMode.mockRejectedValueOnce(new Error('migration failed'));
-    const onMessageAddListener = vi.fn();
-    // @ts-expect-error test global
-    globalThis.chrome = { runtime: { onMessage: { addListener: onMessageAddListener } } };
+    const probe = deferred<any>();
+    mocks.readBackgroundRecoveryProbe.mockReturnValue(probe.promise);
 
-    const callback = await loadBackground();
-    expect(() => callback()).not.toThrow();
-    expect(onMessageAddListener).toHaveBeenCalledTimes(1);
-    expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
-    await expect(mocks.registerClipperContextMenu.mock.calls[0]?.[0]?.ready).resolves.toBeUndefined();
-  });
-
-  it('isolates optional listener registration failures from sibling listeners', async () => {
-    const locale = deferred<void>();
-    mocks.initializeLocale.mockReturnValue(locale.promise);
-    mocks.setupNotionOAuthNavigationListener.mockImplementationOnce(() => {
-      throw new Error('notion listener failed');
-    });
-
-    const onMessageAddListener = vi.fn();
-    const onConnectAddListener = vi.fn();
+    let runtimeMessageListener: ((msg: any, sender: any, sendResponse: any) => boolean) | null = null;
     // @ts-expect-error test global
     globalThis.chrome = {
       runtime: {
-        onMessage: { addListener: onMessageAddListener },
-        onConnect: { addListener: onConnectAddListener },
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            runtimeMessageListener = listener;
+          }),
+        },
       },
     };
 
     const callback = await loadBackground();
-    expect(() => callback()).not.toThrow();
+    callback();
 
-    expect(onMessageAddListener).toHaveBeenCalledTimes(1);
-    expect(mocks.setupFeishuOAuthNavigationListener).toHaveBeenCalledTimes(1);
-    expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
-    expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
-    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
+    expect(runtimeMessageListener).not.toBeNull();
+    const sendResponse = vi.fn();
+    expect(runtimeMessageListener?.({ type: 'probe-pending-router-check' }, null, sendResponse)).toBe(true);
+    await flushMicrotasks();
+    expect(sendResponse).toHaveBeenCalledWith({
+      ok: false,
+      data: null,
+      error: { message: 'unknown message type: probe-pending-router-check', extra: null },
+    });
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+
+    probe.resolve(idleRecoveryProbe());
+    await flushMicrotasks();
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
   });
 
-  it('isolates GitHub settings registration failure from core router and startup recovery', async () => {
+  it('selectively reconciles only an old-instance durable running job', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
-    mocks.registerGithubSettingsHandlers.mockImplementationOnce(() => {
-      throw new Error('github settings registration failed');
+    mocks.readBackgroundRecoveryProbe.mockResolvedValue({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        notion: { runningJob: recoveryRunningJob('notion', 'old-instance'), hasQueuedWork: false },
+      },
     });
     const services = createServices();
     mocks.createBackgroundServices.mockReturnValue(services);
 
     const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    expect(services.notionSyncOrchestrator.isRunActive).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledWith('notion');
+    expect(services.autoSync.notionScheduler.flush).not.toHaveBeenCalled();
+  });
+
+  it('skips same-instance durable running jobs', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockImplementation(async () => {
+      const getInstanceId = mocks.createBackgroundServices.mock.calls[0]?.[0]?.getInstanceId;
+      const instanceId = getInstanceId();
+      return {
+        ...idleRecoveryProbe(),
+        providers: {
+          ...idleRecoveryProbe().providers,
+          notion: { runningJob: recoveryRunningJob('notion', instanceId), hasQueuedWork: false },
+        },
+      };
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    expect(services.notionSyncOrchestrator.isRunActive).not.toHaveBeenCalled();
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('rechecks live ownership before reconciling a stale old-instance probe result', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    const probe = deferred<any>();
+    mocks.readBackgroundRecoveryProbe.mockReturnValue(probe.promise);
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    services.notionSyncOrchestrator.isRunActive.mockReturnValue(true);
+    probe.resolve({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        notion: { runningJob: recoveryRunningJob('notion', 'old-instance'), hasQueuedWork: false },
+      },
+    });
+    await flushMicrotasks();
+
+    expect(services.notionSyncOrchestrator.isRunActive).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('flushes only durable queued work and enabled GitHub cleanup', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockResolvedValue({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        obsidian: { runningJob: null, hasQueuedWork: true },
+      },
+      imageBackfillHasQueuedWork: true,
+      githubCleanupEnabled: true,
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+    expect(services.autoSync.notionScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.obsidianScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.feishuScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.imageBackfillScheduler.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps ordinary worker startup free of locale/display/menu structure initialization', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+
+    const callback = await loadBackground();
     expect(() => callback()).not.toThrow();
     await flushMicrotasks();
 
-    expect(mocks.registerUiMessageHandlers).toHaveBeenCalledTimes(1);
-    expect(mocks.registerSyncHandlers).toHaveBeenCalledTimes(1);
-    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledTimes(4);
-    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
+    expect(mocks.initializeLocale).not.toHaveBeenCalled();
+    expect(mocks.readDisplayMode).not.toHaveBeenCalled();
+    expect(mocks.installContextMenus).not.toHaveBeenCalled();
+  });
+
+  it('installs menu structure only for extension install/update and opens About only on install', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    let installedListener: ((details?: { reason?: string }) => void) | null = null;
+    mocks.onInstalled.mockImplementationOnce((listener: any) => {
+      installedListener = listener;
+    });
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    installedListener?.({ reason: 'browser_update' });
+    installedListener?.({ reason: 'chrome_update' });
+    installedListener?.({ reason: 'shared_module_update' });
+    await flushMicrotasks();
+    expect(mocks.installContextMenus).not.toHaveBeenCalled();
+    expect(mocks.openOrFocusExtensionAppTab).not.toHaveBeenCalled();
+
+    installedListener?.({ reason: 'update' });
+    await flushMicrotasks();
+    expect(mocks.installContextMenus).toHaveBeenCalledTimes(1);
+    expect(mocks.openOrFocusExtensionAppTab).not.toHaveBeenCalled();
+
+    installedListener?.({ reason: 'install' });
+    await flushMicrotasks();
+    expect(mocks.installContextMenus).toHaveBeenCalledTimes(2);
+    expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledTimes(1);
+    expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: '/settings?section=aboutme' });
+  });
+
+  it('keeps menu installation and install About opening isolated from each other', async () => {
+    mocks.installContextMenus.mockRejectedValueOnce(new Error('menu install failed'));
+    mocks.openOrFocusExtensionAppTab.mockResolvedValueOnce(true);
+    let installedListener: ((details?: { reason?: string }) => void) | null = null;
+    mocks.onInstalled.mockImplementationOnce((listener: any) => {
+      installedListener = listener;
+    });
+
+    const callback = await loadBackground();
+    callback();
+    installedListener?.({ reason: 'install' });
+    await flushMicrotasks();
+
+    expect(mocks.installContextMenus).toHaveBeenCalledTimes(1);
+    expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: '/settings?section=aboutme' });
+  });
+
+  it('surfaces GitHub settings registration programming errors instead of hiding them at the entrypoint', async () => {
+    mocks.registerGithubSettingsHandlers.mockImplementationOnce(() => {
+      throw new Error('github settings registration failed');
+    });
+
+    const callback = await loadBackground();
+    expect(() => callback()).toThrow('github settings registration failed');
+
+    expect(mocks.registerUiMessageHandlers).not.toHaveBeenCalled();
+    expect(mocks.registerSyncHandlers).not.toHaveBeenCalled();
+    expect(mocks.readBackgroundRecoveryProbe).not.toHaveBeenCalled();
   });
 
   it('wakes durable GitHub cleanup when auto-sync or provider gate becomes enabled', async () => {
@@ -341,26 +515,9 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(2);
   });
 
-  it('isolates storage-listener registration failure from startup recovery', async () => {
+  it('falls back to full recovery on probe failure and isolates sibling failures', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
-    mocks.storageOnChanged.mockImplementation(() => {
-      throw new Error('storage listener failed');
-    });
-    const services = createServices();
-    mocks.createBackgroundServices.mockReturnValue(services);
-
-    const callback = await loadBackground();
-    expect(() => callback()).not.toThrow();
-    await flushMicrotasks();
-
-    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledTimes(4);
-    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
-  });
-
-  it('isolates each startup recovery failure from sibling jobs and schedulers', async () => {
-    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockRejectedValue(new Error('probe failed'));
     const services = createServices();
     mocks.reconcileStartupSyncJob.mockImplementation(async (provider: string) => {
       if (provider === 'notion') throw new Error('notion recovery failed');
@@ -383,5 +540,6 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.feishuScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.imageBackfillScheduler.flush).toHaveBeenCalledTimes(1);
   });
 });

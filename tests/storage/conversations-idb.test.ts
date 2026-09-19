@@ -18,7 +18,6 @@ import {
   getConversationTailWindowBySourceAndKey,
   getConversationListBootstrap,
   getMessagesByConversationId,
-  getMessagesTailByConversationId,
   getSyncMappingByConversation,
   mergeConversationsByIds,
   patchConversationMessageMarkdownBatch,
@@ -1752,38 +1751,6 @@ describe('conversations storage-idb', () => {
     const stored = await getMessagesByConversationId(id);
     expect(stored[0]).toMatchObject({ contentMarkdown: '# Complete report' });
     expect(stored[1]).toMatchObject({ contentMarkdown: placeholder });
-  });
-
-  it('reads message tails by conversation id with ascending sequence order', async () => {
-    const convo = await upsertConversation({
-      sourceType: 'chat',
-      source: 'debug',
-      conversationKey: 'tail_k1',
-      title: 'Tail',
-      lastActivityAt: 1,
-    });
-    const id = Number(convo.id);
-
-    await syncConversationMessages(
-      id,
-      Array.from({ length: 300 }, (_, index) => {
-        const sequence = index + 1;
-        return {
-          messageKey: `tail_${sequence}`,
-          role: sequence % 2 === 0 ? 'assistant' : 'user',
-          contentMarkdown: `content_${sequence}`,
-          sequence,
-          updatedAt: sequence,
-        };
-      }),
-    );
-
-    const tail = await getMessagesTailByConversationId(id, 200);
-    expect(tail).toHaveLength(200);
-    expect(tail[0]?.sequence).toBe(101);
-    expect(tail[199]?.sequence).toBe(300);
-    expect(tail[0]?.messageKey).toBe('tail_101');
-    expect(tail[199]?.messageKey).toBe('tail_300');
   });
 
   it('reads conversation tail window by source and key', async () => {

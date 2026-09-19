@@ -56,22 +56,23 @@ if (!version) {
 
 const xpiPath = join(outDir, `webclipper-${version}-zen.xpi`);
 
-// Clean up zip artifacts created by `wxt zip` (older build:zen behavior).
-rmSync(join(outDir, `webclipper-${version}-firefox.zip`), { force: true });
-rmSync(join(outDir, `webclipper-${version}-sources.zip`), { force: true });
-
 rmSync(xpiPath, { force: true });
 
 const tmpDir = join(outDir, '.zen-xpi-tmp');
 rmSync(tmpDir, { recursive: true, force: true });
-mkdirSync(tmpDir, { recursive: true });
-cpSync(wxtOut, tmpDir, { recursive: true });
 
-const tmpManifestPath = join(tmpDir, 'manifest.json');
-const tmpManifest = readJson(tmpManifestPath);
-writeJson(tmpManifestPath, applyZenManifestPatches(tmpManifest));
+try {
+  mkdirSync(tmpDir, { recursive: true });
+  cpSync(wxtOut, tmpDir, { recursive: true });
 
-run('zip', ['-r', '-q', '-Z', 'deflate', '-9', xpiPath, '.'], tmpDir);
-rmSync(tmpDir, { recursive: true, force: true });
+  const tmpManifestPath = join(tmpDir, 'manifest.json');
+  const tmpManifest = readJson(tmpManifestPath);
+  writeJson(tmpManifestPath, applyZenManifestPatches(tmpManifest));
+
+  run('node', ['.github/scripts/webclipper/check-dist.mjs', '--root=.output/.zen-xpi-tmp'], webclipperRoot);
+  run('zip', ['-r', '-q', '-Z', 'deflate', '-9', xpiPath, '.'], tmpDir);
+} finally {
+  rmSync(tmpDir, { recursive: true, force: true });
+}
 
 console.log(`[build] packaged: ${xpiPath}`);

@@ -20,7 +20,7 @@ export type AutoSyncScheduler = {
 
 type QueueMap = Record<string, number>;
 
-function normalizeQueue(value: unknown): QueueMap {
+export function normalizeAutoSyncQueue(value: unknown): QueueMap {
   if (!value || typeof value !== 'object') return {};
   const out: QueueMap = {};
   for (const [key, rawDueAt] of Object.entries(value as Record<string, unknown>)) {
@@ -87,7 +87,7 @@ export function createAutoSyncSchedulerCore(config: {
 
   const readQueue = async (): Promise<QueueMap> => {
     const res = await infra.storage.get([queueStorageKey]);
-    return normalizeQueue((res as any)?.[queueStorageKey]);
+    return normalizeAutoSyncQueue((res as any)?.[queueStorageKey]);
   };
 
   const writeQueue = async (queue: QueueMap): Promise<void> => {

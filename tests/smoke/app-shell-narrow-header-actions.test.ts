@@ -77,10 +77,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   }),
 }));
 
-vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
-  ConversationDetailPane: () => createElement('div', null, 'detail-pane'),
-}));
-
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: { listShell?: { rightSlot: ReactNode } }) => {
     const [mode, setMode] = useState<'list' | 'detail'>('list');

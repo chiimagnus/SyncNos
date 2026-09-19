@@ -19,12 +19,12 @@ vi.mock('@platform/storage/local', async (importOriginal) => {
 vi.mock('@platform/webext/tabs', () => ({ tabsQuery: tabsMocks.query, tabsSendMessage: tabsMocks.send }));
 
 async function registerMenu(options: {
-  ready: Promise<unknown>;
+  ensureReady: () => Promise<unknown>;
   readDisplayMode: () => Promise<'supported' | 'all' | 'off'>;
   setDisplayMode: (mode: 'supported' | 'all' | 'off') => Promise<unknown>;
 }) {
   const { registerClipperContextMenu } = await import('@platform/context-menus/clipper-context-menu');
-  registerClipperContextMenu(options);
+  return registerClipperContextMenu({ displayModeStorageKey: 'inpage_display_mode', ...options });
 }
 
 function deferred<T = void>() {
@@ -46,9 +46,9 @@ function createMenusApi() {
   const shown: Array<(info: any, tab: any) => void> = [];
   return {
     create: vi.fn(),
-    update: vi.fn(),
-    removeAll: vi.fn((cb: any) => cb?.()),
-    refresh: vi.fn(),
+    update: vi.fn(async () => {}),
+    removeAll: vi.fn(async () => {}),
+    refresh: vi.fn(async () => {}),
     onClicked: { addListener: vi.fn((cb: any) => clicked.push(cb)) },
     onShown: { addListener: vi.fn((cb: any) => shown.push(cb)) },
     emitClick(id: string, checked?: boolean) {
@@ -85,17 +85,64 @@ afterEach(() => {
 });
 
 describe('clipper context menu runtime settings', () => {
+  it('registers listeners without readiness, state reads, or menu structure creation', async () => {
+    const api = (globalThis.chrome as any).contextMenus;
+    const ensureReady = vi.fn(async () => {});
+    const readDisplayMode = vi.fn().mockResolvedValue('all');
+
+    await registerMenu({ ensureReady, readDisplayMode, setDisplayMode: vi.fn() });
+    await flush();
+
+    expect(ensureReady).not.toHaveBeenCalled();
+    expect(readDisplayMode).not.toHaveBeenCalled();
+    expect(storageMocks.get).not.toHaveBeenCalled();
+    expect(api.removeAll).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(api.onClicked.addListener).toHaveBeenCalledTimes(1);
+    expect(api.onShown.addListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('installs only on explicit request and waits for Promise-only removeAll before create', async () => {
+    const api = (globalThis.chrome as any).contextMenus;
+    const ready = deferred<void>();
+    const removeAllDone = deferred<void>();
+    const ensureReady = vi.fn(() => ready.promise);
+    const readDisplayMode = vi.fn().mockResolvedValue('off');
+    api.removeAll.mockImplementationOnce(() => removeAllDone.promise);
+
+    const controller = await registerMenu({ ensureReady, readDisplayMode, setDisplayMode: vi.fn() });
+    const installing = controller.installOrRefresh();
+    await flush();
+
+    expect(ensureReady).toHaveBeenCalledTimes(1);
+    expect(readDisplayMode).not.toHaveBeenCalled();
+    expect(api.removeAll).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+
+    ready.resolve();
+    await flush();
+    expect(readDisplayMode).toHaveBeenCalledTimes(1);
+    expect(api.removeAll).toHaveBeenCalledTimes(1);
+    expect(api.create).not.toHaveBeenCalled();
+
+    removeAllDone.resolve();
+    await installing;
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'syncnos_clipper_mode_off', checked: true }));
+  });
+
   it('uses the single generic save click route for video-capable pages', async () => {
     const api = (globalThis.chrome as any).contextMenus;
     tabsMocks.query.mockResolvedValue([{ id: 7, url: 'https://www.bilibili.com/video/BV1FwY4zkEef/' }]);
-    await registerMenu({
-      ready: Promise.resolve(),
+    const controller = await registerMenu({
+      ensureReady: async () => {},
       readDisplayMode: vi.fn().mockResolvedValue('all'),
       setDisplayMode: vi.fn(),
     });
-    await flush();
+    await controller.installOrRefresh();
+
     api.emitClick('syncnos_clipper_save_current_page');
     await flush();
+
     expect(tabsMocks.send).toHaveBeenCalledWith(7, {
       type: 'captureCurrentPage',
       payload: { source: 'contextmenu' },
@@ -105,55 +152,39 @@ describe('clipper context menu runtime settings', () => {
     );
   });
 
-  it('waits for ready and reads display through injected owner-facing reader', async () => {
+  it('display clicks use the canonical writer and restore checked truth after a rejected write', async () => {
     const api = (globalThis.chrome as any).contextMenus;
-    const ready = deferred<void>();
-    const readDisplayMode = vi.fn().mockResolvedValue('off');
-    await registerMenu({ ready: ready.promise, readDisplayMode, setDisplayMode: vi.fn() });
-    expect(api.create).not.toHaveBeenCalled();
-    ready.resolve();
-    await flush();
-    expect(readDisplayMode).toHaveBeenCalledTimes(1);
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'syncnos_clipper_mode_off', checked: true }));
-  });
+    const readDisplayMode = vi.fn().mockResolvedValue('all');
+    const setDisplayMode = vi.fn().mockRejectedValue(new Error('write failed'));
+    const controller = await registerMenu({ ensureReady: async () => {}, readDisplayMode, setDisplayMode });
+    await controller.installOrRefresh();
+    api.update.mockClear();
 
-  it('display clicks use injected writer and never storageSet the display key', async () => {
-    const api = (globalThis.chrome as any).contextMenus;
-    const setDisplayMode = vi.fn().mockResolvedValue('off');
-    await registerMenu({
-      ready: Promise.resolve(),
-      readDisplayMode: vi.fn().mockResolvedValue('all'),
-      setDisplayMode,
-    });
-    await flush();
     api.emitClick('syncnos_clipper_mode_off');
     await flush();
+
     expect(setDisplayMode).toHaveBeenCalledWith('off');
     expect(storageMocks.set).not.toHaveBeenCalledWith(
       expect.objectContaining({ inpage_display_mode: expect.anything() }),
     );
-  });
-
-  it('restores checked state from durable truth when the display write rejects', async () => {
-    const api = (globalThis.chrome as any).contextMenus;
-    const readDisplayMode = vi.fn().mockResolvedValue('all');
-    const setDisplayMode = vi.fn().mockRejectedValue(new Error('write failed'));
-    await registerMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode });
-    await flush();
-    api.update.mockClear();
-    api.emitClick('syncnos_clipper_mode_off');
-    await flush();
     expect(readDisplayMode).toHaveBeenCalledTimes(2);
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_mode_all', { checked: true });
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_mode_off', { checked: false });
   });
 
-  it('canonical display and autosave wakes converge checked state without legacy listener support', async () => {
+  it('storage changes update checked state without rebuilding menu structure', async () => {
     const api = (globalThis.chrome as any).contextMenus;
     const readDisplayMode = vi.fn().mockResolvedValue('all');
-    await registerMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode: vi.fn() });
-    await flush();
+    const controller = await registerMenu({
+      ensureReady: async () => {},
+      readDisplayMode,
+      setDisplayMode: vi.fn(),
+    });
+    await controller.installOrRefresh();
+    const removeAllCalls = api.removeAll.mock.calls.length;
+    const createCalls = api.create.mock.calls.length;
     api.update.mockClear();
+
     readDisplayMode.mockResolvedValue('supported');
     storageMocks.get.mockResolvedValue({ ai_chat_auto_save_enabled: false });
     storageListener?.(
@@ -161,32 +192,73 @@ describe('clipper context menu runtime settings', () => {
       'local',
     );
     await flush();
+
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_mode_supported', { checked: true });
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_autosave', { checked: false });
+    expect(api.removeAll).toHaveBeenCalledTimes(removeAllCalls);
+    expect(api.create).toHaveBeenCalledTimes(createCalls);
+
     const reads = readDisplayMode.mock.calls.length;
     storageListener?.({ unrelated_setting: { newValue: true } }, 'local');
     await flush();
     expect(readDisplayMode).toHaveBeenCalledTimes(reads);
   });
 
-  it('onShown re-reads stale checked truth and still refreshes Save title when setting read fails', async () => {
+  it('onShown waits for lazy readiness and refreshes localized labels, dynamic title, and checked state', async () => {
     const api = (globalThis.chrome as any).contextMenus;
-    const readDisplayMode = vi.fn().mockResolvedValue('all');
-    await registerMenu({ ready: Promise.resolve(), readDisplayMode, setDisplayMode: vi.fn() });
-    await flush();
-    api.update.mockClear();
-    readDisplayMode.mockResolvedValueOnce('off');
-    storageMocks.get.mockResolvedValueOnce({ ai_chat_auto_save_enabled: false });
-    api.emitShown({ id: 7, url: 'https://chatgpt.com/c/1' });
-    await flush();
-    expect(api.update).toHaveBeenCalledWith('syncnos_clipper_mode_off', { checked: true });
-    expect(api.update).toHaveBeenCalledWith('syncnos_clipper_save_current_page', { title: 'Save current AI chat' });
+    const ready = deferred<void>();
+    const ensureReady = vi.fn(() => ready.promise);
+    const readDisplayMode = vi.fn().mockResolvedValue('off');
+    storageMocks.get.mockResolvedValue({ ai_chat_auto_save_enabled: false });
 
-    api.update.mockClear();
-    readDisplayMode.mockRejectedValueOnce(new Error('read failed'));
+    await registerMenu({ ensureReady, readDisplayMode, setDisplayMode: vi.fn() });
     api.emitShown({ id: 7, url: 'https://chatgpt.com/c/1' });
     await flush();
+
+    expect(ensureReady).toHaveBeenCalledTimes(1);
+    expect(readDisplayMode).not.toHaveBeenCalled();
+    expect(api.update).not.toHaveBeenCalled();
+    expect(api.refresh).not.toHaveBeenCalled();
+
+    ready.resolve();
+    await vi.waitFor(() => expect(api.refresh).toHaveBeenCalledTimes(1));
+
+    expect(api.update).toHaveBeenCalledWith('syncnos_clipper_root', { title: 'SyncNos WebClipper' });
     expect(api.update).toHaveBeenCalledWith('syncnos_clipper_save_current_page', { title: 'Save current AI chat' });
-    expect(api.refresh).toHaveBeenCalled();
+    expect(api.update).toHaveBeenCalledWith(
+      'syncnos_clipper_mode_off',
+      expect.objectContaining({ title: expect.any(String), checked: true }),
+    );
+    expect(api.update).toHaveBeenCalledWith(
+      'syncnos_clipper_autosave',
+      expect.objectContaining({ title: expect.any(String), checked: false }),
+    );
+    expect(api.removeAll).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+  });
+
+  it('awaits all Promise updates before refresh and isolates update rejection', async () => {
+    const api = (globalThis.chrome as any).contextMenus;
+    const updateDone = deferred<void>();
+    let updateCount = 0;
+    api.update.mockImplementation(() => {
+      updateCount += 1;
+      if (updateCount === 1) return Promise.reject(new Error('one update failed'));
+      return updateDone.promise;
+    });
+
+    await registerMenu({
+      ensureReady: async () => {},
+      readDisplayMode: vi.fn().mockResolvedValue('all'),
+      setDisplayMode: vi.fn(),
+    });
+    api.emitShown({ id: 7, url: 'https://chatgpt.com/c/1' });
+    await flush();
+
+    expect(api.update).toHaveBeenCalled();
+    expect(api.refresh).not.toHaveBeenCalled();
+
+    updateDone.resolve();
+    await vi.waitFor(() => expect(api.refresh).toHaveBeenCalledTimes(1));
   });
 });

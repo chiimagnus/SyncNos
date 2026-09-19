@@ -105,13 +105,7 @@ export function ConversationDetailPane({
     (node: HTMLDivElement | null) => {
       messagesRootRef.current = node;
       setOutlineScrollRoot(findRouteScrollRoot(node));
-      try {
-        onCommentsLocatorRootsChange?.(
-          node ? { sourceRoot: node, scrollRoot: findRouteScrollRoot(node) || node } : null,
-        );
-      } catch (_e) {
-        // ignore
-      }
+      onCommentsLocatorRootsChange?.(node ? { sourceRoot: node, scrollRoot: findRouteScrollRoot(node) || node } : null);
     },
     [onCommentsLocatorRootsChange],
   );
@@ -165,11 +159,7 @@ export function ConversationDetailPane({
 
     const target = userMessageElByIdRef.current.get(entry.messageId);
     if (!target) return;
-    try {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-    } catch (_e) {
-      target.scrollIntoView();
-    }
+    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
   }, []);
 
   const [urlEditing, setUrlEditing] = useState(false);
@@ -279,11 +269,7 @@ export function ConversationDetailPane({
   useEffect(() => {
     if (!urlEditing) return;
     const timer = setTimeout(() => {
-      try {
-        urlInputRef.current?.focus?.();
-      } catch (_e) {
-        // ignore
-      }
+      urlInputRef.current?.focus();
     }, 10);
     return () => clearTimeout(timer);
   }, [urlEditing]);

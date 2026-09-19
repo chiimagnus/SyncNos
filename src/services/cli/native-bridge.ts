@@ -25,7 +25,8 @@ import {
   NATIVE_MESSAGING_PERMISSION,
   disableCliIntegrationAfterPermissionRemoval,
   getCliInstanceId,
-  readCliIntegrationStatus,
+  readCliIntegrationCapability,
+  readCliIntegrationEnabled,
 } from '@services/cli/cli-integration';
 import { storageOnChanged } from '@services/shared/storage';
 import { permissionsOnRemoved } from '@platform/webext/permissions';
@@ -42,7 +43,8 @@ type Router = {
 type BridgeDeps = {
   connectNativeHost: typeof connectNativeHost;
   readExtensionRuntimeMetadata: typeof readExtensionRuntimeMetadata;
-  readCliIntegrationStatus: typeof readCliIntegrationStatus;
+  readCliIntegrationEnabled: typeof readCliIntegrationEnabled;
+  readCliIntegrationCapability: typeof readCliIntegrationCapability;
   getCliInstanceId: typeof getCliInstanceId;
   disableCliIntegrationAfterPermissionRemoval: typeof disableCliIntegrationAfterPermissionRemoval;
   storageOnChanged: typeof storageOnChanged;
@@ -52,7 +54,8 @@ type BridgeDeps = {
 const DEFAULT_DEPS: BridgeDeps = {
   connectNativeHost,
   readExtensionRuntimeMetadata,
-  readCliIntegrationStatus,
+  readCliIntegrationEnabled,
+  readCliIntegrationCapability,
   getCliInstanceId,
   disableCliIntegrationAfterPermissionRemoval,
   storageOnChanged,
@@ -219,7 +222,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     if (method === 'system.ping') {
       const [cliInstanceId, metadata] = await Promise.all([
         deps.getCliInstanceId(),
-        Promise.resolve(deps.readExtensionRuntimeMetadata()),
+        deps.readExtensionRuntimeMetadata(),
       ]);
       safePost(
         currentPort,
@@ -881,10 +884,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     nextPort.onMessage.addListener(onMessage);
     nextPort.onDisconnect.addListener(onDisconnect);
 
-    const [cliInstanceId, metadata] = await Promise.all([
-      deps.getCliInstanceId(),
-      Promise.resolve(deps.readExtensionRuntimeMetadata()),
-    ]);
+    const [cliInstanceId, metadata] = await Promise.all([deps.getCliInstanceId(), deps.readExtensionRuntimeMetadata()]);
     if (stopped || port !== nextPort || generation !== connectGeneration) return;
     safePost(nextPort, {
       kind: FRAMES.hello,
@@ -897,10 +897,12 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
   async function reconcile() {
     if (stopped || port) return;
     const generation = connectGeneration;
-    const status = await deps.readCliIntegrationStatus();
+    const enabled = await deps.readCliIntegrationEnabled();
+    if (stopped || generation !== connectGeneration || !enabled) return;
+
+    const capability = await deps.readCliIntegrationCapability();
     if (stopped || generation !== connectGeneration) return;
-    if (!status.enabled) return;
-    if (!status.permissionGranted) {
+    if (!capability.permissionGranted) {
       await deps.disableCliIntegrationAfterPermissionRemoval().catch(() => {});
       return;
     }
@@ -934,6 +936,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       return;
     }
     clearReconnectTimer();
+    connectGeneration += 1;
     void reconcile().catch(() => scheduleReconnect());
   });
 

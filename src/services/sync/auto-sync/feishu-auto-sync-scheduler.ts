@@ -47,5 +47,9 @@ export function createFeishuAutoSyncScheduler(
     isProviderEnabled: () => isSyncProviderEnabled('feishu'),
     syncConversations: (conversationIds, instanceId) =>
       deps.feishuSyncOrchestrator.syncConversations({ conversationIds, instanceId } as any) as any,
+    getFailureRetryDelayMs: (error) =>
+      String((error as any)?.code || '').trim() === 'feishu_sync_job_persist_failed'
+        ? FEISHU_AUTO_SYNC_DEBOUNCE_MS
+        : null,
   });
 }

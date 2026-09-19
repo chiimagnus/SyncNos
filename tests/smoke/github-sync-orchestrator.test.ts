@@ -526,6 +526,9 @@ describe('github sync orchestrator job lifecycle', () => {
       currentStage: 'cleaning_remote_files',
     });
     expect((jobStore.setJob as any).mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
+    expect((jobStore.setJob as any).mock.invocationCallOrder[0]).toBeLessThan(
+      (services.ackCleanupRows as any).mock.invocationCallOrder[0],
+    );
     expect(getPersistedJob()).toMatchObject({
       status: 'done',
       conversationIds: [],
@@ -865,7 +868,7 @@ describe('github sync orchestrator cleanup outbox', () => {
   });
 
   it('defers identity cleanup while the replacement exists without same-target success', async () => {
-    const { services, commit, getCleanupRows } = fakeServices({
+    const { services, commit, getCleanupRows, jobStore } = fakeServices({
       rows: { 2: { conversation: chat(2), mapping: null } },
       cleanupRows: [
         cleanupRow(7, {
@@ -881,6 +884,9 @@ describe('github sync orchestrator cleanup outbox', () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(services.deferCleanupRows).toHaveBeenCalledWith([7], 9_000);
+    expect((jobStore.setJob as any).mock.invocationCallOrder[0]).toBeLessThan(
+      (services.deferCleanupRows as any).mock.invocationCallOrder[0],
+    );
     expect(services.ackCleanupRows).not.toHaveBeenCalled();
     expect(getCleanupRows()[0]?.nextAttemptAt).toBe(9_000);
     expect(result.transportStatus).toBe('not_needed');

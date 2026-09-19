@@ -43,14 +43,14 @@ describe('background data revision request', () => {
   it('returns the router error contract when the authoritative snapshot read fails', async () => {
     const router = createRouter();
     const readSnapshot = vi.fn(async () => {
-      throw new Error('snapshot_unstable');
+      throw new Error('revision snapshot read failed');
     });
     registerDataRevisionHandlers(router, { readSnapshot });
 
     await expect(router.dispatch({ type: DATA_REVISION_MESSAGE_TYPES.GET_SNAPSHOT })).resolves.toEqual({
       ok: false,
       data: null,
-      error: { message: 'snapshot_unstable', extra: null },
+      error: { message: 'revision snapshot read failed', extra: null },
     });
   });
 });

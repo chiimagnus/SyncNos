@@ -40,7 +40,7 @@ collectors -> services/shared
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
 - `anti_hotlink_rules_v1` 命中后补 Referer 并尝试缓存图片，但图片失败不得阻断正文采集。
-- Provider 手动/自动同步必须复用同一 orchestrator / SyncJob 生命周期；不得另写第二套 progress/terminal state，也不得让共享 lifecycle 改写 Provider 原有事务、并发或远端写入语义。
+- Provider 手动/自动同步必须复用同一 orchestrator / SyncJob 生命周期；普通 conversation sync 的 initial running job 必须在 Provider 远端副作用前持久化成功，claim 失败不得继续远端工作。GitHub cleanup 可先做只读 target preflight，但真正 remote cleanup 与 outbox ack/defer 前必须完成 durable claim。不得另写第二套 progress/terminal state，也不得让共享 lifecycle 改写 Provider 原有事务、并发或远端写入语义。
 - Local CLI / Native Messaging 只是 Extension 的本机入口：Extension/IndexedDB 仍是唯一业务真源，不创建第二套业务数据库；installer 只操作有限、声明过的当前用户 registration target，machine-safe response 不泄露 Provider/Reader secret。
 - Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。旧 `Date: date` 且缺少 `Last Activity` 时直接重命名；managed section list/retrieve 失败必须传播或重试，不能当作“未找到”后创建重复 section。
 - IndexedDB 业务层统一借用 canonical connection；受 revision 跟踪的业务变更与 revision 必须同 transaction 提交，consumer 以 durable revision + canonical reread 为事实真源。恢复/失败语义见 [`docs/storage.md`](docs/storage.md)。

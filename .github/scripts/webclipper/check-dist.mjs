@@ -1,7 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { TextDecoder } from 'node:util';
-import { resolveRepoRoot, resolveWebclipperRoot } from './script-utils.mjs';
+import { analyzeBackgroundRuntime, analyzePopupStartup, formatDistPaths } from './dist-static-closure.mjs';
+import { resolveRepoRoot } from './script-utils.mjs';
+
+// Cross-target maxima observed after P1/P2 were 4,843 B / 368,741 B / 6,436 B.
+const POPUP_BOOTSTRAP_JS_BUDGET_BYTES = 8 * 1024;
+const POPUP_IMMEDIATE_JS_BUDGET_BYTES = 480 * 1024;
+const POPUP_STARTUP_CSS_BUDGET_BYTES = 12 * 1024;
 
 function extractManifestMsgKey(value) {
   if (typeof value !== 'string') return null;
@@ -14,26 +20,10 @@ function stringLen(value) {
 }
 
 function parseArgs(argv) {
-  const args = { root: null, manifest: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const raw = argv[i];
-    if (raw === '--root') {
-      args.root = argv[i + 1] || args.root;
-      i += 1;
-      continue;
-    }
+  const args = { root: null };
+  for (const raw of argv) {
     if (raw.startsWith('--root=')) {
       args.root = raw.slice('--root='.length) || args.root;
-      continue;
-    }
-    if (raw === '--manifest') {
-      args.manifest = argv[i + 1] || args.manifest;
-      i += 1;
-      continue;
-    }
-    if (raw.startsWith('--manifest=')) {
-      args.manifest = raw.slice('--manifest='.length) || args.manifest;
-      continue;
     }
   }
   return args;
@@ -42,6 +32,23 @@ function parseArgs(argv) {
 function fail(message) {
   console.error(`[check] ${message}`);
   process.exit(1);
+}
+
+function formatBytes(bytes) {
+  return `${Number(bytes || 0).toLocaleString('en-US')} B`;
+}
+
+function enforceBudget(label, actualBytes, budgetBytes, root, files) {
+  if (actualBytes <= budgetBytes) return;
+  const largest = [...files]
+    .map((path) => ({ path, bytes: statSync(path).size }))
+    .sort((left, right) => right.bytes - left.bytes)[0];
+  const largestMessage = largest
+    ? `; largest=${formatDistPaths(root, [largest.path])[0]} (${formatBytes(largest.bytes)})`
+    : '';
+  fail(
+    `${label} exceeds budget: actual=${formatBytes(actualBytes)}, budget=${formatBytes(budgetBytes)}${largestMessage}`,
+  );
 }
 
 function readJsonFile(path, label = 'JSON') {
@@ -94,10 +101,10 @@ function validateJavascriptText(root) {
 
 const cli = parseArgs(process.argv.slice(2));
 const repoRoot = resolveRepoRoot(import.meta.url);
-const webclipperRoot = resolveWebclipperRoot(repoRoot);
-const root = cli.root ? join(repoRoot, cli.root) : join(webclipperRoot, '.output', 'chrome-mv3');
+if (!cli.root) fail('missing --root=<dist-path>');
+const root = join(repoRoot, cli.root);
 
-const manifestPath = cli.manifest ? join(root, cli.manifest) : join(root, 'manifest.json');
+const manifestPath = join(root, 'manifest.json');
 if (!existsSync(manifestPath)) {
   fail(`manifest.json missing: ${manifestPath} (run \`npm run build\` first)`);
 }
@@ -106,12 +113,6 @@ const manifest = readJsonFile(manifestPath, 'manifest.json');
 validateJavascriptText(root);
 
 if (manifest.manifest_version !== 3) fail('manifest_version must be 3');
-if (
-  !manifest.background?.service_worker &&
-  !(Array.isArray(manifest.background?.scripts) && manifest.background.scripts.length > 0)
-) {
-  fail('background.service_worker or background.scripts missing');
-}
 if (!manifest.action?.default_popup) fail('action.default_popup missing');
 if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length === 0) fail('content_scripts missing');
 if (!manifest.icons?.['16'] || !manifest.icons?.['48'] || !manifest.icons?.['128']) fail('icons 16/48/128 missing');
@@ -165,6 +166,50 @@ for (const size of [16, 48, 128]) {
   const p = join(root, manifest.icons[String(size)]);
   if (!existsSync(p)) fail(`icon missing: ${manifest.icons[String(size)]}`);
 }
+
+let popupStartup;
+let backgroundRuntime;
+try {
+  popupStartup = await analyzePopupStartup(root, manifest);
+  backgroundRuntime = await analyzeBackgroundRuntime(root, manifest);
+} catch (error) {
+  fail(error?.message || error);
+}
+
+enforceBudget(
+  'Popup bootstrap static JS closure',
+  popupStartup.bootstrapBytes,
+  POPUP_BOOTSTRAP_JS_BUDGET_BYTES,
+  root,
+  popupStartup.bootstrapFiles,
+);
+enforceBudget(
+  'Popup immediate UI JS closure',
+  popupStartup.immediateBytes,
+  POPUP_IMMEDIATE_JS_BUDGET_BYTES,
+  root,
+  popupStartup.immediateFiles,
+);
+enforceBudget(
+  'Popup direct startup CSS',
+  popupStartup.startupStylesheetBytes,
+  POPUP_STARTUP_CSS_BUDGET_BYTES,
+  root,
+  popupStartup.startupStylesheetFiles,
+);
+
+console.log(
+  `[check] popup bootstrap: ${formatBytes(popupStartup.bootstrapBytes)} / ${formatBytes(POPUP_BOOTSTRAP_JS_BUDGET_BYTES)}`,
+);
+console.log(
+  `[check] popup immediate: ${formatBytes(popupStartup.immediateBytes)} / ${formatBytes(POPUP_IMMEDIATE_JS_BUDGET_BYTES)}`,
+);
+console.log(
+  `[check] popup startup css: ${formatBytes(popupStartup.startupStylesheetBytes)} / ${formatBytes(POPUP_STARTUP_CSS_BUDGET_BYTES)}`,
+);
+console.log(
+  `[check] background: mode=${backgroundRuntime.mode}, files=${backgroundRuntime.files.length}, bytes=${formatBytes(backgroundRuntime.bytes)}`,
+);
 
 const isSafariBuild = String(root).includes('safari-mv3');
 if (isSafariBuild) {
