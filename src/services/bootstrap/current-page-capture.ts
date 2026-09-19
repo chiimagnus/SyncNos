@@ -55,7 +55,7 @@ type CurrentPageSavedResult = {
   isNew: boolean;
 };
 
-export type CurrentPageCaptureResult =
+type CurrentPageCaptureResult =
   | (CurrentPageSavedResult & {
       kind: 'chat';
       captureCompleteness?: 'complete' | 'partial';

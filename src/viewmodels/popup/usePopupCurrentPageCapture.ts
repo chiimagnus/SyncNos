@@ -4,7 +4,7 @@ import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
 import { buildCaptureWaitingMessage } from '@services/bootstrap/current-page-capture-status';
-import type { CurrentPageCaptureResult, CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
+import type { CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -83,20 +83,16 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
 
   const capture = useCallback(async () => {
     if (checking || fetching || captureState?.readiness !== 'ready' || captureState.activity?.phase === 'capturing') {
-      return null;
+      return;
     }
 
     setFetching(true);
     setStatus({ kind: 'info', message: t('fetchingDots') });
     try {
-      const response = await send<ApiResponse<CurrentPageCaptureResult>>(
-        UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
-        {},
-      );
-      const data = unwrap(response);
+      const response = await send<ApiResponse<unknown>>(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, {});
+      unwrap(response);
       await refreshState({ silent: true });
       await onCaptured?.();
-      return data;
     } catch (error) {
       const message = (error as any)?.message ?? String(error ?? t('captureFailedFallback'));
       await refreshState({ silent: true });

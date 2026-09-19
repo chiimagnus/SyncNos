@@ -117,12 +117,9 @@ describe('popup current-page video capture', () => {
     await flushEffects();
     expect(latest?.buttonLabel).toBe('Fetch Video Transcript');
 
-    let result: any = null;
     await act(async () => {
-      result = await latest?.capture();
+      await latest?.capture();
     });
-
-    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 19, isNew: true });
     expect(onCaptured).toHaveBeenCalledTimes(1);
     expect(latest?.status).toEqual({
       kind: 'success',
@@ -153,7 +150,7 @@ describe('popup current-page video capture', () => {
       kind: 'info',
       message: 'ChatGPT · waiting for messages…',
     });
-    expect(await latest?.capture()).toBeNull();
+    await expect(latest!.capture()).resolves.toBeUndefined();
     expect(onCaptured).not.toHaveBeenCalled();
   });
 
@@ -390,7 +387,7 @@ describe('popup current-page video capture', () => {
     expect(latest?.status).toEqual({ kind: 'error', message: 'relay failed' });
     expect(latest?.captureState).toBeNull();
     expect(latest?.checking).toBe(false);
-    expect(await latest?.capture()).toBeNull();
+    await expect(latest!.capture()).resolves.toBeUndefined();
     expect(onCaptured).not.toHaveBeenCalled();
   });
 
@@ -435,12 +432,9 @@ describe('popup current-page video capture', () => {
     await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
     await flushEffects();
 
-    let result: any = null;
     await act(async () => {
-      result = await latest?.capture();
+      await latest?.capture();
     });
-
-    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'ok', conversationId: 21, isNew: true });
     expect(onCaptured).toHaveBeenCalledTimes(1);
     expect(latest?.status).toEqual({ kind: 'success', message: 'Saved: Talk' });
     expect(sendMock.mock.calls.filter(([type]) => type === 'getActiveTabCaptureState')).toHaveLength(2);
