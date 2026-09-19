@@ -1,5 +1,3 @@
-import articleFetchService from '@collectors/web/article-fetch-service.ts';
-
 import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
@@ -102,8 +100,6 @@ export type FeishuSyncOrchestrator = SyncOwnershipSurface &
 export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestrator>;
 
 export type BackgroundServices = {
-  articleFetchService: typeof articleFetchService;
-  conversationKinds: typeof conversationKinds;
   notionSyncOrchestrator: NotionSyncOrchestrator;
   obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
   feishuSyncOrchestrator: FeishuSyncOrchestrator;
@@ -185,8 +181,6 @@ export function createBackgroundServices(deps: { getInstanceId: () => string }):
   const imageBackfillScheduler = createImageBackfillScheduler({ onConversationChanged });
 
   return {
-    articleFetchService,
-    conversationKinds,
     notionSyncOrchestrator,
     githubSyncOrchestrator,
     autoSync: {

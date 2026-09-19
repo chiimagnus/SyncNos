@@ -86,13 +86,9 @@ export default defineBackground(() => {
     getInstanceId: getBackgroundInstanceId,
     testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
   });
-  try {
-    registerGithubSettingsHandlers(router, {
-      runExclusiveMaintenance: services.githubSyncOrchestrator.runExclusiveMaintenance,
-    });
-  } catch (_error) {
-    // GitHub Settings is optional during startup; a registration failure must not block the core router.
-  }
+  registerGithubSettingsHandlers(router, {
+    runExclusiveMaintenance: services.githubSyncOrchestrator.runExclusiveMaintenance,
+  });
   registerUiMessageHandlers(router, { ensureLocaleReady: ensureBackgroundLocaleReady });
   registerPublicSettingsHandlers(router);
   registerOpenTargetHandlers(router);
@@ -110,66 +106,40 @@ export default defineBackground(() => {
 
   router.start();
 
-  try {
-    startCliNativeBridge(router);
-  } catch (_e) {
-    // Local CLI integration is optional and must never block the core background router.
-  }
+  startCliNativeBridge(router);
+  setupNotionOAuthNavigationListener();
+  setupFeishuOAuthNavigationListener();
 
-  try {
-    setupNotionOAuthNavigationListener();
-  } catch (_e) {
-    // optional listener registration must not block sibling listeners
-  }
-  try {
-    setupFeishuOAuthNavigationListener();
-  } catch (_e) {
-    // optional listener registration must not block sibling listeners
-  }
-  let contextMenuController = { installOrRefresh: async () => {} };
-  try {
-    contextMenuController = registerClipperContextMenu({
-      ensureReady: ensureBackgroundLocaleReady,
-      readDisplayMode: readEffectiveInpageDisplayMode,
-      setDisplayMode: setCanonicalInpageDisplayMode,
-    });
-  } catch (_e) {
-    // optional listener registration must not block sibling listeners
-  }
-  try {
-    onInstalled((details) => {
-      const reason = String(details?.reason || '');
-      if (reason === 'install' || reason === 'update') {
-        runBestEffort(() => contextMenuController.installOrRefresh());
-      }
-      if (reason === 'install') {
-        runBestEffort(() => openAboutSectionAfterInstall());
-      }
-    });
-  } catch (_e) {
-    // optional listener registration must not block sibling listeners
-  }
-  try {
-    onAlarm((alarm) => {
-      void services.autoSync.handleAlarm(String(alarm?.name || ''));
-    });
-  } catch (_e) {
-    // optional listener registration must not block sibling listeners
-  }
-  try {
-    const githubProviderEnabledKey = syncProviderEnabledStorageKey('github');
-    storageOnChanged((changes, areaName) => {
-      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
-      const autoChange = (changes as any)[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY];
-      const providerChange = (changes as any)[githubProviderEnabledKey];
-      const autoBecameEnabled = Boolean(autoChange) && autoChange.newValue === true;
-      const providerBecameEnabled = Boolean(providerChange) && providerChange.newValue !== false;
-      if (!autoBecameEnabled && !providerBecameEnabled) return;
-      runBestEffort(() => services.autoSync.githubScheduler.scheduleCleanup());
-    });
-  } catch (_e) {
-    // optional listener registration must not block sibling listeners
-  }
+  const contextMenuController = registerClipperContextMenu({
+    ensureReady: ensureBackgroundLocaleReady,
+    readDisplayMode: readEffectiveInpageDisplayMode,
+    setDisplayMode: setCanonicalInpageDisplayMode,
+  });
+
+  onInstalled((details) => {
+    const reason = String(details?.reason || '');
+    if (reason === 'install' || reason === 'update') {
+      runBestEffort(() => contextMenuController.installOrRefresh());
+    }
+    if (reason === 'install') {
+      runBestEffort(() => openAboutSectionAfterInstall());
+    }
+  });
+
+  onAlarm((alarm) => {
+    void services.autoSync.handleAlarm(String(alarm?.name || ''));
+  });
+
+  const githubProviderEnabledKey = syncProviderEnabledStorageKey('github');
+  storageOnChanged((changes, areaName) => {
+    if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
+    const autoChange = (changes as any)[GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY];
+    const providerChange = (changes as any)[githubProviderEnabledKey];
+    const autoBecameEnabled = Boolean(autoChange) && autoChange.newValue === true;
+    const providerBecameEnabled = Boolean(providerChange) && providerChange.newValue !== false;
+    if (!autoBecameEnabled && !providerBecameEnabled) return;
+    runBestEffort(() => services.autoSync.githubScheduler.scheduleCleanup());
+  });
 
   const providerRecovery = {
     notion: {

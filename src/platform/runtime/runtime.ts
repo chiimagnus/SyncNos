@@ -129,28 +129,12 @@ export type RuntimeInstalledDetails = {
 export function onInstalled(listener: (details?: RuntimeInstalledDetails) => void): void {
   if (typeof listener !== 'function') return;
   const anyGlobal = globalThis as any;
-  const browserRuntime = anyGlobal.browser?.runtime;
-  if (browserRuntime?.onInstalled?.addListener) {
-    browserRuntime.onInstalled.addListener(listener);
-    return;
-  }
-  const chromeRuntime = anyGlobal.chrome?.runtime;
-  if (chromeRuntime?.onInstalled?.addListener) {
-    chromeRuntime.onInstalled.addListener(listener);
-  }
-}
-
-export function onStartup(listener: () => void): void {
-  if (typeof listener !== 'function') return;
-  const anyGlobal = globalThis as any;
-  const browserRuntime = anyGlobal.browser?.runtime;
-  if (browserRuntime?.onStartup?.addListener) {
-    browserRuntime.onStartup.addListener(listener);
-    return;
-  }
-  const chromeRuntime = anyGlobal.chrome?.runtime;
-  if (chromeRuntime?.onStartup?.addListener) {
-    chromeRuntime.onStartup.addListener(listener);
+  const event = anyGlobal.browser?.runtime?.onInstalled ?? anyGlobal.chrome?.runtime?.onInstalled;
+  if (!event?.addListener) return;
+  try {
+    event.addListener(listener);
+  } catch (_error) {
+    // Runtime listener registration is optional when the extension context is unavailable.
   }
 }
 

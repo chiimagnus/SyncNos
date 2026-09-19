@@ -3,8 +3,6 @@ import {
   getManifest as platformGetManifest,
   getURL as platformGetURL,
   isInvalidContextError as platformIsInvalidContextError,
-  onInstalled as platformOnInstalled,
-  onStartup as platformOnStartup,
   sendMessage as platformSendMessage,
 } from '@platform/runtime/runtime';
 
@@ -18,8 +16,6 @@ export const runtime = {
   sendMessage: platformSendMessage,
   getURL: platformGetURL,
   getManifest: platformGetManifest,
-  onInstalled: platformOnInstalled,
-  onStartup: platformOnStartup,
   isInvalidContextError: platformIsInvalidContextError,
   INVALIDATED_MESSAGE,
 };
@@ -28,8 +24,6 @@ export {
   platformSendMessage as sendMessage,
   platformGetURL as getURL,
   platformGetManifest as getManifest,
-  platformOnInstalled as onInstalled,
-  platformOnStartup as onStartup,
   platformIsInvalidContextError as isInvalidContextError,
   INVALIDATED_MESSAGE,
 };

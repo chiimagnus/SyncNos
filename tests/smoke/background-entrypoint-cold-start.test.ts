@@ -120,7 +120,6 @@ function createServices() {
       imageBackfillScheduler: { flush: vi.fn().mockResolvedValue(undefined) },
       onRemoteCleanupPending: vi.fn().mockResolvedValue(undefined),
     },
-    conversationKinds: {},
     notionSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
       isRunActive: vi.fn(() => false),
@@ -473,53 +472,17 @@ describe('background entrypoint cold start', () => {
     expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: '/settings?section=aboutme' });
   });
 
-  it('isolates optional listener registration failures from sibling listeners', async () => {
-    const locale = deferred<void>();
-    mocks.initializeLocale.mockReturnValue(locale.promise);
-    mocks.setupNotionOAuthNavigationListener.mockImplementationOnce(() => {
-      throw new Error('notion listener failed');
-    });
-
-    const onMessageAddListener = vi.fn();
-    const onConnectAddListener = vi.fn();
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: { addListener: onMessageAddListener },
-        onConnect: { addListener: onConnectAddListener },
-      },
-    };
-
-    const callback = await loadBackground();
-    expect(() => callback()).not.toThrow();
-
-    expect(onMessageAddListener).toHaveBeenCalledTimes(1);
-    expect(mocks.setupFeishuOAuthNavigationListener).toHaveBeenCalledTimes(1);
-    expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
-    expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
-    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
-  });
-
-  it('isolates GitHub settings registration failure from core router and selective startup recovery', async () => {
-    mocks.initializeLocale.mockResolvedValue(undefined);
+  it('surfaces GitHub settings registration programming errors instead of hiding them at the entrypoint', async () => {
     mocks.registerGithubSettingsHandlers.mockImplementationOnce(() => {
       throw new Error('github settings registration failed');
     });
-    const services = createServices();
-    mocks.createBackgroundServices.mockReturnValue(services);
 
     const callback = await loadBackground();
-    expect(() => callback()).not.toThrow();
-    await flushMicrotasks();
+    expect(() => callback()).toThrow('github settings registration failed');
 
-    expect(mocks.registerUiMessageHandlers).toHaveBeenCalledTimes(1);
-    expect(mocks.registerSyncHandlers).toHaveBeenCalledTimes(1);
-    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.readBackgroundRecoveryProbe).toHaveBeenCalledTimes(1);
-    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
-    expect(services.autoSync.githubScheduler.flush).not.toHaveBeenCalled();
-    expect(services.autoSync.githubScheduler.flushCleanup).not.toHaveBeenCalled();
+    expect(mocks.registerUiMessageHandlers).not.toHaveBeenCalled();
+    expect(mocks.registerSyncHandlers).not.toHaveBeenCalled();
+    expect(mocks.readBackgroundRecoveryProbe).not.toHaveBeenCalled();
   });
 
   it('wakes durable GitHub cleanup when auto-sync or provider gate becomes enabled', async () => {
@@ -549,31 +512,6 @@ describe('background entrypoint cold start', () => {
     storageListener?.({ github_auto_sync_enabled_v1: { oldValue: false, newValue: true } }, 'sync');
     await flushMicrotasks();
     expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(2);
-  });
-
-  it('isolates storage-listener registration failure from selective startup recovery', async () => {
-    mocks.initializeLocale.mockResolvedValue(undefined);
-    mocks.storageOnChanged.mockImplementation(() => {
-      throw new Error('storage listener failed');
-    });
-    mocks.readBackgroundRecoveryProbe.mockResolvedValue({
-      ...idleRecoveryProbe(),
-      providers: {
-        ...idleRecoveryProbe().providers,
-        github: { runningJob: null, hasQueuedWork: true },
-      },
-    });
-    const services = createServices();
-    mocks.createBackgroundServices.mockReturnValue(services);
-
-    const callback = await loadBackground();
-    expect(() => callback()).not.toThrow();
-    await flushMicrotasks();
-
-    expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
-    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).not.toHaveBeenCalled();
   });
 
   it('falls back to full recovery on probe failure and isolates sibling failures', async () => {
