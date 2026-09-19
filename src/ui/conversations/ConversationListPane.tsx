@@ -36,11 +36,7 @@ const MAX_LOCATE_LOAD_ROUNDS = 8;
 
 function formatTime(ts?: number) {
   if (!ts) return '';
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return String(ts);
-  }
+  return new Date(ts).toLocaleString();
 }
 
 function providerButtonLabel(provider: SyncProvider) {
@@ -51,12 +47,8 @@ function providerButtonLabel(provider: SyncProvider) {
 }
 
 function isPopupUi() {
-  try {
-    const p = String(globalThis.location?.pathname || '').toLowerCase();
-    return p.includes('popup.html');
-  } catch (_e) {
-    return false;
-  }
+  const p = String(globalThis.location?.pathname || '').toLowerCase();
+  return p.includes('popup.html');
 }
 
 function syncMenuItemLabel(provider: SyncProvider, syncing: boolean) {
