@@ -1,4 +1,3 @@
-export * from '@viewmodels/shared/useOpenExtensionAppTab';
 export * from '@viewmodels/shared/useStorageOnChanged';
 
 export * from '@viewmodels/settings/insight-stats';
