@@ -20,7 +20,7 @@ function stringLen(value) {
 }
 
 function parseArgs(argv) {
-  const args = { root: null, manifest: null };
+  const args = { root: null };
   for (let i = 0; i < argv.length; i += 1) {
     const raw = argv[i];
     if (raw === '--root') {
@@ -30,16 +30,6 @@ function parseArgs(argv) {
     }
     if (raw.startsWith('--root=')) {
       args.root = raw.slice('--root='.length) || args.root;
-      continue;
-    }
-    if (raw === '--manifest') {
-      args.manifest = argv[i + 1] || args.manifest;
-      i += 1;
-      continue;
-    }
-    if (raw.startsWith('--manifest=')) {
-      args.manifest = raw.slice('--manifest='.length) || args.manifest;
-      continue;
     }
   }
   return args;
@@ -120,7 +110,7 @@ const repoRoot = resolveRepoRoot(import.meta.url);
 const webclipperRoot = resolveWebclipperRoot(repoRoot);
 const root = cli.root ? join(repoRoot, cli.root) : join(webclipperRoot, '.output', 'chrome-mv3');
 
-const manifestPath = cli.manifest ? join(root, cli.manifest) : join(root, 'manifest.json');
+const manifestPath = join(root, 'manifest.json');
 if (!existsSync(manifestPath)) {
   fail(`manifest.json missing: ${manifestPath} (run \`npm run build\` first)`);
 }
