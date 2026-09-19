@@ -69,7 +69,7 @@ async function resolveSaveMenuTitle(tab: { id?: unknown; url?: unknown } | null)
 async function updateMenuItem(api: any, id: string, update: Record<string, unknown>): Promise<void> {
   if (!api?.update) return;
   try {
-    await Promise.resolve(api.update(id, update));
+    await api.update(id, update);
   } catch (_e) {
     // Context menu presentation refresh is best-effort.
   }
@@ -104,7 +104,7 @@ async function refreshVisibleMenus(
   ]);
 
   try {
-    await Promise.resolve(api?.refresh?.());
+    await api?.refresh?.();
   } catch (_e) {
     // Context menu refresh is best-effort.
   }
@@ -115,7 +115,7 @@ async function createOrRefreshMenus(api: any, readDisplayMode: () => Promise<Inp
   const state = await readMenuState(readDisplayMode).catch(() => ({ mode: 'all' as const, autoSave: true }));
 
   if (api.removeAll) {
-    await Promise.resolve(api.removeAll());
+    await api.removeAll();
   }
 
   const base = {
@@ -271,7 +271,7 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
 
   return {
     async installOrRefresh() {
-      await Promise.resolve(ensureReady());
+      await ensureReady();
       await createOrRefreshMenus(api, readDisplayMode);
     },
   };
