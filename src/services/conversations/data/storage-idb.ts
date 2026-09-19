@@ -2062,10 +2062,7 @@ export async function getMessagesByConversationId(conversationId: number): Promi
   return items as any;
 }
 
-export async function getMessagesTailByConversationId(
-  conversationId: number,
-  limit: number,
-): Promise<ConversationMessage[]> {
+async function getMessagesTailByConversationId(conversationId: number, limit: number): Promise<ConversationMessage[]> {
   const normalizedConversationId = Number(conversationId);
   const normalizedLimit = Number(limit);
   if (!Number.isFinite(normalizedConversationId) || normalizedConversationId <= 0) return [];
