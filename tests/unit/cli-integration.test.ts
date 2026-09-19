@@ -15,7 +15,12 @@ const originalBrowser = (globalThis as any).browser;
 const originalNavigator = globalThis.navigator;
 
 function installChrome(
-  options: { requestGranted?: boolean; permissionGranted?: boolean; exposeConnectNative?: boolean } = {},
+  options: {
+    requestGranted?: boolean;
+    permissionGranted?: boolean;
+    exposeConnectNative?: boolean;
+    requiredPermission?: boolean;
+  } = {},
 ) {
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
@@ -37,6 +42,7 @@ function installChrome(
     runtime: {
       id: 'extension-id',
       lastError: null,
+      getManifest: () => ({ permissions: options.requiredPermission ? ['nativeMessaging'] : [] }),
       ...(options.exposeConnectNative === false ? {} : { connectNative: vi.fn() }),
     },
     storage: {
@@ -99,6 +105,18 @@ describe('CLI integration preference', () => {
       available: true,
       permissionGranted: true,
     });
+  });
+
+  it('enables without requesting nativeMessaging when the manifest already requires it', async () => {
+    const chrome = installChrome({ requiredPermission: true, permissionGranted: true });
+
+    await expect(enableCliIntegration()).resolves.toBe(true);
+    expect(chrome.requestCalled()).toBe(false);
+    expect(chrome.store[CLI_INTEGRATION_ENABLED_STORAGE_KEY]).toBe(true);
+
+    await disableCliIntegration();
+    expect(chrome.store[CLI_INTEGRATION_ENABLED_STORAGE_KEY]).toBe(false);
+    expect(chrome.remove).not.toHaveBeenCalled();
   });
 
   it('still rejects unsupported browser families even when the permissions API exists', async () => {

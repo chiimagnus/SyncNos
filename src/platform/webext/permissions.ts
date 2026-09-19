@@ -22,6 +22,15 @@ export function permissionsApiAvailable(): boolean {
   return !!api?.contains && !!api?.request && !!api?.remove;
 }
 
+export function manifestHasRequiredPermission(permission: string): boolean {
+  const name = String(permission || '').trim();
+  if (!name) return false;
+  const anyGlobal = globalThis as any;
+  const runtime = anyGlobal.browser?.runtime ?? anyGlobal.chrome?.runtime;
+  const permissions = runtime?.getManifest?.()?.permissions;
+  return Array.isArray(permissions) && permissions.includes(name);
+}
+
 export async function permissionsContains(permissions: string[]): Promise<boolean> {
   const query = permissionQuery(permissions);
   const anyGlobal = globalThis as any;
