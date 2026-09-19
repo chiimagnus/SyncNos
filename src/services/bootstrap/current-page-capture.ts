@@ -31,7 +31,7 @@ type CurrentPageCaptureProgress = {
   message: string;
 };
 
-export type CurrentPageCaptureActivity = {
+type CurrentPageCaptureActivity = {
   phase: 'capturing' | 'settled';
   kind: 'info' | 'success' | 'warning' | 'error';
   message: string;

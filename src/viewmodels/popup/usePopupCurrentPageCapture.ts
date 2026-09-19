@@ -193,8 +193,6 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     capture,
     captureState,
     checking,
-    fetching,
-    refreshState,
     status,
   };
 }
