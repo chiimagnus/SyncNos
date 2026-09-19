@@ -152,18 +152,16 @@ function buildCommentMetaLine(input: { authorName?: unknown; createdAt: unknown;
   return `${authorName} | ${time}`;
 }
 
-function buildListItemHead(metaLine: string, indentLevel: number) {
+function buildListItemHead(metaLine: string) {
   const meta = safeString(metaLine);
   if (!meta) return '';
-  const indent = '  '.repeat(Math.max(0, indentLevel));
-  return `${indent}- ${meta}`.trimEnd();
+  return `- ${meta}`.trimEnd();
 }
 
-function indentMarkdownUnderListItem(text: string, indentLevel: number): string[] {
+function indentMarkdownUnderListItem(text: string): string[] {
   const src = normalizeNewlines(text).trim();
   if (!src) return [];
-  const indent = '  '.repeat(Math.max(0, indentLevel) + 1);
-  return src.split('\n').map((line) => (line ? `${indent}${line}` : ''));
+  return src.split('\n').map((line) => (line ? `  ${line}` : ''));
 }
 
 function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentTimeZone) {
@@ -175,9 +173,8 @@ function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentT
     if (!text) return '';
     const head = buildListItemHead(
       buildCommentMetaLine({ authorName: comment.authorName, createdAt: comment.createdAt, timeZone }),
-      0,
     );
-    return [head, ...indentMarkdownUnderListItem(degradeMarkdownImagesToLinks(text), 0)].join('\n').trim();
+    return [head, ...indentMarkdownUnderListItem(degradeMarkdownImagesToLinks(text))].join('\n').trim();
   };
 
   for (const thread of graph.threads) {
@@ -190,7 +187,6 @@ function buildCommentsMarkdown(comments: ArticleCommentDto[], timeZone: CommentT
           createdAt: thread.root.createdAt,
           timeZone,
         }),
-        0,
       );
       const quoteLines = buildMarkdownQuote(quote)
         .split('\n')
