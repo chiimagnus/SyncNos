@@ -97,7 +97,10 @@ const webclipperRoot = resolveWebclipperRoot(repoRoot);
 
 const cli = parseArgs(process.argv.slice(2));
 const target = String(cli.target || 'chrome');
-const distDirName = cli.outDir || (target === 'firefox' ? 'dist-firefox' : target === 'edge' ? 'dist-edge' : 'dist');
+if (target !== 'chrome' && target !== 'firefox') {
+  throw new Error(`unsupported release target: ${target}`);
+}
+const distDirName = cli.outDir || (target === 'firefox' ? 'dist-firefox' : 'dist');
 const dist = join(webclipperRoot, distDirName);
 
 const wxtScript = target === 'firefox' ? 'build:firefox' : 'build';
@@ -125,13 +128,7 @@ const distRelativeToRepo = relative(repoRoot, dist);
 run('node', ['.github/scripts/webclipper/check-dist.mjs', `--root=${distRelativeToRepo}`], webclipperRoot);
 
 if (cli.zip) {
-  const zipName =
-    cli.zipName ||
-    (target === 'firefox'
-      ? 'SyncNos-WebClipper-firefox.xpi'
-      : target === 'edge'
-        ? 'SyncNos-WebClipper-edge.zip'
-        : 'SyncNos-WebClipper.zip');
+  const zipName = cli.zipName || (target === 'firefox' ? 'SyncNos-WebClipper-firefox.xpi' : 'SyncNos-WebClipper.zip');
   const zipOut = join(webclipperRoot, zipName);
   rmSync(zipOut, { force: true });
 
