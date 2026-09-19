@@ -56,7 +56,7 @@ describe('current-page-capture content handlers', () => {
         getCurrentPageCaptureState: vi.fn(),
         captureCurrentPage,
       } as any,
-      { inpageTip: { showSaveTip } },
+      { inpageTip: { showSaveTip }, localeReady: Promise.resolve() },
     );
 
     expect(addListener).toHaveBeenCalledTimes(1);
@@ -108,6 +108,7 @@ describe('current-page-capture content handlers', () => {
     const showSaveTip = vi.fn();
     registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
       inpageTip: { showSaveTip },
+      localeReady: Promise.resolve(),
     });
 
     let response: any = null;
@@ -150,7 +151,7 @@ describe('current-page-capture content handlers', () => {
         getCurrentPageCaptureState,
         captureCurrentPage,
       } as any,
-      { localeReady: locale.promise },
+      { inpageTip: { showSaveTip: vi.fn() }, localeReady: locale.promise },
     );
 
     expect(addListener).toHaveBeenCalledTimes(1);
@@ -193,7 +194,7 @@ describe('current-page-capture content handlers', () => {
         getCurrentPageCaptureState: vi.fn(),
         captureCurrentPage,
       } as any,
-      { localeReady: locale.promise },
+      { inpageTip: { showSaveTip: vi.fn() }, localeReady: locale.promise },
     );
 
     let response: any = null;
@@ -229,6 +230,7 @@ describe('current-page-capture content handlers', () => {
     const showSaveTip = vi.fn();
     registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
       inpageTip: { showSaveTip },
+      localeReady: Promise.resolve(),
     });
 
     let response: any = null;
@@ -262,6 +264,7 @@ describe('current-page-capture content handlers', () => {
     const showSaveTip = vi.fn();
     registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
       inpageTip: { showSaveTip },
+      localeReady: Promise.resolve(),
     });
 
     let response: any = null;
@@ -295,6 +298,7 @@ describe('current-page-capture content handlers', () => {
     const showSaveTip = vi.fn();
     registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
       inpageTip: { showSaveTip },
+      localeReady: Promise.resolve(),
     });
 
     let response: any = null;
