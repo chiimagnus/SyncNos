@@ -17,7 +17,7 @@ export function registerCurrentPageCaptureContentHandlers(
 ) {
   const runtime = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
   const onMessage = runtime?.onMessage;
-  if (!onMessage?.addListener) return () => {};
+  if (!onMessage?.addListener) return;
 
   const localeReady = options.localeReady;
   const listener = (msg: any, _sender: any, sendResponse: (value: ApiResponse<any>) => void) => {
@@ -65,8 +65,4 @@ export function registerCurrentPageCaptureContentHandlers(
   };
 
   onMessage.addListener(listener);
-
-  return () => {
-    onMessage.removeListener(listener);
-  };
 }
