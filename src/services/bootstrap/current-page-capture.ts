@@ -156,7 +156,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       captureActivity = null;
       return null;
     }
-    return { ...captureActivity };
+    return captureActivity;
   }
 
   function send(type: string, payload?: Record<string, unknown>) {

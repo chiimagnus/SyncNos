@@ -46,8 +46,8 @@ export function registerCurrentPageCaptureContentHandlers(
             showTip
               ? {
                   onProgress: (progress) => {
-                    inpageTip.showSaveTip(progress?.message, {
-                      kind: progress?.kind === 'error' ? 'error' : 'default',
+                    inpageTip.showSaveTip(progress.message, {
+                      kind: progress.kind === 'error' ? 'error' : 'default',
                     });
                   },
                 }
