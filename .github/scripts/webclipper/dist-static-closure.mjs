@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { init, parse } from 'es-module-lexer';
 import { JSDOM } from 'jsdom';
@@ -110,7 +110,7 @@ async function parseJavaScriptModule(root, file) {
   return { file, source, staticImports, dynamicImports };
 }
 
-export async function collectStaticModuleClosure(root, entries, options = {}) {
+async function collectModuleClosure(root, entries, options = {}) {
   const queue = [...new Set(entries)];
   const visited = new Set();
   const modules = new Map();
@@ -132,6 +132,11 @@ export async function collectStaticModuleClosure(root, entries, options = {}) {
     for (const dependency of moduleInfo.staticImports) {
       if (!visited.has(dependency)) queue.push(dependency);
     }
+    if (options.followDynamicImports) {
+      for (const dependency of moduleInfo.dynamicImports) {
+        if (!visited.has(dependency)) queue.push(dependency);
+      }
+    }
   }
 
   const files = [...visited];
@@ -140,6 +145,28 @@ export async function collectStaticModuleClosure(root, entries, options = {}) {
     modules,
     bytes: files.reduce((total, file) => total + statSync(file).size, 0),
   };
+}
+
+export async function collectStaticModuleClosure(root, entries, options = {}) {
+  return collectModuleClosure(root, entries, options);
+}
+
+export async function collectReachableModuleClosure(root, entries) {
+  return collectModuleClosure(root, entries, { followDynamicImports: true });
+}
+
+export function resolveHtmlModuleEntries(root) {
+  const entries = new Map();
+  for (const dirent of readdirSync(root, { withFileTypes: true })) {
+    if (!dirent.isFile() || !dirent.name.endsWith('.html')) continue;
+    const htmlPath = resolve(root, dirent.name);
+    const dom = new JSDOM(readFileSync(htmlPath, 'utf8'));
+    const scripts = [...dom.window.document.querySelectorAll('script[type="module"][src]')].map((script) =>
+      resolveDistAsset(root, script.getAttribute('src'), htmlPath, `${dirent.name} module entry`),
+    );
+    if (scripts.length) entries.set(htmlPath, [...new Set(scripts)]);
+  }
+  return entries;
 }
 
 export function inspectStartupStylesheets(root, files) {
@@ -182,6 +209,19 @@ export async function analyzePopupStartup(root, manifest) {
   const immediateFiles = [...new Set([...bootstrap.files, ...render.files])];
   const startupStyles = inspectStartupStylesheets(root, assets.stylesheets);
 
+  const reachable = await collectReachableModuleClosure(root, [assets.entry]);
+  const reachableSet = new Set(reachable.files);
+  for (const [htmlPath, entries] of resolveHtmlModuleEntries(root)) {
+    if (htmlPath === assets.popupHtml) continue;
+    for (const entry of entries) {
+      if (reachableSet.has(entry)) {
+        throw new Error(
+          `Popup module graph must not import foreign HTML entry ${normalizeDisplayPath(root, entry)} from ${normalizeDisplayPath(root, htmlPath)}`,
+        );
+      }
+    }
+  }
+
   return {
     ...assets,
     renderTarget,
@@ -189,6 +229,7 @@ export async function analyzePopupStartup(root, manifest) {
     bootstrapBytes: bootstrap.bytes,
     immediateFiles,
     immediateBytes: immediateFiles.reduce((total, file) => total + statSync(file).size, 0),
+    reachableFiles: reachable.files,
     startupStylesheetFiles: startupStyles.files,
     startupStylesheetBytes: startupStyles.bytes,
   };
