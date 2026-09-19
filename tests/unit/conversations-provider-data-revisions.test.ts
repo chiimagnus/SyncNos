@@ -98,6 +98,9 @@ vi.mock('@services/comments/client/repo', () => ({
 
 vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: (...args: any[]) => resolveDetailHeaderActions(...args),
+}));
+
+vi.mock('@services/integrations/detail-header-action-dependencies', () => ({
   hasDetailHeaderActionStorageDependencyChange: (changes: unknown, areaName: string) =>
     hasLocalStorageChange(changes, areaName, DETAIL_HEADER_CONFIG_KEYS),
 }));

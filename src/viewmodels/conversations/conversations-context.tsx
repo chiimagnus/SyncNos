@@ -10,9 +10,6 @@ import type {
 } from '@services/conversations/domain/models';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { formatConversationMarkdownForExternalOutput } from '@services/conversations/external-markdown';
-import { buildConversationsJsonZipExport } from '@services/sync/local/json-export';
-import { buildConversationsMarkdownZipExport } from '@services/sync/local/markdown-export';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { downloadBlobFile } from '@services/shared/webext';
 import {
@@ -25,11 +22,8 @@ import {
   updateConversationUrl,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
-import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
-import {
-  hasDetailHeaderActionStorageDependencyChange,
-  resolveDetailHeaderActions,
-} from '@services/integrations/detail-header-actions';
+import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
+import { hasDetailHeaderActionStorageDependencyChange } from '@services/integrations/detail-header-action-dependencies';
 import {
   requestDataRevisionRetry,
   subscribeDataRevisionChanges,
@@ -97,7 +91,8 @@ function readLocalStorageValue(key: string): string {
   }
 }
 
-type SelectedExportBuilder = typeof buildConversationsMarkdownZipExport;
+type SelectedExportBuilder = (input: { conversations: Conversation[] }) => Promise<{ zipBlob: Blob; filename: string }>;
+type SelectedExportBuilderLoader = () => Promise<SelectedExportBuilder>;
 
 function writeLocalStorageValue(key: string, value: string | null) {
   try {
@@ -1210,7 +1205,10 @@ export function ConversationsProvider({
     }
 
     setDetailHeaderActions([]);
-    void resolveDetailHeaderActions({ conversation: selectedConversation, detail })
+    void import('@services/integrations/detail-header-actions')
+      .then(({ resolveDetailHeaderActions }) =>
+        resolveDetailHeaderActions({ conversation: selectedConversation, detail }),
+      )
       .then((actions) => {
         if (resolveSeq !== detailHeaderResolveSeqRef.current) return;
 
@@ -1288,16 +1286,18 @@ export function ConversationsProvider({
       throw new Error('conversation detail returned a mismatched id');
     }
 
+    const { formatConversationMarkdownForExternalOutput } = await import('@services/conversations/external-markdown');
     const markdown = await formatConversationMarkdownForExternalOutput(conversation, freshDetail);
     if (!(await writeTextToClipboard(markdown))) throw new Error(t('copyFailed'));
   }, []);
 
   const exportSelected = useCallback(
-    async (buildExport: SelectedExportBuilder) => {
+    async (loadBuildExport: SelectedExportBuilderLoader) => {
       if (!selectedIds.length) return;
 
       setExporting(true);
       try {
+        const buildExport = await loadBuildExport();
         const selectedIdSet = new Set(selectedIds);
         const selectedConversations = items.filter((conversation) => selectedIdSet.has(conversation.id));
         const { zipBlob, filename } = await buildExport({ conversations: selectedConversations });
@@ -1312,10 +1312,22 @@ export function ConversationsProvider({
   );
 
   const exportSelectedMarkdown = useCallback(
-    () => exportSelected(buildConversationsMarkdownZipExport),
+    () =>
+      exportSelected(async () => {
+        const { buildConversationsMarkdownZipExport } = await import('@services/sync/local/markdown-export');
+        return buildConversationsMarkdownZipExport;
+      }),
     [exportSelected],
   );
-  const exportSelectedJson = useCallback(() => exportSelected(buildConversationsJsonZipExport), [exportSelected]);
+
+  const exportSelectedJson = useCallback(
+    () =>
+      exportSelected(async () => {
+        const { buildConversationsJsonZipExport } = await import('@services/sync/local/json-export');
+        return buildConversationsJsonZipExport;
+      }),
+    [exportSelected],
+  );
 
   const syncSelected = useCallback(
     async (provider: SyncProvider) => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, ImageDown } from 'lucide-react';
 
-import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
+import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
 import { t } from '@i18n';
 import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
