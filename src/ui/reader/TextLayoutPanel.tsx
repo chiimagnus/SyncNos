@@ -15,7 +15,7 @@ import {
 
 // Presentational, fully controlled. Discrete actions persist through `update`;
 // continuous ranges only `preview` until an explicit interaction boundary commits.
-export type TextLayoutPanelProps = {
+type TextLayoutPanelProps = {
   prefs: ReaderPrefs;
   update: (patch: ReaderPrefsPatch) => void | Promise<void>;
   preview: (patch: ReaderPrefsPatch) => void;

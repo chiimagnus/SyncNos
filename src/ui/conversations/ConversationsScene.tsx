@@ -21,9 +21,9 @@ type ConversationsSceneListShellConfig = {
   rightSlot: ReactNode;
 };
 
-export type ConversationsSceneWideChrome = 'card' | 'none';
+type ConversationsSceneWideChrome = 'card' | 'none';
 
-export type ConversationsSceneProps = {
+type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
   onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
   onOpenInsightsSection?: () => void;

@@ -38,7 +38,7 @@ import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
 // readerFeatures is wired in for the toolbar button visibility; the text-layout
 // piece itself is always active via the `--reader-*` variables below.
-export type ArticleReaderViewProps = DetailViewSharedProps & {
+type ArticleReaderViewProps = DetailViewSharedProps & {
   metadata?: ReactNode;
   readerFeatures?: ConversationKindDefinition['view']['readerFeatures'];
   readerToolbarPortalTarget?: HTMLElement | null;

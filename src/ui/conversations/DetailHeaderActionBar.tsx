@@ -7,7 +7,7 @@ import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 
-export type DetailHeaderActionBarProps = {
+type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
   buttonClassName: string;
   closeMenuOnActionTrigger?: () => void;

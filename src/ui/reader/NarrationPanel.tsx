@@ -16,7 +16,7 @@ import {
 // Presentational, fully controlled. Discrete TTS actions persist immediately;
 // editable AI text fields preview locally and commit on blur. TTS patches contain
 // only changed fields so stale siblings cannot overwrite newer durable values.
-export type NarrationPanelProps = {
+type NarrationPanelProps = {
   prefs: ReaderPrefs;
   update: (patch: ReaderPrefsPatch) => void | Promise<void>;
   preview: (patch: ReaderPrefsPatch) => void;

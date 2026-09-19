@@ -2,7 +2,7 @@ import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-st
 import { APP_THEME_MODES, type AppThemeMode } from '@services/protocols/app-theme';
 import { t } from '@i18n';
 
-export type ThemePanelProps = {
+type ThemePanelProps = {
   mode: AppThemeMode;
   update: (mode: AppThemeMode) => void | Promise<void>;
   className?: string;
