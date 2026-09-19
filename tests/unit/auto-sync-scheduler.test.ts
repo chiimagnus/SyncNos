@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createAutoSyncSchedulerCore,
+  normalizeAutoSyncQueue,
   type AutoSyncSchedulerInfra,
 } from '@services/sync/auto-sync/auto-sync-scheduler-core';
 
@@ -67,6 +68,18 @@ describe('auto-sync-scheduler-core', () => {
     infraPack = makeInfra();
     isProviderEnabled = vi.fn().mockResolvedValue(true);
     syncConversations = vi.fn().mockResolvedValue(undefined);
+  });
+
+  it('exports the same queue normalization used by scheduler reads', () => {
+    expect(
+      normalizeAutoSyncQueue({
+        '7': 123.9,
+        '1.5': 10,
+        invalid: 20,
+        '8': -1,
+        '9': '250',
+      }),
+    ).toEqual({ '7': 123, '9': 250 });
   });
 
   it('does not floor fractional ids into another conversation', async () => {
@@ -174,6 +187,29 @@ describe('auto-sync-scheduler-core', () => {
     await scheduler.enqueue(2, 'a'); // due at now+60s, later than id1
     expect(infraPack.alarm.name).toBe(ALARM_NAME);
     expect(infraPack.alarm.when).toBe(infraPack.storage[QUEUE_KEY]['1']);
+  });
+
+  it('flush rereads the current future queue and rebuilds only its current earliest alarm', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    const now = infraPack.infra.now();
+    infraPack.storage[QUEUE_KEY] = { '1': now + 30_000, '2': now + 10_000 };
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 60_000,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'i-future',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await scheduler.flush();
+
+    expect(syncConversations).not.toHaveBeenCalled();
+    expect(infraPack.alarm).toMatchObject({ name: ALARM_NAME, when: now + 10_000, cleared: false });
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '1': now + 30_000, '2': now + 10_000 });
   });
 
   it('flush processes due items and removes them from queue', async () => {

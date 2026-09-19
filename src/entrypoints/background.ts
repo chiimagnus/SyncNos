@@ -32,6 +32,7 @@ import { startCliNativeBridge } from '@services/cli/native-bridge';
 import { registerPublicSettingsHandlers } from '@services/settings/background-handlers';
 import { registerOpenTargetHandlers } from '@services/integrations/openin/background-handlers';
 import { registerBackgroundKeyboardShortcuts } from '@services/bootstrap/background-keyboard-shortcuts';
+import { readBackgroundRecoveryProbe } from '@services/bootstrap/background-recovery-probe';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -175,18 +176,65 @@ export default defineBackground(() => {
 
   void ensureDefaultFeishuOAuthConfig().catch(() => {});
 
-  runBestEffort(() => services.notionSyncOrchestrator.reconcileStartupSyncJob());
-  runBestEffort(() => services.obsidianSyncOrchestrator.reconcileStartupSyncJob());
-  runBestEffort(() => services.feishuSyncOrchestrator.reconcileStartupSyncJob());
-  runBestEffort(() => services.githubSyncOrchestrator.reconcileStartupSyncJob());
+  const providerRecovery = {
+    notion: {
+      isRunActive: () => services.notionSyncOrchestrator.isRunActive(),
+      reconcile: () => services.notionSyncOrchestrator.reconcileStartupSyncJob(),
+      flush: () => services.autoSync.notionScheduler.flush(),
+    },
+    obsidian: {
+      isRunActive: () => services.obsidianSyncOrchestrator.isRunActive(),
+      reconcile: () => services.obsidianSyncOrchestrator.reconcileStartupSyncJob(),
+      flush: () => services.autoSync.obsidianScheduler.flush(),
+    },
+    feishu: {
+      isRunActive: () => services.feishuSyncOrchestrator.isRunActive(),
+      reconcile: () => services.feishuSyncOrchestrator.reconcileStartupSyncJob(),
+      flush: () => services.autoSync.feishuScheduler.flush(),
+    },
+    github: {
+      isRunActive: () => services.githubSyncOrchestrator.isRunActive(),
+      reconcile: () => services.githubSyncOrchestrator.reconcileStartupSyncJob(),
+      flush: () => services.autoSync.githubScheduler.flush(),
+    },
+  } as const;
 
-  // Best-effort recovery complements alarm wakeups after MV3 worker reloads.
-  // Each provider is isolated so one synchronous or asynchronous failure cannot
-  // prevent sibling queues from recovering.
-  runBestEffort(() => services.autoSync.notionScheduler.flush());
-  runBestEffort(() => services.autoSync.obsidianScheduler.flush());
-  runBestEffort(() => services.autoSync.feishuScheduler.flush());
-  runBestEffort(() => services.autoSync.githubScheduler.flush());
-  runBestEffort(() => services.autoSync.githubScheduler.flushCleanup());
-  runBestEffort(() => services.autoSync.imageBackfillScheduler.flush());
+  type RecoveryProvider = keyof typeof providerRecovery;
+  const recoveryProviders = Object.keys(providerRecovery) as RecoveryProvider[];
+
+  const recoverProviderJob = (provider: RecoveryProvider) => {
+    const recovery = providerRecovery[provider];
+    runBestEffort(async () => {
+      if (recovery.isRunActive()) return;
+      await recovery.reconcile();
+    });
+  };
+
+  const recoverAllStartupWork = () => {
+    for (const provider of recoveryProviders) recoverProviderJob(provider);
+    for (const provider of recoveryProviders) runBestEffort(providerRecovery[provider].flush);
+    runBestEffort(() => services.autoSync.githubScheduler.flushCleanup());
+    runBestEffort(() => services.autoSync.imageBackfillScheduler.flush());
+  };
+
+  const recoverStartup = async () => {
+    let probe;
+    try {
+      probe = await readBackgroundRecoveryProbe();
+    } catch (_error) {
+      recoverAllStartupWork();
+      return;
+    }
+
+    for (const provider of recoveryProviders) {
+      const providerProbe = probe.providers[provider];
+      const runningJob = providerProbe.runningJob;
+      if (runningJob && runningJob.instanceId !== getBackgroundInstanceId()) recoverProviderJob(provider);
+      if (providerProbe.hasQueuedWork) runBestEffort(providerRecovery[provider].flush);
+    }
+    if (probe.githubCleanupEnabled) runBestEffort(() => services.autoSync.githubScheduler.flushCleanup());
+    if (probe.imageBackfillHasQueuedWork) runBestEffort(() => services.autoSync.imageBackfillScheduler.flush());
+  };
+
+  runBestEffort(() => recoverStartup());
 });

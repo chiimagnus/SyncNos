@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   readDisplayMode: vi.fn(),
   setDisplayMode: vi.fn(),
   startCliNativeBridge: vi.fn(),
+  readBackgroundRecoveryProbe: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -92,6 +93,9 @@ vi.mock('@services/shared/inpage-display-mode', () => ({
   setCanonicalInpageDisplayMode: mocks.setDisplayMode,
 }));
 vi.mock('@services/cli/native-bridge', () => ({ startCliNativeBridge: mocks.startCliNativeBridge }));
+vi.mock('@services/bootstrap/background-recovery-probe', () => ({
+  readBackgroundRecoveryProbe: mocks.readBackgroundRecoveryProbe,
+}));
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -116,27 +120,49 @@ function createServices() {
         flushCleanup: vi.fn().mockResolvedValue(undefined),
         scheduleCleanup: vi.fn().mockResolvedValue(undefined),
       },
+      imageBackfillScheduler: { flush: vi.fn().mockResolvedValue(undefined) },
       onRemoteCleanupPending: vi.fn().mockResolvedValue(undefined),
     },
     conversationKinds: {},
     notionSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('notion'),
     },
     obsidianSyncOrchestrator: {
       testConnection: vi.fn(),
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('obsidian'),
     },
     feishuSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('feishu'),
     },
     githubSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('github'),
     },
   };
+}
+
+function idleRecoveryProbe() {
+  return {
+    providers: {
+      notion: { runningJob: null, hasQueuedWork: false },
+      obsidian: { runningJob: null, hasQueuedWork: false },
+      feishu: { runningJob: null, hasQueuedWork: false },
+      github: { runningJob: null, hasQueuedWork: false },
+    },
+    imageBackfillHasQueuedWork: false,
+    githubCleanupEnabled: false,
+  };
+}
+
+function recoveryRunningJob(provider: string, instanceId: string) {
+  return { id: `${provider}-job`, provider, instanceId, status: 'running' };
 }
 
 async function flushMicrotasks() {
@@ -166,6 +192,7 @@ beforeEach(() => {
     throw new Error('invalid inpage display mode');
   });
   mocks.storageOnChanged.mockImplementation(() => () => {});
+  mocks.readBackgroundRecoveryProbe.mockResolvedValue(idleRecoveryProbe());
   mocks.createBackgroundServices.mockReturnValue(createServices());
   // @ts-expect-error test global cleanup
   delete globalThis.browser;
@@ -240,9 +267,14 @@ describe('background entrypoint cold start', () => {
 
     const services = mocks.createBackgroundServices.mock.results[0]?.value;
     await flushMicrotasks();
-    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledWith('github');
-    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(mocks.readBackgroundRecoveryProbe).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+    expect(services.autoSync.notionScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.obsidianScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.feishuScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flushCleanup).not.toHaveBeenCalled();
+    expect(services.autoSync.imageBackfillScheduler.flush).not.toHaveBeenCalled();
 
     expect(runtimeMessageListener).not.toBeNull();
     const sendResponse = vi.fn();
@@ -253,6 +285,138 @@ describe('background entrypoint cold start', () => {
       data: null,
       error: { message: 'unknown message type: cold-start-probe', extra: null },
     });
+  });
+
+  it('serves the core router while the recovery probe is still pending', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    const probe = deferred<any>();
+    mocks.readBackgroundRecoveryProbe.mockReturnValue(probe.promise);
+
+    let runtimeMessageListener: ((msg: any, sender: any, sendResponse: any) => boolean) | null = null;
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            runtimeMessageListener = listener;
+          }),
+        },
+      },
+    };
+
+    const callback = await loadBackground();
+    callback();
+
+    expect(runtimeMessageListener).not.toBeNull();
+    const sendResponse = vi.fn();
+    expect(runtimeMessageListener?.({ type: 'probe-pending-router-check' }, null, sendResponse)).toBe(true);
+    await flushMicrotasks();
+    expect(sendResponse).toHaveBeenCalledWith({
+      ok: false,
+      data: null,
+      error: { message: 'unknown message type: probe-pending-router-check', extra: null },
+    });
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+
+    probe.resolve(idleRecoveryProbe());
+    await flushMicrotasks();
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('selectively reconciles only an old-instance durable running job', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockResolvedValue({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        notion: { runningJob: recoveryRunningJob('notion', 'old-instance'), hasQueuedWork: false },
+      },
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    expect(services.notionSyncOrchestrator.isRunActive).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledWith('notion');
+    expect(services.autoSync.notionScheduler.flush).not.toHaveBeenCalled();
+  });
+
+  it('skips same-instance durable running jobs', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockImplementation(async () => {
+      const getInstanceId = mocks.createBackgroundServices.mock.calls[0]?.[0]?.getInstanceId;
+      const instanceId = getInstanceId();
+      return {
+        ...idleRecoveryProbe(),
+        providers: {
+          ...idleRecoveryProbe().providers,
+          notion: { runningJob: recoveryRunningJob('notion', instanceId), hasQueuedWork: false },
+        },
+      };
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    expect(services.notionSyncOrchestrator.isRunActive).not.toHaveBeenCalled();
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('rechecks live ownership before reconciling a stale old-instance probe result', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    const probe = deferred<any>();
+    mocks.readBackgroundRecoveryProbe.mockReturnValue(probe.promise);
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    services.notionSyncOrchestrator.isRunActive.mockReturnValue(true);
+    probe.resolve({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        notion: { runningJob: recoveryRunningJob('notion', 'old-instance'), hasQueuedWork: false },
+      },
+    });
+    await flushMicrotasks();
+
+    expect(services.notionSyncOrchestrator.isRunActive).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('flushes only durable queued work and enabled GitHub cleanup', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockResolvedValue({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        obsidian: { runningJob: null, hasQueuedWork: true },
+      },
+      imageBackfillHasQueuedWork: true,
+      githubCleanupEnabled: true,
+    });
+    const services = createServices();
+    mocks.createBackgroundServices.mockReturnValue(services);
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+    expect(services.autoSync.notionScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.obsidianScheduler.flush).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.feishuScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.imageBackfillScheduler.flush).toHaveBeenCalledTimes(1);
   });
 
   it('display migration failure does not block router or context-menu startup', async () => {
@@ -297,7 +461,7 @@ describe('background entrypoint cold start', () => {
     expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
   });
 
-  it('isolates GitHub settings registration failure from core router and startup recovery', async () => {
+  it('isolates GitHub settings registration failure from core router and selective startup recovery', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     mocks.registerGithubSettingsHandlers.mockImplementationOnce(() => {
       throw new Error('github settings registration failed');
@@ -312,9 +476,10 @@ describe('background entrypoint cold start', () => {
     expect(mocks.registerUiMessageHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerSyncHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledTimes(4);
-    expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(mocks.readBackgroundRecoveryProbe).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flush).not.toHaveBeenCalled();
+    expect(services.autoSync.githubScheduler.flushCleanup).not.toHaveBeenCalled();
   });
 
   it('wakes durable GitHub cleanup when auto-sync or provider gate becomes enabled', async () => {
@@ -346,10 +511,17 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.githubScheduler.scheduleCleanup).toHaveBeenCalledTimes(2);
   });
 
-  it('isolates storage-listener registration failure from startup recovery', async () => {
+  it('isolates storage-listener registration failure from selective startup recovery', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     mocks.storageOnChanged.mockImplementation(() => {
       throw new Error('storage listener failed');
+    });
+    mocks.readBackgroundRecoveryProbe.mockResolvedValue({
+      ...idleRecoveryProbe(),
+      providers: {
+        ...idleRecoveryProbe().providers,
+        github: { runningJob: null, hasQueuedWork: true },
+      },
     });
     const services = createServices();
     mocks.createBackgroundServices.mockReturnValue(services);
@@ -359,13 +531,14 @@ describe('background entrypoint cold start', () => {
     await flushMicrotasks();
 
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
-    expect(mocks.reconcileStartupSyncJob).toHaveBeenCalledTimes(4);
+    expect(mocks.reconcileStartupSyncJob).not.toHaveBeenCalled();
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
-    expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.githubScheduler.flushCleanup).not.toHaveBeenCalled();
   });
 
-  it('isolates each startup recovery failure from sibling jobs and schedulers', async () => {
+  it('falls back to full recovery on probe failure and isolates sibling failures', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
+    mocks.readBackgroundRecoveryProbe.mockRejectedValue(new Error('probe failed'));
     const services = createServices();
     mocks.reconcileStartupSyncJob.mockImplementation(async (provider: string) => {
       if (provider === 'notion') throw new Error('notion recovery failed');
@@ -388,5 +561,6 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.feishuScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flush).toHaveBeenCalledTimes(1);
     expect(services.autoSync.githubScheduler.flushCleanup).toHaveBeenCalledTimes(1);
+    expect(services.autoSync.imageBackfillScheduler.flush).toHaveBeenCalledTimes(1);
   });
 });

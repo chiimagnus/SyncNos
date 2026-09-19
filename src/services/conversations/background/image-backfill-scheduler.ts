@@ -11,7 +11,7 @@ import {
   type AutoSyncSchedulerInfra,
 } from '@services/sync/auto-sync/auto-sync-scheduler-core';
 
-const AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY = 'ai_chat_image_backfill_queue_v1';
+export const AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY = 'ai_chat_image_backfill_queue_v1';
 export const AI_CHAT_IMAGE_BACKFILL_ALARM_NAME = 'syncnos_ai_chat_image_backfill';
 const AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY = 'ai_chat_cache_images_enabled';
 const AI_CHAT_IMAGE_BACKFILL_QUEUE_MAX_ITEMS = 200;

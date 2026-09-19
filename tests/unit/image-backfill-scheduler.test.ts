@@ -7,10 +7,10 @@ vi.mock('@services/conversations/background/image-backfill-job', () => backfillM
 
 import {
   AI_CHAT_IMAGE_BACKFILL_ALARM_NAME,
+  AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY,
   createImageBackfillScheduler,
 } from '@services/conversations/background/image-backfill-scheduler';
 
-const AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY = 'ai_chat_image_backfill_queue_v1';
 const AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY = 'ai_chat_cache_images_enabled';
 
 function makeInfra(startNow = 1_000_000, alarmsAvailable = true) {
