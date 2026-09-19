@@ -22,8 +22,11 @@ export async function flushCommentsReactWork(): Promise<void> {
   });
 }
 
-export async function waitForCommentsUi<T>(callback: () => T | Promise<T>): Promise<T> {
-  return vi.waitFor(callback, { timeout: 3000, interval: 20 });
+export async function waitForCommentsUi<T>(
+  callback: () => T | Promise<T>,
+  options: { timeout?: number; interval?: number } = {},
+): Promise<T> {
+  return vi.waitFor(callback, { timeout: 3000, interval: 20, ...options });
 }
 
 export async function cleanupCommentsReactRoot(root: Root | null): Promise<void> {

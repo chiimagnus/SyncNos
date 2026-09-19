@@ -1,3 +1,4 @@
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 
@@ -47,6 +48,18 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
+function mountPanel(host: HTMLElement) {
+  let mounted!: ReturnType<typeof mountThreadedCommentsPanel>;
+  act(() => {
+    mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+  });
+  return mounted;
+}
+
+function cleanupPanel(mounted: ReturnType<typeof mountThreadedCommentsPanel>) {
+  act(() => mounted.cleanup());
+}
+
 function installMutableSelectionMock(initialText: string) {
   const state = { text: String(initialText || '') };
   const selectionMock = {
@@ -82,7 +95,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
   afterEach(async () => {
     if (vi.isFakeTimers()) {
-      vi.runOnlyPendingTimers();
+      act(() => vi.runOnlyPendingTimers());
       vi.useRealTimers();
     }
     await flushCommentsReactWork();
@@ -94,7 +107,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
@@ -102,72 +115,78 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const selectionState = installMutableSelectionMock('Quoted text');
     expect(selectionState.text).toBe('Quoted text');
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('submits an empty root when a valid quote locator is attached', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     const onSave = vi.fn(async () => ({ ok: true, createdRootId: 7 }));
     driver.replaceActionCallbacks({ onSave } as any);
-    driver.session.setComposerAttachment({
-      quoteText: 'Quoted text',
-      locator: {
-        v: 1,
-        env: 'app',
-        quote: { type: 'TextQuoteSelector', exact: 'Quoted text' },
-        position: { type: 'TextPositionSelector', start: 0, end: 11 },
-      },
+    act(() => {
+      driver.session.setComposerAttachment({
+        quoteText: 'Quoted text',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'Quoted text' },
+          position: { type: 'TextPositionSelector', start: 0, end: 11 },
+        },
+      });
     });
     await flushCommentsReactWork();
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
     const send = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__send') as HTMLButtonElement;
     expect(send.disabled).toBe(false);
-    send.click();
+    act(() => send.click());
     await flushCommentsReactWork();
 
     expect(onSave).toHaveBeenCalledWith('');
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('keeps highlight-only submit disabled when the attached locator points at different text', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     const driver = getCommentSidebarPanelTestDriver(mounted.api);
     const onSave = vi.fn(async () => ({ ok: true, createdRootId: 8 }));
     driver.replaceActionCallbacks({ onSave } as any);
-    driver.session.setComposerAttachment({
-      quoteText: 'Quoted text',
-      locator: {
-        v: 1,
-        env: 'app',
-        quote: { type: 'TextQuoteSelector', exact: 'Different text' },
-        position: { type: 'TextPositionSelector', start: 0, end: 14 },
-      },
+    act(() => {
+      driver.session.setComposerAttachment({
+        quoteText: 'Quoted text',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'Different text' },
+          position: { type: 'TextPositionSelector', start: 0, end: 14 },
+        },
+      });
     });
     await flushCommentsReactWork();
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
     const send = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__send') as HTMLButtonElement;
     expect(send.disabled).toBe(true);
-    send.click();
+    act(() => send.click());
     await flushCommentsReactWork();
 
     expect(onSave).not.toHaveBeenCalled();
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('requests selection when Selection.toString() is empty but Range contains text (Firefox quirk)', async () => {
@@ -179,7 +198,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(textNode);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const selectionMock = {
@@ -199,13 +218,15 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     } as any;
     Object.defineProperty(globalThis, 'getSelection', { configurable: true, value: () => selectionMock as Selection });
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('commits keyboard selection only after modifier is released (shift + arrow)', async () => {
@@ -213,30 +234,36 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const selectionState = installMutableSelectionMock('Quoted text');
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'ArrowRight', shiftKey: true }));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'ArrowRight', shiftKey: true }));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
 
-    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    act(() => {
+      document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     selectionState.text = '';
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('does not clear quote when composer/reply interactions cause empty selectionchange', async () => {
@@ -244,7 +271,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({ onComposerSelectionRequest } as any);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
@@ -256,8 +283,10 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
       { id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' },
     ]);
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -269,26 +298,30 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
-    (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click();
+    act(() => (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click());
     await flushCommentsReactWork();
     const reply = shadow.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
     ) as HTMLTextAreaElement | null;
     expect(reply).toBeTruthy();
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('clears quote only via explicit ❌ and allows reattaching the same selection', async () => {
@@ -296,7 +329,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
 
     getCommentSidebarPanelTestDriver(mounted.api).replaceActionCallbacks({
       onComposerSelectionRequest,
@@ -311,8 +344,10 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     const selectionState = installMutableSelectionMock('Same quote');
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -322,26 +357,28 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     const clearBtn = shadow.querySelector('.webclipper-inpage-comments-panel__quote-clear') as HTMLButtonElement | null;
     expect(clearBtn).toBeTruthy();
-    clearBtn!.click();
+    act(() => clearBtn!.click());
     await flushCommentsReactWork();
 
     const quoteEl = shadow.querySelector('.webclipper-inpage-comments-panel__quote') as HTMLElement | null;
     expect(quoteEl).toBeFalsy();
 
-    document.dispatchEvent(new window.Event('selectionchange'));
-    document.dispatchEvent(new window.Event('pointerup'));
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
     await flushCommentsReactWork();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(2);
 
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 
   it('renders comments header title and no manual attach-selection button', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const mounted = mountPanel(host);
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
@@ -355,6 +392,6 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLButtonElement | null;
     expect(attachSelectionBtn).toBeFalsy();
 
-    mounted.cleanup();
+    cleanupPanel(mounted);
   });
 });

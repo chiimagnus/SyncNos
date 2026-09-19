@@ -213,6 +213,17 @@ function setupDom() {
   });
 }
 
+async function renderPopupShell(root: ReactDOM.Root) {
+  await act(async () => {
+    root.render(createElement(PopupShell));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  });
+}
+
+async function waitForPopupUi<T>(callback: () => T | Promise<T>): Promise<T> {
+  return vi.waitFor(callback, { timeout: 3000, interval: 20 });
+}
+
 function cleanupDom() {
   delete (globalThis as any).window;
   delete (globalThis as any).document;
@@ -248,18 +259,17 @@ describe('PopupShell header actions', () => {
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  afterEach(() => {
-    act(() => {
+  afterEach(async () => {
+    await act(async () => {
       root?.unmount();
+      await Promise.resolve();
     });
     root = null;
     cleanupDom();
   });
 
-  it('shows fetch and settings in list mode, then swaps to Open in Notion in detail mode', () => {
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+  it('shows fetch and settings in list mode, then swaps to Open in Notion in detail mode', async () => {
+    await renderPopupShell(root!);
 
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
@@ -280,10 +290,8 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
-  it('keeps the popup detail header action area empty when no actions are available', () => {
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+  it('keeps the popup detail header action area empty when no actions are available', async () => {
+    await renderPopupShell(root!);
 
     const detailButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'show-detail-empty',
@@ -300,10 +308,8 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
-  it('shows a menu trigger in popup detail mode when multiple destinations exist', () => {
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+  it('shows a menu trigger in popup detail mode when multiple destinations exist', async () => {
+    await renderPopupShell(root!);
 
     const detailButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'show-detail-menu',
@@ -318,26 +324,26 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 
-  it('keeps current-page capture status in the button without rendering a duplicate header banner', () => {
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+  it('keeps current-page capture status in the button without rendering a duplicate header banner', async () => {
+    await renderPopupShell(root!);
 
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
     expect(document.body.textContent).not.toContain('ChatGPT · Waiting for messages…');
   });
 
   it('publishes the selection and ensures a background App tab for popup syncs', async () => {
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+    await renderPopupShell(root!);
 
     const syncButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'sync-github',
     ) as HTMLButtonElement;
-    act(() => syncButton.click());
+    await act(async () => {
+      syncButton.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-    await vi.waitFor(() => {
+    await waitForPopupUi(() => {
       expect(publishPopupSyncSelectionHandoffMock).toHaveBeenCalledWith([41, 42]);
       expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
     });
@@ -346,16 +352,18 @@ describe('PopupShell header actions', () => {
 
   it('does not ensure the App tab when the popup selection handoff cannot be published', async () => {
     publishPopupSyncSelectionHandoffMock.mockRejectedValueOnce(new Error('storage unavailable'));
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+    await renderPopupShell(root!);
 
     const syncButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'sync-github',
     ) as HTMLButtonElement;
-    act(() => syncButton.click());
+    await act(async () => {
+      syncButton.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-    await vi.waitFor(() => {
+    await waitForPopupUi(() => {
       expect(publishPopupSyncSelectionHandoffMock).toHaveBeenCalledWith([41, 42]);
     });
     expect(ensureExtensionAppTabMock).not.toHaveBeenCalled();
@@ -375,9 +383,13 @@ describe('PopupShell header actions', () => {
       const syncButton = Array.from(document.querySelectorAll('button')).find(
         (el) => el.textContent === label,
       ) as HTMLButtonElement;
-      act(() => syncButton.click());
+      await act(async () => {
+        syncButton.click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-      await vi.waitFor(() => {
+      await waitForPopupUi(() => {
         expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
         expect(storageGetMock).toHaveBeenCalledWith([key]);
         expect(document.querySelector('[role="dialog"]')).toBeTruthy();
@@ -400,9 +412,13 @@ describe('PopupShell header actions', () => {
       const syncButton = Array.from(document.querySelectorAll('button')).find(
         (el) => el.textContent === label,
       ) as HTMLButtonElement;
-      act(() => syncButton.click());
+      await act(async () => {
+        syncButton.click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-      await vi.waitFor(() => {
+      await waitForPopupUi(() => {
         expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
         expect(storageGetMock).toHaveBeenCalledWith([key]);
       });
@@ -414,44 +430,48 @@ describe('PopupShell header actions', () => {
   it('foregrounds the App only when the user explicitly confirms the Notion nudge', async () => {
     (window as any).close = vi.fn();
     openOrFocusExtensionAppTabMock.mockResolvedValue({ id: 9 });
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+    await renderPopupShell(root!);
 
     const syncButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'sync-notion',
     ) as HTMLButtonElement;
-    act(() => syncButton.click());
+    await act(async () => {
+      syncButton.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy());
+    await waitForPopupUi(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy());
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
     const buttons = Array.from(dialog.querySelectorAll('button'));
     act(() => buttons.at(-1)!.click());
 
-    await vi.waitFor(() => {
+    await waitForPopupUi(() => {
       expect(openOrFocusExtensionAppTabMock).toHaveBeenCalledWith({ route: '/' });
       expect((window as any).close).toHaveBeenCalledTimes(1);
     });
   });
 
   it('persists the Feishu dont-show choice on dismiss without foregrounding the App', async () => {
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+    await renderPopupShell(root!);
 
     const syncButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'sync-feishu',
     ) as HTMLButtonElement;
-    act(() => syncButton.click());
+    await act(async () => {
+      syncButton.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy());
+    await waitForPopupUi(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy());
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
     const checkbox = dialog.querySelector('input[type="checkbox"]') as HTMLInputElement;
     act(() => checkbox.click());
     const buttons = Array.from(dialog.querySelectorAll('button'));
     act(() => buttons[0]!.click());
 
-    await vi.waitFor(() => {
+    await waitForPopupUi(() => {
       expect(storageSetMock).toHaveBeenCalledWith({ webclipper_popup_feishu_sync_open_tab_dont_show_v1: true });
       expect(document.querySelector('[role="dialog"]')).toBeFalsy();
     });
@@ -481,11 +501,9 @@ describe('PopupShell header actions', () => {
 
     (window as any).close = vi.fn();
 
-    act(() => {
-      root!.render(createElement(PopupShell));
-    });
+    await renderPopupShell(root!);
 
-    await vi.waitFor(() => {
+    await waitForPopupUi(() => {
       expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
     });
 
@@ -494,19 +512,18 @@ describe('PopupShell header actions', () => {
     ) as HTMLButtonElement | null;
     expect(commentsBtn).toBeTruthy();
 
-    await vi.waitFor(() => {
+    await waitForPopupUi(() => {
       expect(commentsBtn!.disabled).toBe(false);
     });
 
-    act(() => {
+    await act(async () => {
       commentsBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    });
-
-    await vi.waitFor(() => {
-      expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
-        source: 'popup',
+      await vi.waitFor(() => {
+        expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
+          source: 'popup',
+        });
+        expect((window as any).close).toHaveBeenCalledTimes(1);
       });
-      expect((window as any).close).toHaveBeenCalledTimes(1);
     });
 
     expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();

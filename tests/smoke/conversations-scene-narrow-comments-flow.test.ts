@@ -216,7 +216,7 @@ describe('ConversationsScene narrow comments flow', () => {
     cleanupDom();
   });
 
-  it('goes list -> detail -> comments, ignores Escape there, and returns via close', () => {
+  it('goes list -> detail -> comments, ignores Escape there, and returns via close', async () => {
     const commentsSidebarRuntime = {
       sidebarSession: {
         attachPanel,
@@ -254,9 +254,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const commentBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(commentBtn).toBeTruthy();
-    act(() => {
+    await act(async () => {
       commentBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await flushImmediate();
     });
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
@@ -272,16 +273,18 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(commentsPanel?.style.width).toBe('100%');
     expect(commentsPanel?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__resize-handle')).toBeFalsy();
 
-    act(() => {
+    await act(async () => {
       currentSidebarCloseListener?.();
+      await flushImmediate();
     });
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 
     const commentBtnAfterClose = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(commentBtnAfterClose).toBeTruthy();
-    act(() => {
+    await act(async () => {
       commentBtnAfterClose!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtnAfterClose!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await flushImmediate();
     });
     expect(sidebarOpen).toHaveBeenCalledTimes(2);
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
@@ -293,8 +296,9 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(commentsEscape.defaultPrevented).toBe(false);
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
 
-    act(() => {
+    await act(async () => {
       currentSidebarCloseListener?.();
+      await flushImmediate();
     });
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 
@@ -338,7 +342,7 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
   });
 
-  it('opens detail via pending source/key and then enters comments route', () => {
+  it('opens detail via pending source/key and then enters comments route', async () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,
       source: 'chatgpt',
@@ -374,9 +378,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const commentBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(commentBtn).toBeTruthy();
-    act(() => {
+    await act(async () => {
       commentBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await flushImmediate();
     });
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
