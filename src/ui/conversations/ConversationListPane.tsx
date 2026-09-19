@@ -1027,13 +1027,7 @@ export function ConversationListPane({
                         } else {
                           await openOrFocusExtensionAppTab({ route: `/settings?section=${section}` }).catch(() => null);
                         }
-                        if (isPopupUi()) {
-                          try {
-                            window.close();
-                          } catch (_e) {
-                            // ignore
-                          }
-                        }
+                        if (isPopupUi()) window.close();
                       }}
                       disabled={actionBusy}
                     >
