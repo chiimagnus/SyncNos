@@ -100,13 +100,24 @@ function normalizeAuthConfigInput(input: FeishuOAuthConfigInput = {}): FeishuOAu
   };
 }
 
+function applyFeishuOAuthDefaults(rawConfig: FeishuOAuthConfig): FeishuOAuthConfig {
+  const defaultClientId = safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID);
+  const defaultProxy = normalizeHttpsUrlOrEmpty(DEFAULT_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL);
+  return {
+    clientId: rawConfig.clientId || defaultClientId,
+    clientSecret: rawConfig.clientSecret,
+    tokenExchangeProxyUrl:
+      rawConfig.clientSecret || rawConfig.tokenExchangeProxyUrl ? rawConfig.tokenExchangeProxyUrl : defaultProxy,
+  };
+}
+
 async function readAuthConfig(): Promise<FeishuOAuthConfig> {
   const values = await storageGet([KEY_CLIENT_ID, KEY_CLIENT_SECRET, KEY_TOKEN_EXCHANGE_PROXY_URL]);
-  return {
+  return applyFeishuOAuthDefaults({
     clientId: safeString(values?.[KEY_CLIENT_ID]),
     clientSecret: safeString(values?.[KEY_CLIENT_SECRET]),
     tokenExchangeProxyUrl: normalizeHttpsUrlOrEmpty(values?.[KEY_TOKEN_EXCHANGE_PROXY_URL]),
-  };
+  });
 }
 
 export async function getFeishuOAuthConfigSummary(): Promise<FeishuOAuthConfigSummary> {
@@ -180,11 +191,15 @@ export async function saveFeishuOAuthConfig(input: FeishuOAuthConfigInput): Prom
   return enqueueAuthMutation(async () => {
     const current = await readAuthConfig();
     const has = (key: keyof FeishuOAuthConfigInput) => Object.prototype.hasOwnProperty.call(input, key);
-    const next = normalizeAuthConfigInput({
-      clientId: has('clientId') ? input.clientId : current.clientId,
-      clientSecret: has('clientSecret') ? input.clientSecret : current.clientSecret,
-      tokenExchangeProxyUrl: has('tokenExchangeProxyUrl') ? input.tokenExchangeProxyUrl : current.tokenExchangeProxyUrl,
-    });
+    const next = applyFeishuOAuthDefaults(
+      normalizeAuthConfigInput({
+        clientId: has('clientId') ? input.clientId : current.clientId,
+        clientSecret: has('clientSecret') ? input.clientSecret : current.clientSecret,
+        tokenExchangeProxyUrl: has('tokenExchangeProxyUrl')
+          ? input.tokenExchangeProxyUrl
+          : current.tokenExchangeProxyUrl,
+      }),
+    );
     await saveAuthConfigInsideOwner(next, current);
     return toSafeConfigSummary(next);
   });
@@ -197,7 +212,11 @@ export async function startFeishuOAuthAttempt(): Promise<{ state: string }> {
     const state = createSecureOAuthState();
     const authorizationUrl = buildAuthorizationUrl(config, state);
 
-    await storageSet({ [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
+    await storageSet({
+      ...authConfigStoragePatch(config),
+      [KEY_PENDING_STATE]: state,
+      [KEY_LAST_ERROR]: '',
+    });
     try {
       await tabsCreate({ url: authorizationUrl, active: true });
     } catch (error) {
@@ -210,27 +229,6 @@ export async function startFeishuOAuthAttempt(): Promise<{ state: string }> {
 
 export async function clearFeishuOAuthAttemptAndToken(): Promise<void> {
   return enqueueAuthMutation(() => storageRemove([FEISHU_OAUTH_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR]));
-}
-
-export async function ensureDefaultFeishuOAuthConfig(): Promise<void> {
-  const defaultClientId = safeString(DEFAULT_FEISHU_OAUTH_CLIENT_ID);
-  const defaultProxy = normalizeHttpsUrlOrEmpty(DEFAULT_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL);
-  if (!defaultClientId && !defaultProxy) return;
-
-  try {
-    await enqueueAuthMutation(async () => {
-      const current = await readAuthConfig();
-      const next = {
-        ...current,
-        clientId: current.clientId || defaultClientId,
-        tokenExchangeProxyUrl:
-          current.clientSecret || current.tokenExchangeProxyUrl ? current.tokenExchangeProxyUrl : defaultProxy,
-      };
-      await saveAuthConfigInsideOwner(next, current);
-    });
-  } catch (_error) {
-    // Startup defaulting is best-effort and must not block the background worker.
-  }
 }
 
 function normalizeOAuthTokenResponse(

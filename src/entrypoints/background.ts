@@ -10,7 +10,7 @@ import { registerUiMessageHandlers } from '@platform/messaging/ui-background-han
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
 import { setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
-import { ensureDefaultFeishuOAuthConfig, setupFeishuOAuthNavigationListener } from '@services/sync/feishu/auth/oauth';
+import { setupFeishuOAuthNavigationListener } from '@services/sync/feishu/auth/oauth';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerFeishuSettingsHandlers } from '@services/sync/feishu/settings-background-handlers';
@@ -173,8 +173,6 @@ export default defineBackground(() => {
   } catch (_e) {
     // optional listener registration must not block sibling listeners
   }
-
-  void ensureDefaultFeishuOAuthConfig().catch(() => {});
 
   const providerRecovery = {
     notion: {

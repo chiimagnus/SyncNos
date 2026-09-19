@@ -155,12 +155,21 @@ beforeEach(() => {
 });
 
 describe('Feishu OAuth owner', () => {
-  it('starts from durable config and persists only the pending attempt state', async () => {
+  it('starts from durable config and snapshots the effective config with the pending attempt', async () => {
     seedAuthConfig();
     const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
+    const setSpy = vi.spyOn(chromeMock.storage.local, 'set');
     const started = await startFeishuOAuthAttempt();
 
     expect(getSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy.mock.calls[0]?.[0]).toMatchObject({
+      [CLIENT_ID_KEY]: 'app-id',
+      [CLIENT_SECRET_KEY]: 'app-secret',
+      [PROXY_KEY]: '',
+      [PENDING_KEY]: started.state,
+      [ERROR_KEY]: '',
+    });
     expect(started.state).toMatch(/^[0-9a-f]{32}$/);
     expect(chromeMock.__store).toMatchObject({
       [CLIENT_ID_KEY]: 'app-id',
@@ -392,8 +401,7 @@ describe('Feishu OAuth owner', () => {
     expect(chromeMock.__store[ERROR_KEY]).toBe('');
   });
 
-  it('applies startup auth defaults with one owner read and invalidates an older pending attempt', async () => {
-    chromeMock.__store[PENDING_KEY] = 'old-attempt';
+  it('applies build defaults on read without persisting them', async () => {
     (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__ = 'default-app-id';
     (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__ =
       'https://default-worker.example.com/exchange';
@@ -402,13 +410,119 @@ describe('Feishu OAuth owner', () => {
       vi.resetModules();
       const reloaded = await import('@services/sync/feishu/auth/oauth');
       const getSpy = vi.spyOn(chromeMock.storage.local, 'get');
+      const setSpy = vi.spyOn(chromeMock.storage.local, 'set');
 
-      await reloaded.ensureDefaultFeishuOAuthConfig();
+      await expect(reloaded.getFeishuOAuthConfigSummary()).resolves.toEqual({
+        clientId: 'default-app-id',
+        clientSecretPresent: false,
+        tokenExchangeProxyUrl: 'https://default-worker.example.com/exchange',
+      });
 
       expect(getSpy).toHaveBeenCalledTimes(1);
-      expect(chromeMock.__store[CLIENT_ID_KEY]).toBe('default-app-id');
-      expect(chromeMock.__store[PROXY_KEY]).toBe('https://default-worker.example.com/exchange');
-      expect(chromeMock.__store[PENDING_KEY]).toBe('');
+      expect(setSpy).not.toHaveBeenCalled();
+      expect(chromeMock.__store[CLIENT_ID_KEY]).toBeUndefined();
+      expect(chromeMock.__store[PROXY_KEY]).toBeUndefined();
+    } finally {
+      delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__;
+      delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__;
+    }
+  });
+
+  it('freezes effective defaults into the pending attempt before opening the authorization tab', async () => {
+    (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__ = 'old-default-app';
+    (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__ = 'https://old-worker.example.com/exchange';
+
+    try {
+      vi.resetModules();
+      const firstBuild = await import('@services/sync/feishu/auth/oauth');
+      const started = await firstBuild.startFeishuOAuthAttempt();
+
+      expect(chromeMock.__storeAtCreate[0]).toMatchObject({
+        [CLIENT_ID_KEY]: 'old-default-app',
+        [CLIENT_SECRET_KEY]: '',
+        [PROXY_KEY]: 'https://old-worker.example.com/exchange',
+        [PENDING_KEY]: started.state,
+        [ERROR_KEY]: '',
+      });
+
+      (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__ = 'new-default-app';
+      (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__ = 'https://new-worker.example.com/exchange';
+      vi.resetModules();
+      const secondBuild = await import('@services/sync/feishu/auth/oauth');
+      const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+        expect(url).toBe('https://old-worker.example.com/exchange');
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          code: 'code-old-attempt',
+          clientId: 'old-default-app',
+        });
+        return jsonResponse({ access_token: 'old-attempt-token', refresh_token: 'refresh', expires_in: 60 });
+      });
+
+      await expect(
+        secondBuild.handleFeishuOAuthCallbackNavigation(
+          {
+            url: `${secondBuild.getFeishuOAuthDefaults().redirectUri}?code=code-old-attempt&state=${started.state}`,
+            tabId: 8,
+          },
+          { fetchImpl: fetchImpl as any, now: () => 100 },
+        ),
+      ).resolves.toBe(true);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(chromeMock.__store[TOKEN_KEY]).toMatchObject({ accessToken: 'old-attempt-token' });
+    } finally {
+      delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__;
+      delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__;
+    }
+  });
+
+  it('keeps stored user config ahead of build defaults and allows an empty proxy with a client secret', async () => {
+    Object.assign(chromeMock.__store, {
+      [CLIENT_ID_KEY]: 'user-app-id',
+      [CLIENT_SECRET_KEY]: 'user-secret',
+      [PROXY_KEY]: '',
+    });
+    (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__ = 'default-app-id';
+    (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__ =
+      'https://default-worker.example.com/exchange';
+
+    try {
+      vi.resetModules();
+      const reloaded = await import('@services/sync/feishu/auth/oauth');
+      await expect(reloaded.getFeishuOAuthConfigSummary()).resolves.toEqual({
+        clientId: 'user-app-id',
+        clientSecretPresent: true,
+        tokenExchangeProxyUrl: '',
+      });
+    } finally {
+      delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__;
+      delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__;
+    }
+  });
+
+  it('keeps blank/default-equivalent saves consistent with the next effective read', async () => {
+    (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__ = 'default-app-id';
+    (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__ =
+      'https://default-worker.example.com/exchange';
+
+    try {
+      vi.resetModules();
+      const reloaded = await import('@services/sync/feishu/auth/oauth');
+      const setSpy = vi.spyOn(chromeMock.storage.local, 'set');
+
+      const saved = await reloaded.saveFeishuOAuthConfig({
+        clientId: '',
+        clientSecret: '',
+        tokenExchangeProxyUrl: '',
+      });
+      const reread = await reloaded.getFeishuOAuthConfigSummary();
+
+      expect(saved).toEqual({
+        clientId: 'default-app-id',
+        clientSecretPresent: false,
+        tokenExchangeProxyUrl: 'https://default-worker.example.com/exchange',
+      });
+      expect(reread).toEqual(saved);
+      expect(setSpy).not.toHaveBeenCalled();
     } finally {
       delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_CLIENT_ID__;
       delete (globalThis as any).__SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__;

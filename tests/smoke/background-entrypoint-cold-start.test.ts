@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   registerOpenTargetHandlers: vi.fn(),
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
-  ensureDefaultFeishuOAuthConfig: vi.fn(),
   registerClipperContextMenu: vi.fn(),
   onInstalled: vi.fn(),
   onAlarm: vi.fn(),
@@ -77,7 +76,6 @@ vi.mock('@services/sync/notion/auth/oauth', () => ({
   setupNotionOAuthNavigationListener: mocks.setupNotionOAuthNavigationListener,
 }));
 vi.mock('@services/sync/feishu/auth/oauth', () => ({
-  ensureDefaultFeishuOAuthConfig: mocks.ensureDefaultFeishuOAuthConfig,
   setupFeishuOAuthNavigationListener: mocks.setupFeishuOAuthNavigationListener,
 }));
 vi.mock('@platform/runtime/runtime', () => ({ onInstalled: mocks.onInstalled }));
@@ -183,7 +181,6 @@ async function loadBackground() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  mocks.ensureDefaultFeishuOAuthConfig.mockResolvedValue(undefined);
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);
   mocks.ensureDisplayMode.mockResolvedValue('all');
   mocks.readDisplayMode.mockResolvedValue('all');
@@ -201,21 +198,15 @@ beforeEach(() => {
 });
 
 describe('background entrypoint cold start', () => {
-  it('runs auth bootstrap cleanup/defaults only once when onInstalled fires', async () => {
+  it('registers auth navigation listeners without a Feishu startup-defaulting path', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
-    let installedListener: ((details?: { reason?: string }) => void) | null = null;
-    mocks.onInstalled.mockImplementationOnce((listener: any) => {
-      installedListener = listener;
-    });
 
     const callback = await loadBackground();
     expect(callback()).toBeUndefined();
     await flushMicrotasks();
-    expect(mocks.ensureDefaultFeishuOAuthConfig).toHaveBeenCalledTimes(1);
 
-    installedListener?.({ reason: 'update' });
-    await flushMicrotasks();
-    expect(mocks.ensureDefaultFeishuOAuthConfig).toHaveBeenCalledTimes(1);
+    expect(mocks.setupNotionOAuthNavigationListener).toHaveBeenCalledTimes(1);
+    expect(mocks.setupFeishuOAuthNavigationListener).toHaveBeenCalledTimes(1);
   });
 
   it('registers runtime and browser listeners before locale readiness settles', async () => {
