@@ -34,7 +34,7 @@ import type { SyncStartAck } from '@services/sync/repo';
 import { t } from '@i18n';
 import { getSyncProviderDefinition } from '@services/sync/sync-provider-registry';
 
-export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
+type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
 
 export type ConversationSyncFeedbackState = {
   provider: SyncProvider | null;
@@ -109,7 +109,7 @@ function toFailureSummariesFromRows(rows: readonly SyncPerConversationResult[]):
     }));
 }
 
-export type SyncWarningSummary = {
+type SyncWarningSummary = {
   conversationId: number;
   conversationTitle?: string;
   code: string;

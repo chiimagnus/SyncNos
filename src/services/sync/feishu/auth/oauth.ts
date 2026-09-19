@@ -28,14 +28,14 @@ const KEY_LAST_ERROR = 'feishu_oauth_last_error';
 
 let authMutationQueue: Promise<void> = Promise.resolve();
 
-export type FeishuOAuthDefaults = {
+type FeishuOAuthDefaults = {
   authorizationUrl: string;
   redirectUri: string;
   responseType: 'code';
   scope: string;
 };
 
-export type FeishuOAuthConfig = {
+type FeishuOAuthConfig = {
   clientId: string;
   clientSecret: string;
   tokenExchangeProxyUrl: string;
@@ -47,7 +47,7 @@ export type FeishuOAuthConfigInput = {
   tokenExchangeProxyUrl?: unknown;
 };
 
-export type FeishuOAuthConfigSummary = {
+type FeishuOAuthConfigSummary = {
   clientId: string;
   clientSecretPresent: boolean;
   tokenExchangeProxyUrl: string;
@@ -344,7 +344,7 @@ async function removeTab(tabId: number) {
   }
 }
 
-export type FeishuOAuthCallbackDetails = {
+type FeishuOAuthCallbackDetails = {
   url: string;
   tabId?: number;
 };
