@@ -266,11 +266,11 @@ describe('data revision observer', () => {
     stop();
   });
 
-  it('keeps the last stable checkpoint across rejected and unstable snapshot reads', async () => {
+  it('keeps the last stable checkpoint across a rejected snapshot read', async () => {
     const readSnapshot = vi
       .fn()
       .mockResolvedValueOnce(snapshot())
-      .mockRejectedValueOnce(Object.assign(new Error('snapshot_unstable'), { code: 'snapshot_unstable' }))
+      .mockRejectedValueOnce(new Error('revision snapshot read failed'))
       .mockResolvedValueOnce(snapshot({ conversations: 1 }));
     const { observer } = createObserver(readSnapshot);
     const listener = vi.fn();

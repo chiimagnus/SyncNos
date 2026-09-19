@@ -35,23 +35,26 @@ export async function readDataRevision(scope: DataRevisionScope): Promise<number
   return normalizeDataRevisionRecord(stored).revision;
 }
 
-async function readSnapshotPass(): Promise<DataRevisionSnapshot> {
-  const entries = await Promise.all(
-    DATA_REVISION_SCOPES.map(async (scope) => [scope, await readDataRevision(scope)] as const),
-  );
-  return Object.fromEntries(entries) as DataRevisionSnapshot;
-}
-
-function snapshotsEqual(left: DataRevisionSnapshot, right: DataRevisionSnapshot): boolean {
-  return DATA_REVISION_SCOPES.every((scope) => left[scope] === right[scope]);
-}
-
 export async function readDataRevisionSnapshot(): Promise<DataRevisionSnapshot> {
-  const first = await readSnapshotPass();
-  const second = await readSnapshotPass();
-  if (snapshotsEqual(first, second)) return second;
+  const db = await openDb();
+  const storeNames = DATA_REVISION_SCOPES.map((scope) => DATA_REVISION_STORE_BY_SCOPE[scope]);
+  const transaction = db.transaction(storeNames, 'readonly');
+  const done = txDone(transaction);
 
-  const third = await readSnapshotPass();
-  if (snapshotsEqual(second, third)) return third;
-  throw Object.assign(new Error('snapshot_unstable'), { code: 'snapshot_unstable' as const });
+  const requests = DATA_REVISION_SCOPES.map(async (scope) => {
+    const storeName = DATA_REVISION_STORE_BY_SCOPE[scope];
+    const stored = await requestResult(transaction.objectStore(storeName).get(DATA_REVISION_RECORD_KEY));
+    return [scope, normalizeDataRevisionRecord(stored).revision] as const;
+  });
+
+  let entries: ReadonlyArray<readonly [DataRevisionScope, number]>;
+  try {
+    entries = await Promise.all(requests);
+  } catch (error) {
+    await done.catch(() => undefined);
+    throw error;
+  }
+
+  await done;
+  return Object.fromEntries(entries) as DataRevisionSnapshot;
 }
