@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { resolveRepoRoot, resolveWebclipperRoot, run } from './script-utils.mjs';
 
 function parseArgs(argv) {
@@ -120,6 +120,9 @@ manifest = applyTargetManifestPatches(manifest, {
   geckoMinVersion: cli.geckoMinVersion || process.env.FIREFOX_MIN_VERSION || null,
 });
 writeText(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+const distRelativeToRepo = relative(repoRoot, dist);
+run('node', ['.github/scripts/webclipper/check-dist.mjs', `--root=${distRelativeToRepo}`], webclipperRoot);
 
 if (cli.zip) {
   const zipName =

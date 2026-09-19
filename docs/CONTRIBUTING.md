@@ -72,7 +72,7 @@ PR 应让不掌握作者本地上下文的人也能判断改动是否正确：
 | 官网 / GitHub Pages 布局与样式改动 | `npm run website:build`，并在 push 前通过本地 HTTP 以 `/SyncNos/` Pages 路径在真实浏览器渲染首页与受影响 Docs；检查受影响的深浅色、导航与滚动状态 |
 | 视觉行为 | 记录受影响状态的前后效果 |
 
-模拟平台测试只能证明对应契约，不应写成真实 Windows/Linux/浏览器 E2E。CI 对 WebClipper 代码运行 `npm run gate:ci`；绿色 CI 不能替代要求的 production build 或手动验证。
+模拟平台测试只能证明对应契约，不应写成真实 Windows/Linux/浏览器 E2E。CI 对 WebClipper 代码运行 `npm run gate:ci`；绿色 CI 不能替代要求的 production build 或手动验证。`npm run gate` 会额外构建 Chromium production artifact 并执行 `check:dist`；Zen / Safari 或对应打包流程有改动时仍分别运行 `npm run check:zen` / `npm run check:safari`。
 
 触及 [`AGENTS.md`](../AGENTS.md) 中的不变量时，在 PR 中附上对应的定向测试或架构扫描证据。
 
