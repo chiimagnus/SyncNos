@@ -140,6 +140,17 @@ describe('dist static closure analyzer', () => {
     await expect(assertHtmlModuleEntriesAreRoots(appToPopupRoot)).rejects.toThrow(/must remain a graph root/);
   });
 
+  it('rejects imports of nested HTML module entries', async () => {
+    const root = createRoot();
+    write(root, 'popup.html', '<script type="module" src="/popup.js"></script>');
+    write(root, 'pages/settings.html', '<script type="module" src="./settings.js"></script>');
+    write(root, 'popup.js', "import('./render.js');");
+    write(root, 'render.js', "import './pages/settings.js';");
+    write(root, 'pages/settings.js', 'globalThis.__mountedSettings = true;');
+
+    await expect(assertHtmlModuleEntriesAreRoots(root)).rejects.toThrow(/must remain a graph root/);
+  });
+
   it('ignores unrelated non-literal runtime imports while checking HTML entry roots', async () => {
     const root = createRoot();
     write(root, 'popup.html', '<script type="module" src="/popup.js"></script>');

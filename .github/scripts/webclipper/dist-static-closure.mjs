@@ -155,14 +155,26 @@ export async function collectStaticModuleClosure(root, entries, options = {}) {
   return collectModuleClosure(root, entries, options);
 }
 
+function listFilesByExtension(root, extension) {
+  const files = [];
+  const visit = (dir) => {
+    for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+      const path = resolve(dir, dirent.name);
+      if (dirent.isDirectory()) visit(path);
+      else if (dirent.isFile() && dirent.name.endsWith(extension)) files.push(path);
+    }
+  };
+  visit(root);
+  return files;
+}
+
 export function resolveHtmlModuleEntries(root) {
   const entries = new Map();
-  for (const dirent of readdirSync(root, { withFileTypes: true })) {
-    if (!dirent.isFile() || !dirent.name.endsWith('.html')) continue;
-    const htmlPath = resolve(root, dirent.name);
+  for (const htmlPath of listFilesByExtension(root, '.html')) {
     const dom = new JSDOM(readFileSync(htmlPath, 'utf8'));
+    const displayPath = normalizeDisplayPath(root, htmlPath);
     const scripts = [...dom.window.document.querySelectorAll('script[type="module"][src]')].map((script) =>
-      resolveDistAsset(root, script.getAttribute('src'), htmlPath, `${dirent.name} module entry`),
+      resolveDistAsset(root, script.getAttribute('src'), htmlPath, `${displayPath} module entry`),
     );
     if (scripts.length) entries.set(htmlPath, [...new Set(scripts)]);
   }
@@ -170,16 +182,7 @@ export function resolveHtmlModuleEntries(root) {
 }
 
 function listJavaScriptFiles(root) {
-  const files = [];
-  const visit = (dir) => {
-    for (const dirent of readdirSync(dir, { withFileTypes: true })) {
-      const path = resolve(dir, dirent.name);
-      if (dirent.isDirectory()) visit(path);
-      else if (dirent.isFile() && dirent.name.endsWith('.js')) files.push(path);
-    }
-  };
-  visit(root);
-  return files;
+  return listFilesByExtension(root, '.js');
 }
 
 export async function assertHtmlModuleEntriesAreRoots(root) {
