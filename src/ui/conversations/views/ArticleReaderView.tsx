@@ -550,7 +550,7 @@ export function ArticleReaderView({
                 );
               })}
             </div>
-          ) : activeId && !isVideoReader ? (
+          ) : activeId && !isVideoReader && !loadingDetail && !detailError ? (
             <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
           ) : !activeId ? (
             <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">

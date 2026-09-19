@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import ReactDOM from 'react-dom/client';
-import { act, createElement } from 'react';
+import { act, createElement, StrictMode, useLayoutEffect } from 'react';
 
 import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
 
@@ -165,6 +165,16 @@ function Probe() {
   return null;
 }
 
+function StrictDetailDemandProbe() {
+  latestState = useConversationsApp();
+  const { setDetailSurfaceActive } = latestState;
+  useLayoutEffect(() => {
+    setDetailSurfaceActive(true);
+    return () => setDetailSurfaceActive(false);
+  }, [setDetailSurfaceActive]);
+  return null;
+}
+
 describe('ConversationsProvider pagination state', () => {
   let root: ReactDOM.Root | null = null;
 
@@ -233,6 +243,14 @@ describe('ConversationsProvider pagination state', () => {
   async function renderProvider(providerProps?: any) {
     await act(async () => {
       root!.render(createElement(ConversationsProvider, providerProps ?? null, createElement(Probe)));
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+  }
+
+  async function activateDetailSurface() {
+    await act(async () => {
+      latestState.setDetailSurfaceActive(true);
       await flushMicrotasks();
       await flushMicrotasks();
     });
@@ -504,6 +522,96 @@ describe('ConversationsProvider pagination state', () => {
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
   });
 
+  it('deduplicates StrictMode detail-demand layout replay before the active target is established', async () => {
+    const target = makeConversation(7, 'chatgpt', 'conv-7');
+    findConversationBySourceAndKey.mockResolvedValue(target);
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+    getConversationById.mockResolvedValue(target);
+    getConversationDetail.mockResolvedValue({ conversationId: 7, messages: [] });
+
+    await act(async () => {
+      root!.render(
+        createElement(
+          StrictMode,
+          null,
+          createElement(
+            ConversationsProvider,
+            { initialOpenLoc: { source: 'chatgpt', conversationKey: 'conv-7' } },
+            createElement(StrictDetailDemandProbe),
+          ),
+        ),
+      );
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(Number(latestState.activeId)).toBe(7);
+    expect(getConversationById).toHaveBeenCalledTimes(1);
+    expect(getConversationById).toHaveBeenCalledWith(7);
+    expect(getConversationDetail).toHaveBeenCalledTimes(1);
+    expect(getConversationDetail).toHaveBeenCalledWith(7);
+  });
+
+  it('keeps list bootstrap free of hidden point, detail, and Header reads', async () => {
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(1, 'chatgpt', 'conv-1')]));
+
+    await renderProvider();
+
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(latestState.loadingDetail).toBe(false);
+    expect(getConversationById).not.toHaveBeenCalled();
+    expect(getConversationDetail).not.toHaveBeenCalled();
+    expect(resolveDetailHeaderActions).not.toHaveBeenCalled();
+  });
+
+  it('keeps an active detail surface idle when the authoritative list is empty', async () => {
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+
+    await renderProvider();
+    await activateDetailSurface();
+
+    expect(latestState.activeId).toBeNull();
+    expect(latestState.loadingDetail).toBe(false);
+    expect(getConversationById).not.toHaveBeenCalled();
+    expect(getConversationDetail).not.toHaveBeenCalled();
+    expect(resolveDetailHeaderActions).not.toHaveBeenCalled();
+  });
+
+  it('starts exactly one point/detail activation when hidden selection and detail route open in one batch', async () => {
+    const first = makeConversation(1, 'chatgpt', 'conv-1');
+    const second = makeConversation(2, 'chatgpt', 'conv-2');
+    getConversationListBootstrap.mockResolvedValue(makePage([first, second]));
+    getConversationById.mockImplementation(async (conversationId: number) =>
+      Number(conversationId) === 2 ? second : first,
+    );
+    getConversationDetail.mockImplementation(async (conversationId: number) => ({
+      conversationId: Number(conversationId),
+      messages: [],
+    }));
+
+    await renderProvider();
+    expect(getConversationById).not.toHaveBeenCalled();
+    expect(getConversationDetail).not.toHaveBeenCalled();
+
+    act(() => {
+      latestState.activateLoadedConversation(2);
+      latestState.setDetailSurfaceActive(true);
+    });
+    expect(latestState.loadingDetail).toBe(true);
+
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(getConversationById).toHaveBeenCalledTimes(1);
+    expect(getConversationById).toHaveBeenCalledWith(2);
+    expect(getConversationDetail).toHaveBeenCalledTimes(1);
+    expect(getConversationDetail).toHaveBeenCalledWith(2);
+    expect(Number(latestState.detail?.conversationId)).toBe(2);
+  });
+
   it('keeps detail state aligned with the current active conversation', async () => {
     getConversationListBootstrap.mockResolvedValue(
       makePage([
@@ -527,6 +635,9 @@ describe('ConversationsProvider pagination state', () => {
     });
 
     expect(Number(latestState.activeId)).toBe(1);
+    expect(getConversationDetail).not.toHaveBeenCalled();
+
+    await activateDetailSurface();
 
     await act(async () => {
       detailReqs.get(1)?.resolve({
@@ -579,10 +690,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationDetail.mockResolvedValue({ conversationId: 401, messages: [] });
 
     await renderProvider();
-    await act(async () => {
-      await flushMicrotasks();
-      await flushMicrotasks();
-    });
+    await activateDetailSurface();
 
     const initialCalls = resolveDetailHeaderActions.mock.calls.length;
     expect(initialCalls).toBeGreaterThan(0);
@@ -694,9 +802,8 @@ describe('ConversationsProvider pagination state', () => {
     getConversationById.mockResolvedValue(article);
 
     await renderProvider();
+    await activateDetailSurface();
     await act(async () => {
-      await flushMicrotasks();
-      await flushMicrotasks();
       await flushMicrotasks();
     });
 

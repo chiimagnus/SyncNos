@@ -71,7 +71,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
     pendingListLocateId: null,
-    requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
@@ -96,7 +95,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     detailHeaderActions: [],
     refreshList: vi.fn(),
-    refreshActiveDetail: vi.fn(),
+    setDetailSurfaceActive: vi.fn(),
   }),
 }));
 

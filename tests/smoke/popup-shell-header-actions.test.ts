@@ -87,7 +87,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
     refreshList: vi.fn(),
-    refreshActiveDetail: vi.fn(),
+    setDetailSurfaceActive: vi.fn(),
   }),
 }));
 

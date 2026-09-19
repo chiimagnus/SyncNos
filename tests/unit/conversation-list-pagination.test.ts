@@ -155,14 +155,13 @@ function buildState(overrides: Record<string, unknown> = {}) {
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
     pendingListLocateId: null,
-    requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),
     exportSelectedMarkdown: vi.fn(),
     syncSelected: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
     refreshList: vi.fn(async () => {}),
-    refreshActiveDetail: vi.fn(async () => {}),
+    setDetailSurfaceActive: vi.fn(),
     ...overrides,
   };
 }

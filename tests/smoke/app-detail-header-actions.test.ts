@@ -169,6 +169,8 @@ describe('ConversationDetailPane header actions', () => {
   beforeEach(() => {
     setupDom();
     currentState.activeId = 11;
+    currentState.loadingDetail = false;
+    currentState.detailError = null;
     currentState.selectedConversation = {
       id: 11,
       title: 'Conversation',
@@ -200,6 +202,33 @@ describe('ConversationDetailPane header actions', () => {
     });
     root = null;
     cleanupDom();
+  });
+
+  it('shows loading without also rendering the empty-message state for chat and article detail', async () => {
+    currentState.loadingDetail = true;
+    currentState.detailError = null;
+    currentState.detail = { conversationId: 11, messages: [] } as any;
+
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+    expect(document.body.textContent || '').toContain('Loading...');
+    expect(document.body.textContent || '').not.toContain('No messages');
+
+    currentState.selectedConversation = {
+      ...currentState.selectedConversation,
+      source: 'web',
+      sourceType: 'article',
+      url: 'https://example.com/article',
+    } as any;
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(document.body.textContent || '').toContain('Loading...');
+    expect(document.body.textContent || '').not.toContain('No messages');
   });
 
   it('renders two floating control islands and keeps title and URL in content metadata', () => {

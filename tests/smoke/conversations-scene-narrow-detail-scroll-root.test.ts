@@ -66,7 +66,6 @@ const useConversationsAppMock = vi.fn(() => ({
   setListSourceFilterKeyPersistent: vi.fn(),
   setListSiteFilterKeyPersistent: vi.fn(),
   pendingListLocateId: null,
-  requestListLocate: vi.fn(),
   consumeListLocate: vi.fn(() => null),
   openConversationExternalByLoc: vi.fn(),
   openConversationExternalBySourceKey: vi.fn(),
@@ -85,7 +84,7 @@ const useConversationsAppMock = vi.fn(() => ({
   },
   detailHeaderActions: [],
   refreshList: vi.fn(),
-  refreshActiveDetail: vi.fn(),
+  setDetailSurfaceActive: vi.fn(),
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -179,7 +178,6 @@ describe('ConversationsScene narrow detail scroll root', () => {
       setListSourceFilterKeyPersistent: vi.fn(),
       setListSiteFilterKeyPersistent: vi.fn(),
       pendingListLocateId: null,
-      requestListLocate: vi.fn(),
       consumeListLocate: vi.fn(() => null),
       openConversationExternalByLoc: vi.fn(),
       openConversationExternalBySourceKey: vi.fn(),
@@ -198,7 +196,7 @@ describe('ConversationsScene narrow detail scroll root', () => {
       },
       detailHeaderActions: [],
       refreshList: vi.fn(),
-      refreshActiveDetail: vi.fn(),
+      setDetailSurfaceActive: vi.fn(),
     }));
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });

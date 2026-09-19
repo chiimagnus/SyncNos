@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
@@ -57,8 +57,12 @@ export function ConversationsScene({
   wideChrome = 'card',
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { selectedConversation, openConversationExternalBySourceKey, openConversationExternalById } =
-    useConversationsApp();
+  const {
+    selectedConversation,
+    openConversationExternalBySourceKey,
+    openConversationExternalById,
+    setDetailSurfaceActive,
+  } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,
@@ -78,6 +82,12 @@ export function ConversationsScene({
     (typeof onOpenCommentsExternally === 'function' || Boolean(commentsSidebarRuntime)) &&
     commentsSidebarEnabled &&
     Boolean(selectedConversationCanonicalUrl);
+  const detailSurfaceVisible = !isNarrow || narrowRoute === 'detail';
+
+  useLayoutEffect(() => {
+    setDetailSurfaceActive(detailSurfaceVisible);
+    return () => setDetailSurfaceActive(false);
+  }, [detailSurfaceVisible, setDetailSurfaceActive]);
 
   useEffect(() => {
     if (!isNarrow) return;
