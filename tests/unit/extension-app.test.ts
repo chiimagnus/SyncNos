@@ -49,6 +49,7 @@ describe('extension app tab routing', () => {
       active: true,
       url: 'chrome-extension://syncnos/app.html#/settings?section=aboutyou',
     });
+    expect(tabsUpdate.mock.invocationCallOrder[0]).toBeLessThan(windowsUpdate.mock.invocationCallOrder[0]);
     expect(tabsCreate).not.toHaveBeenCalled();
   });
 
