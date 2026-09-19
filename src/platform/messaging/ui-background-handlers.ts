@@ -13,11 +13,11 @@ type AnyRouter = {
 };
 
 type UiMessageHandlersOptions = {
-  ensureLocaleReady?: () => Promise<unknown>;
+  ensureLocaleReady: () => Promise<unknown>;
 };
 
-export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions = {}) {
-  const ensureLocaleReady = options.ensureLocaleReady || (async () => undefined);
+export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions) {
+  const ensureLocaleReady = options.ensureLocaleReady;
   const ensureFallbackLocaleReady = async () => {
     await ensureLocaleReady().catch(() => undefined);
   };
