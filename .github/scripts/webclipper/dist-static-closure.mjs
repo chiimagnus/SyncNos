@@ -29,7 +29,7 @@ function assertLocalSpecifier(specifier, label) {
   return value;
 }
 
-export function resolveDistAsset(root, specifier, fromPath, label = 'asset') {
+function resolveDistAsset(root, specifier, fromPath, label = 'asset') {
   const localSpecifier = assertLocalSpecifier(specifier, label);
   const pathPart = stripUrlSuffix(localSpecifier);
   if (!pathPart) throw new Error(`${label} has no local path: ${localSpecifier}`);
@@ -168,7 +168,7 @@ function listFilesByExtension(root, extension) {
   return files;
 }
 
-export function resolveHtmlModuleEntries(root) {
+function resolveHtmlModuleEntries(root) {
   const entries = new Map();
   for (const htmlPath of listFilesByExtension(root, '.html')) {
     const dom = new JSDOM(readFileSync(htmlPath, 'utf8'));
