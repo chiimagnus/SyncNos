@@ -7,38 +7,38 @@ import type {
   ConversationListQueryInput,
 } from '@services/conversations/domain/models';
 
-export async function getConversationListBootstrap(
+export function getConversationListBootstrap(
   queryInput?: ConversationListQueryInput | null,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  return await idb.getConversationListBootstrap(queryInput, limit);
+  return idb.getConversationListBootstrap(queryInput, limit);
 }
 
-export async function getConversationListPage(
+export function getConversationListPage(
   queryInput: ConversationListQueryInput | null | undefined,
   cursor: ConversationListCursor,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  return await idb.getConversationListPage(queryInput, cursor, limit);
+  return idb.getConversationListPage(queryInput, cursor, limit);
 }
 
-export async function findConversationBySourceAndKey(
+export function findConversationBySourceAndKey(
   source: string,
   conversationKey: string,
 ): Promise<ConversationListOpenTarget | null> {
-  return await idb.findConversationBySourceAndKey(source, conversationKey);
+  return idb.findConversationBySourceAndKey(source, conversationKey);
 }
 
-export async function getConversationById(conversationId: number): Promise<Conversation | null> {
-  return await idb.getConversationById(conversationId);
+export function getConversationById(conversationId: number): Promise<Conversation | null> {
+  return idb.getConversationById(conversationId);
 }
 
-export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {
-  return await idb.getConversationBySourceConversationKey(source, conversationKey);
+export function getConversationBySourceConversationKey(source: string, conversationKey: string) {
+  return idb.getConversationBySourceConversationKey(source, conversationKey);
 }
 
-export async function getConversationTailWindowBySourceAndKey(source: string, conversationKey: string, limit: number) {
-  return await idb.getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
+export function getConversationTailWindowBySourceAndKey(source: string, conversationKey: string, limit: number) {
+  return idb.getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
 }
 
 export async function getConversationDetail(conversationId: number) {
@@ -46,23 +46,23 @@ export async function getConversationDetail(conversationId: number) {
   return { conversationId, messages };
 }
 
-export async function searchConversations(input: idb.ConversationSearchInput): Promise<idb.ConversationSearchResult[]> {
-  return await idb.searchConversations(input);
+export function searchConversations(input: idb.ConversationSearchInput): Promise<idb.ConversationSearchResult[]> {
+  return idb.searchConversations(input);
 }
 
-export async function readRecentConversationMentionCandidates(input: { maxScan: number; maxDurationMs: number }) {
-  return await idb.readRecentConversationMentionCandidates(input);
+export function readRecentConversationMentionCandidates(input: { maxScan: number; maxDurationMs: number }) {
+  return idb.readRecentConversationMentionCandidates(input);
 }
 
-export async function readConversationMentionCandidatePool(input: { maxScan: number; maxDurationMs: number }) {
-  return await idb.readConversationMentionCandidatePool(input);
+export function readConversationMentionCandidatePool(input: { maxScan: number; maxDurationMs: number }) {
+  return idb.readConversationMentionCandidatePool(input);
 }
 
-export async function upsertConversation(payload: any) {
-  return await idb.upsertConversation(payload);
+export function upsertConversation(payload: any) {
+  return idb.upsertConversation(payload);
 }
 
-export async function syncConversationMessages(
+export function syncConversationMessages(
   conversationId: number,
   messages: any[],
   options?: {
@@ -71,21 +71,17 @@ export async function syncConversationMessages(
     activityAt?: number;
   },
 ) {
-  return await idb.syncConversationMessages(conversationId, messages, options);
+  return idb.syncConversationMessages(conversationId, messages, options);
 }
 
-export async function deleteConversationsByIds(conversationIds: any[]) {
-  return await idb.deleteConversationsByIds(conversationIds);
+export function deleteConversationsByIds(conversationIds: any[]) {
+  return idb.deleteConversationsByIds(conversationIds);
 }
 
-export async function mergeConversationsByIds(input: { keepConversationId: number; removeConversationId: number }) {
-  return await idb.mergeConversationsByIds(input);
+export function mergeConversationsByIds(input: { keepConversationId: number; removeConversationId: number }) {
+  return idb.mergeConversationsByIds(input);
 }
 
-export async function updateConversationUrlById(input: {
-  conversationId: number;
-  url: string;
-  mergeExisting?: boolean;
-}) {
-  return await idb.updateConversationUrlById(input);
+export function updateConversationUrlById(input: { conversationId: number; url: string; mergeExisting?: boolean }) {
+  return idb.updateConversationUrlById(input);
 }
