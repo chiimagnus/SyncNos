@@ -383,11 +383,7 @@ export default function AppShell() {
       settingsLastActiveElementRef.current = null;
       if (!lastActive) return;
       if (!document.contains(lastActive)) return;
-      try {
-        lastActive.focus({ preventScroll: true });
-      } catch (e) {
-        void e;
-      }
+      lastActive.focus({ preventScroll: true });
     }, [showSettingsSheet]);
 
     useEffect(() => {
@@ -417,13 +413,9 @@ export default function AppShell() {
 
       processedLocRef.current = loc;
       pendingExternalLocRef.current = loc;
-      void Promise.resolve(
-        openConversationExternalByLoc({
-          source: decoded.source,
-          conversationKey: decoded.conversationKey,
-        }),
-      ).catch(() => {
-        if (pendingExternalLocRef.current === loc) pendingExternalLocRef.current = null;
+      void openConversationExternalByLoc({
+        source: decoded.source,
+        conversationKey: decoded.conversationKey,
       });
     }, [location.pathname, location.search, openConversationExternalByLoc]);
 
