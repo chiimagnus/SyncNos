@@ -127,7 +127,6 @@ type RuntimeInstalledDetails = {
 };
 
 export function onInstalled(listener: (details?: RuntimeInstalledDetails) => void): void {
-  if (typeof listener !== 'function') return;
   const anyGlobal = globalThis as any;
   const event = anyGlobal.browser?.runtime?.onInstalled ?? anyGlobal.chrome?.runtime?.onInstalled;
   if (!event?.addListener) return;
@@ -137,5 +136,3 @@ export function onInstalled(listener: (details?: RuntimeInstalledDetails) => voi
     // Runtime listener registration is optional when the extension context is unavailable.
   }
 }
-
-export { INVALIDATED_MESSAGE };

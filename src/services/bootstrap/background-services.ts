@@ -99,7 +99,7 @@ export type FeishuSyncOrchestrator = SyncOwnershipSurface &
 
 export type GithubSyncOrchestrator = ReturnType<typeof createGithubSyncOrchestrator>;
 
-export type BackgroundServices = {
+type BackgroundServices = {
   notionSyncOrchestrator: NotionSyncOrchestrator;
   obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
   feishuSyncOrchestrator: FeishuSyncOrchestrator;
