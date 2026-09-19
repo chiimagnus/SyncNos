@@ -24,7 +24,7 @@ async function registerMenu(options: {
   setDisplayMode: (mode: 'supported' | 'all' | 'off') => Promise<unknown>;
 }) {
   const { registerClipperContextMenu } = await import('@platform/context-menus/clipper-context-menu');
-  return registerClipperContextMenu(options);
+  return registerClipperContextMenu({ displayModeStorageKey: 'inpage_display_mode', ...options });
 }
 
 function deferred<T = void>() {

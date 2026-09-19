@@ -86,6 +86,7 @@ vi.mock('@platform/context-menus/clipper-context-menu', () => ({
 vi.mock('@platform/alarms/alarms', () => ({ onAlarm: mocks.onAlarm }));
 vi.mock('@platform/storage/local', () => ({ storageOnChanged: mocks.storageOnChanged }));
 vi.mock('@services/shared/inpage-display-mode', () => ({
+  INPAGE_DISPLAY_MODE_STORAGE_KEY: 'inpage_display_mode',
   readEffectiveInpageDisplayMode: mocks.readDisplayMode,
   setCanonicalInpageDisplayMode: mocks.setDisplayMode,
 }));

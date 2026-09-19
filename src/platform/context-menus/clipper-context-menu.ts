@@ -5,7 +5,6 @@ import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
-const STORAGE_KEY_DISPLAY_MODE = 'inpage_display_mode';
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
 const MENU_ROOT_ID = 'syncnos_clipper_root';
@@ -190,6 +189,7 @@ async function updateCheckedStates(api: any, state: { mode: InpageDisplayMode; a
 
 type ContextMenuRegistrationOptions = {
   ensureReady: () => Promise<unknown>;
+  displayModeStorageKey: string;
   readDisplayMode: () => Promise<InpageDisplayMode>;
   setDisplayMode: (mode: InpageDisplayMode) => Promise<unknown>;
 };
@@ -203,6 +203,7 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
   if (!api) return { installOrRefresh: async () => {} };
 
   const ensureReady = options.ensureReady;
+  const displayModeStorageKey = options.displayModeStorageKey;
   const readDisplayMode = options.readDisplayMode;
   const setDisplayMode = options.setDisplayMode;
 
@@ -262,7 +263,7 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
     if (areaName !== 'local') return;
     const keys = changes ? Object.keys(changes) : [];
     if (!keys.length) return;
-    if (!keys.includes(STORAGE_KEY_DISPLAY_MODE) && !keys.includes(STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)) return;
+    if (!keys.includes(displayModeStorageKey) && !keys.includes(STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)) return;
     void readMenuState(readDisplayMode)
       .then((state) => updateCheckedStates(api, state))
       .catch(() => {});

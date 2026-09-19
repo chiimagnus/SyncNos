@@ -23,7 +23,11 @@ import { initializeLocale } from '@i18n';
 import { storageOnChanged } from '@platform/storage/local';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import { readEffectiveInpageDisplayMode, setCanonicalInpageDisplayMode } from '@services/shared/inpage-display-mode';
+import {
+  INPAGE_DISPLAY_MODE_STORAGE_KEY,
+  readEffectiveInpageDisplayMode,
+  setCanonicalInpageDisplayMode,
+} from '@services/shared/inpage-display-mode';
 import { startCliNativeBridge } from '@services/cli/native-bridge';
 import { registerPublicSettingsHandlers } from '@services/settings/background-handlers';
 import { registerOpenTargetHandlers } from '@services/integrations/openin/background-handlers';
@@ -112,6 +116,7 @@ export default defineBackground(() => {
 
   const contextMenuController = registerClipperContextMenu({
     ensureReady: ensureBackgroundLocaleReady,
+    displayModeStorageKey: INPAGE_DISPLAY_MODE_STORAGE_KEY,
     readDisplayMode: readEffectiveInpageDisplayMode,
     setDisplayMode: setCanonicalInpageDisplayMode,
   });
