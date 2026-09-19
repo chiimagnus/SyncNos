@@ -161,11 +161,7 @@ export default function AppShell() {
           commentsSidebarController.dispose();
           commentsSidebarSession.dispose();
         };
-        if (typeof globalThis.queueMicrotask === 'function') {
-          globalThis.queueMicrotask(dispose);
-        } else {
-          void Promise.resolve().then(dispose);
-        }
+        queueMicrotask(dispose);
       };
     }, [commentsSidebarController, commentsSidebarSession]);
     const pendingExternalLocRef = useRef<string | null>(null);
