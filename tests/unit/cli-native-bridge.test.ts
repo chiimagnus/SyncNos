@@ -71,6 +71,11 @@ function createHarness(
   let storageListener: ((changes: any, areaName: string) => void) | null = null;
   let permissionListener: ((change: any) => void) | null = null;
   const connectNativeHost = vi.fn(() => fakePort.port);
+  const readCliIntegrationEnabled = vi.fn(async () => status.enabled);
+  const readCliIntegrationCapability = vi.fn(async () => ({
+    available: status.available,
+    permissionGranted: status.permissionGranted,
+  }));
   const disableAfterPermissionRemoval = vi.fn(async () => {});
   const router =
     routerOverride ||
@@ -84,7 +89,8 @@ function createHarness(
       extensionVersion: '1.2.3',
       browserFamily: 'chromium',
     }),
-    readCliIntegrationStatus: vi.fn(async () => status),
+    readCliIntegrationEnabled,
+    readCliIntegrationCapability,
     getCliInstanceId: vi.fn(async () => 'instance-1'),
     disableCliIntegrationAfterPermissionRemoval: disableAfterPermissionRemoval,
     storageOnChanged(listener) {
@@ -105,6 +111,8 @@ function createHarness(
     router,
     controller,
     connectNativeHost,
+    readCliIntegrationEnabled,
+    readCliIntegrationCapability,
     disableAfterPermissionRemoval,
     storage: (changes: any) => storageListener?.(changes, 'local'),
     removePermission: (permissions: string[]) => permissionListener?.({ permissions }),
@@ -116,6 +124,14 @@ async function waitForPosted(harness: ReturnType<typeof createHarness>, count: n
 }
 
 describe('CLI Native Messaging bridge', () => {
+  it('does not probe capability or connect while the durable opt-in is disabled', async () => {
+    const harness = createHarness({ available: true, enabled: false, permissionGranted: true });
+    await vi.waitFor(() => expect(harness.readCliIntegrationEnabled).toHaveBeenCalledTimes(1));
+    expect(harness.readCliIntegrationCapability).not.toHaveBeenCalled();
+    expect(harness.connectNativeHost).not.toHaveBeenCalled();
+    harness.controller.stop();
+  });
+
   it('connects only after opt-in and sends a safe hello', async () => {
     const harness = createHarness();
     await waitForPosted(harness, 1);
@@ -1050,7 +1066,8 @@ describe('CLI Native Messaging bridge', () => {
         extensionVersion: '1.2.3',
         browserFamily: 'chromium',
       }),
-      readCliIntegrationStatus: vi.fn(async () => ({ available: true, enabled: true, permissionGranted: true })),
+      readCliIntegrationEnabled: vi.fn(async () => true),
+      readCliIntegrationCapability: vi.fn(async () => ({ available: true, permissionGranted: true })),
       getCliInstanceId: vi.fn(async () => 'instance-1'),
       disableCliIntegrationAfterPermissionRemoval: vi.fn(async () => {}),
       storageOnChanged(listener) {
@@ -1128,7 +1145,8 @@ describe('CLI Native Messaging bridge', () => {
     const controller = startCliNativeBridge(router, {
       connectNativeHost,
       readExtensionRuntimeMetadata: () => ({ runtimeId: '', extensionVersion: '', browserFamily: 'unknown' }),
-      readCliIntegrationStatus: vi.fn(async () => ({ available: true, enabled: true, permissionGranted: true })),
+      readCliIntegrationEnabled: vi.fn(async () => true),
+      readCliIntegrationCapability: vi.fn(async () => ({ available: true, permissionGranted: true })),
       getCliInstanceId: vi.fn(async () => 'instance-1'),
       disableCliIntegrationAfterPermissionRemoval: vi.fn(async () => {}),
       storageOnChanged: () => () => {},
