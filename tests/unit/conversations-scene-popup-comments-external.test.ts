@@ -34,6 +34,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     openConversationExternalBySourceKey: vi.fn(),
     openConversationExternalById: vi.fn(),
+    setDetailSurfaceActive: vi.fn(),
   }),
 }));
 
