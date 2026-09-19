@@ -165,11 +165,7 @@ export function ConversationDetailPane({
 
     const target = userMessageElByIdRef.current.get(entry.messageId);
     if (!target) return;
-    try {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-    } catch (_e) {
-      target.scrollIntoView();
-    }
+    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
   }, []);
 
   const [urlEditing, setUrlEditing] = useState(false);

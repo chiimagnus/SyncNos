@@ -178,11 +178,7 @@ export function ArticleReaderView({
   );
 
   const handleOutlinePick = useCallback((entry: ReaderOutlineDomEntry) => {
-    try {
-      entry.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (_error) {
-      entry.element.scrollIntoView();
-    }
+    entry.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
   const outlinePayload = useMemo(
