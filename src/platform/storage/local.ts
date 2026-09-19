@@ -114,11 +114,9 @@ export async function storageRemove(keys: string[]): Promise<void> {
 }
 
 export function storageOnChanged(listener: (changes: any, areaName: string) => void): () => void {
-  if (typeof listener !== 'function') return () => {};
-
   const anyGlobal = globalThis as any;
   const event = anyGlobal.browser?.storage?.onChanged ?? anyGlobal.chrome?.storage?.onChanged;
-  if (!event?.addListener) return () => {};
+  if (!event?.addListener || !event?.removeListener) return () => {};
 
   try {
     event.addListener(listener);
@@ -128,7 +126,7 @@ export function storageOnChanged(listener: (changes: any, areaName: string) => v
 
   return () => {
     try {
-      event.removeListener?.(listener);
+      event.removeListener(listener);
     } catch (_e) {
       // ignore
     }
