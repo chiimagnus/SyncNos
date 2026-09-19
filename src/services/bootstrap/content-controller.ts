@@ -832,9 +832,11 @@ export function createContentController(deps: Deps) {
     ): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
       const manualSlot = await enterManualPersistence(null, () => true);
       if (!manualSlot) throw new Error('manual_capture_in_progress');
+      inpageButton?.setSaving?.(true);
       try {
         return await currentPageCapture.captureCurrentPage(input);
       } finally {
+        inpageButton?.setSaving?.(false);
         exitManualPersistence(manualSlot);
       }
     },

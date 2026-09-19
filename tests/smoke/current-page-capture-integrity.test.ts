@@ -15,6 +15,14 @@ vi.mock('@services/integrations/chatgpt/api-capture', () => ({
 import { t } from '@i18n';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function chatSnapshot(options?: {
   completeness?: 'complete' | 'partial';
   verified?: boolean;
@@ -103,6 +111,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -144,6 +153,41 @@ describe('current page capture integrity routing', () => {
     });
     expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipNoSubtitles'));
     expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
+  });
+
+  it('exposes one transient capture activity across UI surfaces', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-19T12:00:00Z'));
+    const url = 'https://www.youtube.com/watch?v=activity';
+    const pending = deferred<any>();
+    const harness = createHarness({ collectorId: 'web', url, video: pending.promise });
+
+    const run = harness.service.captureCurrentPage();
+    await Promise.resolve();
+
+    expect(harness.service.getCurrentPageCaptureState().activity).toEqual({
+      phase: 'capturing',
+      kind: 'info',
+      message: t('fetchingDots'),
+      expiresAt: null,
+    });
+
+    pending.resolve({
+      conversationId: 77,
+      title: 'Video',
+      url,
+      isNew: true,
+      subtitleStatus: 'ok',
+    });
+    await run;
+
+    expect(harness.service.getCurrentPageCaptureState().activity).toMatchObject({
+      phase: 'settled',
+      kind: 'success',
+    });
+
+    vi.advanceTimersByTime(5_001);
+    expect(harness.service.getCurrentPageCaptureState().activity).toBeUndefined();
   });
 
   it('propagates Video capture errors without falling back to Article', async () => {

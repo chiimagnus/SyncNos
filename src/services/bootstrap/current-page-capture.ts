@@ -31,12 +31,20 @@ type CurrentPageCaptureProgress = {
   message: string;
 };
 
+export type CurrentPageCaptureActivity = {
+  phase: 'capturing' | 'settled';
+  kind: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  expiresAt: number | null;
+};
+
 export type CurrentPageCaptureState = {
   readiness: 'ready' | 'waiting' | 'unsupported';
   kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;
   reason?: string;
+  activity?: CurrentPageCaptureActivity;
 };
 
 type CurrentPageSavedResult = {
@@ -55,6 +63,8 @@ export type CurrentPageCaptureResult =
     })
   | (CurrentPageSavedResult & { kind: 'article' })
   | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: 'ok' | 'empty' });
+
+const CAPTURE_ACTIVITY_VISIBLE_MS = 5_000;
 
 function errorMessage(error: unknown, fallback: string): string {
   const maybeError = error as { message?: unknown };
@@ -125,6 +135,29 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   const runtime = deps.runtime;
   const collectorsRegistry = deps.collectorsRegistry;
   const videoCapture = deps.videoCapture;
+  let captureActivity: CurrentPageCaptureActivity | null = null;
+
+  function setCaptureActivity(
+    phase: CurrentPageCaptureActivity['phase'],
+    kind: CurrentPageCaptureActivity['kind'],
+    message: string,
+  ) {
+    captureActivity = {
+      phase,
+      kind,
+      message,
+      expiresAt: phase === 'capturing' ? null : Date.now() + CAPTURE_ACTIVITY_VISIBLE_MS,
+    };
+  }
+
+  function readCaptureActivity(): CurrentPageCaptureActivity | null {
+    if (!captureActivity) return null;
+    if (captureActivity.expiresAt != null && captureActivity.expiresAt <= Date.now()) {
+      captureActivity = null;
+      return null;
+    }
+    return { ...captureActivity };
+  }
 
   function send(type: string, payload?: Record<string, unknown>) {
     if (!runtime || typeof runtime.send !== 'function') {
@@ -250,6 +283,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       onProgress?.({ message, kind });
     };
 
+    setCaptureActivity('capturing', 'info', t('fetchingDots'));
+
     try {
       const target = resolveCaptureTarget();
       if (target.readiness !== 'ready') {
@@ -265,12 +300,12 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       if (target.kind === 'video') {
         const result = await videoCapture.captureVideoTranscript();
-        report(
+        const message =
           result.subtitleStatus === 'empty'
             ? t('videoTranscriptTipNoSubtitles')
-            : buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' }),
-          'default',
-        );
+            : buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' });
+        setCaptureActivity('settled', 'success', message);
+        report(message, 'default');
         return {
           kind: 'video',
           label: target.label,
@@ -291,7 +326,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         const title = String(response?.data?.title || '');
         const isNew = response?.data?.isNew;
         if (typeof isNew !== 'boolean') throw new Error('invalid article capture response');
-        report(buildCaptureSuccessTipMessage({ isNew, title }), 'default');
+        const message = buildCaptureSuccessTipMessage({ isNew, title });
+        setCaptureActivity('settled', 'success', message);
+        report(message, 'default');
         return {
           kind: 'article',
           label: target.label,
@@ -359,12 +396,12 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       const title = String(snapshot?.conversation?.title || '');
       const isNew = saved.isNew;
-      report(
-        saved.captureCompleteness === 'partial'
-          ? buildPartialCaptureMessage(saved.captureReasons)
-          : buildCaptureSuccessTipMessage({ isNew, title }),
-        'default',
-      );
+      const partial = saved.captureCompleteness === 'partial';
+      const message = partial
+        ? buildPartialCaptureMessage(saved.captureReasons)
+        : buildCaptureSuccessTipMessage({ isNew, title });
+      setCaptureActivity('settled', partial ? 'warning' : 'success', message);
+      report(message, 'default');
       return {
         kind: 'chat',
         label: target.label,
@@ -376,22 +413,24 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
-      report(
-        errorMessage(error, t('captureFailedFallback')),
-        (error as any)?.code === 'capture_waiting' ? 'default' : 'error',
-      );
+      const waiting = (error as any)?.code === 'capture_waiting';
+      const message = errorMessage(error, t('captureFailedFallback'));
+      setCaptureActivity('settled', waiting ? 'info' : 'error', message);
+      report(message, waiting ? 'default' : 'error');
       throw error;
     }
   }
 
   function getCurrentPageCaptureState(): CurrentPageCaptureState {
     const target = resolveCaptureTarget();
+    const activity = readCaptureActivity();
     return {
       readiness: target.readiness,
       kind: target.kind,
       label: target.label,
       collectorId: target.collectorId,
       reason: target.reason,
+      ...(activity ? { activity } : null),
     };
   }
 

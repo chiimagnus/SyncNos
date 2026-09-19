@@ -239,6 +239,93 @@ describe('popup current-page video capture', () => {
     expect(stateCalls).toBe(3);
   });
 
+  it('shows recent capture activity from another surface and clears it after expiry', async () => {
+    vi.useFakeTimers();
+    const onCaptured = vi.fn();
+    sendMock.mockResolvedValue(
+      apiOk({
+        readiness: 'ready',
+        kind: 'video',
+        label: 'Fetch Video Transcript',
+        collectorId: 'video',
+        activity: {
+          phase: 'settled',
+          kind: 'success',
+          message: 'Updated: Talk',
+          expiresAt: Date.now() + 5_000,
+        },
+      }),
+    );
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+
+    expect(latest?.buttonLabel).toBe('Updated: Talk');
+    expect(latest?.status).toEqual({ kind: 'success', message: 'Updated: Talk' });
+
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
+
+    expect(latest?.buttonLabel).toBe('Fetch Video Transcript');
+    expect(latest?.status).toBeNull();
+  });
+
+  it('polls an external capture until the shared activity settles', async () => {
+    vi.useFakeTimers();
+    const onCaptured = vi.fn();
+    let stateCalls = 0;
+    sendMock.mockImplementation(async (type: string) => {
+      if (type !== 'getActiveTabCaptureState') throw new Error(`unexpected message: ${type}`);
+      stateCalls += 1;
+      if (stateCalls === 1) {
+        return apiOk({
+          readiness: 'ready',
+          kind: 'article',
+          label: 'Fetch Article',
+          collectorId: 'web',
+          activity: {
+            phase: 'capturing',
+            kind: 'info',
+            message: 'Fetching...',
+            expiresAt: null,
+          },
+        });
+      }
+      return apiOk({
+        readiness: 'ready',
+        kind: 'article',
+        label: 'Fetch Article',
+        collectorId: 'web',
+        activity: {
+          phase: 'settled',
+          kind: 'success',
+          message: 'Updated: Article',
+          expiresAt: Date.now() + 5_000,
+        },
+      });
+    });
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root?.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+
+    expect(latest?.buttonDisabled).toBe(true);
+    expect(latest?.buttonLabel).toBe('Fetching...');
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    });
+
+    expect(stateCalls).toBe(2);
+    expect(latest?.buttonDisabled).toBe(false);
+    expect(latest?.buttonLabel).toBe('Updated: Article');
+    expect(latest?.status).toEqual({ kind: 'success', message: 'Updated: Article' });
+  });
+
   it('maps ChatGPT live-tail partial reasons to a warning instead of the generic history message', async () => {
     const onCaptured = vi.fn();
     sendMock.mockImplementation(async (type: string) => {
