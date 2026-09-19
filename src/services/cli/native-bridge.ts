@@ -222,7 +222,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     if (method === 'system.ping') {
       const [cliInstanceId, metadata] = await Promise.all([
         deps.getCliInstanceId(),
-        Promise.resolve(deps.readExtensionRuntimeMetadata()),
+        deps.readExtensionRuntimeMetadata(),
       ]);
       safePost(
         currentPort,
@@ -884,10 +884,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     nextPort.onMessage.addListener(onMessage);
     nextPort.onDisconnect.addListener(onDisconnect);
 
-    const [cliInstanceId, metadata] = await Promise.all([
-      deps.getCliInstanceId(),
-      Promise.resolve(deps.readExtensionRuntimeMetadata()),
-    ]);
+    const [cliInstanceId, metadata] = await Promise.all([deps.getCliInstanceId(), deps.readExtensionRuntimeMetadata()]);
     if (stopped || port !== nextPort || generation !== connectGeneration) return;
     safePost(nextPort, {
       kind: FRAMES.hello,
