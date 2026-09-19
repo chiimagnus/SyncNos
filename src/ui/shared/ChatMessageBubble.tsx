@@ -29,7 +29,7 @@ export type ChatMessageBubbleProps = {
 };
 
 // Shared singleton to avoid per-message renderer instantiation.
-const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true, renderMath: false });
+const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
 let sharedMathMd: ReturnType<typeof createMarkdownRenderer> | null = null;
 let sharedMathMdPromise: Promise<ReturnType<typeof createMarkdownRenderer>> | null = null;
 

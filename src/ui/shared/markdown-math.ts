@@ -13,5 +13,5 @@ const katexMathRuntime: MarkdownMathRuntime = {
 };
 
 export function createKatexMarkdownRenderer(options: MarkdownRendererOptions = {}) {
-  return createMarkdownRenderer({ ...options, renderMath: true }, katexMathRuntime);
+  return createMarkdownRenderer(options, katexMathRuntime);
 }

@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
+import MarkdownIt from 'markdown-it';
 
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
 import { CommentMarkdown } from '@ui/comments/react/CommentMarkdown';
@@ -52,6 +53,7 @@ describe('comment markdown rendering', () => {
   afterEach(() => {
     act(() => root?.unmount());
     root = null;
+    vi.restoreAllMocks();
   });
 
   async function renderIntoHost(element: ReturnType<typeof createElement>) {
@@ -109,6 +111,24 @@ describe('comment markdown rendering', () => {
     expect(link?.rel).toBe('noreferrer noopener');
     const imageLink = host.querySelector<HTMLAnchorElement>('a[href="https://example.com/a.png"]');
     expect(imageLink?.textContent).toBe('remote');
+  });
+
+  it('does not reparse unchanged comment Markdown on unrelated rerenders', async () => {
+    const renderSpy = vi.spyOn(MarkdownIt.prototype, 'render');
+    await renderIntoHost(createElement(CommentMarkdown, { markdown: '**same**' }));
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root!.render(createElement(CommentMarkdown, { markdown: '**same**' }));
+      await Promise.resolve();
+    });
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root!.render(createElement(CommentMarkdown, { markdown: '**changed**' }));
+      await Promise.resolve();
+    });
+    expect(renderSpy).toHaveBeenCalledTimes(2);
   });
 
   it('renders inline and block math as MathML after the lazy runtime loads', async () => {

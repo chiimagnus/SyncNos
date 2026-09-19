@@ -5,7 +5,6 @@ import { createMarkdownRenderer, markdownLikelyContainsMath } from '@ui/shared/m
 const plainRenderer = createMarkdownRenderer({
   openLinksInNewTab: true,
   renderImages: false,
-  renderMath: false,
 });
 
 let mathRenderer: ReturnType<typeof createMarkdownRenderer> | null = null;
@@ -32,8 +31,8 @@ async function ensureMathRenderer(): Promise<ReturnType<typeof createMarkdownRen
   return mathRendererPromise;
 }
 
-export function CommentMarkdown({ markdown }: { markdown: unknown }) {
-  const source = String(markdown || '');
+export function CommentMarkdown({ markdown }: { markdown: string }) {
+  const source = markdown;
   const containsMath = useMemo(() => markdownLikelyContainsMath(source), [source]);
   const [loadedMathRenderer, setLoadedMathRenderer] = useState<ReturnType<typeof createMarkdownRenderer> | null>(
     () => mathRenderer,

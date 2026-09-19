@@ -93,7 +93,7 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('degrades image tokens without creating img elements when images are disabled', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true, renderMath: false, renderImages: false });
+    const md = createMarkdownRenderer({ openLinksInNewTab: true, renderImages: false });
     const html = md.render(
       [
         '![Remote](https://example.com/a.png)',
@@ -112,7 +112,7 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('does not rewrite image-like syntax inside inline or fenced code when images are disabled', () => {
-    const md = createMarkdownRenderer({ renderMath: false, renderImages: false });
+    const md = createMarkdownRenderer({ renderImages: false });
     const html = md.render(
       ['`![inline](https://example.com/a.png)`', '```md', '![fenced](https://example.com/b.png)', '```'].join('\n'),
     );
@@ -122,7 +122,7 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('does not emit dangerous href schemes', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true, renderMath: false });
+    const md = createMarkdownRenderer({ openLinksInNewTab: true });
     const html = md.render('[x](javascript:alert(1))');
     expect(html).not.toContain('href="javascript:');
   });

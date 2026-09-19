@@ -12,11 +12,6 @@ export type MarkdownRendererOptions = {
    */
   openLinksInNewTab?: boolean;
   /**
-   * If true, render `$...$` and `$$...$$` using KaTeX.
-   * Defaults to true.
-   */
-  renderMath?: boolean;
-  /**
    * If false, image tokens degrade to readable text/links without creating `<img>`.
    * Defaults to true.
    */
@@ -38,15 +33,13 @@ export type MarkdownMathRuntime = {
 const MATH_BLOCK_RE = /\$\$[\s\S]+?\$\$/;
 const MATH_INLINE_RE = /(^|[^\\])\$(?!\$)[^$\n]+?\$(?!\$)/;
 
-export function markdownLikelyContainsMath(markdown: unknown): boolean {
-  const text = String(markdown || '');
-  if (!text) return false;
-  return MATH_BLOCK_RE.test(text) || MATH_INLINE_RE.test(text);
+export function markdownLikelyContainsMath(markdown: string): boolean {
+  if (!markdown) return false;
+  return MATH_BLOCK_RE.test(markdown) || MATH_INLINE_RE.test(markdown);
 }
 
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, mathRuntime?: MarkdownMathRuntime) {
   const openLinksInNewTab = options.openLinksInNewTab ?? true;
-  const renderMath = options.renderMath ?? true;
   const renderImages = options.renderImages ?? true;
   const mathOutput = options.mathOutput ?? 'htmlAndMathml';
   const inst = new MarkdownIt({
@@ -82,18 +75,16 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     }
   }
 
-  if (renderMath) {
-    if (mathRuntime) {
-      inst.use(mathRuntime.texmathPlugin as any, {
-        engine: mathRuntime.katexEngine as any,
-        delimiters: 'dollars',
-        katexOptions: {
-          throwOnError: false,
-          strict: 'ignore',
-          output: mathOutput,
-        },
-      });
-    }
+  if (mathRuntime) {
+    inst.use(mathRuntime.texmathPlugin as any, {
+      engine: mathRuntime.katexEngine as any,
+      delimiters: 'dollars',
+      katexOptions: {
+        throwOnError: false,
+        strict: 'ignore',
+        output: mathOutput,
+      },
+    });
   }
 
   const defaultImageRender =
