@@ -239,6 +239,16 @@ function setupDom() {
   (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
 }
 
+async function actAndFlush(run: () => void) {
+  await act(async () => {
+    run();
+    await Promise.resolve();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await Promise.resolve();
+  });
+}
+
 function cleanupDom() {
   // Keep the JSDOM globals around: React may schedule async work that still
   // references `window` after the test has completed. The next `setupDom()`
@@ -316,18 +326,18 @@ describe('AppShell comments sidebar', () => {
   });
 
   it('opens the docked comments sidebar from the detail view trigger and closes from the sidebar collapse button', async () => {
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
 
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    await vi.waitFor(
+    await waitForCommentsUi(
       () => {
         expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
       },
@@ -337,29 +347,29 @@ describe('AppShell comments sidebar', () => {
     expect(host).toBeTruthy();
     expect(host?.getAttribute('data-surface')).toBe('app-wide');
 
-    const closeBtn = (await vi.waitFor(() => {
+    const closeBtn = (await waitForCommentsUi(() => {
       const btn = (host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse') ||
         null) as HTMLButtonElement | null;
       expect(btn).toBeTruthy();
       return btn;
     })) as HTMLButtonElement;
 
-    act(() => {
+    await actAndFlush(() => {
       closeBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
     });
 
     const reopenBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(reopenBtn).toBeTruthy();
 
-    act(() => {
+    await actAndFlush(() => {
       reopenBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
     });
   });
@@ -367,13 +377,13 @@ describe('AppShell comments sidebar', () => {
   it('attaches selected text on pointerup commit and ignores reply interactions', async () => {
     commentsByUrl.set('https://example.com/article', [{ id: 101, parentId: null, commentText: 'Root comment' }]);
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
@@ -400,7 +410,7 @@ describe('AppShell comments sidebar', () => {
       expect(shadow?.querySelector('.webclipper-inpage-comments-panel__comment')).toBeTruthy();
     });
 
-    act(() => {
+    await actAndFlush(() => {
       document.dispatchEvent(new window.Event('selectionchange'));
       document.dispatchEvent(new window.Event('pointerup'));
     });
@@ -415,7 +425,7 @@ describe('AppShell comments sidebar', () => {
       '.webclipper-inpage-comments-panel__quote-clear',
     ) as HTMLButtonElement | null;
     expect(clearBtn).toBeTruthy();
-    act(() => {
+    await actAndFlush(() => {
       clearBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
@@ -424,7 +434,7 @@ describe('AppShell comments sidebar', () => {
       expect(quoteText ?? '').toBe('');
     });
 
-    act(() => {
+    await actAndFlush(() => {
       document.dispatchEvent(new window.Event('selectionchange'));
       document.dispatchEvent(new window.Event('pointerup'));
     });
@@ -440,7 +450,7 @@ describe('AppShell comments sidebar', () => {
       '.webclipper-inpage-comments-panel__composer-textarea',
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
-    act(() => {
+    await actAndFlush(() => {
       composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
       composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
@@ -452,7 +462,7 @@ describe('AppShell comments sidebar', () => {
       ?.textContent?.trim();
     expect(quoteAfterComposerClick).toBe(selectedText);
 
-    act(() => {
+    await actAndFlush(() => {
       composer!.value = 'typing root';
       composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
@@ -464,7 +474,7 @@ describe('AppShell comments sidebar', () => {
       ?.textContent?.trim();
     expect(quoteAfterComposerTyping).toBe(selectedText);
 
-    act(() => {
+    await actAndFlush(() => {
       (shadow?.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement | null)?.click();
     });
     const reply = (await waitForCommentsUi(() => {
@@ -474,7 +484,7 @@ describe('AppShell comments sidebar', () => {
       expect(el).toBeTruthy();
       return el;
     })) as HTMLTextAreaElement;
-    act(() => {
+    await actAndFlush(() => {
       reply.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
       reply.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
@@ -484,7 +494,7 @@ describe('AppShell comments sidebar', () => {
     const quoteAfterReply = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
     expect(quoteAfterReply).toBe(selectedText);
 
-    act(() => {
+    await actAndFlush(() => {
       reply.value = 'typing reply';
       reply.dispatchEvent(new window.Event('input', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
@@ -500,11 +510,11 @@ describe('AppShell comments sidebar', () => {
   it('completes root save, thread activation, reply, and confirmed delete in App', async () => {
     commentsByUrl.set('https://example.com/article', [{ id: 101, parentId: null, commentText: 'Existing root' }]);
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
@@ -522,7 +532,7 @@ describe('AppShell comments sidebar', () => {
       return textarea;
     })) as HTMLTextAreaElement;
 
-    act(() => {
+    await actAndFlush(() => {
       composer.value = 'Created root';
       composer.dispatchEvent(new window.Event('input', { bubbles: true }));
     });
@@ -530,7 +540,7 @@ describe('AppShell comments sidebar', () => {
       '.webclipper-inpage-comments-panel__reply-composer.is-root .webclipper-inpage-comments-panel__send',
     ) as HTMLButtonElement | null;
     expect(rootSend?.disabled).toBe(false);
-    act(() => {
+    await actAndFlush(() => {
       rootSend!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     await waitForCommentsUi(() => {
@@ -546,7 +556,7 @@ describe('AppShell comments sidebar', () => {
 
     const existingThread = shadow.querySelector('[data-thread-root-id="101"]') as HTMLElement | null;
     expect(existingThread).toBeTruthy();
-    act(() => {
+    await actAndFlush(() => {
       existingThread!.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
     const reply = (await waitForCommentsUi(() => {
@@ -560,14 +570,14 @@ describe('AppShell comments sidebar', () => {
       expect(document.activeElement === reply || shadow.activeElement === reply).toBe(true);
     });
 
-    act(() => {
+    await actAndFlush(() => {
       reply.value = 'Created reply';
       reply.dispatchEvent(new window.Event('input', { bubbles: true }));
     });
     const replySend = shadow.querySelector(
       '[data-reply-composer-root-id="101"] .webclipper-inpage-comments-panel__send',
     ) as HTMLButtonElement | null;
-    act(() => {
+    await actAndFlush(() => {
       replySend!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     await waitForCommentsUi(() => {
@@ -588,12 +598,12 @@ describe('AppShell comments sidebar', () => {
         item.querySelector('.webclipper-inpage-comments-panel__markdown')?.textContent?.trim() === 'Created reply',
     );
     const overflow = replyItem?.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement | null;
-    act(() => overflow!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    await actAndFlush(() => overflow!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     let deleteAction = replyItem?.querySelector('[role="menuitem"]') as HTMLButtonElement | null;
     expect(deleteAction).toBeTruthy();
-    act(() => deleteAction!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    await actAndFlush(() => deleteAction!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     deleteAction = replyItem?.querySelector('[role="menuitem"]') as HTMLButtonElement | null;
-    act(() => deleteAction!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    await actAndFlush(() => deleteAction!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     await waitForCommentsUi(() => {
       expect(
         Array.from(shadow.querySelectorAll<HTMLElement>('.webclipper-inpage-comments-panel__reply')).some(
@@ -608,17 +618,17 @@ describe('AppShell comments sidebar', () => {
   it('keeps quote empty when locator root is unavailable in app flow', async () => {
     detailPaneMockState.provideLocatorRoot = false;
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    const host = (await vi.waitFor(() => {
+    const host = (await waitForCommentsUi(() => {
       const panel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
       expect(panel).toBeTruthy();
       return panel;
@@ -631,12 +641,12 @@ describe('AppShell comments sidebar', () => {
       ?.textContent?.trim();
     expect(initialQuoteText ?? '').toBe('');
 
-    act(() => {
+    await actAndFlush(() => {
       document.dispatchEvent(new window.Event('selectionchange'));
       document.dispatchEvent(new window.Event('pointerup'));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
       expect(quoteText ?? '').toBe('');
     });
@@ -654,17 +664,17 @@ describe('AppShell comments sidebar', () => {
       url: 'https://example.com/a',
     };
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
       const body = host?.shadowRoot?.querySelector(
         '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__markdown',
@@ -681,11 +691,11 @@ describe('AppShell comments sidebar', () => {
       url: 'https://example.com/b',
     };
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
       const body = host?.shadowRoot?.querySelector(
         '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__markdown',
@@ -699,11 +709,11 @@ describe('AppShell comments sidebar', () => {
     expect(listArticleCommentsByConversationIdMock).toHaveBeenCalledWith(22);
   });
 
-  it('keeps medium tier comments sidebar closed by default', () => {
+  it('keeps medium tier comments sidebar closed by default', async () => {
     responsiveTierState.value = 'medium';
     window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '0');
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
@@ -714,22 +724,22 @@ describe('AppShell comments sidebar', () => {
     responsiveTierState.value = 'wide';
     window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '1');
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
 
-    act(() => {
+    await actAndFlush(() => {
       root?.unmount();
       root = ReactDOM.createRoot(document.getElementById('root')!);
     });
 
     window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '0');
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
     });
   });
@@ -746,25 +756,25 @@ describe('AppShell comments sidebar', () => {
       url: 'https://example.com/medium-article',
     };
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
     const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
     expect(openBtn?.getAttribute('data-can-trigger')).toBe('1');
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     expect(window.localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY)).toBe('1');
 
     responsiveTierState.value = 'wide';
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
     expect(window.localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY)).toBe('1');
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       const toggleBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
       expect(toggleBtn?.getAttribute('aria-pressed')).toBe('false');
     });
@@ -781,7 +791,7 @@ describe('AppShell comments sidebar', () => {
       url: 'https://example.com/medium-open',
     };
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
@@ -792,11 +802,11 @@ describe('AppShell comments sidebar', () => {
     expect(openBtn).toBeTruthy();
     expect(openBtn?.getAttribute('data-can-trigger')).toBe('1');
 
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    await vi.waitFor(() => {
+    await waitForCommentsUi(() => {
       const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
       expect(pressedBtn).toBeTruthy();
     });
@@ -813,7 +823,7 @@ describe('AppShell comments sidebar', () => {
       url: 'https://example.com/video-41',
     };
 
-    act(() => {
+    await actAndFlush(() => {
       root!.render(createElement(AppShell));
     });
 
@@ -821,7 +831,7 @@ describe('AppShell comments sidebar', () => {
     expect(openBtn).toBeTruthy();
     expect(openBtn?.getAttribute('data-can-trigger')).toBe('0');
 
-    act(() => {
+    await actAndFlush(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 

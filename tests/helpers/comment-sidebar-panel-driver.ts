@@ -1,3 +1,4 @@
+import { act } from 'react';
 import { flushSync } from 'react-dom';
 
 import type {
@@ -27,11 +28,13 @@ export type CommentSidebarPanelTestDriver = {
 const drivers = new WeakMap<object, CommentSidebarPanelTestDriver>();
 
 function publish(callback: () => void): void {
-  try {
-    flushSync(callback);
-  } catch (_error) {
-    callback();
-  }
+  act(() => {
+    try {
+      flushSync(callback);
+    } catch (_error) {
+      callback();
+    }
+  });
 }
 
 function toCommentSidebarItem(input: CommentSidebarTestItemInput, index: number): CommentSidebarItem {
@@ -56,7 +59,7 @@ function toCommentSidebarItem(input: CommentSidebarTestItemInput, index: number)
 
 export function createCommentSidebarPanelTestDriver(api: CommentSidebarPanelApi): CommentSidebarPanelTestDriver {
   const session = createCommentSidebarSession();
-  const lease = session.attachPanel(api);
+  let lease: ReturnType<typeof session.attachPanel>;
   const installCallbacks = (callbacks: CommentSidebarHostActionCallbacks = {}) => {
     session.updateHost({
       actionCallbacks: {
@@ -69,6 +72,7 @@ export function createCommentSidebarPanelTestDriver(api: CommentSidebarPanelApi)
     });
   };
   publish(() => {
+    lease = session.attachPanel(api);
     installCallbacks();
     session.requestOpen({ source: 'test' });
   });
@@ -114,8 +118,10 @@ export function createCommentSidebarPanelTestDriver(api: CommentSidebarPanelApi)
     dispose() {
       if (disposed) return;
       disposed = true;
-      lease.dispose();
-      session.dispose();
+      publish(() => {
+        lease.dispose();
+        session.dispose();
+      });
     },
   };
 }
