@@ -55,7 +55,7 @@ export type ConversationSearchInput = {
   limit?: number;
 };
 
-export type ConversationSearchHit = {
+type ConversationSearchHit = {
   field: 'title' | 'url' | 'source' | 'message';
   snippet: string;
   messageId?: number;
@@ -627,7 +627,7 @@ type ConversationMutationContext = {
   markChanged: (scope: any) => void;
 };
 
-export type MergeConversationsResult = {
+type MergeConversationsResult = {
   keptConversationId: number;
   removedConversationId: number;
   movedMessages: number;
@@ -858,7 +858,7 @@ export async function mergeConversationsByIds(input: {
   return outcome.result;
 }
 
-export type UpdateConversationUrlResult = {
+type UpdateConversationUrlResult = {
   status: 'updated' | 'conflict';
   conversationId: number;
   url: string;
