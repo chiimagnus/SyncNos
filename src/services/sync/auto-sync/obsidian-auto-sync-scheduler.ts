@@ -47,5 +47,9 @@ export function createObsidianAutoSyncScheduler(
     isProviderEnabled: () => isSyncProviderEnabled('obsidian'),
     syncConversations: (conversationIds, instanceId) =>
       deps.obsidianSyncOrchestrator.syncConversations({ conversationIds, instanceId } as any) as any,
+    getFailureRetryDelayMs: (error) =>
+      String((error as any)?.code || '').trim() === 'obsidian_sync_job_persist_failed'
+        ? OBSIDIAN_AUTO_SYNC_DEBOUNCE_MS
+        : null,
   });
 }

@@ -24,6 +24,7 @@ const getNotionSyncJobStatus = vi.fn();
 const getObsidianSyncStatus = vi.fn();
 const getFeishuSyncStatus = vi.fn();
 const getGithubSyncStatus = vi.fn();
+const readSyncJobSnapshots = vi.fn();
 
 const storageEventMocks = vi.hoisted(() => ({
   subscribe: vi.fn(),
@@ -155,7 +156,7 @@ describe('Conversations sync feedback', () => {
   }
 
   function FeedbackProbe() {
-    latestFeedback = useConversationSyncFeedback();
+    latestFeedback = useConversationSyncFeedback({ readSyncJobSnapshots });
     return null;
   }
 
@@ -181,6 +182,7 @@ describe('Conversations sync feedback', () => {
     getObsidianSyncStatus.mockReset();
     getFeishuSyncStatus.mockReset();
     getGithubSyncStatus.mockReset();
+    readSyncJobSnapshots.mockReset();
     storageEventMocks.subscribe.mockClear();
     storageEventMocks.unsubscribe.mockClear();
     storageEventMocks.listener = null;
@@ -229,6 +231,12 @@ describe('Conversations sync feedback', () => {
     });
     getFeishuSyncStatus.mockResolvedValue({ provider: 'feishu', active: false, job: null });
     getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: false, job: null });
+    readSyncJobSnapshots.mockResolvedValue({
+      notion: null,
+      obsidian: null,
+      feishu: null,
+      github: null,
+    });
   });
 
   afterEach(() => {
@@ -392,12 +400,98 @@ describe('Conversations sync feedback', () => {
     };
   }
 
-  it('reads all four providers exactly once on initial mount and subscribes to storage once', async () => {
+  function setInitialSyncJobSnapshots(patch: Partial<Record<'notion' | 'obsidian' | 'feishu' | 'github', any>>) {
+    readSyncJobSnapshots.mockResolvedValue({
+      notion: null,
+      obsidian: null,
+      feishu: null,
+      github: null,
+      ...patch,
+    });
+  }
+
+  it('hydrates an empty durable snapshot without provider status RPCs and subscribes first', async () => {
     await renderFeedbackProbe();
 
-    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
+    expect(readSyncJobSnapshots).toHaveBeenCalledTimes(1);
+    expectStatusGetterCalls({});
     expect(storageEventMocks.subscribe).toHaveBeenCalledTimes(1);
+    expect(storageEventMocks.subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+      readSyncJobSnapshots.mock.invocationCallOrder[0],
+    );
     expect(storageEventMocks.unsubscribe).not.toHaveBeenCalled();
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
+  });
+
+  it('hydrates terminal durable feedback without provider status RPCs', async () => {
+    const terminal = notionTerminalJob();
+    readSyncJobSnapshots.mockResolvedValue({
+      notion: terminal,
+      obsidian: null,
+      feishu: null,
+      github: null,
+    });
+
+    await renderFeedbackProbe();
+
+    expectStatusGetterCalls({});
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'notion', phase: 'success', total: 1, done: 1 });
+  });
+
+  it('queries only providers with durable running candidates', async () => {
+    const notionJob = notionRunningJob();
+    const githubRunning = githubJob();
+    readSyncJobSnapshots.mockResolvedValue({
+      notion: notionJob,
+      obsidian: null,
+      feishu: null,
+      github: githubRunning,
+    });
+    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', active: false, job: notionJob });
+    getGithubSyncStatus.mockResolvedValue({ provider: 'github', active: true, job: githubRunning });
+
+    await renderFeedbackProbe();
+
+    expectStatusGetterCalls({ notion: 1, github: 1 });
+    expect(latestFeedback?.feedback).toMatchObject({ provider: 'github', phase: 'running' });
+  });
+
+  it('lets a durable storage event supersede a stale initial snapshot', async () => {
+    const initial = deferred<any>();
+    readSyncJobSnapshots.mockReturnValue(initial.promise);
+    await renderFeedbackProbe();
+
+    const eventJob = notionRunningJob({ currentConversationTitle: 'storage event wins' });
+    await emitStorageChanges({
+      [SYNC_JOB_STORAGE_KEYS.notion]: { newValue: eventJob },
+    });
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      currentConversationTitle: 'storage event wins',
+    });
+
+    initial.resolve({ notion: null, obsidian: null, feishu: null, github: null });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestFeedback?.feedback).toMatchObject({
+      provider: 'notion',
+      phase: 'running',
+      currentConversationTitle: 'storage event wins',
+    });
+    expectStatusGetterCalls({});
+  });
+
+  it('falls back to the existing full scan when the durable batch read fails', async () => {
+    readSyncJobSnapshots.mockRejectedValue(new Error('storage unavailable'));
+
+    await renderFeedbackProbe();
+    await vi.waitFor(() => expect(getGithubSyncStatus).toHaveBeenCalledTimes(1));
+
+    expectStatusGetterCalls({ notion: 1, obsidian: 1, feishu: 1, github: 1 });
   });
 
   it.each([
@@ -541,10 +635,12 @@ describe('Conversations sync feedback', () => {
   });
 
   it('does not let a non-current running storage event steal the preferred live provider or trigger a getter', async () => {
+    const preferredNotion = notionRunningJob({ currentConversationTitle: 'Preferred Notion' });
+    setInitialSyncJobSnapshots({ notion: preferredNotion });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob({ currentConversationTitle: 'Preferred Notion' }),
+      job: preferredNotion,
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -564,6 +660,12 @@ describe('Conversations sync feedback', () => {
   });
 
   it('keeps fixed scan order when multiple providers are active without comparable durable running jobs', async () => {
+    setInitialSyncJobSnapshots({
+      notion: notionRunningJob(),
+      obsidian: { ...notionRunningJob(), id: 'obsidian-job', provider: 'obsidian' },
+      feishu: { ...notionRunningJob(), id: 'feishu-job', provider: 'feishu' },
+      github: githubJob(),
+    });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
@@ -688,10 +790,12 @@ describe('Conversations sync feedback', () => {
 
   it('keeps the preferred live provider when its terminal durable write arrives before ownership settles, then hands off', async () => {
     const terminal = notionTerminalJob();
+    const liveNotion = notionRunningJob({ currentConversationTitle: 'Notion still owns' });
+    setInitialSyncJobSnapshots({ notion: liveNotion });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob({ currentConversationTitle: 'Notion still owns' }),
+      job: liveNotion,
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -736,10 +840,12 @@ describe('Conversations sync feedback', () => {
 
   it('blocks handoff to another active provider while the preferred live provider status is unknown', async () => {
     const terminal = notionTerminalJob();
+    const preferredNotion = notionRunningJob({ currentConversationTitle: 'Notion preferred' });
+    setInitialSyncJobSnapshots({ notion: preferredNotion });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob({ currentConversationTitle: 'Notion preferred' }),
+      job: preferredNotion,
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -774,6 +880,7 @@ describe('Conversations sync feedback', () => {
 
   it('ignores a non-current terminal clear but rescans when the visible terminal provider is cleared', async () => {
     const terminal = notionTerminalJob();
+    setInitialSyncJobSnapshots({ notion: terminal });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
@@ -801,10 +908,12 @@ describe('Conversations sync feedback', () => {
     'arbitrates a multi-key current-terminal plus other-running event independently of key order: %s',
     async (order) => {
       const terminal = notionTerminalJob();
+      const currentNotion = notionRunningJob({ currentConversationTitle: 'Current Notion' });
+      setInitialSyncJobSnapshots({ notion: currentNotion });
       getNotionSyncJobStatus.mockResolvedValue({
         provider: 'notion',
         active: true,
-        job: notionRunningJob({ currentConversationTitle: 'Current Notion' }),
+        job: currentNotion,
       });
       await renderFeedbackProbe();
       clearStatusGetterCalls();
@@ -833,10 +942,12 @@ describe('Conversations sync feedback', () => {
   );
 
   it('does not overlap the 500ms active poll while an earlier poll is still pending', async () => {
+    const initialRunning = notionRunningJob();
+    setInitialSyncJobSnapshots({ notion: initialRunning });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob(),
+      job: initialRunning,
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -863,10 +974,12 @@ describe('Conversations sync feedback', () => {
   });
 
   it('does not let a delayed poll roll back a newer direct durable storage observation', async () => {
+    const initialRunning = notionRunningJob({ currentConversationTitle: 'Initial' });
+    setInitialSyncJobSnapshots({ notion: initialRunning });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob({ currentConversationTitle: 'Initial' }),
+      job: initialRunning,
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -1089,10 +1202,12 @@ describe('Conversations sync feedback', () => {
 
   it('does not let an older running poll revive state after a terminal storage event has already settled', async () => {
     const terminal = notionTerminalJob();
+    const beforeTerminal = notionRunningJob({ currentConversationTitle: 'Before terminal' });
+    setInitialSyncJobSnapshots({ notion: beforeTerminal });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob({ currentConversationTitle: 'Before terminal' }),
+      job: beforeTerminal,
     });
     await renderFeedbackProbe();
     clearStatusGetterCalls();
@@ -1133,6 +1248,7 @@ describe('Conversations sync feedback', () => {
       currentStage: 'done',
       okCount: 1,
     });
+    setInitialSyncJobSnapshots({ notion: notionTerminal });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
@@ -1172,6 +1288,7 @@ describe('Conversations sync feedback', () => {
 
   it('hands off a cleared visible terminal to a surviving active provider and keeps the same storage subscription', async () => {
     const terminal = notionTerminalJob();
+    setInitialSyncJobSnapshots({ notion: terminal });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
@@ -1430,17 +1547,19 @@ describe('Conversations sync feedback', () => {
   });
 
   it('hydrates compact running progress from totalCount without durable queue or result rows', async () => {
+    const compactRunning = notionRunningJob({
+      totalCount: 5,
+      conversationIds: [],
+      currentConversationId: 22,
+      okCount: 2,
+      failCount: 1,
+      perConversation: [],
+    });
+    setInitialSyncJobSnapshots({ notion: compactRunning });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob({
-        totalCount: 5,
-        conversationIds: [],
-        currentConversationId: 22,
-        okCount: 2,
-        failCount: 1,
-        perConversation: [],
-      }),
+      job: compactRunning,
     });
 
     await renderFeedbackProbe();
@@ -1456,10 +1575,12 @@ describe('Conversations sync feedback', () => {
   });
 
   it('does not treat an ownerless durable running snapshot as live feedback', async () => {
+    const orphanRunning = notionRunningJob({ updatedAt: Date.now() - 10 * 60_000 });
+    setInitialSyncJobSnapshots({ notion: orphanRunning });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: false,
-      job: notionRunningJob({ updatedAt: Date.now() - 10 * 60_000 }),
+      job: orphanRunning,
     });
 
     await renderFeedbackProbe();
@@ -1467,7 +1588,7 @@ describe('Conversations sync feedback', () => {
     expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
   });
 
-  it('shows generic running feedback when ownership is active before a durable running snapshot exists', async () => {
+  it('does not probe runtime ownership when the durable snapshot has no running candidate', async () => {
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
@@ -1476,15 +1597,8 @@ describe('Conversations sync feedback', () => {
 
     await renderFeedbackProbe();
 
-    expect(latestFeedback?.feedback).toMatchObject({
-      provider: 'notion',
-      phase: 'running',
-      total: 0,
-      done: 0,
-      currentConversationId: null,
-      currentConversationTitle: '',
-      currentStage: '',
-    });
+    expectStatusGetterCalls({});
+    expect(latestFeedback?.feedback).toMatchObject({ provider: null, phase: 'idle' });
   });
 
   it('keeps a terminal snapshot non-dismissible while ownership is active and exposes it only after settle', async () => {
@@ -1512,6 +1626,7 @@ describe('Conversations sync feedback', () => {
         },
       ],
     };
+    setInitialSyncJobSnapshots({ notion: terminalJob });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
@@ -1542,10 +1657,12 @@ describe('Conversations sync feedback', () => {
   });
 
   it('preserves a live provider across status read rejection and settles only after a trusted inactive observation', async () => {
+    const initialRunning = notionRunningJob();
+    setInitialSyncJobSnapshots({ notion: initialRunning });
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
       active: true,
-      job: notionRunningJob(),
+      job: initialRunning,
     });
     await renderFeedbackProbe();
     expect(latestFeedback?.feedback.phase).toBe('running');
@@ -1572,6 +1689,7 @@ describe('Conversations sync feedback', () => {
 
   it('drops an older mount observation after a local start failure advances the observation generation', async () => {
     const staleMount = deferred<any>();
+    setInitialSyncJobSnapshots({ notion: notionRunningJob() });
     getNotionSyncJobStatus.mockImplementationOnce(() => staleMount.promise);
     syncNotionConversations.mockRejectedValue(new Error('notion not connected'));
 

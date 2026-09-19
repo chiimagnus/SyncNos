@@ -574,7 +574,7 @@ async function runSyncConversations({
     persist: (job) => obsidianSyncJobStore.setJob(job),
   });
 
-  await lifecycle.setRunStage('preparing_queue');
+  if (!(await lifecycle.setRunStage('preparing_queue'))) throw buildJobPersistenceError();
 
   for (const conversationId of ids) {
     let row: any = null;

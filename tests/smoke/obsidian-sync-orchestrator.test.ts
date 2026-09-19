@@ -227,59 +227,26 @@ describe('obsidian-sync-orchestrator', () => {
     expect(putBody).not.toContain('## 1 transcript');
   });
 
-  it('keeps best-effort compact persistence before remote work and synchronously rejects a second direct run', async () => {
+  it('fails before remote work when the initial running snapshot cannot be persisted', async () => {
     const { syncJobSetPayloads } = setupChromeStorage({ failSyncJobWrites: true });
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
-
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
-      id: 1,
-      sourceType: 'chat',
-      source: 'chatgpt',
-      conversationKey: 'best-effort',
-      title: 'Best effort',
-    });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
-      { messageKey: 'm1', sequence: 1, contentMarkdown: 'body', updatedAt: 1 },
-    ]);
-
-    let remoteStarted!: () => void;
-    let releaseRemote!: () => void;
-    const remoteStartedPromise = new Promise<void>((resolve) => {
-      remoteStarted = resolve;
-    });
-    const remoteGate = new Promise<void>((resolve) => {
-      releaseRemote = resolve;
+    const fetchMock = vi.fn(async () => {
+      throw new Error('remote work must not start');
     });
     // @ts-expect-error test global
-    globalThis.fetch = async (_url: any, init: any) => {
-      const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET') {
-        remoteStarted();
-        await remoteGate;
-        return new Response(JSON.stringify({ errorCode: 40400, message: 'not found' }), {
-          status: 404,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (method === 'PUT') {
-        return new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected:${method}`);
-    };
+    globalThis.fetch = fetchMock;
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const firstRun = orch.syncConversations({
-      conversationIds: [1],
-      instanceId: 'first',
-      jobId: 'obsidian-accepted-job',
-    });
-    await remoteStartedPromise;
 
-    expect(orch.isRunActive()).toBe(true);
+    await expect(
+      orch.syncConversations({
+        conversationIds: [1],
+        instanceId: 'first',
+        jobId: 'obsidian-accepted-job',
+      }),
+    ).rejects.toMatchObject({ code: 'obsidian_sync_job_persist_failed' });
+
     expect(syncJobSetPayloads[0]).toMatchObject({
       id: 'obsidian-accepted-job',
       provider: 'obsidian',
@@ -288,41 +255,8 @@ describe('obsidian-sync-orchestrator', () => {
       conversationIds: [],
       perConversation: [],
     });
-    expect((await orch.getSyncStatus()).job).toBeNull();
-
-    let conflict: unknown = null;
-    try {
-      orch.syncConversations({ conversationIds: [2], instanceId: 'second' });
-    } catch (error) {
-      conflict = error;
-    }
-    expect(conflict).toMatchObject({ code: 'sync_already_running' });
-
-    releaseRemote();
-    const result = await firstRun;
-    expect(result.results[0]).toMatchObject({ conversationId: 1, ok: true, mode: 'full_rebuild' });
-    const runningJobs = syncJobSetPayloads.filter((job: any) => job?.status === 'running') as any[];
-    expect(
-      runningJobs.every(
-        (job: any) =>
-          job.totalCount === 1 &&
-          Array.isArray(job.conversationIds) &&
-          job.conversationIds.length === 0 &&
-          Array.isArray(job.perConversation) &&
-          job.perConversation.length === 0,
-      ),
-    ).toBe(true);
-    expect(
-      runningJobs.filter((job: any) => job.currentConversationId === 1 && job.currentStage === 'preparing_sync'),
-    ).toHaveLength(1);
-    expect(runningJobs.filter((job: any) => Number(job.okCount || 0) + Number(job.failCount || 0) === 1)).toEqual([
-      expect.objectContaining({ okCount: 1, failCount: 0, currentConversationId: undefined }),
-    ]);
-    expect(syncJobSetPayloads.at(-1)).toMatchObject({
-      status: 'done',
-      conversationIds: [1],
-      perConversation: [expect.objectContaining({ conversationId: 1, ok: true })],
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(backgroundStorageMocks.getConversationById).not.toHaveBeenCalled();
     expect(orch.isRunActive()).toBe(false);
     expect((await orch.getSyncStatus()).job).toBeNull();
   });

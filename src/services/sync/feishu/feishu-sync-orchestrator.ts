@@ -564,7 +564,7 @@ async function runSyncConversations({
     persist: (job) => feishuSyncJobStore.setJob(encodeSyncJobWarnings(job)),
   });
 
-  await lifecycle.setRunStage('preparing_queue');
+  if (!(await lifecycle.setRunStage('preparing_queue'))) throw buildJobPersistenceError();
   let accessToken = '';
 
   for (const conversationId of ids) {
