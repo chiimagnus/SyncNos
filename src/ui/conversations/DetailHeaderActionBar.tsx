@@ -90,11 +90,7 @@ export function DetailHeaderActionBar({
     } catch (error) {
       const message =
         error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-      if (typeof globalThis.window?.alert === 'function') {
-        globalThis.window.alert(message);
-      } else {
-        console.error(message);
-      }
+      window.alert(message);
     } finally {
       setBusy(false);
     }
