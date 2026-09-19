@@ -10,20 +10,30 @@ import {
 } from '@services/integrations/openin/openin-targets';
 
 export const DETAIL_HEADER_ACTION_LABELS = {
-  openInNotion: t('detailHeaderOpenInNotion'),
-  openInObsidian: t('detailHeaderOpenInObsidian'),
-  openInFeishu: t('detailHeaderOpenInFeishu'),
-  openInGithub: t('detailHeaderOpenInGithub'),
-  obsidianApiNotConnected: t('detailHeaderObsidianApiNotConnected'),
+  get openInNotion() {
+    return t('detailHeaderOpenInNotion');
+  },
+  get openInObsidian() {
+    return t('detailHeaderOpenInObsidian');
+  },
+  get openInFeishu() {
+    return t('detailHeaderOpenInFeishu');
+  },
+  get openInGithub() {
+    return t('detailHeaderOpenInGithub');
+  },
+  get obsidianApiNotConnected() {
+    return t('detailHeaderObsidianApiNotConnected');
+  },
 } as const;
 
 export { buildNotionPageUrl, normalizeNotionPageId };
 
-const OPEN_ACTIONS: Record<Exclude<OpenTargetProvider, 'source'>, { id: string; label: string }> = {
-  notion: { id: 'open-in-notion', label: DETAIL_HEADER_ACTION_LABELS.openInNotion },
-  obsidian: { id: 'open-in-obsidian', label: DETAIL_HEADER_ACTION_LABELS.openInObsidian },
-  feishu: { id: 'open-in-feishu', label: DETAIL_HEADER_ACTION_LABELS.openInFeishu },
-  github: { id: 'open-in-github', label: DETAIL_HEADER_ACTION_LABELS.openInGithub },
+const OPEN_ACTIONS: Record<Exclude<OpenTargetProvider, 'source'>, { id: string; label: () => string }> = {
+  notion: { id: 'open-in-notion', label: () => t('detailHeaderOpenInNotion') },
+  obsidian: { id: 'open-in-obsidian', label: () => t('detailHeaderOpenInObsidian') },
+  feishu: { id: 'open-in-feishu', label: () => t('detailHeaderOpenInFeishu') },
+  github: { id: 'open-in-github', label: () => t('detailHeaderOpenInGithub') },
 };
 
 function launchPort(port: DetailHeaderActionPort) {
@@ -50,7 +60,7 @@ function buildAction({
   if (target.provider === 'obsidian' && target.availabilityState === 'api_unavailable') {
     return {
       id: 'open-in-obsidian-unavailable',
-      label: DETAIL_HEADER_ACTION_LABELS.obsidianApiNotConnected,
+      label: t('detailHeaderObsidianApiNotConnected'),
       kind: 'open-target',
       provider: 'obsidian',
       slot: 'open',
@@ -63,7 +73,7 @@ function buildAction({
   const definition = OPEN_ACTIONS[target.provider];
   return {
     id: definition.id,
-    label: definition.label,
+    label: definition.label(),
     kind: target.provider === 'obsidian' ? 'open-target' : 'external-link',
     provider: target.provider,
     slot: 'open',

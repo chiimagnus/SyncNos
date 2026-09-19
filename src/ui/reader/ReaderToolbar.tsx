@@ -12,10 +12,6 @@ export type ReaderToolbarProps = {
     | null;
 };
 
-const LABELS = {
-  toolbarAria: t('readerToolbarAria'),
-} as const;
-
 /**
  * ReaderToolbar owns the article outline rail. Reader controls
  * (text/theme/narration) live in ReaderHeaderToolbar.
@@ -28,7 +24,7 @@ export function ReaderToolbar({ outline }: ReaderToolbarProps) {
     <div
       role="toolbar"
       aria-orientation="vertical"
-      aria-label={LABELS.toolbarAria}
+      aria-label={t('readerToolbarAria')}
       className="webclipper-reader-toolbar tw-flex tw-w-fit tw-flex-col tw-items-start tw-gap-2"
     >
       <ArticleOutlineMinimap

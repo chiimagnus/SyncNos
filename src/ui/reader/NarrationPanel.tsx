@@ -28,18 +28,6 @@ export type NarrationPanelProps = {
   className?: string;
 };
 
-const ENGINE_LABELS: Record<ReaderTtsEngineId, string> = {
-  web: t('readerEngineWeb'),
-  ai: t('readerEngineAi'),
-};
-const FORMAT_LABELS: Record<ReaderTtsAudioFormat, string> = {
-  opus: t('readerFormatOpus'),
-  mp3: t('readerFormatMp3'),
-  wav: t('readerFormatWav'),
-  aac: t('readerFormatAac'),
-  flac: t('readerFormatFlac'),
-};
-
 const SPEED_PRESETS = [0.8, 1, 1.25, 1.5, 2] as const;
 
 const fieldInputClassName = [textInputClassName, 'tw-w-full'].join(' ');
@@ -107,6 +95,17 @@ export function NarrationPanel({
   const [webVoices, setWebVoices] = useState<Array<{ voiceURI: string; name: string }>>(() =>
     tts.engine === 'web' ? listWebVoices() : [],
   );
+  const engineLabels: Record<ReaderTtsEngineId, string> = {
+    web: t('readerEngineWeb'),
+    ai: t('readerEngineAi'),
+  };
+  const formatLabels: Record<ReaderTtsAudioFormat, string> = {
+    opus: t('readerFormatOpus'),
+    mp3: t('readerFormatMp3'),
+    wav: t('readerFormatWav'),
+    aac: t('readerFormatAac'),
+    flac: t('readerFormatFlac'),
+  };
 
   useEffect(() => {
     if (tts.engine !== 'web') {
@@ -165,7 +164,7 @@ export function NarrationPanel({
           onChange={(next) => updateTts({ engine: next })}
           options={READER_TTS_ENGINES.map((id) => ({
             value: id,
-            label: ENGINE_LABELS[id],
+            label: engineLabels[id],
             disabled: id === 'web' && !webSpeechAvailable,
           }))}
         />
@@ -260,7 +259,7 @@ export function NarrationPanel({
               ariaLabel={t('readerNarrationFormatAria')}
               value={tts.aiFormat}
               onChange={(next) => updateTts({ aiFormat: next })}
-              options={READER_TTS_AUDIO_FORMATS.map((id) => ({ value: id, label: FORMAT_LABELS[id] }))}
+              options={READER_TTS_AUDIO_FORMATS.map((id) => ({ value: id, label: formatLabels[id] }))}
             />
           </Row>
         </>
