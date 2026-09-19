@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
@@ -26,20 +26,12 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar(input: {
   status: PopupCaptureStatus | null;
 }) {
   const { captureState, checking, status } = input;
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
   const [opening, setOpening] = useState(false);
   const eligible = captureState?.readiness === 'ready' && captureState.kind === 'article';
 
   const open = useCallback(async () => {
     if (checking || opening || !eligible) return false;
-    if (mountedRef.current) setOpening(true);
+    setOpening(true);
     try {
       const response = await send<ApiResponse<{ opened: boolean }>>(
         UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
@@ -52,7 +44,7 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar(input: {
     } catch (_error) {
       return false;
     } finally {
-      if (mountedRef.current) setOpening(false);
+      setOpening(false);
     }
   }, [checking, eligible, opening]);
 

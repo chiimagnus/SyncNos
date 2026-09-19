@@ -216,6 +216,16 @@ async function waitForPopupUi<T>(callback: () => T | Promise<T>): Promise<T> {
   return vi.waitFor(callback, { timeout: 3000, interval: 20 });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function cleanupDom() {
   delete (globalThis as any).window;
   delete (globalThis as any).document;
@@ -531,5 +541,53 @@ describe('PopupShell header actions', () => {
     });
 
     expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+  });
+
+  it('allows a pending comments request to settle after the popup unmounts without a mounted-state guard', async () => {
+    const { UI_MESSAGE_TYPES } = await import('../../src/services/protocols/message-contracts');
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: false,
+      buttonLabel: 'Fetch Article',
+      capture: vi.fn(),
+      captureState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
+      checking: false,
+      fetching: false,
+      refreshState: vi.fn(),
+      status: null,
+    });
+    const pending = deferred<{ ok: boolean; data: { opened: boolean }; error: null }>();
+    sendMock.mockImplementation((type: string) => {
+      if (type === UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL) return pending.promise;
+      throw new Error(`unexpected message: ${type}`);
+    });
+    (window as any).close = vi.fn();
+
+    await renderPopupShell(root!);
+    const commentsBtn = document.querySelector(
+      '[aria-label="Open in-page comments sidebar"]',
+    ) as HTMLButtonElement | null;
+    expect(commentsBtn).toBeTruthy();
+
+    act(() => {
+      commentsBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    await vi.waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
+        source: 'popup',
+      }),
+    );
+
+    await act(async () => {
+      root?.unmount();
+      await Promise.resolve();
+    });
+    root = null;
+
+    pending.resolve({ ok: true, data: { opened: false }, error: null });
+    await pending.promise;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect((window as any).close).not.toHaveBeenCalled();
   });
 });
