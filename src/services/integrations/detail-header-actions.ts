@@ -17,13 +17,13 @@ import {
 } from '@services/integrations/openin/openin-targets';
 import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 
-export type ResolveDetailHeaderActionsInput = {
+type ResolveDetailHeaderActionsInput = {
   conversation: Conversation | null | undefined;
   detail?: ConversationDetail | null | undefined;
   port?: DetailHeaderActionPort;
 };
 
-export async function openDetailHeaderProtocolUrl(url: string): Promise<boolean> {
+async function openDetailHeaderProtocolUrl(url: string): Promise<boolean> {
   const safeUrl = String(url || '').trim();
   if (!safeUrl) return false;
 

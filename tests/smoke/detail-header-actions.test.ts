@@ -61,11 +61,7 @@ import {
   getDetailHeaderActionStorageDependencyKeys,
   hasDetailHeaderActionStorageDependencyChange,
 } from '@services/integrations/detail-header-action-dependencies';
-import {
-  buildNotionPageUrl,
-  DETAIL_HEADER_ACTION_LABELS,
-  normalizeNotionPageId,
-} from '@services/integrations/openin/openin-detail-header-actions';
+import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/notion-openin';
 import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
 
 const NOTION_PAGE_ID = '01234567-89ab-cdef-0123-456789abcdef';
@@ -252,7 +248,7 @@ describe('detail-header-actions', () => {
     const copyAction = byId(actions, 'copy-notion-link');
     expect(bySlot(actions, 'open')).toHaveLength(1);
     expect(bySlot(actions, 'copy')).toHaveLength(1);
-    expect(openAction?.label).toBe(DETAIL_HEADER_ACTION_LABELS.openInNotion);
+    expect(openAction?.label).toBe(t('detailHeaderOpenInNotion'));
     expect(openAction?.href).toBe('https://app.notion.com/p/chiimagnus/0123456789abcdef0123456789abcdef');
     expect(copyAction?.href).toBe(openAction?.href);
     expect(copyAction?.afterTriggerLabel).toBe('Copied');
@@ -306,7 +302,7 @@ describe('detail-header-actions', () => {
       .join('/');
     const expectedUrl = `https://github.com/octocat/sync-notes/blob/feature/github-links/${encodedPath}`;
 
-    expect(openAction?.label).toBe(DETAIL_HEADER_ACTION_LABELS.openInGithub);
+    expect(openAction?.label).toBe(t('detailHeaderOpenInGithub'));
     expect(openAction?.provider).toBe('github');
     expect(openAction?.href).toBe(expectedUrl);
     expect(copyAction?.provider).toBe('github');

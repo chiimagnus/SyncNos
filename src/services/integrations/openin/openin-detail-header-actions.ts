@@ -1,33 +1,12 @@
 import type { Conversation } from '@services/conversations/domain/models';
 import { t } from '@i18n';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
-import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/notion-openin';
 import {
   launchOpenTargetByConversationId,
   resolveOpenTargets,
   type OpenTargetDto,
   type OpenTargetProvider,
 } from '@services/integrations/openin/openin-targets';
-
-export const DETAIL_HEADER_ACTION_LABELS = {
-  get openInNotion() {
-    return t('detailHeaderOpenInNotion');
-  },
-  get openInObsidian() {
-    return t('detailHeaderOpenInObsidian');
-  },
-  get openInFeishu() {
-    return t('detailHeaderOpenInFeishu');
-  },
-  get openInGithub() {
-    return t('detailHeaderOpenInGithub');
-  },
-  get obsidianApiNotConnected() {
-    return t('detailHeaderObsidianApiNotConnected');
-  },
-} as const;
-
-export { buildNotionPageUrl, normalizeNotionPageId };
 
 const OPEN_ACTIONS: Record<Exclude<OpenTargetProvider, 'source'>, { id: string; label: () => string }> = {
   notion: { id: 'open-in-notion', label: () => t('detailHeaderOpenInNotion') },
