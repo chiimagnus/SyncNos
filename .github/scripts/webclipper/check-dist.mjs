@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { TextDecoder } from 'node:util';
 import { analyzeBackgroundRuntime, analyzePopupStartup, formatDistPaths } from './dist-static-closure.mjs';
-import { resolveRepoRoot, resolveWebclipperRoot } from './script-utils.mjs';
+import { resolveRepoRoot } from './script-utils.mjs';
 
 // Cross-target maxima observed after P1/P2 were 4,843 B / 368,741 B / 6,436 B.
 const POPUP_BOOTSTRAP_JS_BUDGET_BYTES = 8 * 1024;
@@ -101,7 +101,6 @@ function validateJavascriptText(root) {
 
 const cli = parseArgs(process.argv.slice(2));
 const repoRoot = resolveRepoRoot(import.meta.url);
-const webclipperRoot = resolveWebclipperRoot(repoRoot);
 if (!cli.root) fail('missing --root=<dist-path>');
 const root = join(repoRoot, cli.root);
 
