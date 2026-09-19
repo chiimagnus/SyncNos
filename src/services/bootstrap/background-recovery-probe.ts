@@ -12,7 +12,7 @@ import { normalizeAutoSyncQueue } from '@services/sync/auto-sync/auto-sync-sched
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY } from '@services/conversations/background/image-backfill-scheduler';
 
-const PROVIDERS: readonly SyncProvider[] = ['notion', 'obsidian', 'feishu', 'github'];
+const PROVIDERS = Object.keys(SYNC_JOB_STORAGE_KEYS) as SyncProvider[];
 
 const AUTO_SYNC_QUEUE_STORAGE_KEYS: Record<SyncProvider, string> = {
   notion: NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY,
@@ -53,12 +53,7 @@ export async function readBackgroundRecoveryProbe(): Promise<BackgroundRecoveryP
       };
       return out;
     },
-    {
-      notion: { runningJob: null, hasQueuedWork: false },
-      obsidian: { runningJob: null, hasQueuedWork: false },
-      feishu: { runningJob: null, hasQueuedWork: false },
-      github: { runningJob: null, hasQueuedWork: false },
-    },
+    {} as Record<SyncProvider, BackgroundRecoveryProviderProbe>,
   );
 
   return {
