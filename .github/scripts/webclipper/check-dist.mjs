@@ -21,13 +21,7 @@ function stringLen(value) {
 
 function parseArgs(argv) {
   const args = { root: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const raw = argv[i];
-    if (raw === '--root') {
-      args.root = argv[i + 1] || args.root;
-      i += 1;
-      continue;
-    }
+  for (const raw of argv) {
     if (raw.startsWith('--root=')) {
       args.root = raw.slice('--root='.length) || args.root;
     }
@@ -108,7 +102,8 @@ function validateJavascriptText(root) {
 const cli = parseArgs(process.argv.slice(2));
 const repoRoot = resolveRepoRoot(import.meta.url);
 const webclipperRoot = resolveWebclipperRoot(repoRoot);
-const root = cli.root ? join(repoRoot, cli.root) : join(webclipperRoot, '.output', 'chrome-mv3');
+if (!cli.root) fail('missing --root=<dist-path>');
+const root = join(repoRoot, cli.root);
 
 const manifestPath = join(root, 'manifest.json');
 if (!existsSync(manifestPath)) {
