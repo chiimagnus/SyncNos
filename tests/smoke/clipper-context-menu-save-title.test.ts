@@ -186,12 +186,13 @@ describe('clipper context menu save title', () => {
     expect(tabsSendMessage).not.toHaveBeenCalled();
 
     locale.resolve();
-    await flushMicrotasks();
+    await vi.waitFor(() => {
+      expect(menusApi.refresh).toHaveBeenCalled();
+    });
 
     expect(menusApi.create).not.toHaveBeenCalled();
     expect(tabsSendMessage).toHaveBeenCalled();
     expect(menusApi.update).toHaveBeenCalled();
-    expect(menusApi.refresh).toHaveBeenCalled();
   });
 
   it('falls back after locale readiness rejects instead of permanently blocking menus', async () => {

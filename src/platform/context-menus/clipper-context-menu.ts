@@ -246,14 +246,15 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
   try {
     api.onShown?.addListener?.((info: any, tab: any) => {
       if (!info) return;
-      void Promise.resolve()
-        .then(() => ensureReady())
-        .catch(() => undefined)
-        .then(async () => {
-          const state = await readMenuState(readDisplayMode).catch(() => null);
-          await refreshVisibleMenus(api, state, tab || null);
-        })
-        .catch(() => {});
+      void (async () => {
+        try {
+          await ensureReady();
+        } catch (_error) {
+          // Locale readiness failure must not permanently block context-menu refresh.
+        }
+        const state = await readMenuState(readDisplayMode).catch(() => null);
+        await refreshVisibleMenus(api, state, tab || null);
+      })().catch(() => {});
     });
   } catch (_e) {
     // ignore
