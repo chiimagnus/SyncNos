@@ -6,7 +6,7 @@
 - 只在当前授权范围内修改系统状态。用户要求安装、修复或“让 CLI 集成恢复可用”时，可直接修复 SyncNos 自己拥有的 launcher/registration；这不等于获准编辑浏览器 Profile/私有 storage 或替换无关 package。
 - 普通安装使用 `syncnos install`：只检查当前 OS 声明过的有限浏览器候选，并按 registration target 去重；不要扫描磁盘/Profile 或猜 manifest/Registry 路径。
 - macOS/Linux 只写用户级 manifest；Windows 只写当前用户 HKCU registration，不要求管理员权限或 system-wide 注册。
-- 用户已指定浏览器，或自动发现未命中但已确认 portable/dev/非标准安装时，使用 `syncnos install --browser <id>`。可用 browser id 以 `syncnos --help` 为准。
+- 用户已指定浏览器，或自动发现未命中但已确认 portable/dev/非标准安装时，使用 `syncnos install --browser <id>`。可用 browser id 以 `syncnos --help` 为准；直接传它暴露的产品 id（例如检测到 Helium 就用 `--browser helium`），不要自行猜底层 browser-family id。
 - `--extension-id` 只和显式 `--browser` 同用；仅在用户明确调试 dev extension 时覆盖 production allowlist。
 - `package_invalid` 先修复/重装当前 CLI package，不把它误诊为浏览器权限问题。若当前是 link 的开发版，不要静默换成 npm 发布版。
 - `native_host_install_invalid` 直接重新运行正式 installer（`syncnos install`，已知目标浏览器时用显式 `--browser`）；不要手工补 manifest/Registry。随后再次运行 `syncnos doctor`。

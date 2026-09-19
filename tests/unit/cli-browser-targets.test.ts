@@ -11,7 +11,7 @@ import {
   resolveBrowserTarget,
   resolveRegistrationTargets,
 } from '../../cli/browser-targets.mjs';
-import { contract } from '../../cli/native-host.mjs';
+import { contract } from '../../cli/contract.mjs';
 
 describe('CLI browser target catalog', () => {
   it('covers mainstream and long-tail browser products through production platform target lists', () => {
@@ -161,6 +161,40 @@ describe('CLI browser target catalog', () => {
       pathExists: async (path) => path === '/usr/bin/yandex-browser-stable',
     });
     expect(linux.map((item) => item.id)).toEqual(['yandex']);
+  });
+
+  it('detects Helium Windows and reuses the Chromium HKCU registration', async () => {
+    const options = {
+      platform: 'win32' as const,
+      homeDir: String.raw`C:\Users\example`,
+      localAppDataDir: String.raw`C:\Users\example\AppData\Local`,
+      env: {
+        ProgramFiles: String.raw`C:\Program Files`,
+        'ProgramFiles(x86)': String.raw`C:\Program Files (x86)`,
+      },
+    };
+    const heliumPath = String.raw`C:\Users\example\AppData\Local\imput\Helium\Application\chrome.exe`;
+    const discovered = await discoverInstalledBrowsers({
+      ...options,
+      pathExists: async (path) => path === heliumPath,
+    });
+    expect(discovered).toEqual([
+      expect.objectContaining({ id: 'helium', family: 'chromium', detectedPath: heliumPath }),
+    ]);
+
+    const target = resolveBrowserTarget('helium', options);
+    expect(target).toMatchObject({
+      registrationId: 'chromium',
+      registrationKind: 'registry',
+      registryKey: `HKCU\\Software\\Chromium\\NativeMessagingHosts\\${contract.nativeHostName}`,
+    });
+    expect(resolveRegistrationTargets(['chromium', 'helium'], options)).toEqual([
+      expect.objectContaining({
+        registrationId: 'chromium',
+        browsers: ['chromium', 'helium'],
+        sharedByBrowsers: ['chromium', 'helium'],
+      }),
+    ]);
   });
 
   it('detects an all-users Opera Windows install under Program Files', async () => {

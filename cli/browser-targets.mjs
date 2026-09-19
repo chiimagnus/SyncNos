@@ -227,6 +227,10 @@ const BROWSERS = Object.freeze({
           'Library/Application Support/Google/Chrome/NativeMessagingHosts',
         ),
       }),
+      win32: Object.freeze({
+        detect: winPaths(['localAppData', 'imput\\Helium\\Application\\chrome.exe']),
+        registration: registryRegistration('chromium', REGISTRY.chromium),
+      }),
     }),
   }),
   opera: Object.freeze({
