@@ -1,4 +1,4 @@
-import { storageGet, storageRemove, storageSet } from '@services/shared/storage';
+import { storageGet, storageSet } from '@services/shared/storage';
 
 export const INPAGE_DISPLAY_MODE_STORAGE_KEY = 'inpage_display_mode';
 
@@ -43,21 +43,5 @@ export function setCanonicalInpageDisplayMode(mode: unknown): Promise<InpageDisp
   return enqueueMutation(async () => {
     await storageSet({ [INPAGE_DISPLAY_MODE_STORAGE_KEY]: normalized });
     return normalized;
-  });
-}
-
-export function ensureCanonicalInpageDisplayMode(): Promise<InpageDisplayMode> {
-  return enqueueMutation(async () => {
-    const local = await storageGet([INPAGE_DISPLAY_MODE_STORAGE_KEY]);
-    const canonical = normalizeInpageDisplayMode(local[INPAGE_DISPLAY_MODE_STORAGE_KEY]);
-    if (canonical) return canonical;
-    if (Object.prototype.hasOwnProperty.call(local, INPAGE_DISPLAY_MODE_STORAGE_KEY)) {
-      try {
-        await storageRemove([INPAGE_DISPLAY_MODE_STORAGE_KEY]);
-      } catch (_error) {
-        // Invalid residue is non-authoritative; runtime default remains `all`.
-      }
-    }
-    return 'all';
   });
 }

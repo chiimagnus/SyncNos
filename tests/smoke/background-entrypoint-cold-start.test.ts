@@ -19,12 +19,12 @@ const mocks = vi.hoisted(() => ({
   setupNotionOAuthNavigationListener: vi.fn(),
   setupFeishuOAuthNavigationListener: vi.fn(),
   registerClipperContextMenu: vi.fn(),
+  installContextMenus: vi.fn(),
   onInstalled: vi.fn(),
   onAlarm: vi.fn(),
   storageOnChanged: vi.fn(),
   openOrFocusExtensionAppTab: vi.fn(),
   reconcileStartupSyncJob: vi.fn(),
-  ensureDisplayMode: vi.fn(),
   readDisplayMode: vi.fn(),
   setDisplayMode: vi.fn(),
   startCliNativeBridge: vi.fn(),
@@ -86,7 +86,6 @@ vi.mock('@platform/context-menus/clipper-context-menu', () => ({
 vi.mock('@platform/alarms/alarms', () => ({ onAlarm: mocks.onAlarm }));
 vi.mock('@platform/storage/local', () => ({ storageOnChanged: mocks.storageOnChanged }));
 vi.mock('@services/shared/inpage-display-mode', () => ({
-  ensureCanonicalInpageDisplayMode: mocks.ensureDisplayMode,
   readEffectiveInpageDisplayMode: mocks.readDisplayMode,
   setCanonicalInpageDisplayMode: mocks.setDisplayMode,
 }));
@@ -182,7 +181,8 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   mocks.reconcileStartupSyncJob.mockResolvedValue(undefined);
-  mocks.ensureDisplayMode.mockResolvedValue('all');
+  mocks.installContextMenus.mockResolvedValue(undefined);
+  mocks.registerClipperContextMenu.mockReturnValue({ installOrRefresh: mocks.installContextMenus });
   mocks.readDisplayMode.mockResolvedValue('all');
   mocks.setDisplayMode.mockImplementation(async (mode: unknown) => {
     if (mode === 'supported' || mode === 'all' || mode === 'off') return mode;
@@ -241,14 +241,17 @@ describe('background entrypoint cold start', () => {
     const uiMessageOptions = mocks.registerUiMessageHandlers.mock.calls[0]?.[1];
     expect(uiMessageOptions).not.toHaveProperty('localeReady');
     expect(uiMessageOptions?.ensureLocaleReady).toEqual(expect.any(Function));
-    expect(mocks.initializeLocale).toHaveBeenCalledTimes(1);
+    expect(mocks.initializeLocale).not.toHaveBeenCalled();
     expect(uiMessageOptions.ensureLocaleReady()).toBe(locale.promise);
-    expect(mocks.initializeLocale).toHaveBeenCalledTimes(2);
+    expect(mocks.initializeLocale).toHaveBeenCalledTimes(1);
     const menuOptions = mocks.registerClipperContextMenu.mock.calls[0]?.[0];
     expect(menuOptions).not.toHaveProperty('localeReady');
+    expect(menuOptions).not.toHaveProperty('ready');
+    expect(menuOptions.ensureReady).toEqual(expect.any(Function));
     expect(menuOptions.readDisplayMode).toBe(mocks.readDisplayMode);
     expect(menuOptions.setDisplayMode).toBe(mocks.setDisplayMode);
-    expect(menuOptions.ready).toBeInstanceOf(Promise);
+    expect(menuOptions.ensureReady()).toBe(locale.promise);
+    expect(mocks.initializeLocale).toHaveBeenCalledTimes(2);
     expect(mocks.registerGithubSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerPublicSettingsHandlers).toHaveBeenCalledTimes(1);
     expect(mocks.registerOpenTargetHandlers).toHaveBeenCalledTimes(1);
@@ -410,18 +413,64 @@ describe('background entrypoint cold start', () => {
     expect(services.autoSync.imageBackfillScheduler.flush).toHaveBeenCalledTimes(1);
   });
 
-  it('display migration failure does not block router or context-menu startup', async () => {
+  it('keeps ordinary worker startup free of locale/display/menu structure initialization', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
-    mocks.ensureDisplayMode.mockRejectedValueOnce(new Error('migration failed'));
-    const onMessageAddListener = vi.fn();
-    // @ts-expect-error test global
-    globalThis.chrome = { runtime: { onMessage: { addListener: onMessageAddListener } } };
 
     const callback = await loadBackground();
     expect(() => callback()).not.toThrow();
-    expect(onMessageAddListener).toHaveBeenCalledTimes(1);
+    await flushMicrotasks();
+
     expect(mocks.registerClipperContextMenu).toHaveBeenCalledTimes(1);
-    await expect(mocks.registerClipperContextMenu.mock.calls[0]?.[0]?.ready).resolves.toBeUndefined();
+    expect(mocks.initializeLocale).not.toHaveBeenCalled();
+    expect(mocks.readDisplayMode).not.toHaveBeenCalled();
+    expect(mocks.installContextMenus).not.toHaveBeenCalled();
+  });
+
+  it('installs menu structure only for extension install/update and opens About only on install', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    let installedListener: ((details?: { reason?: string }) => void) | null = null;
+    mocks.onInstalled.mockImplementationOnce((listener: any) => {
+      installedListener = listener;
+    });
+
+    const callback = await loadBackground();
+    callback();
+    await flushMicrotasks();
+
+    installedListener?.({ reason: 'browser_update' });
+    installedListener?.({ reason: 'chrome_update' });
+    installedListener?.({ reason: 'shared_module_update' });
+    await flushMicrotasks();
+    expect(mocks.installContextMenus).not.toHaveBeenCalled();
+    expect(mocks.openOrFocusExtensionAppTab).not.toHaveBeenCalled();
+
+    installedListener?.({ reason: 'update' });
+    await flushMicrotasks();
+    expect(mocks.installContextMenus).toHaveBeenCalledTimes(1);
+    expect(mocks.openOrFocusExtensionAppTab).not.toHaveBeenCalled();
+
+    installedListener?.({ reason: 'install' });
+    await flushMicrotasks();
+    expect(mocks.installContextMenus).toHaveBeenCalledTimes(2);
+    expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledTimes(1);
+    expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: '/settings?section=aboutme' });
+  });
+
+  it('keeps menu installation and install About opening isolated from each other', async () => {
+    mocks.installContextMenus.mockRejectedValueOnce(new Error('menu install failed'));
+    mocks.openOrFocusExtensionAppTab.mockResolvedValueOnce(true);
+    let installedListener: ((details?: { reason?: string }) => void) | null = null;
+    mocks.onInstalled.mockImplementationOnce((listener: any) => {
+      installedListener = listener;
+    });
+
+    const callback = await loadBackground();
+    callback();
+    installedListener?.({ reason: 'install' });
+    await flushMicrotasks();
+
+    expect(mocks.installContextMenus).toHaveBeenCalledTimes(1);
+    expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: '/settings?section=aboutme' });
   });
 
   it('isolates optional listener registration failures from sibling listeners', async () => {

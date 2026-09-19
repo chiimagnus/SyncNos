@@ -8,12 +8,12 @@ vi.mock('../../src/platform/webext/tabs', () => ({
 import { tabsSendMessage } from '../../src/platform/webext/tabs';
 
 async function registerMenu(options: {
-  ready: Promise<unknown>;
+  ensureReady: () => Promise<unknown>;
   readDisplayMode: () => Promise<'supported' | 'all' | 'off'>;
   setDisplayMode: (mode: 'supported' | 'all' | 'off') => Promise<unknown>;
 }) {
   const { registerClipperContextMenu } = await import('../../src/platform/context-menus/clipper-context-menu');
-  registerClipperContextMenu(options);
+  return registerClipperContextMenu(options);
 }
 
 function deferred<T = void>() {
@@ -36,9 +36,9 @@ function createMenusApi() {
 
   const api = {
     create: vi.fn(),
-    update: vi.fn(),
-    removeAll: vi.fn((cb: any) => cb?.()),
-    refresh: vi.fn(),
+    update: vi.fn(async () => {}),
+    removeAll: vi.fn(async () => {}),
+    refresh: vi.fn(async () => {}),
     onClicked: {
       addListener: vi.fn((cb: any) => {
         onClickedListeners.push(cb);
@@ -95,7 +95,7 @@ describe('clipper context menu save title', () => {
     } as any);
 
     await registerMenu({
-      ready: Promise.resolve(),
+      ensureReady: async () => {},
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,
     });
@@ -128,12 +128,12 @@ describe('clipper context menu save title', () => {
       error: null,
     } as any);
 
-    await registerMenu({
-      ready: Promise.resolve(),
+    const controller = await registerMenu({
+      ensureReady: async () => {},
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,
     });
-    await flushMicrotasks();
+    await controller.installOrRefresh();
     const createdIds = menusApi.create.mock.calls.map(([value]) => value?.id);
     expect(createdIds).toContain('syncnos_clipper_save_current_page');
     expect(createdIds).not.toContain('syncnos_clipper_save_video_transcript');
@@ -169,7 +169,7 @@ describe('clipper context menu save title', () => {
     };
 
     await registerMenu({
-      ready: locale.promise,
+      ensureReady: () => locale.promise,
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,
     });
@@ -188,8 +188,9 @@ describe('clipper context menu save title', () => {
     locale.resolve();
     await flushMicrotasks();
 
-    expect(menusApi.create).toHaveBeenCalled();
+    expect(menusApi.create).not.toHaveBeenCalled();
     expect(tabsSendMessage).toHaveBeenCalled();
+    expect(menusApi.update).toHaveBeenCalled();
     expect(menusApi.refresh).toHaveBeenCalled();
   });
 
@@ -213,13 +214,16 @@ describe('clipper context menu save title', () => {
     };
 
     await registerMenu({
-      ready: locale.promise,
+      ensureReady: () => locale.promise,
       readDisplayMode: async () => 'all',
       setDisplayMode: async (mode) => mode,
     });
+    menusApi.__emitShown({ id: 7, url: 'https://chatgpt.com/c/123' });
     locale.reject(new Error('locale failed'));
     await flushMicrotasks();
 
-    expect(menusApi.create).toHaveBeenCalled();
+    expect(menusApi.create).not.toHaveBeenCalled();
+    expect(menusApi.update).toHaveBeenCalled();
+    await vi.waitFor(() => expect(menusApi.refresh).toHaveBeenCalled());
   });
 });

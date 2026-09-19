@@ -23,11 +23,7 @@ import { initializeLocale } from '@i18n';
 import { storageOnChanged } from '@platform/storage/local';
 import { GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY } from '@services/sync/auto-sync/auto-sync-keys';
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import {
-  ensureCanonicalInpageDisplayMode,
-  readEffectiveInpageDisplayMode,
-  setCanonicalInpageDisplayMode,
-} from '@services/shared/inpage-display-mode';
+import { readEffectiveInpageDisplayMode, setCanonicalInpageDisplayMode } from '@services/shared/inpage-display-mode';
 import { startCliNativeBridge } from '@services/cli/native-bridge';
 import { registerPublicSettingsHandlers } from '@services/settings/background-handlers';
 import { registerOpenTargetHandlers } from '@services/integrations/openin/background-handlers';
@@ -54,10 +50,6 @@ function runBestEffort(task: () => unknown | Promise<unknown>): void {
 
 export default defineBackground(() => {
   const ensureBackgroundLocaleReady = () => initializeLocale();
-  const displayModeReady = ensureCanonicalInpageDisplayMode().catch(() => undefined);
-  const menuReady = Promise.all([ensureBackgroundLocaleReady().catch(() => undefined), displayModeReady]).then(
-    () => undefined,
-  );
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
 
   const router = createBackgroundRouter({
@@ -134,9 +126,10 @@ export default defineBackground(() => {
   } catch (_e) {
     // optional listener registration must not block sibling listeners
   }
+  let contextMenuController = { installOrRefresh: async () => {} };
   try {
-    registerClipperContextMenu({
-      ready: menuReady,
+    contextMenuController = registerClipperContextMenu({
+      ensureReady: ensureBackgroundLocaleReady,
       readDisplayMode: readEffectiveInpageDisplayMode,
       setDisplayMode: setCanonicalInpageDisplayMode,
     });
@@ -145,9 +138,13 @@ export default defineBackground(() => {
   }
   try {
     onInstalled((details) => {
-      // Do not auto-open tabs after extension updates.
-      if (details?.reason !== 'install') return;
-      openAboutSectionAfterInstall().catch(() => {});
+      const reason = String(details?.reason || '');
+      if (reason === 'install' || reason === 'update') {
+        runBestEffort(() => contextMenuController.installOrRefresh());
+      }
+      if (reason === 'install') {
+        runBestEffort(() => openAboutSectionAfterInstall());
+      }
     });
   } catch (_e) {
     // optional listener registration must not block sibling listeners

@@ -50,13 +50,11 @@ async function captureActiveTabCurrentPage(): Promise<void> {
   await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.CAPTURE, payload: { source: 'contextmenu' } });
 }
 
-async function refreshSaveMenuTitle(api: any, tab: { id?: unknown; url?: unknown } | null): Promise<void> {
-  if (!api?.update) return;
-  const tabId = Number(tab?.id);
-  if (!Number.isFinite(tabId) || tabId <= 0) return;
-  if (!isHttpUrl(tab?.url)) return;
-
+async function resolveSaveMenuTitle(tab: { id?: unknown; url?: unknown } | null): Promise<string> {
   let title = t('contextMenuSaveCurrentPage');
+  const tabId = Number(tab?.id);
+  if (!Number.isFinite(tabId) || tabId <= 0 || !isHttpUrl(tab?.url)) return title;
+
   try {
     const response = await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE });
     const ok = !!response && typeof response === 'object' && (response as any).ok === true;
@@ -64,13 +62,52 @@ async function refreshSaveMenuTitle(api: any, tab: { id?: unknown; url?: unknown
     if (kind === 'chat') title = t('contextMenuSaveCurrentAiChat');
     else if (kind === 'video') title = t('contextMenuSaveCurrentVideoTranscript');
   } catch (_e) {
-    // ignore
+    // Keep the generic localized title when the page cannot answer.
   }
+  return title;
+}
+
+async function updateMenuItem(api: any, id: string, update: Record<string, unknown>): Promise<void> {
+  if (!api?.update) return;
+  try {
+    await Promise.resolve(api.update(id, update));
+  } catch (_e) {
+    // Context menu presentation refresh is best-effort.
+  }
+}
+
+async function refreshVisibleMenus(
+  api: any,
+  state: { mode: InpageDisplayMode; autoSave: boolean } | null,
+  tab: { id?: unknown; url?: unknown } | null,
+): Promise<void> {
+  const saveTitle = await resolveSaveMenuTitle(tab);
+  await Promise.all([
+    updateMenuItem(api, MENU_ROOT_ID, { title: t('contextMenuRootTitle') }),
+    updateMenuItem(api, MENU_SAVE_CURRENT_PAGE_ID, { title: saveTitle }),
+    updateMenuItem(api, MENU_INPAGE_GROUP_ID, { title: t('contextMenuInpageGroupTitle') }),
+    updateMenuItem(api, MENU_MODE_SUPPORTED_ID, {
+      title: t('inpageDisplayModeSupported'),
+      ...(state ? { checked: state.mode === 'supported' } : null),
+    }),
+    updateMenuItem(api, MENU_MODE_ALL_ID, {
+      title: t('inpageDisplayModeAll'),
+      ...(state ? { checked: state.mode === 'all' } : null),
+    }),
+    updateMenuItem(api, MENU_MODE_OFF_ID, {
+      title: t('inpageDisplayModeOff'),
+      ...(state ? { checked: state.mode === 'off' } : null),
+    }),
+    updateMenuItem(api, MENU_AUTOSAVE_ID, {
+      title: t('aiChatAutoSaveLabel'),
+      ...(state ? { checked: state.autoSave } : null),
+    }),
+  ]);
 
   try {
-    api.update(MENU_SAVE_CURRENT_PAGE_ID, { title });
+    await Promise.resolve(api?.refresh?.());
   } catch (_e) {
-    // ignore
+    // Context menu refresh is best-effort.
   }
 }
 
@@ -79,13 +116,7 @@ async function createOrRefreshMenus(api: any, readDisplayMode: () => Promise<Inp
   const state = await readMenuState(readDisplayMode).catch(() => ({ mode: 'all' as const, autoSave: true }));
 
   if (api.removeAll) {
-    await new Promise<void>((resolve) => {
-      try {
-        api.removeAll(() => resolve());
-      } catch (_error) {
-        resolve();
-      }
-    });
+    await Promise.resolve(api.removeAll());
   }
 
   const base = {
@@ -149,31 +180,31 @@ async function createOrRefreshMenus(api: any, readDisplayMode: () => Promise<Inp
 }
 
 async function updateCheckedStates(api: any, state: { mode: InpageDisplayMode; autoSave: boolean }) {
-  if (!api?.update) return;
-  try {
-    api.update(MENU_MODE_SUPPORTED_ID, { checked: state.mode === 'supported' });
-    api.update(MENU_MODE_ALL_ID, { checked: state.mode === 'all' });
-    api.update(MENU_MODE_OFF_ID, { checked: state.mode === 'off' });
-    api.update(MENU_AUTOSAVE_ID, { checked: state.autoSave });
-  } catch (_e) {
-    // ignore
-  }
+  await Promise.all([
+    updateMenuItem(api, MENU_MODE_SUPPORTED_ID, { checked: state.mode === 'supported' }),
+    updateMenuItem(api, MENU_MODE_ALL_ID, { checked: state.mode === 'all' }),
+    updateMenuItem(api, MENU_MODE_OFF_ID, { checked: state.mode === 'off' }),
+    updateMenuItem(api, MENU_AUTOSAVE_ID, { checked: state.autoSave }),
+  ]);
 }
 
 type ContextMenuRegistrationOptions = {
-  ready: Promise<unknown>;
+  ensureReady: () => Promise<unknown>;
   readDisplayMode: () => Promise<InpageDisplayMode>;
   setDisplayMode: (mode: InpageDisplayMode) => Promise<unknown>;
 };
 
-export function registerClipperContextMenu(options: ContextMenuRegistrationOptions): void {
-  const api = getMenusApi();
-  if (!api) return;
+export type ClipperContextMenuController = {
+  installOrRefresh: () => Promise<void>;
+};
 
-  const ready = options.ready.catch(() => undefined);
+export function registerClipperContextMenu(options: ContextMenuRegistrationOptions): ClipperContextMenuController {
+  const api = getMenusApi();
+  if (!api) return { installOrRefresh: async () => {} };
+
+  const ensureReady = options.ensureReady;
   const readDisplayMode = options.readDisplayMode;
   const setDisplayMode = options.setDisplayMode;
-  void ready.then(() => createOrRefreshMenus(api, readDisplayMode));
 
   try {
     api.onClicked?.addListener?.((info: any, _tab: any) => {
@@ -214,17 +245,14 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
   try {
     api.onShown?.addListener?.((info: any, tab: any) => {
       if (!info) return;
-      void ready.then(async () => {
-        await readMenuState(readDisplayMode)
-          .then((state) => updateCheckedStates(api, state))
-          .catch(() => {});
-        await refreshSaveMenuTitle(api, tab || null).catch(() => {});
-        try {
-          api.refresh?.();
-        } catch (_e) {
-          // ignore
-        }
-      });
+      void Promise.resolve()
+        .then(() => ensureReady())
+        .catch(() => undefined)
+        .then(async () => {
+          const state = await readMenuState(readDisplayMode).catch(() => null);
+          await refreshVisibleMenus(api, state, tab || null);
+        })
+        .catch(() => {});
     });
   } catch (_e) {
     // ignore
@@ -239,4 +267,11 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
       .then((state) => updateCheckedStates(api, state))
       .catch(() => {});
   });
+
+  return {
+    async installOrRefresh() {
+      await Promise.resolve(ensureReady());
+      await createOrRefreshMenus(api, readDisplayMode);
+    },
+  };
 }
