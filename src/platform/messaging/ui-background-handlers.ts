@@ -61,7 +61,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       return router.err('open popup is not supported in this browser', { code: 'OPEN_POPUP_UNSUPPORTED' });
     }
     try {
-      await Promise.resolve(actionApi.openPopup());
+      await actionApi.openPopup();
       return router.ok({ opened: true });
     } catch (e) {
       const message = (e as any)?.message ?? String(e ?? 'open popup failed');
