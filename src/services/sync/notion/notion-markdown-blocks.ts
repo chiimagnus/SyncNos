@@ -1,4 +1,5 @@
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import { degradeMarkdownImagesToLinks } from '@services/shared/markdown-image-references';
 import { isSyncnosAssetUrl } from '@services/shared/syncnos-asset-uri';
 
 const MAX_TEXT = 1900;
@@ -371,8 +372,13 @@ function blocksFromInlineRichText(type: string, richText: any) {
   return blocks;
 }
 
-function markdownToNotionBlocks(markdown: string) {
-  const src = normalizeStandaloneImageCaptionLines(markdown).replace(/\r\n/g, '\n');
+type MarkdownToNotionBlocksOptions = {
+  renderImages?: boolean;
+};
+
+function markdownToNotionBlocks(markdown: string, options: MarkdownToNotionBlocksOptions = {}) {
+  const source = options.renderImages === false ? degradeMarkdownImagesToLinks(markdown) : markdown;
+  const src = normalizeStandaloneImageCaptionLines(source).replace(/\r\n/g, '\n');
   const lines = src.split('\n');
   const out = [];
 

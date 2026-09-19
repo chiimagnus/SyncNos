@@ -177,6 +177,43 @@ describe('github markdown projection', () => {
     expect(pacific.markdownText).toContain('> Quote');
   });
 
+  it('does not treat comment image syntax as GitHub attachments', async () => {
+    const current = conversation({
+      id: 9,
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article-comment-image',
+      title: 'Article',
+      url: 'https://example.com/article-comment-image',
+    });
+    const loader = vi.fn(batchLoaderFromAssets(new Map([[7, imageAsset(7, [1, 2, 3])]])));
+    const projection = await buildGithubMarkdownProjection({
+      conversation: current,
+      messages: [{ messageKey: 'article_body', sequence: 1, contentMarkdown: 'Body' }],
+      comments: [
+        {
+          id: 1,
+          parentId: null,
+          conversationId: 9,
+          canonicalUrl: current.url,
+          quoteText: '',
+          commentText:
+            '![Internal](syncnos-asset://7)\n\n![Remote](https://example.com/remote.png)\n\n`![Code](syncnos-asset://8)`',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      imageBatchLoader: loader,
+    });
+
+    expect(loader).not.toHaveBeenCalled();
+    expect(projection.attachments).toEqual([]);
+    expect(projection.markdownText).toContain('  Internal');
+    expect(projection.markdownText).toContain('  [Remote](https://example.com/remote.png)');
+    expect(projection.markdownText).toContain('  `![Code](syncnos-asset://8)`');
+    expect(projection.markdownText).not.toContain('![Internal](syncnos-asset://7)');
+    expect(projection.markdownText).not.toContain('![Remote](https://example.com/remote.png)');
+  });
   it('requires an injected blob uploader whenever the projection contains internal assets', async () => {
     await expect(
       buildGithubMarkdownProjection({

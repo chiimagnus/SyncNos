@@ -88,6 +88,68 @@ describe('remote-markdown-writer', () => {
     expect(md).toContain('  Reply');
   });
 
+  it('preserves comment markdown blocks and degrades only real image tokens', async () => {
+    const w = await loadWriter();
+    const commentText = [
+      'Paragraph one.',
+      '',
+      'Paragraph two',
+      '',
+      '- nested item',
+      '',
+      '> quote',
+      '',
+      '```md',
+      '![code](syncnos-asset://9)',
+      '',
+      'still code',
+      '```',
+      '',
+      '|a|b|',
+      '|-|-|',
+      '|1|2|',
+      '',
+      '$E=mc^2$',
+      '',
+      '$$',
+      'x^2',
+      '$$',
+      '',
+      '![Remote](https://example.com/remote.png)',
+      '',
+      '![Asset](syncnos-asset://7)',
+    ].join('\n');
+    const md = w.buildFullNoteMarkdown({
+      conversation: { sourceType: 'article', url: 'https://example.com/article' },
+      messages: [{ messageKey: 'article_body', sequence: 1, contentMarkdown: 'Body' }],
+      comments: [
+        {
+          id: 1,
+          parentId: null,
+          conversationId: 1,
+          canonicalUrl: 'https://example.com/article',
+          quoteText: '',
+          commentText,
+          createdAt: Date.UTC(2026, 0, 2, 3, 4),
+          updatedAt: Date.UTC(2026, 0, 2, 3, 4),
+        },
+      ],
+      commentTimeZone: 'utc',
+    });
+
+    const comments = md.slice(md.indexOf('## Comments'));
+    expect(comments).toContain('  Paragraph one.\n\n  Paragraph two');
+    expect(comments).toContain('  - nested item');
+    expect(comments).toContain('  > quote');
+    expect(comments).toContain('  ```md\n  ![code](syncnos-asset://9)\n\n  still code\n  ```');
+    expect(comments).toContain('  |a|b|\n  |-|-|\n  |1|2|');
+    expect(comments).toContain('  $E=mc^2$');
+    expect(comments).toContain('  $$\n  x^2\n  $$');
+    expect(comments).toContain('  [Remote](https://example.com/remote.png)');
+    expect(comments).toContain('  Asset');
+    expect(comments).not.toContain('![Remote](https://example.com/remote.png)');
+    expect(comments).not.toContain('![Asset](syncnos-asset://7)');
+  });
   it('renders Video metadata and semantic body without generic conversation role sections', async () => {
     const w = await loadWriter();
     const md = w.buildFullNoteMarkdown({

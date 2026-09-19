@@ -185,6 +185,81 @@ describe('backup article comments', () => {
     ).toBe(false);
   });
 
+  it('round-trips Markdown comment source without changing quote or locator identity', () => {
+    const locator = {
+      v: 1 as const,
+      env: 'app' as const,
+      quote: { type: 'TextQuoteSelector' as const, exact: 'quoted source' },
+      position: { type: 'TextPositionSelector' as const, start: 3, end: 16 },
+    };
+    const markdown = [
+      '  **bold** and $E=mc^2$',
+      '',
+      '![not-an-attachment](https://example.com/comment.png)',
+      '',
+      '```md',
+      '![code](syncnos-asset://42)',
+      '',
+      'code tail',
+      '```  ',
+    ].join('\n');
+
+    const serialized = serializeArticleCommentArchive(
+      [
+        {
+          id: 1,
+          parentId: null,
+          conversationId: 10,
+          canonicalUrl: 'https://example.com/a',
+          authorName: 'A',
+          quoteText: 'quoted source',
+          commentText: '',
+          locator,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 2,
+          parentId: 1,
+          conversationId: 10,
+          canonicalUrl: 'https://example.com/a',
+          authorName: 'A',
+          quoteText: '',
+          commentText: markdown,
+          locator: null,
+          createdAt: 2,
+          updatedAt: 2,
+        },
+      ],
+      new Map([[10, 'web||a']]),
+    );
+
+    const expectedMarkdown = markdown.trim();
+    expect(serialized.document.comments[0]).toMatchObject({
+      commentId: 1,
+      parentCommentId: null,
+      quoteText: 'quoted source',
+      commentText: '',
+      locator,
+    });
+    expect(serialized.document.comments[1]).toMatchObject({
+      commentId: 2,
+      parentCommentId: 1,
+      quoteText: '',
+      commentText: expectedMarkdown,
+      locator: null,
+    });
+
+    const prepared = prepareArticleCommentArchiveImport(serialized.document);
+    expect(prepared.items.map((item) => [item.commentId, item.parentCommentId])).toEqual([
+      [1, null],
+      [2, 1],
+    ]);
+    expect(prepared.items[0]?.quoteText).toBe('quoted source');
+    expect(prepared.items[0]?.locator).toEqual(locator);
+    expect(prepared.items[1]?.commentText).toBe(expectedMarkdown);
+  });
+
   it('prepares current-schema roots before replies without import-time graph repair', () => {
     const prepared = prepareArticleCommentArchiveImport({
       schemaVersion: 2,

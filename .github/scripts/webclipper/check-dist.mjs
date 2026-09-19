@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TextDecoder } from 'node:util';
 import { resolveRepoRoot, resolveWebclipperRoot } from './script-utils.mjs';
 
 function extractManifestMsgKey(value) {
@@ -60,6 +61,37 @@ function readLocaleMessages(root, locale) {
   };
 }
 
+function listFilesRecursively(root, extension) {
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.isFile() && path.endsWith(extension)) files.push(path);
+    }
+  };
+  walk(root);
+  return files;
+}
+
+function validateJavascriptText(root) {
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  for (const path of listFilesRecursively(root, '.js')) {
+    const bytes = readFileSync(path);
+    try {
+      decoder.decode(bytes);
+    } catch (error) {
+      fail(`JavaScript is not valid UTF-8: ${path}: ${error?.message || error}`);
+    }
+    const controlIndex = bytes.findIndex((byte) => byte < 0x20 && byte !== 0x09 && byte !== 0x0a && byte !== 0x0d);
+    if (controlIndex >= 0) {
+      fail(
+        `JavaScript contains raw C0 control byte 0x${bytes[controlIndex].toString(16).padStart(2, '0')} at offset ${controlIndex}: ${path}`,
+      );
+    }
+  }
+}
+
 const cli = parseArgs(process.argv.slice(2));
 const repoRoot = resolveRepoRoot(import.meta.url);
 const webclipperRoot = resolveWebclipperRoot(repoRoot);
@@ -71,6 +103,7 @@ if (!existsSync(manifestPath)) {
 }
 
 const manifest = readJsonFile(manifestPath, 'manifest.json');
+validateJavascriptText(root);
 
 if (manifest.manifest_version !== 3) fail('manifest_version must be 3');
 if (

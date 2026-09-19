@@ -1,17 +1,14 @@
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { KeyboardEvent, ReactNode, Ref } from 'react';
 import { CommentOverflowMenu, type CommentOverflowAction } from './CommentOverflowMenu';
+import { CommentMarkdown } from './CommentMarkdown';
 import { CommentReplyList } from './CommentReplyList';
 import { commentAuthorLabel, commentAvatarLabel, formatCommentTime } from './comment-display';
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
   if (!element) return false;
-  try {
-    return element.isContentEditable || Boolean(element.closest('button,input,textarea,a,label,select,option'));
-  } catch (_error) {
-    return false;
-  }
+  return element.isContentEditable || Boolean(element.closest?.('button,input,textarea,a,label,select,option'));
 }
 
 type CommentThreadProps = {
@@ -99,7 +96,7 @@ export function CommentThread({
                 />
               </div>
             </div>
-            <div className="webclipper-inpage-comments-panel__text">{String(root.commentText || '')}</div>
+            <CommentMarkdown markdown={root.commentText} />
           </div>
         </div>
       ) : null}

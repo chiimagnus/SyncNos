@@ -125,6 +125,15 @@ export default defineConfig({
       alias: viteAlias,
     },
     build: {
+      // Some dependencies (notably `entities` via markdown-it) store compact lookup tables
+      // with escaped C0 bytes. The default production minifier can emit those as raw bytes,
+      // which Chromium rejects when loading extension scripts. Terser ascii_only keeps them escaped.
+      minify: 'terser',
+      terserOptions: {
+        format: {
+          ascii_only: true,
+        },
+      },
       // Chromium 152 can reject extension-page modulepreload reuse as a cross-world resource mismatch.
       // Firefox/Safari keep Vite's default preload behavior; real ESM imports are unchanged.
       ...(env.browser === 'chrome' ? { modulePreload: false } : {}),

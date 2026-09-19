@@ -535,8 +535,8 @@ describe('AppShell comments sidebar', () => {
     });
     await waitForCommentsUi(() => {
       expect(
-        Array.from(shadow.querySelectorAll('.webclipper-inpage-comments-panel__text')).some(
-          (node) => node.textContent === 'Created root',
+        Array.from(shadow.querySelectorAll('.webclipper-inpage-comments-panel__markdown')).some(
+          (node) => node.textContent?.trim() === 'Created root',
         ),
       ).toBe(true);
     });
@@ -572,8 +572,8 @@ describe('AppShell comments sidebar', () => {
     });
     await waitForCommentsUi(() => {
       expect(
-        Array.from(shadow.querySelectorAll('.webclipper-inpage-comments-panel__text')).some(
-          (node) => node.textContent === 'Created reply',
+        Array.from(shadow.querySelectorAll('.webclipper-inpage-comments-panel__markdown')).some(
+          (node) => node.textContent?.trim() === 'Created reply',
         ),
       ).toBe(true);
     });
@@ -584,7 +584,8 @@ describe('AppShell comments sidebar', () => {
     );
 
     const replyItem = Array.from(shadow.querySelectorAll<HTMLElement>('.webclipper-inpage-comments-panel__reply')).find(
-      (item) => item.querySelector('.webclipper-inpage-comments-panel__text')?.textContent === 'Created reply',
+      (item) =>
+        item.querySelector('.webclipper-inpage-comments-panel__markdown')?.textContent?.trim() === 'Created reply',
     );
     const overflow = replyItem?.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement | null;
     act(() => overflow!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
@@ -596,7 +597,8 @@ describe('AppShell comments sidebar', () => {
     await waitForCommentsUi(() => {
       expect(
         Array.from(shadow.querySelectorAll<HTMLElement>('.webclipper-inpage-comments-panel__reply')).some(
-          (item) => item.querySelector('.webclipper-inpage-comments-panel__text')?.textContent === 'Created reply',
+          (item) =>
+            item.querySelector('.webclipper-inpage-comments-panel__markdown')?.textContent?.trim() === 'Created reply',
         ),
       ).toBe(false);
     });
@@ -665,9 +667,9 @@ describe('AppShell comments sidebar', () => {
     await vi.waitFor(() => {
       const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
       const body = host?.shadowRoot?.querySelector(
-        '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text',
+        '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__markdown',
       );
-      expect(body?.textContent).toBe('Comment A');
+      expect(body?.textContent?.trim()).toBe('Comment A');
     });
 
     currentState.selectedConversation = {
@@ -686,9 +688,9 @@ describe('AppShell comments sidebar', () => {
     await vi.waitFor(() => {
       const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
       const body = host?.shadowRoot?.querySelector(
-        '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text',
+        '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__markdown',
       );
-      expect(body?.textContent).toBe('Comment B');
+      expect(body?.textContent?.trim()).toBe('Comment B');
     });
 
     expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/a');

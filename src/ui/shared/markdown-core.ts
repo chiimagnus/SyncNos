@@ -12,10 +12,15 @@ export type MarkdownRendererOptions = {
    */
   openLinksInNewTab?: boolean;
   /**
-   * If true, render `$...$` and `$$...$$` using KaTeX.
+   * If false, image tokens degrade to readable text/links without creating `<img>`.
    * Defaults to true.
    */
-  renderMath?: boolean;
+  renderImages?: boolean;
+  /**
+   * KaTeX output mode when a math runtime is active.
+   * Defaults to KaTeX's normal HTML + MathML output.
+   */
+  mathOutput?: 'html' | 'mathml' | 'htmlAndMathml';
 };
 
 export type MarkdownMathRuntime = {
@@ -25,9 +30,18 @@ export type MarkdownMathRuntime = {
   };
 };
 
+const MATH_BLOCK_RE = /\$\$[\s\S]+?\$\$/;
+const MATH_INLINE_RE = /(^|[^\\])\$(?!\$)[^$\n]+?\$(?!\$)/;
+
+export function markdownLikelyContainsMath(markdown: string): boolean {
+  if (!markdown) return false;
+  return MATH_BLOCK_RE.test(markdown) || MATH_INLINE_RE.test(markdown);
+}
+
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, mathRuntime?: MarkdownMathRuntime) {
   const openLinksInNewTab = options.openLinksInNewTab ?? true;
-  const renderMath = options.renderMath ?? true;
+  const renderImages = options.renderImages ?? true;
+  const mathOutput = options.mathOutput ?? 'htmlAndMathml';
   const inst = new MarkdownIt({
     html: false,
     breaks: true,
@@ -61,23 +75,16 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     }
   }
 
-  try {
-    inst.enable(['table']);
-  } catch (_e) {
-    // ignore
-  }
-
-  if (renderMath) {
-    if (mathRuntime) {
-      inst.use(mathRuntime.texmathPlugin as any, {
-        engine: mathRuntime.katexEngine as any,
-        delimiters: 'dollars',
-        katexOptions: {
-          throwOnError: false,
-          strict: 'ignore',
-        },
-      });
-    }
+  if (mathRuntime) {
+    inst.use(mathRuntime.texmathPlugin as any, {
+      engine: mathRuntime.katexEngine as any,
+      delimiters: 'dollars',
+      katexOptions: {
+        throwOnError: false,
+        strict: 'ignore',
+        output: mathOutput,
+      },
+    });
   }
 
   const defaultImageRender =
@@ -99,9 +106,17 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     const alt = token && typeof token.content === 'string' ? token.content : '';
 
     const safeSrc = String(src || '').trim();
-    if (!safeSrc) return defaultImageRender(tokens, idx, opts, env, self);
+    if (!safeSrc) return renderImages ? defaultImageRender(tokens, idx, opts, env, self) : '';
 
     const escapedAlt = inst.utils.escapeHtml(String(alt || ''));
+    if (!renderImages) {
+      const label = String(alt || '').trim() || (isHttpUrl(safeSrc) ? sanitizeUrlForDisplay(safeSrc) : 'Image');
+      const escapedLabel = inst.utils.escapeHtml(label);
+      if (!isHttpUrl(safeSrc)) return `<span class="syncnos-md-image-text">${escapedLabel}</span>`;
+      const escapedHref = inst.utils.escapeHtml(safeSrc);
+      const linkAttrs = openLinksInNewTab ? ' target="_blank" rel="noreferrer noopener"' : '';
+      return `<a class="syncnos-md-image-text" href="${escapedHref}"${linkAttrs}>${escapedLabel}</a>`;
+    }
     const titleRaw = token && typeof token.attrGet === 'function' ? String(token.attrGet('title') || '') : '';
     const titleAttr = titleRaw ? ` title="${inst.utils.escapeHtml(titleRaw)}"` : '';
     const assetId = parseSyncnosAssetId(safeSrc);

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { createMarkdownRenderer } from '@ui/shared/markdown-core';
+import { createMarkdownRenderer, markdownLikelyContainsMath } from '@ui/shared/markdown-core';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
 
 type BubbleRole = 'user' | 'assistant';
@@ -29,24 +29,14 @@ export type ChatMessageBubbleProps = {
 };
 
 // Shared singleton to avoid per-message renderer instantiation.
-const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true, renderMath: false });
+const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
 let sharedMathMd: ReturnType<typeof createMarkdownRenderer> | null = null;
 let sharedMathMdPromise: Promise<ReturnType<typeof createMarkdownRenderer>> | null = null;
-
-const MATH_BLOCK_RE = /\$\$[\s\S]+?\$\$/;
-const MATH_INLINE_RE = /(^|[^\\])\$(?!\$)[^$\n]+?\$(?!\$)/;
-const MATH_BRACKET_RE = /\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/;
-
-function markdownLikelyContainsMath(markdown: string): boolean {
-  const text = String(markdown || '');
-  if (!text) return false;
-  return MATH_BLOCK_RE.test(text) || MATH_INLINE_RE.test(text) || MATH_BRACKET_RE.test(text);
-}
 
 async function ensureSharedMathRenderer(): Promise<ReturnType<typeof createMarkdownRenderer>> {
   if (sharedMathMd) return sharedMathMd;
   if (!sharedMathMdPromise) {
-    sharedMathMdPromise = import('@ui/shared/markdown-math').then((mod) => {
+    sharedMathMdPromise = import('@ui/shared/markdown-math-styled').then((mod) => {
       const renderer = mod.createKatexMarkdownRenderer({ openLinksInNewTab: true });
       sharedMathMd = renderer;
       return renderer;
@@ -67,7 +57,6 @@ export function ChatMessageBubble({
 }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
   const readingProfilePreset = useMemo(() => getMarkdownReadingProfilePreset(readingProfile), [readingProfile]);
-  const markdownRef = useRef<HTMLDivElement | null>(null);
   const [mathRenderer, setMathRenderer] = useState<ReturnType<typeof createMarkdownRenderer> | null>(
     () => sharedMathMd,
   );
@@ -192,11 +181,7 @@ export function ChatMessageBubble({
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <div
-        ref={markdownRef}
-        className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
-        dangerouslySetInnerHTML={innerHtml}
-      />
+      <div className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')} dangerouslySetInnerHTML={innerHtml} />
     </section>
   );
 }

@@ -23,7 +23,7 @@ Use `syncnos` as the normal operational entry point. The Extension/IndexedDB rem
 ## Key operations
 
 - `capture` acts on the current active page. If another target page must be captured, use browser automation only to activate that tab; do not reimplement collector logic.
-- Root/reply/delete comments use the CLI. CLI-created root comments and replies are authored as `<About You name>' CLI`, or `CLI` when no name is configured; there is no caller-supplied author override. Selection-anchored comments follow the browser-required flow; never fabricate a locator.
+- Root/reply/delete comments use the CLI. Root/reply text may contain Markdown and `$...$` / `$$...$$` math source; Markdown image syntax is not a comment attachment mechanism. CLI-created root comments and replies are authored as `<About You name>' CLI`, or `CLI` when no name is configured; there is no caller-supplied author override. Selection-anchored comments follow the browser-required flow; never fabricate a locator.
 - Run `settings schema` before changing settings and only operate on public keys.
 - Provider auth/config must use CLI-exposed interfaces; do not read underlying credentials directly.
 - When the user asks to sync and confirm completion, keep the default wait semantics. Use `--no-wait` only when asynchronous behavior is explicitly needed. `sync_wait_timeout` does not mean the remote job was cancelled.

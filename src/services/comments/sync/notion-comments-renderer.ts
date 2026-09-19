@@ -1,8 +1,9 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
+import { markdownToNotionBlocks } from '@services/sync/notion/notion-markdown-blocks';
 
 const MAX_TEXT = 1900;
-const NOTION_COMMENTS_DIGEST_VERSION = 8;
+const NOTION_COMMENTS_DIGEST_VERSION = 9;
 const DEFAULT_COMMENT_AUTHOR = 'You';
 
 function pad2(value: number): string {
@@ -67,19 +68,6 @@ function quoteBlock(content: string) {
   } as any;
 }
 
-function paragraphBlock(content: string) {
-  return {
-    object: 'block',
-    type: 'paragraph',
-    paragraph: { rich_text: [textRich(content)] },
-  } as any;
-}
-
-function paragraphBlocksFromParts(parts: string[]): any[] {
-  const list = Array.isArray(parts) ? parts : [];
-  return list.map((p) => paragraphBlock(p)).filter(Boolean);
-}
-
 function dividerBlock() {
   return {
     object: 'block',
@@ -102,7 +90,7 @@ function bulletedItemBlock(content: string, children?: any[]) {
 
 function commentItemBlock(input: { authorName?: unknown; commentText: unknown; createdAt: unknown }) {
   const metaLine = formatCommentMetaLine({ authorName: input?.authorName, createdAt: input?.createdAt });
-  return bulletedItemBlock(metaLine, paragraphBlocksFromParts(splitText(safeString(input?.commentText))));
+  return bulletedItemBlock(metaLine, markdownToNotionBlocks(safeString(input?.commentText), { renderImages: false }));
 }
 
 export function buildNotionCommentsBlocks(comments: ArticleCommentDto[]): {
