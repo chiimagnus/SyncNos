@@ -145,6 +145,7 @@ describe('settings section definitions', () => {
     expect(Array.from(externalLinks).every((link) => link.tagName === 'A')).toBe(true);
     expect(Array.from(externalLinks).every((link) => link.getAttribute('target') === '_blank')).toBe(true);
     expect(document.querySelector('[id^="btnAbout"]')).toBeNull();
+    expect(document.querySelector('img[src=""]')).toBeNull();
 
     act(() => root.unmount());
     cleanupDom();

@@ -20,7 +20,7 @@ export function AboutSection() {
         <div className="tw-flex tw-items-start tw-gap-3">
           <img
             className="tw-size-10 tw-rounded-2xl tw-object-contain"
-            src={getURL('icons/icon-128.png' as any)}
+            src={getURL('icons/icon-128.png' as any) || undefined}
             alt=""
             draggable={false}
           />
@@ -59,7 +59,7 @@ export function AboutSection() {
         <div className="tw-flex tw-items-center tw-gap-3">
           <img
             className="tw-size-10 tw-rounded-2xl tw-object-cover"
-            src={getURL('icons/author-avatar.png' as any)}
+            src={getURL('icons/author-avatar.png' as any) || undefined}
             alt="Chii Magnus avatar"
             draggable={false}
           />
@@ -113,7 +113,7 @@ export function AboutSection() {
 
         <img
           className="tw-mt-3 tw-w-full tw-rounded-2xl tw-object-cover"
-          src={getURL('icons/buymeacoffee1.jpg' as any)}
+          src={getURL('icons/buymeacoffee1.jpg' as any) || undefined}
           alt={t('donateSectionAria')}
           draggable={false}
         />
