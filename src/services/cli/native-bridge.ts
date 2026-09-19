@@ -939,6 +939,7 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       return;
     }
     clearReconnectTimer();
+    connectGeneration += 1;
     void reconcile().catch(() => scheduleReconnect());
   });
 

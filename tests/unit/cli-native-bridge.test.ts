@@ -16,6 +16,7 @@ vi.mock('@services/cli/file-operations', () => ({
 }));
 
 import { startCliNativeBridge } from '@services/cli/native-bridge';
+import { CLI_INTEGRATION_ENABLED_STORAGE_KEY } from '@services/cli/cli-integration';
 import {
   COMMENTS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
@@ -29,6 +30,16 @@ import {
   SETTINGS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function createPort() {
   const posted: any[] = [];
@@ -130,6 +141,65 @@ describe('CLI Native Messaging bridge', () => {
     expect(harness.readCliIntegrationCapability).not.toHaveBeenCalled();
     expect(harness.connectNativeHost).not.toHaveBeenCalled();
     harness.controller.stop();
+  });
+
+  it('invalidates a pending startup reconcile before an enabled storage event starts a newer one', async () => {
+    const firstEnabled = deferred<boolean>();
+    const secondEnabled = deferred<boolean>();
+    const fakePort = createPort();
+    let storageListener: ((changes: any, areaName: string) => void) | null = null;
+    const readCliIntegrationEnabled = vi
+      .fn()
+      .mockImplementationOnce(() => firstEnabled.promise)
+      .mockImplementationOnce(() => secondEnabled.promise);
+    const readCliIntegrationCapability = vi.fn(async () => ({ available: true, permissionGranted: true }));
+    const connectNativeHost = vi.fn(() => fakePort.port);
+
+    const controller = startCliNativeBridge(
+      { dispatch: vi.fn(async () => ({ ok: true, data: null, error: null })) },
+      {
+        connectNativeHost,
+        readExtensionRuntimeMetadata: () => ({
+          runtimeId: 'runtime-id',
+          extensionVersion: '1.2.3',
+          browserFamily: 'chromium',
+        }),
+        readCliIntegrationEnabled,
+        readCliIntegrationCapability,
+        getCliInstanceId: vi.fn(async () => 'instance-1'),
+        disableCliIntegrationAfterPermissionRemoval: vi.fn(async () => {}),
+        storageOnChanged(listener) {
+          storageListener = listener;
+          return () => {
+            storageListener = null;
+          };
+        },
+        permissionsOnRemoved: () => () => {},
+      },
+    );
+
+    await vi.waitFor(() => expect(readCliIntegrationEnabled).toHaveBeenCalledTimes(1));
+    storageListener?.(
+      {
+        [CLI_INTEGRATION_ENABLED_STORAGE_KEY]: {
+          oldValue: false,
+          newValue: true,
+        },
+      },
+      'local',
+    );
+    await vi.waitFor(() => expect(readCliIntegrationEnabled).toHaveBeenCalledTimes(2));
+
+    secondEnabled.resolve(true);
+    await vi.waitFor(() => expect(connectNativeHost).toHaveBeenCalledTimes(1));
+
+    firstEnabled.resolve(true);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(readCliIntegrationCapability).toHaveBeenCalledTimes(1);
+    expect(connectNativeHost).toHaveBeenCalledTimes(1);
+    controller.stop();
   });
 
   it('connects only after opt-in and sends a safe hello', async () => {
