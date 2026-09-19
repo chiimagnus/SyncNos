@@ -21,12 +21,12 @@ const AUTO_SYNC_QUEUE_STORAGE_KEYS: Record<SyncProvider, string> = {
   github: GITHUB_AUTO_SYNC_QUEUE_STORAGE_KEY,
 };
 
-export type BackgroundRecoveryProviderProbe = {
+type BackgroundRecoveryProviderProbe = {
   runningJob: SyncJobSnapshot | null;
   hasQueuedWork: boolean;
 };
 
-export type BackgroundRecoveryProbe = {
+type BackgroundRecoveryProbe = {
   providers: Record<SyncProvider, BackgroundRecoveryProviderProbe>;
   imageBackfillHasQueuedWork: boolean;
   githubCleanupEnabled: boolean;

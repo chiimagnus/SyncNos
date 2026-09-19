@@ -194,7 +194,7 @@ type ContextMenuRegistrationOptions = {
   setDisplayMode: (mode: InpageDisplayMode) => Promise<unknown>;
 };
 
-export type ClipperContextMenuController = {
+type ClipperContextMenuController = {
   installOrRefresh: () => Promise<void>;
 };
 

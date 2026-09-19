@@ -119,7 +119,7 @@ export function getManifest(): any | null {
   }
 }
 
-export type RuntimeInstalledDetails = {
+type RuntimeInstalledDetails = {
   reason?: string;
   previousVersion?: string;
   temporary?: boolean;
