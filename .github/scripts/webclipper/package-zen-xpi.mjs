@@ -56,10 +56,6 @@ if (!version) {
 
 const xpiPath = join(outDir, `webclipper-${version}-zen.xpi`);
 
-// Clean up zip artifacts created by `wxt zip` (older build:zen behavior).
-rmSync(join(outDir, `webclipper-${version}-firefox.zip`), { force: true });
-rmSync(join(outDir, `webclipper-${version}-sources.zip`), { force: true });
-
 rmSync(xpiPath, { force: true });
 
 const tmpDir = join(outDir, '.zen-xpi-tmp');
