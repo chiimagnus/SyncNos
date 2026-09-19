@@ -185,6 +185,7 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(row).toBeTruthy();
     await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await import('../../src/ui/conversations/ConversationDetailPane');
       await flushImmediate();
     });
 
@@ -251,15 +252,17 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
   });
 
-  it('consumes pending-open source/key target and opens detail via precise API', () => {
+  it('consumes pending-open source/key target and opens detail via precise API', async () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,
       source: 'chatgpt',
       conversationKey: 'conv-99',
     });
 
-    act(() => {
+    await act(async () => {
       root!.render(createElement(ConversationsScene));
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
 
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');

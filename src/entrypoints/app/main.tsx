@@ -4,8 +4,6 @@ import AppShell from '@ui/app/AppShell';
 import { initializeLocale } from '@i18n';
 import '@ui/styles/tokens.css';
 import '@ui/styles/buttons.css';
-import 'react-tooltip/dist/react-tooltip.css';
-import '@ui/styles/tooltip.css';
 import '@ui/styles/tailwind.css';
 import '@entrypoints/app/style.css';
 

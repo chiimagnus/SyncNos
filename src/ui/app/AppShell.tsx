@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
 import { ConversationsProvider, useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
-import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
-import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
+import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { createAppCommentSelectionSource } from '@ui/comments/app-comment-selection-source';
 import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
@@ -526,12 +525,14 @@ export default function AppShell() {
                         wideChrome="none"
                         wideHideList={wideHideList}
                         wideDetail={
-                          <ConversationDetailPane
-                            onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
-                            onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
-                            onCommentsLocatorRootsChange={setCommentsLocatorSurfaceRoots}
-                            commentsSidebarOpen={showCommentsSidebar}
-                          />
+                          <Suspense fallback={null}>
+                            <LazyConversationDetailPane
+                              onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
+                              onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
+                              onCommentsLocatorRootsChange={setCommentsLocatorSurfaceRoots}
+                              commentsSidebarOpen={showCommentsSidebar}
+                            />
+                          </Suspense>
                         }
                         listShell={{
                           rightSlot: (
@@ -584,12 +585,14 @@ export default function AppShell() {
 
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0">
-                  <ArticleCommentsSection
-                    sidebarSession={commentsSidebarSession}
-                    containerClassName="tw-h-full tw-min-h-0"
-                    getLocatorSurfaceRoots={getCommentsLocatorSurfaceRoots}
-                    subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
-                  />
+                  <Suspense fallback={null}>
+                    <LazyArticleCommentsSection
+                      sidebarSession={commentsSidebarSession}
+                      containerClassName="tw-h-full tw-min-h-0"
+                      getLocatorSurfaceRoots={getCommentsLocatorSurfaceRoots}
+                      subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
             </div>

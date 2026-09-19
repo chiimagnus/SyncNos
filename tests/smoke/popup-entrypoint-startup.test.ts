@@ -83,8 +83,8 @@ describe('popup entrypoint startup', () => {
 
     expect(renderSource).toContain("import '@ui/styles/buttons.css'");
     expect(renderSource).toContain("import '@ui/styles/tailwind.css'");
-    expect(renderSource).toContain("import 'react-tooltip/dist/react-tooltip.css'");
-    expect(renderSource).toContain("import '@ui/styles/tooltip.css'");
+    expect(renderSource).not.toContain('react-tooltip/dist/react-tooltip.css');
+    expect(renderSource).not.toContain('@ui/styles/tooltip.css');
     expect(renderSource).not.toContain('initializeLocale');
 
     expect(htmlSource.match(/id=["']root["']/g)).toHaveLength(1);

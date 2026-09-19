@@ -245,8 +245,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
     expect(row).toBeTruthy();
-    act(() => {
+    await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
 
     const detail = document.querySelector('[aria-label="Conversation detail"]');
@@ -257,6 +259,7 @@ describe('ConversationsScene narrow comments flow', () => {
     await act(async () => {
       commentBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await import('../../src/ui/conversations/ArticleCommentsSection');
       await flushImmediate();
     });
 
@@ -317,8 +320,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
     expect(row).toBeTruthy();
-    act(() => {
+    await act(async () => {
       row!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 
@@ -363,13 +368,15 @@ describe('ConversationsScene narrow comments flow', () => {
       subscribeSidebarClose,
     };
 
-    act(() => {
+    await act(async () => {
       root!.render(
         createElement(ConversationsScene, {
           commentsSidebarRuntime,
           narrowCommentsOpenSource: 'popup',
         }),
       );
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
     });
 
     expect(setContext).not.toHaveBeenCalled();
@@ -381,6 +388,7 @@ describe('ConversationsScene narrow comments flow', () => {
     await act(async () => {
       commentBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       commentBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await import('../../src/ui/conversations/ArticleCommentsSection');
       await flushImmediate();
     });
 

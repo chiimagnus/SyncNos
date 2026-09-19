@@ -116,6 +116,10 @@ function setupDom() {
   return dom;
 }
 
+function flushImmediate(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function cleanupDom() {
   delete (globalThis as any).window;
   delete (globalThis as any).document;
@@ -199,17 +203,20 @@ describe('ConversationsScene narrow detail scroll root', () => {
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  afterEach(() => {
-    act(() => {
+  afterEach(async () => {
+    await act(async () => {
       root?.unmount();
+      await flushImmediate();
     });
     root = null;
     cleanupDom();
   });
 
-  it('puts the detail route scroll root on the scene wrapper, not inside ConversationDetailPane', () => {
-    act(() => {
+  it('puts the detail route scroll root on the scene wrapper, not inside ConversationDetailPane', async () => {
+    await act(async () => {
       root!.render(createElement(ConversationsScene));
+      await flushImmediate();
+      await flushImmediate();
     });
 
     const routeScrollRoots = document.querySelectorAll('.route-scroll');
