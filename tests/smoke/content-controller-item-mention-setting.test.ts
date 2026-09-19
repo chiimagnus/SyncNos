@@ -64,11 +64,11 @@ describe('content-controller item mention setting', () => {
 
     const start = vi.fn(() => ({ stop: vi.fn() }));
     const controller = createContentController({
-      runtime: { onInvalidated: () => () => {} },
+      runtime: { send: async () => ({ ok: true, data: {} }), isInvalidContextError: () => false },
       collectorsRegistry: null,
       currentPageCapture: {} as any,
-      inpageButton: null,
-      inpageTip: null,
+      inpageButton: { ensureInpageButton: () => {}, cleanupButtons: () => {}, setSaving: () => {} },
+      inpageTip: { showSaveTip: () => {} },
       createRuntimeObserver: () => ({ start: () => {}, stop: () => {} }),
       incrementalEngine: createAutoSaveIncrementalEngine(),
       itemMention: { start },
@@ -89,11 +89,11 @@ describe('content-controller item mention setting', () => {
     const stopFn = vi.fn();
     const start = vi.fn(() => ({ stop: stopFn }));
     const controller = createContentController({
-      runtime: { onInvalidated: () => () => {} },
+      runtime: { send: async () => ({ ok: true, data: {} }), isInvalidContextError: () => false },
       collectorsRegistry: null,
       currentPageCapture: {} as any,
-      inpageButton: null,
-      inpageTip: null,
+      inpageButton: { ensureInpageButton: () => {}, cleanupButtons: () => {}, setSaving: () => {} },
+      inpageTip: { showSaveTip: () => {} },
       createRuntimeObserver: () => ({ start: () => {}, stop: () => {} }),
       incrementalEngine: createAutoSaveIncrementalEngine(),
       itemMention: { start },
