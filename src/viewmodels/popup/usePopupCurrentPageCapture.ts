@@ -3,11 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
-import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
-import {
-  buildCaptureWaitingMessage,
-  buildPartialCaptureMessage,
-} from '@services/bootstrap/current-page-capture-status';
+import { buildCaptureWaitingMessage } from '@services/bootstrap/current-page-capture-status';
 import type { CurrentPageCaptureResult, CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
@@ -98,22 +94,8 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
         {},
       );
       const data = unwrap(response);
-      await onCaptured?.();
       await refreshState({ silent: true });
-      if (data.kind === 'chat' && data.captureCompleteness === 'partial') {
-        setStatus({
-          kind: 'warning',
-          message: buildPartialCaptureMessage(data.captureReasons),
-        });
-      } else {
-        setStatus({
-          kind: 'success',
-          message:
-            data.kind === 'video' && data.subtitleStatus === 'empty'
-              ? t('videoTranscriptTipNoSubtitles')
-              : buildCaptureSuccessTipMessage({ isNew: data.isNew, title: data.title }),
-        });
-      }
+      await onCaptured?.();
       return data;
     } catch (error) {
       const message = (error as any)?.message ?? String(error ?? t('captureFailedFallback'));

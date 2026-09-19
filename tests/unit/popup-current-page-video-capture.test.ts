@@ -10,26 +10,14 @@ vi.mock('@i18n', () => ({
   t: (key: string) =>
     ({
       unavailable: 'Unavailable',
-      checkingCurrentPage: 'Checking current page',
       currentPageCannotBeCaptured: 'Current page cannot be captured',
       captureFailedFallback: 'Capture failed',
       fetchingDots: 'Fetching...',
       checkingDots: 'Checking...',
-      partialCaptureSaved: 'Partial capture saved',
       captureWaitingForMessages: 'waiting for messages…',
-      partialCaptureSavedLive: 'Live reply saved; confirm later.',
-      partialCaptureSavedHistory: 'History still unconfirmed.',
-      partialCaptureSavedContent: 'Some content remains unconfirmed.',
-      partialCaptureSavedMedia: 'Some media remains incomplete.',
       sourceChatgpt: 'ChatGPT',
-      videoTranscriptTipNoSubtitles: 'No subtitles detected; available video details were saved.',
     })[key] || key,
 }));
-vi.mock('@services/shared/capture-tip', () => ({
-  buildCaptureSuccessTipMessage: ({ isNew, title }: { isNew: boolean; title?: string }) =>
-    `${isNew ? 'Saved' : 'Updated'}: ${title || 'Untitled'}`,
-}));
-
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 
 let dom: JSDOM;
@@ -89,13 +77,25 @@ afterEach(async () => {
 describe('popup current-page video capture', () => {
   it('shows video state and treats empty subtitles as a saved metadata-only video', async () => {
     const onCaptured = vi.fn();
+    let stateCalls = 0;
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
+        stateCalls += 1;
         return apiOk({
           readiness: 'ready',
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',
+          ...(stateCalls > 1
+            ? {
+                activity: {
+                  phase: 'settled',
+                  kind: 'success',
+                  message: 'No subtitles detected; available video details were saved.',
+                  expiresAt: Date.now() + 5_000,
+                },
+              }
+            : null),
         });
       }
       if (type === 'captureActiveTabCurrentPage') {
@@ -326,11 +326,28 @@ describe('popup current-page video capture', () => {
     expect(latest?.status).toEqual({ kind: 'success', message: 'Updated: Article' });
   });
 
-  it('maps ChatGPT live-tail partial reasons to a warning instead of the generic history message', async () => {
+  it('uses the canonical capture activity for ChatGPT partial-save status', async () => {
     const onCaptured = vi.fn();
+    let stateCalls = 0;
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
-        return apiOk({ readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' });
+        stateCalls += 1;
+        return apiOk({
+          readiness: 'ready',
+          kind: 'chat',
+          label: 'Fetch AI Chat',
+          collectorId: 'chatgpt',
+          ...(stateCalls > 1
+            ? {
+                activity: {
+                  phase: 'settled',
+                  kind: 'warning',
+                  message: 'Live reply saved; confirm later.',
+                  expiresAt: Date.now() + 5_000,
+                },
+              }
+            : null),
+        });
       }
       if (type === 'captureActiveTabCurrentPage') {
         return apiOk({
@@ -379,13 +396,25 @@ describe('popup current-page video capture', () => {
 
   it('runs the captured callback only for a saved video', async () => {
     const onCaptured = vi.fn(async () => undefined);
+    let stateCalls = 0;
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
+        stateCalls += 1;
         return apiOk({
           readiness: 'ready',
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',
+          ...(stateCalls > 1
+            ? {
+                activity: {
+                  phase: 'settled',
+                  kind: 'success',
+                  message: 'Saved: Talk',
+                  expiresAt: Date.now() + 5_000,
+                },
+              }
+            : null),
         });
       }
       if (type === 'captureActiveTabCurrentPage') {
