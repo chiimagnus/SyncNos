@@ -172,12 +172,7 @@ export function ArticleReaderView({
     (node: HTMLDivElement | null) => {
       narrationRootRef.current = node;
       setOutlineRoot(node);
-      const ref = setMessagesRootRef as unknown;
-      if (typeof ref === 'function') {
-        (ref as (value: HTMLDivElement | null) => void)(node);
-      } else if (ref && typeof ref === 'object') {
-        (ref as { current: HTMLDivElement | null }).current = node;
-      }
+      setMessagesRootRef(node);
     },
     [setMessagesRootRef],
   );
