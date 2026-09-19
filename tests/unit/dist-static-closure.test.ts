@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import {
   analyzeBackgroundRuntime,
   analyzePopupStartup,
-  collectReachableModuleClosure,
+  assertHtmlModuleEntriesAreRoots,
   collectStaticModuleClosure,
   inspectStartupStylesheets,
   resolveBackgroundEntries,
@@ -118,34 +118,40 @@ describe('dist static closure analyzer', () => {
     expect(immediate).not.toContain('chunks/detail.js');
   });
 
-  it('follows dynamic imports when checking the full reachable Popup module graph', async () => {
-    const root = createRoot();
-    const entry = write(root, 'popup.js', "import './base.js'; import('./render.js');");
-    write(root, 'base.js', 'export const base = 1;');
-    write(root, 'render.js', "import('./detail.js');");
-    write(root, 'detail.js', "import './leaf.js';");
-    write(root, 'leaf.js', 'export const leaf = 1;');
+  it('keeps every HTML module entry as a graph root in both dependency directions', async () => {
+    const popupToAppRoot = createRoot();
+    write(popupToAppRoot, 'popup.html', '<script type="module" src="/popup.js"></script>');
+    write(popupToAppRoot, 'app.html', '<script type="module" src="/app.js"></script>');
+    write(popupToAppRoot, 'popup.js', "import('./render.js');");
+    write(popupToAppRoot, 'render.js', "import('./detail.js');");
+    write(popupToAppRoot, 'detail.js', "import './app.js';");
+    write(popupToAppRoot, 'app.js', 'globalThis.__mountedApp = true;');
 
-    const closure = await collectReachableModuleClosure(root, [entry]);
-    expect(closure.files.map((file: string) => file.slice(root.length + 1)).sort()).toEqual([
-      'base.js',
-      'detail.js',
-      'leaf.js',
-      'popup.js',
-      'render.js',
-    ]);
+    await expect(assertHtmlModuleEntriesAreRoots(popupToAppRoot)).rejects.toThrow(/must remain a graph root/);
+
+    const appToPopupRoot = createRoot();
+    write(appToPopupRoot, 'popup.html', '<script type="module" src="/popup.js"></script>');
+    write(appToPopupRoot, 'app.html', '<script type="module" src="/app.js"></script>');
+    write(appToPopupRoot, 'popup.js', "import('./render.js');");
+    write(appToPopupRoot, 'render.js', '');
+    write(appToPopupRoot, 'app.js', "import './shared.js';");
+    write(appToPopupRoot, 'shared.js', "import './popup.js';");
+
+    await expect(assertHtmlModuleEntriesAreRoots(appToPopupRoot)).rejects.toThrow(/must remain a graph root/);
   });
 
-  it('rejects a foreign HTML entry anywhere in the Popup dynamic dependency graph', async () => {
+  it('ignores unrelated non-literal runtime imports while checking HTML entry roots', async () => {
     const root = createRoot();
     write(root, 'popup.html', '<script type="module" src="/popup.js"></script>');
     write(root, 'app.html', '<script type="module" src="/app.js"></script>');
     write(root, 'popup.js', "import('./render.js');");
-    write(root, 'render.js', "import('./detail.js');");
-    write(root, 'detail.js', "import './app.js';");
-    write(root, 'app.js', 'globalThis.__mountedApp = true;');
+    write(root, 'render.js', '');
+    write(root, 'app.js', "import('./app-render.js');");
+    write(root, 'app-render.js', 'export const app = true;');
+    write(root, 'router-runtime.js', 'export async function load(route) { return import(route.module); }');
 
-    await expect(analyzePopupStartup(root, popupManifest())).rejects.toThrow(/must not import foreign HTML entry/);
+    await expect(assertHtmlModuleEntriesAreRoots(root)).resolves.toBeUndefined();
+    await expect(analyzePopupStartup(root, popupManifest())).resolves.toBeDefined();
   });
 
   it('rejects a Popup modulepreload that bypasses the bootstrap static closure', async () => {

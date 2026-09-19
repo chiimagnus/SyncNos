@@ -79,12 +79,18 @@ export function resolvePopupAssets(root, manifest) {
   };
 }
 
-async function parseJavaScriptModule(root, file) {
+async function parseJavaScriptModule(root, file, options = {}) {
   await init;
   const source = readFileSync(file, 'utf8');
   const [records] = parse(source);
   const staticImports = [];
   const dynamicImports = [];
+
+  const resolveImport = (specifier, label) => {
+    const value = String(specifier || '').trim();
+    if (options.localOnly && !value.startsWith('.') && !value.startsWith('/')) return null;
+    return resolveDistAsset(root, value, file, label);
+  };
 
   for (const record of records) {
     if (record.d === -2) continue;
@@ -94,16 +100,19 @@ async function parseJavaScriptModule(root, file) {
           `Static import cannot be resolved in ${normalizeDisplayPath(root, file)} at offset ${record.ss}`,
         );
       }
-      staticImports.push(resolveDistAsset(root, record.n, file, 'Static module import'));
+      const dependency = resolveImport(record.n, 'Static module import');
+      if (dependency) staticImports.push(dependency);
       continue;
     }
     if (record.d >= 0) {
       if (typeof record.n !== 'string') {
+        if (options.allowUnknownDynamic) continue;
         throw new Error(
           `Dynamic import must use a string literal in ${normalizeDisplayPath(root, file)} at offset ${record.ss}`,
         );
       }
-      dynamicImports.push(resolveDistAsset(root, record.n, file, 'Dynamic module import'));
+      const dependency = resolveImport(record.n, 'Dynamic module import');
+      if (dependency) dynamicImports.push(dependency);
     }
   }
 
@@ -132,11 +141,6 @@ async function collectModuleClosure(root, entries, options = {}) {
     for (const dependency of moduleInfo.staticImports) {
       if (!visited.has(dependency)) queue.push(dependency);
     }
-    if (options.followDynamicImports) {
-      for (const dependency of moduleInfo.dynamicImports) {
-        if (!visited.has(dependency)) queue.push(dependency);
-      }
-    }
   }
 
   const files = [...visited];
@@ -151,10 +155,6 @@ export async function collectStaticModuleClosure(root, entries, options = {}) {
   return collectModuleClosure(root, entries, options);
 }
 
-export async function collectReachableModuleClosure(root, entries) {
-  return collectModuleClosure(root, entries, { followDynamicImports: true });
-}
-
 export function resolveHtmlModuleEntries(root) {
   const entries = new Map();
   for (const dirent of readdirSync(root, { withFileTypes: true })) {
@@ -167,6 +167,37 @@ export function resolveHtmlModuleEntries(root) {
     if (scripts.length) entries.set(htmlPath, [...new Set(scripts)]);
   }
   return entries;
+}
+
+function listJavaScriptFiles(root) {
+  const files = [];
+  const visit = (dir) => {
+    for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+      const path = resolve(dir, dirent.name);
+      if (dirent.isDirectory()) visit(path);
+      else if (dirent.isFile() && dirent.name.endsWith('.js')) files.push(path);
+    }
+  };
+  visit(root);
+  return files;
+}
+
+export async function assertHtmlModuleEntriesAreRoots(root) {
+  const htmlEntries = resolveHtmlModuleEntries(root);
+  const entryFiles = new Set([...htmlEntries.values()].flat());
+
+  for (const file of listJavaScriptFiles(root)) {
+    const moduleInfo = await parseJavaScriptModule(root, file, {
+      allowUnknownDynamic: true,
+      localOnly: true,
+    });
+    for (const dependency of [...moduleInfo.staticImports, ...moduleInfo.dynamicImports]) {
+      if (!entryFiles.has(dependency) || dependency === file) continue;
+      throw new Error(
+        `HTML module entry must remain a graph root: ${normalizeDisplayPath(root, dependency)} is imported by ${normalizeDisplayPath(root, file)}`,
+      );
+    }
+  }
 }
 
 export function inspectStartupStylesheets(root, files) {
@@ -188,6 +219,7 @@ export function inspectStartupStylesheets(root, files) {
 
 export async function analyzePopupStartup(root, manifest) {
   const assets = resolvePopupAssets(root, manifest);
+  await assertHtmlModuleEntriesAreRoots(root);
   const bootstrap = await collectStaticModuleClosure(root, [assets.entry]);
   const entryInfo = bootstrap.modules.get(assets.entry);
   const directDynamicImports = entryInfo?.dynamicImports ?? [];
@@ -209,19 +241,6 @@ export async function analyzePopupStartup(root, manifest) {
   const immediateFiles = [...new Set([...bootstrap.files, ...render.files])];
   const startupStyles = inspectStartupStylesheets(root, assets.stylesheets);
 
-  const reachable = await collectReachableModuleClosure(root, [assets.entry]);
-  const reachableSet = new Set(reachable.files);
-  for (const [htmlPath, entries] of resolveHtmlModuleEntries(root)) {
-    if (htmlPath === assets.popupHtml) continue;
-    for (const entry of entries) {
-      if (reachableSet.has(entry)) {
-        throw new Error(
-          `Popup module graph must not import foreign HTML entry ${normalizeDisplayPath(root, entry)} from ${normalizeDisplayPath(root, htmlPath)}`,
-        );
-      }
-    }
-  }
-
   return {
     ...assets,
     renderTarget,
@@ -229,7 +248,6 @@ export async function analyzePopupStartup(root, manifest) {
     bootstrapBytes: bootstrap.bytes,
     immediateFiles,
     immediateBytes: immediateFiles.reduce((total, file) => total + statSync(file).size, 0),
-    reachableFiles: reachable.files,
     startupStylesheetFiles: startupStyles.files,
     startupStylesheetBytes: startupStyles.bytes,
   };
