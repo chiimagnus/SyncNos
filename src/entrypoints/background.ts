@@ -45,11 +45,9 @@ async function openAboutSectionAfterInstall(): Promise<void> {
 }
 
 function runBestEffort(task: () => unknown | Promise<unknown>): void {
-  try {
-    void Promise.resolve(task()).catch(() => {});
-  } catch (_error) {
-    // Startup and optional listener recovery must stay isolated from siblings.
-  }
+  void (async () => {
+    await task();
+  })().catch(() => {});
 }
 
 export default defineBackground(() => {
