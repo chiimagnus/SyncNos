@@ -49,16 +49,16 @@ export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOpt
   const existingId = Number(existing?.id);
 
   if (existing && Number.isFinite(existingId) && existingId > 0) {
-    const updated = await tabsUpdate(existingId, {
+    await tabsUpdate(existingId, {
       active: true,
       ...(existing.url === targetUrl ? {} : { url: targetUrl }),
     });
     // Popup 会在目标窗口获得焦点时被销毁；先完成目标 tab 的激活与导航。
     await focusTabWindow(existing.windowId).catch(() => {});
-    return updated ?? existing;
+    return existing;
   }
 
-  return await tabsCreate({ url: targetUrl, active: true });
+  return tabsCreate({ url: targetUrl, active: true });
 }
 
 export async function ensureExtensionAppTab() {
@@ -68,5 +68,5 @@ export async function ensureExtensionAppTab() {
   const existing = await findExtensionAppTab();
   if (existing) return existing;
 
-  return await tabsCreate({ url: targetUrl, active: false });
+  return tabsCreate({ url: targetUrl, active: false });
 }
