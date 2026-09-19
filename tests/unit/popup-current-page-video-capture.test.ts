@@ -157,7 +157,41 @@ describe('popup current-page video capture', () => {
     expect(onCaptured).not.toHaveBeenCalled();
   });
 
-  it('serializes waiting polls so one slow state request cannot overlap the next', async () => {
+  it('single-flights mount and immediate focus state refreshes', async () => {
+    const onCaptured = vi.fn();
+    const stateRequest = deferred<ReturnType<typeof apiOk<any>>>();
+    sendMock.mockImplementation((type: string) => {
+      if (type !== 'getActiveTabCaptureState') throw new Error(`unexpected message: ${type}`);
+      return stateRequest.promise;
+    });
+
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => {
+      root?.render(React.createElement(Probe, { onCaptured }));
+      await Promise.resolve();
+    });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      window.dispatchEvent(new window.Event('focus'));
+      await Promise.resolve();
+    });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(latest?.checking).toBe(true);
+
+    await act(async () => {
+      stateRequest.resolve(
+        apiOk({ readiness: 'ready', kind: 'video', label: 'Fetch Video Transcript', collectorId: 'video' }),
+      );
+      await flushEffects();
+    });
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(latest?.checking).toBe(false);
+    expect(latest?.captureState).toMatchObject({ readiness: 'ready', kind: 'video' });
+  });
+
+  it('serializes waiting polls so one slow state request cannot overlap focus or the next poll', async () => {
     vi.useFakeTimers();
     const onCaptured = vi.fn();
     const slowPoll = deferred<ReturnType<typeof apiOk<any>>>();
@@ -188,6 +222,7 @@ describe('popup current-page video capture', () => {
     expect(stateCalls).toBe(2);
 
     await act(async () => {
+      window.dispatchEvent(new window.Event('focus'));
       vi.advanceTimersByTime(3000);
       await Promise.resolve();
     });
@@ -249,7 +284,8 @@ describe('popup current-page video capture', () => {
     expect(latest?.buttonDisabled).toBe(true);
     expect(latest?.buttonLabel).toBe('Unavailable');
     expect(latest?.status).toEqual({ kind: 'error', message: 'relay failed' });
-    expect(Object.prototype.hasOwnProperty.call(latest, 'captureState')).toBe(false);
+    expect(latest?.captureState).toBeNull();
+    expect(latest?.checking).toBe(false);
     expect(await latest?.capture()).toBeNull();
     expect(onCaptured).not.toHaveBeenCalled();
   });

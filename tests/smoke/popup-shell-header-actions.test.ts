@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom';
 import type { ReactNode } from 'react';
 
 const sendMock = vi.fn();
+const popupCaptureHookMock = vi.hoisted(() => vi.fn());
 const ensureExtensionAppTabMock = vi.fn();
 const openOrFocusExtensionAppTabMock = vi.fn();
 const publishPopupSyncSelectionHandoffMock = vi.fn();
@@ -92,16 +93,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
 }));
 
 vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
-  usePopupCurrentPageCapture: () => ({
-    buttonDisabled: false,
-    buttonLabel: 'Fetch AI Chat',
-    capture: vi.fn(),
-    captureState: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
-    checking: false,
-    fetching: false,
-    refreshState: vi.fn(),
-    status: { kind: 'info', message: 'ChatGPT · Waiting for messages…' },
-  }),
+  usePopupCurrentPageCapture: (...args: any[]) => popupCaptureHookMock(...args),
 }));
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
@@ -245,6 +237,17 @@ describe('PopupShell header actions', () => {
   beforeEach(() => {
     setupDom();
     sendMock.mockReset();
+    popupCaptureHookMock.mockReset();
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: false,
+      buttonLabel: 'Fetch AI Chat',
+      capture: vi.fn(),
+      captureState: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
+      checking: false,
+      fetching: false,
+      refreshState: vi.fn(),
+      status: null,
+    });
     ensureExtensionAppTabMock.mockReset();
     openOrFocusExtensionAppTabMock.mockReset();
     publishPopupSyncSelectionHandoffMock.mockReset();
@@ -478,17 +481,20 @@ describe('PopupShell header actions', () => {
     expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
   });
 
-  it('opens the inpage comments sidebar from the popup comments button', async () => {
+  it('opens the inpage comments sidebar from the popup comments button without a second state query', async () => {
     const { UI_MESSAGE_TYPES } = await import('../../src/services/protocols/message-contracts');
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: false,
+      buttonLabel: 'Fetch Article',
+      capture: vi.fn(),
+      captureState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
+      checking: false,
+      fetching: false,
+      refreshState: vi.fn(),
+      status: null,
+    });
 
     sendMock.mockImplementation(async (type: string) => {
-      if (type === UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE) {
-        return {
-          ok: true,
-          data: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
-          error: null,
-        };
-      }
       if (type === UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL) {
         return {
           ok: true,
@@ -503,9 +509,7 @@ describe('PopupShell header actions', () => {
 
     await renderPopupShell(root!);
 
-    await waitForPopupUi(() => {
-      expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
-    });
+    expect(sendMock).not.toHaveBeenCalledWith(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
 
     const commentsBtn = document.querySelector(
       '[aria-label="Open in-page comments sidebar"]',

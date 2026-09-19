@@ -52,9 +52,11 @@ function runBestEffort(task: () => unknown | Promise<unknown>): void {
 }
 
 export default defineBackground(() => {
-  const localeReady = initializeLocale();
+  const ensureBackgroundLocaleReady = () => initializeLocale();
   const displayModeReady = ensureCanonicalInpageDisplayMode().catch(() => undefined);
-  const menuReady = Promise.all([localeReady.catch(() => undefined), displayModeReady]).then(() => undefined);
+  const menuReady = Promise.all([ensureBackgroundLocaleReady().catch(() => undefined), displayModeReady]).then(
+    () => undefined,
+  );
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
 
   const router = createBackgroundRouter({
@@ -98,7 +100,7 @@ export default defineBackground(() => {
   } catch (_error) {
     // GitHub Settings is optional during startup; a registration failure must not block the core router.
   }
-  registerUiMessageHandlers(router, { localeReady });
+  registerUiMessageHandlers(router, { ensureLocaleReady: ensureBackgroundLocaleReady });
   registerPublicSettingsHandlers(router);
   registerOpenTargetHandlers(router);
   registerSyncHandlers(router, {

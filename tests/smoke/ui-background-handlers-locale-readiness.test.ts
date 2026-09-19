@@ -45,51 +45,102 @@ afterEach(() => {
 });
 
 describe('UI background handler locale readiness', () => {
-  it('registers every UI message synchronously while current-page work waits for locale', async () => {
+  it('registers every UI message synchronously and relays HTTP state without touching locale readiness', async () => {
     const locale = deferred<void>();
+    const ensureLocaleReady = vi.fn(() => locale.promise);
     const { router, handlers } = createRouter();
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { readiness: 'ready' }, error: null } as any);
 
-    registerUiMessageHandlers(router, { localeReady: locale.promise });
+    registerUiMessageHandlers(router, { ensureLocaleReady });
 
     expect([...handlers.keys()].sort()).toEqual(Object.values(UI_MESSAGE_TYPES).sort());
 
+    await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toEqual({
+      ok: true,
+      data: { readiness: 'ready' },
+      error: null,
+    });
+    expect(tabsQuery).toHaveBeenCalledTimes(1);
+    expect(tabsSendMessage).toHaveBeenCalledTimes(1);
+    expect(ensureLocaleReady).not.toHaveBeenCalled();
+  });
+
+  it('passes through a content-owned capture error without loading background locale', async () => {
+    const locale = deferred<void>();
+    const ensureLocaleReady = vi.fn(() => locale.promise);
+    const { router, handlers } = createRouter();
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({
+      ok: false,
+      data: null,
+      error: { message: 'content capture failed', extra: null },
+    } as any);
+
+    registerUiMessageHandlers(router, { ensureLocaleReady });
+
+    await expect(handlers.get(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE)?.()).resolves.toEqual({
+      ok: false,
+      data: null,
+      error: { message: 'content capture failed', extra: { code: 'CAPTURE_FAILED' } },
+    });
+    expect(ensureLocaleReady).not.toHaveBeenCalled();
+  });
+
+  it('waits for locale only when background must synthesize a local fallback', async () => {
+    const locale = deferred<void>();
+    const ensureLocaleReady = vi.fn(() => locale.promise);
+    const { router, handlers } = createRouter();
+    vi.mocked(tabsQuery).mockResolvedValue([] as any);
+
+    registerUiMessageHandlers(router, { ensureLocaleReady });
     const responsePromise = handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.();
+    let settled = false;
+    void responsePromise?.then(() => {
+      settled = true;
+    });
+
     await flushMicrotasks();
-    expect(tabsQuery).not.toHaveBeenCalled();
+    expect(ensureLocaleReady).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
     expect(tabsSendMessage).not.toHaveBeenCalled();
 
     locale.resolve();
-    await expect(responsePromise).resolves.toEqual({ ok: true, data: { readiness: 'ready' }, error: null });
-    expect(tabsQuery).toHaveBeenCalledTimes(1);
-    expect(tabsSendMessage).toHaveBeenCalledTimes(1);
+    const response = await responsePromise;
+    expect(response).toMatchObject({
+      ok: true,
+      data: { readiness: 'unsupported', kind: 'unsupported' },
+      error: null,
+    });
   });
 
-  it('continues current-page handling after locale readiness rejects', async () => {
-    const locale = deferred<void>();
+  it('continues a local fallback when locale initialization rejects', async () => {
+    const ensureLocaleReady = vi.fn(async () => {
+      throw new Error('locale failed');
+    });
     const { router, handlers } = createRouter();
-    vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
-    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { captured: true }, error: null } as any);
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'chrome://extensions/' }] as any);
 
-    registerUiMessageHandlers(router, { localeReady: locale.promise });
-    const responsePromise = handlers.get(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE)?.();
+    registerUiMessageHandlers(router, { ensureLocaleReady });
 
-    locale.reject(new Error('locale failed'));
-    await expect(responsePromise).resolves.toEqual({ ok: true, data: { captured: true }, error: null });
-    expect(tabsQuery).toHaveBeenCalledTimes(1);
-    expect(tabsSendMessage).toHaveBeenCalledTimes(1);
+    await expect(handlers.get(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE)?.()).resolves.toMatchObject({
+      ok: false,
+      data: null,
+      error: { extra: { code: 'CAPTURE_UNAVAILABLE' } },
+    });
+    expect(ensureLocaleReady).toHaveBeenCalledTimes(1);
   });
 
   it('does not gate popup or comments handlers on locale readiness', async () => {
     const locale = deferred<void>();
+    const ensureLocaleReady = vi.fn(() => locale.promise);
     const { router, handlers } = createRouter();
     const openPopup = vi.fn().mockResolvedValue(undefined);
     // @ts-expect-error test global
     globalThis.chrome = { action: { openPopup } };
     vi.mocked(tabsSendMessage).mockResolvedValue(null as any);
 
-    registerUiMessageHandlers(router, { localeReady: locale.promise });
+    registerUiMessageHandlers(router, { ensureLocaleReady });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP)?.()).resolves.toEqual({
       ok: true,
@@ -102,5 +153,6 @@ describe('UI background handler locale readiness', () => {
 
     expect(openPopup).toHaveBeenCalledTimes(1);
     expect(tabsSendMessage).toHaveBeenCalledTimes(1);
+    expect(ensureLocaleReady).not.toHaveBeenCalled();
   });
 });

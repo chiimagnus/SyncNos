@@ -220,7 +220,12 @@ describe('background entrypoint cold start', () => {
     expect(mocks.onInstalled).toHaveBeenCalledTimes(1);
     expect(mocks.onAlarm).toHaveBeenCalledTimes(1);
     expect(mocks.storageOnChanged).toHaveBeenCalledTimes(1);
-    expect(mocks.registerUiMessageHandlers.mock.calls[0]?.[1]?.localeReady).toBe(locale.promise);
+    const uiMessageOptions = mocks.registerUiMessageHandlers.mock.calls[0]?.[1];
+    expect(uiMessageOptions).not.toHaveProperty('localeReady');
+    expect(uiMessageOptions?.ensureLocaleReady).toEqual(expect.any(Function));
+    expect(mocks.initializeLocale).toHaveBeenCalledTimes(1);
+    expect(uiMessageOptions.ensureLocaleReady()).toBe(locale.promise);
+    expect(mocks.initializeLocale).toHaveBeenCalledTimes(2);
     const menuOptions = mocks.registerClipperContextMenu.mock.calls[0]?.[0];
     expect(menuOptions).not.toHaveProperty('localeReady');
     expect(menuOptions.readDisplayMode).toBe(mocks.readDisplayMode);
