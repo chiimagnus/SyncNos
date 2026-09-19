@@ -55,6 +55,7 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
         buttonConfig = cfg;
       },
       cleanupButtons: () => {},
+      setSaving: () => {},
     },
     createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
       tickRef = onTick || null;

@@ -21,12 +21,12 @@ const NOTION_AI_SEND_BUTTON_SELECTOR =
 const NOTION_AI_COMPOSER_SELECTOR = 'div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]';
 
 type RuntimeClient = {
-  send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
-  isInvalidContextError?: (error: unknown) => boolean;
+  send: (type: string, payload?: Record<string, unknown>) => Promise<any>;
+  isInvalidContextError: (error: unknown) => boolean;
 };
 
 type InpageButtonApi = {
-  ensureInpageButton?: (input: {
+  ensureInpageButton: (input: {
     collectorId?: string;
     onClick?: () => void;
     onDoubleClick?: () => void;
@@ -34,12 +34,12 @@ type InpageButtonApi = {
     positionState?: any;
     onPositionChange?: (state: any) => void;
   }) => void;
-  cleanupButtons?: (collectorId: string) => void;
-  setSaving?: (saving: boolean) => void;
+  cleanupButtons: (collectorId: string) => void;
+  setSaving: (saving: boolean) => void;
 };
 
 type InpageTipApi = {
-  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
+  showSaveTip: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
 };
 
 type RuntimeObserverFactory = (input: {
@@ -49,11 +49,11 @@ type RuntimeObserverFactory = (input: {
 }) => { start: () => void; stop: () => void };
 
 type Deps = {
-  runtime: RuntimeClient | null;
+  runtime: RuntimeClient;
   collectorsRegistry: CollectorRegistryLike | null;
   currentPageCapture: CurrentPageCaptureService;
-  inpageButton: InpageButtonApi | null;
-  inpageTip: InpageTipApi | null;
+  inpageButton: InpageButtonApi;
+  inpageTip: InpageTipApi;
   createRuntimeObserver: RuntimeObserverFactory;
   incrementalEngine: { prepare: (snapshot: unknown) => any };
   itemMention: { start: () => { stop: () => void } | null };
@@ -98,13 +98,10 @@ export function createContentController(deps: Deps) {
   }
 
   function showInpageTip(text: string, kind?: string) {
-    inpageTip?.showSaveTip?.(text, { kind: toTipKind(kind) });
+    inpageTip.showSaveTip(text, { kind: toTipKind(kind) });
   }
 
   function send(type: string, payload?: Record<string, unknown>) {
-    if (!runtime || typeof runtime.send !== 'function') {
-      return Promise.reject(new Error('runtime client unavailable'));
-    }
     return runtime.send(type, payload);
   }
 
@@ -329,8 +326,8 @@ export function createContentController(deps: Deps) {
       stopped = true;
       liveGeneration += 1;
       releaseResidentOwner(ownerToken);
-      inpageButton?.setSaving?.(false);
-      inpageButton?.cleanupButtons?.('');
+      inpageButton.setSaving(false);
+      inpageButton.cleanupButtons('');
       backfillStateByConversation.clear();
       observer.stop();
       clearProactiveTimers();
@@ -547,7 +544,7 @@ export function createContentController(deps: Deps) {
     }
 
     function setResidentSaving(saving: boolean) {
-      if (!stopped) inpageButton?.setSaving?.(saving);
+      if (!stopped) inpageButton.setSaving(saving);
     }
 
     const clickSave = async () => {
@@ -598,8 +595,8 @@ export function createContentController(deps: Deps) {
       if (stopped) return;
       const captureState = currentPageCapture.getCurrentPageCaptureState();
       const buttonCollectorId = captureState.readiness !== 'unsupported' ? captureState.collectorId || '' : '';
-      inpageButton?.cleanupButtons?.(buttonCollectorId);
-      inpageButton?.ensureInpageButton?.({
+      inpageButton.cleanupButtons(buttonCollectorId);
+      inpageButton.ensureInpageButton({
         collectorId: buttonCollectorId || undefined,
         onClick: clickSave,
         onDoubleClick: captureState.kind === 'article' ? openInpageCommentsSidebar : undefined,
@@ -612,7 +609,7 @@ export function createContentController(deps: Deps) {
         },
       });
       if (stopped) {
-        inpageButton?.cleanupButtons?.('');
+        inpageButton.cleanupButtons('');
         return;
       }
     }
@@ -781,7 +778,7 @@ export function createContentController(deps: Deps) {
           setResidentSaving(false);
         }
       } catch (error) {
-        if (runtime?.isInvalidContextError?.(error)) {
+        if (runtime.isInvalidContextError(error)) {
           stop();
           return;
         }
@@ -797,7 +794,7 @@ export function createContentController(deps: Deps) {
         if (!isAutoSaveRequestAllowed(generation)) return;
         requestAutoSave(ownerToken);
       } catch (error) {
-        if (runtime?.isInvalidContextError?.(error)) stop();
+        if (runtime.isInvalidContextError(error)) stop();
       }
     }
 
@@ -832,9 +829,11 @@ export function createContentController(deps: Deps) {
     ): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
       const manualSlot = await enterManualPersistence(null, () => true);
       if (!manualSlot) throw new Error('manual_capture_in_progress');
+      inpageButton.setSaving(true);
       try {
         return await currentPageCapture.captureCurrentPage(input);
       } finally {
+        inpageButton.setSaving(false);
         exitManualPersistence(manualSlot);
       }
     },

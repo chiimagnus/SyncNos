@@ -254,8 +254,6 @@ describe('PopupShell header actions', () => {
       capture: vi.fn(),
       captureState: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
       checking: false,
-      fetching: false,
-      refreshState: vi.fn(),
       status: null,
     });
     ensureExtensionAppTabMock.mockReset();
@@ -499,8 +497,6 @@ describe('PopupShell header actions', () => {
       capture: vi.fn(),
       captureState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
       checking: false,
-      fetching: false,
-      refreshState: vi.fn(),
       status: null,
     });
 
@@ -551,8 +547,6 @@ describe('PopupShell header actions', () => {
       capture: vi.fn(),
       captureState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
       checking: false,
-      fetching: false,
-      refreshState: vi.fn(),
       status: null,
     });
     const pending = deferred<{ ok: boolean; data: { opened: boolean }; error: null }>();

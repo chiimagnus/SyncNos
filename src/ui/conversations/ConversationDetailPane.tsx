@@ -39,7 +39,7 @@ const DEFAULT_VIEW = {
   commentsSidebar: false,
 };
 
-export type ConversationDetailPaneProps = {
+type ConversationDetailPaneProps = {
   onBack?: () => void;
   onExpandSidebar?: () => void;
   onTriggerCommentsSidebar?: () => void;

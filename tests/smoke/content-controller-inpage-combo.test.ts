@@ -88,6 +88,7 @@ function createHarness(options?: {
         buttonConfig = cfg;
       },
       cleanupButtons: () => {},
+      setSaving: () => {},
     },
     createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
       tickRef = onTick || null;

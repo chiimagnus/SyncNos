@@ -205,6 +205,25 @@ describe('content-controller resident lifecycle', () => {
     currentResident?.stop?.();
   });
 
+  it('mirrors external manual captures to the inpage saving state', async () => {
+    installStorage({ ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: false });
+    const pending = deferred<void>();
+    const h = createHarness({ manualCaptures: [pending] });
+
+    const resident = h.controller.start();
+    await flush();
+
+    const run = h.controller.captureCurrentPage();
+    await flush();
+    expect(h.savingCalls.at(-1)).toBe(true);
+
+    pending.resolve();
+    await run;
+    expect(h.savingCalls.slice(-2)).toEqual([true, false]);
+
+    resident?.stop?.();
+  });
+
   it('old manual progress/finally cannot overwrite a new resident saving state', async () => {
     installStorage({ ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: false });
     const oldManual = deferred<void>();

@@ -55,7 +55,7 @@ export type ConversationSearchInput = {
   limit?: number;
 };
 
-export type ConversationSearchHit = {
+type ConversationSearchHit = {
   field: 'title' | 'url' | 'source' | 'message';
   snippet: string;
   messageId?: number;
@@ -627,7 +627,7 @@ type ConversationMutationContext = {
   markChanged: (scope: any) => void;
 };
 
-export type MergeConversationsResult = {
+type MergeConversationsResult = {
   keptConversationId: number;
   removedConversationId: number;
   movedMessages: number;
@@ -858,7 +858,7 @@ export async function mergeConversationsByIds(input: {
   return outcome.result;
 }
 
-export type UpdateConversationUrlResult = {
+type UpdateConversationUrlResult = {
   status: 'updated' | 'conflict';
   conversationId: number;
   url: string;
@@ -1565,6 +1565,7 @@ async function hydrateConversationListArticleCommentThreadCounts(
   const keyRangeApi = globalThis.IDBKeyRange;
   const byConversation = articleCommentsStore.index('by_conversationId_createdAt');
   const byCanonicalUrl = articleCommentsStore.index('by_canonicalUrl_createdAt');
+  const emptyRows = Promise.resolve<any[]>([]);
   const orphanRowsByCanonicalUrl = new Map<string, Promise<any[]>>();
   const reads: Array<{
     item: Conversation;
@@ -1584,11 +1585,11 @@ async function hydrateConversationListArticleCommentThreadCounts(
               keyRangeApi.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any),
             ) as any,
           )
-        : Promise.resolve([]);
+        : emptyRows;
 
-    let orphanRows = Promise.resolve<any[]>([]);
+    let orphanRows = emptyRows;
     if (canonicalUrl) {
-      orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || Promise.resolve([]);
+      orphanRows = orphanRowsByCanonicalUrl.get(canonicalUrl) || emptyRows;
       if (!orphanRowsByCanonicalUrl.has(canonicalUrl)) {
         orphanRows = reqToPromise<any[]>(
           byCanonicalUrl.getAll(
@@ -1815,7 +1816,7 @@ export async function getConversationListBootstrap(
   queryInput?: ConversationListQueryInput | null,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  return await readConversationListPage({ queryInput, cursor: null, limit });
+  return readConversationListPage({ queryInput, cursor: null, limit });
 }
 
 export async function getConversationListPage(
@@ -1823,7 +1824,7 @@ export async function getConversationListPage(
   cursor: ConversationListCursor,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  return await readConversationListPage({ queryInput, cursor, limit });
+  return readConversationListPage({ queryInput, cursor, limit });
 }
 
 function normalizeConversationSearchLimit(value: unknown): number {

@@ -3,7 +3,7 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { ArticleOutlineMinimap, type ArticleOutlineMinimapState } from '@ui/reader/ArticleOutlineMinimap';
 import type { ReaderOutlineDomEntry } from '@ui/reader/article-outline-dom';
 
-export type ReaderToolbarProps = {
+type ReaderToolbarProps = {
   outline?:
     | (ArticleOutlineMinimapState & {
         onPickStripEntry: (entry: ReaderOutlineDomEntry) => void;

@@ -101,10 +101,11 @@ function createHarness(options?: {
     runtime,
     collectorsRegistry,
     currentPageCapture,
-    inpageTip: null,
+    inpageTip: { showSaveTip: () => {} },
     inpageButton: {
       ensureInpageButton: ensureButton,
       cleanupButtons,
+      setSaving: () => {},
     },
     createRuntimeObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
       tickRef = onTick || null;

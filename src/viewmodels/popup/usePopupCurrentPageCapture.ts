@@ -3,12 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
-import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
-import {
-  buildCaptureWaitingMessage,
-  buildPartialCaptureMessage,
-} from '@services/bootstrap/current-page-capture-status';
-import type { CurrentPageCaptureResult, CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
+import { buildCaptureWaitingMessage } from '@services/bootstrap/current-page-capture-status';
+import type { CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -27,6 +23,28 @@ function unwrap<T>(response: ApiResponse<T>): T {
   }
   if (response.ok) return response.data as T;
   throw new Error(response.error?.message || 'unknown error');
+}
+
+function statusFromCaptureState(state: CurrentPageCaptureState): PopupCaptureStatus | null {
+  if (state.activity) {
+    return {
+      kind: state.activity.kind,
+      message: state.activity.message,
+    };
+  }
+  if (state.readiness === 'waiting') {
+    return {
+      kind: 'info',
+      message: state.reason || buildCaptureWaitingMessage(state.collectorId),
+    };
+  }
+  if (state.readiness === 'unsupported') {
+    return {
+      kind: 'error',
+      message: state.reason || t('currentPageCannotBeCaptured'),
+    };
+  }
+  return null;
 }
 
 export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Promise<void> }) {
@@ -52,19 +70,7 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     try {
       const nextState = await request;
       setCaptureState(nextState);
-      if (nextState.readiness === 'waiting') {
-        setStatus({
-          kind: 'info',
-          message: nextState.reason || buildCaptureWaitingMessage(nextState.collectorId),
-        });
-      } else if (nextState.readiness === 'unsupported') {
-        setStatus({
-          kind: 'error',
-          message: nextState.reason || t('currentPageCannotBeCaptured'),
-        });
-      } else {
-        setStatus(null);
-      }
+      setStatus(statusFromCaptureState(nextState));
     } catch (error) {
       const message = (error as any)?.message ?? String(error ?? t('currentPageCannotBeCaptured'));
       setCaptureState(null);
@@ -76,33 +82,17 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
   }, []);
 
   const capture = useCallback(async () => {
-    if (checking || fetching || captureState?.readiness !== 'ready') return null;
+    if (checking || fetching || captureState?.readiness !== 'ready' || captureState.activity?.phase === 'capturing') {
+      return;
+    }
 
     setFetching(true);
     setStatus({ kind: 'info', message: t('fetchingDots') });
     try {
-      const response = await send<ApiResponse<CurrentPageCaptureResult>>(
-        UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
-        {},
-      );
-      const data = unwrap(response);
-      await onCaptured?.();
+      const response = await send<ApiResponse<unknown>>(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, {});
+      unwrap(response);
       await refreshState({ silent: true });
-      if (data.kind === 'chat' && data.captureCompleteness === 'partial') {
-        setStatus({
-          kind: 'warning',
-          message: buildPartialCaptureMessage(data.captureReasons),
-        });
-      } else {
-        setStatus({
-          kind: 'success',
-          message:
-            data.kind === 'video' && data.subtitleStatus === 'empty'
-              ? t('videoTranscriptTipNoSubtitles')
-              : buildCaptureSuccessTipMessage({ isNew: data.isNew, title: data.title }),
-        });
-      }
-      return data;
+      await onCaptured?.();
     } catch (error) {
       const message = (error as any)?.message ?? String(error ?? t('captureFailedFallback'));
       await refreshState({ silent: true });
@@ -111,7 +101,7 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     } finally {
       setFetching(false);
     }
-  }, [captureState?.readiness, checking, fetching, onCaptured, refreshState]);
+  }, [captureState?.activity?.phase, captureState?.readiness, checking, fetching, onCaptured, refreshState]);
 
   useEffect(() => {
     void refreshState();
@@ -127,38 +117,60 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
   }, [refreshState]);
 
   useEffect(() => {
-    if (checking || fetching || captureState?.readiness !== 'waiting') return;
+    const activity = captureState?.activity;
+    if (!activity || activity.phase !== 'settled' || activity.expiresAt == null) return;
+
+    const delay = Math.max(0, activity.expiresAt - Date.now());
+    const stateWithoutActivity = { ...captureState, activity: undefined };
+    const timer = window.setTimeout(() => {
+      setCaptureState((current) =>
+        current?.activity?.expiresAt === activity.expiresAt ? { ...current, activity: undefined } : current,
+      );
+      setStatus((current) =>
+        current?.message === activity.message ? statusFromCaptureState(stateWithoutActivity) : current,
+      );
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [captureState]);
+
+  useEffect(() => {
+    const observingExternalCapture = captureState?.activity?.phase === 'capturing';
+    const waitingForReadiness = captureState?.readiness === 'waiting';
+    if (checking || fetching || (!observingExternalCapture && !waitingForReadiness)) return;
+
     let cancelled = false;
     let timer: number | null = null;
+    const delay = observingExternalCapture ? 300 : 1000;
     const poll = async () => {
       await refreshState({ silent: true });
       if (cancelled) return;
-      timer = window.setTimeout(() => void poll(), 1000);
+      timer = window.setTimeout(() => void poll(), delay);
     };
-    timer = window.setTimeout(() => void poll(), 1000);
+    timer = window.setTimeout(() => void poll(), delay);
     return () => {
       cancelled = true;
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [captureState?.readiness, checking, fetching, refreshState]);
+  }, [captureState?.activity?.phase, captureState?.readiness, checking, fetching, refreshState]);
 
   const buttonLabel = useMemo(() => {
     if (fetching) return t('fetchingDots');
     if (checking) return t('checkingDots');
+    if (captureState?.activity?.message) return captureState.activity.message;
     if (captureState?.readiness === 'waiting') {
       return captureState.reason || buildCaptureWaitingMessage(captureState.collectorId);
     }
     return captureState?.label || t('unavailable');
   }, [captureState, checking, fetching]);
 
+  const externalCaptureInProgress = captureState?.activity?.phase === 'capturing';
+
   return {
-    buttonDisabled: checking || fetching || captureState?.readiness !== 'ready',
+    buttonDisabled: checking || fetching || externalCaptureInProgress || captureState?.readiness !== 'ready',
     buttonLabel,
     capture,
     captureState,
     checking,
-    fetching,
-    refreshState,
     status,
   };
 }
