@@ -89,7 +89,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     deleting: false,
     listSourceFilterKey: 'all',
     listSiteFilterKey: 'all',
-    listCursor: null,
     listHasMore: false,
     listSummary: { totalCount: 1, todayCount: 1 },
     listFacets: {
@@ -110,7 +109,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     syncSelected: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
-    loadingList: false,
     loadingDetail: false,
     detailError: null,
     detail: {

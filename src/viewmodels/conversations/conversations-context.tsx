@@ -219,11 +219,9 @@ type ConversationOpenIntent =
   | { kind: 'id'; conversationId: number; preserveListScope: boolean };
 
 type ConversationsAppState = {
-  loadingList: boolean;
   loadingInitialList: boolean;
   loadingMoreList: boolean;
   listError: string | null;
-  listCursor: ConversationListCursor | null;
   listHasMore: boolean;
   listSummary: ConversationListSummary;
   listFacets: ConversationListFacets;
@@ -290,7 +288,7 @@ export function ConversationsProvider({
   children: React.ReactNode;
   initialOpenLoc?: { source: string; conversationKey: string } | null;
 }) {
-  const [loadingInitialList, setLoadingInitialList] = useState(false);
+  const [loadingInitialList, setLoadingInitialList] = useState(true);
   const [loadingMoreList, setLoadingMoreList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [listCursor, setListCursor] = useState<ConversationListCursor | null>(null);
@@ -1354,11 +1352,9 @@ export function ConversationsProvider({
   }, [refreshList, selectedIds]);
 
   const value: ConversationsAppState = {
-    loadingList: loadingInitialList,
     loadingInitialList,
     loadingMoreList,
     listError,
-    listCursor,
     listHasMore,
     listSummary,
     listFacets,

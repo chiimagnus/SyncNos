@@ -259,6 +259,56 @@ describe('ConversationsProvider pagination state', () => {
     });
   }
 
+  it('keeps initial loading active until the first bootstrap settles', async () => {
+    const firstPage = deferred<any>();
+    getConversationListBootstrap.mockImplementation(() => firstPage.promise);
+
+    await renderProvider();
+
+    expect(latestState.loadingInitialList).toBe(true);
+    expect(latestState.items).toEqual([]);
+
+    await act(async () => {
+      firstPage.resolve(makePage([]));
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(latestState.loadingInitialList).toBe(false);
+    expect(latestState.listError).toBeNull();
+    expect(latestState.items).toEqual([]);
+  });
+
+  it('re-enters initial loading while retrying a failed empty bootstrap', async () => {
+    const retryPage = deferred<any>();
+    getConversationListBootstrap
+      .mockRejectedValueOnce(new Error('initial read failed'))
+      .mockImplementationOnce(() => retryPage.promise);
+
+    await renderProvider();
+
+    expect(latestState.loadingInitialList).toBe(false);
+    expect(latestState.listError).toBe('initial read failed');
+    expect(latestState.items).toEqual([]);
+
+    let retryPromise!: Promise<void>;
+    await act(async () => {
+      retryPromise = latestState.refreshList();
+      await flushMicrotasks();
+    });
+    expect(latestState.loadingInitialList).toBe(true);
+    expect(latestState.listError).toBeNull();
+
+    await act(async () => {
+      retryPage.resolve(makePage([]));
+      await retryPromise;
+      await flushMicrotasks();
+    });
+
+    expect(latestState.loadingInitialList).toBe(false);
+    expect(latestState.listError).toBeNull();
+  });
+
   it('drops stale bootstrap responses during fast filter switching', async () => {
     const allReq = deferred<any>();
     const webReq = deferred<any>();
@@ -368,8 +418,9 @@ describe('ConversationsProvider pagination state', () => {
       hasMore: true,
       summary: { totalCount: 3, todayCount: 2 },
     };
+    const thirdPage = makePage([]);
     getConversationListBootstrap.mockResolvedValue(firstPage);
-    getConversationListPage.mockResolvedValue(secondPage);
+    getConversationListPage.mockResolvedValueOnce(secondPage).mockResolvedValueOnce(thirdPage);
 
     await renderProvider();
     await act(async () => {
@@ -378,13 +429,24 @@ describe('ConversationsProvider pagination state', () => {
     });
 
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1, 2]);
-    expect(latestState.listCursor).toEqual({ lastActivityAt: 50, id: 2 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 3, todayCount: 2 });
     expect(latestState.listFacets).toEqual(secondPage.facets);
-    expect(getConversationListPage).toHaveBeenCalledWith(
+    expect(getConversationListPage).toHaveBeenNthCalledWith(
+      1,
       expect.any(Object),
       { lastActivityAt: 100, id: 1 },
+      expect.any(Number),
+    );
+
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+    expect(getConversationListPage).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      { lastActivityAt: 50, id: 2 },
       expect.any(Number),
     );
   });
@@ -409,10 +471,21 @@ describe('ConversationsProvider pagination state', () => {
     });
 
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
-    expect(latestState.listCursor).toEqual({ lastActivityAt: 100, id: 1 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 2, todayCount: 1 });
     expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations', 'article_comments']);
+
+    getConversationListPage.mockResolvedValue(makePage([]));
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+    expect(getConversationListPage).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      { lastActivityAt: 100, id: 1 },
+      expect.any(Number),
+    );
   });
 
   it('supports open by source+key even when target is not in loaded items', async () => {
@@ -504,6 +577,7 @@ describe('ConversationsProvider pagination state', () => {
     );
 
     await renderProvider({ initialOpenLoc: { source: 'chatgpt', conversationKey: 'conv-999' } });
+    expect(latestState.loadingInitialList).toBe(true);
     expect(getConversationListBootstrap).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -521,6 +595,7 @@ describe('ConversationsProvider pagination state', () => {
     });
 
     expect(getConversationListBootstrap).toHaveBeenCalled();
+    expect(latestState.loadingInitialList).toBe(false);
     expect(Number(latestState.activeId)).toBe(999);
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
   });

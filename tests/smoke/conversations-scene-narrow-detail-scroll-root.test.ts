@@ -54,7 +54,6 @@ const useConversationsAppMock = vi.fn(() => ({
   deleting: false,
   listSourceFilterKey: 'all',
   listSiteFilterKey: 'all',
-  listCursor: null,
   listHasMore: false,
   listSummary: { totalCount: 1, todayCount: 1 },
   listFacets: {
@@ -75,7 +74,6 @@ const useConversationsAppMock = vi.fn(() => ({
   syncSelected: vi.fn(),
   clearSyncFeedback: vi.fn(),
   deleteSelected: vi.fn(),
-  loadingList: false,
   loadingDetail: false,
   detailError: null,
   detail: {
@@ -166,7 +164,6 @@ describe('ConversationsScene narrow detail scroll root', () => {
       deleting: false,
       listSourceFilterKey: 'all',
       listSiteFilterKey: 'all',
-      listCursor: null,
       listHasMore: false,
       listSummary: { totalCount: 1, todayCount: 1 },
       listFacets: {
@@ -187,7 +184,6 @@ describe('ConversationsScene narrow detail scroll root', () => {
       syncSelected: vi.fn(),
       clearSyncFeedback: vi.fn(),
       deleteSelected: vi.fn(),
-      loadingList: false,
       loadingDetail: false,
       detailError: null,
       detail: {

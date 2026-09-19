@@ -268,6 +268,7 @@ describe('ConversationsProvider data revisions', () => {
 
     await renderProvider();
     expect(subscribeDataRevisionChanges).toHaveBeenCalledTimes(1);
+    expect(latestState.loadingInitialList).toBe(true);
     expect(getConversationListBootstrap).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -276,6 +277,7 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect(getConversationListBootstrap).toHaveBeenCalledTimes(1);
+    expect(latestState.loadingInitialList).toBe(false);
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([1]);
   });
 
@@ -416,11 +418,21 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect((latestState.items as any[]).map((item) => item.id)).toEqual([1]);
-    expect(latestState.listCursor).toEqual({ lastActivityAt: 10, id: 1 });
     expect(latestState.listHasMore).toBe(true);
     expect(latestState.listSummary).toEqual({ totalCount: 7, todayCount: 3 });
     expect(latestState.listFacets).toEqual({ sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 7 }], sites: [] });
     expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+
+    getConversationListPage.mockResolvedValue(makePage([]));
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+    expect(getConversationListPage).toHaveBeenCalledWith(
+      expect.any(Object),
+      { lastActivityAt: 10, id: 1 },
+      expect.any(Number),
+    );
 
     await act(async () => {
       revisionListener?.(['conversations']);
@@ -453,11 +465,16 @@ describe('ConversationsProvider data revisions', () => {
     });
 
     expect(latestState.items).toEqual([]);
-    expect(latestState.listCursor).toBeNull();
     expect(latestState.listHasMore).toBe(false);
     expect(latestState.listSummary).toEqual({ totalCount: 0, todayCount: 0 });
     expect(latestState.listFacets).toEqual({ sources: [], sites: [] });
     expect(latestState.listError).toBe('web read failed');
+
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+    });
+    expect(getConversationListPage).not.toHaveBeenCalled();
   });
 
   it('does not register a retry for a stale rejected list request', async () => {

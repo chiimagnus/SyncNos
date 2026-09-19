@@ -254,6 +254,9 @@ export function ConversationListPane({
   const indeterminate = selectedCount > 0 && selectedCount < selectStateTotal;
   const selectedTotalCount = selectedIds.length;
   const hasLoadedItems = filteredItems.length > 0;
+  const showInitialLoading = !hasLoadedItems && loadingInitialList;
+  const showInitialError = !hasLoadedItems && !loadingInitialList && Boolean(listError);
+  const showAuthoritativeEmpty = !hasLoadedItems && !loadingInitialList && !listError;
   const showPaginationLoadingMore = hasLoadedItems && loadingMoreList;
   const showPaginationError = hasLoadedItems && !loadingMoreList && Boolean(listError);
   const showPaginationDone = hasLoadedItems && !loadingInitialList && !loadingMoreList && !listError && !listHasMore;
@@ -614,11 +617,38 @@ export function ConversationListPane({
         onScroll={() => onListScrollTopChange?.(scrollRef.current?.scrollTop || 0)}
       >
         <div className="tw-grid tw-gap-2 tw-p-3">
-          {filteredItems.length ? null : (
+          {showInitialLoading ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('fetchingDots')}
+            </div>
+          ) : null}
+
+          {showInitialError ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]">
+              <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+                <span className="tw-truncate">{t('actionFailedFallback')}</span>
+                <button
+                  type="button"
+                  className={buttonTintClassName()}
+                  onClick={() => void refreshList()}
+                  aria-label={t('paginationRetryLoadMore')}
+                >
+                  {t('paginationRetryLoadMore')}
+                </button>
+              </div>
+              {paginationErrorMessage ? (
+                <p className="tw-mt-1 tw-break-all tw-text-[10px] tw-font-medium tw-text-[var(--error)]">
+                  {paginationErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showAuthoritativeEmpty ? (
             <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('noConversations')}
             </div>
-          )}
+          ) : null}
 
           {renderedItems.map((entry) => {
             if (entry.type === 'section') {
