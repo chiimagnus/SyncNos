@@ -11,13 +11,9 @@ export { LOCALE_PREFERENCE_STORAGE_KEY, normalizeLocalePreference } from '@servi
 export type { Locale, LocalePreference } from '@services/protocols/locale-preference';
 
 function detectLocale(): Locale {
-  try {
-    if (typeof navigator !== 'undefined') {
-      const lang = (navigator.language || '').toLowerCase();
-      if (lang.startsWith('zh')) return 'zh';
-    }
-  } catch (_e) {
-    // ignore
+  if (typeof navigator !== 'undefined') {
+    const lang = (navigator.language || '').toLowerCase();
+    if (lang.startsWith('zh')) return 'zh';
   }
   return 'en';
 }
