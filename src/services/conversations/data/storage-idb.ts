@@ -1815,7 +1815,7 @@ export async function getConversationListBootstrap(
   queryInput?: ConversationListQueryInput | null,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  return await readConversationListPage({ queryInput, cursor: null, limit });
+  return readConversationListPage({ queryInput, cursor: null, limit });
 }
 
 export async function getConversationListPage(
@@ -1823,7 +1823,7 @@ export async function getConversationListPage(
   cursor: ConversationListCursor,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  return await readConversationListPage({ queryInput, cursor, limit });
+  return readConversationListPage({ queryInput, cursor, limit });
 }
 
 function normalizeConversationSearchLimit(value: unknown): number {

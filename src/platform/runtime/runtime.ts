@@ -80,7 +80,7 @@ export async function sendMessage<TResponse = unknown>(
         reject(e);
       }
     });
-    return await withTimeout(p, timeoutMs, 'runtime.sendMessage');
+    return withTimeout(p, timeoutMs, 'runtime.sendMessage');
   }
 
   throw new Error(INVALIDATED_MESSAGE);

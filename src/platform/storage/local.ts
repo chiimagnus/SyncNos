@@ -23,7 +23,7 @@ export async function storageGet(keys: string[]): Promise<Record<string, unknown
   const normalizedKeys = Array.isArray(keys) ? keys : [];
 
   if (chrome?.storage?.local?.get) {
-    return await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get(normalizedKeys, (res: Record<string, unknown>) => {
         if (chrome?.runtime?.lastError) {
           reject(toError(runtimeLastErrorMessage('storage.get failed')));
@@ -35,7 +35,7 @@ export async function storageGet(keys: string[]): Promise<Record<string, unknown
   }
 
   if (browser?.storage?.local?.get) {
-    return (await browser.storage.local.get(normalizedKeys)) as Record<string, unknown>;
+    return browser.storage.local.get(normalizedKeys);
   }
 
   throw toError('storage.local.get unavailable');
@@ -45,7 +45,7 @@ export async function storageGetAll(): Promise<Record<string, unknown>> {
   const { chrome, browser } = getApis();
 
   if (chrome?.storage?.local?.get) {
-    return await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get(null as any, (res: Record<string, unknown>) => {
         if (chrome?.runtime?.lastError) {
           reject(toError(runtimeLastErrorMessage('storage.get failed')));
@@ -57,7 +57,7 @@ export async function storageGetAll(): Promise<Record<string, unknown>> {
   }
 
   if (browser?.storage?.local?.get) {
-    return (await browser.storage.local.get(null as any)) as Record<string, unknown>;
+    return browser.storage.local.get(null as any);
   }
 
   throw toError('storage.local.get unavailable');
@@ -68,7 +68,7 @@ export async function storageSet(items: Record<string, unknown>): Promise<void> 
   const payload = (items ?? {}) as Record<string, unknown>;
 
   if (chrome?.storage?.local?.set) {
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       chrome.storage.local.set(payload, () => {
         if (chrome?.runtime?.lastError) {
           reject(toError(runtimeLastErrorMessage('storage.set failed')));
@@ -77,12 +77,10 @@ export async function storageSet(items: Record<string, unknown>): Promise<void> 
         resolve();
       });
     });
-    return;
   }
 
   if (browser?.storage?.local?.set) {
-    await browser.storage.local.set(payload);
-    return;
+    return browser.storage.local.set(payload);
   }
 
   throw toError('storage.local.set unavailable');
@@ -93,7 +91,7 @@ export async function storageRemove(keys: string[]): Promise<void> {
   const normalizedKeys = Array.isArray(keys) ? keys : [];
 
   if (chrome?.storage?.local?.remove) {
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       chrome.storage.local.remove(normalizedKeys, () => {
         if (chrome?.runtime?.lastError) {
           reject(toError(runtimeLastErrorMessage('storage.remove failed')));
@@ -102,12 +100,10 @@ export async function storageRemove(keys: string[]): Promise<void> {
         resolve();
       });
     });
-    return;
   }
 
   if (browser?.storage?.local?.remove) {
-    await browser.storage.local.remove(normalizedKeys);
-    return;
+    return browser.storage.local.remove(normalizedKeys);
   }
 
   throw toError('storage.local.remove unavailable');
