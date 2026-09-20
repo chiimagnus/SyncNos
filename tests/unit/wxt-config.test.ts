@@ -20,17 +20,9 @@ async function resolveViteConfig(browser: TargetBrowser) {
   return await wxtConfig.vite(buildEnv(browser));
 }
 
-async function resolveManifest(browser: TargetBrowser, lifecycleEvent?: string) {
+async function resolveManifest(browser: TargetBrowser) {
   if (!wxtConfig.manifest) throw new Error('WXT manifest config is missing');
-  const originalLifecycleEvent = process.env.npm_lifecycle_event;
-  if (lifecycleEvent) process.env.npm_lifecycle_event = lifecycleEvent;
-  else delete process.env.npm_lifecycle_event;
-  try {
-    return typeof wxtConfig.manifest === 'function' ? await wxtConfig.manifest(buildEnv(browser)) : wxtConfig.manifest;
-  } finally {
-    if (originalLifecycleEvent === undefined) delete process.env.npm_lifecycle_event;
-    else process.env.npm_lifecycle_event = originalLifecycleEvent;
-  }
+  return typeof wxtConfig.manifest === 'function' ? await wxtConfig.manifest(buildEnv(browser)) : wxtConfig.manifest;
 }
 
 function loadManifestLocale(locale: 'en' | 'zh_CN' | 'zh_TW') {
@@ -81,19 +73,6 @@ describe('WXT browser-scoped Vite config', () => {
     expect(firefox.permissions).not.toContain('nativeMessaging');
     expect(chrome.optional_permissions).toEqual(['nativeMessaging']);
     expect(firefox.optional_permissions).toEqual(['nativeMessaging']);
-    expect(safari.permissions).not.toContain('nativeMessaging');
-    expect(safari.optional_permissions).toBeUndefined();
-  });
-
-  it('requires nativeMessaging without an optional permission prompt in automation builds', async () => {
-    const chrome = await resolveManifest('chrome', 'build:automation');
-    const firefox = await resolveManifest('firefox', 'build:automation');
-    const safari = await resolveManifest('safari', 'build:automation');
-
-    expect(chrome.permissions).toContain('nativeMessaging');
-    expect(firefox.permissions).toContain('nativeMessaging');
-    expect(chrome.optional_permissions).toBeUndefined();
-    expect(firefox.optional_permissions).toBeUndefined();
     expect(safari.permissions).not.toContain('nativeMessaging');
     expect(safari.optional_permissions).toBeUndefined();
   });

@@ -1,6 +1,5 @@
 import {
   permissionsApiAvailable,
-  manifestHasRequiredPermission,
   permissionsContains,
   permissionsRemove,
   permissionsRequest,
@@ -41,9 +40,6 @@ export async function readCliIntegrationEnabled(): Promise<boolean> {
 
 export function enableCliIntegration(): Promise<boolean> {
   if (!isCliIntegrationAvailable()) return Promise.resolve(false);
-  if (manifestHasRequiredPermission(NATIVE_MESSAGING_PERMISSION)) {
-    return storageSet({ [CLI_INTEGRATION_ENABLED_STORAGE_KEY]: true }).then(() => true);
-  }
 
   // permissions.request must happen synchronously in the user gesture call stack.
   const requested = permissionsRequest([NATIVE_MESSAGING_PERMISSION]);
@@ -56,7 +52,7 @@ export function enableCliIntegration(): Promise<boolean> {
 
 export async function disableCliIntegration(): Promise<void> {
   await storageSet({ [CLI_INTEGRATION_ENABLED_STORAGE_KEY]: false });
-  if (!permissionsApiAvailable() || manifestHasRequiredPermission(NATIVE_MESSAGING_PERMISSION)) return;
+  if (!permissionsApiAvailable()) return;
   await permissionsRemove([NATIVE_MESSAGING_PERMISSION]).catch(() => false);
 }
 

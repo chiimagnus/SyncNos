@@ -4,7 +4,7 @@
 
 ## Local CLI Integration 权限
 
-registration 健康但 `doctor` 仍为 `extension_unreachable` 时，用浏览器 Skill 检查目标浏览器/Profile，不要让用户重复确认已经明确提供的事实。若当前扩展已经把 `nativeMessaging` 声明为 required manifest permission（例如源码 automation build），不要等待浏览器权限弹窗：直接通过 SyncNos 可见的 **设置 → CLI → 本地 CLI 集成** 控件启用，再用 `syncnos status` / `syncnos doctor` read-back。只有 optional-permission 构建在权限缺失或被撤销时才需要浏览器权限 user gesture。不要修改 Profile、Preferences、Secure Preferences 或私有 storage 绕过该手势。
+registration 健康但 `doctor` 仍为 `extension_unreachable` 时，用浏览器 Skill 检查目标浏览器/Profile，不要让用户重复确认已经明确提供的事实。若 Local CLI Integration 未开启，或 `nativeMessaging` 权限确实需要重新授予，就通过 SyncNos 可见的 **设置 → CLI → 本地 CLI 集成** 控件完成所需 user gesture，再运行 `syncnos status` / `syncnos doctor`。不要修改 Profile、Preferences、Secure Preferences 或私有 storage 绕过权限手势。
 
 ## 网页上下文
 

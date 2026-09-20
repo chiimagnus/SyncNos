@@ -12,7 +12,6 @@
     "predev:zen": "npm run cli:link",
     "dev:zen": "wxt -b firefox --mv3 -c wxt.config.zen.ts",
     "build": "wxt build --mv3",
-    "build:automation": "wxt build --mv3",
     "build:firefox": "wxt build -b firefox --mv3",
     "build:zen": "wxt build -b firefox --mv3 -c wxt.config.zen.ts && node .github/scripts/webclipper/package-zen-xpi.mjs",
     "prepare": "wxt prepare",

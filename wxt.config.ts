@@ -45,11 +45,9 @@ const chromeBinary = process.platform === 'darwin' ? resolveChromiumBinaryForMac
 
 const resolveManifest: UserManifestFn = (env) => {
   const isSafari = env.browser === 'safari';
-  const isAutomationBuild = process.env.npm_lifecycle_event === 'build:automation';
 
   // Base permissions shared by all browsers.
   const permissions: string[] = ['storage', 'contextMenus', 'tabs', 'webNavigation', 'scripting', 'alarms'];
-  if (!isSafari && isAutomationBuild) permissions.push('nativeMessaging');
 
   // `declarativeNetRequestWithHostAccess` is Chrome 128+; Safari uses the
   // plain `declarativeNetRequest` permission instead.  The runtime code
@@ -79,7 +77,7 @@ const resolveManifest: UserManifestFn = (env) => {
         description: '__MSG_commandOpenSyncnosAppDescription__',
       },
     },
-    ...(isSafari || isAutomationBuild ? {} : { optional_permissions: ['nativeMessaging'] }),
+    ...(isSafari ? {} : { optional_permissions: ['nativeMessaging'] }),
     host_permissions: ['http://*/*', 'https://*/*'],
     web_accessible_resources: [
       {

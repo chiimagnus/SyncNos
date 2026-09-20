@@ -4,7 +4,7 @@ Read this only when the CLI cannot complete the task by itself and live browser 
 
 ## Local CLI Integration permission
 
-When registration is healthy but `doctor` still reports `extension_unreachable`, inspect the target browser/Profile through the browser Skill. Do not ask the user to reconfirm facts they already provided. If the loaded extension already declares `nativeMessaging` as a required manifest permission (for example, a source automation build), do not wait for a browser permission prompt: use the visible SyncNos **Settings → CLI → Local CLI Integration** control and read back with `syncnos status` / `syncnos doctor`. Only optional-permission builds require the browser permission user gesture when permission is missing or revoked. Do not edit Profile, Preferences, Secure Preferences, or private storage to bypass that gesture.
+When registration is healthy but `doctor` still reports `extension_unreachable`, inspect the target browser/Profile through the browser Skill. Do not ask the user to reconfirm facts they already provided. If Local CLI Integration is not enabled or the `nativeMessaging` permission must be granted again, use the visible SyncNos **Settings → CLI → Local CLI Integration** control and its required user gesture, then run `syncnos status` / `syncnos doctor`. Do not edit Profile, Preferences, Secure Preferences, or private storage to bypass the permission gesture.
 
 ## Live page context
 
