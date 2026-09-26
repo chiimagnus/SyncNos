@@ -123,7 +123,7 @@ describe('current page capture integrity routing', () => {
       'https://www.youtube.com/watch?v=abc123',
     ]) {
       const harness = createHarness({ collectorId: 'web', url });
-      expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
+      expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({
         readiness: 'ready',
         kind: 'video',
         collectorId: 'video',
@@ -165,7 +165,7 @@ describe('current page capture integrity routing', () => {
     const run = harness.service.captureCurrentPage();
     await Promise.resolve();
 
-    expect(harness.service.getCurrentPageCaptureState().activity).toEqual({
+    expect((await harness.service.getCurrentPageCaptureState()).activity).toEqual({
       phase: 'capturing',
       kind: 'info',
       message: t('fetchingDots'),
@@ -181,13 +181,13 @@ describe('current page capture integrity routing', () => {
     });
     await run;
 
-    expect(harness.service.getCurrentPageCaptureState().activity).toMatchObject({
+    expect((await harness.service.getCurrentPageCaptureState()).activity).toMatchObject({
       phase: 'settled',
       kind: 'success',
     });
 
     vi.advanceTimersByTime(5_001);
-    expect(harness.service.getCurrentPageCaptureState().activity).toBeUndefined();
+    expect((await harness.service.getCurrentPageCaptureState()).activity).toBeUndefined();
   });
 
   it('propagates Video capture errors without falling back to Article', async () => {
@@ -198,17 +198,17 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
   });
 
-  it('does not classify Bilibili opus or av as Video', () => {
+  it('does not classify Bilibili opus or av as Video', async () => {
     for (const url of ['https://www.bilibili.com/opus/123', 'https://www.bilibili.com/video/av123']) {
       const harness = createHarness({ collectorId: 'web', url });
-      expect(harness.service.getCurrentPageCaptureState()).toMatchObject({ kind: 'article', collectorId: 'web' });
+      expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({ kind: 'article', collectorId: 'web' });
       vi.unstubAllGlobals();
     }
   });
 
   it('reports a supported chat with no current messages as waiting instead of unsupported', async () => {
     const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'waiting' });
-    const state = harness.service.getCurrentPageCaptureState();
+    const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
       readiness: 'waiting',
@@ -228,7 +228,7 @@ describe('current page capture integrity routing', () => {
 
   it('keeps collector-declared non-chat routes unsupported instead of waiting', async () => {
     const harness = createHarness({ collectorId: 'gemini', snapshot: null, readiness: 'unsupported' });
-    const state = harness.service.getCurrentPageCaptureState();
+    const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
       readiness: 'unsupported',
@@ -247,7 +247,7 @@ describe('current page capture integrity routing', () => {
       readinessError: 'readiness failed',
     });
 
-    expect(() => harness.service.getCurrentPageCaptureState()).toThrow('readiness failed');
+    await expect(harness.service.getCurrentPageCaptureState()).rejects.toThrow('readiness failed');
     const progress: any[] = [];
     await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
       'readiness failed',
@@ -258,13 +258,34 @@ describe('current page capture integrity routing', () => {
   it('consumes the web collector readiness contract before routing to article capture', async () => {
     const harness = createHarness({ collectorId: 'web', snapshot: null, readiness: 'unsupported' });
 
-    expect(harness.service.getCurrentPageCaptureState()).toMatchObject({
+    expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({
       readiness: 'unsupported',
       kind: 'unsupported',
       collectorId: 'web',
     });
     await expect(harness.service.captureCurrentPage()).rejects.toThrow(t('currentPageCannotBeCaptured'));
     expect(harness.calls).toEqual([]);
+  });
+
+  it('treats an enabled durable ChatGPT API route as ready without consulting DOM readiness', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      readinessError: 'DOM readiness must not run',
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.getCurrentPageCaptureState()).resolves.toMatchObject({
+      readiness: 'ready',
+      kind: 'chat',
+      collectorId: 'chatgpt',
+    });
+    await expect(harness.service.captureCurrentPage()).resolves.toMatchObject({ kind: 'chat' });
+    expect(chatgptApiMocks.capture).toHaveBeenCalledTimes(1);
+    expect(harness.capture).not.toHaveBeenCalled();
   });
 
   it('keeps the existing DOM manual path when Advanced API is disabled', async () => {
@@ -305,7 +326,7 @@ describe('current page capture integrity routing', () => {
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
   });
 
-  it('keeps an explicitly finalized backend turn canonical when the DOM is the same turn', async () => {
+  it('keeps an explicitly finalized backend turn canonical without consulting DOM live-tail', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
     snapshot.messages.push({
@@ -341,7 +362,7 @@ describe('current page capture integrity routing', () => {
 
     const result = await harness.service.captureCurrentPage();
 
-    expect(liveTurn).toHaveBeenCalledWith({ expectedConversationId: 'conversation-1' });
+    expect(liveTurn).not.toHaveBeenCalled();
     expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
   });
@@ -349,7 +370,7 @@ describe('current page capture integrity routing', () => {
   it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot, currentTurnState: 'open' });
     const liveTurn = vi.fn(() => ({
       kind: 'candidate',
       conversationId: 'conversation-1',
@@ -390,10 +411,10 @@ describe('current page capture integrity routing', () => {
     });
   });
 
-  it('fails closed before persistence when the API live-turn reader observes another durable conversation', async () => {
+  it('fails closed before persistence when an open API turn live-tail reader observes another durable conversation', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot, currentTurnState: 'open' });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,

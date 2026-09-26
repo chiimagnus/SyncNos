@@ -27,10 +27,13 @@ import {
 // These are env-free and side-effect-free (they never scroll or mutate the DOM), so they can be
 // unit-tested directly and reused by both the live collector and the manual scroll-sweep path.
 
-// Stable per-turn key. Prefers the turn UUID (data-turn-id), which is identical between a
-// virtualized empty shell and its hydrated form; falls back to message id, then testid, then id.
+// Stable per-turn key. Prefers the current data-turn-key, then the legacy data-turn-id;
+// both survive virtualized shell hydration. Falls back to message id, testid, then id.
 export function turnKeyOf(el: any): string {
   if (!el) return '';
+  const currentTurn = el.closest ? el.closest('[data-turn-key]') : null;
+  const currentTurnKey = currentTurn && currentTurn.getAttribute ? currentTurn.getAttribute('data-turn-key') : '';
+  if (currentTurnKey) return String(currentTurnKey);
   const turn = el.closest ? el.closest('[data-turn-id]') : null;
   const turnId = turn && turn.getAttribute ? turn.getAttribute('data-turn-id') : '';
   if (turnId) return String(turnId);
@@ -45,7 +48,10 @@ export function turnKeyOf(el: any): string {
 
 export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinition {
   const consumePreparedCapture = createPreparedCaptureConsumer<any>('chatgpt');
-  const MODERN_TURN_SELECTOR = "[data-testid^='conversation-turn-'], [data-testid='conversation-turn']";
+  const LEGACY_TURN_SELECTOR = "[data-testid^='conversation-turn-'], [data-testid='conversation-turn']";
+  const CURRENT_TURN_SELECTOR = '[data-turn-key]';
+  const TURN_SELECTOR = `${CURRENT_TURN_SELECTOR}, ${LEGACY_TURN_SELECTOR}`;
+  const CURRENT_MESSAGE_UNIT_SELECTOR = '[data-chatgpt-search-unit-key][data-chatgpt-search-message-ids]';
 
   function findDeepResearchIframe(wrapper: any): any | null {
     if (!wrapper || !wrapper.querySelector) return null;
@@ -112,10 +118,32 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const direct = String(element?.getAttribute?.('data-message-id') || '').trim();
     if (direct) return direct;
     const nested = element?.querySelector?.('[data-message-id]');
-    return String(nested?.getAttribute?.('data-message-id') || '').trim();
+    const nestedLegacy = String(nested?.getAttribute?.('data-message-id') || '').trim();
+    if (nestedLegacy) return nestedLegacy;
+
+    const current =
+      (element?.getAttribute?.('data-chatgpt-selection-message-id') ? element : null) ||
+      element?.querySelector?.('[data-chatgpt-selection-message-id]');
+    const currentId = String(current?.getAttribute?.('data-chatgpt-selection-message-id') || '').trim();
+    if (currentId) return currentId;
+
+    const searchIdsNode =
+      (element?.getAttribute?.('data-chatgpt-search-message-ids') ? element : null) ||
+      element?.querySelector?.('[data-chatgpt-search-message-ids]');
+    const searchIds = String(searchIdsNode?.getAttribute?.('data-chatgpt-search-message-ids') || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const unique = Array.from(new Set(searchIds));
+    return unique.length === 1 ? unique[0] : '';
   }
 
   function explicitTurnId(element: any): string {
+    const currentTurn =
+      element?.closest?.(CURRENT_TURN_SELECTOR) ||
+      (element?.getAttribute?.('data-turn-key') ? element : element?.querySelector?.(CURRENT_TURN_SELECTOR));
+    const currentTurnKey = String(currentTurn?.getAttribute?.('data-turn-key') || '').trim();
+    if (currentTurnKey) return currentTurnKey;
     const turn =
       element?.closest?.('[data-turn-id]') ||
       (element?.getAttribute?.('data-turn-id') ? element : element?.querySelector?.('[data-turn-id]'));
@@ -141,7 +169,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function readTurnShells(root: any): any[] {
     if (!root?.querySelectorAll) return [];
-    return Array.from(root.querySelectorAll(MODERN_TURN_SELECTOR)) as any[];
+    return Array.from(root.querySelectorAll(TURN_SELECTOR)) as any[];
   }
 
   function sampleIdentityGuard(root: any): PreparedIdentityGuard {
@@ -242,7 +270,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return normalized === '' || normalized === 'chatgpt';
   }
 
-  function deriveTemporaryChatAutoTitle(messages: any): string {
+  function deriveConversationAutoTitle(messages: any): string {
     const firstUser = Array.isArray(messages)
       ? messages.find((m: any) => m && m.role === 'user' && m.contentMarkdown)
       : null;
@@ -274,12 +302,19 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       if (hrefText) return hrefText;
     }
 
+    const documentTitle = normalizeTitleText(env.document.title);
+    if (conversationId) {
+      if (!isGenericChatgptTitle(documentTitle)) return documentTitle;
+      const derivedTitle = deriveConversationAutoTitle(messages);
+      return derivedTitle || 'ChatGPT';
+    }
+
     const h = env.document.querySelector('h1');
-    const t = h && h.textContent ? h.textContent.trim() : '';
-    const fallbackTitle = t || env.document.title || 'ChatGPT';
-    if (!conversationId && isTemporaryChatMode() && isGenericChatgptTitle(fallbackTitle)) {
-      const temporaryTitle = deriveTemporaryChatAutoTitle(messages);
-      if (temporaryTitle) return temporaryTitle;
+    const h1Title = h && h.textContent ? String(h.textContent).trim() : '';
+    const fallbackTitle = h1Title || documentTitle || 'ChatGPT';
+    if (isTemporaryChatMode() && isGenericChatgptTitle(fallbackTitle)) {
+      const derivedTitle = deriveConversationAutoTitle(messages);
+      if (derivedTitle) return derivedTitle;
     }
     return fallbackTitle;
   }
@@ -288,12 +323,29 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return env.document.querySelector('main') || env.document.querySelector("[role='main']") || env.document.body;
   }
 
+  function getConversationScrollSeed(): any {
+    const root = getConversationRoot();
+    return root?.querySelector?.('[data-app-action-timeline-scroll]') || root;
+  }
+
   function userContentNode(element: any): any {
-    return element.querySelector('.whitespace-pre-wrap') || element;
+    return (
+      element.querySelector('[data-user-message-bubble] .whitespace-pre-wrap') ||
+      element.querySelector('[data-user-message-bubble]') ||
+      element.querySelector('.whitespace-pre-wrap') ||
+      element
+    );
   }
 
   function assistantContentNode(element: any): any {
-    return element.querySelector('.markdown.prose') || element.querySelector('.markdown') || element;
+    return (
+      element.querySelector('[data-chatgpt-selection-message-id]') ||
+      element.querySelector("[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']") ||
+      element.querySelector("[data-markdown-text-style='assistant-message']") ||
+      element.querySelector('.markdown.prose') ||
+      element.querySelector('.markdown') ||
+      element
+    );
   }
 
   function extractChatgptImageUrls(element: ParentNode | null): string[] {
@@ -336,9 +388,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       return nodes.filter((node: any) => !nodes.some((other: any) => other !== node && node.contains(other)));
     }
 
+    const currentUnits = (Array.from(scope.querySelectorAll(CURRENT_MESSAGE_UNIT_SELECTOR)) as any[]).filter((unit) => {
+      const key = String(unit?.getAttribute?.('data-chatgpt-search-unit-key') || '');
+      return (
+        /:(?:user|assistant)$/.test(key) ||
+        !!unit?.querySelector?.('[data-user-message-bubble]') ||
+        !!unit?.querySelector?.("[data-conversation-role='assistant']") ||
+        !!unit?.querySelector?.('[data-chatgpt-selection-message-id]')
+      );
+    });
+    if (currentUnits.length) return sortInDocumentOrder(dropAncestors(currentUnits));
+
     const roleNodes = Array.from(scope.querySelectorAll('[data-message-author-role]')) as any[];
-    // Modern ChatGPT wraps each turn with `data-testid="conversation-turn-N"` but the tag varies (`article`, `section`, etc).
-    const turnNodes = Array.from(scope.querySelectorAll(MODERN_TURN_SELECTOR)) as any[];
+    // Legacy ChatGPT wraps each turn with `data-testid="conversation-turn-N"` but the tag varies (`article`, `section`, etc).
+    const turnNodes = Array.from(scope.querySelectorAll(LEGACY_TURN_SELECTOR)) as any[];
 
     // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple assistant
     // messages inside a single `.agent-turn` container; keeping `.agent-turn` as the wrapper would
@@ -360,6 +423,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function roleFromWrapper(wrapper: any): any {
+    const searchUnitKey = String(wrapper?.getAttribute?.('data-chatgpt-search-unit-key') || '');
+    if (/:user$/.test(searchUnitKey)) return 'user';
+    if (/:assistant$/.test(searchUnitKey)) return 'assistant';
+
     const direct = wrapper && wrapper.getAttribute ? wrapper.getAttribute('data-message-author-role') : '';
     if (direct === 'user' || direct === 'assistant') return direct;
 
@@ -370,12 +437,19 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const innerRole = inner && inner.getAttribute ? inner.getAttribute('data-message-author-role') : '';
     if (innerRole === 'user' || innerRole === 'assistant') return innerRole;
 
+    if (wrapper?.querySelector?.('[data-user-message-bubble]')) return 'user';
+    if (
+      wrapper?.querySelector?.("[data-conversation-role='assistant']") ||
+      wrapper?.querySelector?.('[data-chatgpt-selection-message-id]')
+    ) {
+      return 'assistant';
+    }
     if (wrapper && wrapper.classList && wrapper.classList.contains('agent-turn')) return 'assistant';
     if (wrapper && wrapper.querySelector && wrapper.querySelector("div[class*='user']")) return 'user';
     return 'assistant';
   }
 
-  const COT_REASONING_SELECTOR = '.markdown.prose, .markdown';
+  const COT_REASONING_SELECTOR = ".markdown.prose, .markdown, [data-markdown-text-style='assistant-message']";
   const COT_TOOL_ICON_SELECTOR = "[data-testid='cot-v5-tool-icon-pile']";
 
   type CotContent = {
@@ -523,9 +597,26 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function messageGroupRoot(wrapper: any): any | null {
-    const modern = wrapper?.closest?.(MODERN_TURN_SELECTOR);
+    const current = wrapper?.closest?.(CURRENT_TURN_SELECTOR);
+    if (current) return current;
+    const modern = wrapper?.closest?.(LEGACY_TURN_SELECTOR);
     if (modern) return modern;
     return wrapper?.closest?.('.agent-turn') || null;
+  }
+
+  function currentCotBodies(group: any): any[] {
+    if (!group?.querySelectorAll) return [];
+    const bodies: any[] = [];
+    for (const start of Array.from(group.querySelectorAll('[data-chatgpt-agent-turn-start]')) as any[]) {
+      const block = start?.parentElement;
+      if (!block?.querySelector) continue;
+      const expanded = block.querySelector("button[aria-expanded='true']");
+      if (!expanded) continue;
+      const body = expanded.parentElement?.nextElementSibling;
+      if (!body) continue;
+      bodies.push(body);
+    }
+    return bodies;
   }
 
   function buildCotAssociations(wrappers: any[], includeOuterHtml: boolean): Map<any, CotAssociation> {
@@ -542,8 +633,22 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     for (const [group, groupWrappers] of wrappersByGroup) {
       const assistants = groupWrappers.filter((wrapper) => roleFromWrapper(wrapper) === 'assistant');
       if (!assistants.length || !group?.querySelectorAll) continue;
+      const currentBodies = currentCotBodies(group);
+      const currentBodySet = new Set(currentBodies);
+      if (currentBodies.length) {
+        const owner = assistants[assistants.length - 1];
+        const bucket = pending.get(owner) || { textParts: [], markdownParts: [], htmlParts: [] };
+        for (const body of currentBodies) {
+          const content = extractCotContent(body);
+          if (content.text) bucket.textParts.push(content.text);
+          if (content.markdown) bucket.markdownParts.push(content.markdown);
+          if (includeOuterHtml) bucket.htmlParts.push(String(body.outerHTML || ''));
+        }
+        pending.set(owner, bucket);
+      }
       const candidates = (Array.from(group.querySelectorAll("button[aria-expanded='true']")) as any[])
         .filter((button) => !String(button?.getAttribute?.('aria-controls') || '').trim())
+        .filter((button) => !currentBodySet.has(button?.parentElement?.nextElementSibling))
         .filter((button) => !button?.closest?.('[data-message-author-role]'))
         .filter(
           (button) =>
@@ -750,6 +855,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function structuralTurnOrdinal(turn: any): number | null {
+    const searchTurnKey = String(
+      turn?.getAttribute?.('data-content-search-turn-key') ||
+        turn?.querySelector?.('[data-content-search-turn-key]')?.getAttribute?.('data-content-search-turn-key') ||
+        '',
+    ).trim();
+    const currentMatch = searchTurnKey.match(/^fallback-turn-(\d+)$/);
+    if (currentMatch) {
+      const zeroBased = Number(currentMatch[1]);
+      return Number.isSafeInteger(zeroBased) && zeroBased >= 0 ? zeroBased + 1 : null;
+    }
     const testId = String(turn?.getAttribute?.('data-testid') || '').trim();
     const match = testId.match(/^conversation-turn-(\d+)$/);
     if (!match) return null;
@@ -758,7 +873,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   const BOUNDARY_LOADING_SELECTOR =
-    "[role='progressbar'], [aria-busy='true'], [data-testid*='loading' i], [data-testid*='loader' i], .animate-spin";
+    "[role='progressbar'], [aria-busy='true'], [data-testid*='loading' i], [data-testid*='loader' i], .animate-spin, [data-chatgpt-conversation-selection-target='true'] [role='status']";
 
   function hasBoundaryLoadingSignal(boundary: VirtualizedBoundary, root = getConversationRoot()): boolean {
     if (!root?.querySelectorAll) return false;
@@ -768,7 +883,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (root.matches?.(BOUNDARY_LOADING_SELECTOR)) candidates.push(root);
     candidates.push(...(Array.from(root.querySelectorAll(BOUNDARY_LOADING_SELECTOR)) as any[]));
     for (const candidate of candidates) {
-      if (!candidate || candidate.closest?.(MODERN_TURN_SELECTOR)) continue;
+      if (!candidate || candidate.closest?.(TURN_SELECTOR)) continue;
       if (isExplicitlyHiddenWithin(candidate, root)) continue;
       if (!edgeTurn) return true;
       if (candidate === root || candidate.contains?.(edgeTurn)) return true;
@@ -781,22 +896,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   function readManualBoundaryState(boundary: VirtualizedBoundary): VirtualizedBoundaryState {
     const root = getConversationRoot();
     if (!root) return 'pending';
+    if (hasBoundaryLoadingSignal(boundary, root)) return 'pending';
     if (boundary === 'top') {
       const ordinals = readTurnShells(root)
         .map(structuralTurnOrdinal)
         .filter((value): value is number => value !== null);
-      if (ordinals.length) {
-        if (Math.min(...ordinals) > 1) return 'pending';
-        if (ordinals.includes(1)) return 'confirmed';
-      }
+      if (ordinals.length && Math.min(...ordinals) > 1) return 'pending';
     }
-    return hasBoundaryLoadingSignal(boundary, root) ? 'pending' : 'confirmed';
+    return 'confirmed';
   }
 
   const manualAdapter = {
     readRoot: () => getConversationRoot(),
     readIdentity: () => sampleIdentityGuard(getConversationRoot()),
-    readScrollSeed: () => getConversationRoot(),
+    readScrollSeed: () => getConversationScrollSeed(),
     readDescriptors: readCurrentDescriptors,
     readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
     readUnresolvedKeys: () =>

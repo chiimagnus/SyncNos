@@ -178,6 +178,33 @@ describe('chatgpt-collector', () => {
     expect(snap.conversation.title).toBe('GPR signal preprocessing');
   });
 
+  it('derives a durable conversation title from the first user message when current ChatGPT exposes only a generic page title', async () => {
+    const html = `
+      <article data-testid="conversation-turn-1" data-turn-id="turn_title_user">
+        <div data-message-author-role="user" data-message-id="user-title-1">
+          <div class="whitespace-pre-wrap">请帮我分析强化学习和机器学习的关系</div>
+        </div>
+      </article>
+      <article data-testid="conversation-turn-2" data-turn-id="turn_title_assistant">
+        <div data-message-author-role="assistant" data-message-id="assistant-title-1">
+          <div class="markdown prose"><p>可以。</p></div>
+        </div>
+      </article>
+    `;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-title-1');
+    dom.window.document.title = 'ChatGPT';
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
+    expect(snap.conversation.title).toBe('请帮我分析强化学习和机器学习的关系');
+    expect(snap.conversation.title).not.toBe('ChatGPT');
+  });
+
   it('derives a stable temporary conversation key from the canonical top turn anchor', async () => {
     const html = `
       <article data-testid="conversation-turn-1" data-turn-id="turn_tmp_user">
@@ -418,6 +445,7 @@ describe('chatgpt-collector', () => {
             <p>
               <a href="https://arxiv.org/abs/2312.10997">
                 <span><img src="https://www.google.com/s2/favicons?domain=https://arxiv.org&amp;sz=128" /></span>
+                <span><img src="https://t0.gstatic.com/faviconV2?client=SOCIAL&amp;url=https%3A%2F%2Farxiv.org&amp;size=32" /></span>
                 <span>arXiv</span>
               </a>
             </p>
@@ -1198,6 +1226,164 @@ describe('chatgpt turn identity primitive', () => {
     const shell = dom.window.document.querySelector('[data-testid="conversation-turn-1"]') as any;
     expect(turnKeyOf(roleNode)).toBe('turn_a');
     expect(turnKeyOf(shell)).toBe('turn_a');
+  });
+
+  it('resolves the current ChatGPT turn key from a search-unit message node', () => {
+    const dom = new JSDOM(`<!DOCTYPE html><html><body>
+      <div data-turn-key="user-message-1">
+        <div data-chatgpt-search-unit-key="fallback-turn-0:0:user" data-chatgpt-search-message-ids="user-message-1">
+          <div data-user-message-bubble="true"><div class="whitespace-pre-wrap">question</div></div>
+        </div>
+      </div>
+    </body></html>`);
+    const message = dom.window.document.querySelector('[data-chatgpt-search-unit-key]') as any;
+    const turn = dom.window.document.querySelector('[data-turn-key]') as any;
+    expect(turnKeyOf(message)).toBe('user-message-1');
+    expect(turnKeyOf(turn)).toBe('user-message-1');
+  });
+});
+
+describe('chatgpt current search-unit DOM', () => {
+  function currentDom(expandedCot = true) {
+    return setupChatgptDom(
+      `
+        <div data-turn-key="user-message-1">
+          <div data-content-search-turn-key="fallback-turn-0">
+            <div
+              data-chatgpt-search-unit-key="fallback-turn-0:0:user"
+              data-chatgpt-search-message-ids="user-message-1"
+              data-is-intersecting="true"
+            >
+              <div data-user-message-bubble="true"><div class="whitespace-pre-wrap">Current question</div></div>
+            </div>
+            <div
+              data-chatgpt-search-unit-key="fallback-turn-0:2:assistant"
+              data-chatgpt-search-message-ids="assistant-message-1 assistant-message-1"
+              data-is-intersecting="true"
+            >
+              <h4 data-conversation-role="assistant" class="sr-only">ChatGPT says:</h4>
+              <div class="block-current-cot">
+                <span hidden data-chatgpt-agent-turn-start></span>
+                <div>
+                  <div class="group/activity-header">
+                    <button type="button" aria-expanded="${expandedCot ? 'true' : 'false'}"></button>
+                    <span>Thought for 1s</span>
+                  </div>
+                  ${
+                    expandedCot
+                      ? `<div class="current-cot-body">
+                          <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+                            <p>Reasoning <strong>step</strong>.</p>
+                          </div>
+                          <div data-markdown-text-style="assistant-message" data-markdown-text-tone="tertiary">
+                            <p>Visible tool summary</p>
+                          </div>
+                        </div>`
+                      : ''
+                  }
+                </div>
+              </div>
+              <div
+                data-chatgpt-selection-conversation-id="conversation-1"
+                data-chatgpt-selection-message-id="assistant-message-1"
+              >
+                <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+                  <p>Final <strong>answer</strong>.</p>
+                  <div data-markdown-copy="code-block">
+                    <div data-markdown-copy="exclude">typescript<button type="button">Copy</button></div>
+                    <div><code class="language-ts">const value = 1;</code></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `,
+      'https://chatgpt.com/c/conversation-1',
+    );
+  }
+
+  function currentDef(dom: JSDOM) {
+    (dom.window as any).scrollTo = vi.fn();
+    return createChatgptCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+  }
+
+  it('captures current user/assistant units, expanded reasoning, tool summary, and current code blocks', async () => {
+    const def = currentDef(currentDom(true));
+    expect(def.collector.getCaptureReadiness()).toBe('ready');
+
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot).toBeTruthy();
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'user-message-1',
+      'assistant-message-1',
+    ]);
+    expect(snapshot.messages[0]).toMatchObject({ role: 'user', contentMarkdown: 'Current question' });
+    expect(snapshot.messages[1].role).toBe('assistant');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Reasoning **step**.');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Visible tool summary');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Final **answer**.');
+    expect(snapshot.messages[1].contentMarkdown).toContain('```ts\nconst value = 1;\n```');
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('ChatGPT says:');
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Copy');
+  });
+
+  it('keeps collapsed current reasoning out of the captured assistant answer', async () => {
+    const snapshot = (await capturePrepared(currentDef(currentDom(false)))) as any;
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Reasoning step.');
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Visible tool summary');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Final **answer**.');
+  });
+
+  it('provides stable current-DOM message ids to Advanced API live-tail capture', () => {
+    const def = currentDef(currentDom(false));
+    const live = def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' });
+    expect(live).toMatchObject({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'user-message-1', role: 'user', contentMarkdown: 'Current question' },
+      assistantMessage: { messageKey: 'assistant-message-1', role: 'assistant' },
+    });
+    expect(semanticText(live.assistantMessage)).toContain('Final answer.');
+  });
+
+  it('uses fallback-turn ordinals to keep a virtualized current DOM top boundary pending', () => {
+    const dom = currentDom(false);
+    const turn = dom.window.document.querySelector('[data-content-search-turn-key]') as HTMLElement;
+    turn.setAttribute('data-content-search-turn-key', 'fallback-turn-10');
+    const adapter = currentDef(dom).collector.__test.manualAdapter;
+    expect(adapter.readBoundaryState('top')).toBe('pending');
+    turn.setAttribute('data-content-search-turn-key', 'fallback-turn-0');
+    expect(adapter.readBoundaryState('top')).toBe('confirmed');
+  });
+
+  it('trusts the current top loading status over a local fallback-turn-0 ordinal', () => {
+    const dom = currentDom(false);
+    const main = dom.window.document.querySelector('main') as HTMLElement;
+    const boundary = dom.window.document.createElement('div');
+    boundary.setAttribute('data-chatgpt-conversation-selection-target', 'true');
+    boundary.innerHTML = '<div role="status"><span class="sr-only">Loading earlier messages</span></div>';
+    main.prepend(boundary);
+    const adapter = currentDef(dom).collector.__test.manualAdapter;
+    expect(adapter.readBoundaryState('top')).toBe('pending');
+  });
+
+  it('uses the current inner timeline scroller as the manual sweep seed', () => {
+    const dom = currentDom(false);
+    const main = dom.window.document.querySelector('main') as HTMLElement;
+    const scroller = dom.window.document.createElement('div');
+    scroller.setAttribute('data-app-action-timeline-scroll', '');
+    while (main.firstChild) scroller.appendChild(main.firstChild);
+    main.appendChild(scroller);
+    const adapter = currentDef(dom).collector.__test.manualAdapter;
+    expect(adapter.readScrollSeed()).toBe(scroller);
   });
 });
 

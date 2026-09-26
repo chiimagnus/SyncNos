@@ -1494,7 +1494,10 @@ describe('ChatGPT API transport', () => {
     expect(headers.has('oai-device-id')).toBe(false);
     expect(JSON.stringify(result)).not.toContain(token);
     expect(JSON.stringify(result)).not.toContain('/backend-api/conversations/');
-    if (result.applicable) expect(result.snapshot.conversation.url).toBe('https://chatgpt.com/c/conversation-1');
+    if (result.applicable) {
+      expect(result.snapshot.conversation.url).toBe('https://chatgpt.com/c/conversation-1');
+      expect(result.snapshot.conversation.title).toBe('API Conversation');
+    }
   });
 
   it('is not applicable to temporary/share/root routes and does not fetch', async () => {

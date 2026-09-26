@@ -166,7 +166,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     return runtime.send(type, payload);
   }
 
-  function resolveCaptureTarget() {
+  async function resolveCaptureTarget() {
     if (detectSupportedVideoPagePlatform(globalThis.location?.href || '')) {
       return {
         readiness: 'ready' as const,
@@ -189,7 +189,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       };
     }
 
-    const readiness = collector.getCaptureReadiness();
+    const chatgptApiEnabled = collector.id === 'chatgpt' ? await readChatgptApiCaptureEnabled() : false;
+    const chatgptApiApplicable =
+      chatgptApiEnabled && !!parseChatgptDurableConversationRoute(globalThis.location?.href || '');
+    const readiness = chatgptApiApplicable ? ('ready' as const) : collector.getCaptureReadiness();
     if (readiness !== 'ready' && readiness !== 'waiting' && readiness !== 'unsupported') {
       throw new Error(`invalid capture readiness: ${String(readiness)}`);
     }
@@ -220,6 +223,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       collectorId: collector.id,
       ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage(collector.id) } : null),
       collector,
+      ...(collector.id === 'chatgpt' ? { chatgptApiEnabled } : null),
     };
   }
 
@@ -286,7 +290,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     setCaptureActivity('capturing', 'info', t('fetchingDots'));
 
     try {
-      const target = resolveCaptureTarget();
+      const target = await resolveCaptureTarget();
       if (target.readiness !== 'ready') {
         const fallback =
           target.readiness === 'waiting'
@@ -343,7 +347,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       let snapshot: any = null;
       let expectedChatgptConversationId = '';
-      const useChatgptApi = target.collectorId === 'chatgpt' && (await readChatgptApiCaptureEnabled());
+      const useChatgptApi =
+        target.collectorId === 'chatgpt' && 'chatgptApiEnabled' in target && target.chatgptApiEnabled === true;
       if (useChatgptApi) {
         const apiCapture = await captureCurrentChatgptConversationViaApi({
           fallbackTitle: String(globalThis.document?.title || ''),
@@ -351,13 +356,15 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (apiCapture.applicable) {
           snapshot = apiCapture.snapshot;
           expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
-          const liveTurn = target.collector.captureApiLiveTurn({
-            expectedConversationId: expectedChatgptConversationId,
-          });
-          snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn, {
-            currentTurnState: apiCapture.currentTurnState,
-            currentTurnId: apiCapture.currentTurnId,
-          });
+          if (apiCapture.currentTurnState === 'open') {
+            const liveTurn = target.collector.captureApiLiveTurn({
+              expectedConversationId: expectedChatgptConversationId,
+            });
+            snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn, {
+              currentTurnState: apiCapture.currentTurnState,
+              currentTurnId: apiCapture.currentTurnId,
+            });
+          }
         }
       }
 
@@ -421,8 +428,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     }
   }
 
-  function getCurrentPageCaptureState(): CurrentPageCaptureState {
-    const target = resolveCaptureTarget();
+  async function getCurrentPageCaptureState(): Promise<CurrentPageCaptureState> {
+    const target = await resolveCaptureTarget();
     const activity = readCaptureActivity();
     return {
       readiness: target.readiness,

@@ -142,7 +142,11 @@ function escapeTableCell(text: any): any {
 }
 
 export function isGoogleFaviconUrl(src: unknown): boolean {
-  return /^https:\/\/www\.google\.com\/s2\/favicons(?:[?#]|$)/i.test(String(src || '').trim());
+  const value = String(src || '').trim();
+  return (
+    /^https:\/\/www\.google\.com\/s2\/favicons(?:[?#]|$)/i.test(value) ||
+    /^https:\/\/t\d+\.gstatic\.com\/faviconV2(?:[?#]|$)/i.test(value)
+  );
 }
 
 export function isChatgptNonContentImageUrl(src: unknown): boolean {
@@ -192,6 +196,14 @@ function removeNonContentNodes(container: any): any {
 
     return false;
   }
+
+  container.querySelectorAll("[data-markdown-copy='exclude']").forEach((el: any) => {
+    try {
+      el.remove();
+    } catch (_e) {
+      // ignore
+    }
+  });
 
   container.querySelectorAll('svg, path, input, select, option, script, style').forEach((el: any) => {
     try {
@@ -266,6 +278,9 @@ function removeNonContentNodes(container: any): any {
 function getAssistantContentRoot(wrapper: any): any {
   if (!wrapper) return null;
   const selectors = [
+    '[data-chatgpt-selection-message-id]',
+    "[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']",
+    "[data-markdown-text-style='assistant-message']",
     "[data-message-author-role='assistant'] .markdown.prose",
     "[data-message-author-role='assistant'] .markdown",
     '.text-message .markdown.prose',
@@ -482,6 +497,17 @@ function htmlToMarkdown(root: any): any {
     if (tag === 'br') return '\n';
     if (tag === 'hr') return '\n\n---\n\n';
     if (tag === 'script' || tag === 'style' || tag === 'svg' || tag === 'path' || tag === 'button') return '';
+
+    const markdownCopy =
+      typeof node.getAttribute === 'function' ? String(node.getAttribute('data-markdown-copy') || '') : '';
+    if (markdownCopy === 'exclude') return '';
+    if (markdownCopy === 'code-block') {
+      const text = extractPreCodeText(node);
+      if (!text.trim()) return '';
+      const lang = detectCodeLanguage(node);
+      const fence = codeFenceDelimiter(text);
+      return `\n\n${fence}${lang}\n${text}\n${fence}\n\n`;
+    }
 
     if (tag === 'textarea') {
       const text = String((node && typeof node.value === 'string' ? node.value : node.textContent) || '')
