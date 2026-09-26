@@ -117,6 +117,28 @@ describe('virtualized chat scroll root', () => {
     expect(isAtScrollBottom({ ...metrics, top: 400 })).toBe(true);
   });
 
+  it('normalizes column-reverse negative scrollTop into the same top-to-bottom coordinate system', () => {
+    const { dom, root } = makeNestedRoot();
+    const runtime = { document: dom.window.document, window: dom.window as any };
+    root.style.display = 'flex';
+    root.style.flexDirection = 'column-reverse';
+    root.scrollTop = 0;
+
+    let metrics = readScrollMetrics(runtime, root);
+    expect(metrics.top).toBe(400);
+    expect(isAtScrollBottom(metrics)).toBe(true);
+
+    writeScrollPosition(runtime, root, 0, 0);
+    expect(root.scrollTop).toBe(-400);
+    metrics = readScrollMetrics(runtime, root);
+    expect(metrics.top).toBe(0);
+    expect(isAtScrollTop(metrics)).toBe(true);
+
+    writeScrollPosition(runtime, root, 0, 160);
+    expect(root.scrollTop).toBe(-240);
+    expect(readScrollMetrics(runtime, root).top).toBe(160);
+  });
+
   it('turns restore exceptions into a content-free result', () => {
     const dom = new JSDOM('<body><main id="seed"></main></body>');
     const seed = dom.window.document.querySelector('#seed') as HTMLElement;
@@ -362,6 +384,69 @@ describe('virtualized chat single pass', () => {
     };
   }
 
+  it('sweeps a column-reverse scroller from older history to the newest messages', async () => {
+    const dom = new JSDOM('<body><div id="root"><div id="seed"></div></div></body>');
+    const root = dom.window.document.querySelector('#root') as HTMLElement;
+    const seed = dom.window.document.querySelector('#seed') as HTMLElement;
+    root.style.overflowY = 'auto';
+    root.style.display = 'flex';
+    root.style.flexDirection = 'column-reverse';
+    let physicalTop = 0;
+    const scrollHeight = 300;
+    const clientHeight = 100;
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: clientHeight });
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: scrollHeight });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollTop', {
+      configurable: true,
+      get: () => physicalTop,
+      set: (value: number) => {
+        physicalTop = Number(value) || 0;
+      },
+    });
+    const logicalTop = () => scrollHeight - clientHeight + physicalTop;
+    const currentKeys = () => {
+      const top = logicalTop();
+      if (top >= 180) return ['d', 'e'];
+      if (top >= 120) return ['c', 'd'];
+      if (top >= 60) return ['b', 'c'];
+      return ['a', 'b'];
+    };
+    const accumulator = createPreparedAccumulator<{ text: string }>({
+      source: 'test',
+      conversationKey: 'conversation',
+      identityVerified: true,
+    });
+    const adapter = {
+      getScrollSeed: () => seed,
+      sampleIdentity: () => 'identity',
+      readDescriptorKeys: currentKeys,
+      harvest: async (target: typeof accumulator) =>
+        mergePreparedRecords(
+          target,
+          currentKeys().map((key, index) => ({
+            key,
+            turnKey: key,
+            withinTurn: index,
+            fingerprint: key,
+            payload: { text: key },
+          })),
+        ),
+    };
+
+    const result = await runVirtualizedPass(
+      { document: dom.window.document, window: dom.window as any },
+      adapter,
+      accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(physicalTop).toBe(0);
+    expect(finishPreparedCapture(accumulator).records.map((record) => record.key)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
   it('survives replacement and node recycling because each window is plain data', async () => {
     const test = harness([
       { top: 0, keys: ['a', 'b'] },
@@ -480,6 +565,32 @@ describe('virtualized chat single pass', () => {
       'h',
       'i',
     ]);
+  });
+
+  it('re-enters a stalled pending top boundary to retrigger sentinel-driven history loading', async () => {
+    const test = harness([{ top: 0, keys: ['a', 'b'] }]);
+    const descriptor = Object.getOwnPropertyDescriptor(test.root, 'scrollTop');
+    let leftTop = false;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: descriptor?.get,
+      set: (value: number) => {
+        if (Number(value) > 0) leftTop = true;
+        descriptor?.set?.call(test.root, value);
+      },
+    });
+    (test.adapter as any).readBoundaryState = (boundary: 'top' | 'bottom') =>
+      boundary === 'top' && !leftTop ? 'pending' : 'confirmed';
+
+    const result = await runVirtualizedPass(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, boundaryTimeoutMs: 100 },
+    );
+
+    expect(leftTop).toBe(true);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true });
   });
 
   it('recovers from a transient scroll-extent rebase before deciding the logical bottom', async () => {

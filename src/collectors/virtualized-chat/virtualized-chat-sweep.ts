@@ -68,15 +68,33 @@ export function resolveScrollRoot(runtime: Pick<ScrollRuntime, 'document' | 'win
   return documentScrollRoot(runtime.document);
 }
 
+function usesReverseVerticalScroll(runtime: Pick<ScrollRuntime, 'document' | 'window'>, root: Element): boolean {
+  if (isDocumentScrollRoot(runtime.document, root)) return false;
+  try {
+    return String(runtime.window.getComputedStyle(root).flexDirection || '').toLowerCase() === 'column-reverse';
+  } catch (_error) {
+    return false;
+  }
+}
+
 export function readScrollMetrics(runtime: Pick<ScrollRuntime, 'document' | 'window'>, root: Element): ScrollMetrics {
   const isDocument = isDocumentScrollRoot(runtime.document, root);
   const element = root as HTMLElement;
+  const scrollHeight = finite(element.scrollHeight);
+  const clientHeight = finite(element.clientHeight);
+  const maxTop = Math.max(0, scrollHeight - clientHeight);
+  const physicalTop = isDocument
+    ? finite(runtime.window.scrollY, finite(element.scrollTop))
+    : finite(element.scrollTop);
+  const top = usesReverseVerticalScroll(runtime, root)
+    ? clamp(maxTop + physicalTop, 0, maxTop)
+    : clamp(physicalTop, 0, maxTop);
   return {
-    top: isDocument ? finite(runtime.window.scrollY, finite(element.scrollTop)) : finite(element.scrollTop),
+    top,
     left: isDocument ? finite(runtime.window.scrollX, finite(element.scrollLeft)) : finite(element.scrollLeft),
-    scrollHeight: finite(element.scrollHeight),
+    scrollHeight,
     scrollWidth: finite(element.scrollWidth),
-    clientHeight: finite(element.clientHeight),
+    clientHeight,
     clientWidth: finite(element.clientWidth),
   };
 }
@@ -89,14 +107,15 @@ export function writeScrollPosition(
 ): void {
   const metrics = readScrollMetrics(runtime, root);
   const nextLeft = clamp(finite(left), 0, metrics.scrollWidth - metrics.clientWidth);
-  const nextTop = clamp(finite(top), 0, metrics.scrollHeight - metrics.clientHeight);
+  const maxTop = Math.max(0, metrics.scrollHeight - metrics.clientHeight);
+  const nextTop = clamp(finite(top), 0, maxTop);
   if (isDocumentScrollRoot(runtime.document, root)) {
     runtime.window.scrollTo(nextLeft, nextTop);
     return;
   }
   const element = root as HTMLElement;
   element.scrollLeft = nextLeft;
-  element.scrollTop = nextTop;
+  element.scrollTop = usesReverseVerticalScroll(runtime, root) ? nextTop - maxTop : nextTop;
 }
 
 export function isAtScrollTop(metrics: ScrollMetrics): boolean {
@@ -655,6 +674,7 @@ export async function runVirtualizedPass<T>(
 
   const acquireLogicalTop = async (): Promise<StableWindow | null> => {
     let lastSignature = '';
+    let lastPendingSignature = '';
     let progressDeadline = now() + boundaryTimeoutMs;
     while (!deadlineExceeded()) {
       writeScrollPosition(runtime, root, 0, 0);
@@ -683,6 +703,16 @@ export async function runVirtualizedPass<T>(
         reachedTop = true;
         return stable;
       }
+      if (signature === lastPendingSignature) {
+        const maxTop = Math.max(0, stable.metrics.scrollHeight - stable.metrics.clientHeight);
+        const reentryTop = Math.min(maxTop, Math.max(1, Math.floor(stable.metrics.clientHeight * overlapRatio)));
+        if (reentryTop > 0) {
+          writeScrollPosition(runtime, root, stable.metrics.left, reentryTop);
+          await sleep(Math.max(1, pollMs));
+          if (!validateAfterAwait()) return null;
+        }
+      }
+      lastPendingSignature = signature;
       if (now() > progressDeadline) {
         addReason('boundary_stalled');
         return stable;

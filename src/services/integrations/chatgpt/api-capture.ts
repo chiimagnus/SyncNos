@@ -1,8 +1,6 @@
 import { CHATGPT_ORIGIN, parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
 
-export type ChatgptApiCaptureResult = { applicable: false } | ({ applicable: true } & ChatgptApiSnapshotResult);
-
 type FetchLike = typeof fetch;
 
 function apiCaptureError(code: string, status?: number): Error & { code: string; status?: number } {
@@ -48,17 +46,16 @@ function sanitizedConversationUrl(rawUrl: string): string {
 
 export async function captureCurrentChatgptConversationViaApi(input?: {
   readCurrentUrl?: () => string;
-  fallbackTitle?: string;
   fetchFn?: FetchLike;
   timeoutMs?: number;
   capturedAt?: number;
-}): Promise<ChatgptApiCaptureResult> {
+}): Promise<ChatgptApiSnapshotResult> {
   const readCurrentUrl = input?.readCurrentUrl || (() => String(globalThis.location?.href || ''));
   const fetchFn = input?.fetchFn || fetch;
   const timeoutMs = Math.max(1, Number(input?.timeoutMs) || 30_000);
   const initialUrl = readCurrentUrl();
   const route = parseChatgptDurableConversationRoute(initialUrl);
-  if (!route) return { applicable: false };
+  if (!route) throw apiCaptureError('chatgpt_api_navigation_changed');
 
   const session = await fetchJson({
     fetchFn,
@@ -87,14 +84,10 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     throw apiCaptureError('chatgpt_api_navigation_changed');
   }
 
-  return {
-    applicable: true,
-    ...buildChatgptApiSnapshot({
-      data: mapping,
-      conversationId: route.conversationId,
-      conversationUrl: sanitizedConversationUrl(initialUrl),
-      fallbackTitle: input?.fallbackTitle,
-      capturedAt: input?.capturedAt,
-    }),
-  };
+  return buildChatgptApiSnapshot({
+    data: mapping,
+    conversationId: route.conversationId,
+    conversationUrl: sanitizedConversationUrl(initialUrl),
+    capturedAt: input?.capturedAt,
+  });
 }

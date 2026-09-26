@@ -38,7 +38,6 @@ describe('ChatGPT API live-turn augmentation', () => {
   it('uses the stable turn key for a live assistant while the backend current turn is still open', () => {
     const api = snapshot([{ messageKey: 'user-1', role: 'user', contentMarkdown: 'question', sequence: 0 }]);
     const result = augmentChatgptApiSnapshotWithLiveTurn(api, live('question', 'streaming answer'), {
-      currentTurnState: 'open',
       currentTurnId: 'turn-a',
     });
 

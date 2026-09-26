@@ -1,1792 +1,397 @@
-import * as fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
-import { createChatgptCollectorDef, turnKeyOf } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
+import { createChatgptCollectorDef } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
 import chatgptMarkdown from '../../src/collectors/chatgpt/chatgpt-markdown.ts';
 
 function setupChatgptDom(html: string, url: string) {
-  const dom = new JSDOM(`<body><main>${html}</main></body>`, { url });
-  return dom;
+  return new JSDOM(`<body><main>${html}</main></body>`, { url });
 }
 
 function semanticText(message: any): string {
   return markdownToSemanticText(message?.contentMarkdown, { includeImageAlt: true }).trim();
 }
 
-async function capturePrepared(def: any, prepareOptions: any = {}) {
-  const preparedCapture = await def.collector.prepareManualCapture({
+function currentDom(
+  options: {
+    url?: string;
+    turnKey?: string;
+    ordinal?: number;
+    userId?: string;
+    assistantId?: string;
+    assistantIds?: string;
+    userText?: string;
+    assistantContent?: string;
+    expandedCot?: boolean;
+    cotContent?: string;
+    beforeTurn?: string;
+  } = {},
+) {
+  const turnKey = options.turnKey ?? 'user-message-1';
+  const ordinal = options.ordinal ?? 0;
+  const userId = options.userId ?? 'user-message-1';
+  const assistantId = options.assistantId ?? 'assistant-message-1';
+  const assistantIds = options.assistantIds ?? `${assistantId} ${assistantId}`;
+  const userText = options.userText ?? 'Current question';
+  const expandedCot = options.expandedCot ?? false;
+  const cotContent =
+    options.cotContent ??
+    '<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>Reasoning <strong>step</strong>.</p></div>';
+  const cot = `
+    <div class="block-current-cot">
+      <span hidden data-chatgpt-agent-turn-start></span>
+      <div>
+        <div class="group/activity-header">
+          <button type="button" aria-expanded="${expandedCot ? 'true' : 'false'}"></button>
+          <span>Thought for 1s</span>
+        </div>
+        ${expandedCot ? `<div class="current-cot-body">${cotContent}</div>` : ''}
+      </div>
+    </div>
+  `;
+  const assistantContent =
+    options.assistantContent ??
+    `<div data-chatgpt-selection-conversation-id="conversation-1" data-chatgpt-selection-message-id="${assistantId}">
+      <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <p>Final <strong>answer</strong>.</p>
+        <div data-markdown-copy="code-block">
+          <div data-markdown-copy="exclude">typescript<button type="button">Copy</button></div>
+          <div><code class="language-ts">const value = 1;</code></div>
+        </div>
+      </div>
+    </div>`;
+
+  const dom = setupChatgptDom(
+    `
+      ${options.beforeTurn ?? ''}
+      <div data-turn-key="${turnKey}">
+        <div data-content-search-turn-key="fallback-turn-${ordinal}">
+          <div
+            data-chatgpt-search-unit-key="fallback-turn-${ordinal}:0:user"
+            data-chatgpt-search-message-ids="${userId}"
+            data-is-intersecting="true"
+          >
+            <div data-user-message-bubble="true"><div class="whitespace-pre-wrap">${userText}</div></div>
+          </div>
+          <div
+            data-chatgpt-search-unit-key="fallback-turn-${ordinal}:2:assistant"
+            data-chatgpt-search-message-ids="${assistantIds}"
+            data-is-intersecting="true"
+          >
+            ${cot}
+            ${assistantContent}
+          </div>
+        </div>
+      </div>
+    `,
+    options.url ?? 'https://chatgpt.com/c/conversation-1',
+  );
+  (dom.window as any).scrollTo = vi.fn();
+  return dom;
+}
+
+function currentDef(dom: JSDOM) {
+  return createChatgptCollectorDef(
+    createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    }),
+  ) as any;
+}
+
+async function prepare(def: any, options: any = {}) {
+  return def.collector.prepareManualCapture({
     stableSamples: 1,
     pollMs: 0,
     sleep: async () => {},
-    ...prepareOptions,
+    ...options,
   });
-  if (!preparedCapture) return null;
-  return def.collector.capture({ manual: true, preparedCapture });
 }
 
-describe('chatgpt-collector', () => {
-  it('matches only the canonical ChatGPT hostname', () => {
-    const makeDefinition = (url: string) => {
-      const dom = setupChatgptDom('', url);
-      const env = createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
-      });
-      return createChatgptCollectorDef(env);
-    };
+async function capturePrepared(def: any, options: any = {}) {
+  const preparedCapture = await prepare(def, options);
+  return preparedCapture ? def.collector.capture({ manual: true, preparedCapture }) : null;
+}
 
-    expect(makeDefinition('https://chatgpt.com/c/conv').matches({ hostname: 'chatgpt.com' })).toBe(true);
-    expect(makeDefinition('https://www.chatgpt.com/c/conv').matches({ hostname: 'www.chatgpt.com' })).toBe(false);
-    expect(makeDefinition('https://foo.chatgpt.com/c/conv').matches({ hostname: 'foo.chatgpt.com' })).toBe(false);
-    expect(makeDefinition('https://chat.openai.com/c/conv').matches({ hostname: 'chat.openai.com' })).toBe(false);
+describe('chatgpt current DOM', () => {
+  it('matches only the canonical ChatGPT hostname and waits without current message units', () => {
+    const canonical = currentDef(currentDom());
+    expect(canonical.matches({ hostname: 'chatgpt.com' })).toBe(true);
+    expect(canonical.matches({ hostname: 'www.chatgpt.com' })).toBe(false);
+    expect(canonical.matches({ hostname: 'chat.openai.com' })).toBe(false);
+
+    const empty = currentDef(setupChatgptDom('', 'https://chatgpt.com/'));
+    expect(empty.collector.getCaptureReadiness()).toBe('waiting');
   });
 
-  it('reports an empty supported ChatGPT page as waiting', () => {
-    const dom = setupChatgptDom('', 'https://chatgpt.com/');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env);
-    expect(def.collector.getCaptureReadiness()).toBe('waiting');
-  });
-
-  it('captures only the current visible API live turn with stable backend message ids', () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn-user">
-        <div data-message-author-role="user" data-message-id="user-1">
-          <div class="whitespace-pre-wrap">question</div>
+  it('captures current user/assistant units, expanded reasoning, and current code blocks', async () => {
+    const dom = currentDom({
+      expandedCot: true,
+      cotContent: `
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+          <p>Reasoning <strong>step</strong>.</p>
         </div>
-      </article>
-      <article data-testid="conversation-turn-2" data-turn-id="turn-assistant">
-        <div data-message-author-role="assistant" data-message-id="assistant-1" data-is-intersecting="true">
-          <div class="markdown prose"><p>streaming answer</p></div>
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="tertiary">
+          <p>Visible tool summary</p>
         </div>
-      </article>
-    `;
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
+      `,
     });
-    const def = createChatgptCollectorDef(env) as any;
-
+    const def = currentDef(dom);
     expect(def.collector.getCaptureReadiness()).toBe('ready');
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toMatchObject({
-      kind: 'candidate',
-      conversationId: 'conversation-1',
-      userMessage: { messageKey: 'user-1', role: 'user', contentMarkdown: 'question' },
-      assistantMessage: { messageKey: 'assistant-1', role: 'assistant' },
-    });
-    expect(
-      semanticText(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' }).assistantMessage),
-    ).toBe('streaming answer');
+
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'user-message-1',
+      'assistant-message-1',
+    ]);
+    expect(snapshot.messages[0]).toMatchObject({ role: 'user', contentMarkdown: 'Current question' });
+    expect(snapshot.messages[1].contentMarkdown).toContain('Reasoning **step**.');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Visible tool summary');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Final **answer**.');
+    expect(snapshot.messages[1].contentMarkdown).toContain('```ts\nconst value = 1;\n```');
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Copy');
   });
 
-  it('captures a visible reasoning-only API live turn before final text appears', () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn-live-reasoning">
-        <div data-message-author-role="user" data-message-id="user-reasoning">
-          <div class="whitespace-pre-wrap">question</div>
-        </div>
-        <button type="button" aria-expanded="true">Reasoning</button>
-        <div data-testid="cot-top-body" data-item-anchor="start" data-dimension="height" data-direction="in">
-          <div class="markdown prose"><p>Visible reasoning in progress.</p></div>
-        </div>
-        <div
-          data-message-author-role="assistant"
-          data-message-id="assistant-reasoning"
-          data-is-intersecting="true"
-        ></div>
-      </article>
-    `;
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
+  it('keeps collapsed reasoning out and captures it when expanded after prepare', async () => {
+    const dom = currentDom({ expandedCot: false });
+    const def = currentDef(dom);
+    const preparedCapture = await prepare(def);
+    const before = preparedCapture.records.find((record: any) => record.key === 'assistant-message-1');
+    expect(before.payload.contentMarkdown).not.toContain('Reasoning step.');
 
-    const liveTurn = def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' });
-    expect(liveTurn).toMatchObject({
-      kind: 'candidate',
-      conversationId: 'conversation-1',
-      userMessage: { messageKey: 'user-reasoning', role: 'user' },
-      assistantMessage: { messageKey: 'assistant-reasoning', role: 'assistant' },
-    });
-    expect(semanticText(liveTurn.assistantMessage)).toContain('Visible reasoning in progress.');
+    const button = dom.window.document.querySelector('button[aria-expanded]') as HTMLButtonElement;
+    button.setAttribute('aria-expanded', 'true');
+    const body = dom.window.document.createElement('div');
+    body.className = 'current-cot-body';
+    body.innerHTML =
+      '<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>Reasoning after prepare.</p></div>';
+    button.parentElement?.insertAdjacentElement('afterend', body);
+
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages[1].contentMarkdown).toContain('Reasoning after prepare.');
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
+    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
   });
 
-  it('fails closed when the visible API live turn lacks stable ids or the durable route changed', () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn-user">
-        <div data-message-author-role="user" data-message-id="user-1"><div class="whitespace-pre-wrap">question</div></div>
-      </article>
-      <article data-testid="conversation-turn-2" data-turn-id="turn-assistant">
-        <div data-message-author-role="assistant" data-is-intersecting="true"><div class="markdown prose"><p>streaming answer</p></div></div>
-      </article>
-    `;
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conversation-1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toEqual({ kind: 'unsafe' });
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-2' })).toEqual({
-      kind: 'identity_changed',
-    });
-  });
-
-  it('uses active conversation title in ChatGPT Projects pages (instead of project name h1)', async () => {
-    const html = `
-      <h1>Research</h1>
-      <nav>
-        <a href="/g/p_1/c/conv_project_1" aria-current="page"><span>GPR signal preprocessing</span></a>
-      </nav>
-      <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
-      <div data-message-author-role="assistant" data-message-id="m_ai_1">
-        <div class="markdown prose"><p>A</p></div>
-      </div>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/g/p_1/c/conv_project_1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.conversation.title).toBe('GPR signal preprocessing');
-  });
-
-  it('derives a stable temporary conversation key from the canonical top turn anchor', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn_tmp_user">
-        <div data-message-author-role="user"><div class="whitespace-pre-wrap">请帮我整理今天的发布检查清单</div></div>
-      </article>
-      <article data-testid="conversation-turn-2" data-turn-id="turn_tmp_assistant">
-        <div data-message-author-role="assistant" data-message-id="m_ai_tmp_1">
-          <div class="markdown prose"><p>好的，我们先从回归范围开始。</p></div>
-        </div>
-      </article>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=true');
-    dom.window.document.title = 'ChatGPT';
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const def = createChatgptCollectorDef(env) as any;
-    const preparedCapture = await def.collector.prepareManualCapture({ stableSamples: 1, pollMs: 0 });
-    const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
-    expect(snap).toBeTruthy();
-    expect(String(snap.conversation.conversationKey || '')).toMatch(/^chatgpt_/);
-    expect(snap.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
-    expect(snap.messages.every((message: any) => !String(message.messageKey).startsWith('fallback_'))).toBe(true);
-    expect(String(snap.conversation.title || '')).toBe('请帮我整理今天的发布检查清单');
-    expect(String(snap.conversation.title || '')).not.toBe('ChatGPT');
-  });
-
-  it('does not treat legacy temporary-chat values as canonical temporary mode', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn_tmp_legacy_user">
-        <div data-message-author-role="user"><div class="whitespace-pre-wrap">legacy temporary title</div></div>
-      </article>
-      <article data-testid="conversation-turn-2" data-turn-id="turn_tmp_legacy_assistant">
-        <div data-message-author-role="assistant" data-message-id="m_ai_tmp_legacy">
-          <div class="markdown prose"><p>answer</p></div>
-        </div>
-      </article>
-    `;
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=1');
-    dom.window.document.title = 'ChatGPT';
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.conversation.title).toBe('ChatGPT');
-  });
-
-  it('keeps the temporary conversation key stable across first-user edits and history growth', async () => {
-    async function capture(text: string, includeExtra: boolean) {
-      const html = `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_stable_top">
-          <div data-message-author-role="user"><div class="whitespace-pre-wrap">${text}</div></div>
-        </article>
-        <article data-testid="conversation-turn-2" data-turn-id="turn_stable_answer">
-          <div data-message-author-role="assistant"><div class="markdown prose"><p>answer</p></div></div>
-        </article>
-        ${
-          includeExtra
-            ? '<article data-testid="conversation-turn-3" data-turn-id="turn_extra"><div data-message-author-role="user"><div class="whitespace-pre-wrap">extra</div></div></article>'
-            : ''
-        }
-      `;
-      const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=true');
-      const env = createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
-      });
-      return (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    }
-
-    const before = await capture('first draft', false);
-    const after = await capture('edited prompt', true);
-    expect(before.conversation.conversationKey).toBe(after.conversation.conversationKey);
-  });
-
-  it('marks an unprepared unstable live snapshot as unverified so persistence rejects it', async () => {
-    const dom = setupChatgptDom(
-      '<div data-message-author-role="user"><div class="whitespace-pre-wrap">unstable</div></div>',
-      'https://chatgpt.com/?temporary-chat=true',
-    );
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const snap = await createChatgptCollectorDef(env).collector.capture({ manual: true });
-    expect(snap).toBeNull();
-  });
-
-  it('does not verify temporary-chat identity from an empty structural turn shell', async () => {
-    const dom = setupChatgptDom(
-      '<article data-testid="conversation-turn-1"><div data-message-author-role="user"><div class="whitespace-pre-wrap">unstable shell</div></div></article>',
-      'https://chatgpt.com/?temporary-chat=true',
-    );
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-    const guard = def.collector.__test.sampleIdentityGuard(dom.window.document.querySelector('main'));
-    expect(guard.anchors).toEqual([]);
-    expect(def.collector.__test.identityConversationKey(guard)).toBe('');
-
-    const snapshot = await def.collector.capture({ manual: true });
-    expect(snapshot).toBeNull();
-  });
-
-  it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn_md_user">
-        <div data-message-author-role="user"><div class="whitespace-pre-wrap">你好</div></div>
-      </article>
-      <article data-testid="conversation-turn-2" data-turn-id="turn_md_assistant">
-        <div data-message-author-role="assistant" data-message-id="m_ai_1">
-          <div class="markdown prose">
-            <h1>主标题</h1>
-            <blockquote><p>这是引用</p></blockquote>
-            <ul>
-              <li>
-                <p>父级条目</p>
-                <ul>
-                  <li><p>子级条目</p></li>
-                </ul>
-              </li>
-            </ul>
-            <ol start="3"><li><p>第三项</p></li></ol>
-            <table>
-              <thead><tr><th>类型</th><th>特征</th></tr></thead>
-              <tbody><tr><td>深度工作</td><td>高专注</td></tr></tbody>
-            </table>
-            <pre>
-              <div class="relative">
-                <div class="sticky"><div>代码</div><button aria-label="复制">复制</button></div>
-                <div id="code-block-viewer" class="cm-editor">
-                  <div class="cm-scroller">
-                    <div class="cm-content"><span>const a = 1;</span><br><span>console.log(a);</span></div>
-                  </div>
-                </div>
-              </div>
-            </pre>
-            <p><strong>粗体</strong> <em>斜体</em> <code>sum(1,2)</code> <a href="https://example.com">链接</a></p>
-            <hr />
-          </div>
-        </div>
-      </article>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_md_1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(2);
-
-    const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
-    expect(assistant).toBeTruthy();
-    expect(assistant.contentMarkdown).toContain('# 主标题');
-    expect(assistant.contentMarkdown).toContain('> 这是引用');
-    expect(assistant.contentMarkdown).toContain('- 父级条目');
-    expect(assistant.contentMarkdown).toContain('  - 子级条目');
-    expect(assistant.contentMarkdown).toContain('3. 第三项');
-    expect(assistant.contentMarkdown).toContain('| 类型 | 特征 |');
-    expect(assistant.contentMarkdown).toContain('```');
-    expect(assistant.contentMarkdown).toContain('const a = 1;');
-    expect(assistant.contentMarkdown).toContain('console.log(a);');
-    expect(assistant.contentMarkdown).toContain('**粗体**');
-    expect(assistant.contentMarkdown).toContain('*斜体*');
-    expect(assistant.contentMarkdown).toContain('`sum(1,2)`');
-    expect(assistant.contentMarkdown).toContain('[链接](https://example.com)');
-    expect(assistant.contentMarkdown).toContain('---');
-    expect(assistant.contentMarkdown).not.toContain('复制');
-
-    expect(assistant.contentMarkdown).toContain('主标题');
-    expect(assistant.contentMarkdown).toContain('console.log(a);');
-    expect(assistant.contentMarkdown).not.toContain('复制');
-  });
-
-  it('extracts arbitrary rendered roots with the same semantic cleanup as assistant content', () => {
-    const dom = new JSDOM(`<!DOCTYPE html><html><body>
-      <div id="rendered-root">
-        <section>
-          <h2>Rendered heading</h2>
-          <p>First sibling with <strong>bold text</strong>.</p>
-        </section>
-        <section>
-          <ul><li>Second sibling item</li></ul>
-          <pre><code class="language-ts">const value = 1;</code></pre>
-          <p>Formula <span class="math-block" data-math="x^2"></span></p>
-          <button type="button">Copy chrome</button>
-        </section>
-      </div>
-    </body></html>`);
-    const root = dom.window.document.querySelector('#rendered-root');
-
-    const markdown = chatgptMarkdown.extractRenderedMarkdown(root);
-    const text = chatgptMarkdown.extractRenderedText(root);
-
-    expect(markdown).toContain('## Rendered heading');
-    expect(markdown).toContain('First sibling with **bold text**.');
-    expect(markdown).toContain('- Second sibling item');
-    expect(markdown).toContain('```ts');
-    expect(markdown).toContain('const value = 1;');
-    expect(markdown).toContain('x^2');
-    expect(markdown).not.toContain('Copy chrome');
-    expect(text).toContain('Rendered heading');
-    expect(text).toContain('First sibling with bold text.');
-    expect(text).toContain('Second sibling item');
-    expect(text).toContain('const value = 1;');
-    expect(text).toContain('x^2');
-    expect(text).not.toContain('Copy chrome');
-  });
-
-  it('keeps ChatGPT content images while omitting non-content source and app icons', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn_favicon">
-        <div data-message-author-role="assistant" data-message-id="m_ai_favicon">
-          <div class="markdown prose">
-            <p>
-              <a href="https://arxiv.org/abs/2312.10997">
-                <span><img src="https://www.google.com/s2/favicons?domain=https://arxiv.org&amp;sz=128" /></span>
-                <span>arXiv</span>
-              </a>
-            </p>
+  it('captures rich current assistant Markdown while removing source chrome and non-content icons', async () => {
+    const dom = currentDom({
+      assistantContent: `
+        <div data-chatgpt-selection-conversation-id="conversation-1" data-chatgpt-selection-message-id="assistant-message-1">
+          <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+            <h2>Heading</h2>
+            <blockquote><p>Quote</p></blockquote>
+            <ul><li>Item</li></ul>
+            <p><strong>bold</strong> <em>italic</em> <a href="https://example.com">link</a></p>
+            <p><a href="https://arxiv.org/abs/2312.10997"><img src="https://t0.gstatic.com/faviconV2?url=https%3A%2F%2Farxiv.org" />arXiv</a></p>
             <img src="https://chatgpt.com/images/ecosystem/apps/github/icon.png" />
             <img src="https://example.com/chart.png" />
           </div>
         </div>
-      </article>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_favicon');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    const assistant = snap.messages.find((message: any) => message.role === 'assistant');
-    expect(assistant.contentMarkdown).toContain('[arXiv](https://arxiv.org/abs/2312.10997)');
-    expect(assistant.contentMarkdown).not.toContain('www.google.com/s2/favicons');
-    expect(assistant.contentMarkdown).not.toContain('chatgpt.com/images/ecosystem/apps/github/icon.png');
-    expect(assistant.contentMarkdown).toContain('![](https://example.com/chart.png)');
-  });
-
-  it('extracts multiple assistant messages inside an agent-turn container', async () => {
-    const html = `
-      <div data-message-author-role="user" data-message-id="m_user_1"><div class="whitespace-pre-wrap">Q</div></div>
-      <div class="group/turn-messages flex flex-col agent-turn">
-        <div data-message-author-role="assistant" data-message-id="m_ai_1" class="text-message">
-          <div class="markdown prose"><p>first</p></div>
-        </div>
-        <div class="flex items-center justify-between">
-          <button type="button">Thought for 1s</button>
-        </div>
-        <div data-message-author-role="assistant" data-message-id="m_ai_2" class="text-message">
-          <div class="markdown prose"><p>second</p></div>
-        </div>
-      </div>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_agent_turn_1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'assistant']);
-    expect(snap.messages.map((m: any) => m.contentMarkdown)).toEqual(['Q', 'first', 'second']);
-  });
-
-  it('preserves hidden mermaid code blocks that are rendered as diagrams', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1">
-        <div data-message-author-role="assistant" data-message-id="m_ai_mermaid">
-          <div class="markdown prose">
-            <p>下面是一个 mermaid：</p>
-            <div class="mermaid">
-              <svg aria-hidden="true"><path d="M0 0" /></svg>
-              <pre class="sr-only" aria-hidden="true"><code class="language-mermaid">graph TD\n  A[Start] --> B{Decision}\n  B -->|Yes| C[OK]\n  B -->|No| D[Retry]</code></pre>
-            </div>
-          </div>
-        </div>
-      </article>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_mermaid_1');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
-    expect(snap.messages[0].contentMarkdown).toContain('graph TD');
-    expect(snap.messages[0].contentMarkdown).toContain('graph TD');
-  });
-
-  it('captures multiple deep-research iframes with identical src as distinct reports', async () => {
-    const html = `
-      <section data-testid="conversation-turn-1" data-turn="user" data-turn-id="u1">
-        <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
-      </section>
-      <section data-testid="conversation-turn-2" data-turn="assistant" data-turn-id="a1">
-        <div class="agent-turn">
-          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
-        </div>
-      </section>
-      <section data-testid="conversation-turn-3" data-turn="assistant" data-turn-id="a2">
-        <div class="agent-turn">
-          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
-        </div>
-      </section>
-      <section data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="a3">
-        <div class="agent-turn">
-          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
-        </div>
-      </section>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_multi_1');
-    const iframes = Array.from(dom.window.document.querySelectorAll('iframe')) as any[];
-    expect(iframes.length).toBe(3);
-
-    const mkFrame = (title: string, body: string) => {
-      const win = {
-        postMessage: (msg: any) => {
-          const requestId = msg?.requestId;
-          dom.window.dispatchEvent(
-            new (dom.window as any).MessageEvent('message', {
-              data: {
-                __syncnos: true,
-                type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
-                requestId,
-                title,
-                markdown: `# ${title}\n\n${body}`,
-                text: `${title}\n\n${body}`,
-              },
-              origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
-              source: win as any,
-            }),
-          );
-        },
-      };
-      return win;
-    };
-
-    const w1 = mkFrame('Report A', 'Body A');
-    const w2 = mkFrame('Report A', 'Body A');
-    const w3 = mkFrame('Report B', 'Body B');
-    Object.defineProperty(iframes[0], 'contentWindow', { configurable: true, value: w1 });
-    Object.defineProperty(iframes[1], 'contentWindow', { configurable: true, value: w2 });
-    Object.defineProperty(iframes[2], 'contentWindow', { configurable: true, value: w3 });
-
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    const assistant = snap.messages.filter((m: any) => m.role === 'assistant');
-    expect(assistant.length).toBe(3);
-    // When multiple deep-research iframes exist, we prefer stable placeholders and let the hydrator fill the body.
-    expect(String(assistant[0].contentMarkdown)).toContain('Deep Research (iframe)');
-    expect(String(assistant[1].contentMarkdown)).toContain('Deep Research (iframe)');
-    expect(String(assistant[2].contentMarkdown)).toContain('Deep Research (iframe)');
-    expect(String(assistant[0].messageKey || '')).not.toBe(String(assistant[1].messageKey || ''));
-  });
-
-  it('falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn="assistant" data-turn-id="t1">
-        <h6 class="sr-only select-none">ChatGPT说:</h6>
-        <div class="agent-turn">
-          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/?app=chatgpt&locale=zh-CN"></iframe>
-        </div>
-      </article>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_fallback_1');
-    const iframe = dom.window.document.querySelector('iframe') as any;
-    expect(iframe).toBeTruthy();
-
-    const fakeFrameWindow = {
-      postMessage: (msg: any) => {
-        const requestId = msg?.requestId;
-        dom.window.dispatchEvent(
-          new (dom.window as any).MessageEvent('message', {
-            data: {
-              __syncnos: true,
-              type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
-              requestId,
-              title: 'Deep Research',
-              markdown: '',
-              text: '',
-            },
-            origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
-            source: fakeFrameWindow as any,
-          }),
-        );
-      },
-    };
-    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: fakeFrameWindow });
-
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe('assistant');
-    expect(String(snap.messages[0].contentMarkdown)).toMatch(/^Deep Research \(iframe\):/);
-    expect(String(snap.messages[0].contentMarkdown)).toContain(
-      'connector_openai_deep_research.web-sandbox.oaiusercontent.com',
-    );
-    expect(String(snap.messages[0].contentMarkdown)).not.toContain('ChatGPT说');
-  });
-
-  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
-    const html = `
-      <article data-testid="conversation-turn-1" data-turn-id="turn_fallback">
-        <div data-message-author-role="assistant" data-message-id="m_fallback">
-          <div class="markdown prose"><p>plain answer</p></div>
-        </div>
-      </article>
-    `;
-
-    const extractAssistantText = chatgptMarkdown.extractAssistantText;
-    const extractAssistantMarkdown = chatgptMarkdown.extractAssistantMarkdown;
-    (chatgptMarkdown as any).extractAssistantText = undefined;
-    (chatgptMarkdown as any).extractAssistantMarkdown = undefined;
-    try {
-      const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_fallback_1');
-      const env = createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
-      });
-
-      const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-      expect(snap).toBeTruthy();
-      expect(snap.messages.length).toBe(1);
-      expect(snap.messages[0].role).toBe('assistant');
-      expect(snap.messages[0].contentMarkdown).toBe('plain answer');
-      expect(snap.messages[0].contentMarkdown).toBe('plain answer');
-    } finally {
-      chatgptMarkdown.extractAssistantText = extractAssistantText;
-      chatgptMarkdown.extractAssistantMarkdown = extractAssistantMarkdown;
-    }
-  });
-});
-
-describe('chatgpt expanded COT manual capture', () => {
-  const hiddenToolDetail = `${'hidden tool detail '.repeat(12)}\n\n\`\`\`ts\nconst secret = true;\n\`\`\``;
-
-  function expandedCotBody(
-    options: {
-      firstReasoning?: string;
-      firstTool?: string;
-      secondReasoning?: string;
-      secondTool?: string;
-      transitionClass?: string;
-      transitionStyle?: string;
-      direction?: string;
-    } = {},
-  ) {
-    const firstReasoning = options.firstReasoning || 'Reasoning <strong>block one</strong>.';
-    const firstTool = options.firstTool || 'Visible tool summary one';
-    const secondReasoning = options.secondReasoning || 'Reasoning block two.';
-    const secondTool = options.secondTool || 'Visible tool summary two';
-    return `
-      <div
-        data-testid="cot-top-body"
-        data-item-anchor="start"
-        data-dimension="height"
-        data-direction="${options.direction || 'in'}"
-        class="${options.transitionClass || 'transition-body'}"
-        style="${options.transitionStyle || '--transition-progress: 1'}"
-      >
-        <div class="markdown prose"><p>${firstReasoning}</p></div>
-        <div class="tool-row">
-          <button
-            type="button"
-            aria-label="Nested tool chrome should not be saved"
-            aria-controls="cot-hidden-tool-1"
-            aria-expanded="false"
-          ></button>
-          <div class="tool-summary">
-            <span data-testid="cot-v5-tool-icon-pile"><svg aria-hidden="true"><path d="M0 0" /></svg></span>
-            <span>${firstTool}</span>
-            <svg aria-hidden="true"><path d="M1 1" /></svg>
-          </div>
-          <div id="cot-hidden-tool-1" aria-hidden="true">
-            <pre class="sr-only" aria-hidden="true"><code class="language-ts">${hiddenToolDetail}</code></pre>
-          </div>
-        </div>
-        <div class="markdown prose"><p>${secondReasoning}</p></div>
-        <div class="tool-row">
-          <button
-            type="button"
-            aria-label="Second nested tool chrome should not be saved"
-            aria-controls="cot-hidden-tool-2"
-            aria-expanded="false"
-          ></button>
-          <div class="tool-summary">
-            <span data-testid="cot-v5-tool-icon-pile"><svg aria-hidden="true"><path d="M2 2" /></svg></span>
-            <span>${secondTool}</span>
-          </div>
-          <div id="cot-hidden-tool-2" aria-hidden="true">
-            <div>${'another hidden detail '.repeat(10)}</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function modernCotDom(expanded = true) {
-    return setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_cot_modern">
-          <div data-message-author-role="user" data-message-id="m_user_cot">
-            <div class="whitespace-pre-wrap">Question</div>
-          </div>
-          <div data-message-author-role="assistant" data-message-id="m_assistant_first" class="text-message">
-            <div class="markdown prose"><p>First assistant answer.</p></div>
-          </div>
-          <button data-testid="cot-top-toggle" type="button" aria-expanded="${expanded ? 'true' : 'false'}">
-            TOP_TOGGLE_CHROME
-            <svg aria-hidden="true"><path d="M3 3" /></svg>
-          </button>
-          ${expanded ? expandedCotBody() : ''}
-          <div data-message-author-role="assistant" data-message-id="m_assistant_second" class="text-message">
-            <div class="markdown prose"><p>Final assistant answer.</p></div>
-          </div>
-        </article>
       `,
-      'https://chatgpt.com/c/conv_cot_modern',
-    );
-  }
+    });
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('## Heading');
+    expect(markdown).toContain('> Quote');
+    expect(markdown).toContain('- Item');
+    expect(markdown).toContain('**bold**');
+    expect(markdown).toContain('*italic*');
+    expect(markdown).toContain('[link](https://example.com)');
+    expect(markdown).toContain('[arXiv](https://arxiv.org/abs/2312.10997)');
+    expect(markdown).toContain('![](https://example.com/chart.png)');
+    expect(markdown).not.toContain('gstatic.com/faviconV2');
+    expect(markdown).not.toContain('chatgpt.com/images/ecosystem/apps/github/icon.png');
+  });
 
-  function buildCotDef(dom: JSDOM) {
-    (dom.window as any).scrollTo = vi.fn();
-    return createChatgptCollectorDef(
-      createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
-      }),
-    ) as any;
-  }
+  it('preserves hidden rendered code sources such as Mermaid', () => {
+    const dom = new JSDOM(`<!doctype html><body>
+      <div id="root">
+        <p>Diagram</p>
+        <div class="mermaid">
+          <svg aria-hidden="true"><path d="M0 0"></path></svg>
+          <pre class="sr-only" aria-hidden="true"><code class="language-mermaid">graph TD
+A --> B</code></pre>
+        </div>
+      </div>
+    </body>`);
+    const root = dom.window.document.querySelector('#root');
+    const markdown = chatgptMarkdown.extractRenderedMarkdown(root);
+    expect(markdown).toContain('```mermaid');
+    expect(markdown).toContain('graph TD');
+    expect(markdown).toContain('A --> B');
+  });
 
-  it('uses the shared protected-image identity instead of transient ChatGPT turn ids', async () => {
+  it('uses protected generated-image identity instead of transient message ids', async () => {
     const fileId = 'file_shared_generated_1';
     const imageUrl = `https://chatgpt.com/backend-api/estuary/content?id=${fileId}&ts=1&sig=temporary`;
     const expectedKey = buildChatgptGeneratedImageMessageKey([fileId]);
-
-    const captureKey = async (turnId: string, messageId = '') => {
-      const messageIdAttr = messageId ? ` data-message-id="${messageId}"` : '';
-      const dom = setupChatgptDom(
-        `
-          <article data-testid="conversation-turn-1" data-turn-id="${turnId}">
-            <div data-message-author-role="assistant"${messageIdAttr}>
-              <div class="markdown prose"><img src="${imageUrl}" alt="generated cube" /></div>
-            </div>
-          </article>
-        `,
-        'https://chatgpt.com/c/conv_generated_image_identity',
-      );
-      const snapshot = (await capturePrepared(buildCotDef(dom))) as any;
-      return snapshot.messages[0]?.messageKey;
-    };
-
-    expect(await captureKey('request-WEB:first-0')).toBe(expectedKey);
-    expect(await captureKey('request-WEB:second-0', 'backend-final-id-not-visible-to-api-identity')).toBe(expectedKey);
+    const dom = currentDom({
+      assistantId: 'transient-assistant-id',
+      assistantContent: `
+        <div data-chatgpt-selection-message-id="transient-assistant-id">
+          <div data-markdown-text-style="assistant-message"><img src="${imageUrl}" alt="generated cube" /></div>
+        </div>
+      `,
+    });
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.messages[1].messageKey).toBe(expectedKey);
     expect(expectedKey).not.toContain(fileId);
   });
 
-  it('associates an expanded modern-turn COT only with the following assistant and keeps ordered visible blocks', async () => {
-    const dom = modernCotDom(true);
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap).toBeTruthy();
-
-    const byKey = new Map(snap.messages.map((message: any) => [message.messageKey, message]));
-    expect(byKey.get('m_user_cot')?.contentMarkdown).toBe('Question');
-    expect(byKey.get('m_assistant_first')?.contentMarkdown).toBe('First assistant answer.');
-
-    const owner = byKey.get('m_assistant_second') as any;
-    expect(owner).toBeTruthy();
-    expect(semanticText(owner)).toBe(
-      [
-        'Reasoning block one.',
-        'Visible tool summary one',
-        'Reasoning block two.',
-        'Visible tool summary two',
-        'Final assistant answer.',
-      ].join('\n'),
-    );
-    expect(owner.contentMarkdown).toBe(
-      [
-        'Reasoning **block one**.',
-        'Visible tool summary one',
-        'Reasoning block two.',
-        'Visible tool summary two',
-        'Final assistant answer.',
-      ].join('\n\n'),
-    );
-    expect(owner.contentMarkdown).not.toContain('TOP_TOGGLE_CHROME');
-    expect(owner.contentMarkdown).not.toContain('Nested tool chrome should not be saved');
-    expect(owner.contentMarkdown).not.toContain('hidden tool detail');
-    expect(owner.contentMarkdown).not.toContain('const secret');
-    expect(owner).not.toHaveProperty('contentText');
-  });
-
-  it('uses the same following-assistant ownership rule for the .agent-turn fallback', async () => {
-    const dom = setupChatgptDom(
-      `
-        <div class="agent-turn" data-turn-id="turn_cot_agent">
-          <div data-message-author-role="assistant" data-message-id="m_agent_first">
-            <div class="markdown prose"><p>Agent first.</p></div>
-          </div>
-          <button type="button" aria-expanded="true">Top COT chrome</button>
-          ${expandedCotBody({ firstReasoning: 'Agent reasoning.', firstTool: 'Agent tool summary' })}
-          <div data-message-author-role="assistant" data-message-id="m_agent_second">
-            <div class="markdown prose"><p>Agent second.</p></div>
-          </div>
-        </div>
-      `,
-      'https://chatgpt.com/c/conv_cot_agent',
-    );
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    const first = snap.messages.find((message: any) => message.messageKey === 'm_agent_first');
-    const second = snap.messages.find((message: any) => message.messageKey === 'm_agent_second');
-    expect(first.contentMarkdown).toBe('Agent first.');
-    expect(second.contentMarkdown).toContain('Agent reasoning.');
-    expect(second.contentMarkdown).toContain('Agent tool summary');
-    expect(second.contentMarkdown).toMatch(/Agent reasoning\.[\s\S]*Agent second\./);
-  });
-
-  it('keeps collapsed top COT answer-only', async () => {
-    const dom = modernCotDom(false);
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    const owner = snap.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(owner.contentMarkdown).toBe('Final assistant answer.');
-  });
-
-  it('fingerprints only visible COT semantics, not hidden tool details or transition attributes', () => {
-    const dom = modernCotDom(true);
-    const def = buildCotDef(dom);
-    const adapter = def.collector.__test.manualAdapter;
-    const beforeWindow = adapter.readWindow();
-    const beforeByKey = new Map(beforeWindow.descriptors.map((descriptor: any) => [descriptor.key, descriptor]));
-    const ownerBefore: any = beforeByKey.get('m_assistant_second');
-    const firstBefore: any = beforeByKey.get('m_assistant_first');
-    const userBefore: any = beforeByKey.get('m_user_cot');
-    const ownerInput = beforeWindow.inputsByKey.get('m_assistant_second');
-
-    expect(ownerInput.cotOuterHtml).toEqual(expect.any(String));
-    expect(ownerInput.cotOuterHtml).not.toContain('cot-hidden-tool-1');
-    expect(ownerInput.cotOuterHtml).not.toContain('hidden tool detail');
-    expect(JSON.parse(JSON.stringify(ownerInput))).toEqual(ownerInput);
-    expect(Object.values(ownerInput).some((value) => value instanceof dom.window.Element)).toBe(false);
-
-    const hidden = dom.window.document.querySelector('#cot-hidden-tool-1 code') as HTMLElement;
-    hidden.textContent = `${'changed hidden detail '.repeat(20)}\nconst hiddenChanged = true;`;
-    const body = dom.window.document.querySelector('[data-testid="cot-top-body"]') as HTMLElement;
-    body.className = 'completely-different-transition-class';
-    body.style.cssText = '--transition-progress: 0.42; opacity: 0.5';
-    body.setAttribute('data-direction', 'out');
-
-    const cosmeticByKey = new Map(adapter.readDescriptors().map((descriptor: any) => [descriptor.key, descriptor]));
-    expect((cosmeticByKey.get('m_assistant_second') as any).fingerprint).toBe(ownerBefore.fingerprint);
-    expect((cosmeticByKey.get('m_assistant_first') as any).fingerprint).toBe(firstBefore.fingerprint);
-    expect((cosmeticByKey.get('m_user_cot') as any).fingerprint).toBe(userBefore.fingerprint);
-
-    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
-    toggle.setAttribute('aria-expanded', 'false');
-    const collapsedByKey = new Map(adapter.readDescriptors().map((descriptor: any) => [descriptor.key, descriptor]));
-    expect((collapsedByKey.get('m_assistant_second') as any).fingerprint).not.toBe(ownerBefore.fingerprint);
-    expect((collapsedByKey.get('m_assistant_first') as any).fingerprint).toBe(firstBefore.fingerprint);
-    expect((collapsedByKey.get('m_user_cot') as any).fingerprint).toBe(userBefore.fingerprint);
-  });
-
-  it('fails safe for unrelated expanded accordions, user collapse controls, and assistant-internal accordions', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_negative_cot">
-          <button type="button" aria-expanded="true">Unrelated accordion</button>
-          <div><div class="markdown prose"><p>UNRELATED_ACCORDION_CONTENT</p></div></div>
-
-          <button
-            type="button"
-            data-testid="collapsible-user-message-toggle"
-            aria-controls="user-long-message"
-            aria-expanded="true"
-          >Show less</button>
-          <div id="user-long-message"><p>USER_COLLAPSE_CONTENT</p></div>
-
-          <div data-message-author-role="assistant" data-message-id="m_negative_owner">
-            <button type="button" aria-expanded="true">Internal accordion</button>
-            <div data-item-anchor="start" data-dimension="height">
-              <p>INTERNAL_ACCORDION_CONTENT</p>
-            </div>
-            <div class="markdown prose"><p>Safe final answer.</p></div>
-          </div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_negative_cot',
-    );
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap.messages).toHaveLength(1);
-    expect(snap.messages[0].contentMarkdown).toBe('Safe final answer.');
-    expect(snap.messages[0].contentMarkdown).not.toContain('UNRELATED_ACCORDION_CONTENT');
-    expect(snap.messages[0].contentMarkdown).not.toContain('USER_COLLAPSE_CONTENT');
-    expect(snap.messages[0].contentMarkdown).not.toContain('INTERNAL_ACCORDION_CONTENT');
-  });
-
-  it('fails safe for markerless transition bodies instead of treating generic transition UI as COT', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_fallback_cot">
-          <button type="button" aria-expanded="true">Unconfirmed transition accordion</button>
-          <div data-item-anchor="start" data-dimension="height"><p>MARKERLESS_TRANSITION_CONTENT</p></div>
-          <div data-message-author-role="assistant" data-message-id="m_fallback_cot">
-            <div class="markdown prose"><p>Fallback final answer.</p></div>
-          </div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_fallback_cot',
-    );
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(snap.messages[0].contentMarkdown).toBe('Fallback final answer.');
-    expect(snap.messages[0].contentMarkdown).not.toContain('MARKERLESS_TRANSITION_CONTENT');
-  });
-
-  it('updates COT fingerprint and final markdown when only a visible link target changes', async () => {
-    const dom = modernCotDom(true);
-    const reasoning = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown p') as HTMLElement;
-    reasoning.innerHTML = 'Reasoning <a href="https://example.com/source-a">same source</a>.';
-    const def = buildCotDef(dom);
-    const adapter = def.collector.__test.manualAdapter;
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      sleep: async () => {},
+  it('keeps Deep Research as a stable placeholder for later hydration', async () => {
+    const reportUrl = 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-a';
+    const dom = currentDom({
+      assistantContent: `<iframe title="internal://deep-research" src="${reportUrl}"></iframe>`,
     });
-    const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(semanticText(preparedOwner.payload)).toContain('Reasoning same source.');
-    expect(preparedOwner.payload.contentMarkdown).toContain('[same source](https://example.com/source-a)');
-
-    const link = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown a') as HTMLAnchorElement;
-    link.setAttribute('href', 'https://example.com/source-b');
-    const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
-    expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
-
-    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
-    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(semanticText(owner)).toContain('Reasoning same source.');
-    expect(owner.contentMarkdown).toContain('[same source](https://example.com/source-b)');
-    expect(owner.contentMarkdown).not.toContain('https://example.com/source-a');
-    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
-  });
-
-  it('keeps image-only reasoning in COT markdown even when it has no text contribution', async () => {
-    const imageUrl = 'https://example.com/cot-diagram.png';
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_cot_image_only">
-          <button type="button" aria-expanded="true">Top COT chrome</button>
-          <div data-item-anchor="start" data-dimension="height">
-            <div class="markdown prose"><img src="${imageUrl}" /></div>
-          </div>
-          <div data-message-author-role="assistant" data-message-id="m_cot_image_only">
-            <div class="markdown prose"><p>Final image answer.</p></div>
-          </div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_cot_image_only',
-    );
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(semanticText(snap.messages[0])).toBe('Final image answer.');
-    expect(snap.messages[0].contentMarkdown).toBe(`![](${imageUrl})\n\nFinal image answer.`);
-  });
-
-  it('keeps COT math and code-source recovery on the shared rendered-content sanitizer path', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_cot_rich_content">
-          <button type="button" aria-expanded="true">Top COT chrome</button>
-          <div data-item-anchor="start" data-dimension="height">
-            <div class="markdown prose">
-              <p>Formula <mjx-container class="MathJax"><svg><text>SVG_ONLY_FORMULA</text></svg></mjx-container></p>
-              <div class="mermaid">
-                <svg aria-hidden="true"><path d="M0 0" /></svg>
-                <button type="button" data-code="graph TD&#10;  A[Start] --> B[Done]">Copy source</button>
-              </div>
-            </div>
-          </div>
-          <div data-message-author-role="assistant" data-message-id="m_cot_rich_content">
-            <div class="markdown prose"><p>Final rich answer.</p></div>
-          </div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_cot_rich_content',
-    );
-    const snap = (await capturePrepared(buildCotDef(dom))) as any;
-    expect(semanticText(snap.messages[0])).toContain('SVG_ONLY_FORMULA');
-    expect(snap.messages[0].contentMarkdown).toContain('SVG_ONLY_FORMULA');
-    expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
-    expect(snap.messages[0].contentMarkdown).toContain('A[Start] --> B[Done]');
-    expect(snap.messages[0].contentMarkdown).toContain('Final rich answer.');
-  });
-
-  it('keeps COT snapshot and fingerprint empty for Deep Research placeholders', async () => {
-    const reportUrl = 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-cot';
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_dr_cot">
-          <button data-testid="cot-top-toggle" type="button" aria-expanded="true">Top COT chrome</button>
-          ${expandedCotBody({ firstReasoning: 'Reasoning that must not alter Deep Research.' })}
-          <div data-message-author-role="assistant" data-message-id="m_dr_cot">
-            <iframe title="internal://deep-research" src="${reportUrl}"></iframe>
-          </div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_dr_cot',
-    );
-    const def = buildCotDef(dom);
-    const before = def.collector.__test.manualAdapter.readWindow();
-    const descriptorBefore = before.descriptors.find((descriptor: any) => descriptor.key === 'm_dr_cot');
-    const inputBefore = before.inputsByKey.get('m_dr_cot');
-    expect(inputBefore.cotOuterHtml).toBe('');
-
-    const reasoning = dom.window.document.querySelector('[data-testid="cot-top-body"] .markdown p') as HTMLElement;
-    reasoning.textContent = 'Changed COT that Deep Research must ignore.';
-    const descriptorAfter = def.collector.__test.manualAdapter
-      .readDescriptors()
-      .find((descriptor: any) => descriptor.key === 'm_dr_cot');
-    expect(descriptorAfter.fingerprint).toBe(descriptorBefore.fingerprint);
-
-    const snap = (await capturePrepared(def)) as any;
-    expect(snap.messages[0].contentMarkdown).toBe(`Deep Research (iframe): ${reportUrl}`);
-  });
-
-  it('keeps prepared COT capture plain-data and JSON round-trippable', async () => {
-    const dom = modernCotDom(true);
-    const def = buildCotDef(dom);
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      sleep: async () => {},
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.messages[1]).toMatchObject({
+      messageKey: 'assistant-message-1',
+      role: 'assistant',
+      contentMarkdown: `Deep Research (iframe): ${reportUrl}`,
     });
-    expect(prepared).toBeTruthy();
-    expect(JSON.parse(JSON.stringify(prepared))).toEqual(prepared);
-
-    const containsElement = (value: any): boolean => {
-      if (value instanceof dom.window.Element) return true;
-      if (!value || typeof value !== 'object') return false;
-      return Object.values(value).some((child) => containsElement(child));
-    };
-    expect(containsElement(prepared)).toBe(false);
-    const ownerRecord = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(semanticText(ownerRecord.payload)).toContain('Reasoning block one.');
   });
 
-  it('updates only the owner record when COT becomes expanded between prepare and final capture', async () => {
-    const dom = modernCotDom(false);
-    const def = buildCotDef(dom);
-    const adapter = def.collector.__test.manualAdapter;
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      sleep: async () => {},
+  it('uses active Project conversation title, otherwise derives a generic durable title from the first user message', async () => {
+    const project = currentDom({
+      url: 'https://chatgpt.com/g/p_1/c/conv_project_1',
+      beforeTurn:
+        '<h1>Research</h1><nav><a href="/g/p_1/c/conv_project_1" aria-current="page"><span>GPR signal preprocessing</span></a></nav>',
     });
-    expect(prepared.completeness).toBe('complete');
-    const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(preparedOwner.payload.contentMarkdown).toBe('Final assistant answer.');
-    const extractionCountAfterPrepare = adapter.getExtractionCount();
+    project.window.document.title = 'ChatGPT';
+    expect((await capturePrepared(currentDef(project))).conversation.title).toBe('GPR signal preprocessing');
 
-    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.insertAdjacentHTML('afterend', expandedCotBody());
-    const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
-    expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
-
-    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare + 1);
-    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(semanticText(owner)).toContain('Reasoning block one.');
-    expect(owner.contentMarkdown).toMatch(/Visible tool summary two[\s\S]*Final assistant answer\./);
-    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
-    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
-  });
-
-  it('removes non-sticky COT when it becomes collapsed between prepare and final capture', async () => {
-    const dom = modernCotDom(true);
-    const def = buildCotDef(dom);
-    const adapter = def.collector.__test.manualAdapter;
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      sleep: async () => {},
+    const generic = currentDom({
+      url: 'https://chatgpt.com/c/conversation-title-1',
+      userText: '请帮我分析强化学习和机器学习的关系',
     });
-    expect(prepared.completeness).toBe('complete');
-    const preparedOwner = prepared.records.find((record: any) => record.key === 'm_assistant_second');
-    expect(semanticText(preparedOwner.payload)).toContain('Reasoning block one.');
-    const extractionCountAfterPrepare = adapter.getExtractionCount();
-
-    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLElement;
-    toggle.setAttribute('aria-expanded', 'false');
-    const liveOwner = adapter.readDescriptors().find((descriptor: any) => descriptor.key === 'm_assistant_second');
-    expect(liveOwner.fingerprint).not.toBe(preparedOwner.fingerprint);
-
-    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare + 1);
-    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(owner.messageKey).toBe(preparedOwner.key);
-    expect(owner.contentMarkdown).toBe('Final assistant answer.');
-    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
-    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
+    generic.window.document.title = 'ChatGPT';
+    expect((await capturePrepared(currentDef(generic))).conversation.title).toBe('请帮我分析强化学习和机器学习的关系');
   });
 
-  it('does not create a final-live update for cosmetic or hidden-detail changes', async () => {
-    const dom = modernCotDom(true);
-    const def = buildCotDef(dom);
-    const adapter = def.collector.__test.manualAdapter;
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      sleep: async () => {},
+  it('captures current share pages and uses the share id as durable identity', async () => {
+    const dom = currentDom({ url: 'https://chatgpt.com/share/share-current-1' });
+    dom.window.document.title = 'Shared current conversation';
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.conversation).toMatchObject({
+      conversationKey: 'share-current-1',
+      title: 'Shared current conversation',
     });
-    expect(prepared.completeness).toBe('complete');
-    const extractionCountAfterPrepare = adapter.getExtractionCount();
-
-    const body = dom.window.document.querySelector('[data-testid="cot-top-body"]') as HTMLElement;
-    body.className = 'changed-transition-class';
-    body.style.cssText = '--transition-progress: 0.1; transform: translateY(1px)';
-    body.setAttribute('data-direction', 'out');
-    const hidden = dom.window.document.querySelector('#cot-hidden-tool-1 code') as HTMLElement;
-    hidden.textContent = `${'mutated hidden detail '.repeat(30)}\nconst shouldStayInvisible = true;`;
-
-    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(adapter.getExtractionCount()).toBe(extractionCountAfterPrepare);
-    expect(snapshot.captureMeta).toMatchObject({ completeness: 'complete' });
-    expect(snapshot.captureMeta.reasons).not.toContain('final_live_changed');
-    const owner = snapshot.messages.find((message: any) => message.messageKey === 'm_assistant_second');
-    expect(semanticText(owner)).toContain('Reasoning block one.');
-    expect(owner.contentMarkdown).not.toContain('mutated hidden detail');
   });
 
-  it('never clicks or dispatches events on the live COT toggle', async () => {
-    const dom = modernCotDom(true);
-    const def = buildCotDef(dom);
-    const toggle = dom.window.document.querySelector('[data-testid="cot-top-toggle"]') as HTMLButtonElement;
-    const clickSpy = vi.spyOn(toggle, 'click');
-    const dispatchSpy = vi.spyOn(toggle, 'dispatchEvent');
-
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      sleep: async () => {},
+  it('binds temporary-chat identity only to rendered current units and keeps it stable across prompt edits', async () => {
+    const first = currentDom({
+      url: 'https://chatgpt.com/?temporary-chat=true',
+      turnKey: 'stable-temp-turn',
+      userId: 'stable-temp-user',
+      assistantId: 'stable-temp-assistant',
+      assistantIds: 'stable-temp-assistant',
+      userText: 'first draft',
     });
-    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    first.window.document.title = 'ChatGPT';
+    const firstSnapshot = (await capturePrepared(currentDef(first))) as any;
+    expect(firstSnapshot.conversation.conversationKey).toMatch(/^chatgpt_/);
+    expect(firstSnapshot.conversation.title).toBe('first draft');
 
-    expect(snapshot).toBeTruthy();
-    expect(clickSpy).not.toHaveBeenCalled();
-    expect(dispatchSpy).not.toHaveBeenCalled();
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
-  });
-});
+    const edited = currentDom({
+      url: 'https://chatgpt.com/?temporary-chat=true',
+      turnKey: 'stable-temp-turn',
+      userId: 'stable-temp-user',
+      assistantId: 'stable-temp-assistant',
+      assistantIds: 'stable-temp-assistant',
+      userText: 'edited prompt',
+    });
+    edited.window.document.title = 'ChatGPT';
+    const editedSnapshot = (await capturePrepared(currentDef(edited))) as any;
+    expect(editedSnapshot.conversation.conversationKey).toBe(firstSnapshot.conversation.conversationKey);
 
-describe('chatgpt turn identity primitive', () => {
-  it('resolves the same turn UUID from a role node and its shell', () => {
-    const dom = new JSDOM(`<!DOCTYPE html><html><body>
-      <section data-testid="conversation-turn-1" data-turn-id="turn_a">
-        <div data-message-author-role="user"><div class="whitespace-pre-wrap">你好</div></div>
-      </section>
-    </body></html>`);
-    const roleNode = dom.window.document.querySelector('[data-message-author-role="user"]') as any;
-    const shell = dom.window.document.querySelector('[data-testid="conversation-turn-1"]') as any;
-    expect(turnKeyOf(roleNode)).toBe('turn_a');
-    expect(turnKeyOf(shell)).toBe('turn_a');
-  });
-});
-
-describe('chatgpt virtualized share fixture (5 rounds)', () => {
-  function loadFixture() {
-    const html = fs.readFileSync(new URL('../fixtures/chatgpt-share-virtualized.html', import.meta.url), 'utf8');
-    // F2: the real share DOM has no <main>; load it as a FULL document (no main wrapper).
-    return new JSDOM(html, { url: 'https://chatgpt.com/share/6a422ac4-0fac-83ee-8050-90dec7c22b89' });
-  }
-
-  it('asserts captured fixture facts without treating spacer selectors as completeness proof', () => {
-    const dom = loadFixture();
-    const doc = dom.window.document;
-    expect(doc.querySelectorAll('main')).toHaveLength(0);
-    const nestedDuplicates = Array.from(doc.querySelectorAll('[data-turn-id-container]')).filter((element) =>
-      element.parentElement?.hasAttribute('data-turn-id-container'),
+    const emptyShell = setupChatgptDom(
+      '<div data-turn-key="empty-turn"><div data-content-search-turn-key="fallback-turn-0"></div></div>',
+      'https://chatgpt.com/?temporary-chat=true',
     );
-    expect(nestedDuplicates.length).toBeGreaterThan(0);
-    const turns = Array.from(
-      doc.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
+    const guard = currentDef(emptyShell).collector.__test.sampleIdentityGuard(
+      emptyShell.window.document.querySelector('main'),
     );
-    expect(turns.some((turn) => !turn.querySelector('[data-message-author-role]') && !turn.textContent?.trim())).toBe(
-      true,
-    );
-    expect(turns.some((turn) => turn.querySelectorAll('[data-message-author-role]').length > 1)).toBe(true);
+    expect(guard.anchors).toEqual([]);
   });
 
-  it('re-queries fresh descriptors and snapshots plain extraction input in one scan', () => {
-    const dom = loadFixture();
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-    const adapter = def.collector.__test.manualAdapter;
-    const beforeWindow = adapter.readWindow();
-    const before = beforeWindow.descriptors;
-    expect(before).toHaveLength(12);
-    expect(before.filter((descriptor: any) => descriptor.key).length).toBe(12);
-    const first = before[0];
-    const input = beforeWindow.inputsByKey.get(first.key);
-    expect(JSON.parse(JSON.stringify(input))).toEqual(input);
-    expect(input.outerHtml).toEqual(expect.any(String));
-    expect(Object.values(input).some((value) => value instanceof dom.window.Element)).toBe(false);
-
-    const firstRole = dom.window.document.querySelector('[data-message-author-role]') as HTMLElement;
-    firstRole.querySelector('.whitespace-pre-wrap, .markdown')!.textContent = 'replacement content';
-    const after = adapter.readDescriptors();
-    expect(after[0].key).toBe(first.key);
-    expect(after[0].fingerprint).not.toBe(first.fingerprint);
-  });
-
-  it('waits for an intersecting virtualized shell within one top-to-bottom pass', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_question">
-          <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
-        </article>
-        <div data-is-intersecting="true">
-          <article data-testid="conversation-turn-2" data-turn-id="turn_late"></article>
-        </div>
-      `,
-      'https://chatgpt.com/c/conv_visible_shell',
-    );
-    (dom.window as any).scrollTo = vi.fn();
-    const shell = dom.window.document.querySelector('[data-turn-id="turn_late"]') as HTMLElement;
-    const def = createChatgptCollectorDef(
-      createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
+  it('rejects a prepared temporary capture after same-path identity replacement', async () => {
+    const first = currentDef(
+      currentDom({
+        url: 'https://chatgpt.com/?temporary-chat=true',
+        turnKey: 'temp-a',
+        userId: 'user-a',
+        assistantId: 'assistant-a',
+        assistantIds: 'assistant-a',
       }),
-    ) as any;
-    let waits = 0;
+    );
+    const preparedCapture = await prepare(first);
 
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-      sleep: async () => {
-        waits += 1;
-        if (waits !== 1) return;
-        shell.innerHTML = '<div data-message-author-role="assistant"><div class="markdown prose">answer</div></div>';
-      },
-    });
-
-    expect(waits).toBe(1);
-    expect(prepared.metrics).toMatchObject({ passes: 1, reachedTop: true, reachedBottom: true });
-    expect(prepared.records.map((record: any) => record.payload.contentMarkdown)).toEqual(['question', 'answer']);
+    const second = currentDef(
+      currentDom({
+        url: 'https://chatgpt.com/?temporary-chat=true',
+        turnKey: 'temp-b',
+        userId: 'user-b',
+        assistantId: 'assistant-b',
+        assistantIds: 'assistant-b',
+      }),
+    );
+    expect(await second.collector.capture({ manual: true, preparedCapture })).toBeNull();
   });
 
-  it('treats a top boundary loader as pending when structural turn ordinals are unavailable', () => {
-    const dom = setupChatgptDom(
-      `
-        <div role="progressbar" data-testid="history-loading"></div>
-        <article data-testid="conversation-turn" data-turn-id="turn_unindexed">
-          <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_boundary_loader',
-    );
-    const def = createChatgptCollectorDef(
-      createCollectorEnv({
-        window: dom.window as any,
-        document: dom.window.document as any,
-        location: dom.window.location as any,
-        normalize: normalizeApi,
-      }),
-    ) as any;
-    const adapter = def.collector.__test.manualAdapter;
+  it('provides only stable current DOM ids to Advanced API live-tail and fails closed otherwise', () => {
+    const def = currentDef(currentDom());
+    const live = def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' });
+    expect(live).toMatchObject({
+      kind: 'candidate',
+      conversationId: 'conversation-1',
+      userMessage: { messageKey: 'user-message-1', role: 'user', contentMarkdown: 'Current question' },
+      assistantMessage: { messageKey: 'assistant-message-1', role: 'assistant' },
+    });
+    expect(semanticText(live.assistantMessage)).toContain('Final answer.');
 
+    const missingAssistantId = currentDef(currentDom({ assistantIds: '' }));
+    expect(missingAssistantId.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toEqual({
+      kind: 'unsafe',
+    });
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'other-conversation' })).toEqual({
+      kind: 'identity_changed',
+    });
+  });
+
+  it('uses current fallback-turn ordinals and the dedicated history-loading sentinel for top completeness', () => {
+    const dom = currentDom();
+    const turn = dom.window.document.querySelector('[data-content-search-turn-key]') as HTMLElement;
+    const adapter = currentDef(dom).collector.__test.manualAdapter;
+
+    turn.setAttribute('data-content-search-turn-key', 'fallback-turn-10');
     expect(adapter.readBoundaryState('top')).toBe('pending');
-    dom.window.document.querySelector('[role="progressbar"]')?.remove();
+    turn.setAttribute('data-content-search-turn-key', 'fallback-turn-0');
     expect(adapter.readBoundaryState('top')).toBe('confirmed');
+
+    const unrelated = dom.window.document.createElement('div');
+    unrelated.setAttribute('role', 'progressbar');
+    dom.window.document.querySelector('main')?.prepend(unrelated);
+    expect(adapter.readBoundaryState('top')).toBe('confirmed');
+
+    const boundary = dom.window.document.createElement('div');
+    boundary.setAttribute('data-chatgpt-conversation-selection-target', 'true');
+    boundary.innerHTML = '<div role="status">Loading earlier messages</div>';
+    dom.window.document.querySelector('main')?.prepend(boundary);
+    expect(adapter.readBoundaryState('top')).toBe('pending');
   });
 
-  it('bounds manual extraction to new or changed descriptor fingerprints', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_cost_user">
-          <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
-        </article>
-        <article data-testid="conversation-turn-2" data-turn-id="turn_cost_answer">
-          <div data-message-author-role="assistant"><div class="markdown prose"><p>draft answer</p></div></div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_cost',
-    );
-    (dom.window as any).scrollTo = vi.fn();
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-    const prepared = await def.collector.prepareManualCapture({
-      maxSteps: 4,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-
-    expect(prepared.completeness).toBe('complete');
-    expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(2);
-    expect(JSON.parse(JSON.stringify(prepared))).toEqual(prepared);
-    const containsLiveElement = (value: any): boolean => {
-      if (value instanceof dom.window.Element) return true;
-      if (!value || typeof value !== 'object') return false;
-      return Object.values(value).some((child) => containsLiveElement(child));
-    };
-    expect(containsLiveElement(prepared)).toBe(false);
-
-    const answer = dom.window.document.querySelector('.markdown.prose p') as HTMLElement;
-    answer.textContent = 'final answer';
-    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(3);
-    expect(snapshot.messages.map((message: any) => message.contentMarkdown)).toEqual(['question', 'final answer']);
-    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
-    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
-  });
-
-  it('keeps Deep Research manual extraction synchronous and emits only a placeholder', async () => {
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_report">
-          <div data-message-author-role="assistant">
-            <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-a"></iframe>
-          </div>
-        </article>
-      `,
-      'https://chatgpt.com/c/conv_report',
-    );
-    (dom.window as any).scrollTo = vi.fn();
-    const iframe = dom.window.document.querySelector('iframe') as HTMLIFrameElement;
-    const postMessage = vi.fn();
-    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: { postMessage } });
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-    const prepared = await def.collector.prepareManualCapture({
-      maxSteps: 4,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-
-    expect(postMessage).not.toHaveBeenCalled();
-    expect(prepared.records).toHaveLength(1);
-    expect(prepared.records[0].payload).toMatchObject({
-      contentMarkdown:
-        'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-a',
-    });
-    expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(1);
-  });
-
-  it('keeps content, URLs, stable IDs, and image references out of sweep diagnostics', async () => {
-    const sentinel = 'PRIVATE_DIAGNOSTIC_SENTINEL';
-    const dom = setupChatgptDom(
-      `
-        <article data-testid="conversation-turn-1" data-turn-id="${sentinel}_turn">
-          <div data-message-author-role="assistant" data-message-id="${sentinel}_message">
-            <div class="markdown prose"><p>${sentinel}_body</p></div>
-            <img src="https://example.com/${sentinel}_image.png" />
-          </div>
-        </article>
-      `,
-      `https://chatgpt.com/c/${sentinel}_conversation`,
-    );
-    dom.window.document.title = `${sentinel}_title`;
-    (dom.window as any).scrollTo = vi.fn();
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-    const diagnostics = JSON.stringify({ reasons: prepared.reasons, metrics: prepared.metrics });
-    expect(diagnostics).not.toContain(sentinel);
-    expect(prepared.reasons.every((reason: string) => /^[a-z][a-z0-9_]*$/.test(reason))).toBe(true);
-  });
-
-  it('captures the virtualized fixture as a full document without regression (9 messages, 3 rounds)', async () => {
-    const dom = loadFixture();
-    expect(dom.window.document.querySelectorAll('main').length).toBe(0);
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(9);
-    expect(snap.messages.filter((m: any) => m.role === 'user').length).toBe(3);
-  });
-});
-
-describe('chatgpt manual scroll-sweep capture (P2)', () => {
-  function loadFixtureDom() {
-    const html = fs.readFileSync(new URL('../fixtures/chatgpt-share-virtualized.html', import.meta.url), 'utf8');
-    return new JSDOM(html, { url: 'https://chatgpt.com/share/6a422ac4-0fac-83ee-8050-90dec7c22b89' });
-  }
-  // JSDOM has no layout. Model a document scroller whose viewport hydrates one shell per step.
-  function mockHydrationOnDynamicScroll(dom: JSDOM) {
-    const doc = dom.window.document;
-    const shells = Array.from(
-      doc.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
-    ).filter(
-      (shell) => !shell.querySelector('[data-message-author-role]') && !shell.textContent?.trim(),
-    ) as HTMLElement[];
-    const injRoles = ['user', 'assistant', 'user'];
-    const root = doc.documentElement;
-    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 500 });
-    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
-    let top = 0;
-    let left = 0;
-    const counter = { calls: 0, hydrated: 0 };
-    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
-    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => left });
-    (dom.window as any).scrollTo = (nextLeft: number, nextTop: number) => {
-      left = Number(nextLeft) || 0;
-      top = Number(nextTop) || 0;
-      counter.calls += 1;
-      const hydrateCount = Math.min(shells.length, Math.floor(top / 60));
-      for (let idx = 0; idx < hydrateCount; idx += 1) {
-        const shell = shells[idx];
-        if (shell.querySelector('[data-message-author-role]')) continue;
-        const role = injRoles[idx] || 'assistant';
-        const wrap = doc.createElement('div');
-        wrap.setAttribute('data-message-author-role', role);
-        wrap.setAttribute('data-message-id', `inj_${idx}`);
-        const inner = doc.createElement('div');
-        inner.className = role === 'user' ? 'whitespace-pre-wrap' : 'markdown prose';
-        inner.textContent = `注入-${role}-${idx}`;
-        wrap.appendChild(inner);
-        shell.appendChild(wrap);
-        counter.hydrated += 1;
-      }
-    };
-    return {
-      shells,
-      counter,
-      getTop: () => top,
-      setPosition: (nextLeft: number, nextTop: number) => {
-        left = nextLeft;
-        top = nextTop;
-      },
-    };
-  }
-  function buildEnv(dom: JSDOM) {
-    return createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-  }
-
-  it('prepareManualCapture + manual capture recovers all 5 rounds across virtualized shells', async () => {
-    const dom = loadFixtureDom();
-    (dom.window as any).scrollTo = vi.fn();
-    const { shells, counter } = mockHydrationOnDynamicScroll(dom);
-    expect(shells.length).toBe(3);
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-
-    const preparedCapture = await def.collector.prepareManualCapture({
-      stepTimeoutMs: 100,
-      pollMs: 0,
-      stableSamples: 1,
-    });
-    expect(counter.hydrated).toBe(3);
-    expect(preparedCapture.metrics).toMatchObject({ passes: 1, reachedTop: true, reachedBottom: true });
-
-    const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
-    expect(snap.messages.length).toBe(12);
-    expect(snap.messages.filter((m: any) => m.role === 'user').length).toBe(5);
-    expect(snap.messages.every((m: any, i: number) => m.sequence === i)).toBe(true);
-    expect(snap.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
-    const injectedPositions = snap.messages
-      .map((message: any, index: number) => (String(message.contentMarkdown || '').startsWith('注入-') ? index : -1))
-      .filter((index: number) => index >= 0);
-    expect(injectedPositions).toEqual([3, 4, 5]);
-  });
-
-  it('binds temporary-chat identity only after reaching the canonical top', async () => {
-    const dom = setupChatgptDom('', 'https://chatgpt.com/?temporary-chat=true');
+  it('uses the current inner timeline scroller as the manual sweep seed', () => {
+    const dom = currentDom();
     const main = dom.window.document.querySelector('main') as HTMLElement;
-    const root = dom.window.document.documentElement;
-    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 200 });
-    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
-    let top = 100;
-    const render = () => {
-      const atTop = top < 50;
-      main.innerHTML = `
-        <article data-testid="conversation-turn-1" data-turn-id="${atTop ? 'turn_top' : 'turn_middle'}">
-          <div data-message-author-role="${atTop ? 'user' : 'assistant'}">
-            <div class="${atTop ? 'whitespace-pre-wrap' : 'markdown prose'}">${atTop ? 'top' : 'middle'}</div>
-          </div>
-        </article>
-      `;
-    };
-    render();
-    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
-    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
-    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
-      top = Number(nextTop) || 0;
-      render();
-    };
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-    const topGuard = {
-      route: 'chatgpt.com/?temporary-chat=true',
-      durableId: '',
-      anchors: ['turn:turn_top', 'turn_top:user:0'],
-      topAnchor: 'turn:turn_top',
-    };
-
-    const prepared = await def.collector.prepareManualCapture({
-      maxSteps: 4,
-      maxOverlapRecoveries: 0,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-
-    expect(prepared.conversationKey).toBe(def.collector.__test.identityConversationKey(topGuard));
-    expect(prepared.identityGuard.topAnchor).toBe('turn:turn_top');
-    expect(prepared.identityGuard.anchors).toContain('turn:turn_middle');
-    expect(top).toBe(100);
-  });
-
-  it('waits for the canonical first structural turn before binding temporary-chat identity', async () => {
-    const dom = setupChatgptDom('', 'https://chatgpt.com/?temporary-chat=true');
-    const main = dom.window.document.querySelector('main') as HTMLElement;
-    const root = dom.window.document.documentElement;
-    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 200 });
-    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
-    let top = 100;
-    let waits = 0;
-    const renderMiddle = () => {
-      main.innerHTML = `
-        <article data-testid="conversation-turn-42" data-turn-id="turn_middle">
-          <div data-message-author-role="assistant"><div class="markdown prose">middle</div></div>
-        </article>
-      `;
-    };
-    const renderCanonicalTop = () => {
-      main.innerHTML = `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_top">
-          <div data-message-author-role="user"><div class="whitespace-pre-wrap">top</div></div>
-        </article>
-      `;
-    };
-    renderMiddle();
-    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
-    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
-    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
-      top = Number(nextTop) || 0;
-    };
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-    const topGuard = {
-      route: 'chatgpt.com/?temporary-chat=true',
-      durableId: '',
-      anchors: ['turn:turn_top', 'turn_top:user:0'],
-      topAnchor: 'turn:turn_top',
-    };
-
-    const prepared = await def.collector.prepareManualCapture({
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-      boundaryTimeoutMs: 20,
-      sleep: async () => {
-        waits += 1;
-        if (waits === 2) renderCanonicalTop();
-      },
-    });
-
-    expect(waits).toBeGreaterThanOrEqual(2);
-    expect(prepared.conversationKey).toBe(def.collector.__test.identityConversationKey(topGuard));
-    expect(prepared.identityGuard.topAnchor).toBe('turn:turn_top');
-    expect(prepared.identityGuard.topAnchor).not.toBe('turn:turn_middle');
-  });
-
-  it('recycles every visible anchor without treating scrolling as navigation', async () => {
-    const dom = setupChatgptDom('', 'https://chatgpt.com/?temporary-chat=true');
-    const main = dom.window.document.querySelector('main') as HTMLElement;
-    const root = dom.window.document.documentElement;
-    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 200 });
-    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
-    let top = 0;
-    const render = () => {
-      const suffix = top < 50 ? 'a' : 'b';
-      main.innerHTML = `
-        <article data-testid="conversation-turn-1" data-turn-id="turn_${suffix}">
-          <div data-message-author-role="${suffix === 'a' ? 'user' : 'assistant'}">
-            <div class="${suffix === 'a' ? 'whitespace-pre-wrap' : 'markdown prose'}">message-${suffix}</div>
-          </div>
-        </article>
-      `;
-    };
-    render();
-    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
-    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
-    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
-      top = Number(nextTop) || 0;
-      render();
-    };
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-
-    const prepared = await def.collector.prepareManualCapture({
-      maxSteps: 4,
-      maxOverlapRecoveries: 0,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-
-    expect(top).toBe(0);
-    expect(prepared.identityVerified).toBe(true);
-    expect(prepared.reasons).not.toContain('identity_changed');
-    expect(prepared.records.map((record: any) => record.key)).toEqual(['turn_a:user:0', 'turn_b:assistant:0']);
-  });
-
-  it('downgrades a prepared capture when scroll restoration fails', async () => {
-    const dom = setupChatgptDom(
-      '<article data-testid="conversation-turn-1" data-turn-id="turn_restore"><div data-message-author-role="user"><div class="whitespace-pre-wrap">restore me</div></div></article>',
-      'https://chatgpt.com/c/conv_restore_failure',
-    );
-    const root = dom.window.document.documentElement;
-    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 300 });
-    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
-    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
-    let top = 50;
-    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
-    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
-    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
-      if (Number(nextTop) === 50) throw new Error('restore blocked');
-      top = Number(nextTop) || 0;
-    };
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-
-    const prepared = await def.collector.prepareManualCapture({
-      maxSteps: 8,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 20,
-    });
-
-    expect(prepared.completeness).toBe('partial');
-    expect(prepared.reasons).toContain('restore_failed');
-    expect(prepared.records).toHaveLength(1);
-  });
-
-  it('returns a plain prepared object without sharing state across collector instances', async () => {
-    const firstDom = loadFixtureDom();
-    const secondDom = loadFixtureDom();
-    (firstDom.window as any).scrollTo = vi.fn();
-    (secondDom.window as any).scrollTo = vi.fn();
-    mockHydrationOnDynamicScroll(firstDom);
-    mockHydrationOnDynamicScroll(secondDom);
-    const first = createChatgptCollectorDef(buildEnv(firstDom)) as any;
-    const second = createChatgptCollectorDef(buildEnv(secondDom)) as any;
-
-    const [firstPrepared, secondPrepared] = await Promise.all([
-      first.collector.prepareManualCapture({ stepTimeoutMs: 100, pollMs: 0, stableSamples: 1 }),
-      second.collector.prepareManualCapture({ stepTimeoutMs: 100, pollMs: 0, stableSamples: 1 }),
-    ]);
-
-    expect(firstPrepared).not.toBe(secondPrepared);
-    expect(JSON.parse(JSON.stringify(firstPrepared))).toEqual(firstPrepared);
-    expect(JSON.parse(JSON.stringify(secondPrepared))).toEqual(secondPrepared);
-    firstPrepared.records[0].payload.contentMarkdown = 'mutated-first-only';
-    expect(secondPrepared.records[0].payload.contentMarkdown).not.toBe('mutated-first-only');
-  });
-
-  it('rejects a prepared object after same-path temporary-chat replacement', async () => {
-    const firstDom = setupChatgptDom(
-      '<article data-testid="conversation-turn-1" data-turn-id="turn_first"><div data-message-author-role="user"><div class="whitespace-pre-wrap">first</div></div></article>',
-      'https://chatgpt.com/?temporary-chat=true',
-    );
-    (firstDom.window as any).scrollTo = vi.fn();
-    const first = createChatgptCollectorDef(buildEnv(firstDom)) as any;
-    const prepared = await first.collector.prepareManualCapture({ stableSamples: 1, pollMs: 0 });
-
-    const secondDom = setupChatgptDom(
-      '<article data-testid="conversation-turn-1" data-turn-id="turn_second"><div data-message-author-role="user"><div class="whitespace-pre-wrap">second</div></div></article>',
-      'https://chatgpt.com/?temporary-chat=true',
-    );
-    const second = createChatgptCollectorDef(buildEnv(secondDom)) as any;
-    const snap = await second.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(snap).toBeNull();
-  });
-
-  it('ignores a prepared object from another conversation identity', async () => {
-    const preparedDom = loadFixtureDom();
-    (preparedDom.window as any).scrollTo = vi.fn();
-    mockHydrationOnDynamicScroll(preparedDom);
-    const preparedDef = createChatgptCollectorDef(buildEnv(preparedDom)) as any;
-    const prepared = await preparedDef.collector.prepareManualCapture({
-      stepTimeoutMs: 100,
-      pollMs: 0,
-      stableSamples: 1,
-    });
-
-    const otherDom = setupChatgptDom(
-      '<div data-message-author-role="user" data-message-id="other"><div class="whitespace-pre-wrap">other</div></div>',
-      'https://chatgpt.com/c/other-conversation',
-    );
-    const other = createChatgptCollectorDef(buildEnv(otherDom)) as any;
-    const snap = await other.collector.capture({ manual: true, preparedCapture: prepared });
-    expect(snap).toBeNull();
-  });
-
-  it('rejects manual capture without prepareManualCapture', async () => {
-    const dom = loadFixtureDom();
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-    const snap = await def.collector.capture({ manual: true });
-    expect(snap).toBeNull();
-  });
-
-  it('restores the scroll position after the sweep', async () => {
-    const dom = loadFixtureDom();
-    const scroll = mockHydrationOnDynamicScroll(dom);
-    scroll.setPosition(0, 120);
-    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-    await def.collector.prepareManualCapture({ stepTimeoutMs: 100, pollMs: 0, stableSamples: 1 });
-    expect(scroll.getTop()).toBe(120);
+    const scroller = dom.window.document.createElement('div');
+    scroller.setAttribute('data-app-action-timeline-scroll', '');
+    while (main.firstChild) scroller.appendChild(main.firstChild);
+    main.appendChild(scroller);
+    expect(currentDef(dom).collector.__test.manualAdapter.readScrollSeed()).toBe(scroller);
   });
 });

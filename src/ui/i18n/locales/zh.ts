@@ -330,7 +330,7 @@ export const zh: { [K in TranslationKey]: string } = {
   captureFailedFallback: '获取失败',
   partialCaptureSaved: '已保存可见消息，但无法确认完整历史。',
   captureWaitingForMessages: '等待消息…',
-  partialCaptureSavedLive: '已保存当前可见回复；回复仍在变化，完成后再次保存可确认最终内容。',
+  partialCaptureSavedLive: '已保存对话及当前回复进度；回复仍在变化，完成后再次保存可确认最终内容。',
   partialCaptureSavedHistory: '已保存当前消息；历史记录完整性仍待确认。',
   partialCaptureSavedContent: '已保存可安全确认的消息；部分内容或顺序仍待确认。',
   partialCaptureSavedMedia: '正文已保存；部分图片或深度研究内容仍待补全。',

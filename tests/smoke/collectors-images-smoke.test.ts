@@ -10,14 +10,28 @@ describe('collectors images (smoke)', () => {
     const dom = new JSDOM(
       `<body>
         <main>
-          <div id="m_user" data-testid="conversation-turn" data-message-author-role="user">
-            <div class="whitespace-pre-wrap">hello</div>
-            <img src="https://img.test/u.png" />
-          </div>
-          <div id="m_ai" data-testid="conversation-turn" data-message-author-role="assistant">
-            <div class="markdown">
-              <p>hi</p>
-              <img srcset="https://img.test/a1.png 1x, https://img.test/a2.png 2x" />
+          <div data-turn-key="turn-1">
+            <div data-content-search-turn-key="fallback-turn-0">
+              <div
+                data-chatgpt-search-unit-key="fallback-turn-0:0:user"
+                data-chatgpt-search-message-ids="user-1"
+                data-is-intersecting="true"
+              >
+                <div data-user-message-bubble="true"><div class="whitespace-pre-wrap">hello</div></div>
+                <img src="https://img.test/u.png" />
+              </div>
+              <div
+                data-chatgpt-search-unit-key="fallback-turn-0:2:assistant"
+                data-chatgpt-search-message-ids="assistant-1"
+                data-is-intersecting="true"
+              >
+                <div data-chatgpt-selection-message-id="assistant-1">
+                  <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+                    <p>hi</p>
+                    <img srcset="https://img.test/a1.png 1x, https://img.test/a2.png 2x" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </main>

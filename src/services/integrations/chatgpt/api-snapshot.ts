@@ -215,6 +215,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
       onSchemaDrift();
       return renderContentReferences(message, fallback, onSchemaDrift);
     }
+    if (Object.keys(content).some((key) => key !== 'content_type' && key !== 'parts')) onSchemaDrift();
   }
   return '';
 }
@@ -453,13 +454,12 @@ export function buildChatgptApiSnapshot(input: {
   data: any;
   conversationId: string;
   conversationUrl: string;
-  fallbackTitle?: string;
   capturedAt?: number;
 }): ChatgptApiSnapshotResult {
   const conversationId = stableString(input.conversationId);
   if (!conversationId) throw apiSnapshotError('conversation_identity_invalid');
   const responseId = responseConversationId(input.data);
-  if (responseId && responseId !== conversationId) throw apiSnapshotError('conversation_identity_mismatch');
+  if (!responseId || responseId !== conversationId) throw apiSnapshotError('conversation_identity_mismatch');
 
   const branch = currentBranchNodes(input.data?.mapping, input.data?.current_node);
   const backendCurrentTurn = currentTurnInfo(branch);
@@ -688,7 +688,7 @@ export function buildChatgptApiSnapshot(input: {
   flushPendingStableTurn(true);
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
 
-  const title = stableString(input.data?.title) || stableString(input.fallbackTitle) || 'ChatGPT';
+  const title = stableString(input.data?.title) || 'ChatGPT';
   const snapshot = {
     conversation: {
       sourceType: 'chat',
