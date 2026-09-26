@@ -123,12 +123,12 @@ describe('ChatGPT API snapshot', () => {
     expect(attachmentsResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('uses legacy top-level text only as a partial schema-drift fallback', () => {
+  it('keeps top-level text as a partial schema-drift fallback when parts are absent', () => {
     const data = mappingFrom([message({ id: 'user-1', role: 'user' })]);
-    data.mapping.n1.message.content.text = 'legacy text';
+    data.mapping.n1.message.content.text = 'fallback text';
     const result = build(data);
     expect(result.snapshot.messages).toEqual([
-      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'legacy text' }),
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'fallback text' }),
     ]);
     expect(result.snapshot.captureMeta).toEqual({
       completeness: 'partial',
@@ -137,11 +137,11 @@ describe('ChatGPT API snapshot', () => {
     });
   });
 
-  it('uses only current conversation_id response identity and ignores legacy id aliases', () => {
+  it('requires the current conversation_id response identity', () => {
     const data = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['question'] })]);
     delete data.conversation_id;
-    data.id = 'other';
-    expect(build(data).snapshot.messages.map((entry: any) => entry.messageKey)).toEqual(['user-1']);
+    data.id = 'conversation-1';
+    expect(errorCode(() => build(data))).toBe('conversation_identity_mismatch');
   });
 
   it('renders backend rich references as readable Markdown instead of leaking transport tokens', () => {
@@ -230,11 +230,11 @@ describe('ChatGPT API snapshot', () => {
     const userOnly = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
     expect(build(userOnly)).toMatchObject({ currentTurnState: 'open', currentTurnId: '' });
 
-    const legacyFinal = mappingFrom([
+    const statuslessFinal = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-    expect(build(legacyFinal)).toMatchObject({ currentTurnState: 'unknown', currentTurnId: 'turn-a' });
+    expect(build(statuslessFinal)).toMatchObject({ currentTurnState: 'unknown', currentTurnId: 'turn-a' });
   });
 
   it('keeps an explicitly unfinished final under the turn key until the backend marks it finalized', () => {
@@ -1455,7 +1455,7 @@ describe('ChatGPT API transport', () => {
         readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
         fetchFn,
       }),
-    ).resolves.toMatchObject({ applicable: true });
+    ).resolves.toHaveProperty('snapshot');
     expect(callCount).toBe(2);
   });
 
@@ -1477,12 +1477,10 @@ describe('ChatGPT API transport', () => {
 
     const result = await captureCurrentChatgptConversationViaApi({
       readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1?model=test#tail',
-      fallbackTitle: 'Fallback',
       fetchFn,
       capturedAt: 10,
     });
 
-    expect(result.applicable).toBe(true);
     expect(calls.map((call) => call.url)).toEqual([
       'https://chatgpt.com/api/auth/session',
       'https://chatgpt.com/backend-api/conversation/conversation-1',
@@ -1494,21 +1492,21 @@ describe('ChatGPT API transport', () => {
     expect(headers.has('oai-device-id')).toBe(false);
     expect(JSON.stringify(result)).not.toContain(token);
     expect(JSON.stringify(result)).not.toContain('/backend-api/conversations/');
-    if (result.applicable) {
-      expect(result.snapshot.conversation.url).toBe('https://chatgpt.com/c/conversation-1');
-      expect(result.snapshot.conversation.title).toBe('API Conversation');
-    }
+    expect(result.snapshot.conversation.url).toBe('https://chatgpt.com/c/conversation-1');
+    expect(result.snapshot.conversation.title).toBe('API Conversation');
   });
 
-  it('is not applicable to temporary/share/root routes and does not fetch', async () => {
+  it('rejects non-durable routes before any API request', async () => {
     const fetchFn = vi.fn() as unknown as typeof fetch;
     for (const url of [
       'https://chatgpt.com/?temporary-chat=true',
       'https://chatgpt.com/share/share-id',
       'https://chatgpt.com/',
     ]) {
-      await expect(captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => url, fetchFn })).resolves.toEqual({
-        applicable: false,
+      await expect(
+        captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => url, fetchFn }),
+      ).rejects.toMatchObject({
+        code: 'chatgpt_api_navigation_changed',
       });
     }
     expect(fetchFn).not.toHaveBeenCalled();

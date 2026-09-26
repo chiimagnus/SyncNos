@@ -270,7 +270,7 @@ describe('current page capture integrity routing', () => {
   it('treats an enabled durable ChatGPT API route as ready without consulting DOM readiness', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -303,7 +303,7 @@ describe('current page capture integrity routing', () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const prepare = vi.fn();
     const snapshot = chatSnapshot({ markdown: 'hello\n\n![](chatgpt-file://file_1)' });
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -348,7 +348,6 @@ describe('current page capture integrity routing', () => {
       },
     }));
     chatgptApiMocks.capture.mockResolvedValue({
-      applicable: true,
       snapshot,
       currentTurnState: 'finalized',
       currentTurnId: 'turn-backend',
@@ -370,7 +369,7 @@ describe('current page capture integrity routing', () => {
   it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot, currentTurnState: 'open' });
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot, currentTurnState: 'open' });
     const liveTurn = vi.fn(() => ({
       kind: 'candidate',
       conversationId: 'conversation-1',
@@ -414,7 +413,7 @@ describe('current page capture integrity routing', () => {
   it('fails closed before persistence when an open API turn live-tail reader observes another durable conversation', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot, currentTurnState: 'open' });
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot, currentTurnState: 'open' });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -426,9 +425,8 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
-  it('falls back to DOM only when enabled API mode is not applicable to the current ChatGPT route', async () => {
+  it('uses DOM directly for temporary ChatGPT routes even when Advanced API is enabled', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: false });
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -439,7 +437,7 @@ describe('current page capture integrity routing', () => {
 
     await harness.service.captureCurrentPage();
 
-    expect(chatgptApiMocks.capture).toHaveBeenCalledTimes(1);
+    expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
     expect(prepare).toHaveBeenCalledTimes(1);
     expect(harness.capture).toHaveBeenCalledTimes(1);
   });
@@ -483,7 +481,6 @@ describe('current page capture integrity routing', () => {
     chatgptApiMocks.capture.mockImplementation(async () => {
       vi.stubGlobal('location', { href: 'https://chatgpt.com/c/conversation-2' });
       return {
-        applicable: true,
         snapshot: chatSnapshot(),
       };
     });
@@ -500,7 +497,7 @@ describe('current page capture integrity routing', () => {
   it('keeps ChatGPT image references independent from image-cache success during persistence', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot({ markdown: '![](chatgpt-file://file_1)' });
-    chatgptApiMocks.capture.mockResolvedValue({ applicable: true, snapshot });
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -533,7 +530,6 @@ describe('current page capture integrity routing', () => {
   it('finishes persistence for the captured conversation if SPA navigation changes after the write has started', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     chatgptApiMocks.capture.mockResolvedValue({
-      applicable: true,
       snapshot: chatSnapshot(),
     });
     const harness = createHarness({

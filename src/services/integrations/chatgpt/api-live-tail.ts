@@ -96,7 +96,7 @@ function mergeProvisionalWithLive(provisional: any, incoming: any): any {
 export function augmentChatgptApiSnapshotWithLiveTurn(
   snapshot: any,
   live: ChatgptApiLiveTurnCapture,
-  options?: { currentTurnState?: 'finalized' | 'open' | 'unknown'; currentTurnId?: string },
+  options?: { currentTurnId?: string },
 ): any {
   if (live.kind === 'none') return snapshot;
   if (live.kind === 'identity_changed') {
@@ -129,13 +129,6 @@ export function augmentChatgptApiSnapshotWithLiveTurn(
   }
 
   const anchoredUserIndex = messages.findIndex((message) => messageKey(message) === userKey);
-  if (
-    options?.currentTurnState === 'finalized' &&
-    userIndex >= 0 &&
-    messages.slice(anchoredUserIndex + 1).some((message) => message?.role === 'assistant')
-  ) {
-    return snapshot;
-  }
 
   const assistantIndex = messages.findIndex((message) => messageKey(message) === assistantKey);
   if (assistantIndex < 0) {
@@ -148,7 +141,7 @@ export function augmentChatgptApiSnapshotWithLiveTurn(
       if (anchoredUserIndex !== messages.length - 1) {
         return withPartialReason(snapshot, CHATGPT_API_LIVE_TAIL_UNRESOLVED_REASON);
       }
-      const provisionalTurnId = options?.currentTurnState === 'open' ? stableString(options.currentTurnId) : '';
+      const provisionalTurnId = stableString(options?.currentTurnId);
       const assistantMessage = provisionalTurnId
         ? { ...live.assistantMessage, messageKey: `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${provisionalTurnId}` }
         : live.assistantMessage;

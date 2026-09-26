@@ -60,88 +60,36 @@ function pickCodeLanguageFromClass(className: any): any {
   return '';
 }
 
-function extractTextWithBreaks(node: any): any {
-  if (!node) return '';
-  const TEXT_NODE = typeof Node !== 'undefined' && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
-  const ELEMENT_NODE = typeof Node !== 'undefined' && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
-
-  function walk(n: any): any {
-    if (!n) return '';
-    if (n.nodeType === TEXT_NODE) return String(n.nodeValue || '');
-    if (n.nodeType !== ELEMENT_NODE) return '';
-
-    const tag = String(n.tagName || '').toLowerCase();
-    if (tag === 'br') return '\n';
-    if (tag === 'script' || tag === 'style') return '';
-
-    const children = n.childNodes ? Array.from(n.childNodes) : [];
-    return children.map((child: any) => walk(child)).join('');
-  }
-
-  return walk(node).replace(/\r\n?/g, '\n');
-}
-
-function extractPreCodeText(preEl: any): any {
-  if (!preEl) return '';
-
-  const codeEl = preEl.querySelector ? preEl.querySelector('code') : null;
-  if (codeEl) {
-    return String(codeEl.textContent || '')
-      .replace(/\r\n?/g, '\n')
-      .replace(/\n+$/g, '');
-  }
-
-  const cmContent = preEl.querySelector
-    ? preEl.querySelector('#code-block-viewer .cm-content, #code-block-viewer .cm-line, .cm-content')
-    : null;
-  if (cmContent) {
-    const text = extractTextWithBreaks(cmContent);
-    return String(text || '').replace(/\n+$/g, '');
-  }
-
-  return String(preEl.textContent || '')
+function extractPreCodeText(block: any): string {
+  const code = block?.querySelector?.('code');
+  return String(code?.textContent ?? block?.textContent ?? '')
     .replace(/\r\n?/g, '\n')
     .replace(/\n+$/g, '');
 }
 
-function detectCodeLanguage(preEl: any): any {
-  if (!preEl || !preEl.querySelectorAll) return '';
-
-  const codeEl = preEl.querySelector('code');
-  const byCodeClass = pickCodeLanguageFromClass(codeEl && codeEl.getAttribute ? codeEl.getAttribute('class') : '');
+function detectCodeLanguage(block: any): string {
+  const code = block?.querySelector?.('code');
+  const byCodeClass = pickCodeLanguageFromClass(code?.getAttribute?.('class'));
   if (byCodeClass) return byCodeClass;
 
-  const nodes: any[] = (
-    Array.from(preEl.querySelectorAll('[data-language],[data-code-language],[class]')) as any[]
-  ).slice(0, 16);
-  for (const node of nodes) {
-    if (!node || !node.getAttribute) continue;
-    const langData = normalizeCodeLanguage(
-      node.getAttribute('data-language') || node.getAttribute('data-code-language'),
-    );
-    if (langData) return langData;
-
-    const className = String(node.getAttribute('class') || '');
-    const m = className.match(/\blanguage-([a-z0-9_+.-]+)\b/i);
-    if (m && m[1]) {
-      const byClass = normalizeCodeLanguage(m[1]);
-      if (byClass) return byClass;
-    }
+  const header = block?.querySelector?.("[data-markdown-copy='exclude']");
+  if (!header) return '';
+  const leaves = Array.from(header.querySelectorAll('*')).filter(
+    (node: any) =>
+      !node.children?.length && String(node.tagName || '').toLowerCase() !== 'button' && !node.closest?.('button'),
+  ) as any[];
+  for (const leaf of leaves) {
+    const language = normalizeCodeLanguage(leaf.textContent);
+    if (language) return language;
   }
-
-  const labels: any[] = (Array.from(preEl.querySelectorAll('span,div')) as any[]).slice(0, 16);
-  for (const label of labels) {
-    const text = normalizeCodeLanguage(label && label.textContent ? label.textContent : '');
-    if (text) return text;
-  }
-  return '';
+  return normalizeCodeLanguage(header.textContent);
 }
 
 function escapeTableCell(text: any): any {
   return String(text || '').replace(/\|/g, '\\|');
 }
 
-export function isGoogleFaviconUrl(src: unknown): boolean {
+function isGoogleFaviconUrl(src: unknown): boolean {
   const value = String(src || '').trim();
   return (
     /^https:\/\/www\.google\.com\/s2\/favicons(?:[?#]|$)/i.test(value) ||
@@ -281,12 +229,6 @@ function getAssistantContentRoot(wrapper: any): any {
     '[data-chatgpt-selection-message-id]',
     "[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']",
     "[data-markdown-text-style='assistant-message']",
-    "[data-message-author-role='assistant'] .markdown.prose",
-    "[data-message-author-role='assistant'] .markdown",
-    '.text-message .markdown.prose',
-    '.text-message .markdown',
-    '.markdown.prose',
-    '.markdown',
   ];
   if (wrapper.querySelector) {
     for (const selector of selectors) {
@@ -294,8 +236,6 @@ function getAssistantContentRoot(wrapper: any): any {
       if (node) return node;
     }
   }
-  if (wrapper.classList && (wrapper.classList.contains('markdown') || wrapper.classList.contains('prose')))
-    return wrapper;
   return wrapper;
 }
 
