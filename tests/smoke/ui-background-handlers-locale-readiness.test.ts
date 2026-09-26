@@ -5,7 +5,12 @@ vi.mock('../../src/platform/webext/tabs', () => ({
   tabsSendMessage: vi.fn(),
 }));
 
+vi.mock('../../src/platform/webext/scripting', () => ({
+  scriptingExecuteScript: vi.fn(),
+}));
+
 import { UI_MESSAGE_TYPES } from '../../src/platform/messaging/message-contracts';
+import { scriptingExecuteScript } from '../../src/platform/webext/scripting';
 import { tabsQuery, tabsSendMessage } from '../../src/platform/webext/tabs';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
 
@@ -64,6 +69,67 @@ describe('UI background handler locale readiness', () => {
     expect(tabsQuery).toHaveBeenCalledTimes(1);
     expect(tabsSendMessage).toHaveBeenCalledTimes(1);
     expect(ensureLocaleReady).not.toHaveBeenCalled();
+  });
+
+  it('reinjects the current content bundle once when an updated extension has no receiver', async () => {
+    const locale = deferred<void>();
+    const ensureLocaleReady = vi.fn(() => locale.promise);
+    const { router, handlers } = createRouter();
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://chatgpt.com/c/example' }] as any);
+    vi.mocked(tabsSendMessage)
+      .mockRejectedValueOnce(new Error('Could not establish connection. Receiving end does not exist.'))
+      .mockResolvedValueOnce({ ok: true, data: { readiness: 'ready', kind: 'chat' }, error: null } as any);
+    vi.mocked(scriptingExecuteScript).mockResolvedValue([]);
+
+    registerUiMessageHandlers(router, { ensureLocaleReady });
+
+    await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toEqual({
+      ok: true,
+      data: { readiness: 'ready', kind: 'chat' },
+      error: null,
+    });
+    expect(scriptingExecuteScript).toHaveBeenCalledTimes(1);
+    expect(scriptingExecuteScript).toHaveBeenCalledWith({
+      target: { tabId: 7 },
+      files: ['content-scripts/content.js'],
+    });
+    expect(tabsSendMessage).toHaveBeenCalledTimes(2);
+    expect(ensureLocaleReady).not.toHaveBeenCalled();
+  });
+
+  it('uses the same reinjection recovery for the in-page comments command', async () => {
+    const ensureLocaleReady = vi.fn(async () => undefined);
+    const { router, handlers } = createRouter();
+    vi.mocked(tabsSendMessage)
+      .mockRejectedValueOnce(new Error('No matching message handler'))
+      .mockResolvedValueOnce({ ok: true });
+    vi.mocked(scriptingExecuteScript).mockResolvedValue([]);
+
+    registerUiMessageHandlers(router, { ensureLocaleReady });
+
+    await expect(
+      handlers.get(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL)?.({ tabId: 9 }, null),
+    ).resolves.toEqual({ ok: true, data: { opened: true }, error: null });
+    expect(scriptingExecuteScript).toHaveBeenCalledWith({
+      target: { tabId: 9 },
+      files: ['content-scripts/content.js'],
+    });
+    expect(tabsSendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reinject for ordinary content-owned or transport failures', async () => {
+    const ensureLocaleReady = vi.fn(async () => undefined);
+    const { router, handlers } = createRouter();
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
+    vi.mocked(tabsSendMessage).mockRejectedValue(new Error('message port closed unexpectedly'));
+
+    registerUiMessageHandlers(router, { ensureLocaleReady });
+
+    await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toMatchObject({
+      ok: false,
+      error: { extra: { code: 'CAPTURE_UNAVAILABLE' } },
+    });
+    expect(scriptingExecuteScript).not.toHaveBeenCalled();
   });
 
   it('passes through a content-owned capture error without loading background locale', async () => {
