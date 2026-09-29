@@ -11,6 +11,7 @@ type SourceLabelMapItem = {
 
 const SOURCE_LABEL_MAP: Record<string, SourceLabelMapItem> = {
   chatgpt: { key: 'chatgpt', i18nKey: 'sourceChatgpt' },
+  claude: { key: 'claude', i18nKey: 'sourceClaude' },
   deepseek: { key: 'deepseek', i18nKey: 'sourceDeepseek' },
   notionai: { key: 'notionai', i18nKey: 'sourceNotionai' },
   gemini: { key: 'gemini', i18nKey: 'sourceGemini' },

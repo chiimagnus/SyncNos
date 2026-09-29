@@ -67,4 +67,13 @@ describe('resolveConversationListTag', () => {
 
     expect(result).toEqual({ sourceKey: 'chatgpt', label: 'sourceChatgpt' });
   });
+
+  it('maps Claude to its canonical source label', () => {
+    const result = resolveConversationListTag({
+      conversation: { source: 'claude' },
+      translate: tr,
+    });
+
+    expect(result).toEqual({ sourceKey: 'claude', label: 'sourceClaude' });
+  });
 });

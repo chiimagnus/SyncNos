@@ -51,9 +51,9 @@ Alongside the popup and in-page entry points, SyncNos provides browser-native sh
 
 ### AI conversations
 
-Supported: ChatGPT, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai.
+Supported: ChatGPT, Claude, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai.
 
-ChatGPT and Google AI Studio require manual capture because their virtualized conversation lists cannot be treated as complete automatically. Other supported AI chat collectors can auto-save when AI auto-save is enabled.
+ChatGPT, Claude, and Google AI Studio require manual capture because their virtualized conversation lists cannot be treated as complete automatically. Other supported AI chat collectors can auto-save when AI auto-save is enabled.
 
 ChatGPT uses DOM capture by default and also offers an optional Advanced API path for manual current-conversation capture. See [Capture content](https://chiimagnus.github.io/SyncNos/docs/en/capture/) for behavior and limitations.
 

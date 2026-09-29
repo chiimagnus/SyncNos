@@ -24,6 +24,7 @@ type StartContentBootstrapInput = {
 };
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
+  'claude.ai',
   'gemini.google.com',
   'aistudio.google.com',
   'makersuite.google.com',

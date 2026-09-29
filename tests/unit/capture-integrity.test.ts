@@ -19,7 +19,7 @@ function snapshot(overrides: Record<string, unknown> = {}) {
 
 describe('capture integrity contract', () => {
   it('keeps virtualized providers manual-only from one source', () => {
-    expect(Array.from(VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio']);
+    expect(Array.from(VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS)).toEqual(['chatgpt', 'claude', 'googleaistudio']);
 
     const supportedIds = new Set(SUPPORTED_AI_CHAT_SITES.map((site) => site.id));
     for (const id of VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS) {
