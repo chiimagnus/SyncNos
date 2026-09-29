@@ -323,14 +323,15 @@ export const en = {
   chatsAria: 'Chats',
 
   // usePopupCurrentPageCapture
-  checkingCurrentPage: 'Checking current page...',
   unavailable: 'Unavailable',
   fetchArticle: 'Fetch Article',
   fetchAiChat: 'Fetch AI Chat',
   fetchVideoTranscript: 'Save Video',
-  savingDots: 'Saving...',
-  loadingFullHistory: 'Loading full history...',
   captureFailedFallback: 'Capture failed',
+  chatgptApiCaptureTemporarilyUnavailable: 'ChatGPT Advanced capture is temporarily unavailable. Please try again shortly.',
+  chatgptApiCaptureRateLimited: 'ChatGPT is receiving too many requests. Please try again later.',
+  chatgptApiCaptureSessionExpired: 'Your ChatGPT sign-in may have expired. Refresh ChatGPT and try again.',
+  chatgptApiCaptureNavigationChanged: 'The page changed while capturing. Save the current conversation again.',
   fetchingDots: 'Fetching...',
   checkingDots: 'Checking...',
   savedPrefix: 'Saved: ',

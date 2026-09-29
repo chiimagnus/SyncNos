@@ -320,14 +320,15 @@ export const zh: { [K in TranslationKey]: string } = {
   chatsAria: '对话',
 
   // usePopupCurrentPageCapture
-  checkingCurrentPage: '正在检测当前页面...',
   unavailable: '不支持',
   fetchArticle: '抓取文章',
   fetchAiChat: '抓取 AI 对话',
   fetchVideoTranscript: '保存视频',
-  savingDots: '保存中...',
-  loadingFullHistory: '正在加载完整历史...',
   captureFailedFallback: '获取失败',
+  chatgptApiCaptureTemporarilyUnavailable: 'ChatGPT 高级采集暂时不可用，请稍后重试。',
+  chatgptApiCaptureRateLimited: 'ChatGPT 请求过于频繁，请稍后重试。',
+  chatgptApiCaptureSessionExpired: 'ChatGPT 登录状态可能已失效，请刷新 ChatGPT 页面后重试。',
+  chatgptApiCaptureNavigationChanged: '页面已切换，请重新保存当前对话。',
   fetchingDots: '获取中...',
   checkingDots: '检测中...',
   savedPrefix: '已保存：',

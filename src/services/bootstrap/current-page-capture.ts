@@ -68,6 +68,32 @@ function errorMessage(error: unknown, fallback: string): string {
   return normalized || fallback || t('captureFailedFallback');
 }
 
+function userFacingCaptureError(error: unknown): Error {
+  const raw = error as { code?: unknown; status?: unknown; message?: unknown };
+  const code = String(raw?.code || raw?.message || '').trim();
+  if (!code.startsWith('chatgpt_api_')) {
+    return error instanceof Error ? error : new Error(errorMessage(error, t('captureFailedFallback')));
+  }
+
+  const status = Number(raw?.status || 0);
+  const sessionUnavailable =
+    code === 'chatgpt_api_session_schema' ||
+    (code.startsWith('chatgpt_api_session_') && (status === 401 || status === 403)) ||
+    (code === 'chatgpt_api_mapping_http' && status === 401);
+  const message =
+    code === 'chatgpt_api_navigation_changed'
+      ? t('chatgptApiCaptureNavigationChanged')
+      : status === 429
+        ? t('chatgptApiCaptureRateLimited')
+        : sessionUnavailable
+          ? t('chatgptApiCaptureSessionExpired')
+          : t('chatgptApiCaptureTemporarilyUnavailable');
+  return Object.assign(new Error(message), {
+    code,
+    ...(Number.isFinite(status) && status > 0 ? { status } : null),
+  });
+}
+
 function normalizeArticleCaptureErrorMessage(raw: unknown): string {
   const message = String(raw || '').trim();
   if (!message) return '';
@@ -383,10 +409,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
-      const message = errorMessage(error, t('captureFailedFallback'));
+      const outwardError = userFacingCaptureError(error);
+      const message = errorMessage(outwardError, t('captureFailedFallback'));
       setCaptureActivity('settled', 'error', message);
       report(message, 'error');
-      throw error;
+      throw outwardError;
     }
   }
 

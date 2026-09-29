@@ -416,7 +416,10 @@ describe('current page capture integrity routing', () => {
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureNavigationChanged'),
+      code: 'chatgpt_api_navigation_changed',
+    });
     expect(harness.calls).toEqual([]);
   });
 
@@ -439,7 +442,9 @@ describe('current page capture integrity routing', () => {
 
   it('does not silently run DOM capture when enabled durable API capture fails', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    chatgptApiMocks.capture.mockRejectedValue(new Error('chatgpt_api_mapping_http'));
+    chatgptApiMocks.capture.mockRejectedValue(
+      Object.assign(new Error('chatgpt_api_mapping_http'), { code: 'chatgpt_api_mapping_http', status: 503 }),
+    );
     const prepare = vi.fn();
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -448,10 +453,50 @@ describe('current page capture integrity routing', () => {
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_mapping_http');
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureTemporarilyUnavailable'),
+      code: 'chatgpt_api_mapping_http',
+      status: 503,
+    });
     expect(prepare).not.toHaveBeenCalled();
     expect(harness.capture).not.toHaveBeenCalled();
     expect(harness.calls).toEqual([]);
+  });
+
+  it('maps ChatGPT API rate limits to a user-facing retry-later message', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockRejectedValue(
+      Object.assign(new Error('chatgpt_api_mapping_http'), { code: 'chatgpt_api_mapping_http', status: 429 }),
+    );
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: chatSnapshot(),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureRateLimited'),
+      code: 'chatgpt_api_mapping_http',
+      status: 429,
+    });
+  });
+
+  it('maps ChatGPT API session auth failures to a user-facing sign-in message', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockRejectedValue(
+      Object.assign(new Error('chatgpt_api_session_http'), { code: 'chatgpt_api_session_http', status: 401 }),
+    );
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: chatSnapshot(),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureSessionExpired'),
+      code: 'chatgpt_api_session_http',
+      status: 401,
+    });
   });
 
   it('does not silently run DOM capture when the Advanced setting cannot be read', async () => {
@@ -485,7 +530,10 @@ describe('current page capture integrity routing', () => {
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureNavigationChanged'),
+      code: 'chatgpt_api_navigation_changed',
+    });
     expect(harness.calls).toEqual([]);
   });
 
