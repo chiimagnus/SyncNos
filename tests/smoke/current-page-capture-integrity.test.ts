@@ -706,14 +706,18 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
   });
 
-  it.each(['chatgpt', 'googleaistudio'])(
+  it.each(['chatgpt', 'claude', 'googleaistudio'])(
     'passes the exact prepared object to one capture call for %s',
     async (collectorId) => {
       const preparedCapture = { token: Symbol('prepared') };
       const prepare = vi.fn(() => preparedCapture);
       const snapshot = chatSnapshot({ source: collectorId });
       snapshot.conversation.url =
-        collectorId === 'chatgpt' ? 'https://chatgpt.com/c/1' : 'https://aistudio.google.com/app/1';
+        collectorId === 'chatgpt'
+          ? 'https://chatgpt.com/c/1'
+          : collectorId === 'claude'
+            ? 'https://claude.ai/chat/1'
+            : 'https://aistudio.google.com/app/1';
       const harness = createHarness({ collectorId, snapshot, prepare });
 
       await harness.service.captureCurrentPage();

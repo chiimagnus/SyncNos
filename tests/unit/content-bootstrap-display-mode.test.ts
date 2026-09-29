@@ -92,11 +92,13 @@ describe('content bootstrap display mode', () => {
     expect(off.wrapper.start).not.toHaveBeenCalled();
     off.bootstrap.stop();
 
-    displayMocks.read.mockResolvedValueOnce('supported');
-    const supported = harness('chatgpt.com');
-    await flush();
-    expect(supported.wrapper.start).toHaveBeenCalledTimes(1);
-    supported.bootstrap.stop();
+    for (const supportedHost of ['chatgpt.com', 'claude.ai', 'www.claude.ai']) {
+      displayMocks.read.mockResolvedValueOnce('supported');
+      const supported = harness(supportedHost);
+      await flush();
+      expect(supported.wrapper.start).toHaveBeenCalledTimes(1);
+      supported.bootstrap.stop();
+    }
 
     for (const redirectedAlias of ['www.chatgpt.com', 'foo.chatgpt.com', 'chat.openai.com']) {
       displayMocks.read.mockResolvedValueOnce('supported');

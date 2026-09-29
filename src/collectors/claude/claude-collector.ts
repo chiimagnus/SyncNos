@@ -21,8 +21,7 @@ import {
 } from '@collectors/virtualized-chat/virtualized-chat-sweep.ts';
 
 const TRANSCRIPT_ROW_SELECTOR = "[data-testid='transcript-row']";
-const TRANSCRIPT_FEED_SELECTOR =
-  "[role='feed'][data-perf-region='transcript'], [role='feed'][aria-label='Chat messages']";
+const TRANSCRIPT_FEED_SELECTOR = "[role='feed'][data-perf-region='transcript']";
 
 type ClaudeRole = 'user' | 'assistant';
 
@@ -66,15 +65,11 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function getConversationRoot(): Element | null {
-    return (
-      env.document.querySelector(TRANSCRIPT_FEED_SELECTOR) ||
-      env.document.querySelector("[data-testid='transcript-list']") ||
-      env.document.querySelector('main')
-    );
+    return env.document.querySelector(TRANSCRIPT_FEED_SELECTOR);
   }
 
   function getConversationScrollSeed(): Element | null {
-    return env.document.querySelector(TRANSCRIPT_FEED_SELECTOR) || getConversationRoot();
+    return getConversationRoot();
   }
 
   function isEditingConversation(root: Element | null): boolean {
@@ -99,10 +94,8 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const perfRole = String(row.getAttribute('data-perf-row') || '')
       .trim()
       .toLowerCase();
-    if (perfRole === 'human' || perfRole === 'user') return 'user';
+    if (perfRole === 'human') return 'user';
     if (perfRole === 'assistant') return 'assistant';
-    if (row.querySelector("[data-testid='user-message']")) return 'user';
-    if (row.querySelector("[data-testid='assistant-message'], .font-claude-response")) return 'assistant';
     return null;
   }
 
@@ -113,10 +106,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
 
   function rowPosition(row: Element): number {
     const article = row.querySelector("[role='article']");
-    const ariaPosition = positiveInteger(article?.getAttribute('aria-posinset'));
-    if (ariaPosition) return ariaPosition;
-    const zeroBased = Number.parseInt(String(row.getAttribute('data-index') || ''), 10);
-    return Number.isSafeInteger(zeroBased) && zeroBased >= 0 ? zeroBased + 1 : 0;
+    return positiveInteger(article?.getAttribute('aria-posinset'));
   }
 
   function rowTotal(row: Element): number {
@@ -139,30 +129,24 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     return rowStreaming === 'true' || messageStreaming === 'true';
   }
 
-  function lastElement(nodes: Iterable<Element>): Element | null {
-    const values = Array.from(nodes);
-    return values.length ? values[values.length - 1] : null;
-  }
-
-  function assistantFinalContentNode(row: Element): Element | null {
-    const assistant =
-      row.querySelector("[data-testid='assistant-message']") || row.querySelector('.font-claude-response');
+  function assistantContentNode(row: Element): Element | null {
+    const assistant = row.querySelector("[data-testid='assistant-message']");
     if (!assistant) return null;
 
-    // Claude currently renders transient tool/reasoning status before the formal answer.
-    // The last data-perf-reply-text block is the user-visible final response.
-    const explicitReplies = assistant.querySelectorAll('[data-perf-reply-text]');
-    if (explicitReplies.length) return lastElement(explicitReplies);
+    // Claude renders user-visible prose as one or more reply-text blocks; tool/thinking state lives
+    // in separate TurnStatus nodes. Capture the prose blocks in order and fail closed otherwise.
+    const replies = Array.from(assistant.querySelectorAll('[data-perf-reply-text]'));
+    if (!replies.length) return null;
+    if (replies.length === 1) return replies[0] || null;
 
-    // Conservative fallback for nearby DOM variants: prefer the last rendered markdown block,
-    // not the whole assistant container, so process/status text does not leak into the capture.
-    const renderedMarkdown = assistant.querySelectorAll('.standard-markdown, .progressive-markdown');
-    return lastElement(renderedMarkdown);
+    const combined = env.document.createElement('div');
+    for (const reply of replies) combined.appendChild(reply.cloneNode(true));
+    return combined;
   }
 
   function contentNodeForRow(row: Element, role: ClaudeRole): Element | null {
     if (role === 'user') return row.querySelector("[data-testid='user-message']");
-    return assistantFinalContentNode(row);
+    return assistantContentNode(row);
   }
 
   function imageUrlsForRow(row: Element, role: ClaudeRole, content: Element | null): string[] {
@@ -177,10 +161,8 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const fingerprints: string[] = [];
 
     for (const tile of tiles) {
-      fingerprints.push(String((tile as any).innerHTML || ''));
-
-      const quoteNode =
-        tile.getAttribute('data-cds') === 'MessageAttachmentsQuote' ? tile.querySelector('blockquote') || tile : null;
+      const kind = String(tile.getAttribute('data-cds') || '');
+      const quoteNode = kind === 'MessageAttachmentsQuote' ? tile.querySelector('blockquote') || tile : null;
       const source = quoteNode || tile;
       const clone = source.cloneNode(true) as Element;
       for (const hidden of Array.from(clone.querySelectorAll('.sr-only, svg, button, [aria-hidden="true"]'))) {
@@ -189,6 +171,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
       const text = env.normalize.normalizeText(String(clone.textContent || '')).trim();
       if (!text || textParts.includes(text)) continue;
 
+      fingerprints.push(`${kind}\u001e${text}`);
       textParts.push(text);
       markdownParts.push(
         quoteNode
@@ -241,9 +224,9 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const streaming = role === 'assistant' && isAssistantStreaming(row);
     const imageUrls = imageUrlsForRow(row, role, content);
     const attachment = role === 'user' ? userAttachmentContent(row) : { text: '', markdown: '', fingerprint: '' };
-    const rawText = content ? String((content as any).innerText || content.textContent || '') : '';
-    const rawHtml = content ? String((content as any).innerHTML || '') : '';
-    const rendered = !streaming && (!!rawText.trim() || !!attachment.text || imageUrls.length > 0);
+    const semanticText = normalizedNodeText(content);
+    const semanticMarkdown = markdownFromNode(content, semanticText);
+    const rendered = !streaming && (!!semanticText || !!semanticMarkdown || !!attachment.text || imageUrls.length > 0);
 
     return {
       key,
@@ -253,7 +236,15 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
       position,
       total,
       fingerprint: compactFingerprint(
-        [key, role, String(streaming), rawText, rawHtml, attachment.fingerprint, imageUrls.join('|')].join('\u001f'),
+        [
+          key,
+          role,
+          String(streaming),
+          semanticText,
+          semanticMarkdown,
+          attachment.fingerprint,
+          imageUrls.join('|'),
+        ].join('\u001f'),
       ),
       rendered,
       streaming,
@@ -319,7 +310,6 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
   function snapshotMessage(row: Element, descriptor: ClaudeDescriptor): any | null {
     if (!descriptor.rendered || descriptor.streaming) return null;
     const content = contentNodeForRow(row, descriptor.role);
-    if (!content) return null;
     const baseText = normalizedNodeText(content);
     const attachment =
       descriptor.role === 'user' ? userAttachmentContent(row) : { text: '', markdown: '', fingerprint: '' };
@@ -552,12 +542,8 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     getRoot: getConversationRoot,
     prepareManualCapture,
     __test: {
-      sampleIdentityGuard,
       readCurrentDescriptors,
       readBoundaryState,
-      assistantFinalContentNode,
-      userAttachmentContent,
-      extractConversationTitle,
     },
   };
 

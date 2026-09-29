@@ -20,8 +20,8 @@ function setupClaudeDom(input?: { streaming?: boolean; title?: string }) {
     '<img src="https://img.test/user.png" />',
     '<div data-cds="MessageAttachments">',
     '<div data-testid="file-thumbnail" data-cds="MessageAttachmentsQuote">',
-    '<span class="sr-only">Preview file</span>',
-    '<blockquote>Quoted attachment context</blockquote>',
+    '<span class="sr-only" aria-describedby="_r_quote_">Preview file</span>',
+    '<blockquote id="_r_quote_">Quoted attachment context</blockquote>',
     '</div>',
     '<div data-testid="file-thumbnail" data-cds="MessageAttachmentsFile">',
     '<span class="sr-only">Open file</span>',
@@ -38,6 +38,7 @@ function setupClaudeDom(input?: { streaming?: boolean; title?: string }) {
     '<div data-testid="assistant-message" data-is-streaming="' + String(streaming) + '">',
     '<div class="font-claude-response">',
     '<div class="standard-markdown" data-perf-reply-text><p>I will inspect the page first.</p></div>',
+    '<div data-testid="TurnStatus" data-cds="TurnStatus"><span>Used Notion integration</span></div>',
     '<div class="standard-markdown" data-perf-reply-text>',
     '<h2>Final answer</h2>',
     '<p>This is the captured response.</p>',
@@ -65,26 +66,23 @@ function setupClaudeDom(input?: { streaming?: boolean; title?: string }) {
   return { dom, def: createClaudeCollectorDef(env) as any };
 }
 
-function preparedFromCurrentDom(def: any) {
-  return {
-    kind: 'syncnos.virtualized-chat.prepared.v1',
-    source: 'claude',
-    conversationKey: 'chat_conv-1',
-    identityVerified: true,
-    identityGuard: def.collector.__test.sampleIdentityGuard(),
-    records: [],
-    reasons: ['top_not_reached'],
-    completeness: 'partial',
-    metrics: { samples: 0, messages: 0 },
-  };
+async function prepareStaticCapture(def: any) {
+  return def.collector.prepareManualCapture({
+    totalDeadlineMs: 1_000,
+    maxSteps: 4,
+    stableSamples: 1,
+    pollMs: 0,
+    stepTimeoutMs: 100,
+    boundaryTimeoutMs: 100,
+  });
 }
 
 describe('claude-collector', () => {
-  it('captures stable ordered messages and excludes transient assistant status text', async () => {
+  it('captures all visible assistant prose while excluding separate status nodes', async () => {
     const { def } = setupClaudeDom();
     const snapshot = await def.collector.capture({
       manual: true,
-      preparedCapture: preparedFromCurrentDom(def),
+      preparedCapture: await prepareStaticCapture(def),
     });
 
     expect(snapshot).toBeTruthy();
@@ -115,8 +113,10 @@ describe('claude-collector', () => {
     expect(user.contentMarkdown).toContain('![](https://img.test/user.png)');
 
     const assistant = snapshot.messages[1];
+    expect(assistant.contentText).toContain('I will inspect the page first.');
     expect(assistant.contentText).toContain('Final answer');
-    expect(assistant.contentText).not.toContain('inspect the page first');
+    expect(assistant.contentText).not.toContain('Used Notion integration');
+    expect(assistant.contentMarkdown).toContain('I will inspect the page first.');
     expect(assistant.contentMarkdown).toContain('## Final answer');
     expect(assistant.contentMarkdown).toContain('const value = 1;');
     expect(assistant.contentMarkdown).toContain('![](https://img.test/assistant.png)');
@@ -147,14 +147,7 @@ describe('claude-collector', () => {
 
   it('prepares a complete static transcript and restores the manual capture contract', async () => {
     const { def } = setupClaudeDom();
-    const prepared = await def.collector.prepareManualCapture({
-      totalDeadlineMs: 1_000,
-      maxSteps: 4,
-      stableSamples: 1,
-      pollMs: 0,
-      stepTimeoutMs: 100,
-      boundaryTimeoutMs: 100,
-    });
+    const prepared = await prepareStaticCapture(def);
 
     expect(prepared).toMatchObject({
       source: 'claude',
@@ -165,11 +158,37 @@ describe('claude-collector', () => {
     expect(prepared.records.map((record: any) => record.key)).toEqual(['claude:1:user', 'claude:2:assistant']);
   });
 
+  it('captures attachment-only user rows without requiring a text content node', async () => {
+    const { dom, def } = setupClaudeDom();
+    dom.window.document.querySelector("[data-testid='user-message']")?.remove();
+
+    const snapshot = await def.collector.capture({
+      manual: true,
+      preparedCapture: await prepareStaticCapture(def),
+    });
+    const user = snapshot.messages.find((message: any) => message.role === 'user');
+
+    expect(user.contentText).toContain('Quoted attachment context');
+    expect(user.contentText).toContain('notes.pdf');
+    expect(user.contentMarkdown).toContain('![](https://img.test/user.png)');
+  });
+
+  it('keeps semantic fingerprints stable when transient attachment DOM ids change', () => {
+    const { dom, def } = setupClaudeDom();
+    const before = def.collector.__test.readCurrentDescriptors().find((item: any) => item.role === 'user').fingerprint;
+    const quote = dom.window.document.querySelector("[data-cds='MessageAttachmentsQuote']");
+    quote?.querySelector('blockquote')?.setAttribute('id', '_r_quote_changed_');
+    quote?.querySelector('[aria-describedby]')?.setAttribute('aria-describedby', '_r_quote_changed_');
+    const after = def.collector.__test.readCurrentDescriptors().find((item: any) => item.role === 'user').fingerprint;
+
+    expect(after).toBe(before);
+  });
+
   it('is manual-only and rejects prepared data after navigating to another Claude conversation', async () => {
     const { dom, def } = setupClaudeDom();
     expect(await def.collector.capture()).toBeNull();
 
-    const prepared = preparedFromCurrentDom(def);
+    const prepared = await prepareStaticCapture(def);
     dom.window.history.pushState({}, '', '/chat/conv-2');
 
     expect(await def.collector.capture({ manual: true, preparedCapture: prepared })).toBeNull();
