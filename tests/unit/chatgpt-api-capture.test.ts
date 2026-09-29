@@ -1528,6 +1528,71 @@ describe('ChatGPT API transport', () => {
     ).rejects.toMatchObject({ code: 'chatgpt_api_navigation_changed' });
   });
 
+  it('retries one transient mapping HTTP failure before succeeding', async () => {
+    const mapping = mappingFrom([
+      message({ id: 'user-1', role: 'user', parts: ['question'] }),
+      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
+    ]);
+    let mappingAttempts = 0;
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/auth/session')) {
+        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
+      }
+      mappingAttempts += 1;
+      if (mappingAttempts === 1) return new Response('', { status: 503 });
+      return new Response(JSON.stringify(mapping), { status: 200 });
+    }) as typeof fetch;
+
+    await expect(
+      captureCurrentChatgptConversationViaApi({
+        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
+        fetchFn,
+      }),
+    ).resolves.toHaveProperty('snapshot');
+    expect(mappingAttempts).toBe(2);
+  });
+
+  it('does not retry a rate-limited mapping request', async () => {
+    let mappingAttempts = 0;
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/auth/session')) {
+        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
+      }
+      mappingAttempts += 1;
+      return new Response('', { status: 429 });
+    }) as typeof fetch;
+
+    await expect(
+      captureCurrentChatgptConversationViaApi({
+        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
+        fetchFn,
+      }),
+    ).rejects.toMatchObject({ code: 'chatgpt_api_mapping_http', status: 429 });
+    expect(mappingAttempts).toBe(1);
+  });
+
+  it('does not retry a non-transient mapping HTTP failure', async () => {
+    let mappingAttempts = 0;
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/auth/session')) {
+        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
+      }
+      mappingAttempts += 1;
+      return new Response('', { status: 403 });
+    }) as typeof fetch;
+
+    await expect(
+      captureCurrentChatgptConversationViaApi({
+        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
+        fetchFn,
+      }),
+    ).rejects.toMatchObject({ code: 'chatgpt_api_mapping_http', status: 403 });
+    expect(mappingAttempts).toBe(1);
+  });
+
   it('uses safe error codes without embedding response bodies', async () => {
     const fetchFn = vi.fn(async () => new Response('PRIVATE_RESPONSE_SENTINEL', { status: 401 })) as typeof fetch;
     await expect(

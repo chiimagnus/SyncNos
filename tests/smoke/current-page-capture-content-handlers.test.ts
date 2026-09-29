@@ -143,7 +143,7 @@ describe('current-page-capture content handlers', () => {
       },
     };
 
-    const getCurrentPageCaptureState = vi.fn(async () => ({ readiness: 'ready' }));
+    const getCurrentPageCaptureState = vi.fn(async () => ({ kind: 'chat' }));
     const captureCurrentPage = vi.fn(async () => ({ title: 'Hello' }));
 
     registerCurrentPageCaptureContentHandlers(
@@ -169,7 +169,7 @@ describe('current-page-capture content handlers', () => {
     await waitFor(() => stateResponse?.ok === true);
     expect(getCurrentPageCaptureState).toHaveBeenCalledTimes(1);
     expect(stateResponse?.ok).toBe(true);
-    expect(stateResponse?.data).toEqual({ readiness: 'ready' });
+    expect(stateResponse?.data).toEqual({ kind: 'chat' });
   });
 
   it('continues current-page work after locale readiness rejects', async () => {

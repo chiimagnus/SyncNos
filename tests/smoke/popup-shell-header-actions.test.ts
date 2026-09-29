@@ -252,7 +252,7 @@ describe('PopupShell header actions', () => {
       buttonDisabled: false,
       buttonLabel: 'Fetch AI Chat',
       capture: vi.fn(),
-      captureState: { readiness: 'ready', kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
+      captureState: { kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
       checking: false,
       status: null,
     });
@@ -495,7 +495,7 @@ describe('PopupShell header actions', () => {
       buttonDisabled: false,
       buttonLabel: 'Fetch Article',
       capture: vi.fn(),
-      captureState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
+      captureState: { kind: 'article', label: 'Fetch Article', collectorId: 'web' },
       checking: false,
       status: null,
     });
@@ -545,7 +545,7 @@ describe('PopupShell header actions', () => {
       buttonDisabled: false,
       buttonLabel: 'Fetch Article',
       capture: vi.fn(),
-      captureState: { readiness: 'ready', kind: 'article', label: 'Fetch Article', collectorId: 'web' },
+      captureState: { kind: 'article', label: 'Fetch Article', collectorId: 'web' },
       checking: false,
       status: null,
     });

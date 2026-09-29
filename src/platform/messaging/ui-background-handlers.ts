@@ -133,7 +133,6 @@ function isHttpUrl(raw: unknown) {
 
 function unsupportedState(reason: string) {
   return {
-    readiness: 'unsupported',
     kind: 'unsupported',
     label: t('unavailable'),
     collectorId: null,

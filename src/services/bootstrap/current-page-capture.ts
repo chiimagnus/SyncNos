@@ -11,10 +11,6 @@ import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
-import {
-  buildCaptureWaitingMessage,
-  buildPartialCaptureMessage,
-} from '@services/bootstrap/current-page-capture-status';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -33,13 +29,12 @@ type CurrentPageCaptureProgress = {
 
 type CurrentPageCaptureActivity = {
   phase: 'capturing' | 'settled';
-  kind: 'info' | 'success' | 'warning' | 'error';
+  kind: 'info' | 'success' | 'error';
   message: string;
   expiresAt: number | null;
 };
 
 export type CurrentPageCaptureState = {
-  readiness: 'ready' | 'waiting' | 'unsupported';
   kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;
@@ -71,6 +66,32 @@ function errorMessage(error: unknown, fallback: string): string {
   const message = maybeError?.message ?? error;
   const normalized = String(message || fallback || t('captureFailedFallback')).trim();
   return normalized || fallback || t('captureFailedFallback');
+}
+
+function userFacingCaptureError(error: unknown): Error {
+  const raw = error as { code?: unknown; status?: unknown; message?: unknown };
+  const code = String(raw?.code || raw?.message || '').trim();
+  if (!code.startsWith('chatgpt_api_')) {
+    return error instanceof Error ? error : new Error(errorMessage(error, t('captureFailedFallback')));
+  }
+
+  const status = Number(raw?.status || 0);
+  const sessionUnavailable =
+    code === 'chatgpt_api_session_schema' ||
+    (code.startsWith('chatgpt_api_session_') && (status === 401 || status === 403)) ||
+    (code === 'chatgpt_api_mapping_http' && status === 401);
+  const message =
+    code === 'chatgpt_api_navigation_changed'
+      ? t('chatgptApiCaptureNavigationChanged')
+      : status === 429
+        ? t('chatgptApiCaptureRateLimited')
+        : sessionUnavailable
+          ? t('chatgptApiCaptureSessionExpired')
+          : t('chatgptApiCaptureTemporarilyUnavailable');
+  return Object.assign(new Error(message), {
+    code,
+    ...(Number.isFinite(status) && status > 0 ? { status } : null),
+  });
 }
 
 function normalizeArticleCaptureErrorMessage(raw: unknown): string {
@@ -169,7 +190,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   async function resolveCaptureTarget() {
     if (detectSupportedVideoPagePlatform(globalThis.location?.href || '')) {
       return {
-        readiness: 'ready' as const,
         kind: 'video' as const,
         label: t('fetchVideoTranscript'),
         collectorId: 'video' as const,
@@ -180,7 +200,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const collector = resolveActiveOrInpageCollector(collectorsRegistry);
     if (!collector) {
       return {
-        readiness: 'unsupported' as const,
         kind: 'unsupported' as const,
         label: t('unavailable'),
         collectorId: null,
@@ -193,13 +212,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       collector.id === 'chatgpt' &&
       (await readChatgptApiCaptureEnabled()) &&
       !!parseChatgptDurableConversationRoute(globalThis.location?.href || '');
-    const readiness = chatgptApiApplicable ? ('ready' as const) : collector.getCaptureReadiness();
-    if (readiness !== 'ready' && readiness !== 'waiting' && readiness !== 'unsupported') {
-      throw new Error(`invalid capture readiness: ${String(readiness)}`);
-    }
-    if (readiness === 'unsupported') {
+    const available = chatgptApiApplicable || collector.isCaptureAvailable();
+    if (!available) {
       return {
-        readiness,
         kind: 'unsupported' as const,
         label: t('unavailable'),
         collectorId: collector.id,
@@ -209,20 +224,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     }
     if (collector.id === 'web') {
       return {
-        readiness,
         kind: 'article' as const,
         label: t('fetchArticle'),
         collectorId: 'web',
-        ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage('web') } : null),
         collector,
       };
     }
     return {
-      readiness,
       kind: 'chat' as const,
       label: t('fetchAiChat'),
       collectorId: collector.id,
-      ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage(collector.id) } : null),
       collector,
       useChatgptApi: chatgptApiApplicable,
     };
@@ -292,16 +303,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
     try {
       const target = await resolveCaptureTarget();
-      if (target.readiness !== 'ready') {
-        const fallback =
-          target.readiness === 'waiting'
-            ? buildCaptureWaitingMessage(target.collectorId)
-            : t('currentPageCannotBeCaptured');
-        const error = Object.assign(new Error(target.reason || fallback), {
-          code: target.readiness === 'waiting' ? 'capture_waiting' : 'capture_unsupported',
-        });
-        throw error;
-      }
+      if (target.kind === 'unsupported') throw new Error(target.reason || t('currentPageCannotBeCaptured'));
 
       if (target.kind === 'video') {
         const result = await videoCapture.captureVideoTranscript();
@@ -343,8 +345,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           isNew,
         };
       }
-
-      if (!target.collector) throw new Error(t('currentPageCannotBeCaptured'));
 
       let snapshot: any;
       let expectedChatgptConversationId = '';
@@ -395,11 +395,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       const title = String(snapshot?.conversation?.title || '');
       const isNew = saved.isNew;
-      const partial = saved.captureCompleteness === 'partial';
-      const message = partial
-        ? buildPartialCaptureMessage(saved.captureReasons)
-        : buildCaptureSuccessTipMessage({ isNew, title });
-      setCaptureActivity('settled', partial ? 'warning' : 'success', message);
+      const message = buildCaptureSuccessTipMessage({ isNew, title });
+      setCaptureActivity('settled', 'success', message);
       report(message, 'default');
       return {
         kind: 'chat',
@@ -412,11 +409,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
-      const waiting = (error as any)?.code === 'capture_waiting';
-      const message = errorMessage(error, t('captureFailedFallback'));
-      setCaptureActivity('settled', waiting ? 'info' : 'error', message);
-      report(message, waiting ? 'default' : 'error');
-      throw error;
+      const outwardError = userFacingCaptureError(error);
+      const message = errorMessage(outwardError, t('captureFailedFallback'));
+      setCaptureActivity('settled', 'error', message);
+      report(message, 'error');
+      throw outwardError;
     }
   }
 
@@ -424,7 +421,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const target = await resolveCaptureTarget();
     const activity = readCaptureActivity();
     return {
-      readiness: target.readiness,
       kind: target.kind,
       label: target.label,
       collectorId: target.collectorId,

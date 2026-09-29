@@ -7,34 +7,47 @@ function apiCaptureError(code: string, status?: number): Error & { code: string;
   return Object.assign(new Error(code), { code, ...(status ? { status } : null) });
 }
 
+function isRetryableFetchError(error: unknown): boolean {
+  const code = String((error as any)?.code || '');
+  const status = Number((error as any)?.status || 0);
+  return code.endsWith('_network') || status === 408 || status === 425 || status >= 500;
+}
+
 async function fetchJson(input: {
   fetchFn: FetchLike;
   url: string;
   init: RequestInit;
   timeoutMs: number;
   errorPrefix: string;
+  maxAttempts?: number;
 }): Promise<any> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), input.timeoutMs);
-  try {
-    let response: Response;
+  const maxAttempts = Math.max(1, Math.floor(Number(input.maxAttempts) || 1));
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), input.timeoutMs);
     try {
-      const fetchFn = input.fetchFn;
-      response = await fetchFn(input.url, { ...input.init, signal: controller.signal });
-    } catch (_error) {
-      throw apiCaptureError(
-        controller.signal.aborted ? `${input.errorPrefix}_timeout` : `${input.errorPrefix}_network`,
-      );
+      let response: Response;
+      try {
+        const fetchFn = input.fetchFn;
+        response = await fetchFn(input.url, { ...input.init, signal: controller.signal });
+      } catch (_error) {
+        throw apiCaptureError(
+          controller.signal.aborted ? `${input.errorPrefix}_timeout` : `${input.errorPrefix}_network`,
+        );
+      }
+      if (!response.ok) throw apiCaptureError(`${input.errorPrefix}_http`, response.status);
+      try {
+        return await response.json();
+      } catch (_error) {
+        throw apiCaptureError(`${input.errorPrefix}_schema`);
+      }
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRetryableFetchError(error)) throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    if (!response.ok) throw apiCaptureError(`${input.errorPrefix}_http`, response.status);
-    try {
-      return await response.json();
-    } catch (_error) {
-      throw apiCaptureError(`${input.errorPrefix}_schema`);
-    }
-  } finally {
-    clearTimeout(timer);
   }
+  throw apiCaptureError(`${input.errorPrefix}_network`);
 }
 
 function sanitizedConversationUrl(rawUrl: string): string {
@@ -77,6 +90,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     },
     timeoutMs,
     errorPrefix: 'chatgpt_api_mapping',
+    maxAttempts: 2,
   });
 
   const currentRoute = parseChatgptDurableConversationRoute(readCurrentUrl());

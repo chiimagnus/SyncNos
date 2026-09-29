@@ -180,11 +180,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   const collector: any = {
     capture,
-    getCaptureReadiness: () => {
-      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
-      if (!isValidConversationUrl()) return 'waiting' as const;
-      return getMessageWrappers(getConversationRoot()).length > 0 ? ('ready' as const) : ('waiting' as const);
-    },
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
   };
   collector.__test = {

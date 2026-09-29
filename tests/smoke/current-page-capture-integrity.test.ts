@@ -14,6 +14,7 @@ vi.mock('@services/integrations/chatgpt/api-capture', () => ({
 
 import { t } from '@i18n';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
+import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -54,8 +55,8 @@ function createHarness(input: {
   url?: string;
   syncResponse?: any;
   liveTurn?: () => any;
-  readiness?: 'ready' | 'waiting' | 'unsupported';
-  readinessError?: string;
+  collectorAvailable?: boolean;
+  availabilityError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
@@ -72,9 +73,9 @@ function createHarness(input: {
   };
   const collector: any = {
     capture,
-    getCaptureReadiness: () => {
-      if (input.readinessError) throw new Error(input.readinessError);
-      return input.readiness ?? 'ready';
+    isCaptureAvailable: () => {
+      if (input.availabilityError) throw new Error(input.availabilityError);
+      return input.collectorAvailable ?? true;
     },
   };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
@@ -124,7 +125,6 @@ describe('current page capture integrity routing', () => {
     ]) {
       const harness = createHarness({ collectorId: 'web', url });
       expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({
-        readiness: 'ready',
         kind: 'video',
         collectorId: 'video',
       });
@@ -206,32 +206,29 @@ describe('current page capture integrity routing', () => {
     }
   });
 
-  it('reports a supported chat with no current messages as waiting instead of unsupported', async () => {
-    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'waiting' });
+  it('runs capture on a supported empty chat and reports the actual missing-content error', async () => {
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, collectorAvailable: true });
     const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
-      readiness: 'waiting',
       kind: 'chat',
       collectorId: 'chatgpt',
     });
-    expect(state.reason).toContain('ChatGPT');
 
     const progress: any[] = [];
     await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      state.reason,
+      t('noVisibleConversationFound'),
     );
-    expect(progress.at(-1)).toEqual({ message: state.reason, kind: 'default' });
-    expect(harness.capture).not.toHaveBeenCalled();
+    expect(progress.at(-1)).toEqual({ message: t('noVisibleConversationFound'), kind: 'error' });
+    expect(harness.capture).toHaveBeenCalledTimes(1);
     expect(harness.calls).toEqual([]);
   });
 
-  it('keeps collector-declared non-chat routes unsupported instead of waiting', async () => {
-    const harness = createHarness({ collectorId: 'gemini', snapshot: null, readiness: 'unsupported' });
+  it('keeps collector-declared non-chat routes unavailable', async () => {
+    const harness = createHarness({ collectorId: 'gemini', snapshot: null, collectorAvailable: false });
     const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
-      readiness: 'unsupported',
       kind: 'unsupported',
       collectorId: 'gemini',
       reason: t('currentPageCannotBeCaptured'),
@@ -240,26 +237,25 @@ describe('current page capture integrity routing', () => {
     expect(harness.capture).not.toHaveBeenCalled();
   });
 
-  it('surfaces collector readiness failures instead of masking them as waiting', async () => {
+  it('surfaces collector availability failures directly', async () => {
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot: null,
-      readinessError: 'readiness failed',
+      availabilityError: 'availability failed',
     });
 
-    await expect(harness.service.getCurrentPageCaptureState()).rejects.toThrow('readiness failed');
+    await expect(harness.service.getCurrentPageCaptureState()).rejects.toThrow('availability failed');
     const progress: any[] = [];
     await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      'readiness failed',
+      'availability failed',
     );
-    expect(progress.at(-1)).toEqual({ message: 'readiness failed', kind: 'error' });
+    expect(progress.at(-1)).toEqual({ message: 'availability failed', kind: 'error' });
   });
 
-  it('consumes the web collector readiness contract before routing to article capture', async () => {
-    const harness = createHarness({ collectorId: 'web', snapshot: null, readiness: 'unsupported' });
+  it('consumes the web collector availability contract before routing to article capture', async () => {
+    const harness = createHarness({ collectorId: 'web', snapshot: null, collectorAvailable: false });
 
     expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({
-      readiness: 'unsupported',
       kind: 'unsupported',
       collectorId: 'web',
     });
@@ -267,19 +263,18 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
-  it('treats an enabled durable ChatGPT API route as ready without consulting DOM readiness', async () => {
+  it('treats an enabled durable ChatGPT API route as available without consulting DOM availability', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
     chatgptApiMocks.capture.mockResolvedValue({ snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
-      readinessError: 'DOM readiness must not run',
+      availabilityError: 'DOM availability must not run',
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
     await expect(harness.service.getCurrentPageCaptureState()).resolves.toMatchObject({
-      readiness: 'ready',
       kind: 'chat',
       collectorId: 'chatgpt',
     });
@@ -421,7 +416,10 @@ describe('current page capture integrity routing', () => {
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureNavigationChanged'),
+      code: 'chatgpt_api_navigation_changed',
+    });
     expect(harness.calls).toEqual([]);
   });
 
@@ -444,7 +442,9 @@ describe('current page capture integrity routing', () => {
 
   it('does not silently run DOM capture when enabled durable API capture fails', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    chatgptApiMocks.capture.mockRejectedValue(new Error('chatgpt_api_mapping_http'));
+    chatgptApiMocks.capture.mockRejectedValue(
+      Object.assign(new Error('chatgpt_api_mapping_http'), { code: 'chatgpt_api_mapping_http', status: 503 }),
+    );
     const prepare = vi.fn();
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -453,10 +453,50 @@ describe('current page capture integrity routing', () => {
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_mapping_http');
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureTemporarilyUnavailable'),
+      code: 'chatgpt_api_mapping_http',
+      status: 503,
+    });
     expect(prepare).not.toHaveBeenCalled();
     expect(harness.capture).not.toHaveBeenCalled();
     expect(harness.calls).toEqual([]);
+  });
+
+  it('maps ChatGPT API rate limits to a user-facing retry-later message', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockRejectedValue(
+      Object.assign(new Error('chatgpt_api_mapping_http'), { code: 'chatgpt_api_mapping_http', status: 429 }),
+    );
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: chatSnapshot(),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureRateLimited'),
+      code: 'chatgpt_api_mapping_http',
+      status: 429,
+    });
+  });
+
+  it('maps ChatGPT API session auth failures to a user-facing sign-in message', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockRejectedValue(
+      Object.assign(new Error('chatgpt_api_session_http'), { code: 'chatgpt_api_session_http', status: 401 }),
+    );
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot: chatSnapshot(),
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureSessionExpired'),
+      code: 'chatgpt_api_session_http',
+      status: 401,
+    });
   });
 
   it('does not silently run DOM capture when the Advanced setting cannot be read', async () => {
@@ -490,7 +530,10 @@ describe('current page capture integrity routing', () => {
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
-    await expect(harness.service.captureCurrentPage()).rejects.toThrow('chatgpt_api_navigation_changed');
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      message: t('chatgptApiCaptureNavigationChanged'),
+      code: 'chatgpt_api_navigation_changed',
+    });
     expect(harness.calls).toEqual([]);
   });
 
@@ -569,7 +612,7 @@ describe('current page capture integrity routing', () => {
     const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
 
     expect(result).toMatchObject({ captureCompleteness: 'partial' });
-    expect(progress.at(-1)?.message).toBe(t('partialCaptureSaved'));
+    expect(progress.at(-1)?.message).toBe(buildCaptureSuccessTipMessage({ isNew: true, title: 'Conversation' }));
     expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
     expect(harness.calls[1].payload).toMatchObject({
       mode: 'append',

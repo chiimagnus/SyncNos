@@ -119,14 +119,17 @@ async function capturePrepared(def: any, options: any = {}) {
 }
 
 describe('chatgpt current DOM', () => {
-  it('matches only the canonical ChatGPT hostname and waits without current message units', () => {
+  it('matches only the canonical ChatGPT hostname and keeps empty chat surfaces ready', () => {
     const canonical = currentDef(currentDom());
     expect(canonical.matches({ hostname: 'chatgpt.com' })).toBe(true);
     expect(canonical.matches({ hostname: 'www.chatgpt.com' })).toBe(false);
     expect(canonical.matches({ hostname: 'chat.openai.com' })).toBe(false);
 
     const empty = currentDef(setupChatgptDom('', 'https://chatgpt.com/'));
-    expect(empty.collector.getCaptureReadiness()).toBe('waiting');
+    expect(empty.collector.isCaptureAvailable()).toBe(true);
+
+    const settings = currentDef(setupChatgptDom('', 'https://chatgpt.com/settings'));
+    expect(settings.collector.isCaptureAvailable()).toBe(false);
   });
 
   it('captures current user/assistant units, expanded reasoning, and current code blocks', async () => {
@@ -142,7 +145,7 @@ describe('chatgpt current DOM', () => {
       `,
     });
     const def = currentDef(dom);
-    expect(def.collector.getCaptureReadiness()).toBe('ready');
+    expect(def.collector.isCaptureAvailable()).toBe(true);
 
     const snapshot = (await capturePrepared(def)) as any;
     expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
