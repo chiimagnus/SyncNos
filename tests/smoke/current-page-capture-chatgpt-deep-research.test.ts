@@ -75,7 +75,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
       pickActive: () => ({
         id: 'chatgpt',
         collector: {
-          getCaptureReadiness: () => 'ready' as const,
+          isCaptureAvailable: () => true,
           capture: () => ({
             conversation: {
               sourceType: 'chat',
@@ -169,7 +169,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
         pickActive: () => ({
           id: 'chatgpt',
           collector: {
-            getCaptureReadiness: () => 'ready' as const,
+            isCaptureAvailable: () => true,
             capture: () => ({
               conversation: {
                 sourceType: 'chat',
@@ -239,7 +239,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
         pickActive: () => ({
           id: 'chatgpt',
           collector: {
-            getCaptureReadiness: () => 'ready' as const,
+            isCaptureAvailable: () => true,
             capture: () => ({
               conversation: {
                 sourceType: 'chat',

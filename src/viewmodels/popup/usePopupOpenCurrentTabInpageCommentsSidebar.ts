@@ -27,7 +27,7 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar(input: {
 }) {
   const { captureState, checking, status } = input;
   const [opening, setOpening] = useState(false);
-  const eligible = captureState?.readiness === 'ready' && captureState.kind === 'article';
+  const eligible = captureState?.kind === 'article';
 
   const open = useCallback(async () => {
     if (checking || opening || !eligible) return false;
@@ -55,7 +55,7 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar(input: {
     if (checking) return t('checkingDots');
     if (eligible) return t('openInpageCommentsSidebarTooltip');
     if (!captureState && status?.kind === 'error') return status.message || t('commentsSidebarUnavailableHint');
-    if (captureState?.readiness === 'ready') return t('commentsSidebarArticleOnlyHint');
+    if (captureState && captureState.kind !== 'unsupported') return t('commentsSidebarArticleOnlyHint');
     return t('commentsSidebarUnavailableHint');
   }, [captureState, checking, eligible, opening, status]);
 

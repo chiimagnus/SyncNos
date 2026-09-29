@@ -119,7 +119,7 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   const collector = {
     capture,
-    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
   };
   return { id: 'yuanbao', matches, collector };

@@ -377,7 +377,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   const collector: any = {
     capture,
-    getCaptureReadiness: () => (isValidConversationUrl() ? ('ready' as const) : ('unsupported' as const)),
+    isCaptureAvailable: isValidConversationUrl,
     getRoot: getConversationRoot,
     prepareManualCapture,
   };

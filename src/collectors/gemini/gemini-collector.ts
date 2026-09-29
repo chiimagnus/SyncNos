@@ -993,7 +993,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
   const collector = {
     capture,
-    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
     __test: {
       collectMessages: async (options: { manual?: boolean } = {}) =>

@@ -55,7 +55,7 @@ describe('UI background handler locale readiness', () => {
     const ensureLocaleReady = vi.fn(() => locale.promise);
     const { router, handlers } = createRouter();
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
-    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { readiness: 'ready' }, error: null } as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { kind: 'chat' }, error: null } as any);
 
     registerUiMessageHandlers(router, { ensureLocaleReady });
 
@@ -63,7 +63,7 @@ describe('UI background handler locale readiness', () => {
 
     await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toEqual({
       ok: true,
-      data: { readiness: 'ready' },
+      data: { kind: 'chat' },
       error: null,
     });
     expect(tabsQuery).toHaveBeenCalledTimes(1);
@@ -78,14 +78,14 @@ describe('UI background handler locale readiness', () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://chatgpt.com/c/example' }] as any);
     vi.mocked(tabsSendMessage)
       .mockRejectedValueOnce(new Error('Could not establish connection. Receiving end does not exist.'))
-      .mockResolvedValueOnce({ ok: true, data: { readiness: 'ready', kind: 'chat' }, error: null } as any);
+      .mockResolvedValueOnce({ ok: true, data: { kind: 'chat' }, error: null } as any);
     vi.mocked(scriptingExecuteScript).mockResolvedValue([]);
 
     registerUiMessageHandlers(router, { ensureLocaleReady });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toEqual({
       ok: true,
-      data: { readiness: 'ready', kind: 'chat' },
+      data: { kind: 'chat' },
       error: null,
     });
     expect(scriptingExecuteScript).toHaveBeenCalledTimes(1);
@@ -175,7 +175,7 @@ describe('UI background handler locale readiness', () => {
     const response = await responsePromise;
     expect(response).toMatchObject({
       ok: true,
-      data: { readiness: 'unsupported', kind: 'unsupported' },
+      data: { kind: 'unsupported' },
       error: null,
     });
   });

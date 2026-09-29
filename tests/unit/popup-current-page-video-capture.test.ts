@@ -80,7 +80,6 @@ describe('popup current-page video capture', () => {
       if (type === 'getActiveTabCaptureState') {
         stateCalls += 1;
         return apiOk({
-          readiness: 'ready',
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',
@@ -131,7 +130,6 @@ describe('popup current-page video capture', () => {
     sendMock.mockImplementation(async (type: string) => {
       if (type === 'getActiveTabCaptureState') {
         return apiOk({
-          readiness: 'ready',
           kind: 'chat',
           label: 'Fetch AI Chat',
           collectorId: 'chatgpt',
@@ -181,18 +179,16 @@ describe('popup current-page video capture', () => {
     expect(latest?.checking).toBe(true);
 
     await act(async () => {
-      stateRequest.resolve(
-        apiOk({ readiness: 'ready', kind: 'video', label: 'Fetch Video Transcript', collectorId: 'video' }),
-      );
+      stateRequest.resolve(apiOk({ kind: 'video', label: 'Fetch Video Transcript', collectorId: 'video' }));
       await flushEffects();
     });
 
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(latest?.checking).toBe(false);
-    expect(latest?.captureState).toMatchObject({ readiness: 'ready', kind: 'video' });
+    expect(latest?.captureState).toMatchObject({ kind: 'video' });
   });
 
-  it('does not poll a ready empty chat while idle', async () => {
+  it('does not poll a supported empty chat while idle', async () => {
     vi.useFakeTimers();
     const onCaptured = vi.fn();
     let stateCalls = 0;
@@ -200,7 +196,6 @@ describe('popup current-page video capture', () => {
       if (type !== 'getActiveTabCaptureState') throw new Error(`unexpected message: ${type}`);
       stateCalls += 1;
       return apiOk({
-        readiness: 'ready',
         kind: 'chat',
         label: 'Fetch AI Chat',
         collectorId: 'chatgpt',
@@ -224,7 +219,6 @@ describe('popup current-page video capture', () => {
     const onCaptured = vi.fn();
     sendMock.mockResolvedValue(
       apiOk({
-        readiness: 'ready',
         kind: 'video',
         label: 'Fetch Video Transcript',
         collectorId: 'video',
@@ -262,7 +256,6 @@ describe('popup current-page video capture', () => {
       stateCalls += 1;
       if (stateCalls === 1) {
         return apiOk({
-          readiness: 'ready',
           kind: 'article',
           label: 'Fetch Article',
           collectorId: 'web',
@@ -275,7 +268,6 @@ describe('popup current-page video capture', () => {
         });
       }
       return apiOk({
-        readiness: 'ready',
         kind: 'article',
         label: 'Fetch Article',
         collectorId: 'web',
@@ -313,7 +305,6 @@ describe('popup current-page video capture', () => {
       if (type === 'getActiveTabCaptureState') {
         stateCalls += 1;
         return apiOk({
-          readiness: 'ready',
           kind: 'chat',
           label: 'Fetch AI Chat',
           collectorId: 'chatgpt',
@@ -381,7 +372,6 @@ describe('popup current-page video capture', () => {
       if (type === 'getActiveTabCaptureState') {
         stateCalls += 1;
         return apiOk({
-          readiness: 'ready',
           kind: 'video',
           label: 'Fetch Video Transcript',
           collectorId: 'video',

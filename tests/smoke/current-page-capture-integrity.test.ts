@@ -54,8 +54,8 @@ function createHarness(input: {
   url?: string;
   syncResponse?: any;
   liveTurn?: () => any;
-  readiness?: 'ready' | 'unsupported';
-  readinessError?: string;
+  collectorAvailable?: boolean;
+  availabilityError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
@@ -72,9 +72,9 @@ function createHarness(input: {
   };
   const collector: any = {
     capture,
-    getCaptureReadiness: () => {
-      if (input.readinessError) throw new Error(input.readinessError);
-      return input.readiness ?? 'ready';
+    isCaptureAvailable: () => {
+      if (input.availabilityError) throw new Error(input.availabilityError);
+      return input.collectorAvailable ?? true;
     },
   };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
@@ -124,7 +124,6 @@ describe('current page capture integrity routing', () => {
     ]) {
       const harness = createHarness({ collectorId: 'web', url });
       expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({
-        readiness: 'ready',
         kind: 'video',
         collectorId: 'video',
       });
@@ -207,11 +206,10 @@ describe('current page capture integrity routing', () => {
   });
 
   it('runs capture on a supported empty chat and reports the actual missing-content error', async () => {
-    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'ready' });
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, collectorAvailable: true });
     const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
-      readiness: 'ready',
       kind: 'chat',
       collectorId: 'chatgpt',
     });
@@ -225,12 +223,11 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
-  it('keeps collector-declared non-chat routes unsupported instead of waiting', async () => {
-    const harness = createHarness({ collectorId: 'gemini', snapshot: null, readiness: 'unsupported' });
+  it('keeps collector-declared non-chat routes unavailable', async () => {
+    const harness = createHarness({ collectorId: 'gemini', snapshot: null, collectorAvailable: false });
     const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
-      readiness: 'unsupported',
       kind: 'unsupported',
       collectorId: 'gemini',
       reason: t('currentPageCannotBeCaptured'),
@@ -239,26 +236,25 @@ describe('current page capture integrity routing', () => {
     expect(harness.capture).not.toHaveBeenCalled();
   });
 
-  it('surfaces collector readiness failures directly', async () => {
+  it('surfaces collector availability failures directly', async () => {
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot: null,
-      readinessError: 'readiness failed',
+      availabilityError: 'availability failed',
     });
 
-    await expect(harness.service.getCurrentPageCaptureState()).rejects.toThrow('readiness failed');
+    await expect(harness.service.getCurrentPageCaptureState()).rejects.toThrow('availability failed');
     const progress: any[] = [];
     await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      'readiness failed',
+      'availability failed',
     );
-    expect(progress.at(-1)).toEqual({ message: 'readiness failed', kind: 'error' });
+    expect(progress.at(-1)).toEqual({ message: 'availability failed', kind: 'error' });
   });
 
-  it('consumes the web collector readiness contract before routing to article capture', async () => {
-    const harness = createHarness({ collectorId: 'web', snapshot: null, readiness: 'unsupported' });
+  it('consumes the web collector availability contract before routing to article capture', async () => {
+    const harness = createHarness({ collectorId: 'web', snapshot: null, collectorAvailable: false });
 
     expect(await harness.service.getCurrentPageCaptureState()).toMatchObject({
-      readiness: 'unsupported',
       kind: 'unsupported',
       collectorId: 'web',
     });
@@ -266,19 +262,18 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
-  it('treats an enabled durable ChatGPT API route as ready without consulting DOM readiness', async () => {
+  it('treats an enabled durable ChatGPT API route as available without consulting DOM availability', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
     chatgptApiMocks.capture.mockResolvedValue({ snapshot });
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
-      readinessError: 'DOM readiness must not run',
+      availabilityError: 'DOM availability must not run',
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
     await expect(harness.service.getCurrentPageCaptureState()).resolves.toMatchObject({
-      readiness: 'ready',
       kind: 'chat',
       collectorId: 'chatgpt',
     });
@@ -577,6 +572,22 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls[1].payload.messages[0]).toMatchObject({
       captureSequencePolicy: 'reconcile-existing-order',
     });
+  });
+
+  it.each([
+    ['chatgpt_api_live_tail_unconfirmed', 'partialCaptureSavedLive'],
+    ['top_not_reached', 'partialCaptureSavedHistory'],
+    ['deep_research_hydration_incomplete', 'partialCaptureSavedMedia'],
+    ['chatgpt_api_schema_drift_partial', 'partialCaptureSavedContent'],
+  ])('maps partial reason %s to its user-facing status', async (reason, expectedKey) => {
+    const snapshot = chatSnapshot({ completeness: 'partial' });
+    snapshot.captureMeta.reasons = [reason];
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot });
+    const progress: any[] = [];
+
+    await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+
+    expect(progress.at(-1)?.message).toBe(t(expectedKey as any));
   });
 
   it('preserves COT plus answer through final-live partial append with default replace semantics', async () => {

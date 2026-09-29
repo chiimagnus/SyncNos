@@ -842,7 +842,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
   const collector: any = {
     capture,
     prepareManualCapture,
-    getCaptureReadiness: () => (isNotionAiPage() ? 'ready' : 'unsupported'),
+    isCaptureAvailable: isNotionAiPage,
     getRoot: () => {
       if (!isNotionAiPage()) return null;
       const seed = getLastUserStepEl(document) || getAnyUserStepEl(document);

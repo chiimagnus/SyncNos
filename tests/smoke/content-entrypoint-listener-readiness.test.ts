@@ -99,7 +99,7 @@ describe('content entrypoint listener readiness', () => {
     const rawCapture = vi.fn(async () => ({ title: 'raw' }));
     const gatedCapture = vi.fn(async () => ({ title: 'gated' }));
     mocks.createCurrentPageCaptureService.mockReturnValue({
-      getCurrentPageCaptureState: vi.fn(() => ({ readiness: 'ready' })),
+      getCurrentPageCaptureState: vi.fn(() => ({ kind: 'chat' })),
       captureCurrentPage: rawCapture,
     });
     mocks.createContentController.mockReturnValue({ captureCurrentPage: gatedCapture });

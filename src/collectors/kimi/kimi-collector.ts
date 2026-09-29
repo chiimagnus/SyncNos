@@ -165,7 +165,7 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   const collector = {
     capture,
-    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
   };
   return { id: 'kimi', matches, collector };

@@ -594,7 +594,7 @@ export function createContentController(deps: Deps) {
       const positionState = await ensureInpageButtonPositionLoadedOnce();
       if (stopped) return;
       const captureState = await currentPageCapture.getCurrentPageCaptureState();
-      const buttonCollectorId = captureState.readiness !== 'unsupported' ? captureState.collectorId || '' : '';
+      const buttonCollectorId = captureState.kind !== 'unsupported' ? captureState.collectorId || '' : '';
       inpageButton.cleanupButtons(buttonCollectorId);
       inpageButton.ensureInpageButton({
         collectorId: buttonCollectorId || undefined,

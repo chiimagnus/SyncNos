@@ -31,7 +31,7 @@ function statusFromCaptureState(state: CurrentPageCaptureState): PopupCaptureSta
       message: state.activity.message,
     };
   }
-  if (state.readiness === 'unsupported') {
+  if (state.kind === 'unsupported') {
     return {
       kind: 'error',
       message: state.reason || t('currentPageCannotBeCaptured'),
@@ -74,8 +74,10 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     }
   }, []);
 
+  const captureKind = captureState?.kind;
+  const captureActivityPhase = captureState?.activity?.phase;
   const capture = useCallback(async () => {
-    if (checking || fetching || captureState?.readiness !== 'ready' || captureState.activity?.phase === 'capturing') {
+    if (checking || fetching || !captureKind || captureKind === 'unsupported' || captureActivityPhase === 'capturing') {
       return;
     }
 
@@ -94,7 +96,7 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
     } finally {
       setFetching(false);
     }
-  }, [captureState?.activity?.phase, captureState?.readiness, checking, fetching, onCaptured, refreshState]);
+  }, [captureActivityPhase, captureKind, checking, fetching, onCaptured, refreshState]);
 
   useEffect(() => {
     void refreshState();
@@ -154,7 +156,8 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
   const externalCaptureInProgress = captureState?.activity?.phase === 'capturing';
 
   return {
-    buttonDisabled: checking || fetching || externalCaptureInProgress || captureState?.readiness !== 'ready',
+    buttonDisabled:
+      checking || fetching || externalCaptureInProgress || !captureState || captureState.kind === 'unsupported',
     buttonLabel,
     capture,
     captureState,

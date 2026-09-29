@@ -115,7 +115,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
 
   const collector = {
     capture,
-    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
   };
   return { id: 'deepseek', matches, collector };

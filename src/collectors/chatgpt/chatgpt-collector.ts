@@ -909,7 +909,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   const collector = {
     capture,
-    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
     prepareManualCapture,
     captureApiLiveTurn,

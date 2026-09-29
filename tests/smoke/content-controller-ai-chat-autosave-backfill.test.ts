@@ -70,7 +70,7 @@ function createHarness(options: {
   };
 
   const collector = {
-    getCaptureReadiness: () => 'ready' as const,
+    isCaptureAvailable: () => true,
     capture: () => {
       const index = Math.min(captureCount, Math.max(0, options.snapshots.length - 1));
       captureCount += 1;
@@ -84,7 +84,7 @@ function createHarness(options: {
       if (!resolved) return null;
       return {
         ...resolved,
-        collector: { getCaptureReadiness: () => 'ready' as const, ...resolved.collector },
+        collector: { isCaptureAvailable: () => true, ...resolved.collector },
       };
     },
     list: () => [],

@@ -86,7 +86,7 @@ describe('claude-collector', () => {
       location: empty.window.location as any,
       normalize: normalizeApi,
     });
-    expect(createClaudeCollectorDef(emptyEnv).collector.getCaptureReadiness()).toBe('ready');
+    expect(createClaudeCollectorDef(emptyEnv).collector.isCaptureAvailable()).toBe(true);
 
     const settings = new JSDOM('<body></body>', { url: 'https://claude.ai/settings' });
     const settingsEnv = createCollectorEnv({
@@ -95,7 +95,7 @@ describe('claude-collector', () => {
       location: settings.window.location as any,
       normalize: normalizeApi,
     });
-    expect(createClaudeCollectorDef(settingsEnv).collector.getCaptureReadiness()).toBe('unsupported');
+    expect(createClaudeCollectorDef(settingsEnv).collector.isCaptureAvailable()).toBe(false);
   });
 
   it('captures all visible assistant prose while excluding separate status nodes', async () => {

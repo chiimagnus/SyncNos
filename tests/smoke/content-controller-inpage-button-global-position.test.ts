@@ -87,7 +87,7 @@ function createHarness(options?: {
   const collectorsRegistry = {
     pickActive: () => ({
       id: options?.getCollectorId?.() || options?.collectorId || 'gemini',
-      collector: { capture, getCaptureReadiness: () => 'ready' as const },
+      collector: { capture, isCaptureAvailable: () => true },
     }),
     list: () => [],
   };
