@@ -21,6 +21,14 @@ vi.mock('@platform/webext/windows', () => ({
 
 import { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe('extension app tab routing', () => {
   beforeEach(() => {
     tabsCreate.mockReset();
@@ -125,5 +133,62 @@ describe('extension app tab routing', () => {
       active: false,
       url: 'chrome-extension://syncnos/app.html#/',
     });
+  });
+
+  it('serializes concurrent open requests so repeated shortcuts cannot create duplicate tabs', async () => {
+    const created = {
+      id: 9,
+      windowId: 15,
+      url: 'chrome-extension://syncnos/app.html#/',
+    };
+    const create = deferred<typeof created>();
+    const createStarted = deferred<void>();
+    tabsQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([created]);
+    tabsCreate.mockImplementationOnce(() => {
+      createStarted.resolve();
+      return create.promise;
+    });
+
+    const first = openOrFocusExtensionAppTab({ route: '/' });
+    const second = openOrFocusExtensionAppTab({ route: '/' });
+    await createStarted.promise;
+
+    expect(tabsQuery).toHaveBeenCalledTimes(1);
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+
+    create.resolve(created);
+    await Promise.all([first, second]);
+
+    expect(tabsQuery).toHaveBeenCalledTimes(2);
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+    expect(tabsUpdate).toHaveBeenCalledWith(9, { active: true });
+    expect(windowsUpdate).toHaveBeenCalledWith(15, { focused: true });
+  });
+
+  it('shares the same serialization between background ensure and foreground open', async () => {
+    const created = {
+      id: 11,
+      windowId: 16,
+      url: 'chrome-extension://syncnos/app.html#/',
+    };
+    const create = deferred<typeof created>();
+    const createStarted = deferred<void>();
+    tabsQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([created]);
+    tabsCreate.mockImplementationOnce(() => {
+      createStarted.resolve();
+      return create.promise;
+    });
+
+    const ensure = ensureExtensionAppTab();
+    const open = openOrFocusExtensionAppTab({ route: '/' });
+    await createStarted.promise;
+
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+
+    create.resolve(created);
+    await Promise.all([ensure, open]);
+
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+    expect(tabsUpdate).toHaveBeenCalledWith(11, { active: true });
   });
 });
