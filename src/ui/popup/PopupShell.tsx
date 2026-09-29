@@ -184,7 +184,7 @@ function PopupShellFrame() {
     setSyncNudgeProvider(provider);
   };
 
-  const finishPopupSyncNudge = (openApp: boolean) => {
+  const finishPopupSyncNudge = (openTab: boolean) => {
     const provider = syncNudgeProvider;
     if (!provider) return;
     setSyncNudgeProvider(null);
@@ -193,7 +193,7 @@ function PopupShellFrame() {
       if (syncNudgeDontShowAgain) {
         await setPopupSyncNudgeDismissed(provider).catch(() => {});
       }
-      if (!openApp) return;
+      if (!openTab) return;
       const opened = await openOrFocusExtensionAppTab({ route: '/' });
       if (opened) window.close();
     })().catch(() => {});

@@ -40,7 +40,7 @@ export const zh: { [K in TranslationKey]: string } = {
   keyboardShortcutsHeading: '快捷键',
   keyboardShortcutsOpenPopup: '打开 SyncNos Popup',
   keyboardShortcutsCaptureCurrentPage: '保存当前页面',
-  keyboardShortcutsOpenApp: '打开 SyncNos 应用',
+  keyboardShortcutsOpenTab: '打开 SyncNos 标签页',
   keyboardShortcutsUnassigned: '未分配',
   keyboardShortcutsManage: '管理快捷键',
   keyboardShortcutsManualHint: '请在浏览器的扩展快捷键设置中配置这些操作。',

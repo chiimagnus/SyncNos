@@ -9,7 +9,7 @@ type ShortcutCaptureMessage = {
 
 type BackgroundKeyboardShortcutDeps = {
   dispatchMessage: (message: ShortcutCaptureMessage) => unknown | Promise<unknown>;
-  openApp: () => unknown | Promise<unknown>;
+  openTab: () => unknown | Promise<unknown>;
 };
 
 function runShortcutAction(action: () => unknown | Promise<unknown>): void {
@@ -24,7 +24,7 @@ function runShortcutAction(action: () => unknown | Promise<unknown>): void {
 
 export function registerBackgroundKeyboardShortcuts({
   dispatchMessage,
-  openApp,
+  openTab,
 }: BackgroundKeyboardShortcutDeps): boolean {
   return commandsOnCommand((command) => {
     if (command === KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage) {
@@ -37,8 +37,8 @@ export function registerBackgroundKeyboardShortcuts({
       return;
     }
 
-    if (command === KEYBOARD_SHORTCUT_COMMAND_IDS.openApp) {
-      runShortcutAction(openApp);
+    if (command === KEYBOARD_SHORTCUT_COMMAND_IDS.openTab) {
+      runShortcutAction(openTab);
     }
   });
 }

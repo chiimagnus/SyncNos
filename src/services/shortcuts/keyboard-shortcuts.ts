@@ -10,7 +10,7 @@ import {
   type KeyboardShortcutCommandId,
 } from '@services/shortcuts/keyboard-shortcut-contract';
 
-export type KeyboardShortcutAction = 'open-popup' | 'capture-current-page' | 'open-app';
+export type KeyboardShortcutAction = 'open-popup' | 'capture-current-page' | 'open-tab';
 export type KeyboardShortcutManagerAccess = 'openable' | 'manual' | 'unsupported';
 export type KeyboardShortcutOpenResult = 'opened' | 'manual' | 'unsupported';
 
@@ -28,7 +28,7 @@ export type KeyboardShortcutSnapshot = {
 const ACTION_BY_COMMAND: Record<KeyboardShortcutCommandId, KeyboardShortcutAction> = {
   [KEYBOARD_SHORTCUT_COMMAND_IDS.openPopup]: 'open-popup',
   [KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage]: 'capture-current-page',
-  [KEYBOARD_SHORTCUT_COMMAND_IDS.openApp]: 'open-app',
+  [KEYBOARD_SHORTCUT_COMMAND_IDS.openTab]: 'open-tab',
 };
 
 const SHORTCUT_ACTIONS = KEYBOARD_SHORTCUT_COMMAND_ORDER.map((command) => ({

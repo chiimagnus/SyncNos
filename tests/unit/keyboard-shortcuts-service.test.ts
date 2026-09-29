@@ -32,7 +32,7 @@ describe('keyboard shortcuts service', () => {
       items: [
         { action: 'open-popup', shortcut: 'Ctrl+1' },
         { action: 'capture-current-page', shortcut: 'Ctrl+2' },
-        { action: 'open-app', shortcut: 'Ctrl+3' },
+        { action: 'open-tab', shortcut: 'Ctrl+3' },
       ],
     });
   });
@@ -45,7 +45,7 @@ describe('keyboard shortcuts service', () => {
     expect(snapshot.items).toEqual([
       { action: 'open-popup', shortcut: '⌘+Shift+Y' },
       { action: 'capture-current-page', shortcut: '' },
-      { action: 'open-app', shortcut: '' },
+      { action: 'open-tab', shortcut: '' },
     ]);
   });
 
@@ -67,7 +67,7 @@ describe('keyboard shortcuts service', () => {
       items: [
         { action: 'open-popup', shortcut: '' },
         { action: 'capture-current-page', shortcut: '' },
-        { action: 'open-app', shortcut: '' },
+        { action: 'open-tab', shortcut: '' },
       ],
     });
   });

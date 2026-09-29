@@ -38,7 +38,7 @@ export const en = {
   keyboardShortcutsHeading: 'Keyboard shortcuts',
   keyboardShortcutsOpenPopup: 'Open SyncNos popup',
   keyboardShortcutsCaptureCurrentPage: 'Save current page',
-  keyboardShortcutsOpenApp: 'Open SyncNos app',
+  keyboardShortcutsOpenTab: 'Open SyncNos tab',
   keyboardShortcutsUnassigned: 'Unassigned',
   keyboardShortcutsManage: 'Manage shortcuts',
   keyboardShortcutsManualHint: 'Configure these actions in your browser’s extension keyboard shortcut settings.',

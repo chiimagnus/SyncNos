@@ -13,13 +13,13 @@ import { KEYBOARD_SHORTCUT_COMMAND_IDS } from '@services/shortcuts/keyboard-shor
 describe('background keyboard shortcuts', () => {
   let listener: ((command: string) => void) | null;
   const dispatchMessage = vi.fn();
-  const openApp = vi.fn();
+  const openTab = vi.fn();
 
   beforeEach(() => {
     listener = null;
     commandsOnCommand.mockReset();
     dispatchMessage.mockReset();
-    openApp.mockReset();
+    openTab.mockReset();
     commandsOnCommand.mockImplementation((nextListener: (command: string) => void) => {
       listener = nextListener;
       return true;
@@ -27,7 +27,7 @@ describe('background keyboard shortcuts', () => {
   });
 
   function register() {
-    expect(registerBackgroundKeyboardShortcuts({ dispatchMessage, openApp })).toBe(true);
+    expect(registerBackgroundKeyboardShortcuts({ dispatchMessage, openTab })).toBe(true);
     if (!listener) throw new Error('keyboard command listener was not registered');
     return listener;
   }
@@ -42,15 +42,15 @@ describe('background keyboard shortcuts', () => {
       type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
       source: 'shortcut',
     });
-    expect(openApp).not.toHaveBeenCalled();
+    expect(openTab).not.toHaveBeenCalled();
   });
 
-  it('opens the app without dispatching a capture message', () => {
+  it('opens the SyncNos tab without dispatching a capture message', () => {
     const onCommand = register();
 
-    onCommand(KEYBOARD_SHORTCUT_COMMAND_IDS.openApp);
+    onCommand(KEYBOARD_SHORTCUT_COMMAND_IDS.openTab);
 
-    expect(openApp).toHaveBeenCalledTimes(1);
+    expect(openTab).toHaveBeenCalledTimes(1);
     expect(dispatchMessage).not.toHaveBeenCalled();
   });
 
@@ -61,19 +61,19 @@ describe('background keyboard shortcuts', () => {
     onCommand('unknown-command');
 
     expect(dispatchMessage).not.toHaveBeenCalled();
-    expect(openApp).not.toHaveBeenCalled();
+    expect(openTab).not.toHaveBeenCalled();
   });
 
   it('contains rejected and synchronous shortcut failures', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     dispatchMessage.mockRejectedValueOnce(new Error('dispatch failed'));
-    openApp.mockImplementationOnce(() => {
+    openTab.mockImplementationOnce(() => {
       throw new Error('open failed');
     });
     const onCommand = register();
 
     expect(() => onCommand(KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage)).not.toThrow();
-    expect(() => onCommand(KEYBOARD_SHORTCUT_COMMAND_IDS.openApp)).not.toThrow();
+    expect(() => onCommand(KEYBOARD_SHORTCUT_COMMAND_IDS.openTab)).not.toThrow();
     await Promise.resolve();
     await Promise.resolve();
 
