@@ -298,7 +298,7 @@ describe('popup current-page video capture', () => {
     expect(latest?.status).toEqual({ kind: 'success', message: 'Updated: Article' });
   });
 
-  it('uses the canonical capture activity for ChatGPT partial-save status', async () => {
+  it('shows a normal success status when a partial capture was persisted', async () => {
     const onCaptured = vi.fn();
     let stateCalls = 0;
     sendMock.mockImplementation(async (type: string) => {
@@ -312,8 +312,8 @@ describe('popup current-page video capture', () => {
             ? {
                 activity: {
                   phase: 'settled',
-                  kind: 'warning',
-                  message: 'Live reply saved; confirm later.',
+                  kind: 'success',
+                  message: 'Updated: Chat',
                   expiresAt: Date.now() + 5_000,
                 },
               }
@@ -343,8 +343,8 @@ describe('popup current-page video capture', () => {
     });
 
     expect(latest?.status).toEqual({
-      kind: 'warning',
-      message: 'Live reply saved; confirm later.',
+      kind: 'success',
+      message: 'Updated: Chat',
     });
   });
 

@@ -14,6 +14,7 @@ vi.mock('@services/integrations/chatgpt/api-capture', () => ({
 
 import { t } from '@i18n';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
+import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -563,7 +564,7 @@ describe('current page capture integrity routing', () => {
     const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
 
     expect(result).toMatchObject({ captureCompleteness: 'partial' });
-    expect(progress.at(-1)?.message).toBe(t('partialCaptureSaved'));
+    expect(progress.at(-1)?.message).toBe(buildCaptureSuccessTipMessage({ isNew: true, title: 'Conversation' }));
     expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
     expect(harness.calls[1].payload).toMatchObject({
       mode: 'append',
@@ -572,22 +573,6 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls[1].payload.messages[0]).toMatchObject({
       captureSequencePolicy: 'reconcile-existing-order',
     });
-  });
-
-  it.each([
-    ['chatgpt_api_live_tail_unconfirmed', 'partialCaptureSavedLive'],
-    ['top_not_reached', 'partialCaptureSavedHistory'],
-    ['deep_research_hydration_incomplete', 'partialCaptureSavedMedia'],
-    ['chatgpt_api_schema_drift_partial', 'partialCaptureSavedContent'],
-  ])('maps partial reason %s to its user-facing status', async (reason, expectedKey) => {
-    const snapshot = chatSnapshot({ completeness: 'partial' });
-    snapshot.captureMeta.reasons = [reason];
-    const harness = createHarness({ collectorId: 'chatgpt', snapshot });
-    const progress: any[] = [];
-
-    await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
-
-    expect(progress.at(-1)?.message).toBe(t(expectedKey as any));
   });
 
   it('preserves COT plus answer through final-live partial append with default replace semantics', async () => {

@@ -12,7 +12,7 @@ type ApiResponse<T> = {
 };
 
 export type PopupCaptureStatus = {
-  kind: 'info' | 'success' | 'warning' | 'error';
+  kind: 'info' | 'success' | 'error';
   message: string;
 };
 

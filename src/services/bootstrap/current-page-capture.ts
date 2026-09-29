@@ -29,7 +29,7 @@ type CurrentPageCaptureProgress = {
 
 type CurrentPageCaptureActivity = {
   phase: 'capturing' | 'settled';
-  kind: 'info' | 'success' | 'warning' | 'error';
+  kind: 'info' | 'success' | 'error';
   message: string;
   expiresAt: number | null;
 };
@@ -60,34 +60,6 @@ type CurrentPageCaptureResult =
   | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: 'ok' | 'empty' });
 
 const CAPTURE_ACTIVITY_VISIBLE_MS = 5_000;
-
-const LIVE_PARTIAL_REASONS = new Set([
-  'chatgpt_api_live_tail_unconfirmed',
-  'chatgpt_api_live_tail_unresolved',
-  'final_live_changed',
-]);
-const HISTORY_PARTIAL_REASONS = new Set([
-  'top_not_reached',
-  'bottom_not_reached',
-  'boundary_stalled',
-  'boundary_unstable',
-  'scroll_stalled',
-  'step_timeout',
-  'step_budget_exhausted',
-  'total_deadline_exhausted',
-]);
-const MEDIA_PARTIAL_REASONS = new Set(['deep_research_hydration_incomplete', 'inline_images_incomplete']);
-
-function buildPartialCaptureMessage(reasons: unknown): string {
-  const normalized = (Array.isArray(reasons) ? reasons : [])
-    .map((reason) => String(reason ?? '').trim())
-    .filter(Boolean);
-  if (normalized.some((reason) => LIVE_PARTIAL_REASONS.has(reason))) return t('partialCaptureSavedLive');
-  if (normalized.some((reason) => HISTORY_PARTIAL_REASONS.has(reason))) return t('partialCaptureSavedHistory');
-  if (normalized.some((reason) => MEDIA_PARTIAL_REASONS.has(reason))) return t('partialCaptureSavedMedia');
-  if (normalized.length) return t('partialCaptureSavedContent');
-  return t('partialCaptureSaved');
-}
 
 function errorMessage(error: unknown, fallback: string): string {
   const maybeError = error as { message?: unknown };
@@ -397,11 +369,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       const title = String(snapshot?.conversation?.title || '');
       const isNew = saved.isNew;
-      const partial = saved.captureCompleteness === 'partial';
-      const message = partial
-        ? buildPartialCaptureMessage(saved.captureReasons)
-        : buildCaptureSuccessTipMessage({ isNew, title });
-      setCaptureActivity('settled', partial ? 'warning' : 'success', message);
+      const message = buildCaptureSuccessTipMessage({ isNew, title });
+      setCaptureActivity('settled', 'success', message);
       report(message, 'default');
       return {
         kind: 'chat',
