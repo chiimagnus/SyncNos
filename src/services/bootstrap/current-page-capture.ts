@@ -11,10 +11,7 @@ import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
-import {
-  buildCaptureWaitingMessage,
-  buildPartialCaptureMessage,
-} from '@services/bootstrap/current-page-capture-status';
+import { buildPartialCaptureMessage } from '@services/bootstrap/current-page-capture-status';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -39,7 +36,7 @@ type CurrentPageCaptureActivity = {
 };
 
 export type CurrentPageCaptureState = {
-  readiness: 'ready' | 'waiting' | 'unsupported';
+  readiness: 'ready' | 'unsupported';
   kind: 'chat' | 'video' | 'article' | 'unsupported';
   label: string;
   collectorId: string | null;
@@ -194,7 +191,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       (await readChatgptApiCaptureEnabled()) &&
       !!parseChatgptDurableConversationRoute(globalThis.location?.href || '');
     const readiness = chatgptApiApplicable ? ('ready' as const) : collector.getCaptureReadiness();
-    if (readiness !== 'ready' && readiness !== 'waiting' && readiness !== 'unsupported') {
+    if (readiness !== 'ready' && readiness !== 'unsupported') {
       throw new Error(`invalid capture readiness: ${String(readiness)}`);
     }
     if (readiness === 'unsupported') {
@@ -213,7 +210,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         kind: 'article' as const,
         label: t('fetchArticle'),
         collectorId: 'web',
-        ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage('web') } : null),
         collector,
       };
     }
@@ -222,7 +218,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       kind: 'chat' as const,
       label: t('fetchAiChat'),
       collectorId: collector.id,
-      ...(readiness === 'waiting' ? { reason: buildCaptureWaitingMessage(collector.id) } : null),
       collector,
       useChatgptApi: chatgptApiApplicable,
     };
@@ -293,14 +288,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     try {
       const target = await resolveCaptureTarget();
       if (target.readiness !== 'ready') {
-        const fallback =
-          target.readiness === 'waiting'
-            ? buildCaptureWaitingMessage(target.collectorId)
-            : t('currentPageCannotBeCaptured');
-        const error = Object.assign(new Error(target.reason || fallback), {
-          code: target.readiness === 'waiting' ? 'capture_waiting' : 'capture_unsupported',
+        throw Object.assign(new Error(target.reason || t('currentPageCannotBeCaptured')), {
+          code: 'capture_unsupported',
         });
-        throw error;
       }
 
       if (target.kind === 'video') {
@@ -412,10 +402,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
-      const waiting = (error as any)?.code === 'capture_waiting';
       const message = errorMessage(error, t('captureFailedFallback'));
-      setCaptureActivity('settled', waiting ? 'info' : 'error', message);
-      report(message, waiting ? 'default' : 'error');
+      setCaptureActivity('settled', 'error', message);
+      report(message, 'error');
       throw error;
     }
   }

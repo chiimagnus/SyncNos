@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
-import { buildCaptureWaitingMessage } from '@services/bootstrap/current-page-capture-status';
 import type { CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
@@ -30,12 +29,6 @@ function statusFromCaptureState(state: CurrentPageCaptureState): PopupCaptureSta
     return {
       kind: state.activity.kind,
       message: state.activity.message,
-    };
-  }
-  if (state.readiness === 'waiting') {
-    return {
-      kind: 'info',
-      message: state.reason || buildCaptureWaitingMessage(state.collectorId),
     };
   }
   if (state.readiness === 'unsupported') {
@@ -135,31 +128,26 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
 
   useEffect(() => {
     const observingExternalCapture = captureState?.activity?.phase === 'capturing';
-    const waitingForReadiness = captureState?.readiness === 'waiting';
-    if (checking || fetching || (!observingExternalCapture && !waitingForReadiness)) return;
+    if (checking || fetching || !observingExternalCapture) return;
 
     let cancelled = false;
     let timer: number | null = null;
-    const delay = observingExternalCapture ? 300 : 1000;
     const poll = async () => {
       await refreshState({ silent: true });
       if (cancelled) return;
-      timer = window.setTimeout(() => void poll(), delay);
+      timer = window.setTimeout(() => void poll(), 300);
     };
-    timer = window.setTimeout(() => void poll(), delay);
+    timer = window.setTimeout(() => void poll(), 300);
     return () => {
       cancelled = true;
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [captureState?.activity?.phase, captureState?.readiness, checking, fetching, refreshState]);
+  }, [captureState?.activity?.phase, checking, fetching, refreshState]);
 
   const buttonLabel = useMemo(() => {
     if (fetching) return t('fetchingDots');
     if (checking) return t('checkingDots');
     if (captureState?.activity?.message) return captureState.activity.message;
-    if (captureState?.readiness === 'waiting') {
-      return captureState.reason || buildCaptureWaitingMessage(captureState.collectorId);
-    }
     return captureState?.label || t('unavailable');
   }, [captureState, checking, fetching]);
 

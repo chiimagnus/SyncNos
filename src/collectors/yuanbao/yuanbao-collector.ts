@@ -119,13 +119,7 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   const collector = {
     capture,
-    getCaptureReadiness: () => {
-      if (!isConversationSurfaceUrl()) return 'unsupported' as const;
-      if (!isValidConversationUrl()) return 'waiting' as const;
-      return getConversationRoot()?.querySelector('.agent-chat__list__item--human, .agent-chat__list__item--ai')
-        ? ('ready' as const)
-        : ('waiting' as const);
-    },
+    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
     getRoot: getConversationRoot,
   };
   return { id: 'yuanbao', matches, collector };

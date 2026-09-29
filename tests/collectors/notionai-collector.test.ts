@@ -43,10 +43,6 @@ describe('notionai-collector', () => {
       href: `https://app.notion.com/chat?t=${threadId}&wfv=chat`,
     });
     expect(active?.id).toBe('notionai');
-    expect(collector.getCaptureReadiness()).toBe('waiting');
-    const send = dom.window.document.createElement('button');
-    send.setAttribute('data-testid', 'agent-chat-send-button');
-    dom.window.document.body.appendChild(send);
     expect(collector.getCaptureReadiness()).toBe('ready');
     expect(collector.getRoot()).toBe(dom.window.document.querySelector('.layout-chat'));
   });
@@ -147,7 +143,7 @@ describe('notionai-collector', () => {
     const { collector, registry } = createCollectorHarness();
 
     expect(typeof collector.__test.inpageMatches).toBe('function');
-    expect(collector.getCaptureReadiness()).toBe('waiting');
+    expect(collector.getCaptureReadiness()).toBe('unsupported');
     expect(
       collector.__test.inpageMatches({ hostname: 'app.notion.com', pathname: '/', href: 'https://app.notion.com/' }),
     ).toBe(true);

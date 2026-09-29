@@ -82,8 +82,8 @@ const cases: Array<{ id: string; factory: Factory; url: string; unsupportedUrl: 
 
 describe('AI collector capture readiness', () => {
   for (const item of cases) {
-    it(`${item.id} waits until the current conversation has a captureable message`, () => {
-      expect(readiness(item.factory, item.url)).toBe('waiting');
+    it(`${item.id} keeps supported conversation routes ready even before message DOM appears`, () => {
+      expect(readiness(item.factory, item.url)).toBe('ready');
       expect(readiness(item.factory, item.url, item.readyHtml)).toBe('ready');
       expect(readiness(item.factory, item.unsupportedUrl)).toBe('unsupported');
     });

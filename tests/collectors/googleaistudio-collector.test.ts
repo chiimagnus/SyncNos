@@ -21,7 +21,7 @@ async function capturePrepared(def: any, prepareOptions: any = {}) {
 }
 
 describe('googleaistudio-collector', () => {
-  it('reports a supported AI Studio route with no turns as waiting', () => {
+  it('keeps a supported AI Studio route ready before turns render', () => {
     const dom = setupDom('', 'https://aistudio.google.com/app/abc123');
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -30,7 +30,16 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
     const def = createGoogleAiStudioCollectorDef(env);
-    expect(def.collector.getCaptureReadiness()).toBe('waiting');
+    expect(def.collector.getCaptureReadiness()).toBe('ready');
+
+    const unsupportedDom = setupDom('', 'https://aistudio.google.com/');
+    const unsupportedEnv = createCollectorEnv({
+      window: unsupportedDom.window as any,
+      document: unsupportedDom.window.document as any,
+      location: unsupportedDom.window.location as any,
+      normalize: normalizeApi,
+    });
+    expect(createGoogleAiStudioCollectorDef(unsupportedEnv).collector.getCaptureReadiness()).toBe('unsupported');
   });
 
   it('captures AI Studio ms-chat-turn DOM and renders assistant markdown', async () => {

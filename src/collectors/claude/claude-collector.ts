@@ -533,12 +533,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
 
   const collector = {
     capture,
-    getCaptureReadiness: () => {
-      if (!isValidConversationUrl()) return 'unsupported' as const;
-      const root = getConversationRoot();
-      if (!root || isEditingConversation(root)) return 'waiting' as const;
-      return readCurrentDescriptors().length ? ('ready' as const) : ('waiting' as const);
-    },
+    getCaptureReadiness: () => (isValidConversationUrl() ? ('ready' as const) : ('unsupported' as const)),
     getRoot: getConversationRoot,
     prepareManualCapture,
     __test: {

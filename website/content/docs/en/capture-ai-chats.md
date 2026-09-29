@@ -46,7 +46,7 @@ If preserving a **stable conversation structure and current branch** matters mor
 
 A reply that is still generating can be saved as a partial result and updated by saving again after it finishes. If Advanced capture fails, SyncNos does not silently switch to page capture; turn it off and save again instead.
 
-If the page has no capturable messages yet, SyncNos shows “waiting for messages” instead of treating it as an error.
+On a supported chat surface, capture stays available even before any message is present. If there is nothing capturable when you run it, SyncNos reports that no visible conversation was found.
 
 ## Images and local reuse
 

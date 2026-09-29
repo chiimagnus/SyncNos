@@ -54,7 +54,7 @@ function createHarness(input: {
   url?: string;
   syncResponse?: any;
   liveTurn?: () => any;
-  readiness?: 'ready' | 'waiting' | 'unsupported';
+  readiness?: 'ready' | 'unsupported';
   readinessError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
@@ -206,23 +206,22 @@ describe('current page capture integrity routing', () => {
     }
   });
 
-  it('reports a supported chat with no current messages as waiting instead of unsupported', async () => {
-    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'waiting' });
+  it('runs capture on a supported empty chat and reports the actual missing-content error', async () => {
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot: null, readiness: 'ready' });
     const state = await harness.service.getCurrentPageCaptureState();
 
     expect(state).toMatchObject({
-      readiness: 'waiting',
+      readiness: 'ready',
       kind: 'chat',
       collectorId: 'chatgpt',
     });
-    expect(state.reason).toContain('ChatGPT');
 
     const progress: any[] = [];
     await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      state.reason,
+      t('noVisibleConversationFound'),
     );
-    expect(progress.at(-1)).toEqual({ message: state.reason, kind: 'default' });
-    expect(harness.capture).not.toHaveBeenCalled();
+    expect(progress.at(-1)).toEqual({ message: t('noVisibleConversationFound'), kind: 'error' });
+    expect(harness.capture).toHaveBeenCalledTimes(1);
     expect(harness.calls).toEqual([]);
   });
 
@@ -240,7 +239,7 @@ describe('current page capture integrity routing', () => {
     expect(harness.capture).not.toHaveBeenCalled();
   });
 
-  it('surfaces collector readiness failures instead of masking them as waiting', async () => {
+  it('surfaces collector readiness failures directly', async () => {
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot: null,

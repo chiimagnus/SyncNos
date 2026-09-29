@@ -78,6 +78,26 @@ async function prepareStaticCapture(def: any) {
 }
 
 describe('claude-collector', () => {
+  it('keeps a valid Claude chat route ready before transcript rows render', () => {
+    const empty = new JSDOM('<body><main></main></body>', { url: 'https://claude.ai/chat/conv-empty' });
+    const emptyEnv = createCollectorEnv({
+      window: empty.window as any,
+      document: empty.window.document as any,
+      location: empty.window.location as any,
+      normalize: normalizeApi,
+    });
+    expect(createClaudeCollectorDef(emptyEnv).collector.getCaptureReadiness()).toBe('ready');
+
+    const settings = new JSDOM('<body></body>', { url: 'https://claude.ai/settings' });
+    const settingsEnv = createCollectorEnv({
+      window: settings.window as any,
+      document: settings.window.document as any,
+      location: settings.window.location as any,
+      normalize: normalizeApi,
+    });
+    expect(createClaudeCollectorDef(settingsEnv).collector.getCaptureReadiness()).toBe('unsupported');
+  });
+
   it('captures all visible assistant prose while excluding separate status nodes', async () => {
     const { def } = setupClaudeDom();
     const snapshot = await def.collector.capture({

@@ -84,6 +84,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return match?.[1] ? String(match[1]) : '';
   }
 
+  function isConversationSurfaceUrl(): boolean {
+    const pathname = String(env.location.pathname || '/').replace(/\/+$/, '') || '/';
+    return (
+      pathname === '/' ||
+      !!parseChatgptDurableConversationRoute(env.location.href) ||
+      /^\/share\/[^/]+$/.test(pathname) ||
+      /^\/g\/[^/]+$/.test(pathname)
+    );
+  }
+
   function normalizedRoute(): string {
     const pathname = String(env.location.pathname || '/').replace(/\/+$/, '') || '/';
     const search = String(env.location.search || '');
@@ -899,13 +909,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   const collector = {
     capture,
-    getCaptureReadiness: () => {
-      const root = getConversationRoot();
-      if (!root) return 'waiting' as const;
-      return getTurnWrappers(root).some((wrapper: any) => !isExplicitlyHiddenWithin(wrapper, root))
-        ? ('ready' as const)
-        : ('waiting' as const);
-    },
+    getCaptureReadiness: () => (isConversationSurfaceUrl() ? ('ready' as const) : ('unsupported' as const)),
     getRoot: getConversationRoot,
     prepareManualCapture,
     captureApiLiveTurn,

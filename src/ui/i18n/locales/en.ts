@@ -332,7 +332,6 @@ export const en = {
   loadingFullHistory: 'Loading full history...',
   captureFailedFallback: 'Capture failed',
   partialCaptureSaved: 'Visible messages were saved, but full history could not be confirmed.',
-  captureWaitingForMessages: 'waiting for messages…',
   partialCaptureSavedLive: 'The conversation and current reply progress were saved; save again after it finishes to confirm the final content.',
   partialCaptureSavedHistory: 'Current messages were saved; full history is still unconfirmed.',
   partialCaptureSavedContent: 'Safely confirmed messages were saved; some content or ordering is still unconfirmed.',
