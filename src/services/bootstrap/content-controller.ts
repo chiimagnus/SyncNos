@@ -712,7 +712,7 @@ export function createContentController(deps: Deps) {
         if (!isAutoSavePreSaveAllowed(generation)) return;
         const collector = resolveActiveCollector(collectorsRegistry);
         if (!collector || typeof collector.capture !== 'function') return;
-        // ChatGPT and Google AI Studio remain manual-capture only.
+        // Virtualized chat collectors remain manual-capture only.
         if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
 
         const snapshot = await Promise.resolve(collector.capture());

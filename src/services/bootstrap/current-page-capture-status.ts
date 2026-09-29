@@ -3,6 +3,7 @@ import type { TranslationKey } from '@i18n/locales/en';
 
 const SOURCE_LABEL_KEYS: Record<string, TranslationKey> = {
   chatgpt: 'sourceChatgpt',
+  claude: 'sourceClaude',
   deepseek: 'sourceDeepseek',
   notionai: 'sourceNotionai',
   gemini: 'sourceGemini',

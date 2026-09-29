@@ -219,7 +219,7 @@ describe('content-controller inpage combo', () => {
     expect(harness.tipCalls.some((c) => c.opts?.kind === 'default')).toBe(true);
   });
 
-  it.each(['chatgpt', 'googleaistudio'])(
+  it.each(['chatgpt', 'claude', 'googleaistudio'])(
     'manual button passes the exact prepared object once for %s',
     async (collectorId) => {
       setupDom();
@@ -229,7 +229,12 @@ describe('content-controller inpage combo', () => {
         conversation: {
           source: collectorId,
           conversationKey: `${collectorId}-1`,
-          url: collectorId === 'chatgpt' ? 'https://chatgpt.com/c/1' : 'https://aistudio.google.com/app/1',
+          url:
+            collectorId === 'chatgpt'
+              ? 'https://chatgpt.com/c/1'
+              : collectorId === 'claude'
+                ? 'https://claude.ai/chat/1'
+                : 'https://aistudio.google.com/app/1',
         },
         messages: [{ messageKey: 'm1', sequence: 0, role: 'user', contentMarkdown: 'hi' }],
         captureMeta: { completeness: 'complete', identityVerified: true, reasons: [] },
@@ -471,14 +476,14 @@ describe('content-controller inpage combo', () => {
     vi.useRealTimers();
   });
 
-  it('disables auto-save for googleaistudio to avoid virtualized truncation', async () => {
+  it.each(['claude', 'googleaistudio'])('disables auto-save for virtualized collector %s', async (collectorId) => {
     const snapshot = {
-      conversation: { source: 'googleaistudio', conversationKey: 'auto-ai-studio-1' },
+      conversation: { source: collectorId, conversationKey: `auto-${collectorId}-1` },
       messages: [{ messageKey: 'm1', sequence: 1, role: 'user', contentMarkdown: 'hello' }],
     };
 
     const harness = createHarness({
-      collectorId: 'googleaistudio',
+      collectorId,
       captureImpl: () => snapshot,
       incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
       sendImpl: async (type: string) => {

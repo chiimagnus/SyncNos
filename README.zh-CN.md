@@ -51,9 +51,9 @@ syncnos doctor
 
 ### AI 对话
 
-支持 ChatGPT、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 和 z.ai。
+支持 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 和 z.ai。
 
-ChatGPT 与 Google AI Studio 使用虚拟列表，只支持手动抓取；其它受支持的 AI 对话在开启 AI 自动保存后可自动采集。
+ChatGPT、Claude 与 Google AI Studio 使用虚拟列表，只支持手动抓取；其它受支持的 AI 对话在开启 AI 自动保存后可自动采集。
 
 ChatGPT 默认使用 DOM 采集，也提供可选的高级 API 路径用于手动采集当前会话。具体行为和限制见[采集内容](https://chiimagnus.github.io/SyncNos/docs/capture/)。
 

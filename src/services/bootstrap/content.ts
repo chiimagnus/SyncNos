@@ -1,3 +1,4 @@
+import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
 import {
   INPAGE_DISPLAY_MODE_STORAGE_KEY,
   normalizeInpageDisplayMode,
@@ -23,20 +24,9 @@ type StartContentBootstrapInput = {
   inpageButton?: { initRuntime?: (runtime: { getURL?: (path: string) => string } | null) => void };
 };
 
-const SUPPORTED_HOST_SUFFIXES = Object.freeze([
-  'gemini.google.com',
-  'aistudio.google.com',
-  'makersuite.google.com',
-  'chat.deepseek.com',
-  'chat.z.ai',
-  'kimi.moonshot.cn',
-  'kimi.com',
-  'doubao.com',
-  'yuanbao.tencent.com',
-  'poe.com',
-  'notion.so',
-  'app.notion.com',
-]);
+const SUPPORTED_HOST_SUFFIXES = Object.freeze(
+  SUPPORTED_AI_CHAT_SITES.filter((site) => site.id !== 'chatgpt').flatMap((site) => site.hosts),
+);
 
 function isSupportedHost(hostname: string): boolean {
   const host = String(hostname || '').toLowerCase();

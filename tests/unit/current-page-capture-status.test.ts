@@ -9,6 +9,7 @@ import { t } from '@i18n';
 describe('current-page capture status semantics', () => {
   it('uses localized canonical source names for neutral waiting states', () => {
     expect(buildCaptureWaitingMessage('chatgpt')).toBe(`${t('sourceChatgpt')} · ${t('captureWaitingForMessages')}`);
+    expect(buildCaptureWaitingMessage('claude')).toBe(`${t('sourceClaude')} · ${t('captureWaitingForMessages')}`);
     expect(buildCaptureWaitingMessage('googleaistudio')).toBe(
       `${t('sourceGoogleAiStudio')} · ${t('captureWaitingForMessages')}`,
     );

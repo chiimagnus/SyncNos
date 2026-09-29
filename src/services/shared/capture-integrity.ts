@@ -34,7 +34,7 @@ export type CaptureIntegrityFailure = {
 
 export type CaptureIntegrityResult = CaptureIntegritySuccess | CaptureIntegrityFailure;
 
-export const VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS = new Set<string>(['chatgpt', 'googleaistudio']);
+export const VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS = new Set<string>(['chatgpt', 'claude', 'googleaistudio']);
 
 function stableString(value: unknown): string {
   return String(value || '').trim();

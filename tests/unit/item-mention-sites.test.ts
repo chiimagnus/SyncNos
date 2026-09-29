@@ -10,6 +10,7 @@ describe('item-mention sites', () => {
   it('lists supported hosts', () => {
     const hosts = listMentionSupportedHosts();
     expect(hosts).toContain('chatgpt.com');
+    expect(hosts).toContain('claude.ai');
     expect(hosts).toContain('notion.so');
     expect(hosts).toContain('app.notion.com');
   });
@@ -19,6 +20,8 @@ describe('item-mention sites', () => {
     expect(isMentionSupportedHost('www.chatgpt.com')).toBe(false);
     expect(isMentionSupportedHost('foo.chatgpt.com')).toBe(false);
     expect(isMentionSupportedHost('chat.openai.com')).toBe(false);
+    expect(isMentionSupportedHost('claude.ai')).toBe(true);
+    expect(isMentionSupportedHost('www.claude.ai')).toBe(true);
     expect(isMentionSupportedHost('www.notion.so')).toBe(true);
     expect(isMentionSupportedHost('foo.notion.so')).toBe(true);
     expect(isMentionSupportedHost('app.notion.com')).toBe(true);
@@ -43,6 +46,8 @@ describe('item-mention sites', () => {
 
   it('picks site id', () => {
     expect(pickMentionSupportedSiteIdByHostname('chatgpt.com')).toBe('chatgpt');
+    expect(pickMentionSupportedSiteIdByHostname('claude.ai')).toBe('claude');
+    expect(pickMentionSupportedSiteIdByHostname('www.claude.ai')).toBe('claude');
     expect(pickMentionSupportedSiteIdByHostname('www.notion.so')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('app.notion.com')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('gemini.google.com')).toBe('gemini');

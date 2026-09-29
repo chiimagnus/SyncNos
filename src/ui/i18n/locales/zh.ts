@@ -451,6 +451,7 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',
+  sourceClaude: 'Claude',
   sourceDeepseek: 'DeepSeek',
   sourceNotionai: 'Notion AI',
   sourceGemini: 'Gemini',

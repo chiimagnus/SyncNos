@@ -1174,10 +1174,11 @@ describe('content-controller ai chat autosave backfill', () => {
 
   it('keeps virtualized providers out of the auto-save source set', () => {
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('chatgpt')).toBe(false);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('claude')).toBe(false);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('googleaistudio')).toBe(false);
   });
 
-  it.each(['chatgpt', 'googleaistudio'])(
+  it.each(['chatgpt', 'claude', 'googleaistudio'])(
     'skips virtualized manual collector %s before capture',
     async (collectorId) => {
       const harness = createHarness({
