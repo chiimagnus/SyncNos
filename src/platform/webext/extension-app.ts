@@ -7,6 +7,16 @@ type OpenExtensionAppTabOptions = {
 };
 
 const EXTENSION_APP_PATH = '/app.html';
+let extensionAppTabOperation: Promise<unknown> = Promise.resolve();
+
+function serializeExtensionAppTabOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = extensionAppTabOperation.then(operation, operation);
+  extensionAppTabOperation = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
 
 function normalizeRoute(route?: string): string {
   const value = String(route || '').trim();
@@ -41,7 +51,7 @@ async function findExtensionAppTab() {
   return tabs.find((tab) => isExtensionAppUrl(tab?.url)) ?? null;
 }
 
-export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOptions = {}) {
+async function openOrFocusExtensionAppTabOnce(options: OpenExtensionAppTabOptions) {
   const targetUrl = buildExtensionAppUrl(options.route);
   if (!targetUrl) return null;
 
@@ -61,7 +71,11 @@ export async function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOpt
   return tabsCreate({ url: targetUrl, active: true });
 }
 
-export async function ensureExtensionAppTab() {
+export function openOrFocusExtensionAppTab(options: OpenExtensionAppTabOptions = {}) {
+  return serializeExtensionAppTabOperation(() => openOrFocusExtensionAppTabOnce(options));
+}
+
+async function ensureExtensionAppTabOnce() {
   const targetUrl = buildExtensionAppUrl('/');
   if (!targetUrl) return null;
 
@@ -69,4 +83,8 @@ export async function ensureExtensionAppTab() {
   if (existing) return existing;
 
   return tabsCreate({ url: targetUrl, active: false });
+}
+
+export function ensureExtensionAppTab() {
+  return serializeExtensionAppTabOperation(ensureExtensionAppTabOnce);
 }
