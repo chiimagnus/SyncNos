@@ -19,8 +19,8 @@
     "message": "Save current page to SyncNos",
     "description": "Description for the browser command that saves the active page"
   },
-  "commandOpenSyncnosAppDescription": {
-    "message": "Open SyncNos app",
-    "description": "Description for the browser command that opens or focuses the SyncNos app"
+  "commandOpenSyncnosTabDescription": {
+    "message": "Open SyncNos tab",
+    "description": "Description for the browser command that opens or focuses the SyncNos tab"
   }
 }

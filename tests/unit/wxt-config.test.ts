@@ -103,13 +103,13 @@ describe('WXT browser-scoped Vite config', () => {
     expect(manifest.commands?.['capture-current-page']?.description).toBe(
       '__MSG_commandCaptureCurrentPageDescription__',
     );
-    expect(manifest.commands?.['open-syncnos-app']?.description).toBe('__MSG_commandOpenSyncnosAppDescription__');
+    expect(manifest.commands?.['open-syncnos-app']?.description).toBe('__MSG_commandOpenSyncnosTabDescription__');
     expect(manifest.commands?.['_execute_action']?.description).toBeUndefined();
 
     for (const locale of ['en', 'zh_CN', 'zh_TW'] as const) {
       const messages = loadManifestLocale(locale);
       expect(messages.commandCaptureCurrentPageDescription?.message).toBeTruthy();
-      expect(messages.commandOpenSyncnosAppDescription?.message).toBeTruthy();
+      expect(messages.commandOpenSyncnosTabDescription?.message).toBeTruthy();
     }
   });
 });

@@ -73,8 +73,8 @@ const resolveManifest: UserManifestFn = (env) => {
       [KEYBOARD_SHORTCUT_COMMAND_IDS.captureCurrentPage]: {
         description: '__MSG_commandCaptureCurrentPageDescription__',
       },
-      [KEYBOARD_SHORTCUT_COMMAND_IDS.openApp]: {
-        description: '__MSG_commandOpenSyncnosAppDescription__',
+      [KEYBOARD_SHORTCUT_COMMAND_IDS.openTab]: {
+        description: '__MSG_commandOpenSyncnosTabDescription__',
       },
     },
     ...(isSafari ? {} : { optional_permissions: ['nativeMessaging'] }),

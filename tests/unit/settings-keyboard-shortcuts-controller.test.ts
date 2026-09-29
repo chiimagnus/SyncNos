@@ -33,7 +33,7 @@ const readySnapshot = (captureShortcut = 'Ctrl+Shift+Y') => ({
   items: [
     { action: 'open-popup' as const, shortcut: 'Ctrl+Shift+P' },
     { action: 'capture-current-page' as const, shortcut: captureShortcut },
-    { action: 'open-app' as const, shortcut: '' },
+    { action: 'open-tab' as const, shortcut: '' },
   ],
 });
 

@@ -18,7 +18,7 @@ export type KeyboardShortcutsSectionProps = {
 const ACTION_ROWS: ReadonlyArray<{ action: KeyboardShortcutAction; labelKey: TranslationKey }> = [
   { action: 'open-popup', labelKey: 'keyboardShortcutsOpenPopup' },
   { action: 'capture-current-page', labelKey: 'keyboardShortcutsCaptureCurrentPage' },
-  { action: 'open-app', labelKey: 'keyboardShortcutsOpenApp' },
+  { action: 'open-tab', labelKey: 'keyboardShortcutsOpenTab' },
 ];
 
 export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {

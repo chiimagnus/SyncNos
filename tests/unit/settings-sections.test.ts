@@ -607,7 +607,7 @@ describe('inpage anti-hotlink advanced editor', () => {
       items: [
         { action: 'open-popup', shortcut: 'Ctrl+Shift+P' },
         { action: 'capture-current-page', shortcut: '' },
-        { action: 'open-app', shortcut: '' },
+        { action: 'open-tab', shortcut: '' },
       ],
       managerAccess: 'openable',
       onOpenManager: () => {},
@@ -661,7 +661,7 @@ describe('inpage anti-hotlink advanced editor', () => {
     const shortcutSection = document.querySelector('section[aria-label="Keyboard shortcuts"]');
     expect(shortcutSection?.textContent).toContain('Open SyncNos popup');
     expect(shortcutSection?.textContent).toContain('Save current page');
-    expect(shortcutSection?.textContent).toContain('Open SyncNos app');
+    expect(shortcutSection?.textContent).toContain('Open SyncNos tab');
     expect(shortcutSection?.querySelector('kbd')?.textContent).toBe('Ctrl+Shift+P');
     expect(shortcutSection?.textContent).toContain('Unassigned');
   });

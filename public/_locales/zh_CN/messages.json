@@ -19,8 +19,8 @@
     "message": "将当前页面保存到 SyncNos",
     "description": "保存当前活动页面的浏览器快捷命令说明"
   },
-  "commandOpenSyncnosAppDescription": {
-    "message": "打开 SyncNos 应用",
-    "description": "打开或聚焦 SyncNos 应用的浏览器快捷命令说明"
+  "commandOpenSyncnosTabDescription": {
+    "message": "打开 SyncNos 标签页",
+    "description": "打开或聚焦 SyncNos 标签页的浏览器快捷命令说明"
   }
 }

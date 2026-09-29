@@ -103,7 +103,7 @@ export default defineBackground(() => {
   });
   registerBackgroundKeyboardShortcuts({
     dispatchMessage: (message) => router.dispatch(message),
-    openApp: () => openOrFocusExtensionAppTab({ route: '/' }),
+    openTab: () => openOrFocusExtensionAppTab({ route: '/' }),
   });
 
   router.start();
