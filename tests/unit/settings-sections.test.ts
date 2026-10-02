@@ -864,6 +864,8 @@ describe('backup feedback', () => {
       importStatus: '',
       importStats: null,
       lastBackupExportAt: 0,
+      includeSensitiveData: false,
+      onChangeIncludeSensitiveData: () => {},
       backupImportRef: createRef<HTMLDivElement>(),
       fileInputRef: createRef<HTMLInputElement>(),
       onExport: () => {},
@@ -874,6 +876,22 @@ describe('backup feedback', () => {
       root!.render(createElement(BackupSection, { ...baseProps, ...props }));
     });
   }
+
+  it('keeps full migration backup opt-in off by default and forwards explicit changes', () => {
+    const onChangeIncludeSensitiveData = vi.fn();
+    renderBackup({ onChangeIncludeSensitiveData });
+
+    const checkbox = document.querySelector(
+      'input[aria-label="Include private data (for migration)"]',
+    ) as HTMLInputElement | null;
+    expect(checkbox).toBeTruthy();
+    expect(checkbox?.checked).toBe(false);
+    expect(checkbox?.className || '').toContain('tw-accent-[var(--accent)]');
+    expect(document.body.textContent || '').toContain('OAuth tokens');
+
+    act(() => checkbox!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onChangeIncludeSensitiveData).toHaveBeenCalledWith(true);
+  });
 
   it('hides empty feedback and shows completed backup feedback', () => {
     renderBackup();

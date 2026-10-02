@@ -156,7 +156,10 @@ export const en = {
 
   // BackupSection
   databaseBackup: 'Database Backup',
-  exportZip: 'Export (Zip v2)',
+  exportZip: 'Export backup',
+  backupIncludeSensitiveData: 'Include private data (for migration)',
+  backupIncludeSensitiveDataHint:
+    'Includes OAuth tokens, API keys, and client secrets. The Backup will contain directly usable credentials, so store it securely.',
   importDots: 'Import\u2026',
   lastExport: 'last export:',
   statsConversations: 'Conversations:',

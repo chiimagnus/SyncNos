@@ -30,15 +30,17 @@
 
 Backup ZIP 是恢复包，不是 IndexedDB 的物理副本。当前导入/导出只支持当前 Backup schema；旧 ZIP schema 和 legacy raw JSON backup 不再是受支持入口。
 
-Backup 可以包含本地采集内容、可恢复 sync mapping、图片缓存、文章评论和非敏感设置。Provider token/client secret/API key、pending OAuth/Device Flow credential、Reader TTS AI API key，以及设备/浏览器 Profile 特定的 CLI identity/opt-in 等状态必须排除。
+Backup 可以包含本地采集内容、可恢复 sync mapping、图片缓存、文章评论和设置。默认 Backup 只包含非敏感设置；用户在 Backup 设置中显式勾选“包含私密数据（用于迁移）”时，Full Backup 额外包含当前可迁移的长期凭据，包括 Notion / 飞书 OAuth token、飞书 Client Secret、Obsidian API Key、GitHub 已连接 auth token 和 Reader TTS AI API Key。该选项不持久化，默认关闭。
+
+Full Backup 中的凭据随 ZIP 直接保存，SyncNos 不对 Backup ZIP 额外加密。用户必须把 Full Backup 当作密码文件保管。manifest 的 `config.includesSensitiveData` 是导入时是否允许恢复私密数据的唯一声明；旧 Backup 或缺少该字段的 Backup 一律按 `false` 处理。
 
 Backup 不得以 warning 形式静默丢弃持久化的评论数据；若评论记录无法无损序列化，导出必须失败并保留本地真源，先修复数据一致性后再重新导出。
 
-设备特定、可重新派生的远端 cleanup/pending 状态不跨设备迁移。sync mapping 只有在表达可恢复 continuity 且不携带秘密时才进入 Backup。
+临时 OAuth / Device Flow pending state、错误缓存、revision wake、popup handoff、已移除设置、设备特定 cleanup 状态，以及浏览器 Profile 特定的 CLI identity/opt-in 始终不跨设备迁移。未知未来 auth schema 也不得被 Full Backup 猜测性带走；sync mapping 只有在表达可恢复 continuity 时才进入 Backup。
 
 ## 恢复与失败
 
-- 导入是 merge restore，不无条件覆盖当前数据库；同一 Backup 重复导入应保持幂等。
+- 导入是 merge restore，不无条件覆盖当前数据库；同一 Backup 重复导入应保持幂等。Full Backup 会同时恢复其声明携带的长期凭据；普通 Backup 不得借由伪造 `storage-local.json` 绕过敏感数据过滤。
 - 评论/划线按稳定来源身份或自身文章上下文身份合并，不因内容/时间相似误吞，也不因表示变化制造重复。
 - ZIP 导入按已提交 stage 推进。后续 stage 失败不能回滚已经 commit 的 stage，progress 也只能报告已提交结果。
 - restore / migration 不得用导入时刻伪造 `lastActivityAt`。

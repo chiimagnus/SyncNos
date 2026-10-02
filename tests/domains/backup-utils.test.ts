@@ -8,6 +8,7 @@ import {
   mergeMessageRecord,
   uniqueConversationKey,
   validateBackupManifest,
+  validateSensitiveBackupStorage,
   validateConversationBundle,
 } from '@services/sync/backup/backup-utils';
 
@@ -76,6 +77,110 @@ describe('backup backup-utils', () => {
     );
   });
 
+  it('full backup includes portable secrets but still excludes transient and profile-local state', () => {
+    const filtered = filterStorageForBackup(
+      {
+        notion_oauth_token_v1: {
+          accessToken: 'NOTION_ACCESS_SECRET',
+          workspaceId: 'workspace-1',
+          workspaceName: 'Workspace',
+          createdAt: 1,
+        },
+        feishu_oauth_token_v1: {
+          accessToken: 'FEISHU_ACCESS_SECRET',
+          refreshToken: 'FEISHU_REFRESH_SECRET',
+          expiresAt: 10,
+          createdAt: 1,
+        },
+        feishu_oauth_client_secret: 'FEISHU_CLIENT_SECRET',
+        obsidian_api_key: 'OBSIDIAN_SECRET',
+        github_auth_state_v1: {
+          version: 1,
+          state: 'connected',
+          token: { accessToken: 'GITHUB_ACCESS_SECRET', refreshToken: 'GITHUB_REFRESH_SECRET', createdAt: 1 },
+        },
+        reader_prefs_v1: {
+          tts: { aiApiKey: 'READER_API_SECRET' },
+        },
+        notion_oauth_pending_state: 'notion-pending',
+        feishu_oauth_pending_state: 'feishu-pending',
+        github_auth_state_v2: { token: 'future-secret' },
+        syncnos_cli_instance_id_v1: 'profile-instance',
+        syncnos_cli_integration_enabled_v1: true,
+      },
+      { includeSensitiveData: true },
+    );
+
+    expect(filtered).toMatchObject({
+      notion_oauth_token_v1: { accessToken: 'NOTION_ACCESS_SECRET' },
+      feishu_oauth_token_v1: {
+        accessToken: 'FEISHU_ACCESS_SECRET',
+        refreshToken: 'FEISHU_REFRESH_SECRET',
+      },
+      feishu_oauth_client_secret: 'FEISHU_CLIENT_SECRET',
+      obsidian_api_key: 'OBSIDIAN_SECRET',
+      github_auth_state_v1: {
+        version: 1,
+        state: 'connected',
+        token: { accessToken: 'GITHUB_ACCESS_SECRET', refreshToken: 'GITHUB_REFRESH_SECRET', createdAt: 1 },
+      },
+      reader_prefs_v1: { tts: { aiApiKey: 'READER_API_SECRET' } },
+    });
+    expect(filtered.notion_oauth_pending_state).toBeUndefined();
+    expect(filtered.feishu_oauth_pending_state).toBeUndefined();
+    expect(filtered.github_auth_state_v2).toBeUndefined();
+    expect(filtered.syncnos_cli_instance_id_v1).toBeUndefined();
+    expect(filtered.syncnos_cli_integration_enabled_v1).toBeUndefined();
+  });
+
+  it('rejects malformed portable credentials before a Full Backup can be imported or exported', () => {
+    expect(validateSensitiveBackupStorage({ notion_oauth_token_v1: { accessToken: 'x' } })).toEqual({
+      ok: false,
+      error: 'Invalid Notion OAuth token in Full Backup',
+    });
+    expect(
+      validateSensitiveBackupStorage({
+        feishu_oauth_token_v1: {
+          accessToken: 'x',
+          refreshToken: '',
+          expiresAt: 10,
+          createdAt: 1,
+        },
+      }),
+    ).toEqual({ ok: true, error: '' });
+    expect(validateSensitiveBackupStorage({ github_auth_state_v1: { version: 1, state: 'connected' } })).toEqual({
+      ok: false,
+      error: 'Invalid GitHub auth state in Full Backup',
+    });
+    expect(validateSensitiveBackupStorage({ obsidian_api_key: 42 })).toEqual({
+      ok: false,
+      error: 'Invalid Obsidian API key in Full Backup',
+    });
+  });
+
+  it('full backup excludes an in-progress GitHub Device Flow instead of migrating it', () => {
+    expect(
+      filterStorageForBackup(
+        {
+          github_auth_state_v1: {
+            version: 1,
+            state: 'pending',
+            pending: {
+              deviceCode: 'device-secret',
+              userCode: 'ABCD-EFGH',
+              verificationUri: 'https://github.com/login/device',
+              createdAt: 1,
+              expiresAt: 100,
+              intervalMs: 5000,
+              nextPollAt: 2,
+            },
+          },
+        },
+        { includeSensitiveData: true },
+      ),
+    ).toEqual({});
+  });
+
   it('keeps only the canonical inpage display setting', () => {
     expect(filterStorageForBackup({ inpage_display_mode: 'supported' })).toEqual({ inpage_display_mode: 'supported' });
     expect(filterStorageForBackup({ inpage_display_mode: 'off' })).toEqual({ inpage_display_mode: 'off' });
@@ -112,6 +217,9 @@ describe('backup backup-utils', () => {
     };
     const validate = validateBackupManifest;
     expect(validate(base).ok).toBe(true);
+    expect(validate({ ...base, config: { ...base.config, includesSensitiveData: false } }).ok).toBe(true);
+    expect(validate({ ...base, config: { ...base.config, includesSensitiveData: true } }).ok).toBe(true);
+    expect(validate({ ...base, config: { ...base.config, includesSensitiveData: 'yes' } }).ok).toBe(false);
     expect(
       validate({ ...base, counts: { conversations: 0, messages: 0, sync_mappings: 0, article_comments: 0 } }).ok,
     ).toBe(false);

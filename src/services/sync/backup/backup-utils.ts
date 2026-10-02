@@ -1,6 +1,10 @@
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import { POPUP_SYNC_SELECTION_HANDOFF_KEY } from '@services/conversations/popup-sync-selection-handoff';
 import { CLI_INSTANCE_ID_STORAGE_KEY, CLI_INTEGRATION_ENABLED_STORAGE_KEY } from '@services/cli/cli-integration';
+import { NOTION_OAUTH_TOKEN_KEY, parseNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { FEISHU_OAUTH_TOKEN_KEY, parseFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
+import { GITHUB_AUTH_STATE_KEY, parseGithubAuthState } from '@services/sync/github/auth/auth-store';
+import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
 import {
   normalizeCanonicalVideoChapters,
   normalizeCanonicalVideoTranscriptCues,
@@ -16,24 +20,25 @@ export const BACKUP_ZIP_SCHEMA_VERSION = 3;
 export const LAST_BACKUP_EXPORT_AT_STORAGE_KEY = 'last_backup_export_at';
 const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
 
-const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
-  // Never export tokens (explicit product constraint).
-  'notion_oauth_token_v1',
-  'feishu_oauth_token_v1',
-  // Notion fixed client-id mirror and OAuth attempt session state are local runtime data, not portable settings.
+const STORAGE_BACKUP_SENSITIVE_KEYS_EXACT = new Set<string>([
+  NOTION_OAUTH_TOKEN_KEY,
+  FEISHU_OAUTH_TOKEN_KEY,
+  'feishu_oauth_client_secret',
+  OBSIDIAN_STORAGE_KEYS.apiKey,
+  GITHUB_AUTH_STATE_KEY,
+]);
+
+const STORAGE_BACKUP_ALWAYS_DENYLIST_EXACT = new Set<string>([
+  // Notion no longer reads these legacy local OAuth config mirrors.
   'notion_oauth_client_id',
   'notion_oauth_client_secret',
+  // OAuth attempt/error state is transient and unsafe to resume on another profile.
   'notion_oauth_pending_state',
   'notion_oauth_last_error',
-  'feishu_oauth_client_secret',
   'feishu_oauth_pending_state',
   'feishu_oauth_last_error',
   // Removed feature: never carry the old Notion AI model preference through backups.
   'notion_ai_preferred_model_index',
-  // Obsidian Local REST API key is a secret even though base URL is safe to export.
-  'obsidian_api_key',
-  // GitHub Device Flow/auth state contains access/refresh/device secrets.
-  'github_auth_state_v1',
   // Runtime-only cross-context invalidation metadata and popup UI handoff state.
   DATA_REVISION_WAKE_STORAGE_KEY,
   POPUP_SYNC_SELECTION_HANDOFF_KEY,
@@ -42,11 +47,14 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   CLI_INTEGRATION_ENABLED_STORAGE_KEY,
 ]);
 
-function shouldIncludeStorageKeyInBackup(key: string): boolean {
+type StorageBackupFilterOptions = { includeSensitiveData?: boolean };
+
+function shouldIncludeStorageKeyInBackup(key: string, includeSensitiveData: boolean): boolean {
   const k = String(key || '').trim();
   if (!k) return false;
-  if (STORAGE_BACKUP_DENYLIST_EXACT.has(k)) return false;
-  // Forward-compat: if token key changes versions, keep excluding it.
+  if (STORAGE_BACKUP_ALWAYS_DENYLIST_EXACT.has(k)) return false;
+  if (STORAGE_BACKUP_SENSITIVE_KEYS_EXACT.has(k)) return includeSensitiveData;
+  // Unknown future auth formats stay excluded until their restore contract is known.
   if (k.startsWith('notion_oauth_token')) return false;
   if (k.startsWith('feishu_oauth_token_v')) return false;
   if (k.startsWith('github_auth_')) return false;
@@ -231,20 +239,61 @@ export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRec
   return next;
 }
 
-function sanitizeReaderPrefsForBackup(value: unknown): Record<string, unknown> {
+function sanitizeReaderPrefsForBackup(value: unknown, includeSensitiveData: boolean): Record<string, unknown> {
   const prefs = normalizeReaderPrefs(value);
+  if (includeSensitiveData) return prefs;
   const { aiApiKey: _secret, ...portableTts } = prefs.tts;
   return { ...prefs, tts: portableTts };
 }
 
-export function filterStorageForBackup(storageLocal: unknown): Record<string, unknown> {
+export function filterStorageForBackup(
+  storageLocal: unknown,
+  options: StorageBackupFilterOptions = {},
+): Record<string, unknown> {
   const input = storageLocal && typeof storageLocal === 'object' ? (storageLocal as any) : {};
+  const includeSensitiveData = options.includeSensitiveData === true;
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
-    if (!shouldIncludeStorageKeyInBackup(key)) continue;
-    out[key] = key === READER_PREFS_STORAGE_KEY ? sanitizeReaderPrefsForBackup(value) : value;
+    if (!shouldIncludeStorageKeyInBackup(key, includeSensitiveData)) continue;
+    if (key === GITHUB_AUTH_STATE_KEY && (value as any)?.state !== 'connected') continue;
+    out[key] = key === READER_PREFS_STORAGE_KEY ? sanitizeReaderPrefsForBackup(value, includeSensitiveData) : value;
   }
   return canonicalizeInpageDisplayModeStorageRecord(out);
+}
+
+export function validateSensitiveBackupStorage(storageLocal: unknown): { ok: boolean; error: string } {
+  const input = storageLocal && typeof storageLocal === 'object' ? (storageLocal as Record<string, unknown>) : {};
+
+  if (
+    Object.prototype.hasOwnProperty.call(input, NOTION_OAUTH_TOKEN_KEY) &&
+    !parseNotionOAuthToken(input[NOTION_OAUTH_TOKEN_KEY])
+  ) {
+    return { ok: false, error: 'Invalid Notion OAuth token in Full Backup' };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(input, FEISHU_OAUTH_TOKEN_KEY) &&
+    !parseFeishuOAuthToken(input[FEISHU_OAUTH_TOKEN_KEY])
+  ) {
+    return { ok: false, error: 'Invalid Feishu OAuth token in Full Backup' };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(input, 'feishu_oauth_client_secret') &&
+    typeof input.feishu_oauth_client_secret !== 'string'
+  ) {
+    return { ok: false, error: 'Invalid Feishu client secret in Full Backup' };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(input, OBSIDIAN_STORAGE_KEYS.apiKey) &&
+    typeof input[OBSIDIAN_STORAGE_KEYS.apiKey] !== 'string'
+  ) {
+    return { ok: false, error: 'Invalid Obsidian API key in Full Backup' };
+  }
+  if (Object.prototype.hasOwnProperty.call(input, GITHUB_AUTH_STATE_KEY)) {
+    const githubAuth = parseGithubAuthState(input[GITHUB_AUTH_STATE_KEY]);
+    if (githubAuth.state !== 'connected') return { ok: false, error: 'Invalid GitHub auth state in Full Backup' };
+  }
+
+  return { ok: true, error: '' };
 }
 
 function isSafeZipPath(pathValue: unknown) {
@@ -320,6 +369,9 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
 
   const config = d.config;
   if (!config || typeof config !== 'object') return { ok: false, error: 'Missing config' };
+  if (config.includesSensitiveData != null && typeof config.includesSensitiveData !== 'boolean') {
+    return { ok: false, error: 'Invalid config.includesSensitiveData' };
+  }
   const storageLocalPath = config.storageLocalPath;
   if (!isNonEmptyString(storageLocalPath) || !isSafeZipPath(storageLocalPath)) {
     return { ok: false, error: 'Invalid config.storageLocalPath' };

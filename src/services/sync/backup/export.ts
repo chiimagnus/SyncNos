@@ -3,6 +3,7 @@ import { storageGetAll, storageSet } from '@platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
   filterStorageForBackup,
+  validateSensitiveBackupStorage,
   LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
   uniqueConversationKey,
 } from '@services/sync/backup/backup-utils';
@@ -176,7 +177,7 @@ type BackupZipExportProgress = {
 };
 
 export async function exportBackupZip(
-  options: { onProgress?: (p: BackupZipExportProgress) => void } = {},
+  options: { onProgress?: (p: BackupZipExportProgress) => void; includeSensitiveData?: boolean } = {},
 ): Promise<BackupZipExportResult> {
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   onProgress?.({ stage: 'open_db' });
@@ -196,7 +197,12 @@ export async function exportBackupZip(
 
   onProgress?.({ stage: 'read_storage' });
   const rawStorage = await storageGetAll();
-  const storageLocal = filterStorageForBackup(rawStorage);
+  const includeSensitiveData = options.includeSensitiveData === true;
+  const storageLocal = filterStorageForBackup(rawStorage, { includeSensitiveData });
+  if (includeSensitiveData) {
+    const sensitiveStorageValidation = validateSensitiveBackupStorage(storageLocal);
+    if (!sensitiveStorageValidation.ok) throw new Error(sensitiveStorageValidation.error);
+  }
 
   const exportedAtMs = Date.now();
   const exportedAt = new Date(exportedAtMs).toISOString();
@@ -423,7 +429,7 @@ export async function exportBackupZip(
       image_cache: imageCacheAssets.length,
       article_comments: articleCommentItems.length,
     },
-    config: { storageLocalPath: 'config/storage-local.json' },
+    config: { storageLocalPath: 'config/storage-local.json', includesSensitiveData: includeSensitiveData },
     index: { conversationsCsvPath: 'sources/conversations.csv' },
     sources: manifestSources,
     assets: { imageCacheIndexPath: IMAGE_CACHE_INDEX_PATH, articleCommentsIndexPath: ARTICLE_COMMENTS_INDEX_PATH },
@@ -435,7 +441,7 @@ export async function exportBackupZip(
   });
 
   const stamp = buildLocalTimestampForFilename();
-  const filename = `SyncNos-Backup-${stamp}.zip`;
+  const filename = `${includeSensitiveData ? 'SyncNos-Full-Backup' : 'SyncNos-Backup'}-${stamp}.zip`;
   onProgress?.({ stage: 'zip' });
   const blob = await createZipBlob(files);
   onProgress?.({ stage: 'finalize' });

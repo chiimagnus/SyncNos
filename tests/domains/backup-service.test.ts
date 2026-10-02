@@ -316,6 +316,71 @@ describe('backup service', () => {
     expect(expected.counts.conversations).toBeGreaterThan(0);
   });
 
+  it('does not restore injected secrets from an ordinary backup without the full-backup manifest flag', async () => {
+    const targetReaderPrefs = {
+      fontFamily: 'serif',
+      fontSize: 18,
+      lineHeight: 1.5,
+      contentWidth: 900,
+      letterSpacing: 0,
+      textAlign: 'left',
+      tts: {
+        engine: 'ai',
+        rate: 1,
+        webVoiceURI: '',
+        aiEndpoint: 'https://target.example/v1',
+        aiApiKey: 'TARGET_READER_SECRET',
+        aiModel: 'target-model',
+        aiVoice: 'target-voice',
+        aiFormat: 'opus',
+      },
+    };
+    const targetGithubAuth = {
+      version: 1,
+      state: 'connected',
+      token: { accessToken: 'TARGET_GITHUB_ACCESS', refreshToken: 'TARGET_GITHUB_REFRESH', createdAt: 2 },
+    };
+    const chromeMock = mockChromeStorage({
+      notion_oauth_token_v1: { accessToken: 'TARGET_NOTION_ACCESS' },
+      feishu_oauth_token_v1: { accessToken: 'TARGET_FEISHU_ACCESS' },
+      feishu_oauth_client_secret: 'TARGET_FEISHU_SECRET',
+      obsidian_api_key: 'TARGET_OBSIDIAN_SECRET',
+      github_auth_state_v1: targetGithubAuth,
+      reader_prefs_v1: targetReaderPrefs,
+    });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const entries = emptyBackupZipEntries({
+      notion_oauth_token_v1: { accessToken: 'INJECTED_NOTION_ACCESS' },
+      feishu_oauth_token_v1: { accessToken: 'INJECTED_FEISHU_ACCESS' },
+      feishu_oauth_client_secret: 'INJECTED_FEISHU_SECRET',
+      obsidian_api_key: 'INJECTED_OBSIDIAN_SECRET',
+      github_auth_state_v1: {
+        version: 1,
+        state: 'connected',
+        token: { accessToken: 'INJECTED_GITHUB_ACCESS', createdAt: 1 },
+      },
+      reader_prefs_v1: {
+        ...targetReaderPrefs,
+        fontSize: 27,
+        tts: { ...targetReaderPrefs.tts, aiApiKey: 'INJECTED_READER_SECRET' },
+      },
+    });
+
+    await importBackupZipMerge(entries);
+
+    expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'TARGET_NOTION_ACCESS' });
+    expect(chromeMock.__store.feishu_oauth_token_v1).toEqual({ accessToken: 'TARGET_FEISHU_ACCESS' });
+    expect(chromeMock.__store.feishu_oauth_client_secret).toBe('TARGET_FEISHU_SECRET');
+    expect(chromeMock.__store.obsidian_api_key).toBe('TARGET_OBSIDIAN_SECRET');
+    expect(chromeMock.__store.github_auth_state_v1).toEqual(targetGithubAuth);
+    expect((chromeMock.__store.reader_prefs_v1 as any).tts.aiApiKey).toBe('TARGET_READER_SECRET');
+    expect((chromeMock.__store.reader_prefs_v1 as any).fontSize).toBe(27);
+  });
+
   it('restores canonical ZIP display settings as one logical setting', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
@@ -580,6 +645,7 @@ describe('backup service', () => {
 
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
     expect(manifest.backupSchemaVersion).toBe(3);
+    expect(manifest.config.includesSensitiveData).toBe(false);
     expect(manifest.counts.conversations).toBe(1);
     expect(manifest.counts.github_cleanup_outbox).toBeUndefined();
     expect(manifest.assets.imageCacheIndexPath).toBe('assets/image-cache/index.json');
@@ -722,6 +788,113 @@ describe('backup service', () => {
     expect(
       chromeMock.__runtimeMessages.some((message: any) => message?.type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG),
     ).toBe(false);
+  });
+
+  it('full backup round-trips portable credentials while excluding transient and profile-local state', async () => {
+    const sourceReaderPrefs = {
+      fontFamily: 'mono',
+      fontSize: 24,
+      lineHeight: 1.7,
+      contentWidth: 1100,
+      letterSpacing: 0.01,
+      textAlign: 'justify',
+      tts: {
+        engine: 'ai',
+        rate: 1.2,
+        webVoiceURI: '',
+        aiEndpoint: 'https://tts.example/v1',
+        aiApiKey: 'SOURCE_READER_SECRET',
+        aiModel: 'model-a',
+        aiVoice: 'voice-a',
+        aiFormat: 'mp3',
+      },
+    };
+    const sourceGithubAuth = {
+      version: 1,
+      state: 'connected',
+      token: {
+        accessToken: 'SOURCE_GITHUB_ACCESS',
+        refreshToken: 'SOURCE_GITHUB_REFRESH',
+        createdAt: 1,
+      },
+    };
+    const chromeMock = mockChromeStorage({
+      notion_oauth_token_v1: {
+        accessToken: 'SOURCE_NOTION_ACCESS',
+        workspaceId: 'workspace-1',
+        workspaceName: 'Workspace',
+        createdAt: 1,
+      },
+      feishu_oauth_token_v1: {
+        accessToken: 'SOURCE_FEISHU_ACCESS',
+        refreshToken: 'SOURCE_FEISHU_REFRESH',
+        expiresAt: 99_999,
+        createdAt: 1,
+      },
+      feishu_oauth_client_id: 'feishu-app',
+      feishu_oauth_client_secret: 'SOURCE_FEISHU_CLIENT_SECRET',
+      feishu_oauth_token_exchange_proxy_url: 'https://worker.example.com/exchange',
+      obsidian_api_key: 'SOURCE_OBSIDIAN_SECRET',
+      github_auth_state_v1: sourceGithubAuth,
+      reader_prefs_v1: sourceReaderPrefs,
+      notion_oauth_pending_state: 'SOURCE_NOTION_PENDING',
+      feishu_oauth_pending_state: 'SOURCE_FEISHU_PENDING',
+      syncnos_cli_instance_id_v1: 'source-profile',
+      syncnos_cli_integration_enabled_v1: true,
+    });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const exported = await exportBackupZip({ includeSensitiveData: true });
+    expect(exported.filename).toMatch(/^SyncNos-Full-Backup-/);
+
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
+    expect(manifest.config.includesSensitiveData).toBe(true);
+    expect(config.storageLocal).toMatchObject({
+      notion_oauth_token_v1: { accessToken: 'SOURCE_NOTION_ACCESS' },
+      feishu_oauth_token_v1: {
+        accessToken: 'SOURCE_FEISHU_ACCESS',
+        refreshToken: 'SOURCE_FEISHU_REFRESH',
+      },
+      feishu_oauth_client_secret: 'SOURCE_FEISHU_CLIENT_SECRET',
+      obsidian_api_key: 'SOURCE_OBSIDIAN_SECRET',
+      github_auth_state_v1: sourceGithubAuth,
+      reader_prefs_v1: sourceReaderPrefs,
+    });
+    expect(config.storageLocal.notion_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.feishu_oauth_pending_state).toBeUndefined();
+    expect(config.storageLocal.syncnos_cli_instance_id_v1).toBeUndefined();
+    expect(config.storageLocal.syncnos_cli_integration_enabled_v1).toBeUndefined();
+
+    chromeMock.__store.notion_oauth_token_v1 = { accessToken: 'TARGET_NOTION_ACCESS' };
+    chromeMock.__store.feishu_oauth_token_v1 = { accessToken: 'TARGET_FEISHU_ACCESS' };
+    chromeMock.__store.feishu_oauth_client_secret = 'TARGET_FEISHU_CLIENT_SECRET';
+    chromeMock.__store.obsidian_api_key = 'TARGET_OBSIDIAN_SECRET';
+    chromeMock.__store.github_auth_state_v1 = {
+      version: 1,
+      state: 'connected',
+      token: { accessToken: 'TARGET_GITHUB_ACCESS', createdAt: 2 },
+    };
+    chromeMock.__store.reader_prefs_v1 = {
+      ...sourceReaderPrefs,
+      tts: { ...sourceReaderPrefs.tts, aiApiKey: 'TARGET_READER_SECRET' },
+    };
+
+    await importBackupZipMerge(entries);
+
+    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({ accessToken: 'SOURCE_NOTION_ACCESS' });
+    expect(chromeMock.__store.feishu_oauth_token_v1).toMatchObject({
+      accessToken: 'SOURCE_FEISHU_ACCESS',
+      refreshToken: 'SOURCE_FEISHU_REFRESH',
+    });
+    expect(chromeMock.__store.feishu_oauth_client_secret).toBe('SOURCE_FEISHU_CLIENT_SECRET');
+    expect(chromeMock.__store.obsidian_api_key).toBe('SOURCE_OBSIDIAN_SECRET');
+    expect(chromeMock.__store.github_auth_state_v1).toEqual(sourceGithubAuth);
+    expect((chromeMock.__store.reader_prefs_v1 as any).tts.aiApiKey).toBe('SOURCE_READER_SECRET');
   });
 
   it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {

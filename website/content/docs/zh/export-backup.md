@@ -20,9 +20,13 @@ description: 导出可读文件，或创建以后可以恢复到 SyncNos 的 Bac
 
 打开 **设置 → Backup** 创建恢复包。
 
-Backup 会保存可恢复的本地内容，例如已采集内容、缓存图片、评论和高亮，以及非敏感设置。
+Backup 会保存可恢复的本地内容，例如已采集内容、缓存图片、评论和高亮，以及设置。
 
-密码、token、API Key 等认证秘密不会进入 Backup。
+默认情况下，认证秘密不会进入 Backup。需要把 SyncNos 迁移到另一台设备或另一个浏览器 Profile 时，可以勾选 **包含私密数据（用于迁移）**。此时会额外保存可迁移的 OAuth Token、API Key、Client Secret 等长期凭据，导入后会一并恢复。
+
+该选项每次默认关闭，不会记住上次选择。Full Backup **不会被 SyncNos 额外加密**，拿到 ZIP 的人可能直接取得其中的凭据，因此请像保管密码文件一样保管它。
+
+临时 OAuth / Device Flow 状态、CLI 实例身份等设备运行状态不会进入 Full Backup。
 
 ## 恢复 Backup
 

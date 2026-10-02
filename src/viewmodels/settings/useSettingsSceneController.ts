@@ -318,6 +318,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [importStatus, setImportStatus] = useState<string>('');
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
+  const [includeSensitiveBackupData, setIncludeSensitiveBackupData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
   const chatDbTitle = useMemo(() => getKindDbTitle('chat'), []);
@@ -2008,6 +2009,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
         const result = await exportBackupZip({
+          includeSensitiveData: includeSensitiveBackupData,
           onProgress: ({ stage }) => {
             const label = stageLabel(stage);
             if (label) setExportStatus(`${t('backupExporting')} (${label})`);
@@ -2027,7 +2029,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         },
       },
     );
-  }, [busy, runTask]);
+  }, [busy, includeSensitiveBackupData, runTask]);
 
   const importFromFile = useCallback(
     async (file: File) => {
@@ -2233,6 +2235,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     importStatus,
     importStats,
     lastBackupExportAt,
+    includeSensitiveBackupData,
+    setIncludeSensitiveBackupData,
     backupImportRef,
     fileInputRef,
     useAppImport,
