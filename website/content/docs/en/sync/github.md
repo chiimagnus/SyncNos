@@ -1,38 +1,28 @@
 ---
 title: GitHub
-description: Sync SyncNos content as Markdown to a GitHub repository.
+description: Sync SyncNos content as Markdown into a GitHub repository.
 ---
 
-## Connect GitHub
+## Connect
 
-1. Open **SyncNos → Settings → GitHub**
-2. Click **Connect** and complete GitHub authorization
-3. If prompted, install the SyncNos GitHub App for the account or repositories you want to use
-4. Refresh the repository list and choose the destination repository
-5. Choose the destination branch
-6. Click **Test**
+1. Open **SyncNos → Settings → GitHub**.
+2. Click **Connect** and finish authorization.
+3. Install the SyncNos GitHub App for the account or repositories you want to use when prompted.
+4. Choose a repository and branch.
+5. Click **Test**.
 
-## Empty repositories
+If an empty repository is not initialized yet, use **Initialize repository** first.
 
-If Test reports that the repository is not initialized, click **Initialize repository**, then test again.
+## Sync and disconnect
 
-## Sync
+Once connected, run manual sync or enable auto-sync. SyncNos writes Markdown and attachments to the selected repository and branch.
 
-Once connected, sync manually or enable automatic sync.
+**Disconnect** removes only the SyncNos connection. Revoke GitHub authorization or uninstall the App from GitHub itself.
 
-SyncNos writes Markdown and attachments to the repository and branch you selected.
+## Troubleshoot
 
-## Disconnect
+- Repository missing: check the GitHub App's repository access and refresh the list.
+- No write access: confirm both the App and current account can write to the repository.
+- Branch missing: choose an existing or default branch.
 
-**Disconnect** removes the GitHub connection from SyncNos.
-
-To revoke GitHub authorization or uninstall the GitHub App, do that from GitHub as well.
-
-## When something fails
-
-- **Repository is missing**: check that the GitHub App can access it, then refresh the list
-- **No write permission**: make sure both the GitHub App and your account can write to the repository
-- **Empty repository cannot be tested**: use **Initialize repository** first
-- **Branch not found**: choose an existing branch or the default branch
-
-A failed sync does not delete local content. Fix the problem and sync again.
+Sync failures do not delete local content.

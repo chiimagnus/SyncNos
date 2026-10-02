@@ -3,30 +3,23 @@ title: Notion
 description: Connect Notion and sync SyncNos content under a page you choose.
 ---
 
-## Connect Notion
+## Connect
 
-1. Open **SyncNos → Settings → Notion**
-2. Click **Connect** and complete Notion authorization
-3. Choose a **Parent Page**
-4. Run one manual sync and confirm the content appears correctly
+1. Open **SyncNos → Settings → Notion**.
+2. Click **Connect** and finish authorization.
+3. Choose a **Parent Page**.
+4. Run one manual sync and confirm the result.
 
-Enable automatic sync afterward if you want it.
+Enable auto-sync only if you want it. SyncNos can access only the Notion content you authorize.
 
-SyncNos can only access content you make available during Notion authorization.
+## Managed content
 
-## What SyncNos creates
+SyncNos creates or reuses its managed content database under the Parent Page. Normal use does not require editing its fields or sections manually.
 
-SyncNos creates or uses its managed content databases under the selected Parent Page.
+Changing the Parent Page sends future syncs to the new target.
 
-You do not need to create the database structure yourself. Avoid manually changing properties and sections managed by SyncNos.
+## Disconnect and troubleshoot
 
-If you change the Parent Page, future syncs use the new destination.
+**Disconnect** removes the current SyncNos connection. To revoke authorization completely, also remove SyncNos from Notion's connection settings.
 
-## Disconnect
-
-- Click **Disconnect** in SyncNos to remove the current connection
-- To fully revoke access, remove SyncNos from Notion's connection settings as well
-
-## When sync fails
-
-Your local content stays available. Fix the connection and sync again.
+Sync failures do not affect local content. Fix the connection and retry.
