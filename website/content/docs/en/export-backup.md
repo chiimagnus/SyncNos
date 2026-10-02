@@ -20,9 +20,13 @@ Available local images are included. If an image cannot be retrieved, the text s
 
 Open **Settings → Backup** to create a recovery package.
 
-A Backup stores recoverable local data such as captured content, cached images, comments and highlights, and non-sensitive settings.
+A Backup stores recoverable local data such as captured content, cached images, comments and highlights, and settings.
 
-Passwords, tokens, API keys, and other authentication secrets are not included.
+By default, authentication secrets are excluded. When moving SyncNos to another device or browser profile, enable **Include private data (for migration)**. The resulting Full Backup also stores portable long-lived credentials such as OAuth tokens, API keys, and client secrets, and restores them during import.
+
+This option is off by default every time and is not remembered. A Full Backup is **not additionally encrypted by SyncNos**; anyone who obtains the ZIP may be able to use the credentials inside it, so protect it like a password file.
+
+Transient OAuth / Device Flow state and device-specific CLI identity are still excluded from Full Backup.
 
 ## Restore a Backup
 

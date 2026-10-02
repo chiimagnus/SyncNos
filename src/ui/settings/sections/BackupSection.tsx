@@ -2,7 +2,7 @@ import type { RefObject } from 'react';
 
 import { t } from '@i18n';
 import { formatTime } from '@viewmodels/settings/utils';
-import { buttonClassName, cardClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
 
 function ImportStatsList(props: { stats: any }) {
   const stats = props.stats;
@@ -39,6 +39,8 @@ export function BackupSection(props: {
   importStatus: string;
   importStats: any;
   lastBackupExportAt: number;
+  includeSensitiveData: boolean;
+  onChangeIncludeSensitiveData: (enabled: boolean) => void;
   backupImportRef: RefObject<HTMLDivElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   importLabel?: string;
@@ -52,6 +54,8 @@ export function BackupSection(props: {
     importStatus,
     importStats,
     lastBackupExportAt,
+    includeSensitiveData,
+    onChangeIncludeSensitiveData,
     backupImportRef,
     fileInputRef,
     importLabel,
@@ -64,10 +68,25 @@ export function BackupSection(props: {
     <section className={cardClassName} aria-label={t('databaseBackup')}>
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('databaseBackup')}</h2>
 
+      <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+        <input
+          type="checkbox"
+          checked={includeSensitiveData}
+          disabled={busy}
+          onChange={(event) => onChangeIncludeSensitiveData(event.target.checked)}
+          aria-label={t('backupIncludeSensitiveData')}
+          className={checkboxClassName}
+        />
+        {t('backupIncludeSensitiveData')}
+      </label>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        {t('backupIncludeSensitiveDataHint')}
+      </div>
+
       <div
         ref={backupImportRef}
         id="settings-backup-import"
-        className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5"
+        className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5"
       >
         <button className={buttonClassName} onClick={onExport} disabled={busy}>
           {t('exportZip')}

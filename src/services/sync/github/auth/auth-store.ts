@@ -46,7 +46,7 @@ function isSecretString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value === value.trim() && !hasAsciiControlCharacter(value);
 }
 
-function parseGithubAuthState(value: unknown): GithubAuthState {
+export function parseGithubAuthState(value: unknown): GithubAuthState {
   const raw = value as any;
   if (!raw || typeof raw !== 'object' || raw.version !== 1) return { ...DISCONNECTED };
   if (raw.state === 'disconnected') return { ...DISCONNECTED };

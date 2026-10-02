@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-09-13**
+**Last Updated: 2026-10-03**
 
 This policy covers SyncNos WebClipper on supported Chromium, Firefox-family, and Safari builds.
 
@@ -18,7 +18,7 @@ Durable captured content is stored in browser IndexedDB. Extension local storage
 
 Selected Markdown/JSON exports are assembled locally from the selected items. Referenced local image-cache assets are included when available. If selected ChatGPT content still references an uncached conversation image, export may temporarily resolve and download that image through the current signed-in ChatGPT session so it can be attached to the export; this does not add the image to the permanent local cache. If the image cannot be retrieved, the text still exports and the image is represented as unavailable. Exports do not include sync mappings, article comments, settings, or provider credentials.
 
-Backup ZIP is a separate recovery package. It may contain captured content, recoverable sync mappings, cached images, article comments, and non-sensitive settings. Authentication secrets are excluded, including provider access/refresh tokens, client secrets, the Obsidian API key, GitHub Device Flow credentials, and the Reader TTS AI API key. Machine/profile-specific CLI identity and opt-in state are also excluded.
+Backup ZIP is a separate recovery package. By default it may contain captured content, recoverable sync mappings, cached images, article comments, and non-sensitive settings, while authentication secrets are excluded. In **Settings → Backup**, the optional **Include private data (for migration)** checkbox creates a Full Backup that also contains portable long-lived credentials such as Notion/Feishu OAuth tokens, a user-configured Feishu client secret, the Obsidian API key, connected GitHub auth tokens, and the Reader TTS AI API key. This option is off by default and is not persisted. SyncNos does not add encryption to the Backup ZIP, so a Full Backup must be protected like a password file. Transient OAuth/Device Flow state and machine/profile-specific CLI identity or opt-in state are always excluded.
 
 See [storage, backup, and recovery](docs/storage.md) for the recovery contract.
 
@@ -65,7 +65,7 @@ Obsidian sync uses the Local REST API plugin on the same computer. The current i
 
 GitHub sync uses GitHub App Device Flow and sends authorization, repository, Git, Markdown, and managed asset requests directly to GitHub over HTTPS. SyncNos does not embed a GitHub Client Secret or App private key.
 
-GitHub access/refresh tokens and pending Device Flow credentials remain in extension-local storage and are excluded from Backup ZIP. SyncNos **Disconnect** clears the Extension's local GitHub auth state; revoking authorization or uninstalling the GitHub App is a separate action on GitHub.
+GitHub access/refresh tokens and pending Device Flow credentials remain in extension-local storage. Connected GitHub tokens are excluded from ordinary Backup ZIP files but can be included when the user explicitly creates a Full Backup for migration; pending Device Flow credentials are always excluded. SyncNos **Disconnect** clears the Extension's local GitHub auth state; revoking authorization or uninstalling the GitHub App is a separate action on GitHub.
 
 ### Image hosts
 
@@ -75,7 +75,7 @@ Third-party services process data under their own privacy policies once data is 
 
 ## Credentials and permissions
 
-OAuth tokens and locally configured secrets are stored in extension-local storage and excluded from Backup ZIP as described above.
+OAuth tokens and locally configured secrets are stored in extension-local storage. They are excluded from ordinary Backup ZIP files and are included only when the user explicitly enables the Full Backup migration option described above.
 
 The manifest source of truth is `wxt.config.ts`. Current builds request permissions for local storage, context menus, tab/navigation handling, packaged script injection, scheduled work, and anti-hotlink request handling. Browser-specific builds may differ where platform APIs differ.
 

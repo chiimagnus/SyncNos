@@ -154,7 +154,10 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // BackupSection
   databaseBackup: '数据库备份',
-  exportZip: '导出 (Zip v2)',
+  exportZip: '导出备份',
+  backupIncludeSensitiveData: '包含私密数据（用于迁移）',
+  backupIncludeSensitiveDataHint:
+    '包含 OAuth Token、API Key 和 Client Secret。备份文件将包含可直接使用的凭据，请妥善保管。',
   importDots: '导入\u2026',
   lastExport: '上次导出：',
   statsConversations: '对话：',

@@ -26,7 +26,9 @@ Once data is sent to a third party, that service's own privacy policy applies.
 
 Tokens, API keys, client secrets, and other credentials required by sync services are stored locally by the extension.
 
-These authentication secrets are not written into ordinary captured content and are not included in SyncNos Backups.
+These authentication secrets are not written into ordinary captured content. Ordinary Backups exclude them by default; a Full Backup includes portable long-lived credentials only when you explicitly enable **Include private data (for migration)** in **Settings → Backup**.
+
+Full Backups are not additionally encrypted by SyncNos, so protect them like password files. Transient OAuth / Device Flow state and device-specific state are still excluded.
 
 See [Export & backup](/docs/en/export-backup/) for how backups work.
 

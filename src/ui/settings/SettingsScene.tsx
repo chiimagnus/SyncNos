@@ -151,6 +151,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     importStatus,
     importStats,
     lastBackupExportAt,
+    includeSensitiveBackupData,
+    setIncludeSensitiveBackupData,
     backupImportRef,
     fileInputRef,
     useAppImport,
@@ -416,6 +418,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           importStatus={importStatus}
           importStats={importStats}
           lastBackupExportAt={lastBackupExportAt}
+          includeSensitiveData={includeSensitiveBackupData}
+          onChangeIncludeSensitiveData={setIncludeSensitiveBackupData}
           backupImportRef={backupImportRef}
           fileInputRef={fileInputRef}
           importLabel={useAppImport ? t('importInApp') : undefined}

@@ -165,6 +165,12 @@ async function openV13Db() {
   return reqToPromise(indexedDB.open('webclipper', 13));
 }
 
+async function openV14Db() {
+  const db13 = await openV13Db();
+  db13.close();
+  return reqToPromise(indexedDB.open('webclipper', 14));
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -762,6 +768,90 @@ describe('storage schema migration (v14 independent comment content nodes)', () 
     expect(
       rows.find((row) => Number(row.parentId) === importedRootId && row.commentText === 'imported note'),
     ).toMatchObject({ importSource: 'dedao', importKey: 'note-1', quoteText: '', locator: null });
+  });
+});
+
+describe('storage schema migration (v15 legacy trimmed comment quotes)', () => {
+  it('restores locator-exact whitespace and then safely splits recoverable composite roots', async () => {
+    const db14 = await openV14Db();
+    const tx14 = db14.transaction(['article_comments'], 'readwrite');
+    const comments = tx14.objectStore('article_comments');
+    const highlightId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v15',
+        authorName: 'Chii',
+        quoteText: 'highlight',
+        commentText: '',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'highlight\n' },
+          position: { type: 'TextPositionSelector', start: 0, end: 10 },
+        },
+        createdAt: 100,
+        updatedAt: 100,
+      }) as IDBRequest<number>,
+    );
+    const compositeId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v15',
+        authorName: 'Chii',
+        quoteText: 'quoted text',
+        commentText: 'legacy note',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'quoted text\n' },
+          position: { type: 'TextPositionSelector', start: 0, end: 12 },
+        },
+        createdAt: 200,
+        updatedAt: 201,
+      }) as IDBRequest<number>,
+    );
+    const ambiguousId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId: 1,
+        canonicalUrl: 'https://example.com/comments-v15',
+        authorName: 'Chii',
+        quoteText: 'keep historical text',
+        commentText: 'keep historical note',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'different text' },
+          position: { type: 'TextPositionSelector', start: 0, end: 14 },
+        },
+        createdAt: 300,
+        updatedAt: 300,
+      }) as IDBRequest<number>,
+    );
+    await txDone(tx14);
+    db14.close();
+
+    const currentDb = await openDb();
+    expect(currentDb.version).toBe(DB_VERSION);
+    const verifyTx = currentDb.transaction(['article_comments'], 'readonly');
+    const rows = await reqToPromise<any[]>(verifyTx.objectStore('article_comments').getAll());
+    await txDone(verifyTx);
+
+    expect(rows.find((row) => Number(row.id) === highlightId)).toMatchObject({
+      quoteText: 'highlight\n',
+      commentText: '',
+    });
+    const composite = rows.find((row) => Number(row.id) === compositeId);
+    expect(composite).toMatchObject({ quoteText: 'quoted text\n', commentText: '' });
+    expect(rows.find((row) => Number(row.parentId) === compositeId && row.commentText === 'legacy note')).toMatchObject(
+      { quoteText: '', locator: null, authorName: 'Chii', createdAt: 200, updatedAt: 201 },
+    );
+    expect(rows.find((row) => Number(row.id) === ambiguousId)).toMatchObject({
+      quoteText: 'keep historical text',
+      commentText: 'keep historical note',
+    });
   });
 });
 

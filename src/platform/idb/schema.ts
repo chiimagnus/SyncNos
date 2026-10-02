@@ -8,7 +8,7 @@ import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-reco
 import { normalizeLegacyMessageRecord } from '@platform/idb/message-record';
 
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 14;
+export const DB_VERSION = 15;
 
 type MigrationContext = {
   tx: IDBTransaction;
@@ -177,6 +177,48 @@ function migrateArticleCommentContentNodesForV14({ tx }: MigrationContext): void
     ) {
       cursor.update({ ...row, parentId: null, quoteText, commentText: '' } as any);
       const child = { ...row, parentId: rowId, quoteText: '', commentText, locator: null } as Record<string, unknown>;
+      delete child.id;
+      commentsStore.add(child as any);
+    }
+    cursor.continue();
+  };
+}
+
+function migrateTrimmedArticleCommentQuotesForV15({ tx }: MigrationContext): void {
+  const commentsStore = tx.objectStore('article_comments');
+  const req = commentsStore.openCursor();
+  req.onsuccess = () => {
+    const cursor = req.result;
+    if (!cursor) return;
+    const row = (cursor.value || {}) as Record<string, unknown>;
+    const rowId = Number(row.id);
+    const parentId = Number(row.parentId);
+    const quoteText = String(row.quoteText ?? '').replace(/\r\n?/g, '\n');
+    const locatorExact = String((row.locator as any)?.quote?.exact ?? '').replace(/\r\n?/g, '\n');
+    const commentText = safeString(row.commentText);
+    const isRoot = Number.isSafeInteger(rowId) && rowId > 0 && !(Number.isSafeInteger(parentId) && parentId > 0);
+    const canRecoverTrimmedQuote =
+      isRoot && !!quoteText.trim() && locatorExact !== quoteText && locatorExact.trim() === quoteText;
+
+    if (!canRecoverTrimmedQuote) {
+      cursor.continue();
+      return;
+    }
+
+    cursor.update({
+      ...row,
+      parentId: null,
+      quoteText: locatorExact,
+      commentText: commentText ? '' : row.commentText,
+    } as any);
+    if (commentText) {
+      const child = {
+        ...row,
+        parentId: rowId,
+        quoteText: '',
+        commentText,
+        locator: null,
+      } as Record<string, unknown>;
       delete child.id;
       commentsStore.add(child as any);
     }
@@ -771,6 +813,7 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   if (!tx || oldVersion === 0 || oldVersion >= DB_VERSION) return;
 
   if (oldVersion < 14) migrateArticleCommentContentNodesForV14({ tx });
+  if (oldVersion < 15) migrateTrimmedArticleCommentQuotesForV15({ tx });
 
   const migrateMessages = () => {
     if (oldVersion < 12) normalizeMessageRecordsForV12({ tx });

@@ -26,7 +26,9 @@ description: 了解内容保存位置、联网场景、凭据和浏览器权限�
 
 同步服务需要的 token、API Key、Client Secret 等认证信息保存在扩展本地。
 
-这些认证秘密不会写进普通采集内容，也不会进入 SyncNos Backup。
+这些认证秘密不会写进普通采集内容。普通 Backup 默认也不包含它们；只有你在 **设置 → Backup** 中显式勾选 **包含私密数据（用于迁移）** 时，Full Backup 才会包含可迁移的长期凭据。
+
+Full Backup 不会被 SyncNos 额外加密，请像密码文件一样保管。临时 OAuth / Device Flow 状态和设备特定状态仍不会迁移。
 
 Backup 的用途见[导出与备份](/docs/export-backup/)。
 

@@ -3,6 +3,14 @@ import { buildCanonicalWebArticleIdentity } from '@services/conversations/domain
 import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageGet, storageSet } from '@platform/storage/local';
 import { saveFeishuOAuthConfig } from '@services/sync/feishu/auth/oauth';
+import { FEISHU_OAUTH_TOKEN_KEY, replaceFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
+import { NOTION_OAUTH_TOKEN_KEY, replaceNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { OBSIDIAN_STORAGE_KEYS, saveObsidianSettings } from '@services/sync/obsidian/settings-store';
+import {
+  GITHUB_AUTH_STATE_KEY,
+  replaceGithubAuthState,
+  type GithubAuthState,
+} from '@services/sync/github/auth/auth-store';
 import {
   areBackupValuesEqual,
   filterStorageForBackup,
@@ -13,6 +21,7 @@ import {
   validateBackupManifest,
   validateConversationBundle,
   validateStorageLocalDocument,
+  validateSensitiveBackupStorage,
 } from '@services/sync/backup/backup-utils';
 import { openDb } from '@platform/idb/schema';
 import { reqToPromise } from '@services/sync/backup/idb';
@@ -186,6 +195,22 @@ const FEISHU_PORTABLE_AUTH_CONFIG_KEYS = {
 
 async function applyImportedStorageSettings(filteredSettings: Record<string, unknown>): Promise<void> {
   const directSettings = { ...filteredSettings };
+  const githubAuthState = Object.prototype.hasOwnProperty.call(directSettings, GITHUB_AUTH_STATE_KEY)
+    ? (directSettings[GITHUB_AUTH_STATE_KEY] as GithubAuthState)
+    : null;
+  delete directSettings[GITHUB_AUTH_STATE_KEY];
+  const notionToken = Object.prototype.hasOwnProperty.call(directSettings, NOTION_OAUTH_TOKEN_KEY)
+    ? directSettings[NOTION_OAUTH_TOKEN_KEY]
+    : null;
+  delete directSettings[NOTION_OAUTH_TOKEN_KEY];
+  const feishuToken = Object.prototype.hasOwnProperty.call(directSettings, FEISHU_OAUTH_TOKEN_KEY)
+    ? directSettings[FEISHU_OAUTH_TOKEN_KEY]
+    : null;
+  delete directSettings[FEISHU_OAUTH_TOKEN_KEY];
+  const obsidianApiKey = Object.prototype.hasOwnProperty.call(directSettings, OBSIDIAN_STORAGE_KEYS.apiKey)
+    ? directSettings[OBSIDIAN_STORAGE_KEYS.apiKey]
+    : null;
+  delete directSettings[OBSIDIAN_STORAGE_KEYS.apiKey];
   const hasDisplayMode = Object.prototype.hasOwnProperty.call(directSettings, INPAGE_DISPLAY_MODE_STORAGE_KEY);
   const displayMode = directSettings[INPAGE_DISPLAY_MODE_STORAGE_KEY];
   delete directSettings[INPAGE_DISPLAY_MODE_STORAGE_KEY];
@@ -200,6 +225,10 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
   if (Object.prototype.hasOwnProperty.call(directSettings, FEISHU_PORTABLE_AUTH_CONFIG_KEYS.tokenExchangeProxyUrl)) {
     feishuConfig.tokenExchangeProxyUrl = directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.tokenExchangeProxyUrl];
     delete directSettings[FEISHU_PORTABLE_AUTH_CONFIG_KEYS.tokenExchangeProxyUrl];
+  }
+  if (Object.prototype.hasOwnProperty.call(directSettings, 'feishu_oauth_client_secret')) {
+    feishuConfig.clientSecret = directSettings.feishu_oauth_client_secret;
+    delete directSettings.feishu_oauth_client_secret;
   }
 
   if (Object.keys(directSettings).length) await storageSet(directSettings);
@@ -216,6 +245,10 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
   }
 
   if (Object.keys(feishuConfig).length) await saveFeishuOAuthConfig(feishuConfig);
+  if (notionToken) await replaceNotionOAuthToken(notionToken);
+  if (feishuToken) await replaceFeishuOAuthToken(feishuToken);
+  if (obsidianApiKey != null) await saveObsidianSettings({ apiKey: obsidianApiKey });
+  if (githubAuthState) await replaceGithubAuthState(githubAuthState);
 }
 
 function normalizeHttpUrl(raw: unknown): string {
@@ -327,7 +360,14 @@ export async function importBackupZipMerge(
   const configValidation = validateStorageLocalDocument(configDoc);
   if (!configValidation.ok) throw new Error(configValidation.error || 'Invalid storage-local.json');
 
-  const filteredSettings = filterStorageForBackup((configDoc as any).storageLocal || {});
+  const includesSensitiveData = (manifest as any)?.config?.includesSensitiveData === true;
+  const filteredSettings = filterStorageForBackup((configDoc as any).storageLocal || {}, {
+    includeSensitiveData: includesSensitiveData,
+  });
+  if (includesSensitiveData) {
+    const sensitiveStorageValidation = validateSensitiveBackupStorage(filteredSettings);
+    if (!sensitiveStorageValidation.ok) throw new Error(sensitiveStorageValidation.error);
+  }
   const settingsKeys = Object.keys(filteredSettings);
 
   const convoFiles: string[] = [];
