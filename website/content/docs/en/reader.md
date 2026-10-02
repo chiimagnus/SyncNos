@@ -1,33 +1,20 @@
 ---
-title: Reading, narration & outlines
-description: Adjust article/video reading and jump quickly through long articles or conversations.
+title: Reader, narration & outline
+description: Adjust article and video reading, and jump through long content.
 ---
 
-## Article and video reader
+Open a saved article or video and use reader tools from **More** in the upper-right detail actions.
 
-Open a saved web article or video. Reader tools are available from the upper-right **More** menu in the detail view.
+## Reading
 
-### Text & layout
+Adjust font, size, line height, content width, letter spacing, alignment, and theme.
 
-You can adjust:
+## Narration
 
-- Serif, sans-serif, or monospace font
-- Font size, line height, content width, and letter spacing
-- Left or justified alignment
+Use browser Web Speech or a configured AI narration endpoint. You can control rate, voice, and playback position, and click a sentence to continue from there.
 
-### Theme
+## Outline
 
-The reader supports system, light, sepia, dark, and black themes.
+Articles and videos show an outline when heading structure is available. AI chats use a separate conversation outline organized by user turns.
 
-### Read aloud
-
-Use browser Web Speech or configure an AI narration endpoint. Narration supports speed, voice, and playback-position controls.
-
-While narration is active, click a sentence to continue from that location.
-
-## Outline navigation
-
-- **Web articles / videos**: when the rendered content has headings, use the reading outline to jump through long items
-- **AI conversations**: use a separate conversation outline to jump by user turn
-
-AI conversations do not use the article/video typography, theme, or narration controls.
+AI chats do not currently use the article/video layout, theme, or narration tools.

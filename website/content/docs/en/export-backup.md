@@ -1,35 +1,26 @@
 ---
 title: Export & backup
-description: Export readable files or create a Backup that can later restore SyncNos.
+description: Export readable files or create a Backup that SyncNos can restore later.
 ---
 
-- Want files you can keep or use in other tools: choose **Markdown / JSON export**
-- Want to restore SyncNos later: create a **Backup**
-- Want Notion, Obsidian, Feishu, or GitHub to stay updated: [use sync](/docs/en/sync/)
+- Need ordinary files: use **Markdown / JSON export**
+- Need to restore or migrate SyncNos: use **Backup**
+- Need continuous external updates: [use sync](/docs/en/sync/)
 
-## Export Markdown / JSON
+## Export
 
-Select content in your local library and export it as Markdown or JSON. The result is packaged as a ZIP.
+Select items in the local library and export a Markdown or JSON ZIP. Available local images are included; missing images do not block text export.
 
-- **Markdown**: best for reading, editing, and writing
-- **JSON**: best for programmatic use and structured data
-
-Available local images are included. If an image cannot be retrieved, the text still exports normally.
-
-## Create a Backup
+## Backup
 
 Open **Settings → Backup** to create a recovery package.
 
-A Backup stores recoverable local data such as captured content, cached images, comments and highlights, and settings.
+A normal Backup contains recoverable local content and settings but excludes authentication credentials.
 
-By default, authentication secrets are excluded. When moving SyncNos to another device or browser profile, enable **Include private data (for migration)**. The resulting Full Backup also stores portable long-lived credentials such as OAuth tokens, API keys, and client secrets, and restores them during import.
+When moving to another device or browser profile, enable **Include private data (for migration)**. This adds portable sign-in credentials to the Backup; the option is off by default.
 
-This option is off by default every time and is not remembered. A Full Backup is **not additionally encrypted by SyncNos**; anyone who obtains the ZIP may be able to use the credentials inside it, so protect it like a password file.
+A Full Backup is not additionally encrypted by SyncNos. Protect it like a password file.
 
-Transient OAuth / Device Flow state and device-specific CLI identity are still excluded from Full Backup.
+## Restore
 
-## Restore a Backup
-
-Importing a Backup merges it into your current local library instead of clearing your existing data first.
-
-Backup is primarily for restoring SyncNos. For long-term readable data, keep Markdown / JSON exports as well.
+Import merges Backup data into the current local library instead of clearing existing content first.

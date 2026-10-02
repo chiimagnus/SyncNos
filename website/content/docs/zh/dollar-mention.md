@@ -1,33 +1,17 @@
 ---
 title: $ 插入
-description: 在支持的 AI 输入框中搜索本地条目，并把已保存内容插入当前编辑器。
+description: 在支持的 AI 输入框中搜索本地条目，并插入已保存内容。
 ---
 
-`$ 插入`让你在 AI 对话页面里直接复用 SyncNos 本地库，不需要先同步到 Notion 或其它服务。
+在 **设置 → 通用 → $ 插入** 开启 **$ 插入条目**。
 
-## 开启功能
-
-打开**设置 → 通用 → $ 插入**，启用**$ 插入条目**。
-
-## 使用方法
+## 使用
 
 1. 在支持的 AI 输入框中输入 `$`。
-2. 继续输入关键词缩小本地条目范围。
-3. 使用 `↑` / `↓` 选择候选。
-4. 按 `Tab` 或 `Enter`，把选中条目的 Markdown 插入当前编辑器。
-5. 检查内容后，再由你决定是否发送给 AI。
+2. 输入关键词搜索本地条目。
+3. 用 `↑` / `↓` 选择，按 `Tab` 或 `Enter` 插入 Markdown。
+4. 检查内容后，再决定是否发送。
 
-## 支持的平台
+支持 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 和 z.ai。
 
-- ChatGPT
-- Gemini
-- Google AI Studio
-- DeepSeek
-- Kimi
-- 豆包
-- 元宝
-- Poe
-- Notion AI
-- z.ai
-
-候选内容来自本地库。这个功能不会因为选择条目就自动发送消息。
+选择条目只会插入内容，不会自动发送消息。

@@ -1,29 +1,16 @@
 ---
-title: Data overview
-description: See local capture counts, trends, source distribution, and frequently used content.
+title: Insights
+description: View local capture counts, trends, and source distribution.
 ---
 
-Open **Settings → About you** to view local SyncNos statistics.
+Open **Settings → Insights**.
 
-These statistics read directly from the local library. They do not require uploading data to a SyncNos server or connecting an external sync service.
+You can see:
 
-## What it shows
-
-- Total clips plus AI conversation, web article, and video counts
-- Total AI-chat messages and platform distribution
-- Web-article domain distribution
-- Video platform distribution
-- Longest AI conversations
-- Most-commented article or video items
+- Counts for AI chats, web articles, and videos
+- Message totals and source distribution
+- Article domains and video platforms
+- Longest chats and items with more comments
 - Daily capture trends
 
-## Time ranges
-
-Switch between:
-
-- All data
-- Today
-- Past 7 days
-- Past 30 days
-
-Top entries can open the corresponding local item so you can continue reading.
+Ranges include all time, today, the last 7 days, and the last 30 days. Top items can be opened directly.
