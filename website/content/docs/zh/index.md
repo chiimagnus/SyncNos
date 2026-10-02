@@ -3,31 +3,17 @@ title: 从这里开始
 description: 先保存一条内容，再按需要阅读、同步或导出。
 ---
 
-## 先保存一条内容
-
 1. [安装 SyncNos](/docs/install/)
 2. 打开一个 AI 对话、网页文章或 YouTube / Bilibili 视频
 3. 从 Popup 或页内入口保存当前内容
-4. 回到 SyncNos，在本地库中确认保存结果
+4. 到[本地库](/docs/library/)确认结果
 
-第一次保存不需要连接 Notion、Obsidian、飞书或 GitHub。
+第一次使用不需要连接任何外部服务。
 
-不同来源的保存方式见[采集内容](/docs/capture/)。
+## 下一步
 
-## 内容保存在哪里
-
-所有内容都会先进入 SyncNos 的[本地库](/docs/library/)。
-
-之后你可以选择：
-
-- [同步到 Notion、Obsidian、飞书或 GitHub](/docs/sync/)
-- [导出 Markdown / JSON，或创建 Backup](/docs/export-backup/)
-- 继续只在本地使用
-
-## 继续了解
-
-- [采集总览](/docs/capture/)：按 AI 对话、网页文章、视频查看具体保存方式
-- [功能总览](/docs/features/)：浏览器快捷键、划线评论、阅读朗读、`$` 插入、数据概览等
+- [采集内容](/docs/capture/)：查看不同内容的保存方式
+- [功能](/docs/features/)：阅读、划线、评论、$ 插入和数据概览
 - [同步](/docs/sync/)：连接 Notion、Obsidian、飞书或 GitHub
+- [导出与备份](/docs/export-backup/)：导出文件或创建恢复包
 - [CLI & AI SKILL](/docs/cli/)：让 AI Agent 使用 SyncNos
-- [排障与常见问题](/docs/faq/)：遇到问题时从这里开始

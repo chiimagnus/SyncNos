@@ -1,24 +1,16 @@
 ---
 title: Capture videos
-description: Save YouTube and Bilibili subtitles and available video metadata without downloading audio or video files.
+description: Save subtitles and available metadata from YouTube and Bilibili without downloading media files.
 ---
-
-## Supported sources
-
-SyncNos supports YouTube and Bilibili video pages.
 
 ## Save a video
 
-1. Open the target video page.
-2. Choose **Save video** in the SyncNos popup.
-3. Return to the [local library](/docs/en/library/) and open the video item.
+1. Open a YouTube or Bilibili video.
+2. Choose **Save video** in the popup.
+3. Open the video item in the [local library](/docs/en/library/).
 
-SyncNos reads subtitles available on the page and preserves timing information when possible. A video item can still be saved when no subtitles are available.
+When subtitles are available, SyncNos keeps the transcript and timing. Videos can still be saved without subtitles. Descriptions and chapters are also kept when the page provides them.
 
-When the page provides them, the detail view can also show the video description and chapters.
+SyncNos does not download the audio or video file itself.
 
-## What SyncNos does not download
-
-SyncNos does not download the audio or video file itself. It stores readable subtitles and page metadata for later search, reading, export, or sync.
-
-After saving, use [Reading, narration & outlines](/docs/en/reader/) to adjust the reading experience.
+After saving, use [reader, narration & outline](/docs/en/reader/) if needed.

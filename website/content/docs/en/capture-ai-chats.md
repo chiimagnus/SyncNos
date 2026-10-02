@@ -1,55 +1,36 @@
 ---
-title: Capture AI conversations
+title: Capture AI chats
 description: Save supported AI chats and understand manual capture, auto-save, and ChatGPT Advanced capture.
 ---
 
 ## Supported platforms
 
-| Platform | Save method |
+| Platform | Capture |
 | --- | --- |
-| ChatGPT | Manual |
-| Gemini | Can auto-save |
-| Google AI Studio | Manual |
-| DeepSeek | Can auto-save |
-| Kimi | Can auto-save |
-| Doubao | Can auto-save |
-| Yuanbao | Can auto-save |
-| Poe | Can auto-save |
-| Notion AI | Can auto-save |
-| z.ai | Can auto-save |
+| ChatGPT, Claude, Google AI Studio | Manual |
+| Gemini, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, z.ai | Auto-save available |
 
-ChatGPT and Google AI Studio use virtualized lists, so the full history may not exist in the page at once. They are therefore excluded from auto-save.
+Manual-only platforms use virtualized histories, so the whole conversation is not always present in the page at once.
 
 ## Manual capture
 
-1. Open the conversation and switch to the thread you want to save.
-2. Choose **Capture AI chat** in the SyncNos popup, or use the context-menu action to save the current AI conversation.
-3. Return to the [local library](/docs/en/library/) and confirm the conversation and messages.
+1. Open the target conversation.
+2. Choose **Capture AI chat** in the popup, or save the current chat from the context menu.
+3. Confirm the result in the [local library](/docs/en/library/).
 
-For platforms that support auto-save, enable it under **Settings → General → Auto save**.
+For supported platforms, enable auto-save under **Settings → General → Auto save**.
 
 ## ChatGPT Advanced capture
 
-ChatGPT uses **page capture** by default. Advanced capture is optional and can be enabled under **Settings → General → ChatGPT Advanced capture**.
+ChatGPT uses page capture by default. **Settings → General → ChatGPT Advanced capture** enables an alternative manual capture path.
 
-It is not a “more complete” mode. It uses a different source:
+- **Page capture**: best when you want content already loaded or expanded in the page.
+- **Advanced capture**: better for stable current-branch identity and long conversations, but it cannot recover thinking/progress that ChatGPT did not keep.
 
-|  | Default page capture | Advanced capture |
-| --- | --- | --- |
-| Reads from | Content currently loaded and rendered in the page | The current conversation branch saved by ChatGPT |
-| Best for | Preserving expanded thinking and progress shown in the page | Stable branch and message identity, especially in long conversations |
-| Main limitation | Content that has not been loaded or expanded may be missed | ChatGPT may no longer retain all thinking or progress that was previously shown in the page |
+Advanced capture does not silently fall back to page capture. Disable it and save again if you want the page path.
 
-If preserving the **most complete thinking process** matters more, leave Advanced capture off and expand the thinking you want to keep before saving.
+## Images and reuse
 
-If preserving a **stable conversation structure and current branch** matters more, enable Advanced capture. Citations are converted into readable links, and rich widgets such as charts keep only useful long-term text.
+Image caching can be disabled without blocking text capture.
 
-A reply that is still generating can be saved as a partial result and updated by saving again after it finishes. If Advanced capture fails, SyncNos does not silently switch to page capture; turn it off and save again instead.
-
-On a supported chat surface, capture stays available even before any message is present. If there is nothing capturable when you run it, SyncNos reports that no visible conversation was found.
-
-## Images and local reuse
-
-AI conversation images can be cached locally. Turning automatic image caching off does not prevent the text from being saved.
-
-After saving, you can also use [$ Mention](/docs/en/dollar-mention/) to insert local items into supported AI inputs.
+Saved items can also be inserted into supported AI editors with [$ insert](/docs/en/dollar-mention/).
