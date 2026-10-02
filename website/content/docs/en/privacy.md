@@ -1,43 +1,24 @@
 ---
 title: Privacy & data
-description: Learn where content is stored, when SyncNos uses the network, and how credentials and permissions are handled.
+description: Understand local storage, network use, and credentials in Backups.
 ---
 
-This page is a quick summary. See [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md) for the complete policy.
+See the full policy in [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).
 
-## Content is local by default
+## Local first
 
-Captured content is saved in your browser first.
-
-You can capture, read, search, export, and back up content without connecting any external service.
+Captured content is saved in the browser first. You can capture, read, search, export, and back up without connecting an external service.
 
 ## When SyncNos uses the network
 
-SyncNos contacts an external service only when you enable or use a feature that needs it, for example:
+SyncNos contacts external services only for features you use, such as sync, ChatGPT Advanced capture, and image retrieval. Obsidian sync uses a Local REST API on the same computer.
 
-- syncing to Notion, Feishu, or GitHub
-- using the Obsidian Local REST API on the same computer
-- enabling ChatGPT Advanced capture
-- caching or retrieving images used by saved content
+## Credentials and Backup
 
-Once data is sent to a third party, that service's own privacy policy applies.
+Authentication credentials stay in extension-local storage and are not written into ordinary captured content or normal Backups.
 
-## Credentials and backups
+Only **Settings → Backup → Include private data (for migration)** adds portable credentials to a Full Backup. Full Backups are not additionally encrypted, so protect them carefully.
 
-Tokens, API keys, client secrets, and other credentials required by sync services are stored locally by the extension.
+See [Export & backup](/docs/en/export-backup/) for Backup behavior.
 
-These authentication secrets are not written into ordinary captured content. Ordinary Backups exclude them by default; a Full Backup includes portable long-lived credentials only when you explicitly enable **Include private data (for migration)** in **Settings → Backup**.
-
-Full Backups are not additionally encrypted by SyncNos, so protect them like password files. Transient OAuth / Device Flow state and device-specific state are still excluded.
-
-See [Export & backup](/docs/en/export-backup/) for how backups work.
-
-## Browser permissions
-
-SyncNos needs access to pages you choose to capture and to sync, authorization, and image endpoints you configure or use.
-
-Broad webpage access does not mean page content is uploaded by default.
-
-The extension ships with its executable code and does not download and run remote code from the network.
-
-For complete data-flow, permission, and credential details, read [PRIVACY.md](https://github.com/chiimagnus/SyncNos/blob/main/PRIVACY.md).
+Browser access permissions let SyncNos capture pages you choose and contact services you configure; broad page access does not mean content is uploaded by default.

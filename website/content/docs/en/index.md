@@ -1,33 +1,19 @@
 ---
 title: Start here
-description: Save one item first, then choose whether to read, sync, or export it.
+description: Save one item first, then read, sync, or export when you need to.
 ---
 
-## Save one item
-
 1. [Install SyncNos](/docs/en/install/)
-2. Open an AI conversation, web article, or YouTube / Bilibili video
-3. Save the current content from the popup or in-page entry point
-4. Return to SyncNos and confirm it appears in your local library
+2. Open an AI chat, web article, or YouTube / Bilibili video
+3. Save it from the popup or in-page entry point
+4. Confirm it in the [local library](/docs/en/library/)
 
-You do not need to connect Notion, Obsidian, Feishu, or GitHub before your first save.
+You do not need to connect an external service first.
 
-See [Capture content](/docs/en/capture/) for source-specific save behavior.
+## Next
 
-## Where your content goes
-
-Everything is saved to the SyncNos [local library](/docs/en/library/) first.
-
-From there, you can:
-
-- [Sync to Notion, Obsidian, Feishu, or GitHub](/docs/en/sync/)
-- [Export Markdown / JSON or create a backup](/docs/en/export-backup/)
-- Keep using SyncNos locally without an external service
-
-## Learn more
-
-- [Capture overview](/docs/en/capture/): see the exact save flow for AI chats, articles, and videos
-- [Feature overview](/docs/en/features/): browser shortcuts, highlights, narration, `$` insert, local stats, and more
+- [Capture](/docs/en/capture/): how each content type is saved
+- [Features](/docs/en/features/): reading, highlights, comments, $ insert, and insights
 - [Sync](/docs/en/sync/): connect Notion, Obsidian, Feishu, or GitHub
-- [CLI & AI SKILL](/docs/en/cli/): let AI agents use SyncNos
-- [Troubleshooting & FAQ](/docs/en/faq/): start here when something does not work
+- [Export & backup](/docs/en/export-backup/): export files or create a recovery package
+- [CLI & AI SKILL](/docs/en/cli/): let an AI agent use SyncNos

@@ -1,33 +1,17 @@
 ---
-title: $ Mention
-description: Search local SyncNos items from a supported AI input and insert saved content into the current editor.
+title: $ insert
+description: Search local items from supported AI editors and insert saved content.
 ---
 
-`$ Mention` lets you reuse the SyncNos local library directly inside AI chat pages. No Notion or other external sync service is required.
-
-## Enable it
-
-Open **Settings → General → $ Mention** and enable **Enable $ mention**.
+Enable **$ insert items** under **Settings → General → $ insert**.
 
 ## Use it
 
-1. Type `$` in a supported AI input.
-2. Keep typing to narrow the local results.
-3. Use `↑` / `↓` to choose a candidate.
-4. Press `Tab` or `Enter` to insert the selected item's Markdown into the current editor.
-5. Review the inserted content, then decide whether to send it to the AI.
+1. Type `$` in a supported AI editor.
+2. Enter keywords to search local items.
+3. Use `↑` / `↓`, then press `Tab` or `Enter` to insert Markdown.
+4. Review the content before sending.
 
-## Supported platforms
+Supported: ChatGPT, Claude, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai.
 
-- ChatGPT
-- Gemini
-- Google AI Studio
-- DeepSeek
-- Kimi
-- Doubao
-- Yuanbao
-- Poe
-- Notion AI
-- z.ai
-
-Candidates come from your local library. Selecting one does not automatically send a message.
+Selecting an item inserts content only; it never sends the message automatically.

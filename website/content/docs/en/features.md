@@ -1,18 +1,16 @@
 ---
-title: Feature overview
-description: See what you can do in SyncNos after content has been saved.
+title: Features
+description: See what you can do with content after saving it to SyncNos.
 ---
 
-Capture is only the first step. The features below work directly with the local library and do not require an external sync service.
+After capture, you can use:
 
-| Feature | What it is for |
-| --- | --- |
-| [Local library](/docs/en/library/) | Search, read, copy full Markdown, and open original or synced destinations |
-| [Browser keyboard shortcuts](/docs/en/capture/#browser-keyboard-shortcuts) | Open the popup, save the current page, or open/focus the SyncNos app; bindings are managed by the browser |
-| [Highlights & comments](/docs/en/comments/) | Save quotes, highlights, comments, and replies on web articles |
-| [Reading, narration & outlines](/docs/en/reader/) | Adjust article/video typography and theme, read content aloud, and navigate long items |
-| [$ Mention](/docs/en/dollar-mention/) | Search local items and insert them into supported AI inputs |
-| [Data overview](/docs/en/insights/) | See local capture counts, trends, source distribution, and frequently used content |
-| [Export & backup](/docs/en/export-backup/) | Export Markdown / JSON or create a restorable backup |
+- [Local library](/docs/en/library/): search, read, and continue working with saved content
+- [Highlights & comments](/docs/en/comments/): save quotes and comments on web articles
+- [Reader, narration & outline](/docs/en/reader/): adjust reading and jump through long content
+- [$ insert](/docs/en/dollar-mention/): insert local content into AI editors
+- [Insights](/docs/en/insights/): view local capture statistics
+- [Export & backup](/docs/en/export-backup/): export files or create a recovery package
+- [Browser shortcuts](/docs/en/capture/#browser-shortcuts): save and open SyncNos quickly
 
-To keep writing content into external services, go to [Sync](/docs/en/sync/).
+Use [Sync](/docs/en/sync/) when you want continuous copies in external services.

@@ -35,12 +35,12 @@ collectors -> services/shared
 - ChatGPT 与 Google AI Studio 的虚拟列表会卸载离屏轮次，禁止加入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`。Google AI Studio 完整历史继续只走手动 `prepareManualCapture()`；ChatGPT 默认也走手动 DOM `prepareManualCapture()`，仅用户显式开启 Advanced API 后，手动抓取才可改用已验证的 current-conversation backend mapping，并且不得静默回退 DOM。
 - AI 对话正文持久化不得等待图片网络；ChatGPT 未缓存内容图片保留可恢复身份，禁止持久化临时 signed URL / session credential。用户上传和 AI 生成图片属于内容，普通 tool/MCP 截图与视觉执行产物不属于内容。完整图片缓存、导出和失败语义见 [`docs/storage.md`](docs/storage.md)。
 - 评论选区只附加到 thread 首条引用内容的 composer；reply 输入框和评论面板内选区不得覆盖已附加引用。
-- 新写入和可安全迁移的评论 thread 中，首节点只承载一种内容：可以是仅引用或仅评论；第二条及后续节点都是有正文的同级 comment child，并直接挂首节点。引用节点必须有可验证定位或稳定导入身份；引用与评论具有独立 id/作者/时间和删除生命周期。删除首节点时删除整个 thread；删除非首节点时只删除该节点。历史数据若同时含 quote+comment 且缺少可验证 locator / stable import identity，不得为满足结构整齐而丢弃内容或伪造可定位 quote。
+- 评论 thread 首节点只承载引用或评论一种内容；引用与评论独立持久化。迁移不得丢内容或伪造 locator；删除首节点删除整个 thread，删除后续评论只删除自身。完整恢复边界见 [`docs/storage.md`](docs/storage.md)。
 - 评论定位只接受全局唯一 exact Range，不新增模糊匹配、比例滚动或父元素高亮回退。
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
 - `anti_hotlink_rules_v1` 命中后补 Referer 并尝试缓存图片，但图片失败不得阻断正文采集。
-- Provider 手动/自动同步必须复用同一 orchestrator / SyncJob 生命周期；普通 conversation sync 的 initial running job 必须在 Provider 远端副作用前持久化成功，claim 失败不得继续远端工作。GitHub cleanup 可先做只读 target preflight，但真正 remote cleanup 与 outbox ack/defer 前必须完成 durable claim。不得另写第二套 progress/terminal state，也不得让共享 lifecycle 改写 Provider 原有事务、并发或远端写入语义。
+- Provider 手动/自动同步复用同一 orchestrator / SyncJob 生命周期；远端写入前必须先取得 durable running claim，失败不得继续副作用或伪造成功。GitHub cleanup 只允许在 claim 前做只读 preflight。
 - Local CLI / Native Messaging 只是 Extension 的本机入口：Extension/IndexedDB 仍是唯一业务真源，不创建第二套业务数据库；installer 只操作有限、声明过的当前用户 registration target，machine-safe response 不泄露 Provider/Reader secret。
 - Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。旧 `Date: date` 且缺少 `Last Activity` 时直接重命名；managed section list/retrieve 失败必须传播或重试，不能当作“未找到”后创建重复 section。
 - IndexedDB 业务层统一借用 canonical connection；受 revision 跟踪的业务变更与 revision 必须同 transaction 提交，consumer 以 durable revision + canonical reread 为事实真源。恢复/失败语义见 [`docs/storage.md`](docs/storage.md)。

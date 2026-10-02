@@ -1,28 +1,22 @@
 ---
 title: Capture web articles
-description: Save readable article text, content images, and loaded source comments from Xiaohongshu notes.
+description: Save readable article content, images, and already-loaded Xiaohongshu comments.
 ---
 
 ## Save an article
 
-1. Open the article you want to keep.
-2. Choose **Capture article** in the SyncNos popup.
-3. Return to the [local library](/docs/en/library/) and open the saved item.
+1. Open the article.
+2. Choose **Capture article** in the popup.
+3. Confirm the body in the [local library](/docs/en/library/).
 
-SyncNos keeps the readable body and tries to preserve page metadata such as title, author, and publication time when available.
-
-After saving, you can continue with [Highlights & comments](/docs/en/comments/) and [Reading, narration & outlines](/docs/en/reader/).
+SyncNos keeps readable content and available metadata such as title, author, and publication time. After saving, you can use [highlights & comments](/docs/en/comments/) and [reader tools](/docs/en/reader/).
 
 ## Images
 
-Use **Settings → General → Auto-save web article images locally** to control article image caching.
+Use **Settings → General → Save web article images locally** to control image caching. Image failures do not affect the saved text; retry from **More → Cache images**.
 
-Image failures do not block the article text. For an existing article, use **More → Cache images** in its detail view to retry.
+For image CDNs that require a Referer, add an anti-hotlink rule in the advanced image-cache settings.
 
-If an image CDN requires a specific Referer, add the domain and Referer under the advanced image-cache settings.
+## Xiaohongshu comments
 
-## Xiaohongshu note comments
-
-When capturing a Xiaohongshu note, SyncNos also saves comments and replies that are already loaded and expanded on the current page.
-
-SyncNos does not automatically scroll or expand the entire comment thread.
+When capturing a Xiaohongshu note, SyncNos saves comments and replies that are already loaded on the page. It does not automatically expand the entire comment section.

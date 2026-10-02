@@ -1,35 +1,21 @@
 ---
-title: Sync overview
-description: Send local content to Notion, Obsidian, Feishu, or GitHub.
+title: Sync
+description: Sync local content to Notion, Obsidian, Feishu, or GitHub.
 ---
 
-Sync is optional. SyncNos works without connecting any external service.
+Sync is optional; SyncNos works without any external service.
 
 ## Choose a destination
 
-| Destination | Good for |
+| Destination | Best for |
 | --- | --- |
-| [Notion](/docs/en/sync/notion/) | Organizing content in databases and pages |
-| [Obsidian](/docs/en/sync/obsidian/) | Saving to a local Markdown vault |
-| [Feishu](/docs/en/sync/feishu/) | Saving to Feishu cloud documents |
-| [GitHub](/docs/en/sync/github/) | Saving to a Markdown repository |
+| [Notion](/docs/en/sync/notion/) | Databases and pages |
+| [Obsidian](/docs/en/sync/obsidian/) | Local Markdown vaults |
+| [Feishu](/docs/en/sync/feishu/) | Feishu cloud documents |
+| [GitHub](/docs/en/sync/github/) | Markdown repositories |
 
-Use one destination or several at the same time.
+Each destination supports manual sync and optional auto-sync. Local content stays in SyncNos.
 
-## Manual or automatic sync
+Use [Export & backup](/docs/en/export-backup/) when you only need files or recovery.
 
-Each destination can be synced manually or have automatic sync enabled separately.
-
-Automatic sync only changes when syncing happens. Your local content remains in SyncNos.
-
-## Sync, export, and backup
-
-- **Sync** keeps an external service updated
-- **Export** creates Markdown / JSON files
-- **Backup** creates a package that can later be restored into SyncNos
-
-If you only want files, you do not need to configure sync. See [Export & backup](/docs/en/export-backup/).
-
-## When sync fails
-
-Your local content stays available. Fix the connection or permissions, then sync again.
+A sync failure does not delete local content. Fix the connection or permission and retry.
