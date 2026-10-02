@@ -44,6 +44,24 @@ describe('article-comment-locator', () => {
     expect(locator?.documentRelativeRootPath).toBeTruthy();
   });
 
+  it('uses the DOM text model for selections that span visual line breaks', () => {
+    document.body.innerHTML = '<article id="root"><p id="p1">A<br>B</p><p id="p2">C</p></article>';
+    const root = document.getElementById('root') as HTMLElement;
+    const p1 = document.getElementById('p1')!;
+    const p2 = document.getElementById('p2')!;
+    const range = document.createRange();
+    range.setStart(p1.firstChild!, 0);
+    range.setEnd(p2, 0);
+
+    expect(range.toString()).toBe('AB');
+    const locator = captureCommentAnchor({ root, range, surfaceHint: 'app' });
+    expect(locator).toMatchObject({
+      v: 2,
+      quote: { exact: 'A\nB' },
+      position: { start: 0, end: 3 },
+    });
+  });
+
   it('keeps frozen V1 read compatibility without a V1 writer', () => {
     document.body.innerHTML = '<div id="root">Hello world</div>';
     const root = document.getElementById('root') as HTMLElement;

@@ -2,6 +2,7 @@ import type { ArticleCommentLocator } from '@services/comments/domain/comment-lo
 import { restoreCommentRootFromDocumentPath } from '@services/comments/locator/comment-boundary-path';
 import { isCommentRootEvidenceMatch } from '@services/comments/locator/comment-root-evidence';
 import { captureCommentAnchor } from '@services/comments/locator/capture-comment-anchor';
+import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments/types';
 
 function asElement(node: Node | null): Element | null {
@@ -34,6 +35,44 @@ function pickScrollRoot(root: Element): Element {
   return root.ownerDocument.documentElement;
 }
 
+function tightenBrowserBlockSelectionRange(range: Range, doc: Document): Range {
+  const rawRoot = commonElement(range.startContainer, range.endContainer);
+  if (rawRoot && rawRoot !== doc.body && rawRoot !== doc.documentElement) return range;
+
+  const expected = toCanonicalCommentQuote(range.toString());
+  if (!expected.trim()) return range;
+
+  let candidate = asElement(range.startContainer);
+  while (candidate && candidate !== doc.body && candidate !== doc.documentElement) {
+    const tightened = range.cloneRange();
+    try {
+      tightened.setEnd(candidate, candidate.childNodes.length);
+      if (!tightened.collapsed && toCanonicalCommentQuote(tightened.toString()).trimEnd() === expected.trimEnd()) {
+        return tightened;
+      }
+    } catch (_error) {
+      // Try the next ancestor.
+    }
+    candidate = candidate.parentElement;
+  }
+
+  candidate = asElement(range.endContainer);
+  while (candidate && candidate !== doc.body && candidate !== doc.documentElement) {
+    const tightened = range.cloneRange();
+    try {
+      tightened.setStart(candidate, 0);
+      if (!tightened.collapsed && toCanonicalCommentQuote(tightened.toString()).trimStart() === expected.trimStart()) {
+        return tightened;
+      }
+    } catch (_error) {
+      // Try the next ancestor.
+    }
+    candidate = candidate.parentElement;
+  }
+
+  return range;
+}
+
 export function createInpageCommentRootSource(input: {
   document: Document;
   getPanelRoot?: () => Element | null;
@@ -43,35 +82,43 @@ export function createInpageCommentRootSource(input: {
   const maxCandidates = Math.max(1, Math.floor(Number(input.maxCandidates ?? 8) || 1));
   const maxCandidateTextLength = 200_000;
 
-  const capture = (selection: Selection | null | undefined): CommentLocatorSurfaceRoots | null => {
+  const captureSelection = (
+    selection: Selection | null | undefined,
+  ): { range: Range; roots: CommentLocatorSurfaceRoots } | null => {
     if (!selection || selection.rangeCount !== 1) return null;
-    let range: Range;
+    let rawRange: Range;
     try {
-      range = selection.getRangeAt(0);
+      rawRange = selection.getRangeAt(0);
     } catch (_error) {
       return null;
     }
     if (
-      !range ||
-      range.collapsed ||
-      range.startContainer.ownerDocument !== doc ||
-      range.endContainer.ownerDocument !== doc
+      !rawRange ||
+      rawRange.collapsed ||
+      rawRange.startContainer.ownerDocument !== doc ||
+      rawRange.endContainer.ownerDocument !== doc
     )
       return null;
+
+    const panel = input.getPanelRoot?.();
+    if (panel && (panel.contains(rawRange.startContainer) || panel.contains(rawRange.endContainer))) return null;
+
+    const range = tightenBrowserBlockSelectionRange(rawRange, doc);
     const root = commonElement(range.startContainer, range.endContainer);
     if (!root || root === doc.body || root === doc.documentElement) return null;
-    const panel = input.getPanelRoot?.();
-    if (panel && (panel.contains(range.startContainer) || panel.contains(range.endContainer))) return null;
-    return { sourceRoot: root, scrollRoot: pickScrollRoot(root) };
+    return { range, roots: { sourceRoot: root, scrollRoot: pickScrollRoot(root) } };
   };
 
+  const capture = (selection: Selection | null | undefined): CommentLocatorSurfaceRoots | null =>
+    captureSelection(selection)?.roots ?? null;
+
   const captureAnchor = (selection: Selection | null | undefined) => {
-    const roots = capture(selection);
-    if (!roots || !selection || selection.rangeCount !== 1) return null;
+    const captured = captureSelection(selection);
+    if (!captured) return null;
     try {
       return captureCommentAnchor({
-        root: roots.sourceRoot,
-        range: selection.getRangeAt(0),
+        root: captured.roots.sourceRoot,
+        range: captured.range,
         surfaceHint: 'inpage',
         documentRoot: doc.documentElement,
       });

@@ -23,11 +23,9 @@ export function createAppCommentSelectionSource(input: {
       excludedRoots: input.getExcludedRoots?.(),
     });
     if (!boundary.ok) return { selectionText: '', locator: null };
-    const selectionText = toCanonicalCommentQuote(boundary.range.toString());
+    const locator = captureCommentAnchor({ root: roots.sourceRoot, range: boundary.range, surfaceHint: 'app' });
+    const selectionText = locator?.quote.exact ?? toCanonicalCommentQuote(boundary.range.toString());
     if (!selectionText) return { selectionText: '', locator: null };
-    return {
-      selectionText,
-      locator: captureCommentAnchor({ root: roots.sourceRoot, range: boundary.range, surfaceHint: 'app' }),
-    };
+    return { selectionText, locator };
   };
 }

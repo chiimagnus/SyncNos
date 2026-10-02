@@ -17,7 +17,7 @@ On supported current article pages, you can also open the in-page comments sideb
 
 Select text in the article and attach that selection as the first content item in the current comment thread.
 
-A quote is an independent content item with its own author, timestamp, and locator. If you only want a highlight, save the quote without comment text. Long or multi-line selections keep the full source quote; the sidebar may shorten only the visual preview. SyncNos only stores highlights that can be anchored reliably to the source text instead of guessing with fuzzy positions.
+A quote is an independent content item with its own author, timestamp, and locator. If you only want a highlight, save the quote without comment text. Long or multi-line selections keep the full source quote; the sidebar may shorten only the visual preview. Drag, double-click, and triple-click selections are normalized through the same source-text model, so browser-added paragraph breaks or block boundaries do not make the same text unsendable. SyncNos only stores highlights that can be anchored reliably to the source text instead of guessing with fuzzy positions.
 
 ## Comments and replies
 

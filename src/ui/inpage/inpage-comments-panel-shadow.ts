@@ -85,9 +85,9 @@ export function createInpageCommentsDomSource(input: {
         const roots = rootSource.capture(selection);
         if (!selection || selection.rangeCount !== 1 || !roots) return { selectionText: '', locator: null };
         const range = selection.getRangeAt(0);
-        const selectionText = toCanonicalCommentQuote(range.toString());
-        if (!selectionText) return { selectionText: '', locator: null };
         const locator = rootSource.captureAnchor(selection);
+        const selectionText = locator?.quote.exact ?? toCanonicalCommentQuote(range.toString());
+        if (!selectionText) return { selectionText: '', locator: null };
         return { selectionText, locator };
       } catch (_error) {
         return { selectionText: '', locator: null };

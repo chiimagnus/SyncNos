@@ -276,6 +276,30 @@ describe('inpage comments sidebar toggle', () => {
     api.dispose();
   });
 
+  it('uses the locator canonical text for block-style selections with visual line breaks', () => {
+    document.body.innerHTML = '<p id="p1">A<br>B</p><p id="p2">C</p>';
+    const p1 = document.getElementById('p1')!;
+    const p2 = document.getElementById('p2')!;
+    const range = document.createRange();
+    range.setStart(p1.firstChild!, 0);
+    range.setEnd(p2, 0);
+    const selection = document.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    const captured = createInpageCommentsDomSource({ window, document }).resolveComposerSelection();
+    expect(range.toString()).toBe('AB');
+    expect(captured).toMatchObject({
+      selectionText: 'A\nB',
+      locator: {
+        v: 2,
+        textModelVersion: 'dom-text-v2',
+        surfaceHint: 'inpage',
+        quote: { exact: 'A\nB' },
+      },
+    });
+  });
+
   it('captures a long multi-line page range without truncating the canonical quote and rejects iframe execution', () => {
     document.body.innerHTML = '<main><article id="story"></article></main>';
     const story = document.getElementById('story')!;

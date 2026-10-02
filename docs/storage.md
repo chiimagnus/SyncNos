@@ -8,7 +8,7 @@
 - conversation 的业务时间是 `lastActivityAt`。真实采集或评论活动可以推进它；纯阅读、Provider sync、identity rewrite、schema/backup migration 不得用执行时刻伪造 Activity。
 - sync mapping、cursor 和远端状态不得反向覆盖本地内容事实。
 - 虚拟列表只有在完整性确认后才能做完整快照；不完整 DOM 不能删除历史消息。
-- 文章评论属于本地文章身份下的独立注释层。新写入和可安全迁移的数据中，每个 thread 的首节点只承载一种内容（仅引用或仅评论）；第二条及后续节点都是有正文的同级 comment child，并直接挂首节点。引用节点必须有可验证定位或稳定导入身份，引用与评论独立持久化；删除首节点时删除整个 thread，删除非首节点时只删除该节点。历史 composite quote+comment 若缺少可验证 locator / stable import identity，则保留原记录以避免数据丢失，不伪造可定位 quote。评论正文 `commentText` 保存首尾已规范化的 Markdown source，引用 `quoteText` 始终是原文纯文本；渲染方式不参与 thread、locator 或 Backup identity。评论 Markdown 图片没有图片缓存或附件生命周期。
+- 文章评论属于本地文章身份下的独立注释层。新写入和可安全迁移的数据中，每个 thread 的首节点只承载一种内容（仅引用或仅评论）；第二条及后续节点都是有正文的同级 comment child，并直接挂首节点。引用节点必须有可验证定位或稳定导入身份，引用与评论独立持久化；删除首节点时删除整个 thread，删除非首节点时只删除该节点。浏览器选区进入评论系统时必须统一为 locator 的 `dom-text-v2` canonical text：`<br>`、三击段落末尾等浏览器视觉选区差异不能导致同一正文生成不同 Quote 或失去 locator。历史 composite quote+comment 若缺少可验证 locator / stable import identity，则保留原记录以避免数据丢失，不伪造可定位 quote。评论正文 `commentText` 保存首尾已规范化的 Markdown source，引用 `quoteText` 始终是原文纯文本；渲染方式不参与 thread、locator 或 Backup identity。评论 Markdown 图片没有图片缓存或附件生命周期。
 - 图片缓存是增强数据；缓存失败不得阻断正文保存。
 
 ## 图片引用与缓存
