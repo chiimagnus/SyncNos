@@ -17,6 +17,42 @@ describe('inpage comment root source', () => {
     expect(roots?.sourceRoot).toBe(document.querySelector('b'));
   });
 
+  test('tightens browser block-selection boundaries before choosing the locator root', () => {
+    const document = new JSDOM('<body><p id="p1">A<br>B</p><p id="p2">C</p></body>', {
+      url: 'https://example.com/',
+    }).window.document;
+    const p1 = document.getElementById('p1')!;
+    const p2 = document.getElementById('p2')!;
+    const range = document.createRange();
+    range.setStart(p1.firstChild!, 0);
+    range.setEnd(p2, 0);
+    const selection = { rangeCount: 1, getRangeAt: () => range } as unknown as Selection;
+    const source = createInpageCommentRootSource({ document });
+
+    expect(source.capture(selection)?.sourceRoot).toBe(p1);
+    expect(source.captureAnchor(selection)).toMatchObject({
+      v: 2,
+      surfaceHint: 'inpage',
+      quote: { exact: 'A\nB' },
+    });
+  });
+
+  test('does not truncate a genuine selection spanning multiple body-level blocks', () => {
+    const document = new JSDOM('<body><p id="p1">First</p><p id="p2">Second</p></body>', {
+      url: 'https://example.com/',
+    }).window.document;
+    const p1 = document.getElementById('p1')!;
+    const p2 = document.getElementById('p2')!;
+    const range = document.createRange();
+    range.setStart(p1.firstChild!, 0);
+    range.setEnd(p2.firstChild!, 6);
+    const selection = { rangeCount: 1, getRangeAt: () => range } as unknown as Selection;
+    const source = createInpageCommentRootSource({ document });
+
+    expect(source.capture(selection)).toBeNull();
+    expect(source.captureAnchor(selection)).toBeNull();
+  });
+
   test('rejects panel selections and body-only capture fallback', () => {
     const document = new JSDOM('<body><div id="panel">panel</div><span>page</span></body>', {
       url: 'https://example.com/',

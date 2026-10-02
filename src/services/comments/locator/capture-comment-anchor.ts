@@ -18,8 +18,8 @@ export function captureCommentAnchor(input: {
   const offsets = index.rangeToOffsets(range);
   if (!offsets || offsets.end <= offsets.start) return null;
 
-  const exact = toCanonicalCommentQuote(range.toString());
-  if (!exact || index.text.slice(offsets.start, offsets.end) !== exact) return null;
+  const exact = toCanonicalCommentQuote(index.text.slice(offsets.start, offsets.end));
+  if (!exact) return null;
 
   const boundaryPath = captureCommentBoundaryPath(root, range);
   const rootEvidence = captureCommentRootSnapshot(root, { index });
