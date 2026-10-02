@@ -393,6 +393,16 @@ export async function exportBackupZip(
   });
 
   const articleCommentsArchive = serializeArticleCommentArchive(allArticleComments, uniqueKeyByConversationId);
+  const lossyArticleCommentWarning = articleCommentsArchive.warnings.find(
+    (warning) =>
+      warning.code === 'invalid_row' || warning.code === 'invalid_locator' || warning.code === 'duplicate_id',
+  );
+  if (lossyArticleCommentWarning) {
+    const commentId = lossyArticleCommentWarning.commentId;
+    throw new Error(
+      `article comment backup would lose data: ${lossyArticleCommentWarning.code}${commentId ? ` (${commentId})` : ''}`,
+    );
+  }
   const articleCommentItems = articleCommentsArchive.document.comments;
 
   const articleCommentsIndexDoc = articleCommentsArchive.document;

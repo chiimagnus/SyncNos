@@ -259,6 +259,44 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
+  it('fails closed instead of exporting a ZIP that silently drops an invalid persisted comment', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const tx = db.transaction(['article_comments'], 'readwrite');
+    const commentId = await reqToPromise<number>(
+      tx.objectStore('article_comments').add({
+        parentId: null,
+        conversationId: null,
+        canonicalUrl: 'https://example.com/invalid-backup-comment',
+        authorName: 'Chii',
+        quoteText: 'highlight',
+        commentText: '',
+        locator: {
+          v: 1,
+          env: 'app',
+          quote: { type: 'TextQuoteSelector', exact: 'highlight\n' },
+          position: { type: 'TextPositionSelector', start: 0, end: 10 },
+        },
+        createdAt: 1,
+        updatedAt: 1,
+      }) as IDBRequest<number>,
+    );
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    await expect(exportBackupZip()).rejects.toThrow(
+      `article comment backup would lose data: invalid_row (${commentId})`,
+    );
+  });
+
   it('canonicalizes legacy article identity inside the current ZIP schema at the import boundary', async () => {
     await importBackupZipMerge(legacyArticleZipEntriesForImport());
     await assertLegacyArticleImportUsesCanonicalIdentityImmediately();

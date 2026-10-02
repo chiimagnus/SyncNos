@@ -32,6 +32,8 @@ Backup ZIP 是恢复包，不是 IndexedDB 的物理副本。当前导入/导出
 
 Backup 可以包含本地采集内容、可恢复 sync mapping、图片缓存、文章评论和非敏感设置。Provider token/client secret/API key、pending OAuth/Device Flow credential、Reader TTS AI API key，以及设备/浏览器 Profile 特定的 CLI identity/opt-in 等状态必须排除。
 
+Backup 不得以 warning 形式静默丢弃持久化的评论数据；若评论记录无法无损序列化，导出必须失败并保留本地真源，先修复数据一致性后再重新导出。
+
 设备特定、可重新派生的远端 cleanup/pending 状态不跨设备迁移。sync mapping 只有在表达可恢复 continuity 且不携带秘密时才进入 Backup。
 
 ## 恢复与失败

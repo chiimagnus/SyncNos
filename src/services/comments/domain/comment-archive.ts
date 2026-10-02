@@ -244,7 +244,11 @@ export function serializeArticleCommentArchive(
   for (const raw of rows ?? []) {
     const dto = parseArticleCommentDto(raw);
     if (!dto) {
-      warnings.push({ code: 'invalid_row' });
+      const commentId =
+        raw && typeof raw === 'object' && !Array.isArray(raw)
+          ? (positiveInt((raw as Record<string, unknown>).id) ?? undefined)
+          : undefined;
+      warnings.push({ code: 'invalid_row', ...(commentId ? { commentId } : {}) });
       continue;
     }
     if (raw && typeof raw === 'object' && (raw as Record<string, unknown>).locator != null) {
