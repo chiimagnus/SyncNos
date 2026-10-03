@@ -134,6 +134,34 @@ describe('gemini-collector', () => {
     expect(snap.conversation.title).toBe('Gemini Page Title');
   });
 
+  it('does not persist an in-flight assistant while the current markdown surface is aria-busy', async () => {
+    const html = `
+      <div id="chat-history">
+        <div class="conversation-container" id="current-busy-turn">
+          <user-query><div class="query-text">question</div></user-query>
+          <model-response>
+            <div class="markdown markdown-main-panel" aria-busy="true"><p>partial answer</p></div>
+          </model-response>
+        </div>
+      </div>
+    `;
+    const dom = setupGeminiDom(html, 'https://gemini.google.com/app/busy001');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const def = createGeminiCollectorDef(env) as any;
+    expect(def.collector.__test.isAssistantStreaming(dom.window.document.querySelector('model-response'))).toBe(true);
+    const snap = (await Promise.resolve(def.collector.capture())) as any;
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0]).toMatchObject({ role: 'user' });
+    expect(snap.messages[0].contentMarkdown).toContain('question');
+    expect(snap.messages.some((message: any) => message.contentMarkdown.includes('partial answer'))).toBe(false);
+  });
+
   it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <div id="chat-history">

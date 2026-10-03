@@ -97,6 +97,15 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return extractTextExcludingNonContent(node);
   }
 
+  function isAssistantStreaming(node: any): boolean {
+    if (!node) return false;
+    const ownBusy = String(node.getAttribute?.('aria-busy') || '')
+      .trim()
+      .toLowerCase();
+    if (ownBusy === 'true') return true;
+    return !!node.querySelector?.("[aria-busy='true']");
+  }
+
   function extractTextExcludingNonContent(node: any): string {
     if (!node) return '';
     try {
@@ -930,7 +939,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       }
 
       const model = b.querySelector('model-response') || b.querySelector('model-response .model-response-text') || null;
-      if (model) {
+      if (model && !isAssistantStreaming(model)) {
         const baseText = extractAssistantText(model);
         const baseMarkdown = extractAssistantMarkdown(model, baseText);
 
@@ -1000,6 +1009,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
         collectMessages(createInlineImageContext(), options),
       extractAssistantMarkdown,
       extractAssistantText,
+      isAssistantStreaming,
       findDeepResearchChipTitle,
       extractDeepResearchPanelTitle,
       resolveDeepResearchContent,
