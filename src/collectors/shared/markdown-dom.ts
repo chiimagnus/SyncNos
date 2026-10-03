@@ -2,12 +2,24 @@ export function normalizeMarkdown(markdown: unknown): string {
   const normalized = String(markdown || '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
-  return normalized
-    .split('\n')
-    .map((line) => line.replace(/[ \t]+$/g, ''))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  const lines: string[] = [];
+  let fence = '';
+  let blankLines = 0;
+  for (const line of normalized.split('\n')) {
+    const delimiter = line.match(/^\s*(?:>\s*)*(`{3,}|~{3,})/)?.[1] || '';
+    if (fence) {
+      lines.push(line);
+      if (delimiter[0] === fence[0] && delimiter.length >= fence.length && /^\s*(?:>\s*)*[`~]+\s*$/.test(line)) {
+        fence = '';
+      }
+      continue;
+    }
+    if (delimiter) fence = delimiter;
+    const trimmed = line.replace(/[ \t]+$/g, '');
+    blankLines = trimmed ? 0 : blankLines + 1;
+    if (blankLines <= 1) lines.push(trimmed);
+  }
+  return lines.join('\n').trim();
 }
 
 function normalizeInline(markdown: unknown): string {
@@ -20,7 +32,8 @@ function wrapInlineCode(text: unknown): string {
   const matches = value.match(/`+/g) || [];
   const maxTicks = matches.reduce((max, ticks) => Math.max(max, ticks.length), 0);
   const fence = '`'.repeat(Math.max(1, maxTicks + 1));
-  return `${fence}${value}${fence}`;
+  const padding = value.startsWith('`') || value.endsWith('`') || (/^ .* $/.test(value) && /\S/.test(value)) ? ' ' : '';
+  return `${fence}${padding}${value}${padding}${fence}`;
 }
 
 function pickCodeLanguage(className: unknown): string {
@@ -123,8 +136,14 @@ export function htmlToMarkdown(root: Element | null): string {
       (nested) => nested.closest('li') === listItem,
     );
     for (const nested of nestedLists) {
-      const markdown = renderList(nested, nested.tagName.toLowerCase() === 'ol', depth + 1).trimEnd();
-      if (markdown) output.push(markdown);
+      const markdown = renderList(nested, nested.tagName.toLowerCase() === 'ol', 0).trimEnd();
+      if (markdown)
+        output.push(
+          markdown
+            .split('\n')
+            .map((line) => `${continuationIndent}${line}`)
+            .join('\n'),
+        );
     }
     return output.join('\n');
   }
@@ -177,7 +196,9 @@ export function htmlToMarkdown(root: Element | null): string {
       const code = element.querySelector('code');
       const language = pickCodeLanguage(code?.getAttribute('class'));
       const text = String((code ? code.textContent : element.textContent) || '').replace(/\n+$/g, '');
-      return text.trim() ? `\n\n\`\`\`${language}\n${text}\n\`\`\`\n\n` : '';
+      const maxTicks = Math.max(2, ...(text.match(/`+/g) || []).map((ticks) => ticks.length));
+      const fence = '`'.repeat(maxTicks + 1);
+      return text.trim() ? `\n\n${fence}${language}\n${text}\n${fence}\n\n` : '';
     }
     if (tag === 'code') return wrapInlineCode(element.textContent || '');
     if (tag === 'strong' || tag === 'b') return `**${normalizeInline(renderChildren(element, context))}**`;
