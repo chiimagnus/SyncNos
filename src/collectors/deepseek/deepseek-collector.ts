@@ -346,12 +346,47 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     return finishPreparedCapture(accumulator);
   }
 
+  function snapshotFromPreparedCapture(prepared: any): any | null {
+    const messages = prepared.records.map((record: any, index: number) => ({ ...record.payload, sequence: index }));
+    if (!messages.length || !prepared.identityVerified || !prepared.conversationKey) return null;
+    return {
+      conversation: {
+        sourceType: 'chat',
+        source: 'deepseek',
+        conversationKey: prepared.conversationKey,
+        title: findTitle(),
+        url: env.location.href,
+        warningFlags: [],
+      },
+      messages,
+      captureMeta: {
+        completeness: prepared.completeness,
+        identityVerified: true,
+        reasons: prepared.reasons,
+        metrics: prepared.metrics,
+      },
+    };
+  }
+
   async function capture(options: any = {}): Promise<any | null> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
-      return null;
-    }
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const root = getConversationRoot();
     if (!root || inEditMode(root)) return null;
+
+    if (options?.manual !== true) {
+      const identityGuard = sampleIdentityGuard();
+      const accumulator = createPreparedAccumulator<any>({
+        source: 'deepseek',
+        conversationKey: identityGuard.durableId,
+        identityVerified: !!identityGuard.durableId,
+        identityGuard,
+      });
+      accumulator.completeness = 'partial';
+      addPreparedReason(accumulator, 'top_not_reached');
+      await harvestCurrentInto(accumulator);
+      if (!identityGuardsMatch(identityGuard, sampleIdentityGuard())) return null;
+      return snapshotFromPreparedCapture(finishPreparedCapture(accumulator));
+    }
 
     const prepared = consumePreparedCapture(options?.preparedCapture);
     if (!prepared) return null;
@@ -378,29 +413,8 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       addPreparedReason(accumulator, 'final_live_changed');
     }
 
-    const finalGuard = sampleIdentityGuard();
-    if (!identityGuardsMatch(accumulator.identityGuard, finalGuard)) return null;
-    const finalPrepared = finishPreparedCapture(accumulator);
-    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
-    if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
-
-    return {
-      conversation: {
-        sourceType: 'chat',
-        source: 'deepseek',
-        conversationKey: finalPrepared.conversationKey,
-        title: findTitle(),
-        url: env.location.href,
-        warningFlags: [],
-      },
-      messages,
-      captureMeta: {
-        completeness: finalPrepared.completeness,
-        identityVerified: true,
-        reasons: finalPrepared.reasons,
-        metrics: finalPrepared.metrics,
-      },
-    };
+    if (!identityGuardsMatch(accumulator.identityGuard, sampleIdentityGuard())) return null;
+    return snapshotFromPreparedCapture(finishPreparedCapture(accumulator));
   }
 
   const collector: any = {

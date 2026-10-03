@@ -1,5 +1,3 @@
-import { VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS } from '@services/shared/capture-integrity';
-
 export type SupportedAiChatSite = {
   id: string;
   name: string;
@@ -33,7 +31,16 @@ export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
   { id: 'zai', name: 'z.ai', hosts: ['chat.z.ai'], features: { dollarMention: true } },
 ] as const;
 
-// Virtualized providers require manual prepare and explicit completeness before persistence.
+// Manual-only is a product/runtime constraint, not a synonym for virtualized history.
+// Providers with partial windows may still auto-save when their collector returns stable keys and captureMeta.
+export const AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS = new Set<string>([
+  'chatgpt',
+  'claude',
+  'googleaistudio',
+  'kimi',
+  'zai',
+]);
+
 export const AI_CHAT_AUTO_SAVE_COLLECTOR_IDS = new Set(
-  SUPPORTED_AI_CHAT_SITES.map((site) => site.id).filter((id) => !VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS.has(id)),
+  SUPPORTED_AI_CHAT_SITES.map((site) => site.id).filter((id) => !AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS.has(id)),
 );

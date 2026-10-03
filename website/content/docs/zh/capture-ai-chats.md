@@ -7,8 +7,8 @@ description: 保存支持的 AI 对话，并区分手动保存、自动保存和
 
 | 平台 | 保存方式 |
 | --- | --- |
-| Gemini、豆包 | 手动保存 + 自动保存 |
-| ChatGPT、Claude、Google AI Studio、DeepSeek、Kimi、元宝、Poe、Notion AI、z.ai | 手动保存 |
+| Gemini、DeepSeek、豆包、元宝、Poe、Notion AI | 手动保存 + 自动保存 |
+| ChatGPT、Claude、Google AI Studio、Kimi、z.ai | 手动保存 |
 
 手动保存会主动获取当前站点能够安全确认的历史。遇到虚拟列表、分页历史或未完成回复时，SyncNos 会保守合并已有内容，不会拿当前可见窗口覆盖本地完整历史。
 
@@ -18,7 +18,7 @@ description: 保存支持的 AI 对话，并区分手动保存、自动保存和
 2. 在 Popup 中选择**抓取 AI 对话**，或使用右键菜单保存当前对话。
 3. 到[本地库](/docs/library/)确认结果。
 
-Gemini、豆包还可以在 **设置 → 通用 → 自动保存** 开启自动保存。
+支持自动保存的平台可以在 **设置 → 通用 → 自动保存** 开启自动保存。自动保存只追加或更新当前能够安全识别的消息，不会为了补齐历史主动滚动页面；需要补齐长对话历史时仍使用手动保存。
 
 当前 Notion AI 使用 `/chat` Agent Service 对话与完整 transcript 采集；带文件的消息会保守保存，暂不保证完整保留附件元数据。
 

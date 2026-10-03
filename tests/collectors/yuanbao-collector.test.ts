@@ -192,7 +192,7 @@ describe('yuanbao-collector', () => {
     expect(snapshot.messages[0].contentMarkdown).not.toContain('```');
   });
 
-  it('requires manual prepared capture and keeps the homepage available but not persistable', async () => {
+  it('auto-captures the current safe window while manual capture still uses prepared history', async () => {
     const dom = setupYuanbaoDom(item(0, 'human', '<div class="hyc-content-text">hello</div>'));
     const def = createDef(dom);
     let clock = 0;
@@ -206,7 +206,13 @@ describe('yuanbao-collector', () => {
         clock += 1;
       },
     });
-    expect(await def.collector.capture({ preparedCapture })).toBeNull();
+    const auto = await def.collector.capture();
+    expect(auto).toMatchObject({
+      conversation: { source: 'yuanbao', conversationKey: 'conv001' },
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    });
+    expect(auto.captureMeta.reasons).toContain('top_not_reached');
+    expect(auto.messages.map((message: any) => message.messageKey)).toEqual(['yuanbao_0_user']);
     expect(await def.collector.capture({ manual: true, preparedCapture })).toBeTruthy();
 
     const home = setupYuanbaoDom('', 'https://yuanbao.tencent.com/');

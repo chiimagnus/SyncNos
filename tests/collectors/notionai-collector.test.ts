@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createNotionAiCollectorDef } from '../../src/collectors/notionai/notionai-collector.ts';
 import {
+  createNotionAiTranscriptBridge,
   NOTION_AI_TRANSCRIPT_REQUEST,
   NOTION_AI_TRANSCRIPT_RESPONSE,
 } from '../../src/collectors/notionai/notionai-transcript.ts';
@@ -195,11 +196,82 @@ describe('notionai-collector', () => {
     ]);
   });
 
+  it('requests only the latest transcript window for auto capture', async () => {
+    const dom = setupDom();
+    const { collector } = createHarness(dom);
+    const state = transcriptState({ complete: false });
+    let requestMode = '';
+
+    dom.window.addEventListener('message', (event: MessageEvent) => {
+      const data: any = event.data;
+      if (!data || data.type !== NOTION_AI_TRANSCRIPT_REQUEST) return;
+      requestMode = data.mode;
+      dom.window.dispatchEvent(
+        new dom.window.MessageEvent('message', {
+          source: dom.window,
+          data: {
+            __syncnos: true,
+            type: NOTION_AI_TRANSCRIPT_RESPONSE,
+            requestId: data.requestId,
+            threadId: THREAD_ID,
+            pages: state.pages,
+            complete: state.complete,
+          },
+        }),
+      );
+    });
+
+    const snapshot = await collector.capture();
+    expect(requestMode).toBe('latest');
+    expect(snapshot).toMatchObject({
+      conversation: { source: 'notionai', conversationKey: `notionai_t_${THREAD_ID}` },
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    });
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'user_user-event',
+      'assistant_assistant-event',
+    ]);
+  });
+
+  it('keeps latest auto transcript responses ephemeral instead of growing the full cache', async () => {
+    const dom = setupDom();
+    const bridge = createNotionAiTranscriptBridge({ window: dom.window as any });
+    const full = transcriptState({ complete: true });
+    const latest = transcriptState({ complete: false });
+    latest.pages[0].patches = latest.pages[0].patches.filter((patch: any) => patch?.entity?.id === 'assistant-event');
+
+    dom.window.addEventListener('message', (event: MessageEvent) => {
+      const data: any = event.data;
+      if (!data || data.type !== NOTION_AI_TRANSCRIPT_REQUEST) return;
+      const state = data.mode === 'full' ? full : latest;
+      dom.window.dispatchEvent(
+        new dom.window.MessageEvent('message', {
+          source: dom.window,
+          data: {
+            __syncnos: true,
+            type: NOTION_AI_TRANSCRIPT_RESPONSE,
+            requestId: data.requestId,
+            threadId: THREAD_ID,
+            pages: state.pages,
+            complete: state.complete,
+          },
+        }),
+      );
+    });
+
+    const fullResult = await bridge.requestFull(THREAD_ID);
+    const latestResult = await bridge.requestLatest(THREAD_ID);
+    expect(fullResult?.pages).toHaveLength(1);
+    expect(latestResult?.pages).toHaveLength(1);
+    expect(latestResult?.complete).toBe(false);
+    expect(bridge.get(THREAD_ID)).toEqual(fullResult);
+    expect(bridge.get(THREAD_ID)?.pages).not.toEqual([...full.pages, ...latest.pages]);
+  });
+
   it('fails closed without a matching manual prepared transcript', async () => {
     const dom = setupDom();
     const { collector } = createHarness(dom);
 
-    expect(await collector.capture({ preparedCapture: prepared() })).toBeNull();
     expect(
       await collector.capture({
         manual: true,

@@ -89,13 +89,17 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
 
   async function capture(options: any = {}): Promise<any | null> {
     const threadId = findThreadIdFromLocation(env.location);
-    if (!threadId || options?.manual !== true) return null;
-    const prepared = preparedCapture(options?.preparedCapture, threadId);
-    if (!prepared) return null;
+    if (!threadId) return null;
+
+    const state =
+      options?.manual === true
+        ? preparedCapture(options?.preparedCapture, threadId)?.state || null
+        : await transcriptBridge.requestLatest(threadId);
+    if (!state?.pages?.length) return null;
     if (findThreadIdFromLocation(env.location) !== threadId) return null;
 
     return buildNotionAiTranscriptSnapshot({
-      ...prepared.state,
+      ...state,
       threadId,
       title: env.document.title,
       document: env.document,

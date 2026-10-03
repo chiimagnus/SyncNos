@@ -95,6 +95,13 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
+    const auto = await collector.capture();
+    expect(auto).toMatchObject({
+      conversation: { source: 'poe', conversationKey: '4ogjbuwydndzro1w6g', title: '你好' },
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    });
+    expect(auto.captureMeta.reasons).toContain('top_not_reached');
+
     const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe('你好');

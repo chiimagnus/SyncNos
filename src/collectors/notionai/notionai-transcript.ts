@@ -348,15 +348,11 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
     const threadId = normalizeNotionAiThreadId(data.threadId);
     const pages = Array.isArray(data.pages) ? data.pages : [];
     if (!threadId || threadId !== pending.threadId || !pages.length) {
-      pending.resolve(stateByThread.get(pending.threadId) || null);
+      pending.resolve(pending.mode === 'full' ? stateByThread.get(pending.threadId) || null : null);
       return;
     }
-    const existing = stateByThread.get(threadId);
-    const state =
-      pending.mode === 'full' || !existing
-        ? { pages, complete: data.complete === true }
-        : { pages: [...existing.pages, ...pages], complete: existing.complete };
-    stateByThread.set(threadId, state);
+    const state = { pages, complete: data.complete === true };
+    if (pending.mode === 'full') stateByThread.set(threadId, state);
     pending.resolve(state);
   };
 
@@ -369,7 +365,7 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         pendingByRequestId.delete(requestId);
-        resolve(stateByThread.get(threadId) || null);
+        resolve(mode === 'full' ? stateByThread.get(threadId) || null : null);
       }, 15_000);
       pendingByRequestId.set(requestId, { mode, threadId, resolve, timer });
       window.postMessage({ __syncnos: true, type: NOTION_AI_TRANSCRIPT_REQUEST, requestId, threadId, mode }, '*');

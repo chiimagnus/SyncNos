@@ -142,7 +142,7 @@ describe('deepseek-collector', () => {
     expect(def.collector.__test.readBoundaryState('top')).toBe('confirmed');
   });
 
-  it('requires manual prepared capture and keeps the homepage available but not capturable', async () => {
+  it('auto-captures the current safe window while manual capture still uses prepared history', async () => {
     const dom = setupDeepseekDom(item('1', user('hello')), 'https://chat.deepseek.com/a/chat/s/manual1');
     const def = createDef(dom);
     const preparedCapture = await def.collector.prepareManualCapture({
@@ -151,7 +151,13 @@ describe('deepseek-collector', () => {
       sleep: async () => {},
     });
 
-    expect(await def.collector.capture({ preparedCapture })).toBeNull();
+    const auto = await def.collector.capture();
+    expect(auto).toMatchObject({
+      conversation: { source: 'deepseek', conversationKey: 'manual1' },
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    });
+    expect(auto.captureMeta.reasons).toContain('top_not_reached');
+    expect(auto.messages.map((message: any) => message.messageKey)).toEqual(['deepseek_1']);
     expect(await def.collector.capture({ manual: true, preparedCapture })).toBeTruthy();
 
     const home = setupDeepseekDom('', 'https://chat.deepseek.com/');

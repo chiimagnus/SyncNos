@@ -2,6 +2,7 @@ import type { CurrentPageCaptureService } from '@services/bootstrap/current-page
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { resolveActiveCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
+import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
@@ -648,12 +649,14 @@ export function createContentController(deps: Deps) {
         if (!isAutoSavePreSaveAllowed(generation)) return;
         const collector = resolveActiveCollector(collectorsRegistry);
         if (!collector || typeof collector.capture !== 'function') return;
-        // Virtualized chat collectors remain manual-capture only.
         if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
 
-        const snapshot = await Promise.resolve(collector.capture());
+        const captured = await Promise.resolve(collector.capture());
         if (!isAutoSavePreSaveAllowed(generation)) return;
-        if (!snapshot) return;
+        if (!captured) return;
+        const integrity = resolveCaptureIntegrity(collector.id, captured);
+        if (!integrity.ok) return;
+        const snapshot = integrity.snapshot;
 
         backfill = await maybeRunBackfill(snapshot);
         if (!isAutoSavePreSaveAllowed(generation)) {
