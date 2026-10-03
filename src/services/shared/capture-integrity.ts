@@ -40,6 +40,7 @@ export const VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS = new Set<string>([
   'googleaistudio',
   'deepseek',
   'kimi',
+  'notionai',
   'poe',
   'yuanbao',
   'zai',
