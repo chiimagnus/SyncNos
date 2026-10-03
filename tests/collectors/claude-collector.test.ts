@@ -142,6 +142,34 @@ describe('claude-collector', () => {
     expect(assistant.contentMarkdown).toContain('![](https://img.test/assistant.png)');
   });
 
+  it('captures the current CDS Prose assistant surface while excluding TurnStatus', async () => {
+    const { dom, def } = setupClaudeDom();
+    const assistant = dom.window.document.querySelector("[data-testid='assistant-message']") as HTMLElement;
+    assistant.innerHTML = `
+      <div class="font-claude-response">
+        <div data-cds="TurnStatus" data-testid="TurnStatus" data-state="done">
+          <span role="status" aria-live="polite">Searched the web</span>
+        </div>
+        <div data-cds="Prose" class="prose">
+          <h2>Current answer</h2>
+          <p>This comes from the current Claude Prose surface.</p>
+          <table><tr><th>Name</th><th>Value</th></tr><tr><td>A</td><td>1</td></tr></table>
+        </div>
+      </div>
+    `;
+
+    const snapshot = await def.collector.capture({
+      manual: true,
+      preparedCapture: await prepareStaticCapture(def),
+    });
+    const message = snapshot.messages.find((item: any) => item.role === 'assistant');
+    expect(message.contentText).toContain('Current answer');
+    expect(message.contentText).not.toContain('Searched the web');
+    expect(message.contentMarkdown).toContain('## Current answer');
+    expect(message.contentMarkdown).toContain('| Name | Value |');
+    expect(message.contentMarkdown).not.toContain('Searched the web');
+  });
+
   it('uses aria message positions as stable identity and confirms complete visible boundaries', () => {
     const { def } = setupClaudeDom();
     const descriptors = def.collector.__test.readCurrentDescriptors();

@@ -133,9 +133,13 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const assistant = row.querySelector("[data-testid='assistant-message']");
     if (!assistant) return null;
 
-    // Claude renders user-visible prose as one or more reply-text blocks; tool/thinking state lives
-    // in separate TurnStatus nodes. Capture the prose blocks in order and fail closed otherwise.
-    const replies = Array.from(assistant.querySelectorAll('[data-perf-reply-text]'));
+    // Older Claude builds mark visible reply blocks with data-perf-reply-text. Current builds expose
+    // the final response as one or more CDS Prose blocks while tool/thinking state remains in TurnStatus.
+    const legacyReplies = Array.from(assistant.querySelectorAll('[data-perf-reply-text]'));
+    const currentProse = Array.from(assistant.querySelectorAll("[data-cds='Prose']")).filter(
+      (node) => !node.closest("[data-cds='TurnStatus'], [data-testid='TurnStatus']"),
+    );
+    const replies = legacyReplies.length ? legacyReplies : currentProse;
     if (!replies.length) return null;
     if (replies.length === 1) return replies[0] || null;
 
