@@ -148,39 +148,6 @@ describe('doubao-collector', () => {
     expect(snap.conversation.title).toBe('真实豆包标题');
   });
 
-  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
-    const html = `
-      <div aria-label="doc_editor">
-        <div class="container-PvPoAn">
-          <div data-copy-telemetry="right_click_copy" class="flex flex-col flex-grow">
-            <div data-message-id="43080634158259458" class="relative flex-row flex w-full">
-              <div data-testid="message_text_content">plain answer</div>
-            </div>
-            <div data-foundation-type="receive-message-action-bar"></div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    vi.resetModules();
-    vi.doMock('../../src/collectors/doubao/doubao-markdown.ts', () => ({ default: {} }));
-
-    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/fallback001');
-    const { createDoubaoCollectorDef: createDef } = await import('../../src/collectors/doubao/doubao-collector.ts');
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const snap = (await Promise.resolve(createDef(env).collector.capture())) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
-    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
-  });
-
   it('captures current semantic file attachment names', async () => {
     const html = `
       <div aria-label="doc_editor">

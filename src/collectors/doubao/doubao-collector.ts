@@ -272,10 +272,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
             ) || row;
 
       const fallbackText = env.normalize.normalizeText((textEl as any).innerText || textEl.textContent || '');
-      const text =
-        role === 'assistant' && typeof doubaoMarkdown.extractAssistantText === 'function'
-          ? doubaoMarkdown.extractAssistantText(textEl) || fallbackText
-          : fallbackText;
+      const text = role === 'assistant' ? doubaoMarkdown.extractAssistantText(textEl) || fallbackText : fallbackText;
 
       const imageScope = role === 'assistant' ? row.closest?.("[data-copy-telemetry='right_click_copy']") || row : row;
       const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
@@ -283,9 +280,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
       if (!text && !attachments && !imageUrls.length) continue;
       const contentText = [attachments, text || ''].filter(Boolean).join('\n\n');
       const renderedMarkdown =
-        role === 'assistant' && typeof doubaoMarkdown.extractAssistantMarkdown === 'function'
-          ? doubaoMarkdown.extractAssistantMarkdown(textEl) || text || ''
-          : text || '';
+        role === 'assistant' ? doubaoMarkdown.extractAssistantMarkdown(textEl) || text || '' : text || '';
       const baseMarkdown = [attachments, renderedMarkdown].filter(Boolean).join('\n\n');
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls, { allowDataImageUrls: true });
 
