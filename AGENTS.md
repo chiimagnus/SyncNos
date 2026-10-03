@@ -8,7 +8,7 @@
 - `src/viewmodels/**`：UI 状态编排，只调用 service。
 - `src/services/**`：业务流程、协议和可复用算法。
 - `src/platform/**`：浏览器 runtime、storage、messaging、IndexedDB 等适配。
-- `src/collectors/**`：站点 DOM 采集与视频字幕解析。
+- `src/collectors/**`：站点 DOM 采集与视频字幕解析。各 provider 适配器必须独立，公共采集算法放在无站点语义的 shared/helper 层。
 - `src/entrypoints/**`：background、content、popup、app 等装配入口。
 
 依赖方向必须保持：
@@ -37,6 +37,8 @@ collectors -> services/shared
 - 评论选区只附加到 thread 首条引用内容的 composer；reply 输入框和评论面板内选区不得覆盖已附加引用。
 - 评论 thread 首节点只承载引用或评论一种内容；引用与评论独立持久化。迁移不得丢内容或伪造 locator；删除首节点删除整个 thread，删除后续评论只删除自身。完整恢复边界见 [`docs/storage.md`](docs/storage.md)。
 - 评论定位只接受全局唯一 exact Range，不新增模糊匹配、比例滚动或父元素高亮回退。
+- AI collector 不得跨 provider 复用实现：`src/collectors/<provider>/**` 禁止直接 import 另一个 provider 目录。跨站复用只能提炼到 `src/collectors/shared/**`、现有 collector-level helper 或 `src/services/shared/**`，且 shared 不得包含具体站点 selector / 产品语义。完整维护契约见 [`docs/collectors.md`](docs/collectors.md)。
+- 虚拟列表、分批历史或会卸载离屏消息的站点，只有在完整性可证明时才能 destructive snapshot；否则必须 manual-only 或 partial-safe，禁止用当前可见窗口覆盖本地完整历史。具体判定见 [`docs/collectors.md`](docs/collectors.md)。
 - `$` mention 使用 `$` 打开候选，`Tab`/`Enter` 插入；站点支持真源在 `src/collectors/ai-chat-sites.ts`。
 - `markdown_reading_profile_v1` 未知值归一到 `medium`。
 - `anti_hotlink_rules_v1` 命中后补 Referer 并尝试缓存图片，但图片失败不得阻断正文采集。
