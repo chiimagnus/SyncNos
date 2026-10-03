@@ -4,22 +4,29 @@ import { htmlToMarkdown } from '@collectors/shared/markdown-dom.ts';
 import MarkdownIt from 'markdown-it';
 import texmath from 'markdown-it-texmath';
 
-const markupParser = new MarkdownIt({ html: true, breaks: true, typographer: false });
-markupParser.inline.ruler.before('html_inline', 'notion_edit_reference', (state) => {
-  const match = state.src.slice(state.pos).match(/^<edit_reference(?:\s[^>]*)?>[\s\S]*?<\/edit_reference\s*>/);
-  if (!match) return false;
-  state.pos += match[0].length;
-  return true;
-});
-for (const rule of texmath.rules.dollars.inline) {
-  markupParser.inline.ruler.before('escape', rule.name, texmath.inline(rule));
-  markupParser.renderer.rules[rule.name] = (tokens, index) =>
-    markupParser.utils.escapeHtml(`${rule.tag}${tokens[index].content}${rule.tag}`);
-}
-for (const rule of texmath.rules.dollars.block) {
-  markupParser.block.ruler.before('fence', rule.name, texmath.block(rule));
-  markupParser.renderer.rules[rule.name] = (tokens, index) =>
-    `<p>$$<br>${markupParser.utils.escapeHtml(tokens[index].content.trim())}<br>$$</p>`;
+let markupParser: MarkdownIt | undefined;
+
+function getMarkupParser(): MarkdownIt {
+  if (markupParser) return markupParser;
+  const parser = new MarkdownIt({ html: true, breaks: true, typographer: false });
+  parser.inline.ruler.before('html_inline', 'notion_edit_reference', (state) => {
+    const match = state.src.slice(state.pos).match(/^<edit_reference(?:\s[^>]*)?>[\s\S]*?<\/edit_reference\s*>/);
+    if (!match) return false;
+    state.pos += match[0].length;
+    return true;
+  });
+  for (const rule of texmath.rules.dollars.inline) {
+    parser.inline.ruler.before('escape', rule.name, texmath.inline(rule));
+    parser.renderer.rules[rule.name] = (tokens, index) =>
+      parser.utils.escapeHtml(`${rule.tag}${tokens[index].content}${rule.tag}`);
+  }
+  for (const rule of texmath.rules.dollars.block) {
+    parser.block.ruler.before('fence', rule.name, texmath.block(rule));
+    parser.renderer.rules[rule.name] = (tokens, index) =>
+      `<p>$$<br>${parser.utils.escapeHtml(tokens[index].content.trim())}<br>$$</p>`;
+  }
+  markupParser = parser;
+  return parser;
 }
 
 export const NOTION_AI_TRANSCRIPT_REQUEST = 'SYNCNOS_NOTIONAI_TRANSCRIPT_REQUEST';
@@ -220,7 +227,7 @@ function renderAssistantMarkup(raw: unknown, document: Document): string {
   if (!source.trim()) return '';
 
   const container = document.createElement('div');
-  container.innerHTML = markupParser.render(source);
+  container.innerHTML = getMarkupParser().render(source);
   for (const node of Array.from(container.childNodes)) {
     if (node.nodeType === 3 && !node.textContent?.trim()) node.remove();
   }
