@@ -10,6 +10,8 @@
 - 自动保存测试必须同时观察“生成中”和“生成完成后”；生成中的未完成 assistant 不应被当成完整消息保存。
 - 长历史测试要离开首屏后再验证；只证明当前可见窗口正确，不等于完整历史正确。
 - provider 不支持的编辑、分支、附件或公式能力记为 N/A，不用兼容层伪造。
+- 虚拟列表 / 延迟渲染站点必须先让测试 tab 至少进入一次前台生命周期，并确认正文节点已 hydrate；后台 tab 的空壳 DOM 不能直接记为 BLOCKED / FAIL。
+- 同一真实会话至少连续保存两次，必须复用同一个 SyncNos conversation id；不能因为 `conversationKey` 格式、无关 query 或 collector 升级而新建第二条。
 - 当前 manual-only / auto-save 真源是 `src/collectors/ai-chat-sites.ts`，本页不复制易漂移的 provider 名单。
 
 ## 核心提示词
@@ -160,6 +162,18 @@ SYNCNOS-ATTACHMENT-ACK
 
 检查：用户附件与 AI 正文的结构正确；普通 tool / MCP 截图不应被误当成会话内容资产。
 
+### DOM-08：重复保存与会话身份复用
+
+对同一个真实会话执行两次保存；auto-save provider 还应在追加一轮消息后再次观察自动保存。
+
+检查：
+
+1. 两次保存的 SyncNos conversation id 必须相同。
+2. URL 中无关 query、入口参数或 host alias 变化时，仍应识别为同一 durable chat identity。
+3. collector 的 `conversationKey` 规则升级时，应迁移并复用旧记录，而不是创建第二条。
+4. 若历史已经存在同一 durable identity 的重复记录，下次保存应自动合并；消息、图片缓存和同步映射不得丢失。
+5. 已经同步到 Notion / Feishu / GitHub 的会话必须继续复用原映射，不能因此创建第二个远端页面或文件。
+
 ## 每次真实回归的最小组合
 
 普通 collector 修改至少执行：
@@ -168,6 +182,7 @@ SYNCNOS-ATTACHMENT-ACK
 2. DOM-02
 3. DOM-04
 4. DOM-05 至少 4 轮
+5. DOM-08 重复保存
 
 改 Markdown / formula 时加 DOM-03；改 branch/edit 时加 DOM-06；改附件时加 DOM-07。涉及虚拟列表、分页历史或完整性语义时，DOM-05 必须跑满 12 轮。
 
@@ -187,6 +202,7 @@ SYNCNOS-ATTACHMENT-ACK
 | DOM-05 | PASS / FAIL / N/A |
 | DOM-06 | PASS / FAIL / N/A |
 | DOM-07 | PASS / FAIL / N/A |
+| DOM-08 重复保存 / identity reuse | PASS / FAIL |
 | auto-save | PASS / FAIL / manual-only |
 | manual capture | PASS / FAIL |
 | SyncNos 本地 read-back | PASS / FAIL |

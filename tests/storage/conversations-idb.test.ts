@@ -224,6 +224,214 @@ describe('conversations storage-idb', () => {
     }
   });
 
+  it('keeps repeated durable AI chat exact saves on the indexed fast path after identity verification', async () => {
+    const created = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'fast-path-chat',
+      title: 'Fast path',
+      url: 'https://www.kimi.com/chat/fast-path-chat?chat_enter_method=home',
+      lastActivityAt: 1,
+    });
+    expect(created.canonicalChatIdentity).toBe('kimi:fast-path-chat');
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      const repeated = await upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: 'fast-path-chat',
+        title: 'Fast path updated',
+        url: 'https://kimi.com/chat/fast-path-chat?chat_enter_method=sidebar',
+        lastActivityAt: 2,
+      });
+      expect(Number(repeated.id)).toBe(Number(created.id));
+      expect(repeated.__isNew).toBe(false);
+      const sourceScans = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_listSourceKey_lastActivityAt_id',
+      );
+      expect(sourceScans).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+    }
+  });
+
+  it('rejects reuse of one exact key across two different durable AI chat identities', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'collision-key',
+      title: 'First',
+      url: 'https://www.kimi.com/chat/identity-a',
+      lastActivityAt: 1,
+    });
+
+    await expect(
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: 'collision-key',
+        title: 'Second',
+        url: 'https://www.kimi.com/chat/identity-b',
+        lastActivityAt: 2,
+      }),
+    ).rejects.toMatchObject({ code: 'conversation_identity_conflict' });
+  });
+
+  it('reuses a durable AI chat when the collector conversation key format changes', async () => {
+    const conversationId = '1a102e84-a162-830d-8000-098fcb968d15';
+    const legacy = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: `chat_${conversationId}`,
+      title: 'Legacy Kimi',
+      url: `https://www.kimi.com/chat/${conversationId}?chat_enter_method=home`,
+      lastActivityAt: 10,
+    });
+    await setConversationNotionPageId(Number(legacy.id), 'notion-page-kimi');
+    await syncConversationMessages(Number(legacy.id), [
+      { messageKey: 'legacy-user', role: 'user', contentMarkdown: 'legacy', sequence: 0 },
+    ]);
+
+    const migrated = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: conversationId,
+      title: 'Current Kimi',
+      url: `https://kimi.com/chat/${conversationId}?chat_enter_method=history`,
+      lastActivityAt: 20,
+    });
+
+    expect(migrated.__isNew).toBe(false);
+    expect(Number(migrated.id)).toBe(Number(legacy.id));
+    expect(migrated.conversationKey).toBe(conversationId);
+    expect(migrated.notionPageId).toBe('notion-page-kimi');
+    expect(await listAllConversationsForTests()).toHaveLength(1);
+    expect((await getMessagesByConversationId(Number(legacy.id))).map((message) => message.messageKey)).toEqual([
+      'legacy-user',
+    ]);
+    expect((await getSyncMappingByConversation(Number(legacy.id)))?.mapping?.notionPageId).toBe('notion-page-kimi');
+  });
+
+  it('self-heals already duplicated AI chat rows and keeps current identity plus legacy sync state', async () => {
+    const conversationId = '1a102e84-a162-830d-8000-098fcb968d15';
+    const legacy = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: `chat_${conversationId}`,
+      title: 'Legacy Kimi',
+      url: `https://www.kimi.com/chat/${conversationId}?chat_enter_method=home`,
+      lastActivityAt: 10,
+    });
+    await setConversationNotionPageId(Number(legacy.id), 'notion-page-kimi');
+    await syncConversationMessages(Number(legacy.id), [
+      { messageKey: 'fallback-old-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
+      { messageKey: 'legacy-tail', role: 'user', contentMarkdown: 'legacy tail', sequence: 2 },
+    ]);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations'], 'readwrite');
+    const currentId = Number(
+      await reqToPromise(
+        seedTx.objectStore('conversations').add(
+          normalizeConversationListRecord({
+            sourceType: 'chat',
+            source: 'kimi',
+            conversationKey: conversationId,
+            title: 'Current Kimi',
+            url: `https://www.kimi.com/chat/${conversationId}?chat_enter_method=history`,
+            lastActivityAt: 20,
+            notionPageId: '',
+            feishuDocId: '',
+            warningFlags: [],
+          }),
+        ) as any,
+      ),
+    );
+    await txDone(seedTx);
+    await syncConversationMessages(currentId, [
+      { messageKey: 'kimi-current-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
+      { messageKey: 'current-assistant', role: 'assistant', contentMarkdown: 'current', sequence: 1 },
+    ]);
+
+    const healed = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: conversationId,
+      title: 'Current Kimi updated',
+      url: `https://kimi.com/chat/${conversationId}?chat_enter_method=sidebar`,
+      lastActivityAt: 30,
+    });
+
+    expect(healed.__isNew).toBe(false);
+    expect(Number(healed.id)).toBe(currentId);
+    expect(healed.conversationKey).toBe(conversationId);
+    expect(healed.notionPageId).toBe('notion-page-kimi');
+    expect(await getConversationById(Number(legacy.id))).toBeNull();
+    const rows = await listAllConversationsForTests();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: currentId, conversationKey: conversationId, notionPageId: 'notion-page-kimi' });
+    expect((await getMessagesByConversationId(currentId)).map((message) => message.messageKey).sort()).toEqual([
+      'current-assistant',
+      'kimi-current-user',
+      'legacy-tail',
+    ]);
+    expect((await getSyncMappingByConversation(currentId))?.mapping?.notionPageId).toBe('notion-page-kimi');
+  });
+
+  it('removes semantic message-key aliases during partial append without deleting different content', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'message-alias-repair',
+      title: 'Alias repair',
+      url: 'https://www.kimi.com/chat/message-alias-repair',
+      lastActivityAt: 1,
+    });
+    const id = Number(conversation.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'fallback-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
+      { messageKey: 'different-user', role: 'user', contentMarkdown: 'different content', sequence: 0 },
+      { messageKey: 'fallback-assistant', role: 'assistant', contentMarkdown: 'same assistant', sequence: 1 },
+    ]);
+
+    const repaired = await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'kimi-stable-user',
+          role: 'user',
+          contentMarkdown: 'same   user',
+          sequence: 0,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+        {
+          messageKey: 'kimi-stable-assistant',
+          role: 'assistant',
+          contentMarkdown: 'same assistant',
+          sequence: 1,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+      ],
+      {
+        mode: 'append',
+        diff: {
+          added: ['kimi-stable-user', 'kimi-stable-assistant'],
+          updated: [],
+          removed: [],
+        },
+      },
+    );
+
+    expect(repaired.deleted).toBe(2);
+    const messages = await getMessagesByConversationId(id);
+    expect(messages.map((message) => message.messageKey).sort()).toEqual([
+      'different-user',
+      'kimi-stable-assistant',
+      'kimi-stable-user',
+    ]);
+  });
+
   it('preserves persisted mapping mirrors and unknown fields across an identical upsert', async () => {
     const payload = {
       sourceType: 'chat',
