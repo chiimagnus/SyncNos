@@ -258,6 +258,68 @@ describe('conversations storage-idb', () => {
     }
   });
 
+  it('rejects legacy exact-key reuse across durable identities before any destructive repair', async () => {
+    const existing = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'legacy-collision',
+      url: 'https://www.kimi.com/chat/original',
+      lastActivityAt: 10,
+    });
+    await syncConversationMessages(Number(existing.id), [
+      { messageKey: 'original', role: 'user', contentMarkdown: 'original content', sequence: 0 },
+    ]);
+    const db = await openDb();
+    const transaction = db.transaction(['conversations'], 'readwrite');
+    const legacy = await reqToPromise<any>(transaction.objectStore('conversations').get(Number(existing.id)));
+    delete legacy.canonicalChatIdentity;
+    await reqToPromise(transaction.objectStore('conversations').put(legacy));
+    await txDone(transaction);
+    const revision = await readDataRevision('conversations');
+    await expect(
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: 'legacy-collision',
+        url: 'https://www.kimi.com/chat/other',
+        lastActivityAt: 20,
+      }),
+    ).rejects.toMatchObject({ code: 'conversation_identity_conflict' });
+    expect(await readDataRevision('conversations')).toBe(revision);
+    expect((await getConversationById(Number(existing.id)))?.url).toBe(legacy.url);
+    expect((await getMessagesByConversationId(Number(existing.id)))[0]?.contentMarkdown).toBe('original content');
+  });
+
+  it('does not delete message aliases with different code whitespace during partial append', async () => {
+    const conversation = await upsertConversation({
+      source: 'kimi',
+      sourceType: 'chat',
+      conversationKey: 'code-alias',
+      url: 'https://www.kimi.com/chat/code-alias',
+    });
+    const original = '```py\nif ok:\n    print("a  b")\n```';
+    const changed = '```py\nif ok:\n  print("a b")\n```';
+    await syncConversationMessages(Number(conversation.id), [
+      { messageKey: 'old', role: 'assistant', contentMarkdown: original, sequence: 0 },
+    ]);
+    await syncConversationMessages(
+      Number(conversation.id),
+      [
+        {
+          messageKey: 'new',
+          role: 'assistant',
+          contentMarkdown: changed,
+          sequence: 0,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+      ],
+      { mode: 'append', diff: { added: ['new'] } },
+    );
+    expect(
+      (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+    ).toEqual([original, changed]);
+  });
+
   it('rejects reuse of one exact key across two different durable AI chat identities', async () => {
     await upsertConversation({
       sourceType: 'chat',
@@ -448,7 +510,7 @@ describe('conversations storage-idb', () => {
         {
           messageKey: 'kimi-stable-user',
           role: 'user',
-          contentMarkdown: 'same   user',
+          contentMarkdown: 'same user',
           sequence: 0,
           captureSequencePolicy: 'reconcile-existing-order',
         },

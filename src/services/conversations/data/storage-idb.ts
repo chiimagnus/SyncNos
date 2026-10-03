@@ -611,11 +611,12 @@ export async function upsertConversation(
       const now = Date.now();
       const exactExisting = await findExistingConversationForPayload(stores.conversations, payload);
       const exactStoredChatIdentity = safeString(exactExisting?.canonicalChatIdentity);
+      const exactUrlChatIdentity = canonicalChatIdentityFromUrl(exactExisting?.source, exactExisting?.url);
       if (
         exactExisting &&
         incomingChatIdentity &&
-        exactStoredChatIdentity &&
-        exactStoredChatIdentity !== incomingChatIdentity
+        ((exactStoredChatIdentity && exactStoredChatIdentity !== incomingChatIdentity) ||
+          (exactUrlChatIdentity && exactUrlChatIdentity !== incomingChatIdentity))
       ) {
         throw Object.assign(new Error('conversation durable identity conflicts with existing key'), {
           code: 'conversation_identity_conflict',
@@ -800,9 +801,7 @@ type ConversationMutationContext = {
 };
 
 function normalizeMessageAliasContent(value: unknown): string {
-  return String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(value ?? '').replace(/\r\n?/g, '\n');
 }
 
 function isSemanticMessageAlias(left: any, right: any): boolean {
