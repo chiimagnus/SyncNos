@@ -12,7 +12,10 @@ export function inEditMode(root: ParentNode | null): boolean {
   if (!root || typeof (root as any).querySelector !== 'function') return false;
   const textarea = (root as any).querySelector('textarea');
   if (!textarea) return false;
-  return document.activeElement === textarea || textarea.contains(document.activeElement);
+  const ownerDocument =
+    (root as any).ownerDocument || ((root as any).nodeType === 9 ? (root as any) : null) || globalThis.document;
+  const activeElement = ownerDocument?.activeElement || null;
+  return activeElement === textarea || (!!activeElement && textarea.contains(activeElement));
 }
 
 function isHttpUrl(url: unknown): boolean {
