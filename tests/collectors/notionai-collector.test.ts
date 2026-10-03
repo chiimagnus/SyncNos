@@ -103,6 +103,27 @@ function prepared(state = transcriptState(), threadId = THREAD_ID) {
 }
 
 describe('notionai-collector', () => {
+  it('preserves literal HTML in Markdown code while rendering current transcript markup', async () => {
+    const dom = setupDom();
+    const { collector } = createHarness(dom);
+    const state = transcriptState();
+    const assistant = state.pages[0].patches.find((patch) => patch.entity?.id === 'assistant-event')!.entity!;
+    const code = `const html = '<div data-x="a&b">中文 😀</div>';\n\n\nconsole.log(html);`;
+    assistant.content = [
+      {
+        type: 'text',
+        text: `<b>重点</b> <mention url="https://example.com">链接</mention><edit_reference>hidden</edit_reference>\n\nInline \`<span>&amp;</span>\`.\n\n\`\`\`ts\n${code}\n\`\`\`\n\n$E=mc^2$\n\n$$\n\\int_0^1 x^2\\,dx=\\frac{1}{3}\n$$`,
+      },
+    ];
+    const snapshot = await collector.capture({ manual: true, preparedCapture: prepared(state) });
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('```ts\n' + code + '\n```');
+    expect(markdown).toContain('`<span>&amp;</span>`');
+    expect(markdown).toContain('**重点** [链接](https://example.com/)');
+    expect(markdown).toContain('\\int_0^1 x^2\\,dx=\\frac{1}{3}');
+    expect(markdown).not.toContain('hidden');
+  });
+
   it('supports only the current durable /chat?t= Agent Service route', () => {
     const dom = setupDom();
     const { collector, registry } = createHarness(dom);
