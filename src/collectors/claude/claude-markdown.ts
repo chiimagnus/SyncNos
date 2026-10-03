@@ -7,7 +7,9 @@ function sanitize(node: Element | null): Element | null {
   const clone = node.cloneNode(true) as Element;
   replaceMathElementsWithLatexText(clone);
   for (const element of Array.from(
-    clone.querySelectorAll("button, svg, path, textarea, input, select, option, script, style, [hidden], [aria-hidden='true']"),
+    clone.querySelectorAll(
+      "button, svg, path, textarea, input, select, option, script, style, [hidden], [aria-hidden='true']",
+    ),
   )) {
     element.remove();
   }

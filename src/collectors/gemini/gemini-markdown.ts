@@ -1,9 +1,5 @@
 import { replaceMathElementsWithLatexText } from '@collectors/formula-utils.ts';
-import {
-  extractTextFromSanitizedClone,
-  htmlToMarkdown,
-  normalizeMarkdown,
-} from '@collectors/shared/markdown-dom.ts';
+import { extractTextFromSanitizedClone, htmlToMarkdown, normalizeMarkdown } from '@collectors/shared/markdown-dom.ts';
 import { normalizeText as normalizeTextShared } from '@services/shared/normalize.ts';
 
 function removeNonContentNodes(container: Element | null): Element | null {

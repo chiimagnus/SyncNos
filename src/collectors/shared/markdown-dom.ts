@@ -24,7 +24,9 @@ function wrapInlineCode(text: unknown): string {
 }
 
 function pickCodeLanguage(className: unknown): string {
-  for (const part of String(className || '').split(/\s+/).filter(Boolean)) {
+  for (const part of String(className || '')
+    .split(/\s+/)
+    .filter(Boolean)) {
     const match = part.match(/^(?:language|lang)-([a-z0-9_#+.-]+)$/i);
     if (match?.[1]) return match[1].toLowerCase();
   }
@@ -201,7 +203,12 @@ export function htmlToMarkdown(root: Element | null): string {
     if (tag === 'ol') return renderList(element, true, context.listDepth);
     if (tag === 'blockquote') {
       const body = normalizeMarkdown(renderChildren(element, context));
-      return body ? `${body.split('\n').map((line) => (line ? `> ${line}` : '>')).join('\n')}\n\n` : '';
+      return body
+        ? `${body
+            .split('\n')
+            .map((line) => (line ? `> ${line}` : '>'))
+            .join('\n')}\n\n`
+        : '';
     }
     if (tag === 'p') {
       const text = normalizeMarkdown(renderChildren(element, context));
