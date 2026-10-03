@@ -338,15 +338,33 @@ describe('content-controller auto-save live setting', () => {
     h.resident?.stop?.();
   });
 
-  it('keeps Notion AI manual-only even when the global auto-save setting is enabled', async () => {
+  it('allows Notion AI auto-save when the global auto-save setting is enabled', async () => {
     const storage = installStorage({ ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: false });
-    const h = createHarness({ collectorId: 'notionai' });
+    const h = createHarness({
+      collectorId: 'notionai',
+      capture: () => ({
+        conversation: { source: 'notionai', conversationKey: 'thread-1', title: 'Notion AI' },
+        messages: [
+          {
+            messageKey: 'user_event_1',
+            role: 'user',
+            contentMarkdown: 'hello',
+            sequence: 0,
+          },
+        ],
+        captureMeta: {
+          completeness: 'partial',
+          identityVerified: true,
+          reasons: ['top_not_reached'],
+        },
+      }),
+    });
     await flush();
 
     await h.runTick();
-    expect(h.capture).not.toHaveBeenCalled();
-    expect(h.sendCalls.some((entry) => entry.type === 'upsertConversation')).toBe(false);
-    expect(h.sendCalls.some((entry) => entry.type === 'syncConversationMessages')).toBe(false);
+    expect(h.capture).toHaveBeenCalledTimes(1);
+    expect(h.sendCalls.some((entry) => entry.type === 'upsertConversation')).toBe(true);
+    expect(h.sendCalls.some((entry) => entry.type === 'syncConversationMessages')).toBe(true);
 
     storage.emit('ai_chat_auto_save_enabled', false);
     h.resident?.stop?.();

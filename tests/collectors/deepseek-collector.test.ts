@@ -14,10 +14,10 @@ function setupDeepseekDom(messages: string, url = 'https://chat.deepseek.com/a/c
             ${messages}
           </div>
         </div>
+        <textarea placeholder="给 DeepSeek 发送消息 "></textarea>
       </div>
-      <textarea placeholder="给 DeepSeek 发送消息 "></textarea>
     </body>`,
-    { url },
+    { url, pretendToBeVisual: true },
   );
   (dom.window as any).scrollTo = vi.fn();
   return dom;
@@ -140,6 +140,19 @@ describe('deepseek-collector', () => {
 
     visible.style.setProperty('--dsl-virtual-list-transform-y', '0px');
     expect(def.collector.__test.readBoundaryState('top')).toBe('confirmed');
+  });
+
+  it('does not mistake the focused composer inside the virtual-list root for message edit mode', async () => {
+    const dom = setupDeepseekDom(
+      item('1', user('hello')) + item('2', assistant('<p>finished answer</p>')),
+      'https://chat.deepseek.com/a/chat/s/composer-focus',
+    );
+    const composer = dom.window.document.querySelector('textarea') as HTMLTextAreaElement;
+    composer.focus();
+
+    expect(dom.window.document.activeElement).toBe(composer);
+    const auto = await createDef(dom).collector.capture();
+    expect(auto?.messages.map((message: any) => message.messageKey)).toEqual(['deepseek_1', 'deepseek_2']);
   });
 
   it('auto-captures the current safe window while manual capture still uses prepared history', async () => {

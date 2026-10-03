@@ -38,9 +38,24 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
     return hostname === 'yuanbao.tencent.com';
   }
 
+  function findConversationIdFromMessages(): string {
+    const ids = getMessageItems()
+      .map((item) => {
+        const raw = String(item.getAttribute('data-conv-id') || '').trim();
+        if (!raw) return '';
+        const index = String(item.getAttribute('data-conv-idx') || '').trim();
+        const suffix = index ? `_${index}` : '';
+        return suffix && raw.endsWith(suffix) ? raw.slice(0, -suffix.length) : raw;
+      })
+      .filter(Boolean);
+    const unique = Array.from(new Set(ids));
+    return unique.length === 1 ? unique[0] : '';
+  }
+
   function findConversationIdFromUrl(): string {
-    const match = String(env.location.pathname || '').match(/^\/chat\/([^/?#]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : '';
+    const match = String(env.location.pathname || '').match(/^\/chat\/([^/?#]+)(?:\/([^/?#]+))?/);
+    if (match?.[2]) return decodeURIComponent(match[2]);
+    return findConversationIdFromMessages();
   }
 
   function isValidConversationUrl(): boolean {
@@ -53,8 +68,11 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function normalizedRoute(): string {
+    const host = String(env.location.hostname || '').toLowerCase();
+    const conversationId = findConversationIdFromUrl();
+    if (conversationId) return `${host}/chat/${conversationId}`;
     const pathname = String(env.location.pathname || '/').replace(/\/+$/, '') || '/';
-    return `${String(env.location.hostname || '').toLowerCase()}${pathname}`;
+    return `${host}${pathname}`;
   }
 
   function findTitle(): string {
@@ -119,7 +137,11 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function assistantContentNode(item: Element): Element | null {
-    return item.querySelector('.agent-chat__speech-text');
+    return (
+      item.querySelector('.agent-chat__speech-text') ||
+      item.querySelector('.agent-chat__speech-text--box .hyc-content-md.hyc-content-md-done') ||
+      item.querySelector('.agent-chat__speech-text--box .hyc-content-md')
+    );
   }
 
   function assistantText(item: Element): string {

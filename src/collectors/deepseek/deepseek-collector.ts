@@ -82,7 +82,8 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
   }
 
   function inEditMode(root: Element | null): boolean {
-    return !!root && inEditModeUtil(root);
+    if (!root) return false;
+    return getVisibleItems(root).some((item) => inEditModeUtil(item));
   }
 
   function extractUserText(item: Element): string {

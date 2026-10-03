@@ -25,11 +25,13 @@ function setupYuanbaoDom(messages: string, url = 'https://yuanbao.tencent.com/ch
 }
 
 function item(index: number, speaker: 'human' | 'ai', content: string, attrs: Record<string, string> = {}) {
+  const convId = attrs['data-conv-id'] || `conv001_${index}`;
   const extra = Object.entries(attrs)
+    .filter(([key]) => key !== 'data-conv-id')
     .map(([key, value]) => `${key}="${value}"`)
     .join(' ');
   return `<div class="agent-chat__list__item agent-chat__list__item--${speaker === 'human' ? 'human' : 'ai'}"
-    data-conv-idx="${index}" data-conv-speaker="${speaker}" ${extra}>${content}</div>`;
+    data-conv-idx="${index}" data-conv-speaker="${speaker}" data-conv-id="${convId}" ${extra}>${content}</div>`;
 }
 
 function createDef(dom: JSDOM) {
@@ -103,6 +105,81 @@ describe('yuanbao-collector', () => {
     expect(assistant).toContain('print("yuanbao")');
     expect(assistant).not.toContain('内部思考');
     expect(assistant).not.toContain('复制');
+  });
+
+  it('uses the current two-segment route conversation id instead of the agent id', async () => {
+    const dom = setupYuanbaoDom(
+      item(1, 'human', '<div class="agent-chat__bubble"><div class="hyc-content-text">hello</div></div>', {
+        'data-conv-id': '0QwwxPttxiK_1',
+      }),
+      'https://yuanbao.tencent.com/chat/naQivTmsDa/0QwwxPttxiK',
+    );
+
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(snapshot.conversation.conversationKey).toBe('0QwwxPttxiK');
+  });
+
+  it('derives the durable conversation id from message DOM while the route is still one segment', async () => {
+    const dom = setupYuanbaoDom(
+      item(1, 'human', '<div class="agent-chat__bubble"><div class="hyc-content-text">hello</div></div>', {
+        'data-conv-id': '0QwwxPttxiK_1',
+      }),
+      'https://yuanbao.tencent.com/chat/naQivTmsDa',
+    );
+
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(snapshot.conversation.conversationKey).toBe('0QwwxPttxiK');
+  });
+
+  it('keeps one-segment to two-segment route canonicalization inside the same durable identity', async () => {
+    const dom = setupYuanbaoDom(
+      item(1, 'human', '<div class="agent-chat__bubble"><div class="hyc-content-text">hello</div></div>', {
+        'data-conv-id': '0QwwxPttxiK_1',
+      }),
+      'https://yuanbao.tencent.com/chat/naQivTmsDa',
+    );
+    const def = createDef(dom);
+
+    queueMicrotask(() => {
+      dom.window.history.pushState({}, '', '/chat/naQivTmsDa/0QwwxPttxiK');
+    });
+
+    const snapshot = (await def.collector.capture()) as any;
+    expect(snapshot).toBeTruthy();
+    expect(snapshot.conversation.conversationKey).toBe('0QwwxPttxiK');
+    expect(dom.window.location.pathname).toBe('/chat/naQivTmsDa/0QwwxPttxiK');
+  });
+
+  it('captures the current 2026 assistant speech box without mixing in reasoning chrome', async () => {
+    const dom = setupYuanbaoDom(
+      item(0, 'human', '<div class="agent-chat__bubble"><div class="hyc-content-text">hello</div></div>') +
+        item(
+          1,
+          'ai',
+          `<div class="hyc-component-reasoner__text">内部推理不应保存</div>
+           <div class="agent-chat__speech-text--box agent-chat__speech-text--box-left">
+             <div class="hyc-component-deep-search-agent">
+               <div class="hyc-content-md hyc-content-md-done">
+                 <div class="hyc-common-markdown hyc-common-markdown-style">
+                   <div class="ybc-p">SYNCNOS-DOM-01-BEGIN</div>
+                   <div class="ybc-p">中文：你好，世界。</div>
+                   <div class="ybc-p">SYNCNOS-DOM-01-END</div>
+                 </div>
+               </div>
+             </div>
+           </div>`,
+          { 'data-conv-outputting': 'false', 'data-conv-status': 'finished' },
+        ),
+    );
+
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'yuanbao_0_user',
+      'yuanbao_1_assistant',
+    ]);
+    expect(snapshot.messages[1].contentMarkdown).toContain('SYNCNOS-DOM-01-BEGIN');
+    expect(snapshot.messages[1].contentMarkdown).toContain('SYNCNOS-DOM-01-END');
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('内部推理');
   });
 
   it('captures multimodal images and file names without treating file icons as content images', async () => {
