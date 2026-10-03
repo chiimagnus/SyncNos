@@ -24,6 +24,8 @@ type KimiDescriptor = {
   key: string;
   role: KimiRole;
   fingerprint: string;
+  rendered: boolean;
+  streaming: boolean;
 };
 
 export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
@@ -170,11 +172,19 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
     const role = roleFromItem(item);
     if (!key || !role) return null;
     const content = extractContent(item, role);
+    const streaming =
+      role === 'assistant' &&
+      (item.matches('.awaiting-assistant-item') ||
+        !!item.querySelector('.segment-pending-loading') ||
+        !!item.querySelector('.last-node'));
+    const rendered = !streaming && (!!content.text || !!content.markdown || content.imageUrls.length > 0);
     return {
       key,
       role,
+      rendered,
+      streaming,
       fingerprint: compactFingerprint(
-        [key, role, content.text, content.markdown, content.imageUrls.join('|')].join('\u001f'),
+        [key, role, String(streaming), content.text, content.markdown, content.imageUrls.join('|')].join('\u001f'),
       ),
     };
   }
@@ -217,12 +227,16 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
   ): Promise<{ added: number; updated: number }> {
     const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
     const items = getMessageItems();
+    let unresolved = false;
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index];
       const descriptor = descriptorFromItem(item);
       if (!descriptor) continue;
+      if (!descriptor.rendered || descriptor.streaming) {
+        unresolved = true;
+        continue;
+      }
       const content = extractContent(item, descriptor.role);
-      if (!content.markdown && !content.text && !content.imageUrls.length) continue;
       records.push({
         key: descriptor.key,
         turnKey: descriptor.key,
@@ -237,13 +251,14 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
         },
       });
     }
+    if (unresolved) addPreparedReason(accumulator, 'unresolved_turn');
     return mergePreparedRecords(accumulator, records);
   }
 
   function currentWindowSignature(): string {
     const root = getScrollRoot() as HTMLElement | null;
-    const keys = readCurrentDescriptors().map((descriptor) => descriptor.key);
-    return `${keys.join('|')}|${Number(root?.scrollHeight || 0)}`;
+    const descriptors = readCurrentDescriptors();
+    return `${descriptors.map((descriptor) => `${descriptor.key}:${descriptor.fingerprint}`).join('|')}|${Number(root?.scrollHeight || 0)}`;
   }
 
   async function waitForHistoryChange(
@@ -318,12 +333,48 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
     return finishPreparedCapture(accumulator);
   }
 
+  function snapshotFromPreparedCapture(prepared: any): any | null {
+    const messages = prepared.records.map((record: any, index: number) => ({ ...record.payload, sequence: index }));
+    if (!messages.length || !prepared.identityVerified || !prepared.conversationKey) return null;
+    return {
+      conversation: {
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: prepared.conversationKey,
+        title: env.document.title || 'Kimi',
+        url: env.location.href,
+        warningFlags: [],
+      },
+      messages,
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: prepared.reasons,
+        metrics: prepared.metrics,
+      },
+    };
+  }
+
   async function capture(options: any = {}): Promise<any | null> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
-      return null;
-    }
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const root = getConversationRoot();
     if (!root || inEditMode(root)) return null;
+
+    if (options?.manual !== true) {
+      const identityGuard = sampleIdentityGuard();
+      const accumulator = createPreparedAccumulator<any>({
+        source: 'kimi',
+        conversationKey: identityGuard.durableId,
+        identityVerified: !!identityGuard.durableId,
+        identityGuard,
+      });
+      accumulator.completeness = 'partial';
+      addPreparedReason(accumulator, 'top_not_reached');
+      await harvestCurrentInto(accumulator);
+      if (!identityGuardsMatch(identityGuard, sampleIdentityGuard())) return null;
+      return snapshotFromPreparedCapture(finishPreparedCapture(accumulator));
+    }
+
     const prepared = consumePreparedCapture(options.preparedCapture);
     if (!prepared || !identityGuardsMatch(prepared.identityGuard, sampleIdentityGuard())) return null;
 
@@ -343,27 +394,7 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
     await harvestCurrentInto(accumulator);
 
     if (!identityGuardsMatch(accumulator.identityGuard, sampleIdentityGuard())) return null;
-    const finalPrepared = finishPreparedCapture(accumulator);
-    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
-    if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
-
-    return {
-      conversation: {
-        sourceType: 'chat',
-        source: 'kimi',
-        conversationKey: finalPrepared.conversationKey,
-        title: env.document.title || 'Kimi',
-        url: env.location.href,
-        warningFlags: [],
-      },
-      messages,
-      captureMeta: {
-        completeness: 'partial',
-        identityVerified: true,
-        reasons: finalPrepared.reasons,
-        metrics: finalPrepared.metrics,
-      },
-    };
+    return snapshotFromPreparedCapture(finishPreparedCapture(accumulator));
   }
 
   const collector: any = {

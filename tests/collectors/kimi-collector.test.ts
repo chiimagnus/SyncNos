@@ -135,7 +135,7 @@ describe('kimi-collector', () => {
     expect(snap.messages.map((message: any) => message.messageKey)).toEqual(['kimi_old', 'kimi_new']);
   });
 
-  it('requires manual prepared capture and does not treat the homepage as a persisted conversation', async () => {
+  it('auto-captures the current safe window while manual capture still backfills history', async () => {
     const dom = setupKimiDom(item('one', 'user', '<div class="user-content">hello</div>'));
     const def = createDef(dom);
     let clock = 0;
@@ -149,12 +149,41 @@ describe('kimi-collector', () => {
         clock += 1;
       },
     });
-    expect(await def.collector.capture({ preparedCapture })).toBeNull();
+
+    const auto = await def.collector.capture();
+    expect(auto).toMatchObject({
+      conversation: { source: 'kimi', conversationKey: 'conv001' },
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    });
+    expect(auto.captureMeta.reasons).toContain('top_not_reached');
+    expect(auto.messages.map((message: any) => message.messageKey)).toEqual(['kimi_one']);
     expect(await def.collector.capture({ manual: true, preparedCapture })).toBeTruthy();
 
     const home = setupKimiDom('', 'https://www.kimi.com/');
     expect(createDef(home).collector.isCaptureAvailable()).toBe(true);
+    expect(await createDef(home).collector.capture()).toBeNull();
     expect(await createDef(home).collector.prepareManualCapture()).toBeNull();
+  });
+
+  it('excludes the current streaming assistant until Kimi removes its last-node marker', async () => {
+    const dom = setupKimiDom(
+      item('user-1', 'user', '<div class="user-content">question</div>') +
+        item(
+          'assistant-1',
+          'assistant',
+          '<div class="markdown-container"><div class="markdown"><p class="last-node">partial answer</p></div></div>',
+        ),
+    );
+    const def = createDef(dom);
+
+    const streaming = await def.collector.capture();
+    expect(streaming.captureMeta.reasons).toContain('unresolved_turn');
+    expect(streaming.messages.map((message: any) => message.messageKey)).toEqual(['kimi_user-1']);
+
+    dom.window.document.querySelector('.last-node')?.classList.remove('last-node');
+    const completed = await def.collector.capture();
+    expect(completed.messages.map((message: any) => message.messageKey)).toEqual(['kimi_user-1', 'kimi_assistant-1']);
+    expect(completed.messages[1].contentMarkdown).toContain('partial answer');
   });
 
   it('falls back to plain text markdown when markdown helper is unavailable', async () => {

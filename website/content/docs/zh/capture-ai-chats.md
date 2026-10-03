@@ -7,8 +7,8 @@ description: 保存支持的 AI 对话，并区分手动保存、自动保存和
 
 | 平台 | 保存方式 |
 | --- | --- |
-| Gemini、DeepSeek、豆包、元宝、Poe、Notion AI | 手动保存 + 自动保存 |
-| ChatGPT、Claude、Google AI Studio、Kimi、z.ai | 手动保存 |
+| Gemini、DeepSeek、豆包、Kimi、元宝、Poe、Notion AI | 手动保存 + 自动保存 |
+| ChatGPT、Claude、Google AI Studio、z.ai | 手动保存 |
 
 手动保存会主动获取当前站点能够安全确认的历史。遇到虚拟列表、分页历史或未完成回复时，SyncNos 会保守合并已有内容，不会拿当前可见窗口覆盖本地完整历史。
 

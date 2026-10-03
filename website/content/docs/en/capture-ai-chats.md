@@ -7,8 +7,8 @@ description: Save supported AI chats and understand manual capture, auto-save, a
 
 | Platform | Capture |
 | --- | --- |
-| Gemini, DeepSeek, Doubao, Yuanbao, Poe, Notion AI | Manual + auto-save |
-| ChatGPT, Claude, Google AI Studio, Kimi, z.ai | Manual |
+| Gemini, DeepSeek, Doubao, Kimi, Yuanbao, Poe, Notion AI | Manual + auto-save |
+| ChatGPT, Claude, Google AI Studio, z.ai | Manual |
 
 Manual capture actively retrieves the history that the current site can safely verify. For virtualized lists, paginated histories, or unfinished replies, SyncNos merges conservatively instead of replacing a complete local history with the currently visible window.
 
