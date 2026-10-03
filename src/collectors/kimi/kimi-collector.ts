@@ -3,7 +3,9 @@ import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import {
   addPreparedReason,
@@ -53,6 +55,26 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
   function normalizedRoute(): string {
     const pathname = String(env.location.pathname || '/').replace(/\/+$/, '') || '/';
     return `${String(env.location.hostname || '').toLowerCase()}${pathname}`;
+  }
+
+  function findTitle(messages: any[]): string {
+    const conversationId = findConversationIdFromUrl();
+    if (conversationId) {
+      const links = Array.from(env.document.querySelectorAll('a[href]'));
+      const active = links.find((link) => {
+        try {
+          const href = String(link.getAttribute('href') || '');
+          const url = new URL(href, env.location.href);
+          return url.pathname === `/chat/${conversationId}`;
+        } catch (_error) {
+          return false;
+        }
+      });
+      const activeText = env.normalize.normalizeText(renderedElementText(active)).trim();
+      if (activeText) return activeText;
+    }
+
+    return firstUserMessageTitle(messages) || 'Kimi';
   }
 
   function getConversationRoot(): Element | null {
@@ -341,7 +363,7 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
         sourceType: 'chat',
         source: 'kimi',
         conversationKey: prepared.conversationKey,
-        title: env.document.title || 'Kimi',
+        title: findTitle(messages),
         url: env.location.href,
         warningFlags: [],
       },

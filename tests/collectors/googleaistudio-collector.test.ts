@@ -53,6 +53,57 @@ describe('googleaistudio-collector', () => {
     }
   });
 
+  it('uses the visible AI Studio toolbar title and ignores the browser tab title', async () => {
+    const html = `
+      <ms-playground-toolbar>
+        <div class="page-title"><h1 class="mode-title">Visible AI Studio Title</h1></div>
+      </ms-playground-toolbar>
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-u1"><div data-turn-role="User"><div class="turn-content">hello</div></div></ms-chat-turn>
+        <ms-chat-turn id="turn-a1"><div data-turn-role="Model"><div class="turn-content">world</div></div></ms-chat-turn>
+      </div>
+    `;
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/title-test');
+    dom.window.document.title = 'WRONG BROWSER TAB TITLE | Google AI Studio';
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+
+    const snap = (await capturePrepared(def)) as any;
+    expect(snap.conversation.conversationKey).toBe('title-test');
+    expect(snap.conversation.title).toBe('Visible AI Studio Title');
+  });
+
+  it('uses the saved prompt id as the durable key across AI Studio route variants', async () => {
+    const html = `
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-route-user"><div data-turn-role="User"><div class="turn-content">hello</div></div></ms-chat-turn>
+      </div>
+    `;
+    const captureAt = async (url: string) => {
+      const dom = setupDom(html, url);
+      const def = createGoogleAiStudioCollectorDef(
+        createCollectorEnv({
+          window: dom.window as any,
+          document: dom.window.document as any,
+          location: dom.window.location as any,
+          normalize: normalizeApi,
+        }),
+      ) as any;
+      return (await capturePrepared(def)) as any;
+    };
+
+    const current = await captureAt('https://aistudio.google.com/prompts/durable-prompt');
+    const legacy = await captureAt('https://aistudio.google.com/u/0/prompts/durable-prompt');
+    expect(current.conversation.conversationKey).toBe('durable-prompt');
+    expect(legacy.conversation.conversationKey).toBe(current.conversation.conversationKey);
+  });
+
   it('captures AI Studio ms-chat-turn DOM and renders assistant markdown', async () => {
     const html = `
       <div class="chat-session-content">
@@ -604,8 +655,8 @@ describe('googleaistudio-collector', () => {
     expect(left).toBe(7);
   });
 
-  it('uses stable turn-role-ordinal keys for multiple messages in one turn', async () => {
-    const html = `<div class="chat-session-content"><ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">Q</div></div><div data-turn-role="Model"><div class="turn-content">A</div></div></ms-chat-turn></div>`;
+  it('uses stable persisted ordinal keys even though AI Studio turn ids are runtime-only', async () => {
+    const html = `<div class="chat-session-content"><ms-chat-turn id="turn-runtime-1"><div data-turn-role="User"><div class="turn-content">Q</div></div><div data-turn-role="Model"><div class="turn-content">A</div></div></ms-chat-turn></div>`;
     const dom = setupDom(html, 'https://aistudio.google.com/prompts/identity');
     const def = createGoogleAiStudioCollectorDef(
       createCollectorEnv({
@@ -617,12 +668,47 @@ describe('googleaistudio-collector', () => {
     ) as any;
     const preparedCapture = await def.collector.prepareManualCapture();
     expect(preparedCapture.records.map((record: any) => record.payload.messageKey)).toEqual([
-      'turn-1:user:0',
-      'turn-1:assistant:1',
+      'turn-runtime-1:user:0',
+      'turn-runtime-1:assistant:1',
+    ]);
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'googleaistudio:0:user',
+      'googleaistudio:1:assistant',
     ]);
     expect(
-      preparedCapture.records.every((record: any) => !String(record.payload.messageKey).startsWith('fallback_')),
+      snapshot.messages.every((message: any) => message.captureSequencePolicy === 'reconcile-existing-order'),
     ).toBe(true);
+  });
+
+  it('keeps persisted message keys stable when AI Studio regenerates every DOM turn id after reload', async () => {
+    const captureWithRuntimeIds = async (userId: string, assistantId: string) => {
+      const html = `<div class="chat-session-content">
+        <ms-chat-turn id="${userId}"><div data-turn-role="User"><div class="turn-content">Q</div></div></ms-chat-turn>
+        <ms-chat-turn id="${assistantId}"><div data-turn-role="Model"><div class="turn-content">A</div></div></ms-chat-turn>
+      </div>`;
+      const dom = setupDom(html, 'https://aistudio.google.com/prompts/reload-stability');
+      const def = createGoogleAiStudioCollectorDef(
+        createCollectorEnv({
+          window: dom.window as any,
+          document: dom.window.document as any,
+          location: dom.window.location as any,
+          normalize: normalizeApi,
+        }),
+      ) as any;
+      const preparedCapture = await def.collector.prepareManualCapture();
+      return def.collector.capture({ manual: true, preparedCapture });
+    };
+
+    const before = await captureWithRuntimeIds('turn-before-user', 'turn-before-assistant');
+    const after = await captureWithRuntimeIds('turn-after-user', 'turn-after-assistant');
+    expect(before.messages.map((message: any) => message.messageKey)).toEqual([
+      'googleaistudio:0:user',
+      'googleaistudio:1:assistant',
+    ]);
+    expect(after.messages.map((message: any) => message.messageKey)).toEqual(
+      before.messages.map((message: any) => message.messageKey),
+    );
   });
 
   it('keeps the latest assistant unresolved while the current run button is stoppable', async () => {
@@ -690,6 +776,54 @@ describe('googleaistudio-collector', () => {
     expect(preparedCapture.completeness).toBe('partial');
     expect(preparedCapture.reasons).toContain('unresolved_turn');
     expect(preparedCapture.records.map((record: any) => record.key)).toEqual(['turn-1:user:0']);
+  });
+
+  it('keeps absolute persisted slot indexes when a partial capture has an unresolved middle message', async () => {
+    const html = `<div class="chat-session-content">
+      <ms-chat-turn id="turn-1">
+        <div data-turn-role="User"><div class="turn-content">Q1</div></div>
+        <div data-turn-role="Model"><div class="turn-content"></div></div>
+      </ms-chat-turn>
+      <ms-chat-turn id="turn-2">
+        <div data-turn-role="User"><div class="turn-content">Q2</div></div>
+        <div data-turn-role="Model"><div class="turn-content">A2</div></div>
+      </ms-chat-turn>
+    </div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/partial-slot-order');
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    let clock = 0;
+    const preparedCapture = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 1,
+      stepTimeoutMs: 2,
+      totalDeadlineMs: 20,
+      now: () => clock,
+      sleep: async () => {
+        clock += 1;
+      },
+    });
+    expect(preparedCapture.completeness).toBe('partial');
+    expect(preparedCapture.aiStudioSlotOrder).toEqual([
+      'turn-1:user:0',
+      'turn-1:assistant:1',
+      'turn-2:user:0',
+      'turn-2:assistant:1',
+    ]);
+
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'googleaistudio:0:user',
+      'googleaistudio:2:user',
+      'googleaistudio:3:assistant',
+    ]);
+    expect(snapshot.messages.map((message: any) => message.sequence)).toEqual([0, 2, 3]);
   });
 
   it('refuses to verify manual identity when stable turn ids are missing', async () => {

@@ -2,8 +2,10 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
+  compactConversationTitle,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import claudeMarkdown from '@collectors/claude/claude-markdown.ts';
 import {
@@ -56,7 +58,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function findConversationKey(): string {
-    return isValidConversationUrl() ? conversationKeyFromLocation(env.location) : '';
+    return findConversationId();
   }
 
   function normalizedRoute(): string {
@@ -84,10 +86,31 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     return env.normalize.normalizeText(String(value || '')).trim();
   }
 
-  function extractConversationTitle(): string {
-    const pageTitle = normalizeTitle(env.document.title || '');
-    const withoutSuffix = normalizeTitle(pageTitle.replace(/\s*[-–—]\s*Claude\s*$/i, ''));
-    return withoutSuffix || 'Claude';
+  function extractConversationTitle(messages: any[] = []): string {
+    const conversationId = findConversationId();
+    if (conversationId) {
+      const current = Array.from(env.document.querySelectorAll("a[aria-current='page'][href]")).find((link) => {
+        try {
+          const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+          return url.pathname === `/chat/${conversationId}`;
+        } catch (_error) {
+          return false;
+        }
+      });
+      const currentText = normalizeTitle(renderedElementText(current));
+      if (currentText) return currentText;
+    }
+
+    const headerTitle = env.document.querySelector("[data-testid='chat-title-split'] button");
+    const headerText = normalizeTitle(renderedElementText(headerTitle));
+    if (headerText) return headerText;
+
+    const firstUserRow = Array.from(getConversationRoot()?.querySelectorAll(TRANSCRIPT_ROW_SELECTOR) || []).find(
+      (row) => rowRole(row) === 'user',
+    );
+    const firstUserText = firstUserRow ? normalizedNodeText(contentNodeForRow(firstUserRow, 'user')) : '';
+    if (firstUserText) return compactConversationTitle(firstUserText);
+    return firstUserMessageTitle(messages) || 'Claude';
   }
 
   function rowRole(row: Element): ClaudeRole | null {
@@ -514,7 +537,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
         sourceType: 'chat',
         source: 'claude',
         conversationKey: finalPrepared.conversationKey,
-        title: extractConversationTitle(),
+        title: extractConversationTitle(messages),
         url: env.location.href,
         warningFlags: [],
       },

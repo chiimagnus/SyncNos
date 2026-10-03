@@ -3,7 +3,9 @@ import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import {
   addPreparedReason,
@@ -64,8 +66,11 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     return `${String(env.location.hostname || '').toLowerCase()}${pathname}`;
   }
 
-  function findTitle(): string {
-    return env.normalize.normalizeText(String(env.document.title || 'z.ai')).trim() || 'z.ai';
+  function findTitle(messages: any[]): string {
+    const selected = env.document.querySelector('button[data-selected="true"]');
+    const selectedText = env.normalize.normalizeText(renderedElementText(selected)).trim();
+    if (selectedText) return selectedText;
+    return firstUserMessageTitle(messages) || 'z.ai';
   }
 
   function getConversationRoot(): Element | null {
@@ -484,7 +489,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
         sourceType: 'chat',
         source: 'zai',
         conversationKey: finalPrepared.conversationKey,
-        title: findTitle(),
+        title: findTitle(messages),
         url: env.location.href,
         warningFlags: [],
       },

@@ -169,10 +169,12 @@ SYNCNOS-ATTACHMENT-ACK
 检查：
 
 1. 两次保存的 SyncNos conversation id 必须相同。
-2. URL 中无关 query、入口参数或 host alias 变化时，仍应识别为同一 durable chat identity。
-3. collector 的 `conversationKey` 规则升级时，应迁移并复用旧记录，而不是创建第二条。
+2. URL 中无关 query、入口参数或 host alias 变化时，仍应识别为同一 durable chat identity；本地 read-back URL 应稳定为 provider canonical host + durable route，不保留这些瞬时参数。
+3. collector 的 `conversationKey` 应是站点 durable conversation/prompt/thread id，而不是 pathname 的字符串变体；旧 key 规则升级时，应迁移并复用旧记录，而不是创建第二条。
 4. 若历史已经存在同一 durable identity 的重复记录，下次保存应自动合并；消息、图片缓存和同步映射不得丢失。
-5. 已经同步到 Notion / Feishu / GitHub 的会话必须继续复用原映射，不能因此创建第二个远端页面或文件。
+5. Notion / Feishu 已有目标必须继续复用；GitHub 必须保持 managed-path ownership 连续性，并按既有 cleanup / migration 语义处理旧路径，不能无声留下重复远端文件。
+6. 刷新或重新打开同一会话后，最终持久化的 message key 必须保持稳定；站点若只提供会随 reload 重建的 DOM 临时 id，collector 必须在持久化前转换成稳定 identity。
+7. conversation title 只能来自网页内当前会话的 history/header/title 控件；禁止读取浏览器标签页 `<title>`。网页未暴露稳定会话标题时，才用首条 user 内容的 semantic text 作为短标题兜底。
 
 ## 每次真实回归的最小组合
 
@@ -203,9 +205,11 @@ SYNCNOS-ATTACHMENT-ACK
 | DOM-06 | PASS / FAIL / N/A |
 | DOM-07 | PASS / FAIL / N/A |
 | DOM-08 重复保存 / identity reuse | PASS / FAIL |
+| reload 后 message identity | PASS / FAIL |
+| 会话标题 | PASS / FAIL |
 | auto-save | PASS / FAIL / manual-only |
 | manual capture | PASS / FAIL |
 | SyncNos 本地 read-back | PASS / FAIL |
 | 阻塞 / 备注 |  |
 
-真实站点通过的最低标准是：页面事实、collector 结果和 SyncNos 本地 read-back 三者一致。只检查 selector、bundle、fixture 或 DOM snapshot 都不能写成 E2E PASS。
+真实站点通过的最低标准是：页面事实、collector 结果和 SyncNos 本地 read-back 三者一致。虚拟化站点还必须验证一次后台 → 前台恢复；重复保存测试还必须验证一次 reload 后的 message identity 与 conversation id。只检查 selector、bundle、fixture 或 DOM snapshot 都不能写成 E2E PASS。

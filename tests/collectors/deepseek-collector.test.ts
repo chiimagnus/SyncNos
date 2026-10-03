@@ -106,6 +106,15 @@ describe('deepseek-collector', () => {
     expect(markdown).not.toContain('内部思考');
   });
 
+  it('uses the active DeepSeek history title without the brand suffix', async () => {
+    const dom = setupDeepseekDom(item('1', user('标题测试正文')));
+    dom.window.document.title = '页面标题 - DeepSeek';
+    dom.window.document.body.insertAdjacentHTML('afterbegin', '<a href="/a/chat/s/abc123">真实 DeepSeek 标题</a>');
+
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(snapshot.conversation.title).toBe('真实 DeepSeek 标题');
+  });
+
   it('keeps a think-only assistant unresolved instead of saving a partial response', async () => {
     const dom = setupDeepseekDom(
       item('1', user('question')) +

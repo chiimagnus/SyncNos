@@ -5,13 +5,21 @@ import { createClaudeCollectorDef } from '@collectors/claude/claude-collector.ts
 import { createCollectorEnv } from '@collectors/collector-env.ts';
 import normalizeApi from '@services/shared/normalize.ts';
 
-function setupClaudeDom(input?: { streaming?: boolean; title?: string }) {
+function setupClaudeDom(input?: { streaming?: boolean; browserTitle?: string; siteTitle?: string | null }) {
   const streaming = input?.streaming === true;
+  const siteTitle = input?.siteTitle === undefined ? 'Stable Claude Capture' : input.siteTitle;
   const html = [
     '<!doctype html>',
     '<html>',
-    '<head><title>' + (input?.title || 'Stable Claude Capture - Claude') + '</title></head>',
+    '<head><title>' + (input?.browserTitle || 'Misleading Browser Tab - Claude') + '</title></head>',
     '<body>',
+    siteTitle
+      ? '<nav><a aria-current="page" href="/chat/conv-1">' +
+        siteTitle +
+        '</a></nav><div data-testid="chat-title-split"><button>' +
+        siteTitle +
+        '</button></div>'
+      : '',
     '<main>',
     '<div role="feed" data-perf-region="transcript" aria-label="Chat messages">',
     '<div data-testid="transcript-row" data-rs-index="0" data-index="0" data-perf-row="human" data-perf-row-streaming="false">',
@@ -98,6 +106,18 @@ describe('claude-collector', () => {
     expect(createClaudeCollectorDef(settingsEnv).collector.isCaptureAvailable()).toBe(false);
   });
 
+  it('derives a conversation title from the first user prompt when Claude only exposes a generic title', async () => {
+    const { def } = setupClaudeDom({ browserTitle: 'Wrong Browser Tab - Claude', siteTitle: null });
+    const snapshot = await def.collector.capture({
+      manual: true,
+      preparedCapture: await prepareStaticCapture(def),
+    });
+
+    expect(snapshot.conversation.title).toBe('Hello Claude');
+    expect(snapshot.conversation.title).not.toContain('Quoted attachment context');
+    expect(snapshot.conversation.title).not.toContain('notes.pdf');
+  });
+
   it('captures all visible assistant prose while excluding separate status nodes', async () => {
     const { def } = setupClaudeDom();
     const snapshot = await def.collector.capture({
@@ -109,7 +129,7 @@ describe('claude-collector', () => {
     expect(snapshot.conversation).toMatchObject({
       sourceType: 'chat',
       source: 'claude',
-      conversationKey: 'chat_conv-1',
+      conversationKey: 'conv-1',
       title: 'Stable Claude Capture',
     });
     expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
@@ -199,7 +219,7 @@ describe('claude-collector', () => {
 
     expect(prepared).toMatchObject({
       source: 'claude',
-      conversationKey: 'chat_conv-1',
+      conversationKey: 'conv-1',
       identityVerified: true,
       completeness: 'complete',
     });

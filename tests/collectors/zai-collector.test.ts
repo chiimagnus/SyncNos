@@ -79,6 +79,21 @@ describe('zai-collector', () => {
     expect(snap.messages[0].contentMarkdown).toContain('![](https://z-cdn-media.chatglm.cn/files/');
   });
 
+  it('uses the selected z.ai history title instead of the site slogan', async () => {
+    const html = `
+      <button data-selected="true"><div>真实 z.ai 标题</div></button>
+      <div id="message-title" class="user-message">
+        <div class="chat-user"><div class="whitespace-pre-wrap">标题测试正文</div></div>
+      </div>
+    `;
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-title' });
+    dom.window.document.title = 'Z.ai - Advanced AI Chatbot & Agent powered by GLM-5.3-Flash';
+    setupDom(dom);
+
+    const snap = (await capturePrepared(createCollector())) as any;
+    expect(snap.conversation.title).toBe('真实 z.ai 标题');
+  });
+
   it('ignores thinking-chain-container content', () => {
     const html = `
       <div id="message-1">

@@ -107,6 +107,39 @@ describe('yuanbao-collector', () => {
     expect(assistant).not.toContain('复制');
   });
 
+  it('uses the current Yuanbao history item title by durable conversation id', async () => {
+    const dom = setupYuanbaoDom(
+      item(1, 'human', '<div class="agent-chat__bubble"><div class="hyc-content-text">标题测试正文</div></div>', {
+        'data-conv-id': '0QwwxPttxiK_1',
+      }),
+      'https://yuanbao.tencent.com/chat/naQivTmsDa/0QwwxPttxiK',
+    );
+    dom.window.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<div class="yb-recent-conv-list__item" data-conversation-id="0QwwxPttxiK"><div class="yb-recent-conv-list__item-name">真实元宝标题</div></div>',
+    );
+    dom.window.document.title = '元宝-腾讯旗下全能AI助手';
+
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(snapshot.conversation.title).toBe('真实元宝标题');
+  });
+
+  it('derives a human title from the first user message when Yuanbao only exposes its product title', async () => {
+    const dom = setupYuanbaoDom(
+      item(
+        1,
+        'human',
+        '<div class="agent-chat__bubble"><div class="hyc-content-text">这是一个真正的元宝会话标题来源</div></div>',
+        { 'data-conv-id': '0QwwxPttxiK_1' },
+      ),
+      'https://yuanbao.tencent.com/chat/naQivTmsDa/0QwwxPttxiK',
+    );
+    dom.window.document.title = '元宝-腾讯旗下全能AI助手';
+
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(snapshot.conversation.title).toBe('这是一个真正的元宝会话标题来源');
+  });
+
   it('uses the current two-segment route conversation id instead of the agent id', async () => {
     const dom = setupYuanbaoDom(
       item(1, 'human', '<div class="agent-chat__bubble"><div class="hyc-content-text">hello</div></div>', {

@@ -3,7 +3,9 @@ import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import {
   addPreparedReason,
@@ -75,8 +77,19 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
     return `${host}${pathname}`;
   }
 
-  function findTitle(): string {
-    return env.normalize.normalizeText(String(env.document.title || 'Yuanbao')).trim() || 'Yuanbao';
+  function findTitle(messages: any[]): string {
+    const conversationId = findConversationIdFromUrl();
+    if (conversationId) {
+      const historyItem = Array.from(
+        env.document.querySelectorAll('.yb-recent-conv-list__item[data-conversation-id]'),
+      ).find((item) => String(item.getAttribute('data-conversation-id') || '').trim() === conversationId);
+      const historyTitle = env.normalize
+        .normalizeText(renderedElementText(historyItem?.querySelector('.yb-recent-conv-list__item-name')))
+        .trim();
+      if (historyTitle) return historyTitle;
+    }
+
+    return firstUserMessageTitle(messages) || '元宝';
   }
 
   function getConversationRoot(): Element | null {
@@ -377,7 +390,7 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
         sourceType: 'chat',
         source: 'yuanbao',
         conversationKey: prepared.conversationKey,
-        title: findTitle(),
+        title: findTitle(messages),
         url: env.location.href,
         warningFlags: [],
       },

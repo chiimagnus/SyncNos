@@ -1,7 +1,12 @@
 import { JSDOM } from 'jsdom';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { inEditMode } from '../../src/collectors/collector-utils';
+import {
+  compactConversationTitle,
+  firstUserMessageTitle,
+  inEditMode,
+  renderedElementText,
+} from '../../src/collectors/collector-utils';
 
 const originalDocument = globalThis.document;
 
@@ -25,5 +30,19 @@ describe('collector-utils', () => {
     expect(outer.window.document.activeElement).not.toBe(textarea);
     expect(inner.window.document.activeElement).toBe(textarea);
     expect(inEditMode(root)).toBe(true);
+  });
+
+  it('prefers rendered innerText over duplicated hidden textContent for page titles', () => {
+    const dom = new JSDOM('<body><a id="title"><span>Visible</span><span hidden>Hidden duplicate</span></a></body>');
+    const title = dom.window.document.getElementById('title') as HTMLElement;
+    Object.defineProperty(title, 'innerText', { configurable: true, value: 'Visible' });
+
+    expect(title.textContent).toContain('Hidden duplicate');
+    expect(renderedElementText(title)).toBe('Visible');
+  });
+
+  it('builds a compact fallback title from first-user semantic text', () => {
+    expect(firstUserMessageTitle([{ role: 'user', contentMarkdown: 'Hello **world**' }])).toBe('Hello world');
+    expect(compactConversationTitle('a'.repeat(80), 12)).toBe(`${'a'.repeat(11)}…`);
   });
 });

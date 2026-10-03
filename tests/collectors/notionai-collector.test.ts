@@ -125,9 +125,23 @@ describe('notionai-collector', () => {
     expect(legacy.collector.isCaptureAvailable()).toBe(false);
   });
 
-  it('captures prepared Agent Service transcript and ignores internal execution entities', async () => {
-    const dom = setupDom();
-    dom.window.document.title = 'New Notion AI | Notion';
+  it('captures prepared Agent Service transcript, uses the visible chat title, and ignores browser tab metadata', async () => {
+    const dom = setupDom(
+      `https://app.notion.com/chat?t=${THREAD_ID}&wfv=chat`,
+      `<div id="notion-app">
+        <div data-agent-chat-survey-shortcut-scope="true">
+          <div>
+            <div data-popup-origin="true">
+              <div role="button" aria-haspopup="dialog" aria-expanded="false"><div>网页内 Notion 会话标题</div></div>
+            </div>
+            <div data-popup-origin="true">
+              <div role="button" aria-label="Chat history" aria-haspopup="dialog" aria-expanded="false"></div>
+            </div>
+          </div>
+        </div>
+      </div>`,
+    );
+    dom.window.document.title = 'WRONG BROWSER TAB TITLE | Notion';
     const { collector } = createHarness(dom);
 
     const snapshot = await collector.capture({
@@ -138,7 +152,7 @@ describe('notionai-collector', () => {
     expect(snapshot.conversation).toEqual(
       expect.objectContaining({
         conversationKey: `notionai_t_${THREAD_ID}`,
-        title: 'New Notion AI',
+        title: '网页内 Notion 会话标题',
         url: `https://app.notion.com/chat?t=${THREAD_ID}&wfv=chat`,
       }),
     );
@@ -154,6 +168,14 @@ describe('notionai-collector', () => {
     expect(JSON.stringify(snapshot)).not.toContain('huge internal tool payload');
     expect(JSON.stringify(snapshot)).not.toContain('edit_reference');
     expect(snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('falls back to the first user semantic text only when the webpage exposes no conversation title control', async () => {
+    const dom = setupDom();
+    dom.window.document.title = 'WRONG BROWSER TAB TITLE | Notion';
+    const { collector } = createHarness(dom);
+    const snapshot = await collector.capture({ manual: true, preparedCapture: prepared() });
+    expect(snapshot.conversation.title).toBe('用户问题');
   });
 
   it('requests the full current transcript before manual capture', async () => {

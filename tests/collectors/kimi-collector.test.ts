@@ -76,6 +76,18 @@ describe('kimi-collector', () => {
     expect(snap.messages[0].contentMarkdown).toContain('![](https://www.kimi.com/apiv2-files/sign-obj/');
   });
 
+  it('uses the active Kimi history title without the brand suffix', async () => {
+    const dom = setupKimiDom(item('user-title', 'user', '<div class="user-content">标题测试正文</div>'));
+    dom.window.document.title = '标题测试 - Kimi';
+    dom.window.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<a class="next-sidebar-history-item__link" href="/chat/conv001?chat_enter_method=history">真实 Kimi 标题</a>',
+    );
+
+    const snap = (await capturePrepared(createDef(dom))) as any;
+    expect(snap.conversation.title).toBe('真实 Kimi 标题');
+  });
+
   it('extracts assistant markdown and excludes think-stage content', async () => {
     const dom = setupKimiDom(
       item('user-1', 'user', '<div class="user-content">你好</div>') +

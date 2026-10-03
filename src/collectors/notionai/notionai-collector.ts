@@ -1,5 +1,6 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
+import { renderedElementText } from '@collectors/collector-utils.ts';
 import {
   buildNotionAiTranscriptSnapshot,
   createNotionAiTranscriptBridge,
@@ -58,6 +59,28 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     );
   }
 
+  function findConversationTitle(): string {
+    const scope = env.document.querySelector('[data-agent-chat-survey-shortcut-scope="true"]');
+    if (!scope) return '';
+
+    const historyButton = scope.querySelector('[role="button"][aria-label="Chat history"][aria-haspopup="dialog"]');
+    if (!historyButton) return '';
+
+    const candidates = Array.from(
+      scope.querySelectorAll(
+        'div[data-popup-origin="true"] > [role="button"][aria-haspopup="dialog"]:not([aria-label])',
+      ),
+    );
+    const titleButton = candidates.find((candidate) => {
+      let ancestor: Element | null = candidate.parentElement;
+      for (let depth = 0; depth < 6 && ancestor && ancestor !== scope; depth += 1, ancestor = ancestor.parentElement) {
+        if (ancestor.contains(historyButton)) return true;
+      }
+      return false;
+    });
+    return renderedElementText(titleButton);
+  }
+
   function preparedCapture(value: unknown, expectedThreadId: string): PreparedNotionAiCapture | null {
     const input = value as Partial<PreparedNotionAiCapture> | null;
     if (!input || input.__notionAiTranscript !== true) return null;
@@ -101,7 +124,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     return buildNotionAiTranscriptSnapshot({
       ...state,
       threadId,
-      title: env.document.title,
+      conversationTitle: findConversationTitle(),
       document: env.document,
     });
   }
@@ -114,6 +137,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     __test: {
       matches,
       findThreadIdFromLocation,
+      findConversationTitle,
     },
   };
 

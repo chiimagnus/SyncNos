@@ -2,9 +2,10 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import doubaoMarkdown from '@collectors/doubao/doubao-markdown.ts';
 
@@ -14,15 +15,17 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     return /(^|\.)doubao\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl(): any {
+  function findConversationIdFromUrl(): string {
     try {
-      const p = env.location.pathname || '';
-      if (p === '/chat' || p === '/chat/') return false;
-      if (/^\/chat\/local/.test(p)) return false;
-      return /^\/chat\/(?!local)[^/]+/.test(p);
-    } catch (_e) {
-      return false;
+      const match = String(env.location.pathname || '').match(/^\/chat\/(?!local(?:\/|$))([^/?#]+)/);
+      return match?.[1] ? decodeURIComponent(match[1]) : '';
+    } catch (_error) {
+      return '';
     }
+  }
+
+  function isValidConversationUrl(): any {
+    return !!findConversationIdFromUrl();
   }
 
   function isConversationSurfaceUrl(): boolean {
@@ -34,7 +37,22 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function findConversationKey(): any {
-    return conversationKeyFromLocation(env.location);
+    return findConversationIdFromUrl();
+  }
+
+  function findTitle(messages: any[]): string {
+    const currentPath = String(env.location.pathname || '').replace(/\/+$/, '') || '/';
+    const current = Array.from(env.document.querySelectorAll("a[aria-current='page'][href]")).find((link) => {
+      try {
+        const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+        return (url.pathname.replace(/\/+$/, '') || '/') === currentPath;
+      } catch (_error) {
+        return false;
+      }
+    });
+    const currentText = env.normalize.normalizeText(renderedElementText(current)).trim();
+    if (currentText) return currentText;
+    return firstUserMessageTitle(messages) || '豆包';
   }
 
   function getConversationRoot(): any {
@@ -301,7 +319,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
         sourceType: 'chat',
         source: 'doubao',
         conversationKey: findConversationKey(),
-        title: env.document.title || 'Doubao',
+        title: findTitle(messages),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
       },

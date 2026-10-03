@@ -1,4 +1,5 @@
 import type { CollectorEnv } from '@collectors/collector-env.ts';
+import { firstUserMessageTitle } from '@collectors/collector-utils.ts';
 
 export const NOTION_AI_TRANSCRIPT_REQUEST = 'SYNCNOS_NOTIONAI_TRANSCRIPT_REQUEST';
 export const NOTION_AI_TRANSCRIPT_RESPONSE = 'SYNCNOS_NOTIONAI_TRANSCRIPT_RESPONSE';
@@ -261,7 +262,7 @@ export function buildNotionAiTranscriptSnapshot(input: {
   pages: any[];
   complete: boolean;
   threadId: string;
-  title: string;
+  conversationTitle?: string;
   document: Document;
   capturedAt?: number;
 }): any | null {
@@ -309,7 +310,7 @@ export function buildNotionAiTranscriptSnapshot(input: {
   }
   if (!messages.length) return null;
 
-  const title = stableString(input.title).replace(/\s*\|\s*Notion\s*$/i, '') || 'Notion AI';
+  const title = stableString(input.conversationTitle) || firstUserMessageTitle(messages) || 'Notion AI';
   return {
     conversation: {
       sourceType: 'chat',

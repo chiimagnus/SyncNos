@@ -3,7 +3,9 @@ import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import {
   addPreparedReason,
@@ -48,21 +50,18 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     return `${String(location.hostname || '').toLowerCase()}${pathname}`;
   }
 
-  function findTitle(): any {
+  function findTitle(messages: any[] = []): any {
     const selectors = [
       "div[class*='BaseNavbar_chatTitleItem__'] p[class*='ChatHeader_titleText__']",
       "div[class*='ChatHeader_titleRow__'] p[class*='ChatHeader_titleText__']",
       "p[class*='ChatHeader_titleText__']",
-      "a[class*='BotHeader_title__'] p",
-      "div[class*='BotHeader_textContainer__'] p",
-      'h1',
     ];
     for (const selector of selectors) {
       const node = document.querySelector(selector);
-      const text = node && node.textContent ? node.textContent.trim() : '';
+      const text = renderedElementText(node);
       if (text) return text;
     }
-    return document.title || 'Poe';
+    return firstUserMessageTitle(messages) || 'Poe';
   }
 
   function getConversationRoot(): any {
@@ -432,7 +431,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
         sourceType: 'chat',
         source: 'poe',
         conversationKey: prepared.conversationKey,
-        title: findTitle(),
+        title: findTitle(messages),
         url: env.location.href,
         warningFlags: [],
       },

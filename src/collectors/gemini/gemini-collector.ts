@@ -2,9 +2,10 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
@@ -23,20 +24,20 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return /(^|\.)gemini\.google\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl(): any {
+  function findConversationIdFromUrl(): string {
     try {
-      const p = env.location.pathname || '';
-      if (p === '/app') return false;
-      if (/^\/gem\/[^/]+$/.test(p)) return false;
-      return (
-        /^\/app\/[^/]+$/.test(p) ||
-        /^\/gem\/[^/]+\/[^/]+$/.test(p) ||
-        /\/app\/[^/]+$/.test(p) ||
-        /\/gem\/[^/]+\/[^/]+$/.test(p)
-      );
-    } catch (_e) {
-      return false;
+      const pathname = String(env.location.pathname || '');
+      const app = pathname.match(/^\/app\/([^/?#]+)\/?$/);
+      if (app?.[1]) return decodeURIComponent(app[1]);
+      const gem = pathname.match(/^\/gem\/[^/?#]+\/([^/?#]+)\/?$/);
+      return gem?.[1] ? decodeURIComponent(gem[1]) : '';
+    } catch (_error) {
+      return '';
     }
+  }
+
+  function isValidConversationUrl(): any {
+    return !!findConversationIdFromUrl();
   }
 
   function isConversationSurfaceUrl(): boolean {
@@ -49,7 +50,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function findConversationKey(): any {
-    return conversationKeyFromLocation(env.location);
+    return findConversationIdFromUrl();
   }
 
   function getConversationRoot(): any {
@@ -65,7 +66,19 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return env.normalize.normalizeText(text);
   }
 
-  function extractConversationTitle(): any {
+  function extractConversationTitle(messages: any[] = []): any {
+    const currentPath = String(env.location.pathname || '').replace(/\/+$/, '') || '/';
+    const activeHistory = Array.from(env.document.querySelectorAll("a[aria-current='page'][href]")).find((link) => {
+      try {
+        const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+        return (url.pathname.replace(/\/+$/, '') || '/') === currentPath;
+      } catch (_error) {
+        return false;
+      }
+    });
+    const historyTitle = normalizeTitle(renderedElementText(activeHistory));
+    if (historyTitle) return historyTitle;
+
     const selectors = [
       "[data-test-id='conversation-title']",
       ".conversation-title-container .conversation-title-column [class*='gds-title']",
@@ -74,11 +87,10 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     for (const selector of selectors) {
       const el = env.document.querySelector(selector);
       if (!el) continue;
-      const title = normalizeTitle((el as any).textContent || (el as any).innerText || '');
+      const title = normalizeTitle(renderedElementText(el));
       if (title) return title;
     }
-    const pageTitle = normalizeTitle(env.document.title || '');
-    return pageTitle || 'Gemini';
+    return firstUserMessageTitle(messages) || 'Gemini';
   }
 
   function extractAssistantMarkdown(node: any, fallbackText: any): any {
@@ -919,6 +931,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     let seq = 0;
     for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
       const b = blocks[blockIndex];
+      const turnId = String(b.getAttribute?.('id') || '').trim();
       const userRoot = b.querySelector('user-query') || b.querySelector("[data-test-id='user-message']") || null;
       if (userRoot) {
         const userTextEl = userRoot.querySelector ? userRoot.querySelector('.query-text') || userRoot : userRoot;
@@ -928,10 +941,13 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
           const contentText = text || '';
           const contentMarkdown = appendImageMarkdown(contentText, imageUrls, { allowDataImageUrls: true });
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: 'user', text: contentText, sequence: seq }),
+            messageKey: turnId
+              ? `gemini:${turnId}:user`
+              : env.normalize.makeFallbackMessageKey({ role: 'user', text: contentText, sequence: seq }),
             role: 'user',
             contentMarkdown,
             sequence: seq,
+            ...(turnId ? { captureSequencePolicy: 'reconcile-existing-order' } : null),
             updatedAt: Date.now(),
           });
           seq += 1;
@@ -964,15 +980,18 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
         if (baseMd || imageUrls.length) {
           const contentMarkdown = appendImageMarkdown(baseMd, imageUrls, { allowDataImageUrls: true });
           out.push({
-            // Keep messageKey stable across re-saves by using the base assistant text (without appended reports).
-            messageKey: env.normalize.makeFallbackMessageKey({
-              role: 'assistant',
-              text: baseText || env.normalize.normalizeText(markdownToSemanticText(baseMd, { includeImageAlt: true })),
-              sequence: seq,
-            }),
+            messageKey: turnId
+              ? `gemini:${turnId}:assistant`
+              : env.normalize.makeFallbackMessageKey({
+                  role: 'assistant',
+                  text:
+                    baseText || env.normalize.normalizeText(markdownToSemanticText(baseMd, { includeImageAlt: true })),
+                  sequence: seq,
+                }),
             role: 'assistant',
             contentMarkdown,
             sequence: seq,
+            ...(turnId ? { captureSequencePolicy: 'reconcile-existing-order' } : null),
             updatedAt: Date.now(),
           });
           seq += 1;
@@ -992,7 +1011,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
         sourceType: 'chat',
         source: 'gemini',
         conversationKey: findConversationKey(),
-        title: extractConversationTitle(),
+        title: extractConversationTitle(messages),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
       },

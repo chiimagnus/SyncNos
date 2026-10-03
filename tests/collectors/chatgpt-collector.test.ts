@@ -390,16 +390,38 @@ A --> B</code></pre>
     });
     generic.window.document.title = 'ChatGPT';
     expect((await capturePrepared(currentDef(generic))).conversation.title).toBe('请帮我分析强化学习和机器学习的关系');
+
+    const newChat = currentDom({
+      url: 'https://chatgpt.com/c/conversation-title-2',
+      userText: '这是一个尚未生成站点标题的新会话',
+    });
+    newChat.window.document.title = 'New chat';
+    expect((await capturePrepared(currentDef(newChat))).conversation.title).toBe('这是一个尚未生成站点标题的新会话');
   });
 
   it('captures current share pages and uses the share id as durable identity', async () => {
-    const dom = currentDom({ url: 'https://chatgpt.com/share/share-current-1' });
-    dom.window.document.title = 'Shared current conversation';
+    const dom = currentDom({
+      url: 'https://chatgpt.com/share/share-current-1',
+      userText: 'Shared current conversation',
+    });
+    dom.window.document.title = 'WRONG BROWSER TAB TITLE';
     const snapshot = (await capturePrepared(currentDef(dom))) as any;
     expect(snapshot.conversation).toMatchObject({
       conversationKey: 'share-current-1',
       title: 'Shared current conversation',
     });
+  });
+
+  it('keeps a durable conversation identity stable across irrelevant query changes', () => {
+    const dom = currentDom({ url: 'https://chatgpt.com/c/current-conversation-2026?model=gpt-5' });
+    const def = currentDef(dom);
+    const root = dom.window.document.querySelector('main');
+    const before = def.collector.__test.sampleIdentityGuard(root);
+    dom.window.history.replaceState({}, '', '/c/current-conversation-2026?model=gpt-5&foo=bar');
+    const after = def.collector.__test.sampleIdentityGuard(root);
+    expect(before.durableId).toBe('current-conversation-2026');
+    expect(after.durableId).toBe(before.durableId);
+    expect(after.route).toBe(before.route);
   });
 
   it('binds temporary-chat identity only to rendered current units and keeps it stable across prompt edits', async () => {

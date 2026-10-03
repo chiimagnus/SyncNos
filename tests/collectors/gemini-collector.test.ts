@@ -107,10 +107,37 @@ describe('gemini-collector', () => {
 
     const snap = (await Promise.resolve(createGeminiCollectorDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
+    expect(snap.conversation.conversationKey).toBe('abc123');
     expect(snap.conversation.title).toBe('DOM Title');
   });
 
-  it('falls back to document.title when conversation title node is missing', async () => {
+  it('uses the same durable conversation key across app and custom Gem routes', async () => {
+    const html = `
+      <div id="chat-history">
+        <div class="conversation-container" id="turn-route-test">
+          <user-query><div class="query-text">hello</div></user-query>
+          <model-response><div class="model-response-text">world</div></model-response>
+        </div>
+      </div>
+    `;
+    const captureAt = async (url: string) => {
+      const dom = setupGeminiDom(html, url);
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
+      return (await Promise.resolve(createGeminiCollectorDef(env).collector.capture())) as any;
+    };
+
+    const app = await captureAt('https://gemini.google.com/app/durable-conversation');
+    const gem = await captureAt('https://gemini.google.com/gem/custom-gem/durable-conversation');
+    expect(app.conversation.conversationKey).toBe('durable-conversation');
+    expect(gem.conversation.conversationKey).toBe(app.conversation.conversationKey);
+  });
+
+  it('ignores the browser tab title and falls back to the first user message when site title nodes are missing', async () => {
     const html = `
       <div id="chat-history">
         <div class="conversation-container">
@@ -120,7 +147,7 @@ describe('gemini-collector', () => {
       </div>
     `;
     const dom = setupGeminiDom(html, 'https://gemini.google.com/app/xyz789');
-    dom.window.document.title = 'Gemini Page Title';
+    dom.window.document.title = 'WRONG BROWSER TAB TITLE - Google Gemini';
 
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -131,7 +158,41 @@ describe('gemini-collector', () => {
 
     const snap = (await Promise.resolve(createGeminiCollectorDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
-    expect(snap.conversation.title).toBe('Gemini Page Title');
+    expect(snap.conversation.title).toBe('hello');
+  });
+
+  it('uses the stable conversation-container id so edited content keeps the same message keys', async () => {
+    const capture = async (userText: string, assistantText: string) => {
+      const html = `
+        <div id="chat-history">
+          <div class="conversation-container" id="stable-turn-001">
+            <user-query><div class="query-text">${userText}</div></user-query>
+            <model-response><div class="model-response-text">${assistantText}</div></model-response>
+          </div>
+        </div>
+      `;
+      const dom = setupGeminiDom(html, 'https://gemini.google.com/app/stable-key');
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
+      return (await Promise.resolve(createGeminiCollectorDef(env).collector.capture())) as any;
+    };
+
+    const before = await capture('original question', 'original answer');
+    const after = await capture('edited question', 'edited answer');
+    expect(before.messages.map((message: any) => message.messageKey)).toEqual([
+      'gemini:stable-turn-001:user',
+      'gemini:stable-turn-001:assistant',
+    ]);
+    expect(after.messages.map((message: any) => message.messageKey)).toEqual(
+      before.messages.map((message: any) => message.messageKey),
+    );
+    expect(after.messages.every((message: any) => message.captureSequencePolicy === 'reconcile-existing-order')).toBe(
+      true,
+    );
   });
 
   it('does not persist an in-flight assistant while the current markdown surface is aria-busy', async () => {

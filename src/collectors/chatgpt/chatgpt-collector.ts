@@ -1,12 +1,16 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
-import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
+import {
+  appendImageMarkdown,
+  extractImageUrlsFromElement,
+  firstUserMessageTitle,
+  renderedElementText,
+} from '@collectors/collector-utils.ts';
 import chatgptMarkdown, { isChatgptNonContentImageUrl } from '@collectors/chatgpt/chatgpt-markdown.ts';
 import {
   buildChatgptGeneratedImageMessageKey,
   chatgptFileIdFromEstuaryUrl,
 } from '@services/shared/chatgpt-image-identity';
-import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import { isCanonicalChatgptHostname, parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 import {
   addPreparedReason,
@@ -98,8 +102,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function normalizedRoute(): string {
     const pathname = String(env.location.pathname || '/').replace(/\/+$/, '') || '/';
+    const hostPath = `${String(env.location.hostname || '').toLowerCase()}${pathname}`;
+    if (findConversationIdFromUrl() || findShareIdFromUrl()) return hostPath;
     const search = String(env.location.search || '');
-    return `${String(env.location.hostname || '').toLowerCase()}${pathname}${search}`;
+    return `${hostPath}${search}`;
   }
 
   function hashStableIdentity(value: string): string {
@@ -199,70 +205,30 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return expected.anchors.some((anchor) => actualAnchors.has(anchor));
   }
 
-  function isTemporaryChatMode(): boolean {
-    return (
-      String(new URLSearchParams(env.location.search).get('temporary-chat') || '')
-        .trim()
-        .toLowerCase() === 'true'
-    );
-  }
-
-  function normalizeTitleText(value: unknown): string {
-    return String(value || '').trim();
-  }
-
-  function isGenericChatgptTitle(value: unknown): boolean {
-    const normalized = normalizeTitleText(value).toLowerCase();
-    return normalized === '' || normalized === 'chatgpt';
-  }
-
-  function deriveConversationAutoTitle(messages: any): string {
-    const firstUser = Array.isArray(messages)
-      ? messages.find((m: any) => m && m.role === 'user' && m.contentMarkdown)
-      : null;
-    const raw = firstUser ? markdownToSemanticText(firstUser.contentMarkdown, { includeImageAlt: true }) : '';
-    const normalized = env.normalize.normalizeText(raw);
-    const text = String(normalized || '').trim();
-    if (!text) return '';
-    const maxLen = 56;
-    if (text.length <= maxLen) return text;
-    return `${text.slice(0, maxLen - 1).trimEnd()}…`;
-  }
-
   function findTitle(messages?: any): any {
     const conversationId = findConversationIdFromUrl();
-
     if (conversationId) {
-      const activeLinks = Array.from(env.document.querySelectorAll("a[aria-current='page'][href]")) as any[];
-      const active = activeLinks.find((a: any) =>
-        String(a?.getAttribute?.('href') || '').includes(`/c/${conversationId}`),
+      const routeMatchesConversation = (link: Element) => {
+        try {
+          const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+          return parseChatgptDurableConversationRoute(url)?.conversationId === conversationId;
+        } catch (_error) {
+          return false;
+        }
+      };
+      const links = Array.from(env.document.querySelectorAll('a[href]'));
+      const active = links.find(
+        (link) => link.getAttribute('aria-current') === 'page' && routeMatchesConversation(link),
       );
-      const activeText = active && active.textContent ? String(active.textContent).trim() : '';
+      const activeText = env.normalize.normalizeText(renderedElementText(active)).trim();
       if (activeText) return activeText;
 
-      const hrefLinks = Array.from(env.document.querySelectorAll('a[href]')) as any[];
-      const byHref = hrefLinks.find((a: any) =>
-        String(a?.getAttribute?.('href') || '').includes(`/c/${conversationId}`),
-      );
-      const hrefText = byHref && byHref.textContent ? String(byHref.textContent).trim() : '';
-      if (hrefText) return hrefText;
+      const byRoute = links.find(routeMatchesConversation);
+      const routeText = env.normalize.normalizeText(renderedElementText(byRoute)).trim();
+      if (routeText) return routeText;
     }
 
-    const documentTitle = normalizeTitleText(env.document.title);
-    if (conversationId) {
-      if (!isGenericChatgptTitle(documentTitle)) return documentTitle;
-      const derivedTitle = deriveConversationAutoTitle(messages);
-      return derivedTitle || 'ChatGPT';
-    }
-
-    const h = env.document.querySelector('h1');
-    const h1Title = h && h.textContent ? String(h.textContent).trim() : '';
-    const fallbackTitle = h1Title || documentTitle || 'ChatGPT';
-    if (isTemporaryChatMode() && isGenericChatgptTitle(fallbackTitle)) {
-      const derivedTitle = deriveConversationAutoTitle(messages);
-      if (derivedTitle) return derivedTitle;
-    }
-    return fallbackTitle;
+    return firstUserMessageTitle(messages) || 'ChatGPT';
   }
 
   function getConversationRoot(): any {

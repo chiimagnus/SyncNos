@@ -2,9 +2,10 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
 import googleAiStudioMarkdown from '@collectors/googleaistudio/googleaistudio-markdown.ts';
 import {
@@ -69,7 +70,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   }
 
   function findConversationKey(): any {
-    return conversationKeyFromLocation(env.location);
+    return findSavedPromptIdFromUrl();
   }
 
   function getConversationRoot(): any {
@@ -165,8 +166,11 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return env.normalize.normalizeText(text);
   }
 
-  function extractConversationTitle(): any {
+  function extractConversationTitle(messages: any[] = []): any {
     const selectors = [
+      'ms-playground-toolbar .page-title h1.mode-title',
+      'ms-playground-toolbar h1.mode-title',
+      '.page-title h1.mode-title',
       "[data-test-id='conversation-title']",
       '.conversation-title-container .conversation-title-column [class*="gds-title"]',
       '.conversation-title-container .conversation-title-column',
@@ -174,11 +178,10 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     for (const selector of selectors) {
       const el = env.document.querySelector(selector);
       if (!el) continue;
-      const title = normalizeTitle((el as any).textContent || (el as any).innerText || '');
+      const title = normalizeTitle(renderedElementText(el));
       if (title) return title;
     }
-    const pageTitle = normalizeTitle(env.document.title || '');
-    return pageTitle || 'Google AI Studio';
+    return firstUserMessageTitle(messages) || 'Google AI Studio';
   }
 
   function extractAssistantMarkdown(node: any, fallbackText: any): any {
@@ -500,6 +503,47 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return refs.map(({ entry }) => descriptorFromEntry(entry, streamingKey));
   }
 
+  function mergeObservedSlotOrder(storedKeys: string[], incomingKeys: string[]): { keys: string[]; anchored: boolean } {
+    const stored = Array.from(new Set(storedKeys.map((key) => String(key || '').trim()).filter(Boolean)));
+    const incoming = Array.from(new Set(incomingKeys.map((key) => String(key || '').trim()).filter(Boolean)));
+    if (!stored.length) return { keys: incoming, anchored: true };
+    if (!incoming.length) return { keys: stored, anchored: true };
+
+    const storedPositions = new Map(stored.map((key, index) => [key, index]));
+    const known = incoming.filter((key) => storedPositions.has(key));
+    if (!known.length) {
+      return { keys: [...stored, ...incoming.filter((key) => !storedPositions.has(key))], anchored: false };
+    }
+    const knownPositions = known.map((key) => storedPositions.get(key) as number);
+    if (knownPositions.some((position, index) => index > 0 && position <= knownPositions[index - 1])) {
+      return { keys: stored, anchored: false };
+    }
+
+    const merged = stored.slice();
+    const knownSet = new Set(stored);
+    let cursor = 0;
+    while (cursor < incoming.length) {
+      if (knownSet.has(incoming[cursor])) {
+        cursor += 1;
+        continue;
+      }
+      const start = cursor;
+      while (cursor < incoming.length && !knownSet.has(incoming[cursor])) cursor += 1;
+      const unknownRun = incoming.slice(start, cursor);
+      const previousKnown = start > 0 ? incoming[start - 1] : '';
+      const nextKnown = cursor < incoming.length ? incoming[cursor] : '';
+      let insertionIndex = merged.length;
+      if (nextKnown) insertionIndex = merged.indexOf(nextKnown);
+      else if (previousKnown) {
+        const previousIndex = merged.indexOf(previousKnown);
+        insertionIndex = previousIndex < 0 ? merged.length : previousIndex + 1;
+      }
+      merged.splice(insertionIndex, 0, ...unknownRun);
+      for (const key of unknownRun) knownSet.add(key);
+    }
+    return { keys: merged, anchored: true };
+  }
+
   async function harvestManualInto(
     accumulator: PreparedAccumulator<any>,
     ctx: InlineImageContext,
@@ -581,6 +625,18 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const ctx = createInlineImageContext();
     const sampleIdentity = createCaptureIdentitySampler(identityGuard);
     const runtime = { document: env.document, window: env.window };
+    let observedSlotOrder: string[] = [];
+    let slotOrderAnchored = true;
+    const readTrackedDescriptors = () => {
+      const descriptors = readCurrentDescriptors();
+      const merged = mergeObservedSlotOrder(
+        observedSlotOrder,
+        descriptors.map((descriptor) => descriptor.key),
+      );
+      observedSlotOrder = merged.keys;
+      if (!merged.anchored) slotOrderAnchored = false;
+      return descriptors;
+    };
     const restorer = createScrollRootRestorer({
       ...runtime,
       getSeed: getConversationRoot,
@@ -593,9 +649,9 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         {
           getScrollSeed: getConversationRoot,
           sampleIdentity,
-          readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
+          readDescriptorKeys: () => readTrackedDescriptors().map((descriptor) => descriptor.key),
           readUnresolvedKeys: () =>
-            readCurrentDescriptors()
+            readTrackedDescriptors()
               .filter((descriptor) => !descriptor.rendered)
               .map((descriptor) => descriptor.key),
           harvest: (target) => harvestManualInto(target, ctx),
@@ -631,7 +687,12 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'identity_changed');
     }
-    return { ...finishPreparedCapture(accumulator), warningFlags: Array.from(ctx.warningFlags) };
+    return {
+      ...finishPreparedCapture(accumulator),
+      warningFlags: Array.from(ctx.warningFlags),
+      aiStudioSlotOrder: observedSlotOrder.slice(),
+      aiStudioSlotOrderAnchored: slotOrderAnchored,
+    };
   }
 
   async function capture(options: any = {}): Promise<any> {
@@ -642,6 +703,20 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const prepared = consumePreparedCapture(options?.preparedCapture);
     if (!prepared || !identityGuardsMatch(prepared.identityGuard)) return null;
     for (const flag of (options.preparedCapture as any)?.warningFlags || []) ctx.warningFlags.add(String(flag));
+
+    let slotOrder: string[] = Array.isArray((options.preparedCapture as any)?.aiStudioSlotOrder)
+      ? (options.preparedCapture as any).aiStudioSlotOrder
+          .map((key: unknown) => String(key || '').trim())
+          .filter(Boolean)
+      : [];
+    let slotOrderAnchored = (options.preparedCapture as any)?.aiStudioSlotOrderAnchored !== false;
+    const currentSlotMerge = mergeObservedSlotOrder(
+      slotOrder,
+      readCurrentDescriptors().map((descriptor) => descriptor.key),
+    );
+    slotOrder = currentSlotMerge.keys;
+    if (!currentSlotMerge.anchored) slotOrderAnchored = false;
+    if (!slotOrderAnchored) return null;
 
     const accumulator = createPreparedAccumulator<any>({
       source: 'googleaistudio',
@@ -664,7 +739,17 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     if (!identityGuardsMatch(accumulator.identityGuard)) return null;
 
     const finalPrepared = finishPreparedCapture(accumulator);
-    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
+    const slotIndexByKey = new Map(slotOrder.map((key, index) => [key, index]));
+    if (finalPrepared.records.some((record) => !slotIndexByKey.has(record.key))) return null;
+    const messages = finalPrepared.records.map((record) => {
+      const slotIndex = slotIndexByKey.get(record.key) as number;
+      return {
+        ...record.payload,
+        messageKey: `googleaistudio:${slotIndex}:${record.payload.role}`,
+        sequence: slotIndex,
+        captureSequencePolicy: 'reconcile-existing-order',
+      };
+    });
     if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
     const captureMeta = {
       completeness: finalPrepared.completeness,
@@ -677,7 +762,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         sourceType: 'chat',
         source: 'googleaistudio',
         conversationKey: finalPrepared.conversationKey,
-        title: extractConversationTitle(),
+        title: extractConversationTitle(messages),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
       },

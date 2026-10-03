@@ -48,6 +48,7 @@ describe('doubao-collector', () => {
     const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
 
     expect(snap).toBeTruthy();
+    expect(snap.conversation.conversationKey).toBe('conv-modern-001');
     expect(snap.messages.length).toBe(2);
     expect(snap.messages[0]).toMatchObject({
       messageKey: 'doubao_43080634158254594',
@@ -60,6 +61,33 @@ describe('doubao-collector', () => {
     });
     expect(snap.messages[1].contentMarkdown).toBe('111～👀');
     expect(snap.messages[1].contentMarkdown).toContain('111～👀');
+  });
+
+  it('uses the active Doubao conversation title instead of the product page title', async () => {
+    const html = `
+      <a href="/chat/title001" aria-current="page" class="group/conversation-item">真实豆包标题</a>
+      <div aria-label="doc_editor">
+        <div class="container-PvPoAn">
+          <div class="flex flex-col flex-grow">
+            <div data-message-id="title-user" class="flex-row flex w-full justify-end">
+              <div class="bg-g-send-msg-bubble-bg">标题测试正文</div>
+            </div>
+            <div data-foundation-type="send-message-action-bar"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/title001');
+    dom.window.document.title = '豆包工作 - 字节跳动旗下 AI 智能助手';
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
+    expect(snap.conversation.title).toBe('真实豆包标题');
   });
 
   it('falls back to plain text markdown when markdown helper is unavailable', async () => {

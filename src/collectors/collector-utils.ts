@@ -1,12 +1,4 @@
-export function conversationKeyFromLocation(locationArg: { pathname?: string; href?: string } | null): string {
-  try {
-    const pathname = locationArg && typeof locationArg.pathname === 'string' ? locationArg.pathname : '';
-    const href = locationArg && typeof locationArg.href === 'string' ? locationArg.href : '';
-    return (pathname || '/').replace(/\//g, '_').replace(/^_+/, '') || href.split('?')[0];
-  } catch (_e) {
-    return '';
-  }
-}
+import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 
 export function inEditMode(root: ParentNode | null): boolean {
   if (!root || typeof (root as any).querySelector !== 'function') return false;
@@ -16,6 +8,32 @@ export function inEditMode(root: ParentNode | null): boolean {
     (root as any).ownerDocument || ((root as any).nodeType === 9 ? (root as any) : null) || globalThis.document;
   const activeElement = ownerDocument?.activeElement || null;
   return activeElement === textarea || (!!activeElement && textarea.contains(activeElement));
+}
+
+export function renderedElementText(element: Element | null | undefined): string {
+  if (!element) return '';
+  const innerText = typeof (element as any).innerText === 'string' ? String((element as any).innerText) : '';
+  const raw = innerText.trim() ? innerText : String(element.textContent || '');
+  return raw.replace(/\s+/g, ' ').trim();
+}
+
+export function compactConversationTitle(value: unknown, maxLength = 56): string {
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const max = Number.isFinite(Number(maxLength)) ? Math.max(8, Math.floor(Number(maxLength))) : 56;
+  if (!text || text.length <= max) return text;
+  return `${text.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
+}
+
+export function firstUserMessageTitle(messages: unknown, maxLength = 56): string {
+  const list = Array.isArray(messages) ? messages : [];
+  const firstUser = list.find((message) => message && String(message.role || '').toLowerCase() === 'user');
+  if (!firstUser) return '';
+  const text = String(firstUser.contentText || '').trim();
+  const markdown = String(firstUser.contentMarkdown || '').trim();
+  const semantic = text || (markdown ? markdownToSemanticText(markdown, { includeImageAlt: true }) : '');
+  return compactConversationTitle(semantic, maxLength);
 }
 
 function isHttpUrl(url: unknown): boolean {

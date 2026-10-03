@@ -27,14 +27,15 @@ collectors/<provider>/**
 先核对当前线上页面，再改 fixture。至少确认：
 
 1. host、conversation route 与 capture availability；
-2. 稳定 conversation identity 与 message identity；
-3. user/assistant role、顺序、branch/sibling 行为；
-4. Markdown：标题、段落、嵌套列表、表格、引用、链接、inline/fenced code、公式；
-5. 用户上传图片、AI 内容图片、普通文件、视频及其它附件；
-6. streaming、editing、retry、隐藏 thinking/tool/control UI；
-7. 长对话、lazy load、virtualized list、分批历史、scroll root 与 restore；
-8. auto-save / manual-only 是否仍安全；
-9. `$` mention 输入 surface 是否仍存在。
+2. 稳定 conversation identity 与 message identity；看起来像 ID 的 DOM 属性必须至少跨一次 reload 验证，不能只看单次页面；
+3. 真实会话标题；只能读取网页内与当前会话绑定的 history/header/title 控件，禁止使用浏览器标签页 `<title>`；没有稳定网页标题时才用首条 user semantic text；
+4. user/assistant role、顺序、branch/sibling 行为；
+5. Markdown：标题、段落、嵌套列表、表格、引用、链接、inline/fenced code、公式；
+6. 用户上传图片、AI 内容图片、普通文件、视频及其它附件；
+7. streaming、editing、retry、隐藏 thinking/tool/control UI；
+8. 长对话、lazy load、virtualized list、分批历史、scroll root 与 restore；
+9. auto-save / manual-only 是否仍安全；虚拟化页面还要验证一次后台 → 前台恢复；
+10. `$` mention 输入 surface 是否仍存在。
 
 旧 fixture 只能防回归，不能证明当前网页仍兼容。站点行为改动必须走真实浏览器路径验证；无法访问时记录外部阻塞，不猜 selector。统一的真实站点提示词、场景和记录标准见 [`ai-chat-testing.md`](ai-chat-testing.md)。
 
@@ -50,8 +51,8 @@ collectors/<provider>/**
 
 页面中“当前能看到消息”不等于“完整历史”。如果站点使用虚拟列表、懒加载或分批历史：
 
-- 必须有稳定会话身份；
-- 手动完整采集应确认逻辑顶部和底部，跨窗口累计稳定 message key，并恢复用户原滚动位置；
+- 必须有稳定会话身份；collector 的 `conversationKey` 应直接使用站点 durable conversation/prompt/thread id，不得把 pathname 序列化成 key；key 规则升级、无关 query 或 host alias 变化不能把同一真实会话拆成第二条本地记录；持久 URL 也应规范到 durable route，不能保存入口/视图参数；
+- 手动完整采集应确认逻辑顶部和底部，跨窗口累计稳定 message key，并恢复用户原滚动位置；persisted message key 必须跨 reload 稳定，站点临时 DOM id 只能作为单次 sweep 内部 identity；
 - streaming、未解析 turn、身份变化、加载超时或滚动恢复失败都必须降低为 partial；
 - `complete` 才能用 snapshot 语义覆盖历史；`partial` 只能走安全 merge/append，不能删除未出现在当前页面的旧消息；
 - 无法可靠完成上述证明的站点不得加入自动保存集合。
