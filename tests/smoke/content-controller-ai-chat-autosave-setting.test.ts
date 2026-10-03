@@ -338,37 +338,17 @@ describe('content-controller auto-save live setting', () => {
     h.resident?.stop?.();
   });
 
-  it('disabling autosave clears queued NotionAI proactive capture timers', async () => {
-    vi.useFakeTimers();
-    const listeners = new Map<string, EventListener>();
-    // @ts-expect-error test document
-    globalThis.document = {
-      addEventListener(type: string, listener: EventListener) {
-        listeners.set(type, listener);
-      },
-      removeEventListener(type: string, listener: EventListener) {
-        if (listeners.get(type) === listener) listeners.delete(type);
-      },
-    };
+  it('keeps Notion AI manual-only even when the global auto-save setting is enabled', async () => {
     const storage = installStorage({ ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: false });
     const h = createHarness({ collectorId: 'notionai' });
     await flush();
 
-    const clickListener = listeners.get('click');
-    expect(clickListener).toBeTypeOf('function');
-    clickListener?.({
-      target: {
-        closest(selector: string) {
-          return selector.includes('agent-send-message-button') ? {} : null;
-        },
-      },
-    } as any);
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    await h.runTick();
+    expect(h.capture).not.toHaveBeenCalled();
+    expect(h.sendCalls.some((entry) => entry.type === 'upsertConversation')).toBe(false);
+    expect(h.sendCalls.some((entry) => entry.type === 'syncConversationMessages')).toBe(false);
 
     storage.emit('ai_chat_auto_save_enabled', false);
-    expect(vi.getTimerCount()).toBe(0);
-    await vi.runAllTimersAsync();
-    expect(h.capture).not.toHaveBeenCalled();
     h.resident?.stop?.();
   });
 });

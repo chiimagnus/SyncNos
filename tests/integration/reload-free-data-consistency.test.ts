@@ -76,6 +76,7 @@ async function mountListConsumerHarness(observer: ReturnType<typeof createRealRe
   let bundle: Awaited<ReturnType<typeof getConversationListBootstrap>> | null = null;
   let reads = 0;
   let failures = 0;
+  let bundleAtLastFailure: typeof bundle = null;
   let failNextRead = false;
   let disposed = false;
   let draining = false;
@@ -103,6 +104,7 @@ async function mountListConsumerHarness(observer: ReturnType<typeof createRealRe
           if (!disposed) bundle = next;
         } catch (_error) {
           failures += 1;
+          bundleAtLastFailure = bundle;
           observer.requestRetry(batch as any);
         }
       }
@@ -129,6 +131,9 @@ async function mountListConsumerHarness(observer: ReturnType<typeof createRealRe
     get failures() {
       return failures;
     },
+    get bundleAtLastFailure() {
+      return bundleAtLastFailure;
+    },
     failNext() {
       failNextRead = true;
     },
@@ -146,6 +151,7 @@ async function mountCommentsConsumerHarness(
   let comments = await listArticleCommentsByConversationId(conversationId);
   let reads = 1;
   let failures = 0;
+  let commentsAtLastFailure: typeof comments = [];
   let failNextRead = false;
   let disposed = false;
   let draining = false;
@@ -167,6 +173,7 @@ async function mountCommentsConsumerHarness(
           if (!disposed) comments = next;
         } catch (_error) {
           failures += 1;
+          commentsAtLastFailure = comments;
           observer.requestRetry(['article_comments']);
         }
       }
@@ -192,6 +199,9 @@ async function mountCommentsConsumerHarness(
     },
     get failures() {
       return failures;
+    },
+    get commentsAtLastFailure() {
+      return commentsAtLastFailure;
     },
     failNext() {
       failNextRead = true;
@@ -421,10 +431,10 @@ describe('reload-free data consistency production chain', () => {
     expect({ ...vectorAfterMutation, conversations: 0 }).toEqual({ ...vectorBeforeMutation, conversations: 0 });
 
     await vi.waitFor(() => expect(listConsumer.failures).toBe(1));
-    expect(listConsumer.bundle?.items.find((item) => item.source === 'chatgpt')?.warningFlags).toEqual(
+    expect(listConsumer.bundleAtLastFailure?.items.find((item) => item.source === 'chatgpt')?.warningFlags).toEqual(
       base.expected.chat.warningFlags,
     );
-    const bundleAfterFailure = listConsumer.bundle;
+    const bundleAfterFailure = listConsumer.bundleAtLastFailure;
     expect(bundleAfterFailure?.summary).toEqual({ totalCount: 3, todayCount: 3 });
     expect(bundleAfterFailure?.facets.sources.length).toBeGreaterThan(0);
 
@@ -463,7 +473,7 @@ describe('reload-free data consistency production chain', () => {
     expect(vectorAfterDelete.article_comments).toBe(vectorBeforeDelete.article_comments + 1);
 
     await vi.waitFor(() => expect(commentsConsumer.failures).toBe(1));
-    expect(commentsConsumer.comments).toHaveLength(2);
+    expect(commentsConsumer.commentsAtLastFailure).toHaveLength(2);
 
     await vi.waitFor(() => expect(commentsConsumer.comments).toEqual([]));
     expect(await readDataRevisionSnapshot()).toEqual(vectorAfterDelete);

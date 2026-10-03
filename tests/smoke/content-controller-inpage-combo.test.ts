@@ -389,90 +389,38 @@ describe('content-controller inpage combo', () => {
     vi.useRealTimers();
   });
 
-  it.each(['agent-send-message-button', 'agent-chat-send-button'])(
-    'proactively captures notionai after clicking %s before observer mutations settle',
-    async (sendButtonTestId) => {
-      setupDom();
-      vi.useFakeTimers();
-
-      const snapshot = {
-        conversation: { source: 'notionai', conversationKey: 'notionai_t_1' },
-        messages: [{ messageKey: 'user_u1', sequence: 1, role: 'user', contentMarkdown: 'just sent' }],
-      };
-
-      const harness = createHarness({
-        collectorId: 'notionai',
-        captureImpl: () => snapshot,
-        incrementalImpl: (snap) => ({
-          changed: true,
-          snapshot: snap,
-          diff: { added: ['user_u1'], updated: [], removed: [] },
-        }),
-        sendImpl: async (type: string) => {
-          if (type === 'upsertConversation') return { ok: true, data: { id: 31, __isNew: true } };
-          if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
-          return { ok: true, data: {} };
-        },
-      });
-
-      // T2 starts resident autosave only after the first authoritative settings observation.
-      // This harness has no storage API, so wait for the intentional fail-open observation before simulating a real user click.
-      await Promise.resolve();
-      await Promise.resolve();
-
-      const button = document.createElement('div');
-      button.setAttribute('role', 'button');
-      button.setAttribute('data-testid', sendButtonTestId);
-      document.body.appendChild(button);
-
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      await vi.runAllTimersAsync();
-
-      expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
-      expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
-
-      button.remove();
-      vi.useRealTimers();
-    },
-  );
-
-  it('does not proactively capture notionai on Shift+Enter draft newlines', async () => {
+  it('does not let legacy Notion AI send markers trigger auto-save', async () => {
     setupDom();
     vi.useFakeTimers();
 
     const harness = createHarness({
       collectorId: 'notionai',
       captureImpl: () => ({
-        conversation: { source: 'notionai', conversationKey: 'notionai_t_2' },
-        messages: [{ messageKey: 'user_u2', sequence: 1, role: 'user', contentMarkdown: 'draft' }],
+        conversation: { source: 'notionai', conversationKey: 'notionai_t_1' },
+        messages: [{ messageKey: 'user_u1', sequence: 1, role: 'user', contentMarkdown: 'legacy' }],
       }),
       incrementalImpl: (snap) => ({
         changed: true,
         snapshot: snap,
-        diff: { added: ['user_u2'], updated: [], removed: [] },
+        diff: { added: ['user_u1'], updated: [], removed: [] },
       }),
-      sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 32, __isNew: true } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
-        return { ok: true, data: {} };
-      },
     });
 
+    const button = document.createElement('div');
+    button.setAttribute('data-testid', 'agent-send-message-button');
     const composer = document.createElement('div');
     composer.setAttribute('role', 'textbox');
     composer.setAttribute('data-content-editable-leaf', 'true');
     composer.setAttribute('contenteditable', 'true');
-    document.body.appendChild(composer);
+    document.body.append(button, composer);
 
-    composer.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true }),
-    );
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     await vi.runAllTimersAsync();
 
     expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
 
-    composer.remove();
     vi.useRealTimers();
   });
 
