@@ -5,12 +5,12 @@ description: Start here when capture, sync, or connection does not work as expec
 
 ## Capture is incomplete
 
-- ChatGPT, Claude, Google AI Studio, DeepSeek, Kimi, Yuanbao, Poe, Notion AI, and z.ai: use manual capture.
-- Gemini or Doubao did not auto-save: confirm auto-save is enabled, then try one manual capture.
+- AI chat history is missing: run one manual capture; auto-save does not scroll the page to backfill older messages.
+- Auto-save did not run: confirm **Settings → General → Auto-save** is enabled.
 - ChatGPT Advanced capture fails: disable Advanced capture and save again.
 - Images are missing: the text is usually already saved; retry with **Cache images** later.
 
-See [Capture](/docs/en/capture/) for supported behavior.
+See [Capture AI chats](/docs/en/capture-ai-chats/) for platform support.
 
 ## A keyboard shortcut does not work
 

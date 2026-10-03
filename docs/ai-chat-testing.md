@@ -11,7 +11,7 @@
 - 长历史测试要离开首屏后再验证；只证明当前可见窗口正确，不等于完整历史正确。
 - provider 不支持的编辑、分支、附件或公式能力记为 N/A，不用兼容层伪造。
 - 虚拟列表 / 延迟渲染站点必须先让测试 tab 至少进入一次前台生命周期，并确认正文节点已 hydrate；后台 tab 的空壳 DOM 不能直接记为 BLOCKED / FAIL。
-- 同一真实会话至少连续保存两次，必须复用同一个 SyncNos conversation id；不能因为 `conversationKey` 格式、无关 query 或 collector 升级而新建第二条。
+- 会话身份测试必须覆盖重复保存与 reload；同一真实会话始终复用同一个 SyncNos conversation id。
 - 当前 manual-only / auto-save 真源是 `src/collectors/ai-chat-sites.ts`，本页不复制易漂移的 provider 名单。
 
 ## 核心提示词
@@ -168,13 +168,11 @@ SYNCNOS-ATTACHMENT-ACK
 
 检查：
 
-1. 两次保存的 SyncNos conversation id 必须相同。
-2. URL 中无关 query、入口参数或 host alias 变化时，仍应识别为同一 durable chat identity；本地 read-back URL 应稳定为 provider canonical host + durable route，不保留这些瞬时参数。
-3. collector 的 `conversationKey` 应是站点 durable conversation/prompt/thread id，而不是 pathname 的字符串变体；旧 key 规则升级时，应迁移并复用旧记录，而不是创建第二条。
-4. 若历史已经存在同一 durable identity 的重复记录，下次保存应自动合并；消息、图片缓存和同步映射不得丢失。
-5. Notion / Feishu 已有目标必须继续复用；GitHub 必须保持 managed-path ownership 连续性，并按既有 cleanup / migration 语义处理旧路径，不能无声留下重复远端文件。
-6. 刷新或重新打开同一会话后，最终持久化的 message key 必须保持稳定；站点若只提供会随 reload 重建的 DOM 临时 id，collector 必须在持久化前转换成稳定 identity。
-7. conversation title 只能来自网页内当前会话的 history/header/title 控件；禁止读取浏览器标签页 `<title>`。网页未暴露稳定会话标题时，才用首条 user 内容的 semantic text 作为短标题兜底。
+1. 重复保存后仍是同一个 SyncNos conversation id，不出现第二条本地会话。
+2. 无关 query、入口参数、host alias 或旧 key 迁移不会拆分会话；本地 URL 保持为稳定会话地址。
+3. 已有消息、图片缓存和同步目标仍附着在同一会话上。
+4. reload 或重新打开后，持久化 message key 保持稳定，不产生重复消息。
+5. 会话标题来自网页内当前会话；浏览器标签页标题不得覆盖它。网页没有稳定标题时，才用首条 user 内容生成短标题。
 
 ## 每次真实回归的最小组合
 
@@ -212,4 +210,4 @@ SYNCNOS-ATTACHMENT-ACK
 | SyncNos 本地 read-back | PASS / FAIL |
 | 阻塞 / 备注 |  |
 
-真实站点通过的最低标准是：页面事实、collector 结果和 SyncNos 本地 read-back 三者一致。虚拟化站点还必须验证一次后台 → 前台恢复；重复保存测试还必须验证一次 reload 后的 message identity 与 conversation id。只检查 selector、bundle、fixture 或 DOM snapshot 都不能写成 E2E PASS。
+真实站点通过的最低标准是：页面事实、collector 结果和 SyncNos 本地 read-back 三者一致。虚拟化站点还要验证后台 → 前台恢复；身份相关改动执行 DOM-08。只检查 selector、bundle、fixture 或 DOM snapshot 不能写成 E2E PASS。

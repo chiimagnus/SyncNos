@@ -15,19 +15,19 @@ Manual capture actively retrieves the history that the current site can safely v
 ## Manual capture
 
 1. Open the target conversation.
-2. Choose **Capture AI chat** in the popup, or save the current chat from the context menu.
+2. Choose **Fetch AI Chat** in the popup, or **Save current AI chat** from the context menu.
 3. Confirm the result in the [local library](/docs/en/library/).
 
-Platforms listed with auto-save can enable it under **Settings → General → Auto save**. Auto-save only appends or updates messages that can be identified safely in the current window; it does not scroll the page to backfill older history. Use manual capture when you want SyncNos to retrieve long-chat history.
+Platforms listed with auto-save can enable it under **Settings → General → Auto-save**. Auto-save only appends or updates messages that can be identified safely in the current window; it does not scroll the page to backfill older history. Use manual capture when you want SyncNos to retrieve long-chat history.
 
-Notion AI currently uses the `/chat` Agent Service conversation and its full transcript. Messages containing files are kept partial-safe; complete attachment metadata is not guaranteed yet.
+Notion AI file messages are saved conservatively; some attachment details may be unavailable.
 
 ## ChatGPT Advanced capture
 
 ChatGPT uses page capture by default. **Settings → General → ChatGPT Advanced capture** enables an alternative manual capture path.
 
-- **Page capture**: keeps visible page content and handles the page loading required for long conversations.
-- **Advanced capture**: better for stable current-branch identity and long conversations, but it cannot recover thinking/progress that ChatGPT did not keep.
+- **Page capture**: saves the conversation from the current page and loads older history when needed.
+- **Advanced capture**: better for long conversations and the current branch, but it cannot recover reasoning or generation progress that ChatGPT did not keep.
 
 Advanced capture does not silently fall back to page capture. Disable it and save again if you want the page path.
 

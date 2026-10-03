@@ -5,7 +5,7 @@
 ## 本地真源
 
 - AI 对话、文章和 Video 先保存到浏览器本地；Provider 与导出文件都是派生结果。
-- 同一个真实 AI 会话必须持续复用同一条本地 conversation。collector key 格式升级、无关 URL query 或受支持 host alias 变化时，应按 durable chat identity 原地迁移并保留消息、图片缓存和同步 continuity，而不是创建第二条；持久 URL 同步规范为 provider canonical host + durable route。
+- 同一个真实 AI 会话始终复用同一条本地 conversation。采集 key 格式或瞬时 URL / host 变化只做原地身份迁移，保留消息、图片缓存和同步映射；持久 URL 只保留稳定会话地址。
 - `lastActivityAt` 只由真实内容或评论活动推进；阅读、同步、迁移和恢复不得伪造活跃时间。
 - 虚拟列表只有在确认完整后才能覆盖历史；不完整页面不能删除已有消息。
 - 评论中的引用和评论独立持久化；迁移不得丢内容或伪造 locator。定位仍要求可靠 exact Range，不增加模糊回退。
