@@ -121,12 +121,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return !!env.document.querySelector('ms-run-button .stoppable-spinner, ms-run-button .stoppable-stop');
   }
 
-  function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
-    const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-    if (id) return `${id}:${role}`;
-    return env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence });
-  }
-
   type ManualTurnEntry = {
     turnId: string;
     role: 'user' | 'assistant';
@@ -350,13 +344,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     });
   }
 
-  function snapshotPlainInput(
-    turn: Element,
-    role: 'user' | 'assistant',
-    content: Element,
-    sequence: number,
-    manualEntry?: ManualTurnEntry,
-  ): PlainExtractionInput | null {
+  function snapshotPlainInput(entry: ManualTurnEntry, sequence: number): PlainExtractionInput | null {
+    const { role, content } = entry;
     const cleaned = cleanTurnContentNode(content) || content;
     const contentText =
       role === 'assistant'
@@ -367,29 +356,15 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const blobUrls = uniqueStrings(extractBlobImageUrlsFromElement(cleaned));
     if (!contentText && !httpUrls.length && !blobUrls.length) return null;
     return {
-      messageKey: manualEntry?.messageKey || messageKeyFromTurn(turn, role, contentText, sequence),
-      turnKey: manualEntry?.turnId || String(turn.getAttribute?.('id') || '').trim(),
-      withinTurn: manualEntry?.withinTurn || 0,
+      messageKey: entry.messageKey,
+      turnKey: entry.turnId,
+      withinTurn: entry.withinTurn,
       role,
       sequence,
       baseMarkdown: baseMarkdown || contentText,
       imageReferences: { httpUrls, blobUrls },
       updatedAt: Date.now(),
     };
-  }
-
-  function snapshotNormalInputs(): PlainExtractionInput[] {
-    const root = getConversationRoot();
-    if (!root || inEditMode(root)) return [];
-    const output: PlainExtractionInput[] = [];
-    for (const turn of Array.from(root.querySelectorAll('ms-chat-turn')) as Element[]) {
-      const role = normalizeRoleFromTurn(turn);
-      const content = role ? pickTurnContent(turn, role) : null;
-      if (!role || !content) continue;
-      const input = snapshotPlainInput(turn, role, content, output.length);
-      if (input) output.push(input);
-    }
-    return output;
   }
 
   type ManualEntryRef = { turn: Element; entry: ManualTurnEntry };
@@ -431,19 +406,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       updatedAt: input.updatedAt,
       ...(resolved.incomplete ? { captureMergePolicy: 'preserve-existing-markdown' } : null),
     };
-  }
-
-  async function extractMessagesFromInputs(inputs: PlainExtractionInput[], ctx: InlineImageContext): Promise<any[]> {
-    const output: any[] = [];
-    for (const input of inputs) {
-      const message = await extractMessageFromInput({ ...input, sequence: output.length }, ctx);
-      if (message) output.push(message);
-    }
-    return output;
-  }
-
-  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
-    return extractMessagesFromInputs(snapshotNormalInputs(), ctx);
   }
 
   type AiStudioDescriptor = {
@@ -557,7 +519,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         existing?: PreparedMessageRecord<any>;
         input?: PlainExtractionInput;
       }> = [];
-      for (const { turn, entry } of refs) {
+      for (const { entry } of refs) {
         const descriptor = descriptorFromEntry(entry, streamingKey);
         if (!descriptor.rendered) {
           output.push({ descriptor });
@@ -568,7 +530,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
           output.push({ descriptor, existing });
           continue;
         }
-        const input = snapshotPlainInput(turn, entry.role, entry.content, output.length, entry);
+        const input = snapshotPlainInput(entry, output.length);
         if (input) output.push({ descriptor, input });
       }
       return output;
@@ -611,7 +573,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
     if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const root = getConversationRoot();
-    if (!root) return null;
+    if (!root || inEditMode(root)) return null;
 
     const identityGuard = sampleIdentityGuard();
     const conversationKey = identityGuard.durableId && identityGuard.anchors.length ? identityGuard.durableId : '';
@@ -699,6 +661,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
       return null;
     }
+    if (inEditMode(getConversationRoot())) return null;
     const ctx = createInlineImageContext();
     const prepared = consumePreparedCapture(options?.preparedCapture);
     if (!prepared || !identityGuardsMatch(prepared.identityGuard)) return null;
@@ -778,7 +741,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     getRoot: getConversationRoot,
     prepareManualCapture,
     __test: {
-      collectMessages: async () => collectMessages(createInlineImageContext()),
       extractAssistantMarkdown,
       extractAssistantText,
       isPromptRunning,
