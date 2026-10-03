@@ -34,6 +34,21 @@ async function loadPoeCollector() {
   return collector;
 }
 
+async function capturePrepared(collector: any, options: Record<string, unknown> = {}) {
+  // JSDOM has no native scroll implementation; the collector only needs a no-op document restore in tests.
+  // @ts-expect-error test global
+  if (globalThis.window) (globalThis.window as any).scrollTo = () => {};
+  const preparedCapture = await collector.prepareManualCapture({
+    maxRounds: 1,
+    stableRounds: 1,
+    waitForLoadMs: 20,
+    pollMs: 0,
+    sleep: async () => {},
+    ...options,
+  });
+  return preparedCapture ? collector.capture({ manual: true, preparedCapture }) : null;
+}
+
 function semanticText(message: any): string {
   return markdownToSemanticText(message?.contentMarkdown, { includeImageAlt: true }).trim();
 }
@@ -80,7 +95,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true, preparedCapture: { opaque: true } });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe('你好');
   });
@@ -131,7 +146,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
@@ -211,7 +226,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
@@ -274,7 +289,7 @@ describe('poe-collector', () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/Assistant' });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/current-assistant' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -287,7 +302,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.conversation.source).toBe('poe');
     expect(snap.messages.length).toBe(2);
@@ -365,7 +380,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.messageKey)).toEqual(['message-1', 'message-2', 'message-3', 'message-4']);
     expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
@@ -448,9 +463,14 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    await collector.prepareManualCapture({ maxRounds: 10, settleMs: 0, waitForLoadMs: 60, pollMs: 5 });
+    const preparedCapture = await collector.prepareManualCapture({
+      maxRounds: 10,
+      stableRounds: 2,
+      waitForLoadMs: 60,
+      pollMs: 5,
+    });
 
-    const snap = collector.capture({ manual: true });
+    const snap = await collector.capture({ manual: true, preparedCapture });
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.messageKey)).toEqual([
       'message-1',
@@ -485,7 +505,7 @@ describe('poe-collector', () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/Assistant' });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/current-assistant' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -498,13 +518,45 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
     const md = snap.messages[0].contentMarkdown || '';
     expect(md).toContain('![](https://img.test/attach.png)');
     expect(md).not.toContain('avatar.jpeg');
+  });
+
+  it('skips current Poe messages until data-complete becomes true', async () => {
+    const html = `
+      <div class="ChatMessagesView_messageTuple__X">
+        <div class="ChatMessage_chatMessage__xkgHx" id="message-user" data-complete="true">
+          <div class="ChatMessage_messageWrapper__4Ugd6 ChatMessage_rightSideMessageWrapper__r0roB">
+            <div class="Message_messageTextContainer__w64Sc"><div class="Message_selectableText__SQ8WH">question</div></div>
+          </div>
+        </div>
+        <div class="ChatMessage_chatMessage__xkgHx" id="message-assistant" data-complete="false">
+          <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD"></div>
+          <div class="Message_messageTextContainer__w64Sc"><div class="Message_selectableText__SQ8WH">partial answer</div></div>
+        </div>
+      </div>
+    `;
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/current-stream' });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    const collector = await loadPoeCollector();
+    const snap = await capturePrepared(collector);
+    expect(snap.captureMeta).toMatchObject({ completeness: 'partial', identityVerified: true });
+    expect(snap.captureMeta.reasons).toContain('unresolved_turn');
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0]).toMatchObject({ messageKey: 'message-user', role: 'user' });
   });
 
   it('captures attachment images outside message text container', async () => {
@@ -546,7 +598,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = await capturePrepared(collector);
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(semanticText(snap.messages[0])).toContain('@GLM-5 这是什么？');

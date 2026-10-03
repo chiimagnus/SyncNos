@@ -2,13 +2,24 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
   extractImageUrlsFromElement,
   inEditMode as inEditModeUtil,
 } from '@collectors/collector-utils.ts';
+import {
+  addPreparedReason,
+  createPreparedAccumulator,
+  createPreparedCaptureConsumer,
+  createScrollRootRestorer,
+  finishPreparedCapture,
+  mergePreparedRecords,
+  type PreparedAccumulator,
+  type PreparedIdentityGuard,
+  type PreparedMessageRecord,
+} from '@collectors/virtualized-chat/virtualized-chat-sweep.ts';
 import poeMarkdownApi from '@collectors/poe/poe-markdown.ts';
 
 export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
+  const consumePreparedCapture = createPreparedCaptureConsumer<any>('poe');
   const window = env.window;
   const document = env.document;
   const location = env.location;
@@ -18,20 +29,23 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     return /(^|\.)poe\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl(): any {
-    try {
-      const p = String(location.pathname || '');
-      if (!p || p === '/') return false;
-      // Exclude some well-known non-chat routes to reduce accidental activation.
-      if (/^\/(login|logout|settings|explore|pricing|subscriptions)(\/|$)/.test(p)) return false;
-      return true;
-    } catch (_e) {
-      return false;
-    }
+  function findConversationIdFromUrl(): string {
+    const match = String(location.pathname || '').match(/^\/chat\/([^/?#]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : '';
   }
 
-  function findConversationKey(): any {
-    return conversationKeyFromLocation(location);
+  function isValidConversationUrl(): boolean {
+    return !!findConversationIdFromUrl();
+  }
+
+  function isConversationSurfaceUrl(): boolean {
+    const path = String(location.pathname || '');
+    return path === '/' || /^\/chat(?:\/|$)/.test(path);
+  }
+
+  function normalizedRoute(): string {
+    const pathname = String(location.pathname || '/').replace(/\/+$/, '') || '/';
+    return `${String(location.hostname || '').toLowerCase()}${pathname}`;
   }
 
   function findTitle(): any {
@@ -161,25 +175,6 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     return finalNodes;
   }
 
-  function wrapperSignature(wrapper: any): any {
-    if (!wrapper) return '';
-    const id = wrapper.getAttribute ? String(wrapper.getAttribute('id') || '') : '';
-    if (id) return id;
-    const node = contentNodeFromWrapper(wrapper);
-    const raw = node && node.textContent ? String(node.textContent) : '';
-    return raw.replace(/\s+/g, ' ').trim().slice(0, 80);
-  }
-
-  function messageLoadSignature(root: any): any {
-    const wrappers = getMessageWrappers(root);
-    const total = wrappers.length;
-    if (!total) return '0';
-    const first = wrappers[0];
-    const second = total > 1 ? wrappers[1] : null;
-    const last = wrappers[total - 1];
-    return [total, wrapperSignature(first), wrapperSignature(second), wrapperSignature(last)].join('|');
-  }
-
   function isScrollableElement(el: any): any {
     if (!el) return false;
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
@@ -229,18 +224,6 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     return scrollingRoot;
   }
 
-  function getContainerScrollTop(container: any): any {
-    if (!container) return 0;
-    const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
-    if (container === scrollingRoot || container === document.documentElement || container === document.body) {
-      const y1 = Number(window.pageYOffset || 0);
-      const y2 = document.documentElement ? Number(document.documentElement.scrollTop || 0) : 0;
-      const y3 = document.body ? Number(document.body.scrollTop || 0) : 0;
-      return Math.max(y1, y2, y3);
-    }
-    return Number(container.scrollTop || 0);
-  }
-
   function scrollContainerToTop(container: any): any {
     if (!container) return;
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
@@ -253,131 +236,245 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     container.scrollTop = 0;
   }
 
-  async function waitForMessageChange(root: any, previousSig: any, { waitForLoadMs, pollMs }: any): Promise<any> {
-    const timeoutMs = Math.max(0, Number(waitForLoadMs) || 0);
-    const intervalMs = Math.max(10, Number(pollMs) || 80);
-    const start = Date.now();
-
-    while (Date.now() - start <= timeoutMs) {
-      await sleep(intervalMs);
-      const nextSig = messageLoadSignature(root);
-      if (nextSig !== previousSig) return { changed: true, sig: nextSig };
-    }
-
-    return { changed: false, sig: messageLoadSignature(root) };
+  function getScrollRoot(): Element | null {
+    return (
+      document.querySelector("div[class*='ChatMessagesScrollWrapper_scrollableContainerWrapper__']") ||
+      findScrollContainer(getConversationRoot())
+    );
   }
 
-  async function prepareManualCapture(options: any): Promise<void> {
-    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return;
+  function messageKeyFromWrapper(wrapper: any): string {
+    const id = wrapper?.getAttribute ? String(wrapper.getAttribute('id') || '').trim() : '';
+    return /^message-/.test(id) ? id : '';
+  }
 
+  function collectMessages(): any[] {
     const root = getConversationRoot();
-    if (!root) return;
-
-    const scrollContainer = findScrollContainer(root);
-    if (!scrollContainer) return;
-
-    const maxRounds = Math.max(1, Number(options && options.maxRounds) || 24);
-    const settleMs = Math.max(0, Number(options && options.settleMs) || 120);
-    const waitForLoadMs = Math.max(80, Number(options && options.waitForLoadMs) || 900);
-    const pollMs = Math.max(10, Number(options && options.pollMs) || 80);
-
-    let sig = messageLoadSignature(root);
-    let stableAtTopRounds = 0;
-
-    for (let round = 0; round < maxRounds; round += 1) {
-      scrollContainerToTop(scrollContainer);
-      if (settleMs) await sleep(settleMs);
-
-      const waited = await waitForMessageChange(root, sig, { waitForLoadMs, pollMs });
-      sig = waited.sig;
-
-      const atTop = getContainerScrollTop(scrollContainer) <= 2;
-      if (waited.changed) {
-        stableAtTopRounds = 0;
-        continue;
-      }
-
-      if (atTop) stableAtTopRounds += 1;
-      else stableAtTopRounds = 0;
-
-      if (stableAtTopRounds >= 2) break;
-    }
-  }
-
-  function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
-    const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute('id') || '') : '';
-    if (id) return id;
-    return env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence });
-  }
-
-  function collectMessages({ allowEditing }: any = {}): any {
-    const root = getConversationRoot();
-    if (!root) return [];
-    if (!allowEditing && inEditMode(root)) return [];
+    if (!root || inEditMode(root)) return [];
 
     const wrappers = getMessageWrappers(root);
-    if (!wrappers.length) return [];
-
     const markdown = poeMarkdown();
-
     const out: any[] = [];
-    let seq = 0;
-    for (const w of wrappers) {
-      const role = isUserWrapper(w) ? 'user' : isAssistantWrapper(w) ? 'assistant' : '';
-      if (!role) continue;
+    let sequence = 0;
 
-      const node = contentNodeFromWrapper(w);
+    for (const wrapper of wrappers) {
+      const key = messageKeyFromWrapper(wrapper);
+      const role = isUserWrapper(wrapper) ? 'user' : isAssistantWrapper(wrapper) ? 'assistant' : '';
+      if (!key || !role || String(wrapper.getAttribute?.('data-complete') || 'true') === 'false') continue;
+
+      const node = contentNodeFromWrapper(wrapper);
       const raw =
         node && ((node as any).innerText || node.textContent) ? (node as any).innerText || node.textContent : '';
       const fallbackText = env.normalize.normalizeText(raw);
-
       const contentText =
         typeof markdown.extractMessageText === 'function'
-          ? String(markdown.extractMessageText(w, role) || '')
+          ? String(markdown.extractMessageText(wrapper, role) || '')
           : fallbackText;
-
-      const imageUrls = extractImageUrlsFromElement(imageScopeFromWrapper(w));
+      const imageUrls = extractImageUrlsFromElement(imageScopeFromWrapper(wrapper));
       let contentMarkdown =
         typeof markdown.extractMessageMarkdown === 'function'
-          ? String(markdown.extractMessageMarkdown(w, role) || '')
-          : contentText || '';
-      if (!contentMarkdown) contentMarkdown = contentText || '';
-
+          ? String(markdown.extractMessageMarkdown(wrapper, role) || '')
+          : contentText;
+      if (!contentMarkdown) contentMarkdown = contentText;
       if (!contentText && !imageUrls.length) continue;
-      const nextMarkdown = appendImageMarkdown(contentMarkdown, imageUrls);
 
       out.push({
-        messageKey: messageKeyFromWrapper(w, role, contentText, seq),
+        messageKey: key,
         role,
-        contentMarkdown: nextMarkdown,
-        sequence: seq,
+        contentMarkdown: appendImageMarkdown(contentMarkdown, imageUrls),
+        sequence,
         updatedAt: Date.now(),
       });
-      seq += 1;
+      sequence += 1;
     }
     return out;
   }
 
-  function capture(options: any): any {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
-    const messages = collectMessages({ allowEditing: !!(options && options.manual) });
-    if (!messages.length) return null;
+  function compactFingerprint(value: string): string {
+    return typeof env.normalize.fnv1a32 === 'function' ? String(env.normalize.fnv1a32(value)) : value;
+  }
+
+  function sampleIdentityGuard(): PreparedIdentityGuard {
+    const anchors = getMessageWrappers(getConversationRoot()).map(messageKeyFromWrapper).filter(Boolean);
+    return {
+      route: normalizedRoute(),
+      durableId: findConversationIdFromUrl(),
+      anchors,
+      topAnchor: anchors[0] || '',
+    };
+  }
+
+  function identityGuardsMatch(expected: PreparedIdentityGuard, actual: PreparedIdentityGuard): boolean {
+    return (
+      !!expected?.route &&
+      expected.route === actual?.route &&
+      !!expected.durableId &&
+      expected.durableId === actual?.durableId
+    );
+  }
+
+  function createIdentitySampler(expected: PreparedIdentityGuard): () => string | null {
+    const identity = expected.route && expected.durableId ? `${expected.route}|durable:${expected.durableId}` : '';
+    return () => {
+      if (!identity || normalizedRoute() !== expected.route) return null;
+      return findConversationIdFromUrl() === expected.durableId ? identity : null;
+    };
+  }
+
+  async function harvestCurrentInto(
+    accumulator: PreparedAccumulator<any>,
+  ): Promise<{ added: number; updated: number }> {
+    const messages = collectMessages();
+    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = messages.map((message) => ({
+      key: message.messageKey,
+      turnKey: message.messageKey,
+      withinTurn: 0,
+      fingerprint: compactFingerprint([message.messageKey, message.role, message.contentMarkdown].join('\u001f')),
+      payload: message,
+    }));
+    if (
+      getMessageWrappers(getConversationRoot()).some(
+        (wrapper: any) => wrapper.getAttribute?.('data-complete') === 'false',
+      )
+    ) {
+      addPreparedReason(accumulator, 'unresolved_turn');
+    }
+    return mergePreparedRecords(accumulator, records);
+  }
+
+  function currentWindowSignature(): string {
+    const root = getScrollRoot() as HTMLElement | null;
+    const wrappers = getMessageWrappers(getConversationRoot());
+    return `${wrappers
+      .map((wrapper: any) => `${messageKeyFromWrapper(wrapper)}:${wrapper.getAttribute?.('data-complete') || ''}`)
+      .join('|')}|${Number(root?.scrollHeight || 0)}`;
+  }
+
+  async function waitForHistoryChange(
+    previousSignature: string,
+    options: { waitForLoadMs: number; pollMs: number; sleep: (ms: number) => Promise<void>; now: () => number },
+  ): Promise<boolean> {
+    const deadline = options.now() + options.waitForLoadMs;
+    while (options.now() <= deadline) {
+      await options.sleep(options.pollMs);
+      if (currentWindowSignature() !== previousSignature) return true;
+    }
+    return false;
+  }
+
+  async function prepareManualCapture(options: any = {}): Promise<any | null> {
+    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+    const root = getConversationRoot();
+    const scrollRoot = getScrollRoot() as HTMLElement | null;
+    if (!root || !scrollRoot || inEditMode(root)) return null;
+
+    const initialGuard = sampleIdentityGuard();
+    const accumulator = createPreparedAccumulator<any>({
+      source: 'poe',
+      conversationKey: initialGuard.durableId,
+      identityVerified: !!initialGuard.durableId,
+      identityGuard: initialGuard,
+    });
+    accumulator.completeness = 'partial';
+    addPreparedReason(accumulator, 'top_not_reached');
+
+    const sampleIdentity = createIdentitySampler(initialGuard);
+    const restorer = createScrollRootRestorer({
+      document: env.document,
+      window: env.window,
+      getSeed: getScrollRoot,
+      sampleIdentity,
+    });
+    const maxRounds = Math.max(1, Math.min(50, Number(options.maxRounds) || 24));
+    const stableRoundsRequired = Math.max(1, Math.min(5, Number(options.stableRounds) || 2));
+    const waitForLoadMs = Math.max(20, Number(options.waitForLoadMs) || 900);
+    const pollMs = Math.max(0, Number(options.pollMs) || 80);
+    const sleepFn = options.sleep || sleep;
+    const now = options.now || Date.now;
+    let stableRounds = 0;
+
+    try {
+      await harvestCurrentInto(accumulator);
+      for (let round = 0; round < maxRounds && stableRounds < stableRoundsRequired; round += 1) {
+        const before = currentWindowSignature();
+        scrollContainerToTop(scrollRoot);
+        const changed = await waitForHistoryChange(before, { waitForLoadMs, pollMs, sleep: sleepFn, now });
+        if (!sampleIdentity()) {
+          accumulator.identityVerified = false;
+          accumulator.conversationKey = '';
+          accumulator.records = [];
+          addPreparedReason(accumulator, 'identity_changed');
+          break;
+        }
+        await harvestCurrentInto(accumulator);
+        stableRounds = changed ? 0 : stableRounds + 1;
+      }
+    } finally {
+      const restored = restorer.restore();
+      if (!restored.restored) addPreparedReason(accumulator, 'restore_failed');
+    }
+
+    const finalGuard = sampleIdentityGuard();
+    if (!identityGuardsMatch(initialGuard, finalGuard)) {
+      accumulator.identityVerified = false;
+      accumulator.conversationKey = '';
+      accumulator.records = [];
+      addPreparedReason(accumulator, 'identity_changed');
+    }
+    return finishPreparedCapture(accumulator);
+  }
+
+  async function capture(options: any = {}): Promise<any | null> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
+      return null;
+    }
+    const root = getConversationRoot();
+    if (!root || inEditMode(root)) return null;
+    const prepared = consumePreparedCapture(options.preparedCapture);
+    if (!prepared || !identityGuardsMatch(prepared.identityGuard, sampleIdentityGuard())) return null;
+
+    const accumulator = createPreparedAccumulator<any>({
+      source: 'poe',
+      conversationKey: prepared.conversationKey,
+      identityVerified: prepared.identityVerified === true,
+      identityGuard: prepared.identityGuard,
+    });
+    accumulator.completeness = 'partial';
+    accumulator.reasons.push(...prepared.reasons.filter((reason: string) => !accumulator.reasons.includes(reason)));
+    accumulator.sweepMetrics = { ...prepared.metrics };
+    mergePreparedRecords(
+      accumulator,
+      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }: any) => record),
+    );
+    await harvestCurrentInto(accumulator);
+
+    if (!identityGuardsMatch(accumulator.identityGuard, sampleIdentityGuard())) return null;
+    const finalPrepared = finishPreparedCapture(accumulator);
+    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
+    if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
+
     return {
       conversation: {
         sourceType: 'chat',
         source: 'poe',
-        conversationKey: findConversationKey(),
+        conversationKey: finalPrepared.conversationKey,
         title: findTitle(),
         url: env.location.href,
         warningFlags: [],
       },
       messages,
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: finalPrepared.reasons,
+        metrics: finalPrepared.metrics,
+      },
     };
   }
 
   const collector: any = {
     capture,
-    isCaptureAvailable: isValidConversationUrl,
+    isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
     prepareManualCapture,
   };
@@ -390,6 +487,8 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     extractTextFromSanitizedClone: markdown.extractTextFromSanitizedClone,
     extractMessageMarkdown: markdown.extractMessageMarkdown,
     extractMessageText: markdown.extractMessageText,
+    currentWindowSignature,
+    getMessageWrappers,
   };
 
   return { id: 'poe', matches, collector };
