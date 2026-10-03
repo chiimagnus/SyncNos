@@ -25,6 +25,7 @@ describe('capture integrity contract', () => {
       'googleaistudio',
       'deepseek',
       'kimi',
+      'yuanbao',
       'zai',
     ]);
 
@@ -37,6 +38,7 @@ describe('capture integrity contract', () => {
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('gemini')).toBe(true);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('deepseek')).toBe(false);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('kimi')).toBe(false);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('yuanbao')).toBe(false);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('zai')).toBe(false);
   });
 
