@@ -225,18 +225,22 @@ function removeNonContentNodes(container: any): any {
 
 function getAssistantContentRoot(wrapper: any): any {
   if (!wrapper) return null;
-  const selectors = [
-    '[data-chatgpt-selection-message-id]',
-    "[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']",
-    "[data-markdown-text-style='assistant-message']",
-  ];
-  if (wrapper.querySelector) {
-    for (const selector of selectors) {
-      const node = wrapper.querySelector(selector);
-      if (node) return node;
-    }
+  const selection = wrapper.querySelector?.('[data-chatgpt-selection-message-id]');
+  if (selection) return selection;
+
+  const primary = Array.from(
+    wrapper.querySelectorAll?.("[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']") ||
+      [],
+  ) as any[];
+  if (primary.length === 1) return primary[0];
+  if (primary.length > 1) {
+    const doc = wrapper.ownerDocument || document;
+    const holder = doc.createElement('div');
+    for (const node of primary) holder.appendChild(node.cloneNode(true));
+    return holder;
   }
-  return wrapper;
+
+  return wrapper.querySelector?.("[data-markdown-text-style='assistant-message']") || wrapper;
 }
 
 function sanitizeRenderedClone(root: any): any {

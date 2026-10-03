@@ -25,6 +25,8 @@ import {
 
 const CHATGPT_TURN_SELECTOR = '[data-turn-key]';
 const CHATGPT_MESSAGE_UNIT_SELECTOR = '[data-chatgpt-search-unit-key][data-chatgpt-search-message-ids]';
+const CHATGPT_ASSISTANT_PRIMARY_SELECTOR =
+  "[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']";
 
 function turnKeyOf(el: any): string {
   const turn = el?.closest?.(CHATGPT_TURN_SELECTOR);
@@ -118,7 +120,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const imageKey = buildChatgptGeneratedImageMessageKey(imageUrls.map(chatgptFileIdFromEstuaryUrl));
       if (imageKey) return imageKey;
     }
-    return directMessageId(element);
+    const directId = directMessageId(element);
+    if (directId) return directId;
+    if (role === 'assistant' && element?.matches?.(CHATGPT_TURN_SELECTOR)) {
+      const turnKey = turnKeyOf(element);
+      if (turnKey) return `chatgpt_turn_${turnKey}_assistant`;
+    }
+    return '';
   }
 
   function readTurnShells(root: any): any[] {
@@ -146,7 +154,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const turnId = turnKeyOf(wrapper);
       const withinTurn = perTurn.get(turnId) || 0;
       perTurn.set(turnId, withinTurn + 1);
-      push(stableManualMessageKey(wrapper, roleFromWrapper(wrapper), extractChatgptImageUrls(wrapper)));
+      const role = roleFromWrapper(wrapper);
+      push(stableManualMessageKey(wrapper, role, extractChatgptImageUrlsForRole(wrapper, role)));
     }
     const topAnchor = anchors[0] || '';
     return { route: normalizedRoute(), durableId, anchors, topAnchor };
@@ -273,17 +282,49 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     );
   }
 
+  function aggregateNodes(nodes: any[]): any | null {
+    if (!nodes.length) return null;
+    if (nodes.length === 1) return nodes[0];
+    const holder = env.document.createElement('div');
+    for (const node of nodes) holder.appendChild(node.cloneNode(true));
+    return holder;
+  }
+
   function assistantContentNode(element: any): any {
-    return (
-      element.querySelector('[data-chatgpt-selection-message-id]') ||
-      element.querySelector("[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']") ||
-      element.querySelector("[data-markdown-text-style='assistant-message']") ||
-      element
+    const selection = element?.querySelector?.('[data-chatgpt-selection-message-id]');
+    if (selection) return selection;
+    const cotBodies = element?.matches?.(CHATGPT_TURN_SELECTOR) ? currentCotBodies(element) : [];
+    const primary = (Array.from(element?.querySelectorAll?.(CHATGPT_ASSISTANT_PRIMARY_SELECTOR) || []) as any[]).filter(
+      (node) => !cotBodies.some((body) => body?.contains?.(node)),
     );
+    const aggregated = aggregateNodes(primary);
+    if (aggregated) return aggregated;
+    if (element?.matches?.(CHATGPT_TURN_SELECTOR)) return null;
+    return element?.querySelector?.("[data-markdown-text-style='assistant-message']") || element;
   }
 
   function extractChatgptImageUrls(element: ParentNode | null): string[] {
     return extractImageUrlsFromElement(element).filter((url) => !isChatgptNonContentImageUrl(url));
+  }
+
+  function extractChatgptImageUrlsForRole(element: any, role: 'user' | 'assistant'): string[] {
+    if (role !== 'assistant' || !element?.matches?.(CHATGPT_TURN_SELECTOR)) return extractChatgptImageUrls(element);
+    return extractChatgptImageUrls(assistantContentNode(element));
+  }
+
+  function hasActiveAssistantStatus(element: any): boolean {
+    const turn = element?.matches?.(CHATGPT_TURN_SELECTOR) ? element : element?.closest?.(CHATGPT_TURN_SELECTOR);
+    if (!turn?.querySelector) return false;
+    const status = turn.querySelector("[role='status'][aria-live='polite']");
+    return !!status && !isExplicitlyHiddenWithin(status, turn);
+  }
+
+  function hasFallbackAssistantActivity(turn: any): boolean {
+    if (!turn?.querySelector) return false;
+    if (turn.querySelector("[data-markdown-text-style='assistant-message']")) return true;
+    if (findDeepResearchIframe(turn)) return true;
+    if (hasActiveAssistantStatus(turn)) return true;
+    return extractChatgptImageUrlsForRole(turn, 'assistant').length > 0;
   }
 
   type ChatgptDescriptor = {
@@ -306,9 +347,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function getTurnWrappers(root: any): any[] {
     if (!root?.querySelectorAll) return [];
-    return (Array.from(root.querySelectorAll(CHATGPT_MESSAGE_UNIT_SELECTOR)) as any[]).filter((unit) =>
-      /:(?:user|assistant)$/.test(String(unit?.getAttribute?.('data-chatgpt-search-unit-key') || '')),
-    );
+    const wrappers: any[] = [];
+    for (const turn of readTurnShells(root)) {
+      const units = (Array.from(turn.querySelectorAll(CHATGPT_MESSAGE_UNIT_SELECTOR)) as any[]).filter((unit) =>
+        /:(?:user|assistant)$/.test(String(unit?.getAttribute?.('data-chatgpt-search-unit-key') || '')),
+      );
+      wrappers.push(...units);
+      const hasAssistantUnit = units.some((unit) => roleFromWrapper(unit) === 'assistant');
+      if (!hasAssistantUnit && hasFallbackAssistantActivity(turn)) wrappers.push(turn);
+    }
+    return wrappers;
   }
 
   function roleFromWrapper(wrapper: any): 'user' | 'assistant' {
@@ -477,7 +525,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     cot: CotAssociation | null;
   }): ChatgptExtractionInput {
     const { wrapper, role, key, turnKey, withinTurn, cot } = input;
-    const imageUrls = extractChatgptImageUrls(wrapper);
+    const imageUrls = extractChatgptImageUrlsForRole(wrapper, role);
     const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
     const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
@@ -485,6 +533,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const effectiveCot = role === 'assistant' && !iframe ? cot : null;
     const cotText = String(effectiveCot?.semanticText || '');
     const cotMarkdown = String(effectiveCot?.semanticMarkdown || '');
+    const fallbackAssistantTurn = role === 'assistant' && wrapper?.matches?.(CHATGPT_TURN_SELECTOR);
+    const hasFinalAssistantSurface = !fallbackAssistantTurn || !!node || imageUrls.length > 0 || !!iframe;
+    const streaming = role === 'assistant' && hasActiveAssistantStatus(wrapper);
+    const serializedRoot = fallbackAssistantTurn ? node || iframe || wrapper : wrapper;
     return {
       key,
       turnKey,
@@ -492,9 +544,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       role,
       fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
       hasDeepResearch: !!iframe,
-      rendered: !!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe,
+      rendered:
+        !streaming &&
+        hasFinalAssistantSurface &&
+        (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe),
       visible: isVisibleWindow(wrapper),
-      outerHtml: String(wrapper?.outerHTML || ''),
+      outerHtml: String(serializedRoot?.outerHTML || ''),
       imageUrls,
       iframeUrl,
       cotOuterHtml: effectiveCot?.outerHtml || '',
@@ -517,7 +572,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const turnKey = turnKeyOf(wrapper);
       const withinTurn = perTurn.get(turnKey) || 0;
       perTurn.set(turnKey, withinTurn + 1);
-      const imageUrls = extractChatgptImageUrls(wrapper);
+      const imageUrls = extractChatgptImageUrlsForRole(wrapper, role);
       const key = stableManualMessageKey(wrapper, role, imageUrls);
       if (!key) continue;
       const extractionInput = createCurrentExtractionInput({
@@ -589,8 +644,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     ).trim();
     const currentMatch = searchTurnKey.match(/^fallback-turn-(\d+)$/);
     if (currentMatch) {
-      const zeroBased = Number(currentMatch[1]);
-      return Number.isSafeInteger(zeroBased) && zeroBased >= 0 ? zeroBased + 1 : null;
+      const index = Number(currentMatch[1]);
+      return Number.isSafeInteger(index) && index >= 0 ? index : null;
     }
     return null;
   }
@@ -620,10 +675,18 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (!root) return 'pending';
     if (hasBoundaryLoadingSignal(boundary, root)) return 'pending';
     if (boundary === 'top') {
-      const ordinals = readTurnShells(root)
-        .map(structuralTurnOrdinal)
-        .filter((value): value is number => value !== null);
-      if (ordinals.length && Math.min(...ordinals) > 1) return 'pending';
+      const turns = readTurnShells(root);
+      const ordinals = turns.map(structuralTurnOrdinal).filter((value): value is number => value !== null);
+      const firstTurn = turns[0] || null;
+      const firstTurnUnits = firstTurn
+        ? (Array.from(firstTurn.querySelectorAll?.(CHATGPT_MESSAGE_UNIT_SELECTOR) || []) as any[])
+        : [];
+      const currentOneBasedLayout =
+        !!firstTurn &&
+        !firstTurnUnits.some((unit) => roleFromWrapper(unit) === 'assistant') &&
+        hasFallbackAssistantActivity(firstTurn);
+      const expectedTopOrdinal = currentOneBasedLayout ? 1 : 0;
+      if (ordinals.length && Math.min(...ordinals) > expectedTopOrdinal) return 'pending';
     }
     return 'confirmed';
   }
