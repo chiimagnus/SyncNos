@@ -826,6 +826,30 @@ describe('googleaistudio-collector', () => {
     expect(snapshot.messages.map((message: any) => message.sequence)).toEqual([0, 2, 3]);
   });
 
+  it('does not persist tail-window ordinals when the sweep never reaches the logical top', async () => {
+    const dom = setupDom(
+      '<div class="chat-session-content"><ms-chat-turn id="tail"><div data-turn-role="User"><div class="turn-content">tail only</div></div></ms-chat-turn></div>',
+      'https://aistudio.google.com/prompts/top-timeout',
+    );
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const preparedCapture = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    preparedCapture.completeness = 'partial';
+    preparedCapture.metrics.reachedTop = false;
+    preparedCapture.reasons.push('top_not_reached');
+    expect(await def.collector.capture({ manual: true, preparedCapture })).toBeNull();
+  });
+
   it('refuses to verify manual identity when stable turn ids are missing', async () => {
     const html = `<div class="chat-session-content"><ms-chat-turn><div data-turn-role="User"><div class="turn-content">Q</div></div></ms-chat-turn></div>`;
     const dom = setupDom(html, 'https://aistudio.google.com/prompts/missing-id');

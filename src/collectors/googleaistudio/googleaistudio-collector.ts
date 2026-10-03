@@ -702,6 +702,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const ctx = createInlineImageContext();
     const prepared = consumePreparedCapture(options?.preparedCapture);
     if (!prepared || !identityGuardsMatch(prepared.identityGuard)) return null;
+    if (prepared.metrics.reachedTop !== true) return null;
     for (const flag of (options.preparedCapture as any)?.warningFlags || []) ctx.warningFlags.add(String(flag));
 
     let slotOrder: string[] = Array.isArray((options.preparedCapture as any)?.aiStudioSlotOrder)
