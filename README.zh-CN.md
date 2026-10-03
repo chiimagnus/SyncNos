@@ -67,10 +67,6 @@ syncnos doctor
 
 ## 支持
 
-欢迎加入 SyncNos 用户 QQ 群（1027609452）交流和反馈。
-
-<img src="docs/assets/qq-group.jpg" alt="SyncNos 用户 QQ 群二维码" width="220" />
-
 SyncNos 由一人维护。如果你愿意赞助，也欢迎留下你使用 SyncNos 的原因或期待。
 
 <img src="public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="180" />
