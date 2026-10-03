@@ -1,9 +1,9 @@
 import {
   NOTION_AI_TRANSCRIPT_REQUEST,
   NOTION_AI_TRANSCRIPT_RESPONSE,
-  normalizeNotionAiThreadId,
   notionAiApiThreadId,
-} from '@collectors/notionai/notionai-transcript';
+} from '@collectors/notionai/notionai-protocol';
+import { normalizeNotionId } from '@services/shared/notion-id';
 
 type RequestTemplate = {
   url: string;
@@ -142,7 +142,7 @@ function sanitizePages(pages: any[], visibleKinds: Map<string, 'user_message' | 
 
 function currentThreadId(): string {
   try {
-    return normalizeNotionAiThreadId(new URL(location.href).searchParams.get('t'));
+    return normalizeNotionId(new URL(location.href).searchParams.get('t'));
   } catch (_error) {
     return '';
   }
@@ -184,7 +184,7 @@ export default defineContentScript({
         const response = await responsePromise;
         if (!body) return response;
 
-        const threadId = normalizeNotionAiThreadId(body.threadId);
+        const threadId = normalizeNotionId(body.threadId);
         const template = threadId ? buildTemplate(input, init, url, body) : null;
         if (threadId && template && currentThreadId() === threadId) {
           if (!templates.has(threadId)) {
@@ -202,7 +202,7 @@ export default defineContentScript({
       const data: any = event.data;
       if (!data || data.__syncnos !== true || data.type !== NOTION_AI_TRANSCRIPT_REQUEST) return;
       const requestId = stableString(data.requestId);
-      const threadId = normalizeNotionAiThreadId(data.threadId);
+      const threadId = normalizeNotionId(data.threadId);
       const mode = data.mode === 'latest' ? 'latest' : 'full';
       if (!requestId || !threadId || currentThreadId() !== threadId) return;
 

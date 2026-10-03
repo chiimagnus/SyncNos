@@ -1,10 +1,10 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { renderedElementText } from '@collectors/collector-utils.ts';
+import { normalizeNotionId } from '@services/shared/notion-id';
 import {
   buildNotionAiTranscriptSnapshot,
   createNotionAiTranscriptBridge,
-  normalizeNotionAiThreadId,
 } from '@collectors/notionai/notionai-transcript.ts';
 
 type PreparedNotionAiCapture = {
@@ -35,7 +35,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     if (!isNotionWebHost(loc?.hostname)) return '';
     if (String(loc?.pathname || '') !== '/chat') return '';
     try {
-      return normalizeNotionAiThreadId(new URL(String(loc.href || ''), 'https://app.notion.com').searchParams.get('t'));
+      return normalizeNotionId(new URL(String(loc.href || ''), 'https://app.notion.com').searchParams.get('t'));
     } catch (_error) {
       return '';
     }
@@ -84,7 +84,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
   function preparedCapture(value: unknown, expectedThreadId: string): PreparedNotionAiCapture | null {
     const input = value as Partial<PreparedNotionAiCapture> | null;
     if (!input || input.__notionAiTranscript !== true) return null;
-    if (normalizeNotionAiThreadId(input.threadId) !== expectedThreadId) return null;
+    if (normalizeNotionId(input.threadId) !== expectedThreadId) return null;
     const state = input.state;
     if (!state || !Array.isArray(state.pages) || !state.pages.length) return null;
     return {

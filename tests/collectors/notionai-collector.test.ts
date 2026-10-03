@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createNotionAiCollectorDef } from '../../src/collectors/notionai/notionai-collector.ts';
+import { createNotionAiTranscriptBridge } from '../../src/collectors/notionai/notionai-transcript.ts';
 import {
-  createNotionAiTranscriptBridge,
   NOTION_AI_TRANSCRIPT_REQUEST,
   NOTION_AI_TRANSCRIPT_RESPONSE,
-} from '../../src/collectors/notionai/notionai-transcript.ts';
+} from '../../src/collectors/notionai/notionai-protocol.ts';
 import { createCollectorsRegistry } from '../../src/collectors/registry.ts';
 import normalizeApi from '@services/shared/normalize.ts';
 

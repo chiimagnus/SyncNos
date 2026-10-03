@@ -3,7 +3,8 @@ import type { Conversation } from '@services/conversations/domain/models';
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import { buildFeishuDocUrl } from '@services/integrations/openin/feishu-openin';
 import { buildGithubSyncedMarkdownUrl } from '@services/integrations/openin/github-openin';
-import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/notion-openin';
+import { buildNotionPageUrl } from '@services/integrations/openin/notion-openin';
+import { normalizeNotionId } from '@services/shared/notion-id';
 import {
   defaultObsidianDetailHeaderServices,
   defaultObsidianTargetActionPort,
@@ -145,12 +146,12 @@ function resolveFreshProviderField(conversation: Conversation, mappingRes: SyncM
 
 function resolveFreshNotionConversation(conversation: Conversation, mappingRes: SyncMappingResult): Conversation {
   if (!mappingRes) return conversation;
-  const pageId = normalizeNotionPageId(
+  const pageId = normalizeNotionId(
     hasOwnProperty(mappingRes.mapping, 'notionPageId')
       ? safeString((mappingRes.mapping as any)?.notionPageId)
       : safeString((mappingRes.conversation as any)?.notionPageId),
   );
-  const freshPageId = normalizeNotionPageId(safeString((mappingRes.conversation as any)?.notionPageId));
+  const freshPageId = normalizeNotionId(safeString((mappingRes.conversation as any)?.notionPageId));
   const usesFreshTargetMetadata = !!pageId && freshPageId === pageId;
   return {
     ...(conversation as any),

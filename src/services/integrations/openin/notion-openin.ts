@@ -1,19 +1,11 @@
 import { extractNotionWorkspaceSlugFromUrl } from '@services/sync/notion/notion-url-utils';
-
-const NOTION_PAGE_ID_PATTERN = /^[0-9a-f]{32}$/i;
-
-export function normalizeNotionPageId(pageId?: string | null): string {
-  const compact = String(pageId || '')
-    .trim()
-    .replace(/-/g, '');
-  return NOTION_PAGE_ID_PATTERN.test(compact) ? compact.toLowerCase() : '';
-}
+import { normalizeNotionId } from '@services/shared/notion-id';
 
 export function buildNotionPageUrl(
   pageId?: string | null,
   opts?: { workspaceSlug?: string | null; pageUrl?: string | null },
 ): string {
-  const normalizedPageId = normalizeNotionPageId(pageId);
+  const normalizedPageId = normalizeNotionId(pageId);
   if (!normalizedPageId) return '';
 
   const explicitSlug = String(opts?.workspaceSlug || '').trim();

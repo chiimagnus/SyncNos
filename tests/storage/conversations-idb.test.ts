@@ -165,6 +165,44 @@ async function createMergePair(suffix: string) {
 }
 
 describe('conversations storage-idb', () => {
+  it('reuses a Notion thread when its UUID URL formatting changes', async () => {
+    const compact = '3eebe9d6386a805483df00a912f6bbf8';
+    const payload = {
+      sourceType: 'chat',
+      source: 'notionai',
+      conversationKey: `notionai_t_${compact}`,
+      title: 'Thread',
+      url: 'https://app.notion.com/chat?t=3EEBE9D6-386A-8054-83DF-00A912F6BBF8',
+    };
+    const created = await upsertConversation(payload);
+    const repeated = await upsertConversation({ ...payload, url: `https://app.notion.com/chat?t=${compact}` });
+    expect(repeated.id).toBe(created.id);
+    expect(repeated.canonicalChatIdentity).toBe(`notionai:${compact}`);
+    expect(repeated.url).toBe(`https://app.notion.com/chat?t=${compact}`);
+  });
+
+  it('repairs a previously persisted hyphenated Notion identity marker', async () => {
+    const compact = '3eebe9d6386a805483df00a912f6bbf8';
+    const payload = {
+      sourceType: 'chat',
+      source: 'notionai',
+      conversationKey: `notionai_t_${compact}`,
+      url: `https://app.notion.com/chat?t=${compact}`,
+    };
+    const created = await upsertConversation(payload);
+    const db = await openDb();
+    const transaction = db.transaction(['conversations'], 'readwrite');
+    const store = transaction.objectStore('conversations');
+    const row = await reqToPromise<any>(store.get(created.id));
+    row.canonicalChatIdentity = 'notionai:3eebe9d6-386a-8054-83df-00a912f6bbf8';
+    row.url = 'https://app.notion.com/chat?t=3eebe9d6-386a-8054-83df-00a912f6bbf8';
+    await reqToPromise(store.put(row));
+    await txDone(transaction);
+    const repaired = await upsertConversation(payload);
+    expect(repaired.id).toBe(created.id);
+    expect(repaired.canonicalChatIdentity).toBe(`notionai:${compact}`);
+  });
+
   it('bumps conversations for a new row and keeps an identical upsert revision-stable', async () => {
     const payload = {
       sourceType: 'chat',

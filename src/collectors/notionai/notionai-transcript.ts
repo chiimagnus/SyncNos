@@ -3,6 +3,8 @@ import { firstUserMessageTitle } from '@collectors/collector-utils.ts';
 import { htmlToMarkdown } from '@collectors/shared/markdown-dom.ts';
 import MarkdownIt from 'markdown-it';
 import texmath from 'markdown-it-texmath';
+import { normalizeNotionId } from '@services/shared/notion-id';
+import { NOTION_AI_TRANSCRIPT_REQUEST, NOTION_AI_TRANSCRIPT_RESPONSE } from '@collectors/notionai/notionai-protocol';
 
 let markupParser: MarkdownIt | undefined;
 
@@ -29,9 +31,6 @@ function getMarkupParser(): MarkdownIt {
   return parser;
 }
 
-export const NOTION_AI_TRANSCRIPT_REQUEST = 'SYNCNOS_NOTIONAI_TRANSCRIPT_REQUEST';
-export const NOTION_AI_TRANSCRIPT_RESPONSE = 'SYNCNOS_NOTIONAI_TRANSCRIPT_RESPONSE';
-
 const HISTORY_PARTIAL_REASON = 'notionai_transcript_history_partial';
 const SCHEMA_DRIFT_REASON = 'notionai_transcript_schema_drift_partial';
 const FILES_UNSUPPORTED_REASON = 'notionai_transcript_files_unsupported';
@@ -50,16 +49,6 @@ type PendingRequest = {
 
 function stableString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-export function normalizeNotionAiThreadId(value: unknown): string {
-  const compact = stableString(value).replace(/-/g, '').toLowerCase();
-  return /^[0-9a-f]{32}$/.test(compact) ? compact : '';
-}
-
-export function notionAiApiThreadId(value: unknown): string {
-  const compact = normalizeNotionAiThreadId(value);
-  return compact ? compact.replace(/^(........)(....)(....)(....)(............)$/, '$1-$2-$3-$4-$5') : '';
 }
 
 function cloneJson<T>(value: T): T {
@@ -268,7 +257,7 @@ export function buildNotionAiTranscriptSnapshot(input: {
   document: Document;
   capturedAt?: number;
 }): any | null {
-  const threadId = normalizeNotionAiThreadId(input.threadId);
+  const threadId = normalizeNotionId(input.threadId);
   if (!threadId || !Array.isArray(input.pages) || !input.pages.length) return null;
   const { entities, schemaDrift } = materializeEntities(input.pages);
   const reasons = new Set<string>();
@@ -348,7 +337,7 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingByRequestId.delete(requestId);
-    const threadId = normalizeNotionAiThreadId(data.threadId);
+    const threadId = normalizeNotionId(data.threadId);
     const pages = Array.isArray(data.pages) ? data.pages : [];
     if (!threadId || threadId !== pending.threadId || !pages.length) {
       pending.resolve(pending.mode === 'full' ? stateByThread.get(pending.threadId) || null : null);
@@ -362,7 +351,7 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
   window.addEventListener('message', onMessage);
 
   const request = (threadIdValue: unknown, mode: 'full' | 'latest'): Promise<TranscriptState | null> => {
-    const threadId = normalizeNotionAiThreadId(threadIdValue);
+    const threadId = normalizeNotionId(threadIdValue);
     if (!threadId) return Promise.resolve(null);
     const requestId = `notionai-${Date.now()}-${++requestCounter}`;
     return new Promise((resolve) => {
@@ -377,7 +366,7 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
 
   return {
     get(threadIdValue: unknown): TranscriptState | null {
-      const threadId = normalizeNotionAiThreadId(threadIdValue);
+      const threadId = normalizeNotionId(threadIdValue);
       return threadId ? stateByThread.get(threadId) || null : null;
     },
     requestFull(threadIdValue: unknown): Promise<TranscriptState | null> {

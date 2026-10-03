@@ -1,4 +1,5 @@
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
+import { normalizeNotionId } from '@services/shared/notion-id';
 
 function normalizeSource(value: unknown): string {
   return String(value || '')
@@ -93,9 +94,7 @@ export function canonicalChatIdentityFromUrl(sourceValue: unknown, urlValue: unk
 
   if (source === 'notionai' && (hostMatches(hostname, 'notion.so') || hostMatches(hostname, 'app.notion.com'))) {
     if (pathname !== '/chat') return '';
-    const threadId = String(url.searchParams.get('t') || '')
-      .trim()
-      .toLowerCase();
+    const threadId = normalizeNotionId(url.searchParams.get('t'));
     return threadId ? `notionai:${threadId}` : '';
   }
 
@@ -128,7 +127,7 @@ export function canonicalChatUrlFromUrl(sourceValue: unknown, urlValue: unknown)
   const origin = canonicalOrigins[source] || url.origin;
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
   if (source === 'notionai') {
-    const threadId = String(url.searchParams.get('t') || '').trim();
+    const threadId = normalizeNotionId(url.searchParams.get('t'));
     return threadId ? `${origin}/chat?t=${encodeURIComponent(threadId)}` : '';
   }
 

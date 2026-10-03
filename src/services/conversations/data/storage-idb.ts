@@ -9,6 +9,7 @@ import {
 } from '@services/conversations/data/image-cache-record';
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
 import { canonicalChatIdentityFromUrl, canonicalChatUrlFromUrl } from '@services/conversations/domain/chat-identity';
+import { normalizeNotionId } from '@services/shared/notion-id';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
@@ -611,11 +612,17 @@ export async function upsertConversation(
       const now = Date.now();
       const exactExisting = await findExistingConversationForPayload(stores.conversations, payload);
       const exactStoredChatIdentity = safeString(exactExisting?.canonicalChatIdentity);
+      const normalizedStoredNotionId = exactStoredChatIdentity.startsWith('notionai:')
+        ? normalizeNotionId(exactStoredChatIdentity.slice('notionai:'.length))
+        : '';
+      const normalizedStoredChatIdentity = normalizedStoredNotionId
+        ? `notionai:${normalizedStoredNotionId}`
+        : exactStoredChatIdentity;
       const exactUrlChatIdentity = canonicalChatIdentityFromUrl(exactExisting?.source, exactExisting?.url);
       if (
         exactExisting &&
         incomingChatIdentity &&
-        ((exactStoredChatIdentity && exactStoredChatIdentity !== incomingChatIdentity) ||
+        ((normalizedStoredChatIdentity && normalizedStoredChatIdentity !== incomingChatIdentity) ||
           (exactUrlChatIdentity && exactUrlChatIdentity !== incomingChatIdentity))
       ) {
         throw Object.assign(new Error('conversation durable identity conflicts with existing key'), {
