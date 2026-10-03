@@ -76,7 +76,7 @@ describe('deepseek-collector', () => {
               <p><strong>粗体</strong> <em>斜体</em> <code>sum(1,2)</code> <a href="https://example.com">链接</a></p>
               <table><thead><tr><th>语法元素</th><th>说明</th></tr></thead><tbody><tr><td>标题</td><td>使用 #</td></tr></tbody></table>
               <div class="md-code-block md-code-block-dark">
-                <div class="md-code-block-banner-wrap"><span class="d813de27">python</span><button>复制</button></div>
+                <div class="md-code-block-banner-wrap"><div class="md-code-block-infostring">python</div><button>复制</button></div>
                 <pre><span>def greet(name):</span><br><span>    return f"Hello, {name}"</span></pre>
               </div>
             `,
