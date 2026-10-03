@@ -156,13 +156,9 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const assistant = row.querySelector("[data-testid='assistant-message']");
     if (!assistant) return null;
 
-    // Older Claude builds mark visible reply blocks with data-perf-reply-text. Current builds expose
-    // the final response as one or more CDS Prose blocks while tool/thinking state remains in TurnStatus.
-    const legacyReplies = Array.from(assistant.querySelectorAll('[data-perf-reply-text]'));
-    const currentProse = Array.from(assistant.querySelectorAll("[data-cds='Prose']")).filter(
+    const replies = Array.from(assistant.querySelectorAll("[data-cds='Prose']")).filter(
       (node) => !node.closest("[data-cds='TurnStatus'], [data-testid='TurnStatus']"),
     );
-    const replies = legacyReplies.length ? legacyReplies : currentProse;
     if (!replies.length) return null;
     if (replies.length === 1) return replies[0] || null;
 
@@ -488,14 +484,14 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     return finishPreparedCapture(accumulator);
   }
 
-  async function capture(options: any): Promise<any | null> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
-      return null;
-    }
-    const prepared = consumePreparedCapture(options?.preparedCapture);
-    if (!prepared) return null;
+  async function capture(options: any = {}): Promise<any | null> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
+    const root = getConversationRoot();
+    if (!root || isEditingConversation(root)) return null;
     const currentGuard = sampleIdentityGuard();
-    if (!identityGuardsMatch(prepared.identityGuard, currentGuard)) return null;
+    const prepared = options.manual === true ? consumePreparedCapture(options.preparedCapture) : null;
+    if (options.manual === true && (!prepared || !identityGuardsMatch(prepared.identityGuard, currentGuard)))
+      return null;
 
     observedMessageCount = Math.max(
       observedMessageCount,
@@ -503,17 +499,21 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     );
     const accumulator = createPreparedAccumulator<any>({
       source: 'claude',
-      conversationKey: prepared.conversationKey,
-      identityVerified: prepared.identityVerified === true,
-      identityGuard: prepared.identityGuard,
+      conversationKey: prepared?.conversationKey || currentGuard.durableId,
+      identityVerified: prepared ? prepared.identityVerified === true : !!currentGuard.durableId,
+      identityGuard: prepared?.identityGuard || currentGuard,
     });
-    accumulator.completeness = prepared.completeness;
-    accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
-    accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-    );
+    accumulator.completeness = prepared?.completeness || 'partial';
+    if (prepared) {
+      accumulator.reasons.push(...prepared.reasons);
+      accumulator.sweepMetrics = { ...prepared.metrics };
+      mergePreparedRecords(
+        accumulator,
+        prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
+      );
+    } else {
+      addPreparedReason(accumulator, 'top_not_reached');
+    }
 
     const finalLive = await harvestCurrentInto(accumulator);
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {

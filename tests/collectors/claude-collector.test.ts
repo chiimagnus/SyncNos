@@ -45,9 +45,9 @@ function setupClaudeDom(input?: { streaming?: boolean; browserTitle?: string; si
     '<div role="article" aria-posinset="2" aria-setsize="2" aria-label="Message 2 of 2">',
     '<div data-testid="assistant-message" data-is-streaming="' + String(streaming) + '">',
     '<div class="font-claude-response">',
-    '<div class="standard-markdown" data-perf-reply-text><p>I will inspect the page first.</p></div>',
+    '<div class="standard-markdown" data-cds="Prose"><p>I will inspect the page first.</p></div>',
     '<div data-testid="TurnStatus" data-cds="TurnStatus"><span>Used Notion integration</span></div>',
-    '<div class="standard-markdown" data-perf-reply-text>',
+    '<div class="standard-markdown" data-cds="Prose">',
     '<h2>Final answer</h2>',
     '<p>This is the captured response.</p>',
     '<pre><code class="language-ts">const value = 1;</code></pre>',
@@ -86,6 +86,26 @@ async function prepareStaticCapture(def: any) {
 }
 
 describe('claude-collector', () => {
+  it('auto-captures only completed current-window messages without scrolling', async () => {
+    const { dom, def } = setupClaudeDom({ streaming: true });
+    const feed = dom.window.document.querySelector("[role='feed']") as HTMLElement;
+    feed.scrollTop = 80;
+    const partial = await def.collector.capture();
+    expect(partial.captureMeta.completeness).toBe('partial');
+    expect(partial.messages.map((message: any) => message.role)).toEqual(['user']);
+    expect(feed.scrollTop).toBe(80);
+    dom.window.document.querySelector("[data-perf-row='assistant']")!.setAttribute('data-perf-row-streaming', 'false');
+    dom.window.document.querySelector("[data-testid='assistant-message']")!.setAttribute('data-is-streaming', 'false');
+    const completed = await def.collector.capture();
+    expect(completed.messages.map((message: any) => message.messageKey)).toEqual([
+      'claude:1:user',
+      'claude:2:assistant',
+    ]);
+    expect(completed.captureMeta.completeness).toBe('partial');
+    expect(feed.scrollTop).toBe(80);
+    expect(await def.collector.capture({ manual: true })).toBeNull();
+  });
+
   it('keeps a valid Claude chat route ready before transcript rows render', () => {
     const empty = new JSDOM('<body><main></main></body>', { url: 'https://claude.ai/chat/conv-empty' });
     const emptyEnv = createCollectorEnv({
@@ -252,9 +272,9 @@ describe('claude-collector', () => {
     expect(after).toBe(before);
   });
 
-  it('is manual-only and rejects prepared data after navigating to another Claude conversation', async () => {
+  it('rejects prepared manual data after navigating to another Claude conversation', async () => {
     const { dom, def } = setupClaudeDom();
-    expect(await def.collector.capture()).toBeNull();
+    expect(await def.collector.capture({ manual: true })).toBeNull();
 
     const prepared = await prepareStaticCapture(def);
     dom.window.history.pushState({}, '', '/chat/conv-2');

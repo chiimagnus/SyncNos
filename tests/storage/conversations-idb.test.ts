@@ -5,6 +5,11 @@ import { normalizeConversationListRecord } from '@platform/idb/conversation-list
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
+import { JSDOM } from 'jsdom';
+import { createCollectorEnv } from '@collectors/collector-env';
+import { createClaudeCollectorDef } from '@collectors/claude/claude-collector';
+import { createZaiCollectorDef } from '@collectors/zai/zai-collector';
+import normalizeApi from '@services/shared/normalize';
 
 import {
   attachOrphanCommentsToConversation,
@@ -258,6 +263,53 @@ describe('conversations storage-idb', () => {
     }
   });
 
+  it.each(['claude', 'zai'])(
+    'persists %s auto windows without deleting stored history or unfinished replies',
+    async (source) => {
+      const html =
+        source === 'claude'
+          ? '<div role="feed" data-perf-region="transcript"><div data-testid="transcript-row" data-perf-row="human"><div role="article" aria-posinset="3" aria-setsize="4"><div data-testid="user-message">current question</div></div></div><div data-testid="transcript-row" data-perf-row="assistant" data-perf-row-streaming="true"><div role="article" aria-posinset="4" aria-setsize="4"><div data-testid="assistant-message"><div data-cds="Prose">current answer</div></div></div></div></div>'
+          : '<textarea id="chat-input"></textarea><div id="messages-container"><div id="message-current-user" class="user-message"><div class="chat-user"><div class="whitespace-pre-wrap">current question</div></div></div><div id="message-current-assistant" class="chat-assistant"><div id="response-content-container"><p>current answer</p></div></div></div>';
+      const dom = new JSDOM(html, {
+        url: source === 'claude' ? 'https://claude.ai/chat/auto-storage' : 'https://chat.z.ai/c/auto-storage',
+      });
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
+      const collector = (source === 'claude' ? createClaudeCollectorDef(env) : createZaiCollectorDef(env)).collector;
+      const partial = await collector.capture();
+      const conversation = await upsertConversation(partial.conversation);
+      await syncConversationMessages(Number(conversation.id), [
+        { messageKey: 'stored-history', role: 'user', contentMarkdown: 'older question', sequence: 0 },
+      ]);
+      const persist = async (snapshot: any) => {
+        const integrity = resolveCaptureIntegrity(source, snapshot);
+        if (!integrity.ok) throw new Error(integrity.code);
+        await syncConversationMessages(Number(conversation.id), integrity.snapshot.messages, integrity.persistence);
+      };
+      await persist(partial);
+      expect(
+        (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+      ).toEqual(['older question', 'current question']);
+      if (source === 'claude')
+        dom.window.document
+          .querySelector('[data-perf-row-streaming]')!
+          .setAttribute('data-perf-row-streaming', 'false');
+      else {
+        const button = dom.window.document.createElement('button');
+        button.id = 'send-message-button';
+        dom.window.document.body.append(button);
+      }
+      await persist(await collector.capture());
+      expect(
+        (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+      ).toEqual(['older question', 'current question', 'current answer']);
+    },
+  );
+
   it('rejects legacy exact-key reuse across durable identities before any destructive repair', async () => {
     const existing = await upsertConversation({
       sourceType: 'chat',
@@ -488,7 +540,38 @@ describe('conversations storage-idb', () => {
     expect((await getConversationById(currentId))?.feishuDocId).toBe('feishu-doc-kimi');
   });
 
-  it('removes semantic message-key aliases during partial append without deleting different content', async () => {
+  it('preserves identical messages at different logical positions when a partial window starts at zero', async () => {
+    const conversation = await upsertConversation({
+      source: 'kimi',
+      sourceType: 'chat',
+      conversationKey: 'repeated-prompt',
+      url: 'https://www.kimi.com/chat/repeated-prompt',
+    });
+    await syncConversationMessages(Number(conversation.id), [
+      { messageKey: 'kimi-first', role: 'user', contentMarkdown: 'repeat', sequence: 0 },
+      { messageKey: 'kimi-middle', role: 'assistant', contentMarkdown: 'middle', sequence: 1 },
+    ]);
+    await syncConversationMessages(
+      Number(conversation.id),
+      [
+        {
+          messageKey: 'kimi-later',
+          role: 'user',
+          contentMarkdown: 'repeat',
+          sequence: 0,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+      ],
+      { mode: 'append', diff: { added: ['kimi-later'] } },
+    );
+    expect((await getMessagesByConversationId(Number(conversation.id))).map((message) => message.messageKey)).toEqual([
+      'kimi-first',
+      'kimi-middle',
+      'kimi-later',
+    ]);
+  });
+
+  it('cleans obsolete message keys only after a complete snapshot, not by partial-window guessing', async () => {
     const conversation = await upsertConversation({
       sourceType: 'chat',
       source: 'kimi',
@@ -533,11 +616,21 @@ describe('conversations storage-idb', () => {
       },
     );
 
-    expect(repaired.deleted).toBe(2);
-    expect((await getConversationById(id))?.lastActivityAt).toBe(1);
+    expect(repaired.deleted).toBe(0);
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
     const messages = await getMessagesByConversationId(id);
     expect(messages.map((message) => message.messageKey).sort()).toEqual([
       'different-user',
+      'fallback-assistant',
+      'fallback-user',
+      'kimi-stable-assistant',
+      'kimi-stable-user',
+    ]);
+    await syncConversationMessages(
+      id,
+      messages.filter((message) => message.messageKey.startsWith('kimi-stable-')),
+    );
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey).sort()).toEqual([
       'kimi-stable-assistant',
       'kimi-stable-user',
     ]);

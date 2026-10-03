@@ -254,8 +254,9 @@ describe('content-controller inpage combo', () => {
       await harness.getButtonConfig().onClick();
 
       expect(prepareImpl).toHaveBeenCalledTimes(1);
-      expect(captureImpl).toHaveBeenCalledTimes(1);
-      expect(captureImpl.mock.calls[0][0].preparedCapture).toBe(prepared);
+      const manualCalls = captureImpl.mock.calls.filter(([options]) => options?.manual === true);
+      expect(manualCalls).toHaveLength(1);
+      expect(manualCalls[0][0].preparedCapture).toBe(prepared);
     },
   );
 

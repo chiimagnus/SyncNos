@@ -1464,13 +1464,11 @@ export async function syncConversationMessages(
             : [];
         const sequenceOverrides = new Map<string, number>();
         let existingByKey: Map<unknown, any> | null = null;
-        let semanticAliasCandidates: any[] = [];
         let nextTailSequence = 0;
         if (hasTailPolicy || reconcileKeys.length) {
           const seqIdx = stores.messages.index('by_conversationId_sequence');
           const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
           const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
-          if (reconcileKeys.length) semanticAliasCandidates = storedRows.slice();
           existingByKey = new Map<unknown, any>();
           for (const row of storedRows) {
             if (!row || !Object.prototype.hasOwnProperty.call(row, 'messageKey')) continue;
@@ -1530,24 +1528,13 @@ export async function syncConversationMessages(
                 : Number.isFinite(m.sequence)
                   ? m.sequence
                   : 0;
-          const aliasProbe = {
-            ...m,
-            messageKey: key,
-            sequence: Number.isFinite(m.sequence) ? m.sequence : sequence,
-          };
-          const semanticAlias =
-            !existing && m.captureSequencePolicy === 'reconcile-existing-order'
-              ? semanticAliasCandidates.find((candidate) => isSemanticMessageAlias(candidate, aliasProbe)) || null
-              : null;
-          const semanticBaseline = existing || semanticAlias;
-          const existingForResolution = semanticAlias ? { ...semanticAlias, id: undefined } : existing;
           const record: any = buildResolvedConversationMessageRecord({
             conversationId,
             message: { ...m, messageKey: key },
-            existing: existingForResolution,
+            existing,
             sequence,
           });
-          if (!semanticBaseline || (!semanticAlias && !messageSemanticContentEquivalent(semanticBaseline, record))) {
+          if (!existing || !messageSemanticContentEquivalent(existing, record)) {
             semanticContentChanged = true;
           }
           if (existing) {
@@ -1562,23 +1549,6 @@ export async function syncConversationMessages(
           }
           existingByKey?.set(key, record);
           upserted += 1;
-
-          if (m.captureSequencePolicy === 'reconcile-existing-order' && semanticAliasCandidates.length) {
-            const remainingAliases: any[] = [];
-            for (const candidate of semanticAliasCandidates) {
-              if (!isSemanticMessageAlias(candidate, aliasProbe)) {
-                remainingAliases.push(candidate);
-                continue;
-              }
-              const aliasId = Number(candidate?.id);
-              if (!Number.isSafeInteger(aliasId) || aliasId <= 0) continue;
-              await reqToPromise(stores.messages.delete(aliasId));
-              existingByKey?.delete(candidate?.messageKey);
-              markChanged('messages');
-              deleted += 1;
-            }
-            semanticAliasCandidates = remainingAliases;
-          }
         }
 
         for (const key of removedKeys) {

@@ -34,7 +34,7 @@ describe('capture integrity contract', () => {
       'yuanbao',
       'zai',
     ]);
-    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'claude', 'googleaistudio', 'zai']);
+    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio']);
 
     const supportedIds = new Set(SUPPORTED_AI_CHAT_SITES.map((site) => site.id));
     for (const id of CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS) expect(supportedIds.has(id)).toBe(true);
@@ -46,7 +46,8 @@ describe('capture integrity contract', () => {
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('notionai')).toBe(true);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('poe')).toBe(true);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('yuanbao')).toBe(true);
-    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('zai')).toBe(false);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('zai')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('claude')).toBe(true);
   });
 
   it('keeps capture metadata and merge policies content-free and transient', () => {

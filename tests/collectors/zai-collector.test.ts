@@ -271,7 +271,7 @@ describe('zai-collector', () => {
     expect(snap.messages.map((message: any) => message.contentMarkdown)).toEqual(['old', 'new']);
   });
 
-  it('requires manual prepared capture and does not expose z.ai homepage as capturable conversation', async () => {
+  it('auto-captures partial windows and requires preparation only for manual history', async () => {
     const html = `
       <div id="message-1" class="user-message">
         <div class="chat-user"><div class="whitespace-pre-wrap">hello</div></div>
@@ -281,7 +281,8 @@ describe('zai-collector', () => {
     setupDom(dom);
     const collector = createCollector();
     const prepared = await collector.prepareManualCapture({ stableSamples: 1, pollMs: 0, sleep: async () => {} });
-    expect(await collector.capture({ preparedCapture: prepared })).toBeNull();
+    expect((await collector.capture()).captureMeta.completeness).toBe('partial');
+    expect(await collector.capture({ manual: true })).toBeNull();
     expect(await collector.capture({ manual: true, preparedCapture: prepared })).toBeTruthy();
 
     const home = new JSDOM('<body><div id="messages-container"></div></body>', { url: 'https://chat.z.ai/' });

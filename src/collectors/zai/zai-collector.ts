@@ -446,30 +446,32 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   }
 
   async function capture(options: any = {}): Promise<any | null> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
-      return null;
-    }
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const root = getConversationRoot();
     if (!root || inEditMode(root)) return null;
 
-    const prepared = consumePreparedCapture(options?.preparedCapture);
-    if (!prepared) return null;
     const currentGuard = sampleIdentityGuard();
-    if (!identityGuardsMatch(prepared.identityGuard, currentGuard)) return null;
+    const prepared = options.manual === true ? consumePreparedCapture(options.preparedCapture) : null;
+    if (options.manual === true && (!prepared || !identityGuardsMatch(prepared.identityGuard, currentGuard)))
+      return null;
 
     const accumulator = createPreparedAccumulator<any>({
       source: 'zai',
-      conversationKey: prepared.conversationKey,
-      identityVerified: prepared.identityVerified === true,
-      identityGuard: prepared.identityGuard,
+      conversationKey: prepared?.conversationKey || currentGuard.durableId,
+      identityVerified: prepared ? prepared.identityVerified === true : !!currentGuard.durableId,
+      identityGuard: prepared?.identityGuard || currentGuard,
     });
-    accumulator.completeness = prepared.completeness;
-    accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
-    accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-    );
+    accumulator.completeness = prepared?.completeness || 'partial';
+    if (prepared) {
+      accumulator.reasons.push(...prepared.reasons);
+      accumulator.sweepMetrics = { ...prepared.metrics };
+      mergePreparedRecords(
+        accumulator,
+        prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
+      );
+    } else {
+      addPreparedReason(accumulator, 'top_not_reached');
+    }
 
     const finalLive = await harvestCurrentInto(accumulator);
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
