@@ -5,7 +5,7 @@ import {
   conversationKeyFromLocation,
   extractImageUrlsFromElement,
 } from '@collectors/collector-utils.ts';
-import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
+import claudeMarkdown from '@collectors/claude/claude-markdown.ts';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -192,20 +192,13 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
 
   function normalizedNodeText(node: Element | null): string {
     if (!node) return '';
-    const extracted =
-      typeof geminiMarkdown.extractAssistantText === 'function'
-        ? geminiMarkdown.extractAssistantText(node)
-        : (node as any).innerText || node.textContent || '';
+    const extracted = claudeMarkdown.extractText(node) || (node as any).innerText || node.textContent || '';
     return env.normalize.normalizeText(extracted || '');
   }
 
   function markdownFromNode(node: Element | null, fallbackText: string): string {
     if (!node) return '';
-    const extracted =
-      typeof geminiMarkdown.extractAssistantMarkdown === 'function'
-        ? geminiMarkdown.extractAssistantMarkdown(node)
-        : '';
-    return String(extracted || fallbackText || '').trim();
+    return String(claudeMarkdown.extractMarkdown(node) || fallbackText || '').trim();
   }
 
   function compactFingerprint(value: string): string {

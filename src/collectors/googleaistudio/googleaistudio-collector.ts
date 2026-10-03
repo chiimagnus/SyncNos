@@ -6,7 +6,7 @@ import {
   extractImageUrlsFromElement,
   inEditMode as inEditModeUtil,
 } from '@collectors/collector-utils.ts';
-import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
+import googleAiStudioMarkdown from '@collectors/googleaistudio/googleaistudio-markdown.ts';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -171,18 +171,12 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   }
 
   function extractAssistantMarkdown(node: any, fallbackText: any): any {
-    if (typeof geminiMarkdown.extractAssistantMarkdown === 'function') {
-      const markdown = geminiMarkdown.extractAssistantMarkdown(node);
-      if (markdown) return markdown;
-    }
-    return fallbackText || '';
+    return googleAiStudioMarkdown.extractMarkdown(node) || fallbackText || '';
   }
 
   function extractAssistantText(node: any): any {
-    if (typeof geminiMarkdown.extractAssistantText === 'function') {
-      const text = geminiMarkdown.extractAssistantText(node);
-      if (text) return text;
-    }
+    const text = googleAiStudioMarkdown.extractText(node);
+    if (text) return text;
     const raw = node ? node.innerText || node.textContent || '' : '';
     return env.normalize.normalizeText(raw);
   }
