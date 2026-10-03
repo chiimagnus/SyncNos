@@ -69,17 +69,15 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   type InlineImageContext = {
-    blobUrlCache: Map<string, { dataUrl: string; bytes: number }>;
-    inlinedCount: number;
-    inlinedBytes: number;
+    blobUrlCache: Map<string, string>;
+    streamingAssistantCount: number;
     warningFlags: Set<string>;
   };
 
   function createInlineImageContext(): InlineImageContext {
     return {
       blobUrlCache: new Map(),
-      inlinedCount: 0,
-      inlinedBytes: 0,
+      streamingAssistantCount: 0,
       warningFlags: new Set(),
     };
   }
@@ -140,7 +138,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
 
   async function inlineBlobImageUrl(blobUrl: string, ctx: InlineImageContext): Promise<string | null> {
     const cached = ctx.blobUrlCache.get(blobUrl);
-    if (cached && cached.dataUrl) return cached.dataUrl;
+    if (cached) return cached;
 
     const fetchFn: any = (env.window as any)?.fetch || (globalThis as any).fetch;
     if (typeof fetchFn !== 'function') {
@@ -173,9 +171,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
         return null;
       }
 
-      ctx.blobUrlCache.set(blobUrl, { dataUrl, bytes: size });
-      ctx.inlinedCount += 1;
-      ctx.inlinedBytes += size;
+      ctx.blobUrlCache.set(blobUrl, dataUrl);
       return dataUrl;
     } catch (_e) {
       ctx.warningFlags.add('inline_images_fetch_failed');
@@ -261,6 +257,10 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
 
       const role = detectModernRole(row);
       if (!role) continue;
+      if (role === 'assistant' && row.querySelector("[data-streaming='true']")) {
+        ctx.streamingAssistantCount += 1;
+        continue;
+      }
 
       const textEl =
         role === 'user'
@@ -279,9 +279,8 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
 
       const imageScope = role === 'assistant' ? row.closest?.("[data-copy-telemetry='right_click_copy']") || row : row;
       const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
-      if (!text && !imageUrls.length) continue;
-
       const attachments = attachmentMarkdown(row);
+      if (!text && !attachments && !imageUrls.length) continue;
       const contentText = [attachments, text || ''].filter(Boolean).join('\n\n');
       const renderedMarkdown =
         role === 'assistant' && typeof doubaoMarkdown.extractAssistantMarkdown === 'function'
@@ -305,14 +304,10 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     return out;
   }
 
-  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
-    return collectModernMessages(ctx);
-  }
-
   async function capture(): Promise<any> {
     if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const ctx = createInlineImageContext();
-    const messages = await collectMessages(ctx);
+    const messages = await collectModernMessages(ctx);
     if (!messages.length) return null;
     return {
       conversation: {
@@ -324,6 +319,16 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
         warningFlags: Array.from(ctx.warningFlags),
       },
       messages,
+      ...(ctx.streamingAssistantCount
+        ? {
+            captureMeta: {
+              completeness: 'partial',
+              identityVerified: true,
+              reasons: ['streaming_in_progress'],
+              metrics: { streamingAssistantCount: ctx.streamingAssistantCount },
+            },
+          }
+        : null),
     };
   }
 

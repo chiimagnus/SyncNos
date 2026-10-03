@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import normalizeApi from '@services/shared/normalize.ts';
+import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createDoubaoCollectorDef } from '../../src/collectors/doubao/doubao-collector.ts';
 
@@ -10,6 +11,63 @@ function setupDoubaoDom(html: string, url: string) {
 }
 
 describe('doubao-collector', () => {
+  it('excludes streaming assistants and keeps partial captures non-destructive until completion', async () => {
+    const dom = setupDoubaoDom(
+      `<div aria-label="doc_editor">
+        <div class="flex flex-col flex-grow">
+          <div data-message-id="user" class="justify-end"><div data-testid="message_text_content">prompt</div></div>
+          <div data-foundation-type="send-message-action-bar"></div>
+        </div>
+        <div class="flex flex-col flex-grow">
+          <div data-message-id="assistant"><div data-testid="message_text_content" data-streaming="true">partial</div></div>
+          <div data-foundation-type="receive-message-action-bar"></div>
+        </div>
+      </div>`,
+      'https://www.doubao.com/chat/streaming001',
+    );
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const collector = createDoubaoCollectorDef(env).collector;
+    const partial = (await collector.capture()) as any;
+    expect(partial.messages.map((message: any) => message.messageKey)).toEqual(['doubao_user']);
+    expect(partial.captureMeta.completeness).toBe('partial');
+    expect(resolveCaptureIntegrity('doubao', partial)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
+    const assistant = dom.window.document.querySelector('[data-streaming]')!;
+    assistant.setAttribute('data-streaming', 'false');
+    assistant.textContent = 'complete';
+    const completed = (await collector.capture()) as any;
+    expect(completed.messages).toHaveLength(2);
+    expect(completed.messages[1]).toMatchObject({ messageKey: 'doubao_assistant', contentMarkdown: 'complete' });
+    expect(resolveCaptureIntegrity('doubao', completed)).toMatchObject({ ok: true });
+  });
+
+  it('retains file-only messages when the text container is empty', async () => {
+    const dom = setupDoubaoDom(
+      `<div aria-label="doc_editor"><div data-message-id="file-only" class="justify-end">
+        <div data-testid="message_text_content"></div>
+        <div data-testid="attachment_file_item"><span data-testid="message_nested_content_file_name">only.pdf</span></div>
+      </div></div>`,
+      'https://www.doubao.com/chat/file-only001',
+    );
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snapshot = (await createDoubaoCollectorDef(env).collector.capture()) as any;
+    expect(snapshot?.messages).toEqual([
+      expect.objectContaining({ messageKey: 'doubao_file-only', contentMarkdown: 'Attachment: only.pdf' }),
+    ]);
+  });
+
   it('extracts messages from modern data-message-id DOM structure', async () => {
     const html = `
       <div aria-label="doc_editor">
