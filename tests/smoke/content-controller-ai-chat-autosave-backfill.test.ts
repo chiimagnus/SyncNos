@@ -664,7 +664,10 @@ describe('content-controller ai chat autosave backfill', () => {
     const firstSync = deferred<any>();
     let syncCount = 0;
     const captureA = vi.fn(() => makeSnapshot('scheduler-a', ['A']));
-    const captureB = vi.fn(() => makeSnapshot('scheduler-b', ['B']));
+    const captureB = vi.fn(() => ({
+      ...makeSnapshot('scheduler-b', ['B']),
+      conversation: { source: 'doubao', conversationKey: 'scheduler-b' },
+    }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
       snapshots: [makeSnapshot('unused', ['U'])],
@@ -695,7 +698,7 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.runTick();
     await harness.runTick();
     expect(captureA).toHaveBeenCalledTimes(1);
-    current = { id: 'notionai', collector: { capture: captureB } };
+    current = { id: 'doubao', collector: { capture: captureB } };
 
     firstSync.resolve({ ok: true, data: { upserted: 1 } });
     await harness.settle();
@@ -746,7 +749,10 @@ describe('content-controller ai chat autosave backfill', () => {
     const firstSync = deferred<any>();
     let syncCount = 0;
     const captureA = vi.fn(() => makeSnapshot('restart-a', ['A']));
-    const captureB = vi.fn(() => makeSnapshot('restart-b', ['B']));
+    const captureB = vi.fn(() => ({
+      ...makeSnapshot('restart-b', ['B']),
+      conversation: { source: 'doubao', conversationKey: 'restart-b' },
+    }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
       snapshots: [makeSnapshot('unused', ['U'])],
@@ -772,7 +778,7 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.runTick();
     expect(captureA).toHaveBeenCalledTimes(1);
 
-    current = { id: 'notionai', collector: { capture: captureB } };
+    current = { id: 'doubao', collector: { capture: captureB } };
     harness.restartResident();
     await harness.settle();
     await harness.runTick();
@@ -788,7 +794,10 @@ describe('content-controller ai chat autosave backfill', () => {
   it('abandons an old pre-save run after restart and then runs the new owner trailing request', async () => {
     const oldCapture = deferred<any>();
     const captureA = vi.fn(() => oldCapture.promise);
-    const captureB = vi.fn(() => makeSnapshot('restart-pre-b', ['B']));
+    const captureB = vi.fn(() => ({
+      ...makeSnapshot('restart-pre-b', ['B']),
+      conversation: { source: 'doubao', conversationKey: 'restart-pre-b' },
+    }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
       snapshots: [makeSnapshot('unused', ['U'])],
@@ -807,7 +816,7 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.settle();
     await harness.runTick();
 
-    current = { id: 'notionai', collector: { capture: captureB } };
+    current = { id: 'doubao', collector: { capture: captureB } };
     harness.restartResident();
     await harness.settle();
     await harness.runTick();
