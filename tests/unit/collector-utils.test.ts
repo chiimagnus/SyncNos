@@ -17,7 +17,9 @@ afterEach(() => {
 
 describe('collector-utils', () => {
   it('detects the focused edit textarea even when another textarea comes first', () => {
-    const dom = new JSDOM('<main><textarea id="first"></textarea><textarea id="editing"></textarea></main><textarea id="outside"></textarea>');
+    const dom = new JSDOM(
+      '<main><textarea id="first"></textarea><textarea id="editing"></textarea></main><textarea id="outside"></textarea>',
+    );
     const root = dom.window.document.querySelector('main');
     (dom.window.document.getElementById('editing') as HTMLTextAreaElement).focus();
     expect(inEditMode(root)).toBe(true);
