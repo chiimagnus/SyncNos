@@ -5,6 +5,13 @@ import { normalizeText } from '@services/shared/normalize.ts';
 function sanitize(node: Element | null): Element | null {
   if (!node?.cloneNode) return null;
   const clone = node.cloneNode(true) as Element;
+  for (const span of Array.from(clone.querySelectorAll<HTMLSpanElement>('span.inline-code, span[style]'))) {
+    const tag = span.classList.contains('inline-code') ? 'code' : span.style.fontStyle === 'italic' ? 'em' : null;
+    if (!tag) continue;
+    const semantic = clone.ownerDocument.createElement(tag);
+    semantic.append(...span.childNodes);
+    span.replaceWith(semantic);
+  }
   replaceMathElementsWithLatexText(clone);
   for (const element of Array.from(
     clone.querySelectorAll(

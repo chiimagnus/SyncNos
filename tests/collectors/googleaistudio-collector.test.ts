@@ -21,6 +21,31 @@ async function capturePrepared(def: any, prepareOptions: any = {}) {
 }
 
 describe('googleaistudio-collector', () => {
+  it('preserves current cmark span italics and inline code semantics', async () => {
+    const dom = setupDom(
+      `<div class="chat-session-content"><ms-chat-turn id="turn-current"><div data-turn-role="Model"><div class="turn-content">
+        <p><ms-cmark-node><span style="font-style: italic;"><ms-cmark-node><span>斜体</span></ms-cmark-node></span></ms-cmark-node>
+        and <ms-cmark-node><span class="inline-code">inline_code()</span></ms-cmark-node>
+        and <span style="font-style:normal">normal</span> and <em>native</em> and <code>literal</code>.</p>
+      </div></div></ms-chat-turn></div>`,
+      'https://aistudio.google.com/prompts/current-cmark',
+    );
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    );
+    const snapshot = await capturePrepared(def);
+    expect(snapshot.messages[0].contentMarkdown).toContain('*斜体*');
+    expect(snapshot.messages[0].contentMarkdown).toContain('`inline_code()`');
+    expect(snapshot.messages[0].contentMarkdown).toContain('normal');
+    expect(snapshot.messages[0].contentMarkdown).toContain('*native*');
+    expect(snapshot.messages[0].contentMarkdown).toContain('`literal`');
+  });
+
   it('only marks saved AI Studio prompt routes as capture-ready', () => {
     const dom = setupDom('', 'https://aistudio.google.com/prompts/abc123');
     const env = createCollectorEnv({
