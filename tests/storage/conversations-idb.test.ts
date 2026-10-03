@@ -10,6 +10,7 @@ import { createCollectorEnv } from '@collectors/collector-env';
 import { createClaudeCollectorDef } from '@collectors/claude/claude-collector';
 import { createZaiCollectorDef } from '@collectors/zai/zai-collector';
 import { createDoubaoCollectorDef } from '@collectors/doubao/doubao-collector';
+import { createGoogleAiStudioCollectorDef } from '@collectors/googleaistudio/googleaistudio-collector';
 import normalizeApi from '@services/shared/normalize';
 
 import {
@@ -364,6 +365,48 @@ describe('conversations storage-idb', () => {
       ).toEqual(['older question', 'current question', 'current answer']);
     },
   );
+
+  it('preserves a saved AI Studio reply when regeneration exposes only model-error UI', async () => {
+    const dom = new JSDOM(
+      `<div class="chat-session-content">
+      <ms-chat-turn id="turn-user"><div data-turn-role="User"><div class="turn-content">question</div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-assistant"><div data-turn-role="Model"><div class="turn-content"><ms-text-chunk></ms-text-chunk><div class="model-error">An internal error has occurred.</div></div></div></ms-chat-turn>
+    </div>`,
+      { url: 'https://aistudio.google.com/prompts/failed-regeneration' },
+    );
+    const collector = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ).collector;
+    const preparedCapture = await collector.prepareManualCapture!({
+      stepTimeoutMs: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    const snapshot = await collector.capture({ manual: true, preparedCapture });
+    const integrity = resolveCaptureIntegrity('googleaistudio', snapshot);
+    expect(integrity).toMatchObject({ ok: true, persistence: { mode: 'append', diff: { removed: [] } } });
+    if (!integrity.ok) throw new Error(integrity.code);
+    expect(integrity.snapshot.messages.map((message: any) => message.role)).toEqual(['user']);
+    const conversation = await upsertConversation(snapshot.conversation);
+    await syncConversationMessages(Number(conversation.id), [
+      { messageKey: 'googleaistudio:0:user', role: 'user', contentMarkdown: 'question', sequence: 0 },
+      {
+        messageKey: 'googleaistudio:1:assistant',
+        role: 'assistant',
+        contentMarkdown: 'previous completed reply',
+        sequence: 1,
+      },
+    ]);
+    await syncConversationMessages(Number(conversation.id), integrity.snapshot.messages, integrity.persistence);
+    expect(
+      (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+    ).toEqual(['question', 'previous completed reply']);
+  });
 
   it('rejects legacy exact-key reuse across durable identities before any destructive repair', async () => {
     const existing = await upsertConversation({

@@ -439,6 +439,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const httpUrls = extractImageUrlsFromElement(entry.content);
     const blobUrls = extractBlobImageUrlsFromElement(entry.content);
     const streaming = entry.role === 'assistant' && entry.messageKey === streamingKey;
+    const failed = entry.role === 'assistant' && !!entry.content.querySelector('.model-error');
     return {
       key: entry.messageKey,
       turnKey: entry.turnId,
@@ -454,7 +455,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
           blobUrls.join('|'),
         ].join('\u001f'),
       ),
-      rendered: !streaming && (!!rawText || !!httpUrls.length || !!blobUrls.length),
+      rendered: !streaming && !failed && (!!rawText || !!httpUrls.length || !!blobUrls.length),
       streaming,
     };
   }
