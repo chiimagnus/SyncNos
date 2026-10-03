@@ -48,6 +48,28 @@ function conversationBody(messages: string, extra = '') {
 }
 
 describe('zai-collector', () => {
+  it('preserves current readonly CodeMirror code blocks without toolbar labels', async () => {
+    const code = `const html = '<div data-x="a&b">中文 😀</div>';\n\nconsole.log(html);`;
+    const dom = new JSDOM(
+      conversationBody(`<div id="message-code"><div class="chat-assistant"><div id="response-content-container">
+        <p>Code:</p><div class="relative">
+          <div class="absolute text-xs font-medium">ts</div>
+          <div class="sticky"><button>Copy</button></div>
+          <div class="language-ts"><div class="cm-editor"><div class="cm-content" contenteditable="false" data-language="typescript">
+            <div class="cm-line">const html = '&lt;div data-x="a&amp;b"&gt;中文 😀&lt;/div&gt;';</div>
+            <div class="cm-line"><br></div><div class="cm-line">console.log(html);</div>
+          </div></div></div>
+        </div><p>End</p>
+      </div></div></div>`),
+      { url: 'https://chat.z.ai/c/conv-code' },
+    );
+    setupDom(dom);
+    const snapshot = await createCollector().capture();
+    expect(snapshot.messages[0].contentMarkdown).toContain('```ts\n' + code + '\n```');
+    expect(snapshot.messages[0].contentMarkdown).not.toContain('Copy');
+    expect(snapshot.messages[0].contentMarkdown).not.toContain('\n\nts\n');
+  });
+
   it('captures user uploaded images from attachment card', async () => {
     const html = `
       <div id="message-u1" class="user-message">

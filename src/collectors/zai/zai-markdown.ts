@@ -32,6 +32,23 @@ function sanitizeContentClone(wrapper: Element | null): Element | null {
   if (!content?.cloneNode) return null;
   try {
     const clone = content.cloneNode(true) as Element;
+    for (const editor of Array.from(clone.querySelectorAll('.cm-content[contenteditable="false"][data-language]'))) {
+      const languageContainer = editor.closest('[class*="language-"]');
+      if (!languageContainer) continue;
+      const pre = editor.ownerDocument.createElement('pre');
+      const code = editor.ownerDocument.createElement('code');
+      code.className = Array.from(languageContainer.classList).find((name) => name.startsWith('language-')) || '';
+      code.textContent = Array.from(editor.querySelectorAll('.cm-line'))
+        .map((line) => line.textContent || '')
+        .join('\n');
+      pre.append(code);
+      for (const toolbar of Array.from(
+        languageContainer.parentElement?.querySelectorAll('.absolute.text-xs.font-medium, .sticky') || [],
+      )) {
+        toolbar.remove();
+      }
+      languageContainer.replaceWith(pre);
+    }
     removeThinkingNodes(clone);
     replaceMathElementsWithLatexText(clone);
     removeNonContentNodes(clone);
