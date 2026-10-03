@@ -39,6 +39,8 @@ collectors/<provider>/**
 
 旧 fixture 只能防回归，不能证明当前网页仍兼容。站点行为改动必须走真实浏览器路径验证；无法访问时记录外部阻塞，不猜 selector。统一的真实站点提示词、场景和记录标准见 [`ai-chat-testing.md`](ai-chat-testing.md)。
 
+DeepSeek 的 `data-virtual-list-item-key` 在新用户消息上是保留的临时 `renderKey`，不是服务端 ID。MAIN adapter 只把当前消息组件中已确认、属于当前 session 的正数 `messageId` 投影到 DOM；隔离世界 collector 使用该身份。无法确认时消息保持 unresolved / partial，不按负数、相邻 ID、正文或序号推导身份。站点组件契约变化时先更新该 adapter 并跨 reload 验证，不在存储层猜测去重。
+
 ## Markdown 与附件
 
 - provider 先克隆正确的正文 DOM，再删除该站点的 thinking/control/UI 节点；之后才调用通用 Markdown / formula helper。

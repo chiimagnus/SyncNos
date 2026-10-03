@@ -62,6 +62,24 @@ async function capturePrepared(def: any, options: Record<string, unknown> = {}) 
 }
 
 describe('deepseek-collector', () => {
+  it('keeps ready user keys stable when the site replaces a negative render key after reload', async () => {
+    const dom = setupDeepseekDom(item('-2', user('prompt')) + item('2', assistant('<p>answer</p>')));
+    const def = createDef(dom);
+    const itemNode = dom.window.document.querySelector('[data-virtual-list-item-key="-2"]')!;
+    const pending = await def.collector.capture();
+    expect(pending.messages.map((message: any) => message.messageKey)).toEqual(['deepseek_2']);
+    expect(pending.captureMeta.completeness).toBe('partial');
+    itemNode.setAttribute('data-syncnos-deepseek-message-id', '1');
+    const ready = await def.collector.capture();
+    expect(ready.messages.map((message: any) => message.messageKey)).toEqual(['deepseek_1', 'deepseek_2']);
+    itemNode.removeAttribute('data-syncnos-deepseek-message-id');
+    itemNode.setAttribute('data-virtual-list-item-key', '1');
+    const reloaded = await def.collector.capture();
+    expect(reloaded.messages.map((message: any) => message.messageKey)).toEqual(
+      ready.messages.map((message: any) => message.messageKey),
+    );
+  });
+
   it('captures current semantic virtual-list items with stable keys and final assistant markdown only', async () => {
     const dom = setupDeepseekDom(
       item('1', user('你好')) +

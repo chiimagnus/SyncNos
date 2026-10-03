@@ -1,5 +1,6 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
+import { DEEPSEEK_MESSAGE_ID_ATTRIBUTE } from '@collectors/deepseek/deepseek-message-identity';
 import {
   appendImageMarkdown,
   extractImageUrlsFromElement,
@@ -90,7 +91,9 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
   }
 
   function stableMessageKey(item: Element): string {
-    const raw = String(item.getAttribute('data-virtual-list-item-key') || '').trim();
+    const raw = String(
+      item.getAttribute(DEEPSEEK_MESSAGE_ID_ATTRIBUTE) || item.getAttribute('data-virtual-list-item-key') || '',
+    ).trim();
     return raw ? `deepseek_${raw}` : '';
   }
 
@@ -158,7 +161,13 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     const editing = inEditMode(item);
     const streaming = role === 'assistant' && isAssistantStreaming(item);
     const content = extractContent(item, role);
-    const rendered = !editing && !streaming && (!!content.text || !!content.markdown || content.imageUrls.length > 0);
+    const numericIdentity = Number(key.slice('deepseek_'.length));
+    const identityPending = !Number.isSafeInteger(numericIdentity) || numericIdentity <= 0;
+    const rendered =
+      !identityPending &&
+      !editing &&
+      !streaming &&
+      (!!content.text || !!content.markdown || content.imageUrls.length > 0);
     return {
       key,
       role,
