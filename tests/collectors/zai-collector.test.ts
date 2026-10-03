@@ -131,6 +131,99 @@ describe('zai-collector', () => {
     expect(md).toContain('```');
   });
 
+  it('preserves rich markdown structure used by current z.ai responses', async () => {
+    const html = `
+      <div id="message-rich">
+        <div class="chat-assistant markdown-prose">
+          <div id="response-content-container">
+            <h4>Deep heading</h4>
+            <ul><li>Parent<ul><li>Child</li></ul></li></ul>
+            <table>
+              <thead><tr><th>Name</th><th>Value</th></tr></thead>
+              <tbody><tr><td>A</td><td>1</td></tr></tbody>
+            </table>
+            <p>Inline <span class="katex"><annotation encoding="application/x-tex">x^2</annotation></span> formula.</p>
+            <img src="https://example.com/result.png" alt="result" />
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-rich' });
+    setupDom(dom);
+    const collector = createCollector();
+    const wrapper = dom.window.document.querySelector('#message-rich');
+    const md = collector.__test.extractAssistantMarkdown(wrapper);
+
+    expect(md).toContain('#### Deep heading');
+    expect(md).toContain('- Parent\n  - Child');
+    expect(md).toContain('| Name | Value |');
+    expect(md).toContain('| --- | --- |');
+    expect(md).toContain('| A | 1 |');
+    expect(md).toContain('$x^2$');
+    expect(md).toContain('![](https://example.com/result.png)');
+  });
+
+  it('captures current z.ai file cards and videos as user attachments', async () => {
+    const html = `
+      <div id="message-files" class="user-message">
+        <div class="chat-user markdown-prose">
+          <div class="flex overflow-x-auto flex-col flex-wrap gap-1 justify-end mt-2.5 mb-1 w-full">
+            <button type="button">
+              <div><img src="../icons/pdf.svg" alt="PDF" /></div>
+              <div><div class="text-sm leading-5 text-text-primary truncate">paper.pdf</div></div>
+            </button>
+            <video src="https://example.com/demo.mp4"></video>
+          </div>
+          <div class="relative w-full"><div class="whitespace-pre-wrap">请总结附件</div></div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-files' });
+    setupDom(dom);
+    const collector = createCollector();
+    const snap = collector.capture() as any;
+
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0].contentMarkdown).toContain('Attachment: paper.pdf');
+    expect(snap.messages[0].contentMarkdown).toContain('[Video attachment](https://example.com/demo.mp4)');
+    expect(snap.messages[0].contentMarkdown).toContain('请总结附件');
+  });
+
+  it('does not capture a message while the user is editing it', async () => {
+    const html = `
+      <div id="message-editing" class="user-message">
+        <div class="chat-user"><div class="whitespace-pre-wrap">旧内容</div></div>
+        <textarea id="message-edit-editing">正在编辑</textarea>
+      </div>
+    `;
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-edit' });
+    setupDom(dom);
+    const collector = createCollector();
+    expect(collector.capture({ manual: true })).toBeNull();
+  });
+
+  it('skips the unfinished tail assistant while z.ai shows the stop control', async () => {
+    const html = `
+      <div id="message-user" class="user-message">
+        <div class="chat-user"><div class="whitespace-pre-wrap">question</div></div>
+      </div>
+      <div id="message-assistant">
+        <div class="chat-assistant"><div id="response-content-container"><p>partial answer</p></div></div>
+      </div>
+      <textarea id="chat-input"></textarea>
+    `;
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-stream' });
+    setupDom(dom);
+    const collector = createCollector();
+    const snap = collector.capture({ manual: true }) as any;
+
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0]).toMatchObject({ messageKey: 'message-user', role: 'user' });
+    expect(snap.messages[0].contentMarkdown).toContain('question');
+  });
+
   it('does not leak UI button labels when falling back to wrapper', async () => {
     const html = `
       <div id="message-2">
