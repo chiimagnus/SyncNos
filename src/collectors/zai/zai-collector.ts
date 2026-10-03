@@ -210,7 +210,9 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   function extractMessageContent(wrapper: Element, role: ZaiRole): ZaiMessageContent {
     const attachment = role === 'user' ? userAttachmentContent(wrapper) : { text: '', markdown: '', fingerprint: '' };
     const baseText = role === 'user' ? extractUserText(wrapper) : extractAssistantText(wrapper);
-    const imageUrls = extractImageUrlsFromElement(imageScopeForWrapper(wrapper, role));
+    const imageUrls = extractImageUrlsFromElement(imageScopeForWrapper(wrapper, role)).filter(
+      (url) => !url.startsWith(`${env.location.origin}/icons/`),
+    );
     const baseMarkdown = role === 'assistant' ? extractAssistantMarkdown(wrapper) || baseText : baseText;
     const contentText = [attachment.text, baseText].filter(Boolean).join('\n\n');
     const contentMarkdown = appendImageMarkdown(

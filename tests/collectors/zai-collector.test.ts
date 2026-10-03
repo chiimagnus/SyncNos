@@ -219,6 +219,7 @@ describe('zai-collector', () => {
     const snap = (await capturePrepared(createCollector())) as any;
     expect(snap.messages).toHaveLength(1);
     expect(snap.messages[0].contentMarkdown).toContain('Attachment: paper.pdf');
+    expect(snap.messages[0].contentMarkdown).not.toContain('/icons/');
     expect(snap.messages[0].contentMarkdown).toContain('[Video attachment](https://example.com/demo.mp4)');
     expect(snap.messages[0].contentMarkdown).toContain('请总结附件');
   });
