@@ -5,10 +5,10 @@ description: Start here when capture, sync, or connection does not work as expec
 
 ## Capture is incomplete
 
-- ChatGPT / Claude / Google AI Studio: use manual capture.
+- ChatGPT, Claude, Google AI Studio, DeepSeek, Kimi, Yuanbao, Poe, Notion AI, and z.ai: use manual capture.
+- Gemini or Doubao did not auto-save: confirm auto-save is enabled, then try one manual capture.
 - ChatGPT Advanced capture fails: disable Advanced capture and save again.
 - Images are missing: the text is usually already saved; retry with **Cache images** later.
-- Another AI site did not auto-save: confirm auto-save is enabled, then try one manual capture.
 
 See [Capture](/docs/en/capture/) for supported behavior.
 

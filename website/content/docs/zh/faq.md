@@ -5,10 +5,10 @@ description: 采集、同步或连接遇到问题时，从这里开始。
 
 ## 采集不完整
 
-- ChatGPT / Claude / Google AI Studio：使用手动保存。
+- ChatGPT、Claude、Google AI Studio、DeepSeek、Kimi、元宝、Poe、Notion AI、z.ai：使用手动保存。
+- Gemini、豆包未自动保存：确认自动保存已开启，再手动保存一次。
 - ChatGPT 高级采集失败：关闭高级采集后重新保存。
 - 图片缺失：正文通常已经保存，可稍后用 **缓存图片** 重试。
-- 其它 AI 站点未自动保存：确认自动保存已开启，再手动保存一次。
 
 支持范围见[采集内容](/docs/capture/)。
 

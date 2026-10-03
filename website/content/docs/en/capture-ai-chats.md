@@ -7,10 +7,10 @@ description: Save supported AI chats and understand manual capture, auto-save, a
 
 | Platform | Capture |
 | --- | --- |
-| ChatGPT, Claude, Google AI Studio | Manual |
-| Gemini, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, z.ai | Auto-save available |
+| Gemini, Doubao | Manual + auto-save |
+| ChatGPT, Claude, Google AI Studio, DeepSeek, Kimi, Yuanbao, Poe, Notion AI, z.ai | Manual |
 
-Manual-only platforms use virtualized histories, so the whole conversation is not always present in the page at once.
+Manual capture actively retrieves the history that the current site can safely verify. For virtualized lists, paginated histories, or unfinished replies, SyncNos merges conservatively instead of replacing a complete local history with the currently visible window.
 
 ## Manual capture
 
@@ -18,19 +18,21 @@ Manual-only platforms use virtualized histories, so the whole conversation is no
 2. Choose **Capture AI chat** in the popup, or save the current chat from the context menu.
 3. Confirm the result in the [local library](/docs/en/library/).
 
-For supported platforms, enable auto-save under **Settings → General → Auto save**.
+Gemini and Doubao can also enable auto-save under **Settings → General → Auto save**.
+
+Notion AI currently uses the `/chat` Agent Service conversation and its full transcript. Messages containing files are kept partial-safe; complete attachment metadata is not guaranteed yet.
 
 ## ChatGPT Advanced capture
 
 ChatGPT uses page capture by default. **Settings → General → ChatGPT Advanced capture** enables an alternative manual capture path.
 
-- **Page capture**: best when you want content already loaded or expanded in the page.
+- **Page capture**: keeps visible page content and handles the page loading required for long conversations.
 - **Advanced capture**: better for stable current-branch identity and long conversations, but it cannot recover thinking/progress that ChatGPT did not keep.
 
 Advanced capture does not silently fall back to page capture. Disable it and save again if you want the page path.
 
 ## Images and reuse
 
-Image caching can be disabled without blocking text capture.
+Supported platforms preserve conversation images and recognizable attachments where available. Image caching can be disabled without blocking text capture.
 
 Saved items can also be inserted into supported AI editors with [$ insert](/docs/en/dollar-mention/).
