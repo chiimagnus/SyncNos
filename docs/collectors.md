@@ -36,7 +36,7 @@ collectors/<provider>/**
 8. auto-save / manual-only 是否仍安全；
 9. `$` mention 输入 surface 是否仍存在。
 
-旧 fixture 只能防回归，不能证明当前网页仍兼容。站点行为改动必须走真实浏览器路径验证；无法访问时记录外部阻塞，不猜 selector。
+旧 fixture 只能防回归，不能证明当前网页仍兼容。站点行为改动必须走真实浏览器路径验证；无法访问时记录外部阻塞，不猜 selector。统一的真实站点提示词、场景和记录标准见 [`ai-chat-testing.md`](ai-chat-testing.md)。
 
 ## Markdown 与附件
 
@@ -65,7 +65,7 @@ collectors/<provider>/**
 - 对应 collector / markdown 定向测试；
 - 涉及虚拟历史时运行 capture-integrity 与 virtualized-sweep 测试；
 - 涉及图片/附件时运行相应 smoke；
-- 真实浏览器走通受影响的当前站点路径；
+- 按 [`ai-chat-testing.md`](ai-chat-testing.md) 用统一提示词真实走通受影响的当前站点路径；
 - review 前按 [`CONTRIBUTING.md`](CONTRIBUTING.md) 运行相称 gate。
 
 架构测试必须持续阻止 provider→provider 直接 import。若确有跨站通用逻辑，先提炼为无站点语义 shared，再由各 provider 独立调用。

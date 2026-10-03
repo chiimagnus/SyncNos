@@ -41,7 +41,7 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshoo
 | 常规代码 | `npm run gate:ci` |
 | production build、manifest、权限、打包或发布 | `npm run gate` |
 | CLI / installer / Native Messaging | `npm run gate` + `npm run cli:check`，并在受影响 OS 做真实 discovery/read-back |
-| 浏览器、站点或视觉行为 | 手动走通受影响的真实路径，并记录用户可观察结果 |
+| 浏览器、站点或视觉行为 | 手动走通受影响的真实路径，并记录用户可观察结果；AI 对话按 [`ai-chat-testing.md`](ai-chat-testing.md) 执行统一回归 |
 
 `npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。模拟平台测试不能冒充真实平台 E2E。
 

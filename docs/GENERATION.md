@@ -21,6 +21,7 @@
 | `website/llms.txt` | 面向 LLM / Agent 的官网级产品能力摘要与主要文档入口，不复制具体操作步骤 | 顶层用户可见能力、支持范围或主要文档入口变化 | 官网 `llms.txt` 消费者 |
 | `AGENTS.md`, `src/ui/AGENTS.md` | 维护者/agent 必须提前看到的架构与高风险不变量 | 分层、依赖方向或不可破坏产品/UI 契约变化 | agent rule loader、CONTRIBUTING |
 | `docs/collectors.md` | AI 对话 collector 的 provider/shared 边界、维护检查项、虚拟历史完整性与验证契约 | 新增/删除 provider、collector 分层、shared 能力、manual/auto-save 判定或真实站点验证责任变化 | AGENTS、collector 维护者、feature 审计 |
+| `docs/ai-chat-testing.md` | AI 对话真实站点的统一提示词、场景、E2E 判定与记录模板 | collector 需要覆盖新的 DOM/消息能力，或真实站点验证流程变化 | collector 维护者、feature 审计 |
 | `skills/syncnos/SKILL.md`, `skills/syncnos-zh/SKILL.md` | AI Agent 使用 `syncnos` 的运行说明 | 命令路由、JSON/error、instance、安装/权限或写入/sync 等调用契约变化 | Repository Skill 使用者 |
 | `docs/storage.md` | local-first、一致性、Backup/restore 和失败恢复边界 | IDB/revision、backup/import、asset remap 或 continuity 语义变化 | AGENTS、Privacy、CONTRIBUTING |
 | `docs/CONTRIBUTING.md` | 开发、PR 和验证责任 | scripts、CI gate、贡献流程或 manual validation 责任变化 | README、PR template |
