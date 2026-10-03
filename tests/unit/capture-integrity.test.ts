@@ -28,6 +28,7 @@ describe('capture integrity contract', () => {
       'claude',
       'googleaistudio',
       'deepseek',
+      'doubao',
       'kimi',
       'notionai',
       'poe',

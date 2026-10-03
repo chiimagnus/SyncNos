@@ -9,6 +9,7 @@ import { JSDOM } from 'jsdom';
 import { createCollectorEnv } from '@collectors/collector-env';
 import { createClaudeCollectorDef } from '@collectors/claude/claude-collector';
 import { createZaiCollectorDef } from '@collectors/zai/zai-collector';
+import { createDoubaoCollectorDef } from '@collectors/doubao/doubao-collector';
 import normalizeApi from '@services/shared/normalize';
 
 import {
@@ -301,15 +302,24 @@ describe('conversations storage-idb', () => {
     }
   });
 
-  it.each(['claude', 'zai'])(
+  it.each(['claude', 'zai', 'doubao'])(
     'persists %s auto windows without deleting stored history or unfinished replies',
     async (source) => {
-      const html =
-        source === 'claude'
-          ? '<div role="feed" data-perf-region="transcript"><div data-testid="transcript-row" data-perf-row="human"><div role="article" aria-posinset="3" aria-setsize="4"><div data-testid="user-message">current question</div></div></div><div data-testid="transcript-row" data-perf-row="assistant" data-perf-row-streaming="true"><div role="article" aria-posinset="4" aria-setsize="4"><div data-testid="assistant-message"><div data-cds="Prose">current answer</div></div></div></div></div>'
-          : '<textarea id="chat-input"></textarea><div id="messages-container"><div id="message-current-user" class="user-message"><div class="chat-user"><div class="whitespace-pre-wrap">current question</div></div></div><div id="message-current-assistant" class="chat-assistant"><div id="response-content-container"><p>current answer</p></div></div></div>';
+      const fixtures = {
+        claude:
+          '<div role="feed" data-perf-region="transcript"><div data-testid="transcript-row" data-perf-row="human"><div role="article" aria-posinset="3" aria-setsize="4"><div data-testid="user-message">current question</div></div></div><div data-testid="transcript-row" data-perf-row="assistant" data-perf-row-streaming="true"><div role="article" aria-posinset="4" aria-setsize="4"><div data-testid="assistant-message"><div data-cds="Prose">current answer</div></div></div></div></div>',
+        zai: '<textarea id="chat-input"></textarea><div id="messages-container"><div id="message-current-user" class="user-message"><div class="chat-user"><div class="whitespace-pre-wrap">current question</div></div></div><div id="message-current-assistant" class="chat-assistant"><div id="response-content-container"><p>current answer</p></div></div></div>',
+        doubao:
+          '<div aria-label="doc_editor"><div data-message-id="user" class="justify-end"><div data-testid="message_text_content">current question</div></div><div data-message-id="assistant"><div class="flow-markdown-body" data-streaming="true">current answer</div></div></div>',
+      };
+      const urls = {
+        claude: 'https://claude.ai/chat/auto-storage',
+        zai: 'https://chat.z.ai/c/auto-storage',
+        doubao: 'https://www.doubao.com/chat/auto-storage',
+      };
+      const html = fixtures[source as keyof typeof fixtures];
       const dom = new JSDOM(html, {
-        url: source === 'claude' ? 'https://claude.ai/chat/auto-storage' : 'https://chat.z.ai/c/auto-storage',
+        url: urls[source as keyof typeof urls],
       });
       const env = createCollectorEnv({
         window: dom.window as any,
@@ -317,7 +327,12 @@ describe('conversations storage-idb', () => {
         location: dom.window.location as any,
         normalize: normalizeApi,
       });
-      const collector = (source === 'claude' ? createClaudeCollectorDef(env) : createZaiCollectorDef(env)).collector;
+      const factories = {
+        claude: createClaudeCollectorDef,
+        zai: createZaiCollectorDef,
+        doubao: createDoubaoCollectorDef,
+      };
+      const collector = factories[source as keyof typeof factories](env).collector;
       const partial = await collector.capture();
       const conversation = await upsertConversation(partial.conversation);
       await syncConversationMessages(Number(conversation.id), [
@@ -336,6 +351,8 @@ describe('conversations storage-idb', () => {
         dom.window.document
           .querySelector('[data-perf-row-streaming]')!
           .setAttribute('data-perf-row-streaming', 'false');
+      else if (source === 'doubao')
+        dom.window.document.querySelector('[data-streaming]')!.setAttribute('data-streaming', 'false');
       else {
         const button = dom.window.document.createElement('button');
         button.id = 'send-message-button';

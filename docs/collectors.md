@@ -41,6 +41,8 @@ collectors/<provider>/**
 
 DeepSeek 的 `data-virtual-list-item-key` 在新用户消息上是保留的临时 `renderKey`，不是服务端 ID。MAIN adapter 只把当前消息组件中已确认、属于当前 session 的正数 `messageId` 投影到 DOM；隔离世界 collector 使用该身份。无法确认时消息保持 unresolved / partial，不按负数、相邻 ID、正文或序号推导身份。站点组件契约变化时先更新该 adapter 并跨 reload 验证，不在存储层猜测去重。
 
+豆包的 `.scroller` 是会卸载离屏消息的虚拟列表，`data-message-id` 只证明消息身份，不证明历史完整。自动保存只读取当前窗口；手动保存复用共享 sweep 补齐可达窗口并恢复滚动位置。当前 DOM 不暴露历史 exhausted 证明，因此两条路径都必须标记 partial 并 append/reconcile，不能因滚到物理顶部或回复已完成就改为 destructive snapshot。
+
 ## Markdown 与附件
 
 - provider 先克隆正确的正文 DOM，再删除该站点的 thinking/control/UI 节点；之后才调用通用 Markdown / formula helper。

@@ -39,6 +39,7 @@ export const CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS = new Set<string>([
   'claude',
   'googleaistudio',
   'deepseek',
+  'doubao',
   'kimi',
   'notionai',
   'poe',

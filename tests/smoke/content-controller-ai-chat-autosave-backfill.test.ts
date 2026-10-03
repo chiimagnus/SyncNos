@@ -667,6 +667,8 @@ describe('content-controller ai chat autosave backfill', () => {
     const captureB = vi.fn(() => ({
       ...makeSnapshot('scheduler-b', ['B']),
       conversation: { source: 'doubao', conversationKey: 'scheduler-b' },
+      messages: [{ messageKey: 'doubao_b', role: 'user', contentMarkdown: 'B', sequence: 0 }],
+      captureMeta: { completeness: 'partial', identityVerified: true },
     }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
@@ -752,6 +754,8 @@ describe('content-controller ai chat autosave backfill', () => {
     const captureB = vi.fn(() => ({
       ...makeSnapshot('restart-b', ['B']),
       conversation: { source: 'doubao', conversationKey: 'restart-b' },
+      messages: [{ messageKey: 'doubao_b', role: 'user', contentMarkdown: 'B', sequence: 0 }],
+      captureMeta: { completeness: 'partial', identityVerified: true },
     }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
@@ -797,6 +801,8 @@ describe('content-controller ai chat autosave backfill', () => {
     const captureB = vi.fn(() => ({
       ...makeSnapshot('restart-pre-b', ['B']),
       conversation: { source: 'doubao', conversationKey: 'restart-pre-b' },
+      messages: [{ messageKey: 'doubao_b', role: 'user', contentMarkdown: 'B', sequence: 0 }],
+      captureMeta: { completeness: 'partial', identityVerified: true },
     }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
@@ -1189,7 +1195,7 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('notionai')).toBe(true);
   });
 
-  it.each(['deepseek', 'claude', 'zai'])(
+  it.each(['deepseek', 'claude', 'zai', 'doubao'])(
     'guards %s partial autosave windows before append persistence',
     async (collectorId) => {
       const harness = createHarness({

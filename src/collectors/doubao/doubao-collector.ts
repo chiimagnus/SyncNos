@@ -8,8 +8,19 @@ import {
   renderedElementText,
 } from '@collectors/collector-utils.ts';
 import doubaoMarkdown from '@collectors/doubao/doubao-markdown.ts';
+import {
+  addPreparedReason,
+  createPreparedAccumulator,
+  createPreparedCaptureConsumer,
+  createScrollRootRestorer,
+  finishPreparedCapture,
+  mergePreparedRecords,
+  runVirtualizedPass,
+  type PreparedAccumulator,
+} from '@collectors/virtualized-chat/virtualized-chat-sweep.ts';
 
 export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition {
+  const consumePreparedCapture = createPreparedCaptureConsumer<any>('doubao');
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)doubao\.com$/.test(hostname);
@@ -240,6 +251,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   async function collectModernMessages(ctx: InlineImageContext): Promise<any[]> {
+    ctx.streamingAssistantCount = 0;
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
@@ -252,8 +264,9 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     let seq = 0;
     for (const row of messageRows) {
       const messageId = String(row.getAttribute?.('data-message-id') || '').trim();
-      if (messageId && seenMessageIds.has(messageId)) continue;
-      if (messageId) seenMessageIds.add(messageId);
+      if (!messageId) continue;
+      if (seenMessageIds.has(messageId)) continue;
+      seenMessageIds.add(messageId);
 
       const role = detectModernRole(row);
       if (!role) continue;
@@ -278,16 +291,13 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
       const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
       const attachments = attachmentMarkdown(row);
       if (!text && !attachments && !imageUrls.length) continue;
-      const contentText = [attachments, text || ''].filter(Boolean).join('\n\n');
       const renderedMarkdown =
         role === 'assistant' ? doubaoMarkdown.extractAssistantMarkdown(textEl) || text || '' : text || '';
       const baseMarkdown = [attachments, renderedMarkdown].filter(Boolean).join('\n\n');
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls, { allowDataImageUrls: true });
 
       out.push({
-        messageKey: messageId
-          ? `doubao_${messageId}`
-          : env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence: seq }),
+        messageKey: `doubao_${messageId}`,
         role,
         contentMarkdown,
         sequence: seq,
@@ -299,10 +309,105 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     return out;
   }
 
-  async function capture(): Promise<any> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
-    const ctx = createInlineImageContext();
+  function currentIdentity(): string {
+    const conversationKey = findConversationIdFromUrl();
+    return matches(env.location) && conversationKey ? `${env.location.hostname}/chat/${conversationKey}` : '';
+  }
+
+  function getScrollSeed(): Element | null {
+    const root = getConversationRoot();
+    return root?.querySelector('.scroller') || root;
+  }
+
+  function readMessageKeys(streamingOnly = false): string[] {
+    return Array.from(getConversationRoot()?.querySelectorAll('[data-message-id]') || [])
+      .filter(
+        (row: any) =>
+          !streamingOnly || (detectModernRole(row) === 'assistant' && row.querySelector("[data-streaming='true']")),
+      )
+      .map((row: any) => String(row.getAttribute('data-message-id') || '').trim())
+      .filter(Boolean)
+      .map((id) => `doubao_${id}`);
+  }
+
+  async function harvestCurrentInto(accumulator: PreparedAccumulator<any>, ctx: InlineImageContext) {
     const messages = await collectModernMessages(ctx);
+    return mergePreparedRecords(
+      accumulator,
+      messages.map((message) => ({
+        key: message.messageKey,
+        turnKey: message.messageKey,
+        withinTurn: 0,
+        fingerprint: env.normalize.fnv1a32(`${message.role}\u001f${message.contentMarkdown}`),
+        payload: message,
+      })),
+    );
+  }
+
+  async function prepareManualCapture(options: any = {}): Promise<any | null> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
+    if (inEditMode(getConversationRoot())) return null;
+    const identity = currentIdentity();
+    const accumulator = createPreparedAccumulator<any>({
+      source: 'doubao',
+      conversationKey: findConversationKey(),
+      identityVerified: !!identity,
+      identityGuard: { route: identity, durableId: findConversationKey() },
+    });
+    addPreparedReason(accumulator, 'top_not_reached');
+    const ctx = createInlineImageContext();
+    const runtime = { document: env.document, window: env.window };
+    const sampleIdentity = () => (currentIdentity() === identity ? identity : null);
+    const restorer = createScrollRootRestorer({ ...runtime, getSeed: getScrollSeed, sampleIdentity });
+    const now = options.now || Date.now;
+    try {
+      const pass = await runVirtualizedPass(
+        runtime,
+        {
+          getScrollSeed,
+          sampleIdentity,
+          readDescriptorKeys: () => readMessageKeys(),
+          readUnresolvedKeys: () => readMessageKeys(true),
+          harvest: (target) => harvestCurrentInto(target, ctx),
+        },
+        accumulator,
+        { ...options, deadline: now() + Math.min(300_000, Math.max(1, Number(options.totalDeadlineMs) || 300_000)) },
+      );
+      accumulator.sweepMetrics = { steps: pass.steps, reachedBottom: pass.reachedBottom };
+    } finally {
+      if (!restorer.restore().restored) addPreparedReason(accumulator, 'restore_failed');
+    }
+    if (!sampleIdentity()) return null;
+    await harvestCurrentInto(accumulator, ctx);
+    if (!sampleIdentity()) return null;
+    return { ...finishPreparedCapture(accumulator), warningFlags: Array.from(ctx.warningFlags) };
+  }
+
+  async function capture(options: any = {}): Promise<any> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
+    if (inEditMode(getConversationRoot())) return null;
+    const identity = currentIdentity();
+    const ctx = createInlineImageContext();
+    const accumulator = createPreparedAccumulator<any>({
+      source: 'doubao',
+      conversationKey: findConversationKey(),
+      identityVerified: !!identity,
+      identityGuard: { route: identity, durableId: findConversationKey() },
+    });
+    addPreparedReason(accumulator, 'top_not_reached');
+    if (options.manual === true) {
+      const prepared: any = consumePreparedCapture(options.preparedCapture);
+      if (!prepared || prepared.identityGuard.route !== identity) return null;
+      for (const reason of prepared.reasons) addPreparedReason(accumulator, reason);
+      accumulator.sweepMetrics = prepared.metrics;
+      mergePreparedRecords(accumulator, prepared.records);
+      for (const flag of prepared.warningFlags || []) ctx.warningFlags.add(flag);
+    }
+    await harvestCurrentInto(accumulator, ctx);
+    if (currentIdentity() !== identity) return null;
+    if (ctx.streamingAssistantCount) addPreparedReason(accumulator, 'unresolved_turn');
+    const prepared = finishPreparedCapture(accumulator);
+    const messages = prepared.records.map((record, sequence) => ({ ...record.payload, sequence }));
     if (!messages.length) return null;
     return {
       conversation: {
@@ -314,16 +419,12 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
         warningFlags: Array.from(ctx.warningFlags),
       },
       messages,
-      ...(ctx.streamingAssistantCount
-        ? {
-            captureMeta: {
-              completeness: 'partial',
-              identityVerified: true,
-              reasons: ['streaming_in_progress'],
-              metrics: { streamingAssistantCount: ctx.streamingAssistantCount },
-            },
-          }
-        : null),
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: prepared.reasons,
+        metrics: { ...prepared.metrics, streamingAssistantCount: ctx.streamingAssistantCount },
+      },
     };
   }
 
@@ -331,6 +432,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     capture,
     isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
+    prepareManualCapture,
   };
   return { id: 'doubao', matches, collector };
 }

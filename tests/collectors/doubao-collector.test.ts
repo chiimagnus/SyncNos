@@ -11,6 +11,64 @@ function setupDoubaoDom(html: string, url: string) {
 }
 
 describe('doubao-collector', () => {
+  it('sweeps virtual windows only for manual capture and keeps the result partial-safe', async () => {
+    const dom = setupDoubaoDom(
+      '<div aria-label="doc_editor"><div class="scroller" style="overflow-y:auto"></div></div>',
+      'https://www.doubao.com/chat/virtual-history',
+    );
+    const scroller = dom.window.document.querySelector('.scroller') as HTMLElement;
+    let top = 200;
+    const render = () => {
+      const start = top >= 140 ? 4 : top >= 60 ? 2 : 0;
+      scroller.innerHTML = Array.from({ length: 4 }, (_, index) => {
+        const ordinal = start + index;
+        return `<div data-message-id="${ordinal + 1}" class="${ordinal % 2 ? '' : 'justify-end'}"><div class="${ordinal % 2 ? 'flow-markdown-body' : ''}" data-testid="message_text_content">message ${ordinal + 1}</div></div>`;
+      }).join('');
+    };
+    Object.defineProperties(scroller, {
+      scrollHeight: { value: 300 },
+      clientHeight: { value: 100 },
+      scrollTop: {
+        get: () => top,
+        set: (value: number) => {
+          top = value;
+          render();
+        },
+      },
+    });
+    render();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const collector = createDoubaoCollectorDef(env).collector;
+    const auto = (await collector.capture()) as any;
+    expect(auto.messages.map((message: any) => message.messageKey)).toEqual([
+      'doubao_5',
+      'doubao_6',
+      'doubao_7',
+      'doubao_8',
+    ]);
+    expect(top).toBe(200);
+    const prepared = await collector.prepareManualCapture!({ pollMs: 1 });
+    expect(top).toBe(200);
+    const snapshot = (await collector.capture({ manual: true, preparedCapture: prepared })) as any;
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `doubao_${index + 1}`),
+    );
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial', reasons: ['top_not_reached'] });
+    expect(resolveCaptureIntegrity('doubao', snapshot)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
+    expect(await collector.capture({ manual: true, preparedCapture: prepared })).toBeNull();
+    const stale = await collector.prepareManualCapture!({ pollMs: 1 });
+    dom.reconfigure({ url: 'https://www.doubao.com/chat/another-history' });
+    expect(await collector.capture({ manual: true, preparedCapture: stale })).toBeNull();
+  });
+
   it('excludes streaming assistants and keeps partial captures non-destructive until completion', async () => {
     const dom = setupDoubaoDom(
       `<div aria-label="doc_editor">
@@ -45,7 +103,10 @@ describe('doubao-collector', () => {
     const completed = (await collector.capture()) as any;
     expect(completed.messages).toHaveLength(2);
     expect(completed.messages[1]).toMatchObject({ messageKey: 'doubao_assistant', contentMarkdown: 'complete' });
-    expect(resolveCaptureIntegrity('doubao', completed)).toMatchObject({ ok: true });
+    expect(resolveCaptureIntegrity('doubao', completed)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
   });
 
   it('retains file-only messages when the text container is empty', async () => {
