@@ -234,6 +234,7 @@ describe('conversations storage-idb', () => {
       lastActivityAt: 1,
     });
     expect(created.canonicalChatIdentity).toBe('kimi:fast-path-chat');
+    expect(created.url).toBe('https://www.kimi.com/chat/fast-path-chat');
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
     try {
@@ -247,6 +248,7 @@ describe('conversations storage-idb', () => {
       });
       expect(Number(repeated.id)).toBe(Number(created.id));
       expect(repeated.__isNew).toBe(false);
+      expect(repeated.url).toBe('https://www.kimi.com/chat/fast-path-chat');
       const sourceScans = getAllSpy.mock.contexts.filter(
         (context) => String((context as IDBIndex)?.name || '') === 'by_listSourceKey_lastActivityAt_id',
       );
@@ -289,6 +291,10 @@ describe('conversations storage-idb', () => {
       lastActivityAt: 10,
     });
     await setConversationNotionPageId(Number(legacy.id), 'notion-page-kimi');
+    await patchSyncMapping(Number(legacy.id), {
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
     await syncConversationMessages(Number(legacy.id), [
       { messageKey: 'legacy-user', role: 'user', contentMarkdown: 'legacy', sequence: 0 },
     ]);
@@ -305,12 +311,44 @@ describe('conversations storage-idb', () => {
     expect(migrated.__isNew).toBe(false);
     expect(Number(migrated.id)).toBe(Number(legacy.id));
     expect(migrated.conversationKey).toBe(conversationId);
+    expect(migrated.url).toBe(`https://www.kimi.com/chat/${conversationId}`);
     expect(migrated.notionPageId).toBe('notion-page-kimi');
     expect(await listAllConversationsForTests()).toHaveLength(1);
     expect((await getMessagesByConversationId(Number(legacy.id))).map((message) => message.messageKey)).toEqual([
       'legacy-user',
     ]);
-    expect((await getSyncMappingByConversation(Number(legacy.id)))?.mapping?.notionPageId).toBe('notion-page-kimi');
+    expect((await getSyncMappingByConversation(Number(legacy.id)))?.mapping).toMatchObject({
+      notionPageId: 'notion-page-kimi',
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
+  });
+
+  it('serializes overlapping AI chat identity saves into one durable conversation', async () => {
+    const id = 'overlap-identity-001';
+    const [legacy, current] = await Promise.all([
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: `chat_${id}`,
+        title: 'Legacy overlap',
+        url: `https://www.kimi.com/chat/${id}?chat_enter_method=home`,
+        lastActivityAt: 1,
+      }),
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: id,
+        title: 'Current overlap',
+        url: `https://kimi.com/chat/${id}?chat_enter_method=history`,
+        lastActivityAt: 2,
+      }),
+    ]);
+
+    expect(Number(legacy.id)).toBe(Number(current.id));
+    const rows = await listAllConversationsForTests();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.canonicalChatIdentity).toBe(`kimi:${id}`);
   });
 
   it('self-heals already duplicated AI chat rows and keeps current identity plus legacy sync state', async () => {
@@ -324,6 +362,10 @@ describe('conversations storage-idb', () => {
       lastActivityAt: 10,
     });
     await setConversationNotionPageId(Number(legacy.id), 'notion-page-kimi');
+    await patchSyncMapping(Number(legacy.id), {
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
     await syncConversationMessages(Number(legacy.id), [
       { messageKey: 'fallback-old-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
       { messageKey: 'legacy-tail', role: 'user', contentMarkdown: 'legacy tail', sequence: 2 },
@@ -376,7 +418,12 @@ describe('conversations storage-idb', () => {
       'kimi-current-user',
       'legacy-tail',
     ]);
-    expect((await getSyncMappingByConversation(currentId))?.mapping?.notionPageId).toBe('notion-page-kimi');
+    expect((await getSyncMappingByConversation(currentId))?.mapping).toMatchObject({
+      notionPageId: 'notion-page-kimi',
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
+    expect((await getConversationById(currentId))?.feishuDocId).toBe('feishu-doc-kimi');
   });
 
   it('removes semantic message-key aliases during partial append without deleting different content', async () => {
@@ -420,10 +467,12 @@ describe('conversations storage-idb', () => {
           updated: [],
           removed: [],
         },
+        activityAt: 20,
       },
     );
 
     expect(repaired.deleted).toBe(2);
+    expect((await getConversationById(id))?.lastActivityAt).toBe(1);
     const messages = await getMessagesByConversationId(id);
     expect(messages.map((message) => message.messageKey).sort()).toEqual([
       'different-user',
@@ -613,7 +662,7 @@ describe('conversations storage-idb', () => {
     expect(finalMessages[1]?.contentMarkdown).toBe('streaming complete');
   });
 
-  it('commits capture activity with messages while keeping Activity-only recaptures message-revision stable', async () => {
+  it('advances capture activity only when message semantics actually change', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
@@ -627,15 +676,26 @@ describe('conversations storage-idb', () => {
     const beforeConversations = await readDataRevision('conversations');
     const beforeMessages = await readDataRevision('messages');
 
-    await syncConversationMessages(id, [message], { activityAt: 20 });
-    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
-    expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
+    await syncConversationMessages(id, [{ ...message, updatedAt: 200 }], { activityAt: 20 });
+    expect((await getConversationById(id))?.lastActivityAt).toBe(10);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations);
     expect(await readDataRevision('messages')).toBe(beforeMessages);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(100);
 
-    await syncConversationMessages(id, [message], { activityAt: 15 });
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: 'changed', updatedAt: 201 }], {
+      activityAt: 20,
+    });
     expect((await getConversationById(id))?.lastActivityAt).toBe(20);
     expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
-    expect(await readDataRevision('messages')).toBe(beforeMessages);
+    expect(await readDataRevision('messages')).toBe(beforeMessages + 1);
+
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: 'changed', updatedAt: 300 }], {
+      activityAt: 25,
+    });
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
+    expect(await readDataRevision('messages')).toBe(beforeMessages + 1);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(201);
   });
 
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
@@ -711,7 +771,7 @@ describe('conversations storage-idb', () => {
     ).rejects.toThrow('conversation not found');
   });
 
-  it('keeps equivalent message rows revision-stable when incoming timestamps are missing or invalid', async () => {
+  it('keeps semantically equivalent message rows revision-stable regardless of incoming timestamps', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
@@ -765,6 +825,10 @@ describe('conversations storage-idb', () => {
     expect(preserved[0]?.updatedAt).toBe(100);
 
     await syncConversationMessages(id, [{ ...stableMessage, updatedAt: 101 }]);
+    expect(await readDataRevision('messages')).toBe(1);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(100);
+
+    await syncConversationMessages(id, [{ ...stableMessage, contentMarkdown: 'changed', updatedAt: 101 }]);
     expect(await readDataRevision('messages')).toBe(2);
     expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(101);
   });
@@ -3922,7 +3986,7 @@ describe('canonical video storage', () => {
     expect(stored.videoChapters).toEqual([]);
   });
 
-  it('does not allow transcript-only structured fields on ordinary messages and keeps Activity-only recapture revision-safe', async () => {
+  it('does not allow transcript-only structured fields on ordinary messages and keeps unchanged recaptures activity-stable', async () => {
     const convo = await upsertConversation({
       sourceType: 'video',
       source: 'video',
@@ -3945,8 +4009,15 @@ describe('canonical video storage', () => {
     const messageRevision = await readDataRevision('messages');
     const conversationRevision = await readDataRevision('conversations');
 
-    await syncConversationMessages(id, [message], { activityAt: 20 });
+    await syncConversationMessages(id, [{ ...message, updatedAt: 200 }], { activityAt: 20 });
     expect(await readDataRevision('messages')).toBe(messageRevision);
+    expect(await readDataRevision('conversations')).toBe(conversationRevision);
+    expect((await getConversationById(id))?.lastActivityAt).toBe(10);
+
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: '[00:01] changed', updatedAt: 201 }], {
+      activityAt: 20,
+    });
+    expect(await readDataRevision('messages')).toBe(messageRevision + 1);
     expect(await readDataRevision('conversations')).toBe(conversationRevision + 1);
     expect((await getConversationById(id))?.lastActivityAt).toBe(20);
 

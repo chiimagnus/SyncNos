@@ -6,6 +6,7 @@ export type Conversation = {
   sourceType?: string;
   source: string;
   conversationKey: string;
+  canonicalChatIdentity?: string;
   listSourceKey?: string;
   listSiteKey?: string;
   title?: string;

@@ -85,6 +85,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       messages: [message],
       mode: 'snapshot',
       conversationSourceType: 'video',
+      conversationContentChanged: (conversation as any)?.__semanticContentChanged === true,
       activityAt,
     });
     if (!messagesRes?.ok) {

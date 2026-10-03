@@ -52,8 +52,11 @@ export function canonicalChatIdentityFromUrl(sourceValue: unknown, urlValue: unk
   }
 
   if (source === 'gemini' && hostname === 'gemini.google.com') {
-    const id = pathId(pathname, /^\/app\/([^/?#]+)\/?$/);
-    return id ? `gemini:${id}` : '';
+    const appId = pathId(pathname, /^\/app\/([^/?#]+)\/?$/);
+    if (appId) return `gemini:${appId}`;
+    const gemMatch = pathname.match(/^\/gem\/[^/?#]+\/([^/?#]+)\/?$/);
+    const gemConversationId = gemMatch?.[1] ? decoded(gemMatch[1]) : '';
+    return gemConversationId ? `gemini:${gemConversationId}` : '';
   }
 
   if (source === 'googleaistudio' && (hostname === 'aistudio.google.com' || hostname === 'makersuite.google.com')) {
@@ -102,4 +105,32 @@ export function canonicalChatIdentityFromUrl(sourceValue: unknown, urlValue: unk
   }
 
   return '';
+}
+
+export function canonicalChatUrlFromUrl(sourceValue: unknown, urlValue: unknown): string {
+  const source = normalizeSource(sourceValue);
+  const url = parseUrl(urlValue);
+  if (!source || !url || !canonicalChatIdentityFromUrl(source, url)) return '';
+
+  const canonicalOrigins: Record<string, string> = {
+    chatgpt: 'https://chatgpt.com',
+    claude: 'https://claude.ai',
+    gemini: 'https://gemini.google.com',
+    googleaistudio: 'https://aistudio.google.com',
+    deepseek: 'https://chat.deepseek.com',
+    kimi: 'https://www.kimi.com',
+    doubao: 'https://www.doubao.com',
+    yuanbao: 'https://yuanbao.tencent.com',
+    poe: 'https://poe.com',
+    notionai: 'https://app.notion.com',
+    zai: 'https://chat.z.ai',
+  };
+  const origin = canonicalOrigins[source] || url.origin;
+  const pathname = url.pathname.replace(/\/+$/, '') || '/';
+  if (source === 'notionai') {
+    const threadId = String(url.searchParams.get('t') || '').trim();
+    return threadId ? `${origin}/chat?t=${encodeURIComponent(threadId)}` : '';
+  }
+
+  return `${origin}${pathname}`;
 }

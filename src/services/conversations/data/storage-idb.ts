@@ -8,7 +8,7 @@ import {
   reusableImageCacheByteSize,
 } from '@services/conversations/data/image-cache-record';
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
-import { canonicalChatIdentityFromUrl } from '@services/conversations/domain/chat-identity';
+import { canonicalChatIdentityFromUrl, canonicalChatUrlFromUrl } from '@services/conversations/domain/chat-identity';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
@@ -168,6 +168,31 @@ function conversationRecordsEquivalent(left: unknown, right: unknown): boolean {
   return storedValueEqual(leftRecord, rightRecord);
 }
 
+function conversationSemanticContentChanged(existing: any, next: any): boolean {
+  if (!existing) return true;
+  const sourceType = safeString(next?.sourceType || existing?.sourceType).toLowerCase();
+  const project = (record: any) => {
+    if (sourceType === 'article') {
+      return {
+        title: safeString(record?.title),
+        author: safeString(record?.author),
+        publishedAt: safeString(record?.publishedAt),
+      };
+    }
+    if (sourceType === 'video') {
+      return {
+        title: safeString(record?.title),
+        author: safeString(record?.author),
+        durationSeconds: record?.durationSeconds == null ? null : Number(record.durationSeconds),
+        videoDescription: safeString(record?.videoDescription),
+      };
+    }
+    return null;
+  };
+  if (sourceType === 'chat') return false;
+  return !storedValueEqual(project(existing), project(next));
+}
+
 type ResolvedMessageTimestamp = { present: false } | { present: true; value: unknown };
 
 function resolveMessageTimestamp(
@@ -216,6 +241,27 @@ function messageRecordsEquivalent(left: unknown, right: unknown): boolean {
   return storedValueEqual(leftRecord, rightRecord);
 }
 
+function messageSemanticContentEquivalent(left: unknown, right: unknown): boolean {
+  const project = (value: unknown) => {
+    const record = { ...((value && typeof value === 'object' ? value : {}) as Record<string, unknown>) };
+    delete record.id;
+    delete record.conversationId;
+    delete record.messageKey;
+    delete record.sequence;
+    delete record.updatedAt;
+    return record;
+  };
+  return storedValueEqual(project(left), project(right));
+}
+
+function preserveEquivalentMessageTimestamp(existing: any, record: any): any {
+  if (!existing || !record || !messageSemanticContentEquivalent(existing, record)) return record;
+  const next = { ...record };
+  if (Object.prototype.hasOwnProperty.call(existing, 'updatedAt')) next.updatedAt = existing.updatedAt;
+  else delete next.updatedAt;
+  return next;
+}
+
 function buildConversationMessageRecord(input: {
   conversationId: number;
   message: any;
@@ -256,6 +302,31 @@ function buildConversationMessageRecord(input: {
   }
 
   return withOptionalId(existing && existing.id, baseRecord);
+}
+
+function buildResolvedConversationMessageRecord(input: {
+  conversationId: number;
+  message: any;
+  existing?: any;
+  sequence: number;
+}) {
+  const { conversationId, message, existing, sequence } = input;
+  const merge = resolveMessageContentMerge(existing, message);
+  const incomingAuthorName =
+    message?.authorName && String(message.authorName).trim() ? String(message.authorName).trim() : '';
+  const timestamp = resolveMessageTimestamp(existing, message?.updatedAt, merge.preserveExistingTimestamp);
+  const record = buildConversationMessageRecord({
+    conversationId,
+    message,
+    existing,
+    contentMarkdown: merge.contentMarkdown,
+    authorName: incomingAuthorName,
+    sequence,
+    timestamp,
+  });
+  return message?.captureMergePolicy === 'preserve-existing-markdown'
+    ? record
+    : preserveEquivalentMessageTimestamp(existing, record);
 }
 
 function normalizeListKey(value: unknown, fallback: string): string {
@@ -514,7 +585,9 @@ async function migrateSyncMappingKey(
   return { syncMappingChanged };
 }
 
-export async function upsertConversation(payload: any): Promise<Conversation & { __isNew: boolean }> {
+export async function upsertConversation(
+  payload: any,
+): Promise<Conversation & { __isNew: boolean; __semanticContentChanged: boolean }> {
   const db = await openDb();
   const incomingChatIdentity =
     safeString(payload?.sourceType).toLowerCase() === 'chat'
@@ -578,7 +651,11 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
       const isArticleSource =
         safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === WEB_ARTICLE_SOURCE;
 
-      const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+      const rawPayloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+      const payloadUrl =
+        safeString(nextSourceType).toLowerCase() === 'chat'
+          ? canonicalChatUrlFromUrl(nextSource, rawPayloadUrl) || rawPayloadUrl
+          : rawPayloadUrl;
       const existingUrl = existing ? String(existing.url || '').trim() : '';
       const nextUrlCandidate = payloadUrl || existingUrl;
       const articleIdentity = isArticleSource ? buildCanonicalWebArticleIdentity(nextUrlCandidate) : null;
@@ -694,18 +771,27 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
           await reqToPromise(stores.conversations.put(record));
           markChanged('conversations');
         }
-        return { record, conversationChanged, isNew: false };
+        return {
+          record,
+          conversationChanged,
+          semanticContentChanged: conversationSemanticContentChanged(existing, record),
+          isNew: false,
+        };
       }
 
       const id = await reqToPromise(stores.conversations.add(record));
       record.id = id as any;
       markChanged('conversations');
-      return { record, conversationChanged: true, isNew: true };
+      return { record, conversationChanged: true, semanticContentChanged: true, isNew: true };
     },
   );
 
   if (outcome.conversationChanged) invalidateConversationListStatsCache();
-  return { ...outcome.record, __isNew: outcome.isNew };
+  return {
+    ...outcome.record,
+    __isNew: outcome.isNew,
+    __semanticContentChanged: outcome.semanticContentChanged,
+  };
 }
 
 type ConversationMutationContext = {
@@ -1311,6 +1397,7 @@ export async function syncConversationMessages(
     mode?: 'snapshot' | 'incremental' | 'append';
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
     activityAt?: number;
+    conversationContentChanged?: boolean;
   },
 ): Promise<{ upserted: number; deleted: number }> {
   const requestedMode = options?.mode;
@@ -1331,12 +1418,13 @@ export async function syncConversationMessages(
     },
     async ({ stores, markChanged }) => {
       let activityConversation: any = null;
+      let semanticContentChanged = options?.conversationContentChanged === true;
       if (activityAtProvided) {
         activityConversation = await reqToPromise(stores.conversations.get(conversationId as any));
         if (!activityConversation) throw new Error('conversation not found');
       }
       const commitActivity = async () => {
-        if (!activityConversation) return;
+        if (!activityConversation || !semanticContentChanged) return;
         const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
         if (activityAt <= current) return;
         activityConversation = { ...activityConversation, lastActivityAt: activityAt };
@@ -1443,18 +1531,26 @@ export async function syncConversationMessages(
                 : Number.isFinite(m.sequence)
                   ? m.sequence
                   : 0;
-          const merge = resolveMessageContentMerge(existing, m);
-          const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-          const timestamp = resolveMessageTimestamp(existing, m.updatedAt, merge.preserveExistingTimestamp);
-          const record: any = buildConversationMessageRecord({
+          const aliasProbe = {
+            ...m,
+            messageKey: key,
+            sequence: Number.isFinite(m.sequence) ? m.sequence : sequence,
+          };
+          const semanticAlias =
+            !existing && m.captureSequencePolicy === 'reconcile-existing-order'
+              ? semanticAliasCandidates.find((candidate) => isSemanticMessageAlias(candidate, aliasProbe)) || null
+              : null;
+          const semanticBaseline = existing || semanticAlias;
+          const existingForResolution = semanticAlias ? { ...semanticAlias, id: undefined } : existing;
+          const record: any = buildResolvedConversationMessageRecord({
             conversationId,
             message: { ...m, messageKey: key },
-            existing,
-            contentMarkdown: merge.contentMarkdown,
-            authorName: incomingAuthorName,
+            existing: existingForResolution,
             sequence,
-            timestamp,
           });
+          if (!semanticBaseline || (!semanticAlias && !messageSemanticContentEquivalent(semanticBaseline, record))) {
+            semanticContentChanged = true;
+          }
           if (existing) {
             if (!messageRecordsEquivalent(existing, record)) {
               await reqToPromise(stores.messages.put(record));
@@ -1471,7 +1567,7 @@ export async function syncConversationMessages(
           if (m.captureSequencePolicy === 'reconcile-existing-order' && semanticAliasCandidates.length) {
             const remainingAliases: any[] = [];
             for (const candidate of semanticAliasCandidates) {
-              if (!isSemanticMessageAlias(candidate, m)) {
+              if (!isSemanticMessageAlias(candidate, aliasProbe)) {
                 remainingAliases.push(candidate);
                 continue;
               }
@@ -1493,6 +1589,7 @@ export async function syncConversationMessages(
           await reqToPromise(stores.messages.delete(id));
           markChanged('messages');
           deleted += 1;
+          semanticContentChanged = true;
         }
 
         await commitActivity();
@@ -1509,6 +1606,7 @@ export async function syncConversationMessages(
       }
 
       const presentKeys = new Set<string>();
+      const structuralAliasKeys = new Set<string>();
       let upserted = 0;
 
       for (const m of messages || []) {
@@ -1516,18 +1614,23 @@ export async function syncConversationMessages(
         presentKeys.add(String(m.messageKey));
 
         const existing: any = existingByKey.get(m.messageKey);
-        const merge = resolveMessageContentMerge(existing, m);
-        const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-        const timestamp = resolveMessageTimestamp(existing, m.updatedAt, merge.preserveExistingTimestamp);
-        const record: any = buildConversationMessageRecord({
+        const sequence = Number.isFinite(m.sequence) ? m.sequence : 0;
+        const aliasProbe = { ...m, sequence };
+        const semanticAlias = existing
+          ? null
+          : storedRows.find((candidate) => isSemanticMessageAlias(candidate, aliasProbe)) || null;
+        if (semanticAlias?.messageKey) structuralAliasKeys.add(String(semanticAlias.messageKey));
+        const semanticBaseline = existing || semanticAlias;
+        const existingForResolution = semanticAlias ? { ...semanticAlias, id: undefined } : existing;
+        const record: any = buildResolvedConversationMessageRecord({
           conversationId,
           message: m,
-          existing,
-          contentMarkdown: merge.contentMarkdown,
-          authorName: incomingAuthorName,
-          sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-          timestamp,
+          existing: existingForResolution,
+          sequence,
         });
+        if (!semanticBaseline || (!semanticAlias && !messageSemanticContentEquivalent(semanticBaseline, record))) {
+          semanticContentChanged = true;
+        }
         if (existing) {
           if (!messageRecordsEquivalent(existing, record)) {
             await reqToPromise(stores.messages.put(record));
@@ -1550,6 +1653,7 @@ export async function syncConversationMessages(
         await reqToPromise(stores.messages.delete(id));
         markChanged('messages');
         deleted += 1;
+        if (!structuralAliasKeys.has(String(row.messageKey))) semanticContentChanged = true;
       }
 
       await commitActivity();

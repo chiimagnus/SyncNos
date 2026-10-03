@@ -128,6 +128,7 @@ export function createContentController(deps: Deps) {
       mode: options?.mode || 'snapshot',
       diff: options?.diff || null,
       conversationSourceType: snapshot?.conversation?.sourceType || 'chat',
+      conversationContentChanged: (conversation as any)?.__semanticContentChanged === true,
       activityAt,
     });
     if (!messagesRes?.ok) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canonicalChatIdentityFromUrl } from '@services/conversations/domain/chat-identity';
+import { canonicalChatIdentityFromUrl, canonicalChatUrlFromUrl } from '@services/conversations/domain/chat-identity';
 
 describe('canonical chat identity', () => {
   it.each([
@@ -9,6 +9,7 @@ describe('canonical chat identity', () => {
     ['chatgpt', 'https://chatgpt.com/share/share-1', 'chatgpt:share:share-1'],
     ['claude', 'https://claude.ai/chat/claude-1', 'claude:claude-1'],
     ['gemini', 'https://gemini.google.com/app/gemini-1?hl=zh', 'gemini:gemini-1'],
+    ['gemini', 'https://gemini.google.com/gem/custom-gem/gemini-2?hl=zh', 'gemini:gemini-2'],
     ['googleaistudio', 'https://aistudio.google.com/u/0/prompts/prompt-1', 'googleaistudio:prompt-1'],
     ['deepseek', 'https://chat.deepseek.com/a/chat/s/deep-1', 'deepseek:deep-1'],
     ['kimi', 'https://www.kimi.com/chat/kimi-1?chat_enter_method=home', 'kimi:kimi-1'],
@@ -19,6 +20,25 @@ describe('canonical chat identity', () => {
     ['zai', 'https://chat.z.ai/c/zai-1', 'zai:zai-1'],
   ])('derives %s durable identity from its real conversation route', (source, url, expected) => {
     expect(canonicalChatIdentityFromUrl(source, url)).toBe(expected);
+  });
+
+  it.each([
+    ['kimi', 'https://www.kimi.com/chat/kimi-1?chat_enter_method=home', 'https://www.kimi.com/chat/kimi-1'],
+    ['kimi', 'https://kimi.moonshot.cn/chat/kimi-1?from=old', 'https://www.kimi.com/chat/kimi-1'],
+    ['gemini', 'https://gemini.google.com/app/gemini-1?hl=zh', 'https://gemini.google.com/app/gemini-1'],
+    [
+      'gemini',
+      'https://gemini.google.com/gem/custom-gem/gemini-2?hl=zh',
+      'https://gemini.google.com/gem/custom-gem/gemini-2',
+    ],
+    [
+      'notionai',
+      'https://app.notion.com/chat?t=ABCDEF&wfv=chat&source=sidebar',
+      'https://app.notion.com/chat?t=ABCDEF',
+    ],
+    ['doubao', 'https://www.doubao.com/chat/doubao-1?from=history', 'https://www.doubao.com/chat/doubao-1'],
+  ])('normalizes %s durable conversation url', (source, url, expected) => {
+    expect(canonicalChatUrlFromUrl(source, url)).toBe(expected);
   });
 
   it('normalizes provider aliases and ignores non-durable home/new-chat routes', () => {

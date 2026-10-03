@@ -371,6 +371,9 @@ describe('data revision storage', () => {
     expect(await readDataRevision('messages')).toBe(1);
 
     await syncConversationMessages(42, [{ ...message, updatedAt: 11 }]);
+    expect(await readDataRevision('messages')).toBe(1);
+
+    await syncConversationMessages(42, [{ ...message, contentMarkdown: 'changed', updatedAt: 11 }]);
     expect(await readDataRevision('messages')).toBe(2);
 
     await syncConversationMessages(42, []);

@@ -313,6 +313,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       String(msg?.conversationSourceType || '')
         .trim()
         .toLowerCase() || 'chat';
+    const conversationContentChanged = msg?.conversationContentChanged === true;
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
     const needsDefaultUserAuthor = messages.some((message: any) => {
@@ -394,6 +395,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       mode,
       diff,
       ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
+      ...(conversationContentChanged ? { conversationContentChanged: true } : null),
     });
     fireAndForget(
       deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
