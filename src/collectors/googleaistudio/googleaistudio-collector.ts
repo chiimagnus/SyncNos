@@ -51,14 +51,21 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl(): any {
+  function findSavedPromptIdFromUrl(): string {
     try {
-      const p = env.location.pathname || '';
-      if (!p || p === '/') return false;
-      return true;
-    } catch (_e) {
-      return false;
+      const path = String(env.location.pathname || '');
+      const match = path.match(/^\/(?:app\/)?(?:u\/\d+\/)?prompts\/([^/?#]+)(?:\/|$)/);
+      const id = match?.[1] ? decodeURIComponent(match[1]).trim() : '';
+      if (!id) return '';
+      if (new Set(['new_chat', 'new_comparison', 'new_image', 'new_video', 'new_music']).has(id)) return '';
+      return id;
+    } catch (_error) {
+      return '';
     }
+  }
+
+  function isValidConversationUrl(): boolean {
+    return !!findSavedPromptIdFromUrl();
   }
 
   function findConversationKey(): any {
@@ -107,6 +114,10 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
   function inEditMode(root: any): any {
     return inEditModeUtil(root);
+  }
+
+  function isPromptRunning(): boolean {
+    return !!env.document.querySelector('ms-run-button .stoppable-spinner, ms-run-button .stoppable-stop');
   }
 
   function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
@@ -438,6 +449,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     withinTurn: number;
     fingerprint: string;
     rendered: boolean;
+    streaming: boolean;
   };
 
   function compactFingerprint(value: string): string {
@@ -445,26 +457,47 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return env.normalize?.fnv1a32 ? String(env.normalize.fnv1a32(normalized)) : normalized;
   }
 
-  function descriptorFromEntry(entry: ManualTurnEntry): AiStudioDescriptor {
+  function latestStreamingAssistantKey(refs: ManualEntryRef[]): string {
+    if (!isPromptRunning()) return '';
+    for (let index = refs.length - 1; index >= 0; index -= 1) {
+      const entry = refs[index]?.entry;
+      if (entry?.role === 'assistant') return entry.messageKey;
+    }
+    return '';
+  }
+
+  function descriptorFromEntry(entry: ManualTurnEntry, streamingKey = ''): AiStudioDescriptor {
     const rawText = env.normalize.normalizeText(
       (entry.content as any).innerText || (entry.content as any).textContent || '',
     );
     const rawHtml = String((entry.content as any).innerHTML || '');
     const httpUrls = extractImageUrlsFromElement(entry.content);
     const blobUrls = extractBlobImageUrlsFromElement(entry.content);
+    const streaming = entry.role === 'assistant' && entry.messageKey === streamingKey;
     return {
       key: entry.messageKey,
       turnKey: entry.turnId,
       withinTurn: entry.withinTurn,
       fingerprint: compactFingerprint(
-        [entry.messageKey, entry.role, rawText, rawHtml, httpUrls.join('|'), blobUrls.join('|')].join('\u001f'),
+        [
+          entry.messageKey,
+          entry.role,
+          String(streaming),
+          rawText,
+          rawHtml,
+          httpUrls.join('|'),
+          blobUrls.join('|'),
+        ].join('\u001f'),
       ),
-      rendered: !!rawText || !!httpUrls.length || !!blobUrls.length,
+      rendered: !streaming && (!!rawText || !!httpUrls.length || !!blobUrls.length),
+      streaming,
     };
   }
 
   function readCurrentDescriptors(): AiStudioDescriptor[] {
-    return readCurrentManualEntryRefs().map(({ entry }) => descriptorFromEntry(entry));
+    const refs = readCurrentManualEntryRefs();
+    const streamingKey = latestStreamingAssistantKey(refs);
+    return refs.map(({ entry }) => descriptorFromEntry(entry, streamingKey));
   }
 
   async function harvestManualInto(
@@ -472,14 +505,20 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     ctx: InlineImageContext,
   ): Promise<{ added: number; updated: number }> {
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
+    const refs = readCurrentManualEntryRefs();
+    const streamingKey = latestStreamingAssistantKey(refs);
     const candidates = (() => {
       const output: Array<{
         descriptor: AiStudioDescriptor;
         existing?: PreparedMessageRecord<any>;
         input?: PlainExtractionInput;
       }> = [];
-      for (const { turn, entry } of readCurrentManualEntryRefs()) {
-        const descriptor = descriptorFromEntry(entry);
+      for (const { turn, entry } of refs) {
+        const descriptor = descriptorFromEntry(entry, streamingKey);
+        if (!descriptor.rendered) {
+          output.push({ descriptor });
+          continue;
+        }
         const existing = existingByKey.get(descriptor.key);
         if (existing && existing.fingerprint === descriptor.fingerprint) {
           output.push({ descriptor, existing });
@@ -656,6 +695,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       collectMessages: async () => collectMessages(createInlineImageContext()),
       extractAssistantMarkdown,
       extractAssistantText,
+      isPromptRunning,
+      readCurrentDescriptors,
     },
   };
 

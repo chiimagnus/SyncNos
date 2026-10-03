@@ -21,8 +21,8 @@ async function capturePrepared(def: any, prepareOptions: any = {}) {
 }
 
 describe('googleaistudio-collector', () => {
-  it('keeps a supported AI Studio route ready before turns render', () => {
-    const dom = setupDom('', 'https://aistudio.google.com/app/abc123');
+  it('only marks saved AI Studio prompt routes as capture-ready', () => {
+    const dom = setupDom('', 'https://aistudio.google.com/prompts/abc123');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -32,14 +32,25 @@ describe('googleaistudio-collector', () => {
     const def = createGoogleAiStudioCollectorDef(env);
     expect(def.collector.isCaptureAvailable()).toBe(true);
 
-    const unsupportedDom = setupDom('', 'https://aistudio.google.com/');
-    const unsupportedEnv = createCollectorEnv({
-      window: unsupportedDom.window as any,
-      document: unsupportedDom.window.document as any,
-      location: unsupportedDom.window.location as any,
-      normalize: normalizeApi,
-    });
-    expect(createGoogleAiStudioCollectorDef(unsupportedEnv).collector.isCaptureAvailable()).toBe(false);
+    for (const url of [
+      'https://aistudio.google.com/',
+      'https://aistudio.google.com/library',
+      'https://aistudio.google.com/apps',
+      'https://aistudio.google.com/prompts/new_chat',
+      'https://aistudio.google.com/prompts/new_comparison',
+      'https://aistudio.google.com/prompts/new_image',
+      'https://aistudio.google.com/prompts/new_video',
+      'https://aistudio.google.com/prompts/new_music',
+    ]) {
+      const unsupportedDom = setupDom('', url);
+      const unsupportedEnv = createCollectorEnv({
+        window: unsupportedDom.window as any,
+        document: unsupportedDom.window.document as any,
+        location: unsupportedDom.window.location as any,
+        normalize: normalizeApi,
+      });
+      expect(createGoogleAiStudioCollectorDef(unsupportedEnv).collector.isCaptureAvailable()).toBe(false);
+    }
   });
 
   it('captures AI Studio ms-chat-turn DOM and renders assistant markdown', async () => {
@@ -72,7 +83,7 @@ describe('googleaistudio-collector', () => {
         </ms-chat-turn>
       </div>
     `;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/abc123');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -135,7 +146,7 @@ describe('googleaistudio-collector', () => {
         </ms-chat-turn>
       </div>
     `;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/abc123');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -175,7 +186,7 @@ describe('googleaistudio-collector', () => {
         </ms-chat-turn>
       </div>
     `;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/abc123');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -193,7 +204,7 @@ describe('googleaistudio-collector', () => {
   });
 
   it('keeps ms-katex inline formulas inline (no forced line breaks)', async () => {
-    const dom = setupDom('', 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom('', 'https://aistudio.google.com/prompts/abc123');
     const d = dom.window.document;
 
     const session = d.createElement('div');
@@ -295,7 +306,7 @@ describe('googleaistudio-collector', () => {
         </ms-chat-turn>
       </div>
     `;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/abc123');
     const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]); // PNG signature
     const pngBlob = new (dom.window as any).Blob([pngBytes], { type: 'image/png' });
 
@@ -324,7 +335,7 @@ describe('googleaistudio-collector', () => {
       <ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">one<img src="blob:https://aistudio.google.com/one" /></div></div></ms-chat-turn>
       <ms-chat-turn id="turn-2"><div data-turn-role="User"><div class="turn-content">two<img src="blob:https://aistudio.google.com/two" /></div></div></ms-chat-turn>
     </div>`;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/plain-input');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/plain-input');
     let releaseFirst: (() => void) | null = null;
     let calls = 0;
     (dom.window as any).fetch = async () => {
@@ -360,7 +371,7 @@ describe('googleaistudio-collector', () => {
       <ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">one<img src="${shared}" /></div></div></ms-chat-turn>
       <ms-chat-turn id="turn-2"><div data-turn-role="Model"><div class="turn-content">two<img src="${shared}" /></div></div></ms-chat-turn>
     </div>`;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/blob-cache');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/blob-cache');
     let calls = 0;
     (dom.window as any).fetch = async () => {
       calls += 1;
@@ -385,7 +396,7 @@ describe('googleaistudio-collector', () => {
       <ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">failed<img src="blob:https://aistudio.google.com/fail" /></div></div></ms-chat-turn>
       <ms-chat-turn id="turn-2"><div data-turn-role="Model"><div class="turn-content">ok<img src="blob:https://aistudio.google.com/ok" /></div></div></ms-chat-turn>
     </div>`;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/image-policy');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/image-policy');
     (dom.window as any).fetch = async (url: string) =>
       url.endsWith('/fail')
         ? { ok: false }
@@ -425,7 +436,7 @@ describe('googleaistudio-collector', () => {
         </ms-chat-turn>
       </div>
     `;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/abc123');
     (dom.window as any).fetch = async () => ({
       ok: false,
       blob: async () => new (dom.window as any).Blob([], { type: 'image/png' }),
@@ -449,11 +460,11 @@ describe('googleaistudio-collector', () => {
   it('keeps prepared results isolated across collector instances', async () => {
     const firstDom = setupDom(
       '<div class="chat-session-content"><ms-chat-turn id="a"><div class="chat-turn-container user"><div data-turn-role="User"><div class="turn-content">A</div></div></div></ms-chat-turn></div>',
-      'https://aistudio.google.com/app/a',
+      'https://aistudio.google.com/prompts/a',
     );
     const secondDom = setupDom(
       '<div class="chat-session-content"><ms-chat-turn id="b"><div class="chat-turn-container user"><div data-turn-role="User"><div class="turn-content">B</div></div></div></ms-chat-turn></div>',
-      'https://aistudio.google.com/app/b',
+      'https://aistudio.google.com/prompts/b',
     );
     const first = createGoogleAiStudioCollectorDef(
       createCollectorEnv({
@@ -505,7 +516,7 @@ describe('googleaistudio-collector', () => {
       </div>
     `;
 
-    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/abc123');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -527,7 +538,7 @@ describe('googleaistudio-collector', () => {
   it('sweeps remounted virtual windows and restores the nested scroll root', async () => {
     const dom = setupDom(
       '<div id="scroll"><div class="chat-session-content"></div></div>',
-      'https://aistudio.google.com/app/dynamic',
+      'https://aistudio.google.com/prompts/dynamic',
     );
     const document = dom.window.document;
     const scroll = document.querySelector('#scroll') as HTMLElement;
@@ -595,7 +606,7 @@ describe('googleaistudio-collector', () => {
 
   it('uses stable turn-role-ordinal keys for multiple messages in one turn', async () => {
     const html = `<div class="chat-session-content"><ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">Q</div></div><div data-turn-role="Model"><div class="turn-content">A</div></div></ms-chat-turn></div>`;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/identity');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/identity');
     const def = createGoogleAiStudioCollectorDef(
       createCollectorEnv({
         window: dom.window as any,
@@ -614,9 +625,48 @@ describe('googleaistudio-collector', () => {
     ).toBe(true);
   });
 
+  it('keeps the latest assistant unresolved while the current run button is stoppable', async () => {
+    const html = `<div class="chat-session-content">
+      <ms-chat-turn id="turn-1">
+        <div data-turn-role="User"><div class="turn-content">Q</div></div>
+        <div data-turn-role="Model"><div class="turn-content">partial answer</div></div>
+      </ms-chat-turn>
+    </div>
+    <ms-run-button><span class="stoppable-stop"></span></ms-run-button>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/running');
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    expect(def.collector.__test.isPromptRunning()).toBe(true);
+    expect(def.collector.__test.readCurrentDescriptors()).toEqual([
+      expect.objectContaining({ key: 'turn-1:user:0', rendered: true, streaming: false }),
+      expect.objectContaining({ key: 'turn-1:assistant:1', rendered: false, streaming: true }),
+    ]);
+
+    let clock = 0;
+    const prepared = await def.collector.prepareManualCapture({
+      stableSamples: 1,
+      pollMs: 1,
+      stepTimeoutMs: 2,
+      totalDeadlineMs: 20,
+      now: () => clock,
+      sleep: async () => {
+        clock += 1;
+      },
+    });
+    expect(prepared.completeness).toBe('partial');
+    expect(prepared.reasons).toContain('unresolved_turn');
+    expect(prepared.records.map((record: any) => record.key)).toEqual(['turn-1:user:0']);
+  });
+
   it('keeps an unloaded message in a multi-message turn partial', async () => {
     const html = `<div class="chat-session-content"><ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">Q</div></div><div data-turn-role="Model"><div class="turn-content"></div></div></ms-chat-turn></div>`;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/identity');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/identity');
     const def = createGoogleAiStudioCollectorDef(
       createCollectorEnv({
         window: dom.window as any,
@@ -644,7 +694,7 @@ describe('googleaistudio-collector', () => {
 
   it('refuses to verify manual identity when stable turn ids are missing', async () => {
     const html = `<div class="chat-session-content"><ms-chat-turn><div data-turn-role="User"><div class="turn-content">Q</div></div></ms-chat-turn></div>`;
-    const dom = setupDom(html, 'https://aistudio.google.com/app/missing-id');
+    const dom = setupDom(html, 'https://aistudio.google.com/prompts/missing-id');
     const def = createGoogleAiStudioCollectorDef(
       createCollectorEnv({
         window: dom.window as any,
