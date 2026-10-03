@@ -49,9 +49,15 @@ describe('doubao-collector', () => {
 
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    expect(snap.messages[0].role).toBe('user');
-    expect(snap.messages[0].contentMarkdown).toBe('111');
-    expect(snap.messages[1].role).toBe('assistant');
+    expect(snap.messages[0]).toMatchObject({
+      messageKey: 'doubao_43080634158254594',
+      role: 'user',
+      contentMarkdown: '111',
+    });
+    expect(snap.messages[1]).toMatchObject({
+      messageKey: 'doubao_43080634158259458',
+      role: 'assistant',
+    });
     expect(snap.messages[1].contentMarkdown).toBe('111～👀');
     expect(snap.messages[1].contentMarkdown).toContain('111～👀');
   });
@@ -87,6 +93,38 @@ describe('doubao-collector', () => {
     expect(snap.messages[0].role).toBe('assistant');
     expect(snap.messages[0].contentMarkdown).toBe('plain answer');
     expect(snap.messages[0].contentMarkdown).toBe('plain answer');
+  });
+
+  it('captures current semantic file attachment names', async () => {
+    const html = `
+      <div aria-label="doc_editor">
+        <div class="flex flex-col flex-grow">
+          <div data-message-id="43080634158254595" class="flex-row flex w-full justify-end">
+            <div class="bg-g-send-msg-bubble-bg">
+              <div data-testid="attachment_file_item">
+                <div data-testid="message_nested_content_file_name">paper.pdf</div>
+              </div>
+              <div data-testid="message_text_content">总结附件</div>
+            </div>
+          </div>
+          <div data-foundation-type="send-message-action-bar"></div>
+        </div>
+      </div>
+    `;
+
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/file001');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
+
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0]).toMatchObject({ messageKey: 'doubao_43080634158254595', role: 'user' });
+    expect(snap.messages[0].contentMarkdown).toContain('Attachment: paper.pdf');
+    expect(snap.messages[0].contentMarkdown).toContain('总结附件');
   });
 
   it('inlines blob: uploaded images as data:image urls', async () => {

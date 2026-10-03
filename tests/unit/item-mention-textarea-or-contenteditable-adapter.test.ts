@@ -36,6 +36,17 @@ afterEach(() => {
 });
 
 describe('item-mention textarea/contenteditable editor adapter', () => {
+  it('detects the current Doubao Tiptap/ProseMirror contenteditable editor', () => {
+    document.body.innerHTML = '<div class="tiptap ProseMirror" contenteditable="true">$ab</div>';
+    const el = document.querySelector('.ProseMirror') as HTMLElement;
+    (el as any).getBoundingClientRect = () => ({ width: 300, height: 80, top: 0, left: 0, right: 300, bottom: 80 });
+    el.focus();
+
+    const editor = textareaOrContentEditableEditorAdapter.detectActiveEditor();
+    expect(editor?.kind).toBe('contenteditable');
+    expect(editor?.el).toBe(el);
+  });
+
   it('replaces a range in textarea', () => {
     const el = document.querySelector('textarea') as HTMLTextAreaElement;
     (el as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });

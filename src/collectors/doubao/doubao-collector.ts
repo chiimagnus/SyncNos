@@ -214,6 +214,17 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     return null;
   }
 
+  function attachmentMarkdown(row: Element): string {
+    const names = Array.from(
+      row.querySelectorAll("[data-testid='attachment_file_item'] [data-testid='message_nested_content_file_name']"),
+    )
+      .map((node) => env.normalize.normalizeText(String(node.textContent || '')).trim())
+      .filter(Boolean);
+    return Array.from(new Set(names))
+      .map((name) => `Attachment: ${name}`)
+      .join('\n\n');
+  }
+
   async function collectModernMessages(ctx: InlineImageContext): Promise<any[]> {
     const root = getConversationRoot();
     if (!root) return [];
@@ -252,15 +263,19 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
       const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
       if (!text && !imageUrls.length) continue;
 
-      const contentText = text || '';
-      const baseMarkdown =
+      const attachments = attachmentMarkdown(row);
+      const contentText = [attachments, text || ''].filter(Boolean).join('\n\n');
+      const renderedMarkdown =
         role === 'assistant' && typeof doubaoMarkdown.extractAssistantMarkdown === 'function'
-          ? doubaoMarkdown.extractAssistantMarkdown(textEl) || contentText
-          : contentText;
+          ? doubaoMarkdown.extractAssistantMarkdown(textEl) || text || ''
+          : text || '';
+      const baseMarkdown = [attachments, renderedMarkdown].filter(Boolean).join('\n\n');
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls, { allowDataImageUrls: true });
 
       out.push({
-        messageKey: env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence: seq }),
+        messageKey: messageId
+          ? `doubao_${messageId}`
+          : env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence: seq }),
         role,
         contentMarkdown,
         sequence: seq,
