@@ -87,6 +87,49 @@ describe('runtime observer lifecycle', () => {
     observer.stop();
   });
 
+  it('reruns capture and rebinds the root when a virtualized page becomes visible again', () => {
+    const listeners = new Map<string, EventListener>();
+    let visibilityState: 'hidden' | 'visible' = 'hidden';
+    const fakeDocument = {
+      get visibilityState() {
+        return visibilityState;
+      },
+      addEventListener: vi.fn((type: string, listener: EventListener) => listeners.set(type, listener)),
+      removeEventListener: vi.fn((type: string, listener: EventListener) => {
+        if (listeners.get(type) === listener) listeners.delete(type);
+      }),
+    };
+    // @ts-expect-error minimal fake document
+    globalThis.document = fakeDocument;
+
+    const firstRoot = {} as Node;
+    const resumedRoot = {} as Node;
+    let root: Node | null = firstRoot;
+    const onTick = vi.fn();
+    const observer = createObserver({ getRoot: () => root, onTick, debounceMs: 50 });
+    observer.start();
+    expect(onTick).toHaveBeenCalledTimes(1);
+    expect(observerRecords).toHaveLength(1);
+
+    listeners.get('visibilitychange')?.(new Event('visibilitychange'));
+    expect(onTick).toHaveBeenCalledTimes(1);
+
+    root = resumedRoot;
+    visibilityState = 'visible';
+    listeners.get('visibilitychange')?.(new Event('visibilitychange'));
+    expect(onTick).toHaveBeenCalledTimes(2);
+    expect(observerRecords).toHaveLength(2);
+    expect(observerRecords[0]!.disconnect).toHaveBeenCalledTimes(1);
+    expect(observerRecords[1]!.observe).toHaveBeenCalledWith(
+      resumedRoot,
+      expect.objectContaining({ subtree: true, childList: true }),
+    );
+
+    observer.stop();
+    expect(fakeDocument.removeEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+    expect(listeners.has('visibilitychange')).toBe(false);
+  });
+
   it('clears the root poll even if a MutationObserver was never created', async () => {
     const getRoot = vi.fn(() => null);
     const observer = createObserver({ getRoot, onTick: vi.fn(), debounceMs: 50 });
