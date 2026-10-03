@@ -60,7 +60,7 @@ describe('collectors images (smoke)', () => {
   it('z.ai collector appends image markdown', async () => {
     const dom = new JSDOM(
       `<body>
-        <main>
+        <main id="messages-container">
           <div id="message-1" class="user-message">
             <div class="whitespace-pre-wrap">
               user
@@ -87,7 +87,14 @@ describe('collectors images (smoke)', () => {
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = createZaiCollectorDef(env).collector.capture({ manual: true }) as any;
+    const collector = createZaiCollectorDef(env).collector as any;
+    const preparedCapture = await collector.prepareManualCapture({
+      maxSteps: 1,
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    const snap = (await collector.capture({ manual: true, preparedCapture })) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     expect(snap.messages[0].contentMarkdown).toContain('![](https://img.test/z-user.png)');

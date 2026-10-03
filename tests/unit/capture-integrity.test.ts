@@ -19,7 +19,12 @@ function snapshot(overrides: Record<string, unknown> = {}) {
 
 describe('capture integrity contract', () => {
   it('keeps virtualized providers manual-only from one source', () => {
-    expect(Array.from(VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS)).toEqual(['chatgpt', 'claude', 'googleaistudio']);
+    expect(Array.from(VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS)).toEqual([
+      'chatgpt',
+      'claude',
+      'googleaistudio',
+      'zai',
+    ]);
 
     const supportedIds = new Set(SUPPORTED_AI_CHAT_SITES.map((site) => site.id));
     for (const id of VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS) {
@@ -28,6 +33,7 @@ describe('capture integrity contract', () => {
     }
 
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('gemini')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('zai')).toBe(false);
   });
 
   it('keeps capture metadata and merge policies content-free and transient', () => {

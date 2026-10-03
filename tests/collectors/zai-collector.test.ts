@@ -30,6 +30,23 @@ function createCollector() {
   return createZaiCollectorDef(env).collector as any;
 }
 
+async function capturePrepared(collector: any, options: Record<string, unknown> = {}) {
+  const preparedCapture = await collector.prepareManualCapture({
+    maxSteps: 8,
+    stableSamples: 1,
+    pollMs: 0,
+    stepTimeoutMs: 20,
+    boundaryTimeoutMs: 20,
+    sleep: async () => {},
+    ...options,
+  });
+  return collector.capture({ manual: true, preparedCapture });
+}
+
+function conversationBody(messages: string, extra = '') {
+  return `<body><div id="messages-container">${messages}</div>${extra}</body>`;
+}
+
 describe('zai-collector', () => {
   it('captures user uploaded images from attachment card', async () => {
     const html = `
@@ -46,25 +63,23 @@ describe('zai-collector', () => {
               </button>
             </div>
           </div>
-          <div class="relative w-full">
-            <div class="whitespace-pre-wrap">这是什么？</div>
-          </div>
+          <div class="relative w-full"><div class="whitespace-pre-wrap">这是什么？</div></div>
         </div>
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-img1' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-img1' });
     setupDom(dom);
-    const collector = createCollector();
-    const snap = collector.capture() as any;
+    const snap = (await capturePrepared(createCollector())) as any;
     expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(1);
+    expect(snap.captureMeta.completeness).toBe('complete');
+    expect(snap.messages).toHaveLength(1);
     expect(snap.messages[0].role).toBe('user');
     expect(snap.messages[0].contentMarkdown).toContain('这是什么？');
     expect(snap.messages[0].contentMarkdown).toContain('![](https://z-cdn-media.chatglm.cn/files/');
   });
 
-  it('ignores thinking-chain-container content', async () => {
+  it('ignores thinking-chain-container content', () => {
     const html = `
       <div id="message-1">
         <div class="chat-assistant">
@@ -73,53 +88,40 @@ describe('zai-collector', () => {
               <div data-direct="false" class="w-full thinking-chain-container">
                 <button><span>思考过程</span></button>
               </div>
-              <div class="w-full overflow-hidden h-0">
-                <div class="thinking-block w-full h-full">
-                  <blockquote slot="content"><p>这里是思维链内容，应该被忽略。</p></blockquote>
-                </div>
-              </div>
+              <div class="thinking-block"><blockquote><p>这里是思维链内容，应该被忽略。</p></blockquote></div>
               <p>这是最终回答内容。</p>
             </div>
           </div>
         </div>
       </div>
     `;
-
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv1' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv1' });
     setupDom(dom);
     const collector = createCollector();
-
-    const wrapper = dom.window.document.querySelector('#message-1');
-    const text = collector.__test.extractAssistantText(wrapper);
+    const text = collector.__test.extractAssistantText(dom.window.document.querySelector('#message-1'));
     expect(text).toContain('这是最终回答内容。');
     expect(text).not.toContain('思考过程');
     expect(text).not.toContain('思维链内容');
   });
 
-  it('extracts assistant markdown from rendered HTML', async () => {
+  it('extracts assistant markdown from rendered HTML', () => {
     const html = `
       <div id="message-3">
         <div class="chat-assistant">
           <div id="response-content-container">
             <div class="markdown-prose">
               <p><strong>Bold</strong> and <em>italic</em> with <a href="https://example.com">link</a> and <code>x = 1</code>.</p>
-              <ul>
-                <li>Item A</li>
-                <li>Item B</li>
-              </ul>
+              <ul><li>Item A</li><li>Item B</li></ul>
               <pre><code class="language-js">console.log(1);\nconsole.log(2);</code></pre>
             </div>
           </div>
         </div>
       </div>
     `;
-
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv3' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv3' });
     setupDom(dom);
     const collector = createCollector();
-
-    const wrapper = dom.window.document.querySelector('#message-3');
-    const md = collector.__test.extractAssistantMarkdown(wrapper);
+    const md = collector.__test.extractAssistantMarkdown(dom.window.document.querySelector('#message-3'));
     expect(md).toContain('**Bold**');
     expect(md).toContain('*italic*');
     expect(md).toContain('[link](https://example.com)');
@@ -128,10 +130,9 @@ describe('zai-collector', () => {
     expect(md).toContain('- Item B');
     expect(md).toContain('```js');
     expect(md).toContain('console.log(1);');
-    expect(md).toContain('```');
   });
 
-  it('preserves rich markdown structure used by current z.ai responses', async () => {
+  it('preserves rich markdown structure used by current z.ai responses', () => {
     const html = `
       <div id="message-rich">
         <div class="chat-assistant markdown-prose">
@@ -148,13 +149,10 @@ describe('zai-collector', () => {
         </div>
       </div>
     `;
-
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-rich' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-rich' });
     setupDom(dom);
     const collector = createCollector();
-    const wrapper = dom.window.document.querySelector('#message-rich');
-    const md = collector.__test.extractAssistantMarkdown(wrapper);
-
+    const md = collector.__test.extractAssistantMarkdown(dom.window.document.querySelector('#message-rich'));
     expect(md).toContain('#### Deep heading');
     expect(md).toContain('- Parent\n  - Child');
     expect(md).toContain('| Name | Value |');
@@ -179,32 +177,28 @@ describe('zai-collector', () => {
         </div>
       </div>
     `;
-
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-files' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-files' });
     setupDom(dom);
-    const collector = createCollector();
-    const snap = collector.capture() as any;
-
+    const snap = (await capturePrepared(createCollector())) as any;
     expect(snap.messages).toHaveLength(1);
     expect(snap.messages[0].contentMarkdown).toContain('Attachment: paper.pdf');
     expect(snap.messages[0].contentMarkdown).toContain('[Video attachment](https://example.com/demo.mp4)');
     expect(snap.messages[0].contentMarkdown).toContain('请总结附件');
   });
 
-  it('does not capture a message while the user is editing it', async () => {
+  it('does not prepare a capture while the user is editing a message', async () => {
     const html = `
       <div id="message-editing" class="user-message">
         <div class="chat-user"><div class="whitespace-pre-wrap">旧内容</div></div>
         <textarea id="message-edit-editing">正在编辑</textarea>
       </div>
     `;
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-edit' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-edit' });
     setupDom(dom);
-    const collector = createCollector();
-    expect(collector.capture({ manual: true })).toBeNull();
+    expect(await createCollector().prepareManualCapture({ manual: true })).toBeNull();
   });
 
-  it('skips the unfinished tail assistant while z.ai shows the stop control', async () => {
+  it('keeps an unfinished tail assistant partial while z.ai shows the stop control', async () => {
     const html = `
       <div id="message-user" class="user-message">
         <div class="chat-user"><div class="whitespace-pre-wrap">question</div></div>
@@ -212,47 +206,90 @@ describe('zai-collector', () => {
       <div id="message-assistant">
         <div class="chat-assistant"><div id="response-content-container"><p>partial answer</p></div></div>
       </div>
-      <textarea id="chat-input"></textarea>
     `;
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-stream' });
+    const dom = new JSDOM(conversationBody(html, '<textarea id="chat-input"></textarea>'), {
+      url: 'https://chat.z.ai/c/conv-stream',
+    });
     setupDom(dom);
     const collector = createCollector();
-    const snap = collector.capture({ manual: true }) as any;
-
+    let clock = 0;
+    const snap = (await capturePrepared(collector, {
+      stepTimeoutMs: 2,
+      boundaryTimeoutMs: 2,
+      totalDeadlineMs: 20,
+      now: () => clock,
+      sleep: async () => {
+        clock += 2;
+      },
+    })) as any;
+    expect(snap.captureMeta.completeness).toBe('partial');
     expect(snap.messages).toHaveLength(1);
     expect(snap.messages[0]).toMatchObject({ messageKey: 'message-user', role: 'user' });
-    expect(snap.messages[0].contentMarkdown).toContain('question');
   });
 
-  it('does not leak UI button labels when falling back to wrapper', async () => {
+  it('loads older batches until the current z.ai top sentinel disappears', async () => {
+    const html = `
+      <div id="older-loader" class="animate-pulse">Loading...</div>
+      <div id="message-new" class="user-message">
+        <div class="chat-user"><div class="whitespace-pre-wrap">new</div></div>
+      </div>
+    `;
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-batched' });
+    setupDom(dom);
+    const collector = createCollector();
+    let loaded = false;
+    const snap = (await capturePrepared(collector, {
+      sleep: async () => {
+        if (loaded) return;
+        loaded = true;
+        dom.window.document.getElementById('older-loader')?.remove();
+        const older = dom.window.document.createElement('div');
+        older.id = 'message-old';
+        older.className = 'user-message';
+        older.innerHTML = '<div class="chat-user"><div class="whitespace-pre-wrap">old</div></div>';
+        dom.window.document.getElementById('messages-container')?.prepend(older);
+      },
+    })) as any;
+
+    expect(snap.captureMeta.completeness).toBe('complete');
+    expect(snap.messages.map((message: any) => message.messageKey)).toEqual(['message-old', 'message-new']);
+    expect(snap.messages.map((message: any) => message.contentMarkdown)).toEqual(['old', 'new']);
+  });
+
+  it('requires manual prepared capture and does not expose z.ai homepage as capturable conversation', async () => {
+    const html = `
+      <div id="message-1" class="user-message">
+        <div class="chat-user"><div class="whitespace-pre-wrap">hello</div></div>
+      </div>
+    `;
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv-manual' });
+    setupDom(dom);
+    const collector = createCollector();
+    const prepared = await collector.prepareManualCapture({ stableSamples: 1, pollMs: 0, sleep: async () => {} });
+    expect(await collector.capture({ preparedCapture: prepared })).toBeNull();
+    expect(await collector.capture({ manual: true, preparedCapture: prepared })).toBeTruthy();
+
+    const home = new JSDOM('<body><div id="messages-container"></div></body>', { url: 'https://chat.z.ai/' });
+    setupDom(home);
+    expect(createCollector().isCaptureAvailable()).toBe(false);
+  });
+
+  it('does not leak UI button labels when falling back to wrapper', () => {
     const html = `
       <div id="message-2">
         <div class="chat-assistant">
           <div class="markdown-prose">
-            <div data-direct="false" class="thinking-chain-container">
-              <button><span>思考过程</span></button>
-            </div>
-            <div class="w-full overflow-hidden h-0">
-              <div class="thinking-block w-full h-full">
-                <blockquote slot="content"><p>should be ignored</p></blockquote>
-              </div>
-            </div>
+            <div data-direct="false" class="thinking-chain-container"><button><span>思考过程</span></button></div>
+            <div class="thinking-block"><blockquote><p>should be ignored</p></blockquote></div>
             <p>Hello answer</p>
           </div>
-          <div class="buttons">
-            <button aria-label="复制">复制</button>
-            <button aria-label="重新生成">重新生成</button>
-          </div>
+          <div class="buttons"><button>复制</button><button>重新生成</button></div>
         </div>
       </div>
     `;
-
-    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv2' });
+    const dom = new JSDOM(conversationBody(html), { url: 'https://chat.z.ai/c/conv2' });
     setupDom(dom);
-    const collector = createCollector();
-
-    const wrapper = dom.window.document.querySelector('#message-2');
-    const text = collector.__test.extractAssistantText(wrapper);
+    const text = createCollector().__test.extractAssistantText(dom.window.document.querySelector('#message-2'));
     expect(text).toContain('Hello answer');
     expect(text).not.toContain('复制');
     expect(text).not.toContain('重新生成');
