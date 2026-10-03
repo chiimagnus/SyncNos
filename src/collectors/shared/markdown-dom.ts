@@ -119,11 +119,8 @@ export function htmlToMarkdown(root: Element | null): string {
   function renderListItem(listItem: Element, marker: string, depth: number): string {
     const indent = '  '.repeat(Math.max(0, depth));
     const continuationIndent = `${indent}${' '.repeat(marker.length + 1)}`;
-    const body = normalizeMarkdown(renderChildren(listItemBodyClone(listItem), { listDepth: depth })).replace(
-      /\n{2,}/g,
-      '\n',
-    );
-    const lines = body ? body.split('\n').filter(Boolean) : [];
+    const body = normalizeMarkdown(renderChildren(listItemBodyClone(listItem), { listDepth: depth }));
+    const lines = body ? body.split('\n') : [];
     const output: string[] = [];
     if (lines.length) {
       output.push(`${indent}${marker} ${lines[0]}`);
@@ -225,7 +222,7 @@ export function htmlToMarkdown(root: Element | null): string {
     if (tag === 'blockquote') {
       const body = normalizeMarkdown(renderChildren(element, context));
       return body
-        ? `${body
+        ? `\n\n${body
             .split('\n')
             .map((line) => (line ? `> ${line}` : '>'))
             .join('\n')}\n\n`

@@ -11,6 +11,12 @@ function roundTrip(html: string): Document {
 }
 
 describe('shared collector Markdown semantics', () => {
+  it('preserves quote and paragraph boundaries inside list items', () => {
+    const document = roundTrip('<ol><li>Before<blockquote><p>Quote</p></blockquote><p>After</p></li></ol>');
+    expect(document.querySelector('ol > li > blockquote')?.textContent.trim()).toBe('Quote');
+    expect(document.querySelector('ol > li > p:last-child')?.textContent.trim()).toBe('After');
+  });
+
   it('preserves code whitespace and embedded Markdown fences', () => {
     const code = '  first  \n\n\n```ts\nexample()\n```\n  last  \n';
     const document = new JSDOM('<pre><code class="language-md"></code></pre>').window.document;
