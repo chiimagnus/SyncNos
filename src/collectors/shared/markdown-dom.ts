@@ -104,7 +104,7 @@ export function htmlToMarkdown(root: Element | null): string {
   const textNode = typeof Node !== 'undefined' && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
   const elementNode = typeof Node !== 'undefined' && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
 
-  function renderChildren(element: Element, context: { listDepth: number }): string {
+  function renderChildren(element: Element, context: { listDepth: number; inTable?: boolean }): string {
     return Array.from(element.childNodes)
       .map((child) => renderNode(child, context))
       .join('');
@@ -158,23 +158,35 @@ export function htmlToMarkdown(root: Element | null): string {
     return output.join('\n') + (output.length ? '\n\n' : '');
   }
 
-  function renderTable(table: Element, context: { listDepth: number }): string {
+  function renderTable(table: Element, context: { listDepth: number; inTable?: boolean }): string {
     const rows = Array.from(table.querySelectorAll('tr'));
     if (!rows.length) return '';
     const matrix = rows.map((row) =>
       Array.from(row.children)
         .filter((cell) => ['th', 'td'].includes(cell.tagName.toLowerCase()))
-        .map((cell) => escapeTableCell(normalizeInline(renderChildren(cell, context)))),
+        .map((cell) => escapeTableCell(normalizeInline(renderChildren(cell, { ...context, inTable: true })))),
     );
     const columns = Math.max(0, ...matrix.map((row) => row.length));
     if (!columns) return '';
     const pad = (row: string[]) => row.concat(Array(Math.max(0, columns - row.length)).fill(''));
-    const output = [`| ${pad(matrix[0]).join(' | ')} |`, `| ${Array(columns).fill('---').join(' | ')} |`];
+    const alignments = Array.from(rows[0].children)
+      .filter((cell) => ['th', 'td'].includes(cell.tagName.toLowerCase()))
+      .map((cell) => {
+        const alignment = String(
+          (cell as HTMLElement).style.textAlign || cell.getAttribute('align') || '',
+        ).toLowerCase();
+        if (alignment === 'left') return ':---';
+        if (alignment === 'center') return ':---:';
+        if (alignment === 'right') return '---:';
+        return '---';
+      });
+    const separators = alignments.concat(Array(Math.max(0, columns - alignments.length)).fill('---'));
+    const output = [`| ${pad(matrix[0]).join(' | ')} |`, `| ${separators.join(' | ')} |`];
     for (const row of matrix.slice(1)) output.push(`| ${pad(row).join(' | ')} |`);
     return `${output.join('\n')}\n\n`;
   }
 
-  function renderNode(node: Node, context: { listDepth: number }): string {
+  function renderNode(node: Node, context: { listDepth: number; inTable?: boolean }): string {
     if (node.nodeType === textNode) {
       const raw = node.nodeValue ? String(node.nodeValue) : '';
       if (!raw) return '';
@@ -185,7 +197,7 @@ export function htmlToMarkdown(root: Element | null): string {
 
     const element = node as Element;
     const tag = element.tagName.toLowerCase();
-    if (tag === 'br') return '\n';
+    if (tag === 'br') return context.inTable ? ' ' : '\\\n';
     if (tag === 'hr') return '\n\n---\n\n';
     if (['script', 'style', 'svg', 'path', 'button'].includes(tag)) return '';
 
@@ -198,9 +210,9 @@ export function htmlToMarkdown(root: Element | null): string {
       return text.trim() ? `\n\n${fence}${language}\n${text}\n${fence}\n\n` : '';
     }
     if (tag === 'code') return wrapInlineCode(element.textContent || '');
-    if (tag === 'strong' || tag === 'b') return `**${normalizeInline(renderChildren(element, context))}**`;
-    if (tag === 'em' || tag === 'i') return `*${normalizeInline(renderChildren(element, context))}*`;
-    if (tag === 'del' || tag === 's') return `~~${normalizeInline(renderChildren(element, context))}~~`;
+    if (tag === 'strong' || tag === 'b') return `**${normalizeMarkdown(renderChildren(element, context))}**`;
+    if (tag === 'em' || tag === 'i') return `*${normalizeMarkdown(renderChildren(element, context))}*`;
+    if (tag === 'del' || tag === 's') return `~~${normalizeMarkdown(renderChildren(element, context))}~~`;
 
     if (tag === 'a') {
       const href = String(element.getAttribute('href') || '').trim();

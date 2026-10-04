@@ -32,7 +32,7 @@ function sanitizeContentClone(wrapper: Element | null): Element | null {
   if (!content?.cloneNode) return null;
   try {
     const clone = content.cloneNode(true) as Element;
-    for (const editor of Array.from(clone.querySelectorAll('.cm-content[contenteditable="false"][data-language]'))) {
+    for (const editor of Array.from(clone.querySelectorAll('.cm-content[contenteditable="false"]'))) {
       const languageContainer = editor.closest('[class*="language-"]');
       if (!languageContainer) continue;
       const pre = editor.ownerDocument.createElement('pre');
@@ -50,6 +50,25 @@ function sanitizeContentClone(wrapper: Element | null): Element | null {
       languageContainer.replaceWith(pre);
     }
     removeThinkingNodes(clone);
+    for (const checkbox of Array.from(clone.querySelectorAll<HTMLInputElement>('li > input[type="checkbox"]'))) {
+      checkbox.replaceWith(checkbox.ownerDocument.createTextNode(checkbox.checked ? '[x] ' : '[ ] '));
+    }
+    for (const paragraph of Array.from(clone.querySelectorAll('p'))) {
+      const walker = paragraph.ownerDocument.createTreeWalker(paragraph, 4);
+      const nodes: Text[] = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+      for (const node of nodes) {
+        if (node.parentElement?.closest('pre, code, .katex, math')) continue;
+        const lines = String(node.textContent || '').split(/\r\n?|\n/);
+        if (lines.length < 2) continue;
+        const fragment = paragraph.ownerDocument.createDocumentFragment();
+        lines.forEach((line, index) => {
+          if (index) fragment.append(paragraph.ownerDocument.createElement('br'));
+          fragment.append(line);
+        });
+        node.replaceWith(fragment);
+      }
+    }
     replaceMathElementsWithLatexText(clone);
     removeNonContentNodes(clone);
     return clone;
@@ -73,7 +92,9 @@ function extractUserMarkdown(wrapper: Element): string {
   if (!content) return '';
   const clone = content.cloneNode(true) as Element;
   removeNonContentNodes(clone);
-  return String(clone.textContent || '').replace(/\r\n?/g, '\n').trim();
+  return String(clone.textContent || '')
+    .replace(/\r\n?/g, '\n')
+    .trim();
 }
 
 export default {

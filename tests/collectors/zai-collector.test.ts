@@ -1,4 +1,5 @@
 import { JSDOM } from 'jsdom';
+import MarkdownIt from 'markdown-it';
 import { describe, expect, it } from 'vitest';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createZaiCollectorDef } from '../../src/collectors/zai/zai-collector.ts';
@@ -48,6 +49,44 @@ function conversationBody(messages: string, extra = '') {
 }
 
 describe('zai-collector', () => {
+  it('preserves task checkbox state from the current DOM property', async () => {
+    const dom = new JSDOM(
+      conversationBody(`<div id="message-tasks"><div class="chat-assistant"><div id="response-content-container">
+        <ul><li><input type="checkbox">Done</li><li><input type="checkbox">Todo</li></ul>
+        <input type="text" value="control"><button>Copy</button>
+      </div></div></div>`),
+      { url: 'https://chat.z.ai/c/conv-tasks' },
+    );
+    setupDom(dom);
+    const checkbox = dom.window.document.querySelector('input')!;
+    checkbox.checked = true;
+    expect(checkbox.hasAttribute('checked')).toBe(false);
+    const snapshot = await capturePrepared(createCollector());
+    expect(snapshot.messages[0].contentMarkdown).toContain('- [x] Done\n- [ ] Todo');
+    expect(snapshot.messages[0].contentMarkdown).not.toContain('Copy');
+    expect(checkbox.checked).toBe(true);
+    expect(dom.window.document.querySelectorAll('input')).toHaveLength(3);
+  });
+
+  it('preserves pre-line paragraphs without changing code or display formulas', async () => {
+    const dom = new JSDOM(
+      conversationBody(`<div id="message-lines"><div class="chat-assistant"><div id="response-content-container">
+        <p>First\nSecond <em>Third\nFourth</em> <code>a\nb</code></p>
+        <p><span class="katex-display"><span class="katex"><annotation encoding="application/x-tex">x^2</annotation></span></span></p>
+      </div></div></div>`),
+      { url: 'https://chat.z.ai/c/conv-lines' },
+    );
+    setupDom(dom);
+    const snapshot = await capturePrepared(createCollector());
+    const markdown = snapshot.messages[0].contentMarkdown;
+    const rendered = new JSDOM(new MarkdownIt().render(markdown)).window.document;
+    expect(rendered.querySelectorAll('br')).toHaveLength(2);
+    expect(rendered.querySelector('em br')).not.toBeNull();
+    expect(rendered.querySelector('code')?.textContent).toBe('a b');
+    expect(markdown.split('\n').at(-1)?.trim()).toBe('$$x^2$$');
+    expect(dom.window.document.querySelector('p')?.textContent).toContain('First\nSecond');
+  });
+
   it('preserves user Markdown whitespace without collapsed-message controls', async () => {
     const source = '- Parent\n  - Child\n\n```ts\n  first();  \n\n\n  last();\n```';
     const dom = new JSDOM(
@@ -68,14 +107,14 @@ describe('zai-collector', () => {
     expect(dom.window.document.querySelector('button')?.textContent).toBe('收起');
   });
 
-  it('preserves current readonly CodeMirror code blocks without toolbar labels', async () => {
+  it.each([true, false])('preserves readonly CodeMirror code (language metadata: %s)', async (withLanguageMetadata) => {
     const code = `const html = '<div data-x="a&b">中文 😀</div>';\n\nconsole.log(html);`;
     const dom = new JSDOM(
       conversationBody(`<div id="message-code"><div class="chat-assistant"><div id="response-content-container">
         <p>Code:</p><div class="relative">
           <div class="absolute text-xs font-medium">ts</div>
           <div class="sticky"><button>Copy</button></div>
-          <div class="language-ts"><div class="cm-editor"><div class="cm-content" contenteditable="false" data-language="typescript">
+          <div class="language-ts"><div class="cm-editor"><div class="cm-content" contenteditable="false"${withLanguageMetadata ? ' data-language="typescript"' : ''}>
             <div class="cm-line">const html = '&lt;div data-x="a&amp;b"&gt;中文 😀&lt;/div&gt;';</div>
             <div class="cm-line"><br></div><div class="cm-line">console.log(html);</div>
           </div></div></div>
