@@ -8,6 +8,8 @@ import {
   reusableImageCacheByteSize,
 } from '@services/conversations/data/image-cache-record';
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
+import { canonicalChatIdentityFromUrl, canonicalChatUrlFromUrl } from '@services/conversations/domain/chat-identity';
+import { normalizeNotionId } from '@services/shared/notion-id';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
@@ -26,7 +28,10 @@ import {
   buildGithubCleanupOutboxRecord,
   GITHUB_CLEANUP_OUTBOX_STORE,
 } from '@platform/idb/github-cleanup-outbox-record';
-import { normalizeConversationListRecord } from '@platform/idb/conversation-list-record';
+import {
+  normalizeConversationListRecord,
+  normalizeConversationListStoredSourceKey,
+} from '@platform/idb/conversation-list-record';
 import { openDb } from '@platform/idb/schema';
 import {
   DATA_REVISION_RECORD_KEY,
@@ -164,6 +169,31 @@ function conversationRecordsEquivalent(left: unknown, right: unknown): boolean {
   return storedValueEqual(leftRecord, rightRecord);
 }
 
+function conversationSemanticContentChanged(existing: any, next: any): boolean {
+  if (!existing) return true;
+  const sourceType = safeString(next?.sourceType || existing?.sourceType).toLowerCase();
+  const project = (record: any) => {
+    if (sourceType === 'article') {
+      return {
+        title: safeString(record?.title),
+        author: safeString(record?.author),
+        publishedAt: safeString(record?.publishedAt),
+      };
+    }
+    if (sourceType === 'video') {
+      return {
+        title: safeString(record?.title),
+        author: safeString(record?.author),
+        durationSeconds: record?.durationSeconds == null ? null : Number(record.durationSeconds),
+        videoDescription: safeString(record?.videoDescription),
+      };
+    }
+    return null;
+  };
+  if (sourceType === 'chat') return false;
+  return !storedValueEqual(project(existing), project(next));
+}
+
 type ResolvedMessageTimestamp = { present: false } | { present: true; value: unknown };
 
 function resolveMessageTimestamp(
@@ -212,6 +242,27 @@ function messageRecordsEquivalent(left: unknown, right: unknown): boolean {
   return storedValueEqual(leftRecord, rightRecord);
 }
 
+function messageSemanticContentEquivalent(left: unknown, right: unknown): boolean {
+  const project = (value: unknown) => {
+    const record = { ...((value && typeof value === 'object' ? value : {}) as Record<string, unknown>) };
+    delete record.id;
+    delete record.conversationId;
+    delete record.messageKey;
+    delete record.sequence;
+    delete record.updatedAt;
+    return record;
+  };
+  return storedValueEqual(project(left), project(right));
+}
+
+function preserveEquivalentMessageTimestamp(existing: any, record: any): any {
+  if (!existing || !record || !messageSemanticContentEquivalent(existing, record)) return record;
+  const next = { ...record };
+  if (Object.prototype.hasOwnProperty.call(existing, 'updatedAt')) next.updatedAt = existing.updatedAt;
+  else delete next.updatedAt;
+  return next;
+}
+
 function buildConversationMessageRecord(input: {
   conversationId: number;
   message: any;
@@ -252,6 +303,31 @@ function buildConversationMessageRecord(input: {
   }
 
   return withOptionalId(existing && existing.id, baseRecord);
+}
+
+function buildResolvedConversationMessageRecord(input: {
+  conversationId: number;
+  message: any;
+  existing?: any;
+  sequence: number;
+}) {
+  const { conversationId, message, existing, sequence } = input;
+  const merge = resolveMessageContentMerge(existing, message);
+  const incomingAuthorName =
+    message?.authorName && String(message.authorName).trim() ? String(message.authorName).trim() : '';
+  const timestamp = resolveMessageTimestamp(existing, message?.updatedAt, merge.preserveExistingTimestamp);
+  const record = buildConversationMessageRecord({
+    conversationId,
+    message,
+    existing,
+    contentMarkdown: merge.contentMarkdown,
+    authorName: incomingAuthorName,
+    sequence,
+    timestamp,
+  });
+  return message?.captureMergePolicy === 'preserve-existing-markdown'
+    ? record
+    : preserveEquivalentMessageTimestamp(existing, record);
 }
 
 function normalizeListKey(value: unknown, fallback: string): string {
@@ -309,6 +385,40 @@ async function findExistingConversationForPayload(
   const idx = conversationsStore.index('by_source_conversationKey');
   const existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
   return existing || null;
+}
+
+async function findCanonicalChatConversationCandidates(
+  conversationsStore: IDBObjectStore,
+  payload: any,
+  identity: string,
+): Promise<any[]> {
+  if (payload && Object.prototype.hasOwnProperty.call(payload, 'id')) return [];
+  if (safeString(payload?.sourceType).toLowerCase() !== 'chat') return [];
+
+  const source = safeString(payload?.source);
+  if (!source || !identity) return [];
+
+  const listSourceKey = normalizeConversationListStoredSourceKey(source);
+  const index = conversationsStore.index('by_listSourceKey_lastActivityAt_id');
+  const range = globalThis.IDBKeyRange.bound(
+    [listSourceKey, -Infinity, -Infinity] as any,
+    [listSourceKey, Infinity, Infinity] as any,
+  );
+  const rows = (await reqToPromise(index.getAll(range) as any)) as any[];
+  const currentKey = safeString(payload?.conversationKey);
+
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => canonicalChatIdentityFromUrl(row?.source, row?.url) === identity)
+    .sort((left, right) => {
+      const leftExact = currentKey && safeString(left?.conversationKey) === currentKey ? 1 : 0;
+      const rightExact = currentKey && safeString(right?.conversationKey) === currentKey ? 1 : 0;
+      if (leftExact !== rightExact) return rightExact - leftExact;
+      const activity =
+        normalizeStoredActivityTimestamp(right?.lastActivityAt) -
+        normalizeStoredActivityTimestamp(left?.lastActivityAt);
+      if (activity) return activity;
+      return Number(right?.id || 0) - Number(left?.id || 0);
+    });
 }
 
 function pickMaxFiniteNumber(...values: unknown[]): number | null {
@@ -476,24 +586,84 @@ async function migrateSyncMappingKey(
   return { syncMappingChanged };
 }
 
-export async function upsertConversation(payload: any): Promise<Conversation & { __isNew: boolean }> {
+export async function upsertConversation(
+  payload: any,
+): Promise<Conversation & { __isNew: boolean; __semanticContentChanged: boolean }> {
   const db = await openDb();
+  const incomingChatIdentity =
+    safeString(payload?.sourceType).toLowerCase() === 'chat'
+      ? canonicalChatIdentityFromUrl(payload?.source, payload?.url)
+      : '';
   const outcome = await runTrackedTransaction(
     {
       db,
-      stores: ['conversations', 'sync_mappings', 'article_comments', GITHUB_CLEANUP_OUTBOX_STORE],
-      revisionScopes: ['conversations', 'sync_mappings', 'article_comments'],
+      stores: [
+        'conversations',
+        'messages',
+        'sync_mappings',
+        'image_cache',
+        'article_comments',
+        GITHUB_CLEANUP_OUTBOX_STORE,
+      ],
+      revisionScopes: ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
     },
-    async ({ stores, markChanged }) => {
-      const existing = await findExistingConversationForPayload(stores.conversations, payload);
-
+    async (context) => {
+      const { stores, markChanged } = context;
       const now = Date.now();
+      const exactExisting = await findExistingConversationForPayload(stores.conversations, payload);
+      const exactStoredChatIdentity = safeString(exactExisting?.canonicalChatIdentity);
+      const normalizedStoredNotionId = exactStoredChatIdentity.startsWith('notionai:')
+        ? normalizeNotionId(exactStoredChatIdentity.slice('notionai:'.length))
+        : '';
+      const normalizedStoredChatIdentity = normalizedStoredNotionId
+        ? `notionai:${normalizedStoredNotionId}`
+        : exactStoredChatIdentity;
+      const exactUrlChatIdentity = canonicalChatIdentityFromUrl(exactExisting?.source, exactExisting?.url);
+      if (
+        exactExisting &&
+        incomingChatIdentity &&
+        ((normalizedStoredChatIdentity && normalizedStoredChatIdentity !== incomingChatIdentity) ||
+          (exactUrlChatIdentity && exactUrlChatIdentity !== incomingChatIdentity))
+      ) {
+        throw Object.assign(new Error('conversation durable identity conflicts with existing key'), {
+          code: 'conversation_identity_conflict',
+        });
+      }
+      const shouldRepairCanonicalChatIdentity =
+        !!incomingChatIdentity && (!exactExisting || exactStoredChatIdentity !== incomingChatIdentity);
+      const canonicalMatches = shouldRepairCanonicalChatIdentity
+        ? await findCanonicalChatConversationCandidates(stores.conversations, payload, incomingChatIdentity)
+        : [];
+      const canonicalCandidates = exactExisting
+        ? [exactExisting, ...canonicalMatches.filter((candidate) => Number(candidate?.id) !== Number(exactExisting.id))]
+        : canonicalMatches;
+      let existing = exactExisting || canonicalCandidates[0] || null;
+
+      if (shouldRepairCanonicalChatIdentity && canonicalCandidates.length > 1) {
+        let keep = exactExisting || canonicalCandidates[0];
+        for (const duplicate of canonicalCandidates) {
+          if (Number(duplicate?.id) === Number(keep?.id)) continue;
+          const merged = await mergeConversationsInTransaction(context, {
+            keepConversationId: Number(keep.id),
+            removeConversationId: Number(duplicate.id),
+            now,
+            dedupeSemanticMessageAliases: true,
+          });
+          keep = merged.keptConversation;
+        }
+        existing = keep;
+      }
+
       const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
       const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
       const isArticleSource =
         safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === WEB_ARTICLE_SOURCE;
 
-      const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+      const rawPayloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+      const payloadUrl =
+        safeString(nextSourceType).toLowerCase() === 'chat'
+          ? canonicalChatUrlFromUrl(nextSource, rawPayloadUrl) || rawPayloadUrl
+          : rawPayloadUrl;
       const existingUrl = existing ? String(existing.url || '').trim() : '';
       const nextUrlCandidate = payloadUrl || existingUrl;
       const articleIdentity = isArticleSource ? buildCanonicalWebArticleIdentity(nextUrlCandidate) : null;
@@ -523,6 +693,7 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
         sourceType: nextSourceType,
         source: nextSource,
         conversationKey: nextConversationKey,
+        ...(incomingChatIdentity ? { canonicalChatIdentity: incomingChatIdentity } : null),
         title: nextTitle || (existing ? existing.title || '' : ''),
         url: nextUrl || (existing ? existing.url || '' : ''),
         author: payload.author || (existing ? existing.author || '' : ''),
@@ -608,24 +779,53 @@ export async function upsertConversation(payload: any): Promise<Conversation & {
           await reqToPromise(stores.conversations.put(record));
           markChanged('conversations');
         }
-        return { record, conversationChanged, isNew: false };
+        return {
+          record,
+          conversationChanged,
+          semanticContentChanged: conversationSemanticContentChanged(existing, record),
+          isNew: false,
+        };
       }
 
       const id = await reqToPromise(stores.conversations.add(record));
       record.id = id as any;
       markChanged('conversations');
-      return { record, conversationChanged: true, isNew: true };
+      return { record, conversationChanged: true, semanticContentChanged: true, isNew: true };
     },
   );
 
   if (outcome.conversationChanged) invalidateConversationListStatsCache();
-  return { ...outcome.record, __isNew: outcome.isNew };
+  return {
+    ...outcome.record,
+    __isNew: outcome.isNew,
+    __semanticContentChanged: outcome.semanticContentChanged,
+  };
 }
 
 type ConversationMutationContext = {
   stores: Record<string, IDBObjectStore>;
   markChanged: (scope: any) => void;
 };
+
+function normalizeMessageAliasContent(value: unknown): string {
+  return String(value ?? '').replace(/\r\n?/g, '\n');
+}
+
+function isSemanticMessageAlias(left: any, right: any): boolean {
+  if (!left || !right) return false;
+  const leftKey = safeString(left.messageKey);
+  const rightKey = safeString(right.messageKey);
+  if (!leftKey || !rightKey || leftKey === rightKey) return false;
+  const leftSequence = Number(left.sequence);
+  const rightSequence = Number(right.sequence);
+  if (!Number.isFinite(leftSequence) || !Number.isFinite(rightSequence) || leftSequence !== rightSequence) return false;
+  const leftRole = safeString(left.role).toLowerCase();
+  const rightRole = safeString(right.role).toLowerCase();
+  if (!leftRole || leftRole !== rightRole) return false;
+  const leftContent = normalizeMessageAliasContent(left.contentMarkdown);
+  const rightContent = normalizeMessageAliasContent(right.contentMarkdown);
+  return !!leftContent && leftContent === rightContent;
+}
 
 type MergeConversationsResult = {
   keptConversationId: number;
@@ -647,7 +847,12 @@ function conversationMutationError(code: string, message: string, extra?: Record
 
 async function mergeConversationsInTransaction(
   context: ConversationMutationContext,
-  input: { keepConversationId: number; removeConversationId: number; now?: number },
+  input: {
+    keepConversationId: number;
+    removeConversationId: number;
+    now?: number;
+    dedupeSemanticMessageAliases?: boolean;
+  },
 ): Promise<MergeConversationsTransactionOutcome> {
   const { stores, markChanged } = context;
   const keepConversationId = Number(input.keepConversationId);
@@ -718,6 +923,22 @@ async function mergeConversationsInTransaction(
     if (key) {
       const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
       if (exists) {
+        if (Number.isFinite(rowId) && rowId > 0) {
+          await reqToPromise(stores.messages.delete(rowId));
+          markChanged('messages');
+        }
+        continue;
+      }
+    }
+    if (input.dedupeSemanticMessageAliases === true && Number.isFinite(Number(row.sequence))) {
+      const keepRowsAtSequence = (await reqToPromise(
+        msgSeqIdx.getAll([keepConversationId, Number(row.sequence)] as any) as any,
+      )) as any[];
+      if (
+        (Array.isArray(keepRowsAtSequence) ? keepRowsAtSequence : []).some((candidate) =>
+          isSemanticMessageAlias(row, candidate),
+        )
+      ) {
         if (Number.isFinite(rowId) && rowId > 0) {
           await reqToPromise(stores.messages.delete(rowId));
           markChanged('messages');
@@ -1182,6 +1403,7 @@ export async function syncConversationMessages(
     mode?: 'snapshot' | 'incremental' | 'append';
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
     activityAt?: number;
+    conversationContentChanged?: boolean;
   },
 ): Promise<{ upserted: number; deleted: number }> {
   const requestedMode = options?.mode;
@@ -1202,12 +1424,13 @@ export async function syncConversationMessages(
     },
     async ({ stores, markChanged }) => {
       let activityConversation: any = null;
+      let semanticContentChanged = options?.conversationContentChanged === true;
       if (activityAtProvided) {
         activityConversation = await reqToPromise(stores.conversations.get(conversationId as any));
         if (!activityConversation) throw new Error('conversation not found');
       }
       const commitActivity = async () => {
-        if (!activityConversation) return;
+        if (!activityConversation || !semanticContentChanged) return;
         const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
         if (activityAt <= current) return;
         activityConversation = { ...activityConversation, lastActivityAt: activityAt };
@@ -1286,6 +1509,7 @@ export async function syncConversationMessages(
         }
 
         let upserted = 0;
+        let deleted = 0;
         for (const key of upsertKeys) {
           const m = byKey.get(key);
           if (!m) continue;
@@ -1311,18 +1535,15 @@ export async function syncConversationMessages(
                 : Number.isFinite(m.sequence)
                   ? m.sequence
                   : 0;
-          const merge = resolveMessageContentMerge(existing, m);
-          const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-          const timestamp = resolveMessageTimestamp(existing, m.updatedAt, merge.preserveExistingTimestamp);
-          const record: any = buildConversationMessageRecord({
+          const record: any = buildResolvedConversationMessageRecord({
             conversationId,
             message: { ...m, messageKey: key },
             existing,
-            contentMarkdown: merge.contentMarkdown,
-            authorName: incomingAuthorName,
             sequence,
-            timestamp,
           });
+          if (!existing || !messageSemanticContentEquivalent(existing, record)) {
+            semanticContentChanged = true;
+          }
           if (existing) {
             if (!messageRecordsEquivalent(existing, record)) {
               await reqToPromise(stores.messages.put(record));
@@ -1337,7 +1558,6 @@ export async function syncConversationMessages(
           upserted += 1;
         }
 
-        let deleted = 0;
         for (const key of removedKeys) {
           const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
           const id = Number(existing && existing.id);
@@ -1345,6 +1565,7 @@ export async function syncConversationMessages(
           await reqToPromise(stores.messages.delete(id));
           markChanged('messages');
           deleted += 1;
+          semanticContentChanged = true;
         }
 
         await commitActivity();
@@ -1361,6 +1582,7 @@ export async function syncConversationMessages(
       }
 
       const presentKeys = new Set<string>();
+      const structuralAliasKeys = new Set<string>();
       let upserted = 0;
 
       for (const m of messages || []) {
@@ -1368,18 +1590,23 @@ export async function syncConversationMessages(
         presentKeys.add(String(m.messageKey));
 
         const existing: any = existingByKey.get(m.messageKey);
-        const merge = resolveMessageContentMerge(existing, m);
-        const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
-        const timestamp = resolveMessageTimestamp(existing, m.updatedAt, merge.preserveExistingTimestamp);
-        const record: any = buildConversationMessageRecord({
+        const sequence = Number.isFinite(m.sequence) ? m.sequence : 0;
+        const aliasProbe = { ...m, sequence };
+        const semanticAlias = existing
+          ? null
+          : storedRows.find((candidate) => isSemanticMessageAlias(candidate, aliasProbe)) || null;
+        if (semanticAlias?.messageKey) structuralAliasKeys.add(String(semanticAlias.messageKey));
+        const semanticBaseline = existing || semanticAlias;
+        const existingForResolution = semanticAlias ? { ...semanticAlias, id: undefined } : existing;
+        const record: any = buildResolvedConversationMessageRecord({
           conversationId,
           message: m,
-          existing,
-          contentMarkdown: merge.contentMarkdown,
-          authorName: incomingAuthorName,
-          sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-          timestamp,
+          existing: existingForResolution,
+          sequence,
         });
+        if (!semanticBaseline || (!semanticAlias && !messageSemanticContentEquivalent(semanticBaseline, record))) {
+          semanticContentChanged = true;
+        }
         if (existing) {
           if (!messageRecordsEquivalent(existing, record)) {
             await reqToPromise(stores.messages.put(record));
@@ -1402,6 +1629,7 @@ export async function syncConversationMessages(
         await reqToPromise(stores.messages.delete(id));
         markChanged('messages');
         deleted += 1;
+        if (!structuralAliasKeys.has(String(row.messageKey))) semanticContentChanged = true;
       }
 
       await commitActivity();

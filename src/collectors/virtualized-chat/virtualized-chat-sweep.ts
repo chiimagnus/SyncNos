@@ -447,6 +447,7 @@ export type VirtualizedPassAdapter<T> = {
   readDescriptorKeys: () => string[];
   // Unresolved entries must use the matching descriptor/message key, never a shared turn key.
   readUnresolvedKeys?: () => string[];
+  readPendingKeys?: () => string[];
   readBoundaryState?: (boundary: VirtualizedBoundary) => VirtualizedBoundaryState;
   onTopConfirmed?: (accumulator: PreparedAccumulator<T>) => void;
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
@@ -641,6 +642,7 @@ export async function runVirtualizedPass<T>(
         .filter(Boolean);
       const currentUnresolvedKeys = readUnresolvedKeys();
       if (!currentUnresolvedKeys) return null;
+      const currentPendingKeys = adapter.readPendingKeys ? adapter.readPendingKeys() : currentUnresolvedKeys;
       latest = { metrics, keys, unresolvedKeys: currentUnresolvedKeys };
       const signature = contentFreeWindowSignature(originalIdentity, metrics, keys);
       if (signature === lastSignature) stableCount += 1;
@@ -648,7 +650,7 @@ export async function runVirtualizedPass<T>(
         lastSignature = signature;
         stableCount = 1;
       }
-      if (stableCount >= stableSamples && !currentUnresolvedKeys.length) return latest;
+      if (stableCount >= stableSamples && !currentPendingKeys.length) return latest;
       await sleep(pollMs);
       if (deadlineExceeded() || !validateAfterAwait()) return null;
     }

@@ -93,6 +93,63 @@ function currentDom(
   return dom;
 }
 
+function current2026Dom(
+  options: {
+    url?: string;
+    turnKey?: string;
+    userId?: string;
+    userText?: string;
+    assistantBlocks?: string;
+    expandedCot?: boolean;
+    activeStatus?: boolean;
+  } = {},
+) {
+  const turnKey = options.turnKey ?? 'current-turn-2026';
+  const userId = options.userId ?? 'current-user-2026';
+  const userText = options.userText ?? 'Current 2026 question';
+  const expandedCot = options.expandedCot ?? false;
+  const cot = expandedCot
+    ? `<div class="block-current-cot">
+         <span hidden data-chatgpt-agent-turn-start></span>
+         <div>
+           <div><button type="button" aria-expanded="true"></button></div>
+           <div class="current-cot-body">
+             <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>Expanded reasoning.</p></div>
+           </div>
+         </div>
+       </div>`
+    : '';
+  const assistantBlocks =
+    options.assistantBlocks ??
+    `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>First final block.</p></div>
+     <div data-markdown-text-style="assistant-message" data-markdown-text-tone="tertiary"><p>Tool chrome should stay out.</p></div>
+     <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>Second final block.</p></div>`;
+  const activeStatus = options.activeStatus ? '<div role="status" aria-live="polite">Still generating</div>' : '';
+  const dom = setupChatgptDom(
+    `<div data-turn-key="${turnKey}">
+       <div data-content-search-turn-key="fallback-turn-1">
+         <div class="flex flex-col gap-1.5">
+           <div
+             data-chatgpt-search-unit-key="fallback-turn-1:0:user"
+             data-chatgpt-search-message-ids="${userId}"
+             data-is-intersecting="true"
+           >
+             <div data-user-message-bubble="true"><div class="whitespace-pre-wrap">${userText}</div></div>
+           </div>
+           ${cot}
+           <div class="assistant-current-surface">${assistantBlocks}</div>
+           ${activeStatus}
+         </div>
+       </div>
+     </div>`,
+    options.url ?? 'https://chatgpt.com/c/current-conversation-2026',
+  );
+  (dom.window as any).scrollTo = vi.fn();
+  const turn = dom.window.document.querySelector(`[data-turn-key="${turnKey}"]`) as HTMLElement;
+  (turn as any).getBoundingClientRect = () => ({ top: 0, bottom: 400, height: 400, left: 0, right: 800, width: 800 });
+  return dom;
+}
+
 function currentDef(dom: JSDOM) {
   return createChatgptCollectorDef(
     createCollectorEnv({
@@ -130,6 +187,65 @@ describe('chatgpt current DOM', () => {
 
     const settings = currentDef(setupChatgptDom('', 'https://chatgpt.com/settings'));
     expect(settings.collector.isCaptureAvailable()).toBe(false);
+  });
+
+  it('captures 2026 turn-shell assistants when search units only identify the user', async () => {
+    const dom = current2026Dom({ expandedCot: true });
+    const def = currentDef(dom);
+    const snapshot = (await capturePrepared(def)) as any;
+
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'current-user-2026',
+      'chatgpt_turn_current-turn-2026_assistant',
+    ]);
+    expect(snapshot.messages[0]).toMatchObject({ role: 'user', contentMarkdown: 'Current 2026 question' });
+    expect(snapshot.messages[1].role).toBe('assistant');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Expanded reasoning.');
+    expect(snapshot.messages[1].contentMarkdown).toContain('First final block.');
+    expect(snapshot.messages[1].contentMarkdown).toContain('Second final block.');
+    expect(snapshot.messages[1].contentMarkdown.match(/Expanded reasoning\./g)).toHaveLength(1);
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Tool chrome should stay out.');
+  });
+
+  it('keeps a 2026 assistant turn unresolved until a final primary block exists', async () => {
+    const dom = current2026Dom({
+      assistantBlocks:
+        '<div data-markdown-text-style="assistant-message" data-markdown-text-tone="tertiary"><p>Thinking only.</p></div>',
+    });
+    const def = currentDef(dom);
+    const descriptors = def.collector.__test.manualAdapter.readDescriptors();
+    const assistant = descriptors.find((descriptor: any) => descriptor.role === 'assistant');
+
+    expect(assistant).toMatchObject({
+      key: 'chatgpt_turn_current-turn-2026_assistant',
+      rendered: false,
+      visible: true,
+    });
+    expect(def.collector.__test.manualAdapter.readUnresolvedKeys()).toContain(
+      'chatgpt_turn_current-turn-2026_assistant',
+    );
+  });
+
+  it('keeps partially rendered 2026 assistants unresolved while an aria-live status is active', () => {
+    const def = currentDef(current2026Dom({ activeStatus: true }));
+    const assistant = def.collector.__test.manualAdapter
+      .readDescriptors()
+      .find((descriptor: any) => descriptor.role === 'assistant');
+    expect(assistant).toMatchObject({
+      key: 'chatgpt_turn_current-turn-2026_assistant',
+      rendered: false,
+      visible: true,
+    });
+    expect(def.collector.__test.manualAdapter.readUnresolvedKeys()).toContain(
+      'chatgpt_turn_current-turn-2026_assistant',
+    );
+  });
+
+  it('keeps Advanced API live-tail fail-closed when the current DOM has no assistant message id', () => {
+    const def = currentDef(current2026Dom());
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'current-conversation-2026' })).toEqual({
+      kind: 'unsafe',
+    });
   });
 
   it('captures current user/assistant units, expanded reasoning, and current code blocks', async () => {
@@ -274,16 +390,38 @@ A --> B</code></pre>
     });
     generic.window.document.title = 'ChatGPT';
     expect((await capturePrepared(currentDef(generic))).conversation.title).toBe('请帮我分析强化学习和机器学习的关系');
+
+    const newChat = currentDom({
+      url: 'https://chatgpt.com/c/conversation-title-2',
+      userText: '这是一个尚未生成站点标题的新会话',
+    });
+    newChat.window.document.title = 'New chat';
+    expect((await capturePrepared(currentDef(newChat))).conversation.title).toBe('这是一个尚未生成站点标题的新会话');
   });
 
   it('captures current share pages and uses the share id as durable identity', async () => {
-    const dom = currentDom({ url: 'https://chatgpt.com/share/share-current-1' });
-    dom.window.document.title = 'Shared current conversation';
+    const dom = currentDom({
+      url: 'https://chatgpt.com/share/share-current-1',
+      userText: 'Shared current conversation',
+    });
+    dom.window.document.title = 'WRONG BROWSER TAB TITLE';
     const snapshot = (await capturePrepared(currentDef(dom))) as any;
     expect(snapshot.conversation).toMatchObject({
       conversationKey: 'share-current-1',
       title: 'Shared current conversation',
     });
+  });
+
+  it('keeps a durable conversation identity stable across irrelevant query changes', () => {
+    const dom = currentDom({ url: 'https://chatgpt.com/c/current-conversation-2026?model=gpt-5' });
+    const def = currentDef(dom);
+    const root = dom.window.document.querySelector('main');
+    const before = def.collector.__test.sampleIdentityGuard(root);
+    dom.window.history.replaceState({}, '', '/c/current-conversation-2026?model=gpt-5&foo=bar');
+    const after = def.collector.__test.sampleIdentityGuard(root);
+    expect(before.durableId).toBe('current-conversation-2026');
+    expect(after.durableId).toBe(before.durableId);
+    expect(after.route).toBe(before.route);
   });
 
   it('binds temporary-chat identity only to rendered current units and keeps it stable across prompt edits', async () => {

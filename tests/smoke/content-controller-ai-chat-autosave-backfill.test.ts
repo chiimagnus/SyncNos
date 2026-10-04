@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites.ts';
+import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS, AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS } from '@collectors/ai-chat-sites.ts';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 import normalizeApi from '@services/shared/normalize.ts';
@@ -664,7 +664,12 @@ describe('content-controller ai chat autosave backfill', () => {
     const firstSync = deferred<any>();
     let syncCount = 0;
     const captureA = vi.fn(() => makeSnapshot('scheduler-a', ['A']));
-    const captureB = vi.fn(() => makeSnapshot('scheduler-b', ['B']));
+    const captureB = vi.fn(() => ({
+      ...makeSnapshot('scheduler-b', ['B']),
+      conversation: { source: 'doubao', conversationKey: 'scheduler-b' },
+      messages: [{ messageKey: 'doubao_b', role: 'user', contentMarkdown: 'B', sequence: 0 }],
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
       snapshots: [makeSnapshot('unused', ['U'])],
@@ -695,7 +700,7 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.runTick();
     await harness.runTick();
     expect(captureA).toHaveBeenCalledTimes(1);
-    current = { id: 'notionai', collector: { capture: captureB } };
+    current = { id: 'doubao', collector: { capture: captureB } };
 
     firstSync.resolve({ ok: true, data: { upserted: 1 } });
     await harness.settle();
@@ -746,7 +751,12 @@ describe('content-controller ai chat autosave backfill', () => {
     const firstSync = deferred<any>();
     let syncCount = 0;
     const captureA = vi.fn(() => makeSnapshot('restart-a', ['A']));
-    const captureB = vi.fn(() => makeSnapshot('restart-b', ['B']));
+    const captureB = vi.fn(() => ({
+      ...makeSnapshot('restart-b', ['B']),
+      conversation: { source: 'doubao', conversationKey: 'restart-b' },
+      messages: [{ messageKey: 'doubao_b', role: 'user', contentMarkdown: 'B', sequence: 0 }],
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
       snapshots: [makeSnapshot('unused', ['U'])],
@@ -772,7 +782,7 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.runTick();
     expect(captureA).toHaveBeenCalledTimes(1);
 
-    current = { id: 'notionai', collector: { capture: captureB } };
+    current = { id: 'doubao', collector: { capture: captureB } };
     harness.restartResident();
     await harness.settle();
     await harness.runTick();
@@ -788,7 +798,12 @@ describe('content-controller ai chat autosave backfill', () => {
   it('abandons an old pre-save run after restart and then runs the new owner trailing request', async () => {
     const oldCapture = deferred<any>();
     const captureA = vi.fn(() => oldCapture.promise);
-    const captureB = vi.fn(() => makeSnapshot('restart-pre-b', ['B']));
+    const captureB = vi.fn(() => ({
+      ...makeSnapshot('restart-pre-b', ['B']),
+      conversation: { source: 'doubao', conversationKey: 'restart-pre-b' },
+      messages: [{ messageKey: 'doubao_b', role: 'user', contentMarkdown: 'B', sequence: 0 }],
+      captureMeta: { completeness: 'partial', identityVerified: true },
+    }));
     let current = { id: 'gemini', collector: { capture: captureA } };
     const harness = createHarness({
       snapshots: [makeSnapshot('unused', ['U'])],
@@ -807,7 +822,7 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.settle();
     await harness.runTick();
 
-    current = { id: 'notionai', collector: { capture: captureB } };
+    current = { id: 'doubao', collector: { capture: captureB } };
     harness.restartResident();
     await harness.settle();
     await harness.runTick();
@@ -1172,14 +1187,60 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(manualCaptureCount).toBe(1);
   });
 
-  it('keeps virtualized providers out of the auto-save source set', () => {
-    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('chatgpt')).toBe(false);
-    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('claude')).toBe(false);
-    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('googleaistudio')).toBe(false);
+  it('keeps only explicit manual-only providers out of the auto-save source set', () => {
+    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio']);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('deepseek')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('yuanbao')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('poe')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('notionai')).toBe(true);
   });
 
-  it.each(['chatgpt', 'claude', 'googleaistudio'])(
-    'skips virtualized manual collector %s before capture',
+  it.each(['deepseek', 'claude', 'zai', 'doubao'])(
+    'guards %s partial autosave windows before append persistence',
+    async (collectorId) => {
+      const harness = createHarness({
+        collectorId,
+        snapshots: [
+          {
+            conversation: { source: collectorId, conversationKey: 'safe-partial' },
+            messages: [
+              { messageKey: 'deepseek_10', role: 'user', contentMarkdown: 'Q', sequence: 0 },
+              { messageKey: 'deepseek_11', role: 'assistant', contentMarkdown: 'A', sequence: 1 },
+            ],
+            captureMeta: {
+              completeness: 'partial',
+              identityVerified: true,
+              reasons: ['top_not_reached'],
+            },
+          },
+        ],
+        tailWindows: [{ conversationId: null, messages: [] }],
+      });
+
+      await harness.runTick();
+
+      const sync = harness.sendCalls.find(
+        (entry) => entry.type === 'syncConversationMessages' && entry.payload?.mode === 'append',
+      );
+      expect(sync).toBeTruthy();
+      expect(sync?.payload?.diff?.removed || []).toEqual([]);
+      expect(sync?.payload?.messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            messageKey: 'deepseek_10',
+            captureSequencePolicy: 'reconcile-existing-order',
+          }),
+          expect.objectContaining({
+            messageKey: 'deepseek_11',
+            captureSequencePolicy: 'reconcile-existing-order',
+          }),
+        ]),
+      );
+    },
+  );
+
+  it.each(['chatgpt', 'googleaistudio'])(
+    'skips explicit manual-only collector %s before capture',
     async (collectorId) => {
       const harness = createHarness({
         snapshots: [makeSnapshot(`manual-${collectorId}`, ['A'])],

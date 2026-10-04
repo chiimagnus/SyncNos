@@ -16,21 +16,14 @@ function isNotionHost(hostname: string): boolean {
   );
 }
 
-function hasNotionAiSignals(): boolean {
-  const doc = document;
-  if (!doc || !doc.querySelector) return false;
-  // These signals are observed on Notion AI chat UIs (page/side-panel/dialog).
-  return !!doc.querySelector(
-    '[data-agent-chat-user-step-id], [data-testid="agent-send-message-button"], [data-testid="unified-chat-model-button"]',
-  );
-}
-
 function isNotionAiContext(): boolean {
   if (!isNotionHost(location?.hostname || '')) return false;
-  const path = String(location?.pathname || '');
-  // `https://app.notion.com/chat?...` is the canonical Notion AI chat entry.
-  if (path === '/chat' || path.startsWith('/chat/')) return true;
-  return hasNotionAiSignals();
+  if (String(location?.pathname || '') !== '/chat') return false;
+  try {
+    return /^[0-9a-f]{32}$/i.test(String(new URL(location.href).searchParams.get('t') || '').replace(/-/g, ''));
+  } catch (_error) {
+    return false;
+  }
 }
 
 function isVisible(el: Element | null): boolean {

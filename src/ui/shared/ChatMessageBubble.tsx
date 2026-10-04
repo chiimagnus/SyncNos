@@ -128,7 +128,7 @@ export function ChatMessageBubble({
     '[&_del]:tw-opacity-70',
 
     '[&_ul]:tw-mt-0 [&_ul]:tw-mb-2 [&_ul]:tw-pl-5 [&_ul]:tw-list-disc',
-    '[&_ol]:tw-mt-0 [&_ol]:tw-mb-2 [&_ol]:tw-pl-5 [&_ol]:tw-list-decimal',
+    '[&_ol]:tw-mt-0 [&_ol]:tw-mb-2 [&_ol]:tw-pl-[2em] [&_ol]:tw-list-decimal',
     '[&_ul>li+li]:tw-mt-1 [&_ol>li+li]:tw-mt-1',
     '[&_li>p]:tw-mb-1 [&_li>p:last-child]:tw-mb-0',
 
@@ -145,9 +145,9 @@ export function ChatMessageBubble({
     '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none',
 
     // Tables can be wider than the viewport; let the table itself scroll instead of the whole bubble.
-    '[&_table]:tw-block [&_table]:tw-overflow-x-auto [&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
-    '[&_th]:tw-border [&_th]:tw-border-[var(--border)] [&_th]:tw-px-[6px] [&_th]:tw-py-[4px] [&_th]:tw-align-top [&_th]:tw-font-[600]',
-    '[&_td]:tw-border [&_td]:tw-border-[var(--border)] [&_td]:tw-px-[6px] [&_td]:tw-py-[4px] [&_td]:tw-align-top',
+    '[&_table]:tw-block [&_table]:tw-break-normal [&_table]:tw-overflow-x-auto [&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
+    '[&_th]:tw-border [&_th]:tw-border-solid [&_th]:tw-border-[var(--border)] [&_th]:tw-px-[6px] [&_th]:tw-py-[4px] [&_th]:tw-align-top [&_th]:tw-font-[600]',
+    '[&_td]:tw-border [&_td]:tw-border-solid [&_td]:tw-border-[var(--border)] [&_td]:tw-px-[6px] [&_td]:tw-py-[4px] [&_td]:tw-align-top',
     '[&_thead_th]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))]',
     '[&_tbody_tr:nth-child(even)>td]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_42%,transparent)]',
 

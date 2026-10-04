@@ -34,7 +34,18 @@ export type CaptureIntegrityFailure = {
 
 export type CaptureIntegrityResult = CaptureIntegritySuccess | CaptureIntegrityFailure;
 
-export const VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS = new Set<string>(['chatgpt', 'claude', 'googleaistudio']);
+export const CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS = new Set<string>([
+  'chatgpt',
+  'claude',
+  'googleaistudio',
+  'deepseek',
+  'doubao',
+  'kimi',
+  'notionai',
+  'poe',
+  'yuanbao',
+  'zai',
+]);
 
 function stableString(value: unknown): string {
   return String(value || '').trim();
@@ -103,11 +114,11 @@ function failureMeta(meta: CaptureMeta | null, reason: string): CaptureMeta {
 
 export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): CaptureIntegrityResult {
   const normalizedCollectorId = stableIdentityString(collectorId).toLowerCase();
-  const isVirtual = VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS.has(normalizedCollectorId);
+  const isGuarded = CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS.has(normalizedCollectorId);
   const meta = normalizeMeta(snapshot?.captureMeta);
   const rawMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
 
-  if (isVirtual) {
+  if (isGuarded) {
     const source = stableIdentityString(snapshot?.conversation?.source).toLowerCase();
     const conversationKey = stableIdentityString(snapshot?.conversation?.conversationKey);
     if (!meta || meta.identityVerified !== true || source !== normalizedCollectorId || !conversationKey) {
@@ -119,7 +130,7 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     }
   }
 
-  if (!meta && !isVirtual) {
+  if (!meta && !isGuarded) {
     return {
       ok: true,
       snapshot,
@@ -134,7 +145,7 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     rawMessages.length > 0 &&
     completeKeys.every((key) => isStablePartialKey(key)) &&
     new Set(completeKeys).size === completeKeys.length;
-  const unsafeComplete = isVirtual && effectiveMeta.completeness === 'complete' && !completeKeysAreSafe;
+  const unsafeComplete = isGuarded && effectiveMeta.completeness === 'complete' && !completeKeysAreSafe;
   if (unsafeComplete) {
     effectiveMeta = failureMeta(effectiveMeta, 'capture_integrity_complete_untrusted');
   }

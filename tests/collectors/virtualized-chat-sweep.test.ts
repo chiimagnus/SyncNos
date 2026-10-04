@@ -945,6 +945,48 @@ describe('virtualized chat single-pass sweep', () => {
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a']);
   });
 
+  it('does not wait for offscreen gaps while retaining their incomplete result', async () => {
+    let clock = 0;
+    const test = singlePageAdapter([[{ key: 'a', fingerprint: 'a', text: 'A' }]], () => ['offscreen']);
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      { ...test.adapter, readPendingKeys: () => [] },
+      test.accumulator,
+      {
+        pollMs: 40,
+        now: () => clock,
+        sleep: async (duration) => {
+          clock += duration;
+        },
+      },
+    );
+    expect(clock).toBe(40);
+    expect(result.completeness).toBe('partial');
+    expect(result.reasons).toContain('unresolved_turn');
+  });
+
+  it('waits for viewport hydration even when another unresolved gap cannot settle here', async () => {
+    let clock = 0;
+    const test = singlePageAdapter([[{ key: 'visible', fingerprint: 'a', text: 'A' }]], () =>
+      clock < 80 ? ['visible', 'offscreen'] : ['offscreen'],
+    );
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      { ...test.adapter, readPendingKeys: () => (clock < 80 ? ['visible'] : []) },
+      test.accumulator,
+      {
+        pollMs: 40,
+        now: () => clock,
+        sleep: async (duration) => {
+          clock += duration;
+        },
+      },
+    );
+    expect(clock).toBe(80);
+    expect(result.completeness).toBe('partial');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['visible']);
+  });
+
   it('keeps unresolved expected turns partial without restarting the pass', async () => {
     const test = singlePageAdapter([[{ key: 'a', fingerprint: 'a', text: 'A' }]], () => ['unresolved-shell']);
     const result = await runVirtualizedSweep(

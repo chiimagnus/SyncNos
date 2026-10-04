@@ -34,6 +34,7 @@ export function createObserver(input: ObserverInput): ObserverController {
   let observer: MutationObserver | null = null;
   let observedRoot: Node | null = null;
   let rootRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  let visibilityDocument: Document | null = null;
   let started = false;
 
   function readRequestedRoot(): Node | null {
@@ -59,11 +60,31 @@ export function createObserver(input: ObserverInput): ObserverController {
     });
   }
 
+  const onVisibilityChange = () => {
+    if (!started) return;
+    if (visibilityDocument?.visibilityState === 'hidden') return;
+    ensureObservedRoot(readRequestedRoot());
+    void onTick();
+  };
+
+  function subscribeVisibilityResume() {
+    const doc = globalThis.document;
+    if (!doc || typeof doc.addEventListener !== 'function') return;
+    visibilityDocument = doc;
+    doc.addEventListener('visibilitychange', onVisibilityChange);
+  }
+
+  function unsubscribeVisibilityResume() {
+    visibilityDocument?.removeEventListener?.('visibilitychange', onVisibilityChange);
+    visibilityDocument = null;
+  }
+
   return {
     start() {
       if (started) return;
       started = true;
 
+      subscribeVisibilityResume();
       ensureObservedRoot(readRequestedRoot());
       void onTick();
 
@@ -79,6 +100,7 @@ export function createObserver(input: ObserverInput): ObserverController {
     stop() {
       started = false;
       debouncedTick.cancel();
+      unsubscribeVisibilityResume();
       if (rootRefreshTimer) {
         clearInterval(rootRefreshTimer);
         rootRefreshTimer = null;

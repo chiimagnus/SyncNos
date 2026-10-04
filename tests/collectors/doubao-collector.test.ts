@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import normalizeApi from '@services/shared/normalize.ts';
+import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createDoubaoCollectorDef } from '../../src/collectors/doubao/doubao-collector.ts';
 
@@ -10,6 +11,124 @@ function setupDoubaoDom(html: string, url: string) {
 }
 
 describe('doubao-collector', () => {
+  it('sweeps virtual windows only for manual capture and keeps the result partial-safe', async () => {
+    const dom = setupDoubaoDom(
+      '<div aria-label="doc_editor"><div class="scroller" style="overflow-y:auto"></div></div>',
+      'https://www.doubao.com/chat/virtual-history',
+    );
+    const scroller = dom.window.document.querySelector('.scroller') as HTMLElement;
+    let top = 200;
+    const render = () => {
+      const start = top >= 140 ? 4 : top >= 60 ? 2 : 0;
+      scroller.innerHTML = Array.from({ length: 4 }, (_, index) => {
+        const ordinal = start + index;
+        return `<div data-message-id="${ordinal + 1}" class="${ordinal % 2 ? '' : 'justify-end'}"><div class="${ordinal % 2 ? 'flow-markdown-body' : ''}" data-testid="message_text_content">message ${ordinal + 1}</div></div>`;
+      }).join('');
+    };
+    Object.defineProperties(scroller, {
+      scrollHeight: { value: 300 },
+      clientHeight: { value: 100 },
+      scrollTop: {
+        get: () => top,
+        set: (value: number) => {
+          top = value;
+          render();
+        },
+      },
+    });
+    render();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const collector = createDoubaoCollectorDef(env).collector;
+    const auto = (await collector.capture()) as any;
+    expect(auto.messages.map((message: any) => message.messageKey)).toEqual([
+      'doubao_5',
+      'doubao_6',
+      'doubao_7',
+      'doubao_8',
+    ]);
+    expect(top).toBe(200);
+    const prepared = await collector.prepareManualCapture!({ pollMs: 1 });
+    expect(top).toBe(200);
+    const snapshot = (await collector.capture({ manual: true, preparedCapture: prepared })) as any;
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `doubao_${index + 1}`),
+    );
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial', reasons: ['top_not_reached'] });
+    expect(resolveCaptureIntegrity('doubao', snapshot)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
+    expect(await collector.capture({ manual: true, preparedCapture: prepared })).toBeNull();
+    const stale = await collector.prepareManualCapture!({ pollMs: 1 });
+    dom.reconfigure({ url: 'https://www.doubao.com/chat/another-history' });
+    expect(await collector.capture({ manual: true, preparedCapture: stale })).toBeNull();
+  });
+
+  it('excludes streaming assistants and keeps partial captures non-destructive until completion', async () => {
+    const dom = setupDoubaoDom(
+      `<div aria-label="doc_editor">
+        <div class="flex flex-col flex-grow">
+          <div data-message-id="user" class="justify-end"><div data-testid="message_text_content">prompt</div></div>
+          <div data-foundation-type="send-message-action-bar"></div>
+        </div>
+        <div class="flex flex-col flex-grow">
+          <div data-message-id="assistant"><div data-testid="message_text_content" data-streaming="true">partial</div></div>
+          <div data-foundation-type="receive-message-action-bar"></div>
+        </div>
+      </div>`,
+      'https://www.doubao.com/chat/streaming001',
+    );
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const collector = createDoubaoCollectorDef(env).collector;
+    const partial = (await collector.capture()) as any;
+    expect(partial.messages.map((message: any) => message.messageKey)).toEqual(['doubao_user']);
+    expect(partial.captureMeta.completeness).toBe('partial');
+    expect(resolveCaptureIntegrity('doubao', partial)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
+    const assistant = dom.window.document.querySelector('[data-streaming]')!;
+    assistant.setAttribute('data-streaming', 'false');
+    assistant.textContent = 'complete';
+    const completed = (await collector.capture()) as any;
+    expect(completed.messages).toHaveLength(2);
+    expect(completed.messages[1]).toMatchObject({ messageKey: 'doubao_assistant', contentMarkdown: 'complete' });
+    expect(resolveCaptureIntegrity('doubao', completed)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
+  });
+
+  it('retains file-only messages when the text container is empty', async () => {
+    const dom = setupDoubaoDom(
+      `<div aria-label="doc_editor"><div data-message-id="file-only" class="justify-end">
+        <div data-testid="message_text_content"></div>
+        <div data-testid="attachment_file_item"><span data-testid="message_nested_content_file_name">only.pdf</span></div>
+      </div></div>`,
+      'https://www.doubao.com/chat/file-only001',
+    );
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snapshot = (await createDoubaoCollectorDef(env).collector.capture()) as any;
+    expect(snapshot?.messages).toEqual([
+      expect.objectContaining({ messageKey: 'doubao_file-only', contentMarkdown: 'Attachment: only.pdf' }),
+    ]);
+  });
+
   it('extracts messages from modern data-message-id DOM structure', async () => {
     const html = `
       <div aria-label="doc_editor">
@@ -48,45 +167,78 @@ describe('doubao-collector', () => {
     const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
 
     expect(snap).toBeTruthy();
+    expect(snap.conversation.conversationKey).toBe('conv-modern-001');
     expect(snap.messages.length).toBe(2);
-    expect(snap.messages[0].role).toBe('user');
-    expect(snap.messages[0].contentMarkdown).toBe('111');
-    expect(snap.messages[1].role).toBe('assistant');
+    expect(snap.messages[0]).toMatchObject({
+      messageKey: 'doubao_43080634158254594',
+      role: 'user',
+      contentMarkdown: '111',
+    });
+    expect(snap.messages[1]).toMatchObject({
+      messageKey: 'doubao_43080634158259458',
+      role: 'assistant',
+    });
     expect(snap.messages[1].contentMarkdown).toBe('111～👀');
     expect(snap.messages[1].contentMarkdown).toContain('111～👀');
   });
 
-  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
+  it('uses the active Doubao conversation title instead of the product page title', async () => {
     const html = `
+      <a href="/chat/title001" aria-current="page" class="group/conversation-item">真实豆包标题</a>
       <div aria-label="doc_editor">
         <div class="container-PvPoAn">
-          <div data-copy-telemetry="right_click_copy" class="flex flex-col flex-grow">
-            <div data-message-id="43080634158259458" class="relative flex-row flex w-full">
-              <div data-testid="message_text_content">plain answer</div>
+          <div class="flex flex-col flex-grow">
+            <div data-message-id="title-user" class="flex-row flex w-full justify-end">
+              <div class="bg-g-send-msg-bubble-bg">标题测试正文</div>
             </div>
-            <div data-foundation-type="receive-message-action-bar"></div>
+            <div data-foundation-type="send-message-action-bar"></div>
           </div>
         </div>
       </div>
     `;
-
-    vi.resetModules();
-    vi.doMock('../../src/collectors/doubao/doubao-markdown.ts', () => ({ default: {} }));
-
-    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/fallback001');
-    const { createDoubaoCollectorDef: createDef } = await import('../../src/collectors/doubao/doubao-collector.ts');
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/title001');
+    dom.window.document.title = '豆包工作 - 字节跳动旗下 AI 智能助手';
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = (await Promise.resolve(createDef(env).collector.capture())) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
-    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
+
+    const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
+    expect(snap.conversation.title).toBe('真实豆包标题');
+  });
+
+  it('captures current semantic file attachment names', async () => {
+    const html = `
+      <div aria-label="doc_editor">
+        <div class="flex flex-col flex-grow">
+          <div data-message-id="43080634158254595" class="flex-row flex w-full justify-end">
+            <div class="bg-g-send-msg-bubble-bg">
+              <div data-testid="attachment_file_item">
+                <div data-testid="message_nested_content_file_name">paper.pdf</div>
+              </div>
+              <div data-testid="message_text_content">总结附件</div>
+            </div>
+          </div>
+          <div data-foundation-type="send-message-action-bar"></div>
+        </div>
+      </div>
+    `;
+
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/file001');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
+
+    expect(snap.messages).toHaveLength(1);
+    expect(snap.messages[0]).toMatchObject({ messageKey: 'doubao_43080634158254595', role: 'user' });
+    expect(snap.messages[0].contentMarkdown).toContain('Attachment: paper.pdf');
+    expect(snap.messages[0].contentMarkdown).toContain('总结附件');
   });
 
   it('inlines blob: uploaded images as data:image urls', async () => {

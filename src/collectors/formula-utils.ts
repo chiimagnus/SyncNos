@@ -257,7 +257,7 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
 
       const closestFn = typeof el.closest === 'function' ? el.closest.bind(el) : null;
       const inlineAncestorSelector = 'ms-katex.inline, strong, em, b, i, a, span, code, small, sub, sup';
-      if (closestFn && closestFn(inlineAncestorSelector)) return true;
+      if (el.matches?.('ms-katex.inline') || el.parentElement?.closest(inlineAncestorSelector)) return true;
 
       // `<pre>` is block-level by default. Only treat it as inline when it's in an explicitly inline wrapper.
       if (tag === 'pre') return false;

@@ -49,9 +49,9 @@ beforeEach(() => {
   revisionMocks.retry.mockReset();
 
   dom = new JSDOM(
-    '<!doctype html><html><body><div data-testid="agent-send-message-button"></div><div role="textbox" data-content-editable-leaf="true" contenteditable="true"></div></body></html>',
+    '<!doctype html><html><body><div role="textbox" data-content-editable-leaf="true" contenteditable="true"></div></body></html>',
     {
-      url: 'https://app.notion.com/',
+      url: 'https://app.notion.com/chat?t=0123456789abcdef0123456789abcdef&wfv=chat',
       pretendToBeVisual: true,
     },
   );

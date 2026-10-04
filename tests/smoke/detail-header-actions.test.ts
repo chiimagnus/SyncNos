@@ -56,7 +56,8 @@ import { buildConversationBasename } from '@services/conversations/domain/file-n
 import { DETAIL_HEADER_COPY_LINK_ACTION_STORAGE_KEY } from '@services/integrations/detail-header-copy-link-preference';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { hasDetailHeaderActionStorageDependencyChange } from '@services/integrations/detail-header-action-dependencies';
-import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/notion-openin';
+import { buildNotionPageUrl } from '@services/integrations/openin/notion-openin';
+import { normalizeNotionId } from '@services/shared/notion-id';
 import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
 import { syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 
@@ -185,7 +186,7 @@ describe('detail-header-actions', () => {
   });
 
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
-    expect(normalizeNotionPageId('01234567-89AB-CDEF-0123-456789ABCDEF')).toBe('0123456789abcdef0123456789abcdef');
+    expect(normalizeNotionId('01234567-89AB-CDEF-0123-456789ABCDEF')).toBe('0123456789abcdef0123456789abcdef');
     expect(buildNotionPageUrl('01234567-89AB-CDEF-0123-456789ABCDEF')).toBe(
       'https://www.notion.so/0123456789abcdef0123456789abcdef',
     );

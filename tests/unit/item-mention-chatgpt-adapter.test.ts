@@ -34,6 +34,41 @@ afterEach(() => {
 });
 
 describe('item-mention chatgpt composer adapter', () => {
+  it('detects the current data-composer-markdown editor without the legacy id', () => {
+    const legacy = document.querySelector('#prompt-textarea');
+    legacy?.remove();
+    const current = document.createElement('div');
+    current.setAttribute('role', 'textbox');
+    current.setAttribute('contenteditable', 'true');
+    current.setAttribute('data-composer-markdown', '');
+    current.className = 'ProseMirror';
+    current.textContent = '$ab';
+    (current as any).getBoundingClientRect = () => ({
+      width: 100,
+      height: 20,
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 20,
+    });
+    document.querySelector('main')?.appendChild(current);
+    (current as any).focus?.();
+
+    const textNode = current.firstChild as Text;
+    const sel = globalThis.getSelection?.();
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 3);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+
+    const editor = chatgptComposerEditorAdapter.detectActiveEditor();
+    expect(editor?.el).toBe(current);
+    const after = chatgptComposerEditorAdapter.replaceRange(editor!, { start: 0, end: 3 }, 'MD');
+    expect(current.textContent).toBe('MD');
+    expect(after).toEqual({ start: 2, end: 2 });
+  });
+
   it('replaces a range and moves caret to the end of inserted text', () => {
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
     el.textContent = 'hello $ab world';

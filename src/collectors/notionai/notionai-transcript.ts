@@ -1,7 +1,35 @@
 import type { CollectorEnv } from '@collectors/collector-env.ts';
+import { firstUserMessageTitle } from '@collectors/collector-utils.ts';
+import { htmlToMarkdown } from '@collectors/shared/markdown-dom.ts';
+import MarkdownIt from 'markdown-it';
+import texmath from 'markdown-it-texmath';
+import { normalizeNotionId } from '@services/shared/notion-id';
+import { NOTION_AI_TRANSCRIPT_REQUEST, NOTION_AI_TRANSCRIPT_RESPONSE } from '@collectors/notionai/notionai-protocol';
 
-export const NOTION_AI_TRANSCRIPT_REQUEST = 'SYNCNOS_NOTIONAI_TRANSCRIPT_REQUEST';
-export const NOTION_AI_TRANSCRIPT_RESPONSE = 'SYNCNOS_NOTIONAI_TRANSCRIPT_RESPONSE';
+let markupParser: MarkdownIt | undefined;
+
+function getMarkupParser(): MarkdownIt {
+  if (markupParser) return markupParser;
+  const parser = new MarkdownIt({ html: true, breaks: true, typographer: false });
+  parser.inline.ruler.before('html_inline', 'notion_edit_reference', (state) => {
+    const match = state.src.slice(state.pos).match(/^<edit_reference(?:\s[^>]*)?>[\s\S]*?<\/edit_reference\s*>/);
+    if (!match) return false;
+    state.pos += match[0].length;
+    return true;
+  });
+  for (const rule of texmath.rules.dollars.inline) {
+    parser.inline.ruler.before('escape', rule.name, texmath.inline(rule));
+    parser.renderer.rules[rule.name] = (tokens, index) =>
+      parser.utils.escapeHtml(`${rule.tag}${tokens[index].content}${rule.tag}`);
+  }
+  for (const rule of texmath.rules.dollars.block) {
+    parser.block.ruler.before('fence', rule.name, texmath.block(rule));
+    parser.renderer.rules[rule.name] = (tokens, index) =>
+      `<p>$$<br>${parser.utils.escapeHtml(tokens[index].content.trim())}<br>$$</p>`;
+  }
+  markupParser = parser;
+  return parser;
+}
 
 const HISTORY_PARTIAL_REASON = 'notionai_transcript_history_partial';
 const SCHEMA_DRIFT_REASON = 'notionai_transcript_schema_drift_partial';
@@ -21,16 +49,6 @@ type PendingRequest = {
 
 function stableString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-export function normalizeNotionAiThreadId(value: unknown): string {
-  const compact = stableString(value).replace(/-/g, '').toLowerCase();
-  return /^[0-9a-f]{32}$/.test(compact) ? compact : '';
-}
-
-export function notionAiApiThreadId(value: unknown): string {
-  const compact = normalizeNotionAiThreadId(value);
-  return compact ? compact.replace(/^(........)(....)(....)(....)(............)$/, '$1-$2-$3-$4-$5') : '';
 }
 
 function cloneJson<T>(value: T): T {
@@ -198,44 +216,18 @@ function renderAssistantMarkup(raw: unknown, document: Document): string {
   if (!source.trim()) return '';
 
   const container = document.createElement('div');
-  container.innerHTML = source;
-
-  const render = (node: Node, listIndex = 0): string => {
-    if (node.nodeType === 3) return node.nodeValue || '';
-    if (node.nodeType !== 1) return '';
-    const element = node as HTMLElement;
-    const tag = element.tagName.toLowerCase();
-    if (tag === 'edit_reference' || tag === 'script' || tag === 'style') return '';
-    const children = Array.from(element.childNodes)
-      .map((child) => render(child, listIndex))
-      .join('');
-    if (tag === 'br') return '\n';
-    if (tag === 'b' || tag === 'strong') return children ? `**${children}**` : '';
-    if (tag === 'i' || tag === 'em') return children ? `*${children}*` : '';
-    if (tag === 'code') return children ? `\`${children.replace(/`/g, '\\`')}\`` : '';
-    if (tag === 'a' || tag === 'mention') {
-      const url = safeHttpUrl(element.getAttribute(tag === 'mention' ? 'url' : 'href'));
-      return url ? `[${children.trim() || url}](${url})` : children;
-    }
-    if (tag === 'p') return `${children.trim()}\n\n`;
-    if (tag === 'li') {
-      const parentTag = element.parentElement?.tagName.toLowerCase();
-      const prefix = parentTag === 'ol' ? `${listIndex + 1}. ` : '- ';
-      return `${prefix}${children.trim()}\n`;
-    }
-    if (tag === 'ul' || tag === 'ol') {
-      return `${Array.from(element.children)
-        .map((child, index) => render(child, index))
-        .join('')}\n`;
-    }
-    return children;
-  };
-
-  return Array.from(container.childNodes)
-    .map((node) => render(node))
-    .join('')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  container.innerHTML = getMarkupParser().render(source);
+  for (const node of Array.from(container.childNodes)) {
+    if (node.nodeType === 3 && !node.textContent?.trim()) node.remove();
+  }
+  for (const element of Array.from(container.querySelectorAll('edit_reference, script, style'))) element.remove();
+  for (const mention of Array.from(container.querySelectorAll('mention'))) {
+    const link = document.createElement('a');
+    link.href = safeHttpUrl(mention.getAttribute('url'));
+    link.textContent = mention.textContent || link.getAttribute('href') || '';
+    mention.replaceWith(link);
+  }
+  return htmlToMarkdown(container);
 }
 
 function renderAssistantContent(value: unknown, document: Document): { markdown: string; supported: boolean } {
@@ -261,11 +253,11 @@ export function buildNotionAiTranscriptSnapshot(input: {
   pages: any[];
   complete: boolean;
   threadId: string;
-  title: string;
+  conversationTitle?: string;
   document: Document;
   capturedAt?: number;
 }): any | null {
-  const threadId = normalizeNotionAiThreadId(input.threadId);
+  const threadId = normalizeNotionId(input.threadId);
   if (!threadId || !Array.isArray(input.pages) || !input.pages.length) return null;
   const { entities, schemaDrift } = materializeEntities(input.pages);
   const reasons = new Set<string>();
@@ -309,7 +301,7 @@ export function buildNotionAiTranscriptSnapshot(input: {
   }
   if (!messages.length) return null;
 
-  const title = stableString(input.title).replace(/\s*\|\s*Notion\s*$/i, '') || 'Notion AI';
+  const title = stableString(input.conversationTitle) || firstUserMessageTitle(messages) || 'Notion AI';
   return {
     conversation: {
       sourceType: 'chat',
@@ -345,31 +337,27 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingByRequestId.delete(requestId);
-    const threadId = normalizeNotionAiThreadId(data.threadId);
+    const threadId = normalizeNotionId(data.threadId);
     const pages = Array.isArray(data.pages) ? data.pages : [];
     if (!threadId || threadId !== pending.threadId || !pages.length) {
-      pending.resolve(stateByThread.get(pending.threadId) || null);
+      pending.resolve(pending.mode === 'full' ? stateByThread.get(pending.threadId) || null : null);
       return;
     }
-    const existing = stateByThread.get(threadId);
-    const state =
-      pending.mode === 'full' || !existing
-        ? { pages, complete: data.complete === true }
-        : { pages: [...existing.pages, ...pages], complete: existing.complete };
-    stateByThread.set(threadId, state);
+    const state = { pages, complete: data.complete === true };
+    if (pending.mode === 'full') stateByThread.set(threadId, state);
     pending.resolve(state);
   };
 
   window.addEventListener('message', onMessage);
 
   const request = (threadIdValue: unknown, mode: 'full' | 'latest'): Promise<TranscriptState | null> => {
-    const threadId = normalizeNotionAiThreadId(threadIdValue);
+    const threadId = normalizeNotionId(threadIdValue);
     if (!threadId) return Promise.resolve(null);
     const requestId = `notionai-${Date.now()}-${++requestCounter}`;
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         pendingByRequestId.delete(requestId);
-        resolve(stateByThread.get(threadId) || null);
+        resolve(mode === 'full' ? stateByThread.get(threadId) || null : null);
       }, 15_000);
       pendingByRequestId.set(requestId, { mode, threadId, resolve, timer });
       window.postMessage({ __syncnos: true, type: NOTION_AI_TRANSCRIPT_REQUEST, requestId, threadId, mode }, '*');
@@ -378,7 +366,7 @@ export function createNotionAiTranscriptBridge(env: Pick<CollectorEnv, 'window'>
 
   return {
     get(threadIdValue: unknown): TranscriptState | null {
-      const threadId = normalizeNotionAiThreadId(threadIdValue);
+      const threadId = normalizeNotionId(threadIdValue);
       return threadId ? stateByThread.get(threadId) || null : null;
     },
     requestFull(threadIdValue: unknown): Promise<TranscriptState | null> {

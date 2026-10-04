@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS,
+  CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS,
   resolveCaptureIntegrity,
   type CaptureMessageMergePolicy,
   type CaptureMeta,
 } from '@services/shared/capture-integrity';
-import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS, SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
+import {
+  AI_CHAT_AUTO_SAVE_COLLECTOR_IDS,
+  AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS,
+  SUPPORTED_AI_CHAT_SITES,
+} from '@collectors/ai-chat-sites';
 
 function snapshot(overrides: Record<string, unknown> = {}) {
   return {
@@ -18,16 +22,33 @@ function snapshot(overrides: Record<string, unknown> = {}) {
 }
 
 describe('capture integrity contract', () => {
-  it('keeps virtualized providers manual-only from one source', () => {
-    expect(Array.from(VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS)).toEqual(['chatgpt', 'claude', 'googleaistudio']);
+  it('separates integrity-guarded providers from manual-only autosave policy', () => {
+    expect(Array.from(CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS)).toEqual([
+      'chatgpt',
+      'claude',
+      'googleaistudio',
+      'deepseek',
+      'doubao',
+      'kimi',
+      'notionai',
+      'poe',
+      'yuanbao',
+      'zai',
+    ]);
+    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio']);
 
     const supportedIds = new Set(SUPPORTED_AI_CHAT_SITES.map((site) => site.id));
-    for (const id of VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS) {
-      expect(supportedIds.has(id)).toBe(true);
-      expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(id)).toBe(false);
-    }
+    for (const id of CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS) expect(supportedIds.has(id)).toBe(true);
+    for (const id of AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS) expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(id)).toBe(false);
 
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('gemini')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('deepseek')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('kimi')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('notionai')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('poe')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('yuanbao')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('zai')).toBe(true);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('claude')).toBe(true);
   });
 
   it('keeps capture metadata and merge policies content-free and transient', () => {

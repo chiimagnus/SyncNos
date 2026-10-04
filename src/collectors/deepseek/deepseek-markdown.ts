@@ -96,7 +96,7 @@ function detectCodeLanguage(preEl: any): any {
   if (!preEl || !preEl.closest) return '';
   const codeBlock = preEl.closest('.md-code-block');
   if (codeBlock && codeBlock.querySelector) {
-    const label = codeBlock.querySelector(".d813de27, [class*='language']");
+    const label = codeBlock.querySelector('.md-code-block-infostring, [data-language], [data-code-language]');
     const labelText = normalizeCodeLanguage(label && label.textContent ? label.textContent : '');
     if (labelText) return labelText;
   }

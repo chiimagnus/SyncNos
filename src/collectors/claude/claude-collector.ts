@@ -2,10 +2,12 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
+  compactConversationTitle,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
-import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
+import claudeMarkdown from '@collectors/claude/claude-markdown.ts';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -56,7 +58,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function findConversationKey(): string {
-    return isValidConversationUrl() ? conversationKeyFromLocation(env.location) : '';
+    return findConversationId();
   }
 
   function normalizedRoute(): string {
@@ -84,10 +86,31 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     return env.normalize.normalizeText(String(value || '')).trim();
   }
 
-  function extractConversationTitle(): string {
-    const pageTitle = normalizeTitle(env.document.title || '');
-    const withoutSuffix = normalizeTitle(pageTitle.replace(/\s*[-–—]\s*Claude\s*$/i, ''));
-    return withoutSuffix || 'Claude';
+  function extractConversationTitle(messages: any[] = []): string {
+    const conversationId = findConversationId();
+    if (conversationId) {
+      const current = Array.from(env.document.querySelectorAll("a[aria-current='page'][href]")).find((link) => {
+        try {
+          const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+          return url.pathname === `/chat/${conversationId}`;
+        } catch (_error) {
+          return false;
+        }
+      });
+      const currentText = normalizeTitle(renderedElementText(current));
+      if (currentText) return currentText;
+    }
+
+    const headerTitle = env.document.querySelector("[data-testid='chat-title-split'] button");
+    const headerText = normalizeTitle(renderedElementText(headerTitle));
+    if (headerText) return headerText;
+
+    const firstUserRow = Array.from(getConversationRoot()?.querySelectorAll(TRANSCRIPT_ROW_SELECTOR) || []).find(
+      (row) => rowRole(row) === 'user',
+    );
+    const firstUserText = firstUserRow ? normalizedNodeText(contentNodeForRow(firstUserRow, 'user')) : '';
+    if (firstUserText) return compactConversationTitle(firstUserText);
+    return firstUserMessageTitle(messages) || 'Claude';
   }
 
   function rowRole(row: Element): ClaudeRole | null {
@@ -133,9 +156,9 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const assistant = row.querySelector("[data-testid='assistant-message']");
     if (!assistant) return null;
 
-    // Claude renders user-visible prose as one or more reply-text blocks; tool/thinking state lives
-    // in separate TurnStatus nodes. Capture the prose blocks in order and fail closed otherwise.
-    const replies = Array.from(assistant.querySelectorAll('[data-perf-reply-text]'));
+    const replies = Array.from(assistant.querySelectorAll("[data-cds='Prose']")).filter(
+      (node) => !node.closest("[data-cds='TurnStatus'], [data-testid='TurnStatus']"),
+    );
     if (!replies.length) return null;
     if (replies.length === 1) return replies[0] || null;
 
@@ -192,20 +215,13 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
 
   function normalizedNodeText(node: Element | null): string {
     if (!node) return '';
-    const extracted =
-      typeof geminiMarkdown.extractAssistantText === 'function'
-        ? geminiMarkdown.extractAssistantText(node)
-        : (node as any).innerText || node.textContent || '';
+    const extracted = claudeMarkdown.extractText(node) || (node as any).innerText || node.textContent || '';
     return env.normalize.normalizeText(extracted || '');
   }
 
   function markdownFromNode(node: Element | null, fallbackText: string): string {
     if (!node) return '';
-    const extracted =
-      typeof geminiMarkdown.extractAssistantMarkdown === 'function'
-        ? geminiMarkdown.extractAssistantMarkdown(node)
-        : '';
-    return String(extracted || fallbackText || '').trim();
+    return String(claudeMarkdown.extractMarkdown(node) || fallbackText || '').trim();
   }
 
   function compactFingerprint(value: string): string {
@@ -468,14 +484,14 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     return finishPreparedCapture(accumulator);
   }
 
-  async function capture(options: any): Promise<any | null> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
-      return null;
-    }
-    const prepared = consumePreparedCapture(options?.preparedCapture);
-    if (!prepared) return null;
+  async function capture(options: any = {}): Promise<any | null> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
+    const root = getConversationRoot();
+    if (!root || isEditingConversation(root)) return null;
     const currentGuard = sampleIdentityGuard();
-    if (!identityGuardsMatch(prepared.identityGuard, currentGuard)) return null;
+    const prepared = options.manual === true ? consumePreparedCapture(options.preparedCapture) : null;
+    if (options.manual === true && (!prepared || !identityGuardsMatch(prepared.identityGuard, currentGuard)))
+      return null;
 
     observedMessageCount = Math.max(
       observedMessageCount,
@@ -483,17 +499,21 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     );
     const accumulator = createPreparedAccumulator<any>({
       source: 'claude',
-      conversationKey: prepared.conversationKey,
-      identityVerified: prepared.identityVerified === true,
-      identityGuard: prepared.identityGuard,
+      conversationKey: prepared?.conversationKey || currentGuard.durableId,
+      identityVerified: prepared ? prepared.identityVerified === true : !!currentGuard.durableId,
+      identityGuard: prepared?.identityGuard || currentGuard,
     });
-    accumulator.completeness = prepared.completeness;
-    accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
-    accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-    );
+    accumulator.completeness = prepared?.completeness || 'partial';
+    if (prepared) {
+      accumulator.reasons.push(...prepared.reasons);
+      accumulator.sweepMetrics = { ...prepared.metrics };
+      mergePreparedRecords(
+        accumulator,
+        prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
+      );
+    } else {
+      addPreparedReason(accumulator, 'top_not_reached');
+    }
 
     const finalLive = await harvestCurrentInto(accumulator);
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
@@ -517,7 +537,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
         sourceType: 'chat',
         source: 'claude',
         conversationKey: finalPrepared.conversationKey,
-        title: extractConversationTitle(),
+        title: extractConversationTitle(messages),
         url: env.location.href,
         warningFlags: [],
       },

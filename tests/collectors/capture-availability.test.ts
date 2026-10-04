@@ -58,7 +58,7 @@ const cases: Array<{ id: string; factory: Factory; url: string; unsupportedUrl: 
   {
     id: 'yuanbao',
     factory: createYuanbaoCollectorDef,
-    url: 'https://yuanbao.tencent.com/chat/a/b',
+    url: 'https://yuanbao.tencent.com/chat/naQivTmsDa',
     unsupportedUrl: 'https://yuanbao.tencent.com/settings',
     messageHtml:
       '<main><div class="agent-chat__list__content"><div class="agent-chat__list__item--human"><div class="hyc-content-text">hello</div></div></div></main>',

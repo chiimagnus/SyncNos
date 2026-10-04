@@ -2,11 +2,12 @@ import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
-  conversationKeyFromLocation,
   extractImageUrlsFromElement,
+  firstUserMessageTitle,
   inEditMode as inEditModeUtil,
+  renderedElementText,
 } from '@collectors/collector-utils.ts';
-import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
+import googleAiStudioMarkdown from '@collectors/googleaistudio/googleaistudio-markdown.ts';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -15,6 +16,7 @@ import {
   mergePreparedRecords,
   createPreparedCaptureConsumer,
   runVirtualizedSweep,
+  resolveScrollRoot,
   type PreparedAccumulator,
   type PreparedIdentityGuard,
   type PreparedMessageRecord,
@@ -51,18 +53,25 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl(): any {
+  function findSavedPromptIdFromUrl(): string {
     try {
-      const p = env.location.pathname || '';
-      if (!p || p === '/') return false;
-      return true;
-    } catch (_e) {
-      return false;
+      const path = String(env.location.pathname || '');
+      const match = path.match(/^\/(?:app\/)?(?:u\/\d+\/)?prompts\/([^/?#]+)(?:\/|$)/);
+      const id = match?.[1] ? decodeURIComponent(match[1]).trim() : '';
+      if (!id) return '';
+      if (new Set(['new_chat', 'new_comparison', 'new_image', 'new_video', 'new_music']).has(id)) return '';
+      return id;
+    } catch (_error) {
+      return '';
     }
   }
 
+  function isValidConversationUrl(): boolean {
+    return !!findSavedPromptIdFromUrl();
+  }
+
   function findConversationKey(): any {
-    return conversationKeyFromLocation(env.location);
+    return findSavedPromptIdFromUrl();
   }
 
   function getConversationRoot(): any {
@@ -109,10 +118,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return inEditModeUtil(root);
   }
 
-  function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
-    const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-    if (id) return `${id}:${role}`;
-    return env.normalize.makeFallbackMessageKey({ role, text: contentText, sequence });
+  function isPromptRunning(): boolean {
+    return !!env.document.querySelector('ms-run-button .stoppable-spinner, ms-run-button .stoppable-stop');
   }
 
   type ManualTurnEntry = {
@@ -154,8 +161,11 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return env.normalize.normalizeText(text);
   }
 
-  function extractConversationTitle(): any {
+  function extractConversationTitle(messages: any[] = []): any {
     const selectors = [
+      'ms-playground-toolbar .page-title h1.mode-title',
+      'ms-playground-toolbar h1.mode-title',
+      '.page-title h1.mode-title',
       "[data-test-id='conversation-title']",
       '.conversation-title-container .conversation-title-column [class*="gds-title"]',
       '.conversation-title-container .conversation-title-column',
@@ -163,28 +173,10 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     for (const selector of selectors) {
       const el = env.document.querySelector(selector);
       if (!el) continue;
-      const title = normalizeTitle((el as any).textContent || (el as any).innerText || '');
+      const title = normalizeTitle(renderedElementText(el));
       if (title) return title;
     }
-    const pageTitle = normalizeTitle(env.document.title || '');
-    return pageTitle || 'Google AI Studio';
-  }
-
-  function extractAssistantMarkdown(node: any, fallbackText: any): any {
-    if (typeof geminiMarkdown.extractAssistantMarkdown === 'function') {
-      const markdown = geminiMarkdown.extractAssistantMarkdown(node);
-      if (markdown) return markdown;
-    }
-    return fallbackText || '';
-  }
-
-  function extractAssistantText(node: any): any {
-    if (typeof geminiMarkdown.extractAssistantText === 'function') {
-      const text = geminiMarkdown.extractAssistantText(node);
-      if (text) return text;
-    }
-    const raw = node ? node.innerText || node.textContent || '' : '';
-    return env.normalize.normalizeText(raw);
+    return firstUserMessageTitle(messages) || 'Google AI Studio';
   }
 
   type InlineImageContext = {
@@ -297,39 +289,13 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     }
   }
 
-  function stripThinkingFromNode(node: Element | null): Element | null {
-    if (!node || typeof (node as any).cloneNode !== 'function') return node;
-    const cloned = (node as any).cloneNode(true) as Element;
-    const selectors = ['ms-thought-chunk', '.thought-panel', 'img[alt="Thinking"]', '.thinking-progress-icon'];
-    for (const selector of selectors) {
-      for (const element of Array.from((cloned as any).querySelectorAll?.(selector) || [])) {
-        try {
-          (element as any).remove?.();
-        } catch (_error) {
-          // ignore
-        }
-      }
-    }
-    return cloned;
-  }
+  const TURN_CHROME_SELECTOR =
+    'ms-thought-chunk, .thought-panel, img[alt="Thinking"], .thinking-progress-icon, .author-label, .timestamp';
 
-  function stripTurnChromeFromNode(node: Element | null): Element | null {
-    if (!node || typeof (node as any).cloneNode !== 'function') return node;
-    const cloned = (node as any).cloneNode(true) as Element;
-    for (const selector of ['.author-label', '.timestamp']) {
-      for (const element of Array.from((cloned as any).querySelectorAll?.(selector) || [])) {
-        try {
-          (element as any).remove?.();
-        } catch (_error) {
-          // ignore
-        }
-      }
-    }
-    return cloned;
-  }
-
-  function cleanTurnContentNode(node: Element | null): Element | null {
-    return stripTurnChromeFromNode(stripThinkingFromNode(node));
+  function cleanTurnContentNode(node: Element): Element {
+    const clone = node.cloneNode(true) as Element;
+    for (const element of Array.from(clone.querySelectorAll(TURN_CHROME_SELECTOR))) element.remove();
+    return clone;
   }
 
   function uniqueStrings(values: string[]): string[] {
@@ -342,46 +308,23 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     });
   }
 
-  function snapshotPlainInput(
-    turn: Element,
-    role: 'user' | 'assistant',
-    content: Element,
-    sequence: number,
-    manualEntry?: ManualTurnEntry,
-  ): PlainExtractionInput | null {
-    const cleaned = cleanTurnContentNode(content) || content;
-    const contentText =
-      role === 'assistant'
-        ? extractAssistantText(cleaned)
-        : env.normalize.normalizeText((cleaned as any).innerText || (cleaned as any).textContent || '');
-    const baseMarkdown = role === 'assistant' ? extractAssistantMarkdown(cleaned, contentText) : contentText;
+  function snapshotPlainInput(entry: ManualTurnEntry, sequence: number): PlainExtractionInput | null {
+    const { role, content } = entry;
+    const cleaned = cleanTurnContentNode(content);
+    const baseMarkdown = googleAiStudioMarkdown.extractMarkdown(cleaned);
     const httpUrls = uniqueStrings(extractImageUrlsFromElement(cleaned));
     const blobUrls = uniqueStrings(extractBlobImageUrlsFromElement(cleaned));
-    if (!contentText && !httpUrls.length && !blobUrls.length) return null;
+    if (!baseMarkdown && !httpUrls.length && !blobUrls.length) return null;
     return {
-      messageKey: manualEntry?.messageKey || messageKeyFromTurn(turn, role, contentText, sequence),
-      turnKey: manualEntry?.turnId || String(turn.getAttribute?.('id') || '').trim(),
-      withinTurn: manualEntry?.withinTurn || 0,
+      messageKey: entry.messageKey,
+      turnKey: entry.turnId,
+      withinTurn: entry.withinTurn,
       role,
       sequence,
-      baseMarkdown: baseMarkdown || contentText,
+      baseMarkdown,
       imageReferences: { httpUrls, blobUrls },
       updatedAt: Date.now(),
     };
-  }
-
-  function snapshotNormalInputs(): PlainExtractionInput[] {
-    const root = getConversationRoot();
-    if (!root || inEditMode(root)) return [];
-    const output: PlainExtractionInput[] = [];
-    for (const turn of Array.from(root.querySelectorAll('ms-chat-turn')) as Element[]) {
-      const role = normalizeRoleFromTurn(turn);
-      const content = role ? pickTurnContent(turn, role) : null;
-      if (!role || !content) continue;
-      const input = snapshotPlainInput(turn, role, content, output.length);
-      if (input) output.push(input);
-    }
-    return output;
   }
 
   type ManualEntryRef = { turn: Element; entry: ManualTurnEntry };
@@ -425,25 +368,14 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     };
   }
 
-  async function extractMessagesFromInputs(inputs: PlainExtractionInput[], ctx: InlineImageContext): Promise<any[]> {
-    const output: any[] = [];
-    for (const input of inputs) {
-      const message = await extractMessageFromInput({ ...input, sequence: output.length }, ctx);
-      if (message) output.push(message);
-    }
-    return output;
-  }
-
-  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
-    return extractMessagesFromInputs(snapshotNormalInputs(), ctx);
-  }
-
   type AiStudioDescriptor = {
     key: string;
     turnKey: string;
     withinTurn: number;
     fingerprint: string;
     rendered: boolean;
+    streaming: boolean;
+    pending: boolean;
   };
 
   function compactFingerprint(value: string): string {
@@ -451,26 +383,113 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return env.normalize?.fnv1a32 ? String(env.normalize.fnv1a32(normalized)) : normalized;
   }
 
-  function descriptorFromEntry(entry: ManualTurnEntry): AiStudioDescriptor {
-    const rawText = env.normalize.normalizeText(
-      (entry.content as any).innerText || (entry.content as any).textContent || '',
-    );
+  function latestStreamingAssistantKey(refs: ManualEntryRef[]): string {
+    if (!isPromptRunning()) return '';
+    for (let index = refs.length - 1; index >= 0; index -= 1) {
+      const entry = refs[index]?.entry;
+      if (entry?.role === 'assistant') return entry.messageKey;
+    }
+    return '';
+  }
+
+  function descriptorFromEntry(
+    entry: ManualTurnEntry,
+    streamingKey = '',
+    inViewport: (node: Element) => boolean = () => true,
+  ): AiStudioDescriptor {
+    const cleaned = cleanTurnContentNode(entry.content);
+    const rawText = googleAiStudioMarkdown.extractText(cleaned);
     const rawHtml = String((entry.content as any).innerHTML || '');
-    const httpUrls = extractImageUrlsFromElement(entry.content);
-    const blobUrls = extractBlobImageUrlsFromElement(entry.content);
+    const httpUrls = extractImageUrlsFromElement(cleaned);
+    const blobUrls = extractBlobImageUrlsFromElement(cleaned);
+    const streaming = entry.role === 'assistant' && entry.messageKey === streamingKey;
+    const failed = entry.role === 'assistant' && !!entry.content.querySelector('.model-error');
+    const pendingMath = Array.from(entry.content.querySelectorAll('ms-katex')).filter(
+      (formula) => !formula.closest(TURN_CHROME_SELECTOR) && !env.normalize.normalizeText(formula.textContent || ''),
+    );
+    const rendered =
+      !streaming && !failed && !pendingMath.length && (!!rawText || !!httpUrls.length || !!blobUrls.length);
     return {
       key: entry.messageKey,
       turnKey: entry.turnId,
       withinTurn: entry.withinTurn,
       fingerprint: compactFingerprint(
-        [entry.messageKey, entry.role, rawText, rawHtml, httpUrls.join('|'), blobUrls.join('|')].join('\u001f'),
+        [
+          entry.messageKey,
+          entry.role,
+          String(streaming),
+          rawText,
+          rawHtml,
+          httpUrls.join('|'),
+          blobUrls.join('|'),
+        ].join('\u001f'),
       ),
-      rendered: !!rawText || !!httpUrls.length || !!blobUrls.length,
+      rendered,
+      streaming,
+      pending:
+        !rendered &&
+        !failed &&
+        (pendingMath.length
+          ? pendingMath.some(inViewport)
+          : inViewport(entry.content.closest('[data-turn-role]') || entry.content)),
     };
   }
 
   function readCurrentDescriptors(): AiStudioDescriptor[] {
-    return readCurrentManualEntryRefs().map(({ entry }) => descriptorFromEntry(entry));
+    const refs = readCurrentManualEntryRefs();
+    const streamingKey = latestStreamingAssistantKey(refs);
+    const scrollRoot = resolveScrollRoot({ document: env.document, window: env.window }, getConversationRoot());
+    const bounds = scrollRoot.getBoundingClientRect();
+    const viewportTop = Math.max(0, bounds.top);
+    const viewportBottom = bounds.height > 0 ? Math.min(env.window.innerHeight, bounds.bottom) : env.window.innerHeight;
+    const inViewport = (node: Element): boolean => {
+      const rect = node.getBoundingClientRect();
+      return rect.height === 0
+        ? rect.top >= viewportTop && rect.top < viewportBottom
+        : rect.bottom > viewportTop && rect.top < viewportBottom;
+    };
+    return refs.map(({ entry }) => descriptorFromEntry(entry, streamingKey, inViewport));
+  }
+
+  function mergeObservedSlotOrder(storedKeys: string[], incomingKeys: string[]): { keys: string[]; anchored: boolean } {
+    const stored = Array.from(new Set(storedKeys.map((key) => String(key || '').trim()).filter(Boolean)));
+    const incoming = Array.from(new Set(incomingKeys.map((key) => String(key || '').trim()).filter(Boolean)));
+    if (!stored.length) return { keys: incoming, anchored: true };
+    if (!incoming.length) return { keys: stored, anchored: true };
+
+    const storedPositions = new Map(stored.map((key, index) => [key, index]));
+    const known = incoming.filter((key) => storedPositions.has(key));
+    if (!known.length) {
+      return { keys: [...stored, ...incoming.filter((key) => !storedPositions.has(key))], anchored: false };
+    }
+    const knownPositions = known.map((key) => storedPositions.get(key) as number);
+    if (knownPositions.some((position, index) => index > 0 && position <= knownPositions[index - 1])) {
+      return { keys: stored, anchored: false };
+    }
+
+    const merged = stored.slice();
+    const knownSet = new Set(stored);
+    let cursor = 0;
+    while (cursor < incoming.length) {
+      if (knownSet.has(incoming[cursor])) {
+        cursor += 1;
+        continue;
+      }
+      const start = cursor;
+      while (cursor < incoming.length && !knownSet.has(incoming[cursor])) cursor += 1;
+      const unknownRun = incoming.slice(start, cursor);
+      const previousKnown = start > 0 ? incoming[start - 1] : '';
+      const nextKnown = cursor < incoming.length ? incoming[cursor] : '';
+      let insertionIndex = merged.length;
+      if (nextKnown) insertionIndex = merged.indexOf(nextKnown);
+      else if (previousKnown) {
+        const previousIndex = merged.indexOf(previousKnown);
+        insertionIndex = previousIndex < 0 ? merged.length : previousIndex + 1;
+      }
+      merged.splice(insertionIndex, 0, ...unknownRun);
+      for (const key of unknownRun) knownSet.add(key);
+    }
+    return { keys: merged, anchored: true };
   }
 
   async function harvestManualInto(
@@ -478,20 +497,26 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     ctx: InlineImageContext,
   ): Promise<{ added: number; updated: number }> {
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
+    const refs = readCurrentManualEntryRefs();
+    const streamingKey = latestStreamingAssistantKey(refs);
     const candidates = (() => {
       const output: Array<{
         descriptor: AiStudioDescriptor;
         existing?: PreparedMessageRecord<any>;
         input?: PlainExtractionInput;
       }> = [];
-      for (const { turn, entry } of readCurrentManualEntryRefs()) {
-        const descriptor = descriptorFromEntry(entry);
+      for (const { entry } of refs) {
+        const descriptor = descriptorFromEntry(entry, streamingKey);
+        if (!descriptor.rendered) {
+          output.push({ descriptor });
+          continue;
+        }
         const existing = existingByKey.get(descriptor.key);
         if (existing && existing.fingerprint === descriptor.fingerprint) {
           output.push({ descriptor, existing });
           continue;
         }
-        const input = snapshotPlainInput(turn, entry.role, entry.content, output.length, entry);
+        const input = snapshotPlainInput(entry, output.length);
         if (input) output.push({ descriptor, input });
       }
       return output;
@@ -534,7 +559,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
     if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const root = getConversationRoot();
-    if (!root) return null;
+    if (!root || inEditMode(root)) return null;
 
     const identityGuard = sampleIdentityGuard();
     const conversationKey = identityGuard.durableId && identityGuard.anchors.length ? identityGuard.durableId : '';
@@ -548,6 +573,19 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const ctx = createInlineImageContext();
     const sampleIdentity = createCaptureIdentitySampler(identityGuard);
     const runtime = { document: env.document, window: env.window };
+    let observedSlotOrder: string[] = [];
+    let slotOrderAnchored = true;
+    let windowDescriptors: AiStudioDescriptor[] = [];
+    const readTrackedDescriptors = () => {
+      const descriptors = readCurrentDescriptors();
+      const merged = mergeObservedSlotOrder(
+        observedSlotOrder,
+        descriptors.map((descriptor) => descriptor.key),
+      );
+      observedSlotOrder = merged.keys;
+      if (!merged.anchored) slotOrderAnchored = false;
+      return descriptors;
+    };
     const restorer = createScrollRootRestorer({
       ...runtime,
       getSeed: getConversationRoot,
@@ -560,11 +598,14 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         {
           getScrollSeed: getConversationRoot,
           sampleIdentity,
-          readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
+          readDescriptorKeys: () => {
+            windowDescriptors = readTrackedDescriptors();
+            return windowDescriptors.map((descriptor) => descriptor.key);
+          },
           readUnresolvedKeys: () =>
-            readCurrentDescriptors()
-              .filter((descriptor) => !descriptor.rendered)
-              .map((descriptor) => descriptor.key),
+            windowDescriptors.filter((descriptor) => !descriptor.rendered).map((descriptor) => descriptor.key),
+          readPendingKeys: () =>
+            windowDescriptors.filter((descriptor) => descriptor.pending).map((descriptor) => descriptor.key),
           harvest: (target) => harvestManualInto(target, ctx),
         },
         accumulator,
@@ -598,17 +639,38 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'identity_changed');
     }
-    return { ...finishPreparedCapture(accumulator), warningFlags: Array.from(ctx.warningFlags) };
+    return {
+      ...finishPreparedCapture(accumulator),
+      warningFlags: Array.from(ctx.warningFlags),
+      aiStudioSlotOrder: observedSlotOrder.slice(),
+      aiStudioSlotOrderAnchored: slotOrderAnchored,
+    };
   }
 
   async function capture(options: any = {}): Promise<any> {
     if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
       return null;
     }
+    if (inEditMode(getConversationRoot())) return null;
     const ctx = createInlineImageContext();
     const prepared = consumePreparedCapture(options?.preparedCapture);
     if (!prepared || !identityGuardsMatch(prepared.identityGuard)) return null;
+    if (prepared.metrics.reachedTop !== true) return null;
     for (const flag of (options.preparedCapture as any)?.warningFlags || []) ctx.warningFlags.add(String(flag));
+
+    let slotOrder: string[] = Array.isArray((options.preparedCapture as any)?.aiStudioSlotOrder)
+      ? (options.preparedCapture as any).aiStudioSlotOrder
+          .map((key: unknown) => String(key || '').trim())
+          .filter(Boolean)
+      : [];
+    let slotOrderAnchored = (options.preparedCapture as any)?.aiStudioSlotOrderAnchored !== false;
+    const currentSlotMerge = mergeObservedSlotOrder(
+      slotOrder,
+      readCurrentDescriptors().map((descriptor) => descriptor.key),
+    );
+    slotOrder = currentSlotMerge.keys;
+    if (!currentSlotMerge.anchored) slotOrderAnchored = false;
+    if (!slotOrderAnchored) return null;
 
     const accumulator = createPreparedAccumulator<any>({
       source: 'googleaistudio',
@@ -631,7 +693,17 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     if (!identityGuardsMatch(accumulator.identityGuard)) return null;
 
     const finalPrepared = finishPreparedCapture(accumulator);
-    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
+    const slotIndexByKey = new Map(slotOrder.map((key, index) => [key, index]));
+    if (finalPrepared.records.some((record) => !slotIndexByKey.has(record.key))) return null;
+    const messages = finalPrepared.records.map((record) => {
+      const slotIndex = slotIndexByKey.get(record.key) as number;
+      return {
+        ...record.payload,
+        messageKey: `googleaistudio:${slotIndex}:${record.payload.role}`,
+        sequence: slotIndex,
+        captureSequencePolicy: 'reconcile-existing-order',
+      };
+    });
     if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
     const captureMeta = {
       completeness: finalPrepared.completeness,
@@ -644,7 +716,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         sourceType: 'chat',
         source: 'googleaistudio',
         conversationKey: finalPrepared.conversationKey,
-        title: extractConversationTitle(),
+        title: extractConversationTitle(messages),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
       },
@@ -659,9 +731,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     getRoot: getConversationRoot,
     prepareManualCapture,
     __test: {
-      collectMessages: async () => collectMessages(createInlineImageContext()),
-      extractAssistantMarkdown,
-      extractAssistantText,
+      isPromptRunning,
+      readCurrentDescriptors,
     },
   };
 

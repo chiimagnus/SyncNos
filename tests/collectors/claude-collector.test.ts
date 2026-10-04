@@ -5,13 +5,21 @@ import { createClaudeCollectorDef } from '@collectors/claude/claude-collector.ts
 import { createCollectorEnv } from '@collectors/collector-env.ts';
 import normalizeApi from '@services/shared/normalize.ts';
 
-function setupClaudeDom(input?: { streaming?: boolean; title?: string }) {
+function setupClaudeDom(input?: { streaming?: boolean; browserTitle?: string; siteTitle?: string | null }) {
   const streaming = input?.streaming === true;
+  const siteTitle = input?.siteTitle === undefined ? 'Stable Claude Capture' : input.siteTitle;
   const html = [
     '<!doctype html>',
     '<html>',
-    '<head><title>' + (input?.title || 'Stable Claude Capture - Claude') + '</title></head>',
+    '<head><title>' + (input?.browserTitle || 'Misleading Browser Tab - Claude') + '</title></head>',
     '<body>',
+    siteTitle
+      ? '<nav><a aria-current="page" href="/chat/conv-1">' +
+        siteTitle +
+        '</a></nav><div data-testid="chat-title-split"><button>' +
+        siteTitle +
+        '</button></div>'
+      : '',
     '<main>',
     '<div role="feed" data-perf-region="transcript" aria-label="Chat messages">',
     '<div data-testid="transcript-row" data-rs-index="0" data-index="0" data-perf-row="human" data-perf-row-streaming="false">',
@@ -37,9 +45,9 @@ function setupClaudeDom(input?: { streaming?: boolean; title?: string }) {
     '<div role="article" aria-posinset="2" aria-setsize="2" aria-label="Message 2 of 2">',
     '<div data-testid="assistant-message" data-is-streaming="' + String(streaming) + '">',
     '<div class="font-claude-response">',
-    '<div class="standard-markdown" data-perf-reply-text><p>I will inspect the page first.</p></div>',
+    '<div class="standard-markdown" data-cds="Prose"><p>I will inspect the page first.</p></div>',
     '<div data-testid="TurnStatus" data-cds="TurnStatus"><span>Used Notion integration</span></div>',
-    '<div class="standard-markdown" data-perf-reply-text>',
+    '<div class="standard-markdown" data-cds="Prose">',
     '<h2>Final answer</h2>',
     '<p>This is the captured response.</p>',
     '<pre><code class="language-ts">const value = 1;</code></pre>',
@@ -78,6 +86,26 @@ async function prepareStaticCapture(def: any) {
 }
 
 describe('claude-collector', () => {
+  it('auto-captures only completed current-window messages without scrolling', async () => {
+    const { dom, def } = setupClaudeDom({ streaming: true });
+    const feed = dom.window.document.querySelector("[role='feed']") as HTMLElement;
+    feed.scrollTop = 80;
+    const partial = await def.collector.capture();
+    expect(partial.captureMeta.completeness).toBe('partial');
+    expect(partial.messages.map((message: any) => message.role)).toEqual(['user']);
+    expect(feed.scrollTop).toBe(80);
+    dom.window.document.querySelector("[data-perf-row='assistant']")!.setAttribute('data-perf-row-streaming', 'false');
+    dom.window.document.querySelector("[data-testid='assistant-message']")!.setAttribute('data-is-streaming', 'false');
+    const completed = await def.collector.capture();
+    expect(completed.messages.map((message: any) => message.messageKey)).toEqual([
+      'claude:1:user',
+      'claude:2:assistant',
+    ]);
+    expect(completed.captureMeta.completeness).toBe('partial');
+    expect(feed.scrollTop).toBe(80);
+    expect(await def.collector.capture({ manual: true })).toBeNull();
+  });
+
   it('keeps a valid Claude chat route ready before transcript rows render', () => {
     const empty = new JSDOM('<body><main></main></body>', { url: 'https://claude.ai/chat/conv-empty' });
     const emptyEnv = createCollectorEnv({
@@ -98,6 +126,18 @@ describe('claude-collector', () => {
     expect(createClaudeCollectorDef(settingsEnv).collector.isCaptureAvailable()).toBe(false);
   });
 
+  it('derives a conversation title from the first user prompt when Claude only exposes a generic title', async () => {
+    const { def } = setupClaudeDom({ browserTitle: 'Wrong Browser Tab - Claude', siteTitle: null });
+    const snapshot = await def.collector.capture({
+      manual: true,
+      preparedCapture: await prepareStaticCapture(def),
+    });
+
+    expect(snapshot.conversation.title).toBe('Hello Claude');
+    expect(snapshot.conversation.title).not.toContain('Quoted attachment context');
+    expect(snapshot.conversation.title).not.toContain('notes.pdf');
+  });
+
   it('captures all visible assistant prose while excluding separate status nodes', async () => {
     const { def } = setupClaudeDom();
     const snapshot = await def.collector.capture({
@@ -109,7 +149,7 @@ describe('claude-collector', () => {
     expect(snapshot.conversation).toMatchObject({
       sourceType: 'chat',
       source: 'claude',
-      conversationKey: 'chat_conv-1',
+      conversationKey: 'conv-1',
       title: 'Stable Claude Capture',
     });
     expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
@@ -142,6 +182,34 @@ describe('claude-collector', () => {
     expect(assistant.contentMarkdown).toContain('![](https://img.test/assistant.png)');
   });
 
+  it('captures the current CDS Prose assistant surface while excluding TurnStatus', async () => {
+    const { dom, def } = setupClaudeDom();
+    const assistant = dom.window.document.querySelector("[data-testid='assistant-message']") as HTMLElement;
+    assistant.innerHTML = `
+      <div class="font-claude-response">
+        <div data-cds="TurnStatus" data-testid="TurnStatus" data-state="done">
+          <span role="status" aria-live="polite">Searched the web</span>
+        </div>
+        <div data-cds="Prose" class="prose">
+          <h2>Current answer</h2>
+          <p>This comes from the current Claude Prose surface.</p>
+          <table><tr><th>Name</th><th>Value</th></tr><tr><td>A</td><td>1</td></tr></table>
+        </div>
+      </div>
+    `;
+
+    const snapshot = await def.collector.capture({
+      manual: true,
+      preparedCapture: await prepareStaticCapture(def),
+    });
+    const message = snapshot.messages.find((item: any) => item.role === 'assistant');
+    expect(message.contentText).toContain('Current answer');
+    expect(message.contentText).not.toContain('Searched the web');
+    expect(message.contentMarkdown).toContain('## Current answer');
+    expect(message.contentMarkdown).toContain('| Name | Value |');
+    expect(message.contentMarkdown).not.toContain('Searched the web');
+  });
+
   it('uses aria message positions as stable identity and confirms complete visible boundaries', () => {
     const { def } = setupClaudeDom();
     const descriptors = def.collector.__test.readCurrentDescriptors();
@@ -171,7 +239,7 @@ describe('claude-collector', () => {
 
     expect(prepared).toMatchObject({
       source: 'claude',
-      conversationKey: 'chat_conv-1',
+      conversationKey: 'conv-1',
       identityVerified: true,
       completeness: 'complete',
     });
@@ -204,9 +272,9 @@ describe('claude-collector', () => {
     expect(after).toBe(before);
   });
 
-  it('is manual-only and rejects prepared data after navigating to another Claude conversation', async () => {
+  it('rejects prepared manual data after navigating to another Claude conversation', async () => {
     const { dom, def } = setupClaudeDom();
-    expect(await def.collector.capture()).toBeNull();
+    expect(await def.collector.capture({ manual: true })).toBeNull();
 
     const prepared = await prepareStaticCapture(def);
     dom.window.history.pushState({}, '', '/chat/conv-2');

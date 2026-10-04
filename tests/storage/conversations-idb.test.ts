@@ -5,6 +5,13 @@ import { normalizeConversationListRecord } from '@platform/idb/conversation-list
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
+import { JSDOM } from 'jsdom';
+import { createCollectorEnv } from '@collectors/collector-env';
+import { createClaudeCollectorDef } from '@collectors/claude/claude-collector';
+import { createZaiCollectorDef } from '@collectors/zai/zai-collector';
+import { createDoubaoCollectorDef } from '@collectors/doubao/doubao-collector';
+import { createGoogleAiStudioCollectorDef } from '@collectors/googleaistudio/googleaistudio-collector';
+import normalizeApi from '@services/shared/normalize';
 
 import {
   attachOrphanCommentsToConversation,
@@ -160,6 +167,44 @@ async function createMergePair(suffix: string) {
 }
 
 describe('conversations storage-idb', () => {
+  it('reuses a Notion thread when its UUID URL formatting changes', async () => {
+    const compact = '3eebe9d6386a805483df00a912f6bbf8';
+    const payload = {
+      sourceType: 'chat',
+      source: 'notionai',
+      conversationKey: `notionai_t_${compact}`,
+      title: 'Thread',
+      url: 'https://app.notion.com/chat?t=3EEBE9D6-386A-8054-83DF-00A912F6BBF8',
+    };
+    const created = await upsertConversation(payload);
+    const repeated = await upsertConversation({ ...payload, url: `https://app.notion.com/chat?t=${compact}` });
+    expect(repeated.id).toBe(created.id);
+    expect(repeated.canonicalChatIdentity).toBe(`notionai:${compact}`);
+    expect(repeated.url).toBe(`https://app.notion.com/chat?t=${compact}`);
+  });
+
+  it('repairs a previously persisted hyphenated Notion identity marker', async () => {
+    const compact = '3eebe9d6386a805483df00a912f6bbf8';
+    const payload = {
+      sourceType: 'chat',
+      source: 'notionai',
+      conversationKey: `notionai_t_${compact}`,
+      url: `https://app.notion.com/chat?t=${compact}`,
+    };
+    const created = await upsertConversation(payload);
+    const db = await openDb();
+    const transaction = db.transaction(['conversations'], 'readwrite');
+    const store = transaction.objectStore('conversations');
+    const row = await reqToPromise<any>(store.get(created.id));
+    row.canonicalChatIdentity = 'notionai:3eebe9d6-386a-8054-83df-00a912f6bbf8';
+    row.url = 'https://app.notion.com/chat?t=3eebe9d6-386a-8054-83df-00a912f6bbf8';
+    await reqToPromise(store.put(row));
+    await txDone(transaction);
+    const repaired = await upsertConversation(payload);
+    expect(repaired.id).toBe(created.id);
+    expect(repaired.canonicalChatIdentity).toBe(`notionai:${compact}`);
+  });
+
   it('bumps conversations for a new row and keeps an identical upsert revision-stable', async () => {
     const payload = {
       sourceType: 'chat',
@@ -222,6 +267,518 @@ describe('conversations storage-idb', () => {
     } finally {
       openCursorSpy.mockRestore();
     }
+  });
+
+  it('keeps repeated durable AI chat exact saves on the indexed fast path after identity verification', async () => {
+    const created = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'fast-path-chat',
+      title: 'Fast path',
+      url: 'https://www.kimi.com/chat/fast-path-chat?chat_enter_method=home',
+      lastActivityAt: 1,
+    });
+    expect(created.canonicalChatIdentity).toBe('kimi:fast-path-chat');
+    expect(created.url).toBe('https://www.kimi.com/chat/fast-path-chat');
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      const repeated = await upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: 'fast-path-chat',
+        title: 'Fast path updated',
+        url: 'https://kimi.com/chat/fast-path-chat?chat_enter_method=sidebar',
+        lastActivityAt: 2,
+      });
+      expect(Number(repeated.id)).toBe(Number(created.id));
+      expect(repeated.__isNew).toBe(false);
+      expect(repeated.url).toBe('https://www.kimi.com/chat/fast-path-chat');
+      const sourceScans = getAllSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_listSourceKey_lastActivityAt_id',
+      );
+      expect(sourceScans).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+    }
+  });
+
+  it.each(['claude', 'zai', 'doubao'])(
+    'persists %s auto windows without deleting stored history or unfinished replies',
+    async (source) => {
+      const fixtures = {
+        claude:
+          '<div role="feed" data-perf-region="transcript"><div data-testid="transcript-row" data-perf-row="human"><div role="article" aria-posinset="3" aria-setsize="4"><div data-testid="user-message">current question</div></div></div><div data-testid="transcript-row" data-perf-row="assistant" data-perf-row-streaming="true"><div role="article" aria-posinset="4" aria-setsize="4"><div data-testid="assistant-message"><div data-cds="Prose">current answer</div></div></div></div></div>',
+        zai: '<textarea id="chat-input"></textarea><div id="messages-container"><div id="message-current-user" class="user-message"><div class="chat-user"><div class="whitespace-pre-wrap">current question</div></div></div><div id="message-current-assistant" class="chat-assistant"><div id="response-content-container"><p>current answer</p></div></div></div>',
+        doubao:
+          '<div aria-label="doc_editor"><div data-message-id="user" class="justify-end"><div data-testid="message_text_content">current question</div></div><div data-message-id="assistant"><div class="flow-markdown-body" data-streaming="true">current answer</div></div></div>',
+      };
+      const urls = {
+        claude: 'https://claude.ai/chat/auto-storage',
+        zai: 'https://chat.z.ai/c/auto-storage',
+        doubao: 'https://www.doubao.com/chat/auto-storage',
+      };
+      const html = fixtures[source as keyof typeof fixtures];
+      const dom = new JSDOM(html, {
+        url: urls[source as keyof typeof urls],
+      });
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
+      const factories = {
+        claude: createClaudeCollectorDef,
+        zai: createZaiCollectorDef,
+        doubao: createDoubaoCollectorDef,
+      };
+      const collector = factories[source as keyof typeof factories](env).collector;
+      const partial = await collector.capture();
+      const conversation = await upsertConversation(partial.conversation);
+      await syncConversationMessages(Number(conversation.id), [
+        { messageKey: 'stored-history', role: 'user', contentMarkdown: 'older question', sequence: 0 },
+      ]);
+      const persist = async (snapshot: any) => {
+        const integrity = resolveCaptureIntegrity(source, snapshot);
+        if (!integrity.ok) throw new Error(integrity.code);
+        await syncConversationMessages(Number(conversation.id), integrity.snapshot.messages, integrity.persistence);
+      };
+      await persist(partial);
+      expect(
+        (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+      ).toEqual(['older question', 'current question']);
+      if (source === 'claude')
+        dom.window.document
+          .querySelector('[data-perf-row-streaming]')!
+          .setAttribute('data-perf-row-streaming', 'false');
+      else if (source === 'doubao')
+        dom.window.document.querySelector('[data-streaming]')!.setAttribute('data-streaming', 'false');
+      else {
+        const button = dom.window.document.createElement('button');
+        button.id = 'send-message-button';
+        dom.window.document.body.append(button);
+      }
+      await persist(await collector.capture());
+      expect(
+        (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+      ).toEqual(['older question', 'current question', 'current answer']);
+    },
+  );
+
+  it.each([
+    {
+      state: 'model-error UI',
+      user: 'question',
+      assistant: '<ms-text-chunk></ms-text-chunk><div class="model-error">An internal error has occurred.</div>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+    {
+      state: 'an unrendered user formula',
+      user: 'question <ms-katex class="inline"><pre><code></code></pre></ms-katex>',
+      assistant: 'answer',
+      roles: ['assistant'],
+      expected: ['previous completed question $E=mc^2$', 'answer'],
+    },
+    {
+      state: 'an unrendered model formula',
+      user: 'question',
+      assistant: 'reply <ms-katex class="inline"><pre><code></code></pre></ms-katex>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+    {
+      state: 'author chrome without a rendered model body',
+      user: 'question',
+      assistant:
+        '<div class="author-label">Model <span class="timestamp">10:11</span></div><ms-text-chunk></ms-text-chunk>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+    {
+      state: 'thinking chrome without a final model body',
+      user: 'question',
+      assistant: '<ms-thought-chunk><p>private reasoning</p></ms-thought-chunk><ms-text-chunk></ms-text-chunk>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+  ])('preserves saved AI Studio content when exposed to $state', async ({ user, assistant, roles, expected }) => {
+    const dom = new JSDOM(
+      `<div class="chat-session-content">
+      <ms-chat-turn id="turn-user"><div data-turn-role="User"><div class="turn-content">${user}</div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-assistant"><div data-turn-role="Model"><div class="turn-content">${assistant}</div></div></ms-chat-turn>
+    </div>`,
+      { url: 'https://aistudio.google.com/prompts/failed-regeneration' },
+    );
+    const collector = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ).collector;
+    let clock = 0;
+    const preparedCapture = await collector.prepareManualCapture!({
+      stableSamples: 1,
+      stepTimeoutMs: 1,
+      pollMs: 0,
+      now: () => clock,
+      sleep: async () => {
+        clock += 1;
+      },
+    });
+    const snapshot = await collector.capture({ manual: true, preparedCapture });
+    const integrity = resolveCaptureIntegrity('googleaistudio', snapshot);
+    expect(integrity).toMatchObject({ ok: true, persistence: { mode: 'append', diff: { removed: [] } } });
+    if (!integrity.ok) throw new Error(integrity.code);
+    expect(integrity.snapshot.messages.map((message: any) => message.role)).toEqual(roles);
+    const conversation = await upsertConversation(snapshot.conversation);
+    await syncConversationMessages(Number(conversation.id), [
+      {
+        messageKey: 'googleaistudio:0:user',
+        role: 'user',
+        contentMarkdown: 'previous completed question $E=mc^2$',
+        sequence: 0,
+      },
+      {
+        messageKey: 'googleaistudio:1:assistant',
+        role: 'assistant',
+        contentMarkdown: 'previous completed reply $E=mc^2$',
+        sequence: 1,
+      },
+    ]);
+    await syncConversationMessages(Number(conversation.id), integrity.snapshot.messages, integrity.persistence);
+    expect(
+      (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+    ).toEqual(expected);
+  });
+
+  it('rejects legacy exact-key reuse across durable identities before any destructive repair', async () => {
+    const existing = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'legacy-collision',
+      url: 'https://www.kimi.com/chat/original',
+      lastActivityAt: 10,
+    });
+    await syncConversationMessages(Number(existing.id), [
+      { messageKey: 'original', role: 'user', contentMarkdown: 'original content', sequence: 0 },
+    ]);
+    const db = await openDb();
+    const transaction = db.transaction(['conversations'], 'readwrite');
+    const legacy = await reqToPromise<any>(transaction.objectStore('conversations').get(Number(existing.id)));
+    delete legacy.canonicalChatIdentity;
+    await reqToPromise(transaction.objectStore('conversations').put(legacy));
+    await txDone(transaction);
+    const revision = await readDataRevision('conversations');
+    await expect(
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: 'legacy-collision',
+        url: 'https://www.kimi.com/chat/other',
+        lastActivityAt: 20,
+      }),
+    ).rejects.toMatchObject({ code: 'conversation_identity_conflict' });
+    expect(await readDataRevision('conversations')).toBe(revision);
+    expect((await getConversationById(Number(existing.id)))?.url).toBe(legacy.url);
+    expect((await getMessagesByConversationId(Number(existing.id)))[0]?.contentMarkdown).toBe('original content');
+  });
+
+  it('does not delete message aliases with different code whitespace during partial append', async () => {
+    const conversation = await upsertConversation({
+      source: 'kimi',
+      sourceType: 'chat',
+      conversationKey: 'code-alias',
+      url: 'https://www.kimi.com/chat/code-alias',
+    });
+    const original = '```py\nif ok:\n    print("a  b")\n```';
+    const changed = '```py\nif ok:\n  print("a b")\n```';
+    await syncConversationMessages(Number(conversation.id), [
+      { messageKey: 'old', role: 'assistant', contentMarkdown: original, sequence: 0 },
+    ]);
+    await syncConversationMessages(
+      Number(conversation.id),
+      [
+        {
+          messageKey: 'new',
+          role: 'assistant',
+          contentMarkdown: changed,
+          sequence: 0,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+      ],
+      { mode: 'append', diff: { added: ['new'] } },
+    );
+    expect(
+      (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
+    ).toEqual([original, changed]);
+  });
+
+  it('rejects reuse of one exact key across two different durable AI chat identities', async () => {
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'collision-key',
+      title: 'First',
+      url: 'https://www.kimi.com/chat/identity-a',
+      lastActivityAt: 1,
+    });
+
+    await expect(
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: 'collision-key',
+        title: 'Second',
+        url: 'https://www.kimi.com/chat/identity-b',
+        lastActivityAt: 2,
+      }),
+    ).rejects.toMatchObject({ code: 'conversation_identity_conflict' });
+  });
+
+  it('reuses a durable AI chat when the collector conversation key format changes', async () => {
+    const conversationId = '1a102e84-a162-830d-8000-098fcb968d15';
+    const legacy = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: `chat_${conversationId}`,
+      title: 'Legacy Kimi',
+      url: `https://www.kimi.com/chat/${conversationId}?chat_enter_method=home`,
+      lastActivityAt: 10,
+    });
+    await setConversationNotionPageId(Number(legacy.id), 'notion-page-kimi');
+    await patchSyncMapping(Number(legacy.id), {
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
+    await syncConversationMessages(Number(legacy.id), [
+      { messageKey: 'legacy-user', role: 'user', contentMarkdown: 'legacy', sequence: 0 },
+    ]);
+
+    const migrated = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: conversationId,
+      title: 'Current Kimi',
+      url: `https://kimi.com/chat/${conversationId}?chat_enter_method=history`,
+      lastActivityAt: 20,
+    });
+
+    expect(migrated.__isNew).toBe(false);
+    expect(Number(migrated.id)).toBe(Number(legacy.id));
+    expect(migrated.conversationKey).toBe(conversationId);
+    expect(migrated.url).toBe(`https://www.kimi.com/chat/${conversationId}`);
+    expect(migrated.notionPageId).toBe('notion-page-kimi');
+    expect(await listAllConversationsForTests()).toHaveLength(1);
+    expect((await getMessagesByConversationId(Number(legacy.id))).map((message) => message.messageKey)).toEqual([
+      'legacy-user',
+    ]);
+    expect((await getSyncMappingByConversation(Number(legacy.id)))?.mapping).toMatchObject({
+      notionPageId: 'notion-page-kimi',
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
+  });
+
+  it('serializes overlapping AI chat identity saves into one durable conversation', async () => {
+    const id = 'overlap-identity-001';
+    const [legacy, current] = await Promise.all([
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: `chat_${id}`,
+        title: 'Legacy overlap',
+        url: `https://www.kimi.com/chat/${id}?chat_enter_method=home`,
+        lastActivityAt: 1,
+      }),
+      upsertConversation({
+        sourceType: 'chat',
+        source: 'kimi',
+        conversationKey: id,
+        title: 'Current overlap',
+        url: `https://kimi.com/chat/${id}?chat_enter_method=history`,
+        lastActivityAt: 2,
+      }),
+    ]);
+
+    expect(Number(legacy.id)).toBe(Number(current.id));
+    const rows = await listAllConversationsForTests();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.canonicalChatIdentity).toBe(`kimi:${id}`);
+  });
+
+  it('self-heals already duplicated AI chat rows and keeps current identity plus legacy sync state', async () => {
+    const conversationId = '1a102e84-a162-830d-8000-098fcb968d15';
+    const legacy = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: `chat_${conversationId}`,
+      title: 'Legacy Kimi',
+      url: `https://www.kimi.com/chat/${conversationId}?chat_enter_method=home`,
+      lastActivityAt: 10,
+    });
+    await setConversationNotionPageId(Number(legacy.id), 'notion-page-kimi');
+    await patchSyncMapping(Number(legacy.id), {
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
+    await syncConversationMessages(Number(legacy.id), [
+      { messageKey: 'fallback-old-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
+      { messageKey: 'legacy-tail', role: 'user', contentMarkdown: 'legacy tail', sequence: 2 },
+    ]);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['conversations'], 'readwrite');
+    const currentId = Number(
+      await reqToPromise(
+        seedTx.objectStore('conversations').add(
+          normalizeConversationListRecord({
+            sourceType: 'chat',
+            source: 'kimi',
+            conversationKey: conversationId,
+            title: 'Current Kimi',
+            url: `https://www.kimi.com/chat/${conversationId}?chat_enter_method=history`,
+            lastActivityAt: 20,
+            notionPageId: '',
+            feishuDocId: '',
+            warningFlags: [],
+          }),
+        ) as any,
+      ),
+    );
+    await txDone(seedTx);
+    await syncConversationMessages(currentId, [
+      { messageKey: 'kimi-current-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
+      { messageKey: 'current-assistant', role: 'assistant', contentMarkdown: 'current', sequence: 1 },
+    ]);
+
+    const healed = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: conversationId,
+      title: 'Current Kimi updated',
+      url: `https://kimi.com/chat/${conversationId}?chat_enter_method=sidebar`,
+      lastActivityAt: 30,
+    });
+
+    expect(healed.__isNew).toBe(false);
+    expect(Number(healed.id)).toBe(currentId);
+    expect(healed.conversationKey).toBe(conversationId);
+    expect(healed.notionPageId).toBe('notion-page-kimi');
+    expect(await getConversationById(Number(legacy.id))).toBeNull();
+    const rows = await listAllConversationsForTests();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: currentId, conversationKey: conversationId, notionPageId: 'notion-page-kimi' });
+    expect((await getMessagesByConversationId(currentId)).map((message) => message.messageKey).sort()).toEqual([
+      'current-assistant',
+      'kimi-current-user',
+      'legacy-tail',
+    ]);
+    expect((await getSyncMappingByConversation(currentId))?.mapping).toMatchObject({
+      notionPageId: 'notion-page-kimi',
+      feishuDocId: 'feishu-doc-kimi',
+      unknownMetadata: { preserve: true },
+    });
+    expect((await getConversationById(currentId))?.feishuDocId).toBe('feishu-doc-kimi');
+  });
+
+  it('preserves identical messages at different logical positions when a partial window starts at zero', async () => {
+    const conversation = await upsertConversation({
+      source: 'kimi',
+      sourceType: 'chat',
+      conversationKey: 'repeated-prompt',
+      url: 'https://www.kimi.com/chat/repeated-prompt',
+    });
+    await syncConversationMessages(Number(conversation.id), [
+      { messageKey: 'kimi-first', role: 'user', contentMarkdown: 'repeat', sequence: 0 },
+      { messageKey: 'kimi-middle', role: 'assistant', contentMarkdown: 'middle', sequence: 1 },
+    ]);
+    await syncConversationMessages(
+      Number(conversation.id),
+      [
+        {
+          messageKey: 'kimi-later',
+          role: 'user',
+          contentMarkdown: 'repeat',
+          sequence: 0,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+      ],
+      { mode: 'append', diff: { added: ['kimi-later'] } },
+    );
+    expect((await getMessagesByConversationId(Number(conversation.id))).map((message) => message.messageKey)).toEqual([
+      'kimi-first',
+      'kimi-middle',
+      'kimi-later',
+    ]);
+  });
+
+  it('cleans obsolete message keys only after a complete snapshot, not by partial-window guessing', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'kimi',
+      conversationKey: 'message-alias-repair',
+      title: 'Alias repair',
+      url: 'https://www.kimi.com/chat/message-alias-repair',
+      lastActivityAt: 1,
+    });
+    const id = Number(conversation.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'fallback-user', role: 'user', contentMarkdown: 'same user', sequence: 0 },
+      { messageKey: 'different-user', role: 'user', contentMarkdown: 'different content', sequence: 0 },
+      { messageKey: 'fallback-assistant', role: 'assistant', contentMarkdown: 'same assistant', sequence: 1 },
+    ]);
+
+    const repaired = await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'kimi-stable-user',
+          role: 'user',
+          contentMarkdown: 'same user',
+          sequence: 0,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+        {
+          messageKey: 'kimi-stable-assistant',
+          role: 'assistant',
+          contentMarkdown: 'same assistant',
+          sequence: 1,
+          captureSequencePolicy: 'reconcile-existing-order',
+        },
+      ],
+      {
+        mode: 'append',
+        diff: {
+          added: ['kimi-stable-user', 'kimi-stable-assistant'],
+          updated: [],
+          removed: [],
+        },
+        activityAt: 20,
+      },
+    );
+
+    expect(repaired.deleted).toBe(0);
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
+    const messages = await getMessagesByConversationId(id);
+    expect(messages.map((message) => message.messageKey).sort()).toEqual([
+      'different-user',
+      'fallback-assistant',
+      'fallback-user',
+      'kimi-stable-assistant',
+      'kimi-stable-user',
+    ]);
+    await syncConversationMessages(
+      id,
+      messages.filter((message) => message.messageKey.startsWith('kimi-stable-')),
+    );
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey).sort()).toEqual([
+      'kimi-stable-assistant',
+      'kimi-stable-user',
+    ]);
   });
 
   it('preserves persisted mapping mirrors and unknown fields across an identical upsert', async () => {
@@ -405,7 +962,7 @@ describe('conversations storage-idb', () => {
     expect(finalMessages[1]?.contentMarkdown).toBe('streaming complete');
   });
 
-  it('commits capture activity with messages while keeping Activity-only recaptures message-revision stable', async () => {
+  it('advances capture activity only when message semantics actually change', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
@@ -419,15 +976,26 @@ describe('conversations storage-idb', () => {
     const beforeConversations = await readDataRevision('conversations');
     const beforeMessages = await readDataRevision('messages');
 
-    await syncConversationMessages(id, [message], { activityAt: 20 });
-    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
-    expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
+    await syncConversationMessages(id, [{ ...message, updatedAt: 200 }], { activityAt: 20 });
+    expect((await getConversationById(id))?.lastActivityAt).toBe(10);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations);
     expect(await readDataRevision('messages')).toBe(beforeMessages);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(100);
 
-    await syncConversationMessages(id, [message], { activityAt: 15 });
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: 'changed', updatedAt: 201 }], {
+      activityAt: 20,
+    });
     expect((await getConversationById(id))?.lastActivityAt).toBe(20);
     expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
-    expect(await readDataRevision('messages')).toBe(beforeMessages);
+    expect(await readDataRevision('messages')).toBe(beforeMessages + 1);
+
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: 'changed', updatedAt: 300 }], {
+      activityAt: 25,
+    });
+    expect((await getConversationById(id))?.lastActivityAt).toBe(20);
+    expect(await readDataRevision('conversations')).toBe(beforeConversations + 1);
+    expect(await readDataRevision('messages')).toBe(beforeMessages + 1);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(201);
   });
 
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
@@ -503,7 +1071,7 @@ describe('conversations storage-idb', () => {
     ).rejects.toThrow('conversation not found');
   });
 
-  it('keeps equivalent message rows revision-stable when incoming timestamps are missing or invalid', async () => {
+  it('keeps semantically equivalent message rows revision-stable regardless of incoming timestamps', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
@@ -557,6 +1125,10 @@ describe('conversations storage-idb', () => {
     expect(preserved[0]?.updatedAt).toBe(100);
 
     await syncConversationMessages(id, [{ ...stableMessage, updatedAt: 101 }]);
+    expect(await readDataRevision('messages')).toBe(1);
+    expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(100);
+
+    await syncConversationMessages(id, [{ ...stableMessage, contentMarkdown: 'changed', updatedAt: 101 }]);
     expect(await readDataRevision('messages')).toBe(2);
     expect((await getMessagesByConversationId(id))[0]?.updatedAt).toBe(101);
   });
@@ -3714,7 +4286,7 @@ describe('canonical video storage', () => {
     expect(stored.videoChapters).toEqual([]);
   });
 
-  it('does not allow transcript-only structured fields on ordinary messages and keeps Activity-only recapture revision-safe', async () => {
+  it('does not allow transcript-only structured fields on ordinary messages and keeps unchanged recaptures activity-stable', async () => {
     const convo = await upsertConversation({
       sourceType: 'video',
       source: 'video',
@@ -3737,8 +4309,15 @@ describe('canonical video storage', () => {
     const messageRevision = await readDataRevision('messages');
     const conversationRevision = await readDataRevision('conversations');
 
-    await syncConversationMessages(id, [message], { activityAt: 20 });
+    await syncConversationMessages(id, [{ ...message, updatedAt: 200 }], { activityAt: 20 });
     expect(await readDataRevision('messages')).toBe(messageRevision);
+    expect(await readDataRevision('conversations')).toBe(conversationRevision);
+    expect((await getConversationById(id))?.lastActivityAt).toBe(10);
+
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: '[00:01] changed', updatedAt: 201 }], {
+      activityAt: 20,
+    });
+    expect(await readDataRevision('messages')).toBe(messageRevision + 1);
     expect(await readDataRevision('conversations')).toBe(conversationRevision + 1);
     expect((await getConversationById(id))?.lastActivityAt).toBe(20);
 

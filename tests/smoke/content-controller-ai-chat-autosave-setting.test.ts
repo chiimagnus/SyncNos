@@ -338,37 +338,35 @@ describe('content-controller auto-save live setting', () => {
     h.resident?.stop?.();
   });
 
-  it('disabling autosave clears queued NotionAI proactive capture timers', async () => {
-    vi.useFakeTimers();
-    const listeners = new Map<string, EventListener>();
-    // @ts-expect-error test document
-    globalThis.document = {
-      addEventListener(type: string, listener: EventListener) {
-        listeners.set(type, listener);
-      },
-      removeEventListener(type: string, listener: EventListener) {
-        if (listeners.get(type) === listener) listeners.delete(type);
-      },
-    };
+  it('allows Notion AI auto-save when the global auto-save setting is enabled', async () => {
     const storage = installStorage({ ai_chat_auto_save_enabled: true, ai_chat_dollar_mention_enabled: false });
-    const h = createHarness({ collectorId: 'notionai' });
+    const h = createHarness({
+      collectorId: 'notionai',
+      capture: () => ({
+        conversation: { source: 'notionai', conversationKey: 'thread-1', title: 'Notion AI' },
+        messages: [
+          {
+            messageKey: 'user_event_1',
+            role: 'user',
+            contentMarkdown: 'hello',
+            sequence: 0,
+          },
+        ],
+        captureMeta: {
+          completeness: 'partial',
+          identityVerified: true,
+          reasons: ['top_not_reached'],
+        },
+      }),
+    });
     await flush();
 
-    const clickListener = listeners.get('click');
-    expect(clickListener).toBeTypeOf('function');
-    clickListener?.({
-      target: {
-        closest(selector: string) {
-          return selector.includes('agent-send-message-button') ? {} : null;
-        },
-      },
-    } as any);
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    await h.runTick();
+    expect(h.capture).toHaveBeenCalledTimes(1);
+    expect(h.sendCalls.some((entry) => entry.type === 'upsertConversation')).toBe(true);
+    expect(h.sendCalls.some((entry) => entry.type === 'syncConversationMessages')).toBe(true);
 
     storage.emit('ai_chat_auto_save_enabled', false);
-    expect(vi.getTimerCount()).toBe(0);
-    await vi.runAllTimersAsync();
-    expect(h.capture).not.toHaveBeenCalled();
     h.resident?.stop?.();
   });
 });

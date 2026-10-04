@@ -28,6 +28,13 @@ function isVisible(el: Element | null): boolean {
   return rect.width >= 6 && rect.height >= 6;
 }
 
+const CHATGPT_COMPOSER_SELECTOR = "#prompt-textarea, [data-composer-markdown][role='textbox'][contenteditable='true']";
+
+function isChatgptComposerElement(el: Element | null): el is HTMLElement {
+  if (!el || !el.matches?.(CHATGPT_COMPOSER_SELECTOR)) return false;
+  return isContentEditable(el) && isVisible(el) && !!el.closest?.('main');
+}
+
 function findChatgptComposer(): HTMLElement | null {
   const doc = document;
   if (!doc) return null;
@@ -35,14 +42,15 @@ function findChatgptComposer(): HTMLElement | null {
   const active = doc.activeElement as Element | null;
   const activeEl = isElement(active) ? active : null;
   if (activeEl) {
-    const maybe = activeEl.id === 'prompt-textarea' ? activeEl : (activeEl as any).closest?.('#prompt-textarea');
-    if (isElement(maybe) && maybe.id === 'prompt-textarea' && isContentEditable(maybe) && isVisible(maybe)) {
-      return maybe as HTMLElement;
-    }
+    const maybe = activeEl.matches?.(CHATGPT_COMPOSER_SELECTOR)
+      ? activeEl
+      : ((activeEl as any).closest?.(CHATGPT_COMPOSER_SELECTOR) as Element | null);
+    if (isChatgptComposerElement(maybe)) return maybe;
   }
 
-  const el = doc.querySelector?.('#prompt-textarea') as Element | null;
-  if (el && isContentEditable(el) && isVisible(el)) return el as HTMLElement;
+  for (const candidate of Array.from(doc.querySelectorAll?.(CHATGPT_COMPOSER_SELECTOR) || [])) {
+    if (isChatgptComposerElement(candidate)) return candidate;
+  }
   return null;
 }
 

@@ -276,6 +276,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       mode: integrity.persistence.mode,
       diff: integrity.persistence.diff,
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
+      conversationContentChanged: (conversation as any)?.__semanticContentChanged === true,
       activityAt,
     });
     if (!messagesRes?.ok) {
