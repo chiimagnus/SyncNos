@@ -20,7 +20,222 @@ async function capturePrepared(def: any, prepareOptions: any = {}) {
   return def.collector.capture({ manual: true, preparedCapture });
 }
 
+function virtualizedPrompt(unresolvedMarkup?: string, formulaDelayMs = 0) {
+  const dom = setupDom(
+    `<div id="scroll"><div class="chat-session-content">${Array.from(
+      { length: 8 },
+      (_, index) =>
+        `<ms-chat-turn id="turn-${index}"><div data-turn-role="User"><div class="turn-content"></div></div></ms-chat-turn>`,
+    ).join('')}</div></div>`,
+    'https://aistudio.google.com/prompts/virtual-rendering',
+  );
+  const scroll = dom.window.document.querySelector('#scroll') as HTMLElement;
+  const markers = Array.from(dom.window.document.querySelectorAll('[data-turn-role]')) as HTMLElement[];
+  scroll.style.overflowY = 'auto';
+  Object.defineProperties(scroll, {
+    clientHeight: { value: 200 },
+    clientWidth: { value: 100 },
+    scrollHeight: { value: 800 },
+    scrollWidth: { value: 100 },
+  });
+  scroll.getBoundingClientRect = () => new dom.window.DOMRect(0, 100, 100, 200);
+  let clock = 0;
+  let top = 130;
+  let readyAt = 0;
+  const render = () => {
+    for (const [index, marker] of markers.entries()) {
+      const visible = index * 100 < top + 200 && (index + 1) * 100 > top;
+      const content = marker.querySelector('.turn-content') as HTMLElement;
+      content.innerHTML =
+        visible && clock >= readyAt
+          ? index === 3 && unresolvedMarkup !== undefined
+            ? unresolvedMarkup
+            : index === 3 && formulaDelayMs
+              ? `<div>message-${index}<ms-katex class="inline"><pre><code>${
+                  clock >= readyAt + formulaDelayMs
+                    ? '<span class="katex"><annotation encoding="application/x-tex">E=mc^2</annotation></span>'
+                    : ''
+                }</code></pre></ms-katex></div>`
+              : `message-${index}`
+          : '';
+      for (const formula of Array.from(content.querySelectorAll('ms-katex'))) {
+        formula.getBoundingClientRect = () => new dom.window.DOMRect(0, 120 + index * 100 - top, 100, 20);
+      }
+    }
+  };
+  for (const [index, marker] of markers.entries()) {
+    marker.getBoundingClientRect = () => new dom.window.DOMRect(0, 100 + index * 100 - top, 100, 100);
+  }
+  Object.defineProperty(scroll, 'scrollTop', {
+    get: () => top,
+    set: (value) => {
+      if (top !== Number(value)) readyAt = clock + 80;
+      top = Number(value);
+      render();
+    },
+  });
+  render();
+  const def = createGoogleAiStudioCollectorDef(
+    createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    }),
+  ) as any;
+  return {
+    def,
+    scroll,
+    now: () => clock,
+    sleep: async (duration: number) => {
+      clock += duration;
+      render();
+    },
+  };
+}
+
 describe('googleaistudio-collector', () => {
+  it.each(['User', 'Model'])('scrolls to a lazy formula below the viewport in a long %s message', async (role) => {
+    const dom = setupDom(
+      `<div id="scroll"><div class="chat-session-content"><ms-chat-turn id="long-message"><div data-turn-role="${role}"><div class="turn-content">long message <ms-katex class="inline"><pre><code></code></pre></ms-katex></div></div></ms-chat-turn></div></div>`,
+      'https://aistudio.google.com/prompts/lazy-formula',
+    );
+    const scroll = dom.window.document.querySelector('#scroll') as HTMLElement;
+    const marker = dom.window.document.querySelector('[data-turn-role]') as HTMLElement;
+    const formula = dom.window.document.querySelector('ms-katex') as HTMLElement;
+    scroll.style.overflowY = 'auto';
+    Object.defineProperties(scroll, {
+      clientHeight: { value: 200 },
+      clientWidth: { value: 100 },
+      scrollHeight: { value: 600 },
+      scrollWidth: { value: 100 },
+    });
+    scroll.getBoundingClientRect = () => new dom.window.DOMRect(0, 100, 100, 200);
+    let top = 0;
+    let clock = 0;
+    let visibleAt = Number.POSITIVE_INFINITY;
+    Object.defineProperty(scroll, 'scrollTop', {
+      get: () => top,
+      set: (value) => {
+        top = Number(value);
+        if (top + 200 > 500 && top < 520) visibleAt = Math.min(visibleAt, clock);
+      },
+    });
+    marker.getBoundingClientRect = () => new dom.window.DOMRect(0, 100 - top, 100, 600);
+    formula.getBoundingClientRect = () => new dom.window.DOMRect(0, 600 - top, 100, 20);
+    const collector = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ).collector;
+    const preparedCapture = await collector.prepareManualCapture!({
+      now: () => clock,
+      sleep: async (duration: number) => {
+        clock += duration;
+        if (clock >= visibleAt + 80) {
+          formula.querySelector('code')!.innerHTML =
+            '<span class="katex"><annotation encoding="application/x-tex">E=mc^2</annotation></span>';
+        }
+      },
+    });
+    expect(clock).toBeLessThan(600);
+    expect(preparedCapture.completeness).toBe('complete');
+    const snapshot = await collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages).toHaveLength(1);
+    expect(snapshot.messages[0].contentMarkdown).toContain('E=mc^2');
+    expect(scroll.scrollTop).toBe(0);
+  });
+
+  it.each(['User', 'Model'])('waits for async formulas within an otherwise rendered %s message', async (role) => {
+    const fixture = virtualizedPrompt(undefined, 120);
+    for (const marker of Array.from(fixture.scroll.querySelectorAll('[data-turn-role]'))) {
+      marker.setAttribute('data-turn-role', role);
+    }
+    const preparedCapture = await fixture.def.collector.prepareManualCapture({
+      now: fixture.now,
+      sleep: fixture.sleep,
+    });
+    expect({ completeness: preparedCapture.completeness, reasons: preparedCapture.reasons }).toEqual({
+      completeness: 'complete',
+      reasons: [],
+    });
+    expect(preparedCapture.records).toHaveLength(8);
+    expect(preparedCapture.records[3].payload.contentMarkdown).toContain('E=mc^2');
+    expect(fixture.now()).toBeLessThan(2000);
+    const snapshot = await fixture.def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages[3].contentMarkdown).toContain('E=mc^2');
+    expect(fixture.scroll.scrollTop).toBe(130);
+  });
+
+  it.each(['User', 'Model'])('does not overwrite a %s message whose formula never renders', async (role) => {
+    const fixture = virtualizedPrompt(undefined, Number.POSITIVE_INFINITY);
+    for (const marker of Array.from(fixture.scroll.querySelectorAll('[data-turn-role]'))) {
+      marker.setAttribute('data-turn-role', role);
+    }
+    const preparedCapture = await fixture.def.collector.prepareManualCapture({
+      now: fixture.now,
+      sleep: fixture.sleep,
+    });
+    expect(preparedCapture.completeness).toBe('partial');
+    expect(preparedCapture.reasons).toContain('unresolved_turn');
+    expect(preparedCapture.records).toHaveLength(7);
+    const snapshot = await fixture.def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages.map((message: any) => message.sequence)).toEqual([0, 1, 2, 4, 5, 6, 7]);
+  });
+
+  it('only waits for viewport hydration while retaining every offscreen slot', async () => {
+    const fixture = virtualizedPrompt();
+    const preparedCapture = await fixture.def.collector.prepareManualCapture({
+      now: fixture.now,
+      sleep: fixture.sleep,
+    });
+    expect(fixture.now()).toBeGreaterThanOrEqual(80);
+    expect(fixture.now()).toBeLessThan(1200);
+    expect(preparedCapture.completeness).toBe('complete');
+    expect(preparedCapture.records).toHaveLength(8);
+    const snapshot = await fixture.def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages.map((message: any) => message.contentMarkdown)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `message-${index}`),
+    );
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `googleaistudio:${index}:user`),
+    );
+    expect(fixture.scroll.scrollTop).toBe(130);
+  });
+
+  it('still waits for an empty viewport message and never marks its gap complete', async () => {
+    const fixture = virtualizedPrompt('');
+    const preparedCapture = await fixture.def.collector.prepareManualCapture({
+      now: fixture.now,
+      sleep: fixture.sleep,
+    });
+    expect(fixture.now()).toBeGreaterThanOrEqual(1200);
+    expect(preparedCapture.completeness).toBe('partial');
+    expect(preparedCapture.reasons).toContain('unresolved_turn');
+    const snapshot = await fixture.def.collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(
+      [0, 1, 2, 4, 5, 6, 7].map((index) => `googleaistudio:${index}:user`),
+    );
+  });
+
+  it('does not wait for a permanent model error but keeps the failed slot unresolved', async () => {
+    const fixture = virtualizedPrompt('<div class="model-error">An internal error has occurred.</div>');
+    for (const marker of Array.from(fixture.scroll.querySelectorAll('[data-turn-role]'))) {
+      marker.setAttribute('data-turn-role', 'Model');
+    }
+    const preparedCapture = await fixture.def.collector.prepareManualCapture({
+      now: fixture.now,
+      sleep: fixture.sleep,
+    });
+    expect(fixture.now()).toBeLessThan(1200);
+    expect(preparedCapture.completeness).toBe('partial');
+    expect(preparedCapture.reasons).toContain('unresolved_turn');
+    expect(preparedCapture.records).toHaveLength(7);
+  });
+
   it('preserves current cmark span italics and inline code semantics', async () => {
     const dom = setupDom(
       `<div class="chat-session-content"><ms-chat-turn id="turn-current"><div data-turn-role="Model"><div class="turn-content">

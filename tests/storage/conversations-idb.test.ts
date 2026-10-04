@@ -366,11 +366,33 @@ describe('conversations storage-idb', () => {
     },
   );
 
-  it('preserves a saved AI Studio reply when regeneration exposes only model-error UI', async () => {
+  it.each([
+    {
+      state: 'model-error UI',
+      user: 'question',
+      assistant: '<ms-text-chunk></ms-text-chunk><div class="model-error">An internal error has occurred.</div>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+    {
+      state: 'an unrendered user formula',
+      user: 'question <ms-katex class="inline"><pre><code></code></pre></ms-katex>',
+      assistant: 'answer',
+      roles: ['assistant'],
+      expected: ['previous completed question $E=mc^2$', 'answer'],
+    },
+    {
+      state: 'an unrendered model formula',
+      user: 'question',
+      assistant: 'reply <ms-katex class="inline"><pre><code></code></pre></ms-katex>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+  ])('preserves saved AI Studio content when exposed to $state', async ({ user, assistant, roles, expected }) => {
     const dom = new JSDOM(
       `<div class="chat-session-content">
-      <ms-chat-turn id="turn-user"><div data-turn-role="User"><div class="turn-content">question</div></div></ms-chat-turn>
-      <ms-chat-turn id="turn-assistant"><div data-turn-role="Model"><div class="turn-content"><ms-text-chunk></ms-text-chunk><div class="model-error">An internal error has occurred.</div></div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-user"><div data-turn-role="User"><div class="turn-content">${user}</div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-assistant"><div data-turn-role="Model"><div class="turn-content">${assistant}</div></div></ms-chat-turn>
     </div>`,
       { url: 'https://aistudio.google.com/prompts/failed-regeneration' },
     );
@@ -391,21 +413,26 @@ describe('conversations storage-idb', () => {
     const integrity = resolveCaptureIntegrity('googleaistudio', snapshot);
     expect(integrity).toMatchObject({ ok: true, persistence: { mode: 'append', diff: { removed: [] } } });
     if (!integrity.ok) throw new Error(integrity.code);
-    expect(integrity.snapshot.messages.map((message: any) => message.role)).toEqual(['user']);
+    expect(integrity.snapshot.messages.map((message: any) => message.role)).toEqual(roles);
     const conversation = await upsertConversation(snapshot.conversation);
     await syncConversationMessages(Number(conversation.id), [
-      { messageKey: 'googleaistudio:0:user', role: 'user', contentMarkdown: 'question', sequence: 0 },
+      {
+        messageKey: 'googleaistudio:0:user',
+        role: 'user',
+        contentMarkdown: 'previous completed question $E=mc^2$',
+        sequence: 0,
+      },
       {
         messageKey: 'googleaistudio:1:assistant',
         role: 'assistant',
-        contentMarkdown: 'previous completed reply',
+        contentMarkdown: 'previous completed reply $E=mc^2$',
         sequence: 1,
       },
     ]);
     await syncConversationMessages(Number(conversation.id), integrity.snapshot.messages, integrity.persistence);
     expect(
       (await getMessagesByConversationId(Number(conversation.id))).map((message) => message.contentMarkdown),
-    ).toEqual(['question', 'previous completed reply']);
+    ).toEqual(expected);
   });
 
   it('rejects legacy exact-key reuse across durable identities before any destructive repair', async () => {

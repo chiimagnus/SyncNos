@@ -16,6 +16,7 @@ import {
   mergePreparedRecords,
   createPreparedCaptureConsumer,
   runVirtualizedSweep,
+  resolveScrollRoot,
   type PreparedAccumulator,
   type PreparedIdentityGuard,
   type PreparedMessageRecord,
@@ -415,6 +416,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     fingerprint: string;
     rendered: boolean;
     streaming: boolean;
+    pending: boolean;
   };
 
   function compactFingerprint(value: string): string {
@@ -431,7 +433,11 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return '';
   }
 
-  function descriptorFromEntry(entry: ManualTurnEntry, streamingKey = ''): AiStudioDescriptor {
+  function descriptorFromEntry(
+    entry: ManualTurnEntry,
+    streamingKey = '',
+    inViewport: (node: Element) => boolean = () => true,
+  ): AiStudioDescriptor {
     const rawText = env.normalize.normalizeText(
       (entry.content as any).innerText || (entry.content as any).textContent || '',
     );
@@ -440,6 +446,11 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const blobUrls = extractBlobImageUrlsFromElement(entry.content);
     const streaming = entry.role === 'assistant' && entry.messageKey === streamingKey;
     const failed = entry.role === 'assistant' && !!entry.content.querySelector('.model-error');
+    const pendingMath = Array.from(entry.content.querySelectorAll('ms-katex')).filter(
+      (formula) => !env.normalize.normalizeText(formula.textContent || ''),
+    );
+    const rendered =
+      !streaming && !failed && !pendingMath.length && (!!rawText || !!httpUrls.length || !!blobUrls.length);
     return {
       key: entry.messageKey,
       turnKey: entry.turnId,
@@ -455,15 +466,31 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
           blobUrls.join('|'),
         ].join('\u001f'),
       ),
-      rendered: !streaming && !failed && (!!rawText || !!httpUrls.length || !!blobUrls.length),
+      rendered,
       streaming,
+      pending:
+        !rendered &&
+        !failed &&
+        (pendingMath.length
+          ? pendingMath.some(inViewport)
+          : inViewport(entry.content.closest('[data-turn-role]') || entry.content)),
     };
   }
 
   function readCurrentDescriptors(): AiStudioDescriptor[] {
     const refs = readCurrentManualEntryRefs();
     const streamingKey = latestStreamingAssistantKey(refs);
-    return refs.map(({ entry }) => descriptorFromEntry(entry, streamingKey));
+    const scrollRoot = resolveScrollRoot({ document: env.document, window: env.window }, getConversationRoot());
+    const bounds = scrollRoot.getBoundingClientRect();
+    const viewportTop = Math.max(0, bounds.top);
+    const viewportBottom = bounds.height > 0 ? Math.min(env.window.innerHeight, bounds.bottom) : env.window.innerHeight;
+    const inViewport = (node: Element): boolean => {
+      const rect = node.getBoundingClientRect();
+      return rect.height === 0
+        ? rect.top >= viewportTop && rect.top < viewportBottom
+        : rect.bottom > viewportTop && rect.top < viewportBottom;
+    };
+    return refs.map(({ entry }) => descriptorFromEntry(entry, streamingKey, inViewport));
   }
 
   function mergeObservedSlotOrder(storedKeys: string[], incomingKeys: string[]): { keys: string[]; anchored: boolean } {
@@ -590,6 +617,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const runtime = { document: env.document, window: env.window };
     let observedSlotOrder: string[] = [];
     let slotOrderAnchored = true;
+    let windowDescriptors: AiStudioDescriptor[] = [];
     const readTrackedDescriptors = () => {
       const descriptors = readCurrentDescriptors();
       const merged = mergeObservedSlotOrder(
@@ -612,11 +640,14 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         {
           getScrollSeed: getConversationRoot,
           sampleIdentity,
-          readDescriptorKeys: () => readTrackedDescriptors().map((descriptor) => descriptor.key),
+          readDescriptorKeys: () => {
+            windowDescriptors = readTrackedDescriptors();
+            return windowDescriptors.map((descriptor) => descriptor.key);
+          },
           readUnresolvedKeys: () =>
-            readTrackedDescriptors()
-              .filter((descriptor) => !descriptor.rendered)
-              .map((descriptor) => descriptor.key),
+            windowDescriptors.filter((descriptor) => !descriptor.rendered).map((descriptor) => descriptor.key),
+          readPendingKeys: () =>
+            windowDescriptors.filter((descriptor) => descriptor.pending).map((descriptor) => descriptor.key),
           harvest: (target) => harvestManualInto(target, ctx),
         },
         accumulator,
