@@ -109,8 +109,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   }
 
   function extractUserText(wrapper: Element): string {
-    const node = wrapper.querySelector('.whitespace-pre-wrap') || wrapper;
-    return env.normalize.normalizeText(String((node as HTMLElement).innerText || node.textContent || ''));
+    return zaiMarkdown.extractUserMarkdown(wrapper);
   }
 
   function extractAssistantText(wrapper: Element): string {

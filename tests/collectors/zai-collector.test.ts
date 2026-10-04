@@ -48,6 +48,26 @@ function conversationBody(messages: string, extra = '') {
 }
 
 describe('zai-collector', () => {
+  it('preserves user Markdown whitespace without collapsed-message controls', async () => {
+    const source = '- Parent\n  - Child\n\n```ts\n  first();  \n\n\n  last();\n```';
+    const dom = new JSDOM(
+      conversationBody(`<div id="message-user" class="user-message"><div class="chat-user">
+        <div class="whitespace-pre-wrap" data-expanded="false"><div>${source}<div class="absolute"></div><button>显示完整信息</button></div></div>
+      </div></div>`),
+      { url: 'https://chat.z.ai/c/conv-user-markdown' },
+    );
+    setupDom(dom);
+    const collector = createCollector();
+    const collapsed = await capturePrepared(collector);
+    expect(collapsed.messages[0].contentMarkdown).toBe(source);
+    const fingerprint = collector.__test.readCurrentDescriptors()[0].fingerprint;
+    dom.window.document.querySelector('.whitespace-pre-wrap')!.setAttribute('data-expanded', 'true');
+    dom.window.document.querySelector('button')!.textContent = '收起';
+    expect(collector.__test.readCurrentDescriptors()[0].fingerprint).toBe(fingerprint);
+    expect((await capturePrepared(collector)).messages[0].contentMarkdown).toBe(source);
+    expect(dom.window.document.querySelector('button')?.textContent).toBe('收起');
+  });
+
   it('preserves current readonly CodeMirror code blocks without toolbar labels', async () => {
     const code = `const html = '<div data-x="a&b">中文 😀</div>';\n\nconsole.log(html);`;
     const dom = new JSDOM(

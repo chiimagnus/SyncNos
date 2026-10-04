@@ -68,6 +68,14 @@ function extractAssistantText(wrapper: Element | null): string {
   return clone ? normalizeTextShared(extractTextFromSanitizedClone(clone)) : '';
 }
 
+function extractUserMarkdown(wrapper: Element): string {
+  const content = wrapper.querySelector('.whitespace-pre-wrap');
+  if (!content) return '';
+  const clone = content.cloneNode(true) as Element;
+  removeNonContentNodes(clone);
+  return String(clone.textContent || '').replace(/\r\n?/g, '\n').trim();
+}
+
 export default {
   removeThinkingNodes,
   removeNonContentNodes,
@@ -76,4 +84,5 @@ export default {
   extractTextFromSanitizedClone,
   extractAssistantMarkdown,
   extractAssistantText,
+  extractUserMarkdown,
 };
