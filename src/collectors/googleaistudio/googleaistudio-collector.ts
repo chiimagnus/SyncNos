@@ -179,17 +179,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return firstUserMessageTitle(messages) || 'Google AI Studio';
   }
 
-  function extractAssistantMarkdown(node: any, fallbackText: any): any {
-    return googleAiStudioMarkdown.extractMarkdown(node) || fallbackText || '';
-  }
-
-  function extractAssistantText(node: any): any {
-    const text = googleAiStudioMarkdown.extractText(node);
-    if (text) return text;
-    const raw = node ? node.innerText || node.textContent || '' : '';
-    return env.normalize.normalizeText(raw);
-  }
-
   type InlineImageContext = {
     blobUrlCache: Map<string, string | null>;
     warningFlags: Set<string>;
@@ -300,39 +289,13 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     }
   }
 
-  function stripThinkingFromNode(node: Element | null): Element | null {
-    if (!node || typeof (node as any).cloneNode !== 'function') return node;
-    const cloned = (node as any).cloneNode(true) as Element;
-    const selectors = ['ms-thought-chunk', '.thought-panel', 'img[alt="Thinking"]', '.thinking-progress-icon'];
-    for (const selector of selectors) {
-      for (const element of Array.from((cloned as any).querySelectorAll?.(selector) || [])) {
-        try {
-          (element as any).remove?.();
-        } catch (_error) {
-          // ignore
-        }
-      }
-    }
-    return cloned;
-  }
+  const TURN_CHROME_SELECTOR =
+    'ms-thought-chunk, .thought-panel, img[alt="Thinking"], .thinking-progress-icon, .author-label, .timestamp';
 
-  function stripTurnChromeFromNode(node: Element | null): Element | null {
-    if (!node || typeof (node as any).cloneNode !== 'function') return node;
-    const cloned = (node as any).cloneNode(true) as Element;
-    for (const selector of ['.author-label', '.timestamp']) {
-      for (const element of Array.from((cloned as any).querySelectorAll?.(selector) || [])) {
-        try {
-          (element as any).remove?.();
-        } catch (_error) {
-          // ignore
-        }
-      }
-    }
-    return cloned;
-  }
-
-  function cleanTurnContentNode(node: Element | null): Element | null {
-    return stripTurnChromeFromNode(stripThinkingFromNode(node));
+  function cleanTurnContentNode(node: Element): Element {
+    const clone = node.cloneNode(true) as Element;
+    for (const element of Array.from(clone.querySelectorAll(TURN_CHROME_SELECTOR))) element.remove();
+    return clone;
   }
 
   function uniqueStrings(values: string[]): string[] {
@@ -347,22 +310,18 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
   function snapshotPlainInput(entry: ManualTurnEntry, sequence: number): PlainExtractionInput | null {
     const { role, content } = entry;
-    const cleaned = cleanTurnContentNode(content) || content;
-    const contentText =
-      role === 'assistant'
-        ? extractAssistantText(cleaned)
-        : env.normalize.normalizeText((cleaned as any).innerText || (cleaned as any).textContent || '');
-    const baseMarkdown = role === 'assistant' ? extractAssistantMarkdown(cleaned, contentText) : contentText;
+    const cleaned = cleanTurnContentNode(content);
+    const baseMarkdown = googleAiStudioMarkdown.extractMarkdown(cleaned);
     const httpUrls = uniqueStrings(extractImageUrlsFromElement(cleaned));
     const blobUrls = uniqueStrings(extractBlobImageUrlsFromElement(cleaned));
-    if (!contentText && !httpUrls.length && !blobUrls.length) return null;
+    if (!baseMarkdown && !httpUrls.length && !blobUrls.length) return null;
     return {
       messageKey: entry.messageKey,
       turnKey: entry.turnId,
       withinTurn: entry.withinTurn,
       role,
       sequence,
-      baseMarkdown: baseMarkdown || contentText,
+      baseMarkdown,
       imageReferences: { httpUrls, blobUrls },
       updatedAt: Date.now(),
     };
@@ -438,16 +397,15 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     streamingKey = '',
     inViewport: (node: Element) => boolean = () => true,
   ): AiStudioDescriptor {
-    const rawText = env.normalize.normalizeText(
-      (entry.content as any).innerText || (entry.content as any).textContent || '',
-    );
+    const cleaned = cleanTurnContentNode(entry.content);
+    const rawText = googleAiStudioMarkdown.extractText(cleaned);
     const rawHtml = String((entry.content as any).innerHTML || '');
-    const httpUrls = extractImageUrlsFromElement(entry.content);
-    const blobUrls = extractBlobImageUrlsFromElement(entry.content);
+    const httpUrls = extractImageUrlsFromElement(cleaned);
+    const blobUrls = extractBlobImageUrlsFromElement(cleaned);
     const streaming = entry.role === 'assistant' && entry.messageKey === streamingKey;
     const failed = entry.role === 'assistant' && !!entry.content.querySelector('.model-error');
     const pendingMath = Array.from(entry.content.querySelectorAll('ms-katex')).filter(
-      (formula) => !env.normalize.normalizeText(formula.textContent || ''),
+      (formula) => !formula.closest(TURN_CHROME_SELECTOR) && !env.normalize.normalizeText(formula.textContent || ''),
     );
     const rendered =
       !streaming && !failed && !pendingMath.length && (!!rawText || !!httpUrls.length || !!blobUrls.length);
@@ -773,8 +731,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     getRoot: getConversationRoot,
     prepareManualCapture,
     __test: {
-      extractAssistantMarkdown,
-      extractAssistantText,
       isPromptRunning,
       readCurrentDescriptors,
     },

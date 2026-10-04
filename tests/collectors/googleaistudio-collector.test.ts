@@ -95,6 +95,74 @@ function virtualizedPrompt(unresolvedMarkup?: string, formulaDelayMs = 0) {
 }
 
 describe('googleaistudio-collector', () => {
+  it.each(['User', 'Model'])('preserves current rich %s content without code toolbar chrome', async (role) => {
+    const dom = setupDom(
+      `<div class="chat-session-content"><ms-chat-turn id="current-rich"><div data-turn-role="${role}"><div class="turn-content">
+        <div class="author-label">AUTHOR_META <span class="timestamp">10:11</span></div>
+        <h2>Current heading</h2><p><strong>Bold</strong> and <span class="inline-code">inline_code()</span>.</p>
+        <ul><li>First item</li><li>Second item</li></ul>
+        <div>Inline: <ms-katex class="inline"><pre><code class="rendered"><span class="katex"><span class="katex-mathml"><annotation encoding="application/x-tex">E=mc^2</annotation></span><span class="katex-html" aria-hidden="true">DUPLICATE_MATH</span></span></code></pre></ms-katex></div>
+        <ms-code-block data-test-language="ts"><mat-expansion-panel><mat-expansion-panel-header><span>TOOLBAR_META Ts</span><button>download content_copy expand_less</button></mat-expansion-panel-header>
+          <pre><code class="hljs"><span>const html = '&lt;div data-x="a&amp;b"&gt;中文 😀&lt;/div&gt;';</span>\nconsole.log(html);</code></pre>
+        </mat-expansion-panel></ms-code-block>
+      </div></div></ms-chat-turn></div>`,
+      'https://aistudio.google.com/prompts/current-rich-code',
+    );
+    const collector = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    );
+    const snapshot = await capturePrepared(collector);
+    expect(snapshot.messages).toHaveLength(1);
+    const markdown = snapshot.messages[0].contentMarkdown;
+    for (const text of [
+      '## Current heading',
+      '**Bold**',
+      '`inline_code()`',
+      '- First item',
+      '$E=mc^2$',
+      '```ts',
+      '<div data-x="a&b">中文 😀</div>',
+    ]) {
+      expect(markdown).toContain(text);
+    }
+    for (const text of ['AUTHOR_META', '10:11', 'TOOLBAR_META', 'content_copy', 'DUPLICATE_MATH']) {
+      expect(markdown).not.toContain(text);
+    }
+  });
+
+  it('ignores unrendered thought formulas when proving final body completeness', async () => {
+    const dom = setupDom(
+      `<div class="chat-session-content"><ms-chat-turn id="thought-formula"><div data-turn-role="Model"><div class="turn-content"><ms-thought-chunk>private reasoning <ms-katex><pre><code></code></pre></ms-katex></ms-thought-chunk><p>Final answer</p></div></div></ms-chat-turn></div>`,
+      'https://aistudio.google.com/prompts/thought-formula',
+    );
+    const collector = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ).collector;
+    let clock = 0;
+    const preparedCapture = await collector.prepareManualCapture!({
+      stableSamples: 1,
+      stepTimeoutMs: 1,
+      pollMs: 0,
+      now: () => clock,
+      sleep: async () => {
+        clock += 1;
+      },
+    });
+    expect(preparedCapture.completeness).toBe('complete');
+    const snapshot = await collector.capture({ manual: true, preparedCapture });
+    expect(snapshot.messages.map((message: any) => message.contentMarkdown)).toEqual(['Final answer']);
+  });
+
   it.each(['User', 'Model'])('scrolls to a lazy formula below the viewport in a long %s message', async (role) => {
     const dom = setupDom(
       `<div id="scroll"><div class="chat-session-content"><ms-chat-turn id="long-message"><div data-turn-role="${role}"><div class="turn-content">long message <ms-katex class="inline"><pre><code></code></pre></ms-katex></div></div></ms-chat-turn></div></div>`,

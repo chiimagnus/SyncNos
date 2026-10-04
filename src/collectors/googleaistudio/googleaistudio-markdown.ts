@@ -5,6 +5,13 @@ import { normalizeText } from '@services/shared/normalize.ts';
 function sanitize(node: Element | null): Element | null {
   if (!node?.cloneNode) return null;
   const clone = node.cloneNode(true) as Element;
+  for (const block of Array.from(clone.querySelectorAll('ms-code-block'))) {
+    const pre = block.querySelector('pre');
+    if (!pre) continue;
+    const language = block.getAttribute('data-test-language');
+    if (language) pre.querySelector('code')?.setAttribute('class', `language-${language}`);
+    block.replaceWith(pre);
+  }
   for (const span of Array.from(clone.querySelectorAll<HTMLSpanElement>('span.inline-code, span[style]'))) {
     const tag = span.classList.contains('inline-code') ? 'code' : span.style.fontStyle === 'italic' ? 'em' : null;
     if (!tag) continue;

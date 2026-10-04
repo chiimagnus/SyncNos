@@ -388,6 +388,21 @@ describe('conversations storage-idb', () => {
       roles: ['user'],
       expected: ['question', 'previous completed reply $E=mc^2$'],
     },
+    {
+      state: 'author chrome without a rendered model body',
+      user: 'question',
+      assistant:
+        '<div class="author-label">Model <span class="timestamp">10:11</span></div><ms-text-chunk></ms-text-chunk>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
+    {
+      state: 'thinking chrome without a final model body',
+      user: 'question',
+      assistant: '<ms-thought-chunk><p>private reasoning</p></ms-thought-chunk><ms-text-chunk></ms-text-chunk>',
+      roles: ['user'],
+      expected: ['question', 'previous completed reply $E=mc^2$'],
+    },
   ])('preserves saved AI Studio content when exposed to $state', async ({ user, assistant, roles, expected }) => {
     const dom = new JSDOM(
       `<div class="chat-session-content">
@@ -404,10 +419,15 @@ describe('conversations storage-idb', () => {
         normalize: normalizeApi,
       }),
     ).collector;
+    let clock = 0;
     const preparedCapture = await collector.prepareManualCapture!({
+      stableSamples: 1,
       stepTimeoutMs: 1,
       pollMs: 0,
-      sleep: async () => {},
+      now: () => clock,
+      sleep: async () => {
+        clock += 1;
+      },
     });
     const snapshot = await collector.capture({ manual: true, preparedCapture });
     const integrity = resolveCaptureIntegrity('googleaistudio', snapshot);
