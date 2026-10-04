@@ -66,6 +66,10 @@ describe('markdown reading profile matrix guards', () => {
         expect(markdownClass).toContain('[&_blockquote]:tw-relative');
         expect(markdownClass).toContain('[&_pre]:tw-overflow-auto');
         expect(markdownClass).toContain('[&_table]:tw-overflow-x-auto');
+        expect(markdownClass).toContain('[&_table]:tw-break-normal');
+        expect(markdownClass).toContain('[&_th]:tw-border-solid');
+        expect(markdownClass).toContain('[&_td]:tw-border-solid');
+        expect(markdownClass).toContain('[&_ol]:tw-pl-[2em]');
         expect(markdownClass).toContain('[&_.syncnos-md-image-link]');
       }
     }
