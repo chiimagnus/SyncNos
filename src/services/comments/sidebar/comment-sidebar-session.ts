@@ -141,7 +141,6 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
       actionCallbacks = { ...(input.actionCallbacks ?? {}) };
     }
     const next: Partial<CommentSidebarHostSnapshot> = {};
-    if ('busy' in input) next.busy = input.busy === true;
     if ('comments' in input) {
       next.comments = (input.comments ?? []).map((item) => ({
         ...item,

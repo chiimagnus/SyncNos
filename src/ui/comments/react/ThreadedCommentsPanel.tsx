@@ -45,7 +45,7 @@ export function ThreadedCommentsPanel({
   const unmountedRef = useRef(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
-  const busy = discussion.busy;
+  const busy = discussion.mutationBusy;
   const canSubmitHighlightOnly = hasValidArticleCommentContent({
     parentId: null,
     quoteText: snapshot.composerAttachment.quoteText,

@@ -18,7 +18,6 @@ export type CommentSidebarPanelTestDriver = {
   open: (input?: { focusComposer?: boolean }) => void;
   close: () => void;
   isOpen: () => boolean;
-  updateBusy: (busy: boolean) => void;
   updateComposerQuote: (text: string) => void;
   replaceComments: (items: CommentSidebarTestItemInput[]) => void;
   replaceActionCallbacks: (callbacks: CommentSidebarHostActionCallbacks) => void;
@@ -92,11 +91,6 @@ export function createCommentSidebarPanelTestDriver(api: CommentSidebarPanelApi)
     },
     isOpen() {
       return session.getSnapshot().open;
-    },
-    updateBusy(busy) {
-      publish(() => {
-        session.updateHost({ busy: busy === true });
-      });
     },
     updateComposerQuote(text) {
       publish(() => {
