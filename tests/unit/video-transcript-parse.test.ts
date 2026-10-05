@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseBilibiliPlayerStateJson,
   parseBilibiliSubtitleJson,
-  parseBilibiliViewPointsJson,
   parseWebVtt,
   parseYoutubeJson3,
   parseYoutubeTimedtextXml,
@@ -99,8 +99,8 @@ describe('video transcript parsers', () => {
     ]);
   });
 
-  it('parses Bilibili view_points into platform-neutral chapters', () => {
-    const chapters = parseBilibiliViewPointsJson(
+  it('parses Bilibili player state into platform-neutral chapters and subtitle tracks', () => {
+    const state = parseBilibiliPlayerStateJson(
       JSON.stringify({
         code: 0,
         data: {
@@ -119,23 +119,50 @@ describe('video transcript parsers', () => {
             { content: '', from: 40, to: 50 },
             { content: 'Bad start', from: null, to: 50 },
           ],
+          subtitle: {
+            lan: 'ai-zh',
+            subtitles: [
+              {
+                lan: 'ai-zh',
+                subtitle_url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/prod/current?auth_key=signed',
+                subtitle_url_v2: '//subtitle.bilibili.com/encrypted',
+              },
+              { lan: '', subtitle_url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/invalid' },
+            ],
+          },
         },
       }),
     );
 
-    expect(chapters).toEqual([
-      { title: 'Intro section', startSeconds: 0, endSeconds: 30.5 },
-      { title: 'Bad end', startSeconds: 31, endSeconds: null },
-    ]);
+    expect(state).toEqual({
+      chapters: [
+        { title: 'Intro section', startSeconds: 0, endSeconds: 30.5 },
+        { title: 'Bad end', startSeconds: 31, endSeconds: null },
+      ],
+      subtitleTracks: [
+        {
+          language: 'ai-zh',
+          url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/prod/current?auth_key=signed',
+        },
+      ],
+    });
   });
 
-  it('distinguishes an explicit empty chapter list from an unknown or non-success response', () => {
-    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: 0, data: { view_points: [] } }))).toEqual([]);
-    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: -1, data: { view_points: [] } }))).toBeNull();
-    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: null, data: { view_points: [] } }))).toBeNull();
-    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: '', data: { view_points: [] } }))).toBeNull();
-    expect(parseBilibiliViewPointsJson(JSON.stringify({ data: { view_points: [] } }))).toBeNull();
-    expect(parseBilibiliViewPointsJson(JSON.stringify({ code: 0, data: {} }))).toBeNull();
-    expect(parseBilibiliViewPointsJson('{bad')).toBeNull();
+  it('distinguishes explicit empty player arrays from missing fields and invalid responses', () => {
+    expect(
+      parseBilibiliPlayerStateJson(JSON.stringify({ code: 0, data: { view_points: [], subtitle: { subtitles: [] } } })),
+    ).toEqual({
+      chapters: [],
+      subtitleTracks: [],
+    });
+    expect(parseBilibiliPlayerStateJson(JSON.stringify({ code: 0, data: {} }))).toEqual({
+      chapters: null,
+      subtitleTracks: null,
+    });
+    expect(parseBilibiliPlayerStateJson(JSON.stringify({ code: -1, data: {} }))).toBeNull();
+    expect(parseBilibiliPlayerStateJson(JSON.stringify({ code: null, data: {} }))).toBeNull();
+    expect(parseBilibiliPlayerStateJson(JSON.stringify({ code: '', data: {} }))).toBeNull();
+    expect(parseBilibiliPlayerStateJson(JSON.stringify({ data: {} }))).toBeNull();
+    expect(parseBilibiliPlayerStateJson('{bad')).toBeNull();
   });
 });

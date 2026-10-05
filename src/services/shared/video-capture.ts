@@ -18,9 +18,12 @@ export type VideoPageMetaCandidate = {
 export type VideoPageMetaCandidates = {
   state: VideoPageMetaCandidate | null;
   dom: VideoPageMetaCandidate | null;
+  activeSubtitleLanguage: string;
 };
 
-export type VideoResponseKind = 'youtube-timedtext' | 'bilibili-subtitle' | 'bilibili-chapters';
+export type VideoResponseKind = 'youtube-timedtext' | 'bilibili-player';
+
+export type VideoSubtitleStatus = 'ok' | 'empty' | 'off' | 'unavailable';
 
 export function classifyVideoResponseUrl(raw: unknown): VideoResponseKind | null {
   const text = String(raw ?? '').trim();
@@ -42,15 +45,8 @@ export function classifyVideoResponseUrl(raw: unknown): VideoResponseKind | null
     return 'youtube-timedtext';
   }
 
-  if (
-    (host === 'hdslb.com' || host.endsWith('.hdslb.com')) &&
-    (path.startsWith('/bfs/subtitle/') || path.startsWith('/bfs/ai_subtitle/'))
-  ) {
-    return 'bilibili-subtitle';
-  }
-
   if (host === 'api.bilibili.com' && path === '/x/player/wbi/v2') {
-    return 'bilibili-chapters';
+    return 'bilibili-player';
   }
 
   return null;

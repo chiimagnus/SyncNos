@@ -88,7 +88,7 @@ describe('popup current-page video capture', () => {
                 activity: {
                   phase: 'settled',
                   kind: 'success',
-                  message: 'No subtitles detected; available video details were saved.',
+                  message: 'No subtitles. Video info saved.',
                   expiresAt: Date.now() + 5_000,
                 },
               }
@@ -120,7 +120,7 @@ describe('popup current-page video capture', () => {
     expect(onCaptured).toHaveBeenCalledTimes(1);
     expect(latest?.status).toEqual({
       kind: 'success',
-      message: 'No subtitles detected; available video details were saved.',
+      message: 'No subtitles. Video info saved.',
     });
     expect(sendMock.mock.calls.filter(([type]) => type === 'getActiveTabCaptureState')).toHaveLength(2);
   });

@@ -63,7 +63,9 @@ export const en = {
   contextMenuSaveCurrentPage: 'Save current page',
   contextMenuSaveCurrentAiChat: 'Save current AI chat',
   contextMenuSaveCurrentVideoTranscript: 'Save video',
-  videoTranscriptTipNoSubtitles: 'No subtitles detected; available video details were saved.',
+  videoTranscriptTipNoSubtitles: 'No subtitles. Video info saved.',
+  videoTranscriptTipSubtitlesOff: 'Subtitles off. Video info saved.',
+  videoTranscriptTipSubtitlesUnavailable: 'Subtitle fetch failed. Video info saved.',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT Advanced capture',
   chatgptApiCaptureAdvancedLabel: 'Use the ChatGPT API for the current conversation',
   chatgptApiCaptureAdvancedHint:

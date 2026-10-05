@@ -7,6 +7,7 @@ import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
+import type { VideoSubtitleStatus } from '@services/shared/video-capture';
 import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api-capture-settings';
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
@@ -57,7 +58,7 @@ type CurrentPageCaptureResult =
       captureReasons?: string[];
     })
   | (CurrentPageSavedResult & { kind: 'article' })
-  | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: 'ok' | 'empty' });
+  | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: VideoSubtitleStatus });
 
 const CAPTURE_ACTIVITY_VISIBLE_MS = 5_000;
 
@@ -311,7 +312,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         const message =
           result.subtitleStatus === 'empty'
             ? t('videoTranscriptTipNoSubtitles')
-            : buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' });
+            : result.subtitleStatus === 'off'
+              ? t('videoTranscriptTipSubtitlesOff')
+              : result.subtitleStatus === 'unavailable'
+                ? t('videoTranscriptTipSubtitlesUnavailable')
+                : buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' });
         setCaptureActivity('settled', 'success', message);
         report(message, 'default');
         return {

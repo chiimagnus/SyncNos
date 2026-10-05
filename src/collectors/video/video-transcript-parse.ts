@@ -6,6 +6,16 @@ export type TranscriptCue = {
   text: string;
 };
 
+export type BilibiliSubtitleTrack = {
+  language: string;
+  url: string;
+};
+
+export type BilibiliPlayerState = {
+  chapters: VideoChapter[] | null;
+  subtitleTracks: BilibiliSubtitleTrack[] | null;
+};
+
 function normalizeText(value: unknown): string {
   return String(value || '')
     .replace(/\r\n/g, '\n')
@@ -170,26 +180,42 @@ export function parseBilibiliSubtitleJson(text: string): TranscriptCue[] {
   }
 }
 
-export function parseBilibiliViewPointsJson(text: string): VideoChapter[] | null {
+export function parseBilibiliPlayerStateJson(text: string): BilibiliPlayerState | null {
   const src = normalizeText(text);
   if (!src) return null;
   try {
     const json: any = JSON.parse(src);
-    if (typeof json?.code !== 'number' || json.code !== 0 || !Array.isArray(json?.data?.view_points)) return null;
+    if (typeof json?.code !== 'number' || json.code !== 0 || !json?.data || typeof json.data !== 'object') return null;
 
-    const chapters: VideoChapter[] = [];
-    for (const item of json.data.view_points) {
-      const title = normalizeText(item?.content).replace(/\s+/g, ' ');
-      const startSeconds = readNonNegativeNumber(item?.from);
-      const end = readNonNegativeNumber(item?.to);
-      if (!title || startSeconds == null) continue;
-      chapters.push({
-        title,
-        startSeconds,
-        endSeconds: end != null && end >= startSeconds ? end : null,
-      });
-    }
-    return chapters;
+    const chapters = Array.isArray(json.data.view_points)
+      ? json.data.view_points.flatMap((item: any) => {
+          const title = normalizeText(item?.content).replace(/\s+/g, ' ');
+          const startSeconds = readNonNegativeNumber(item?.from);
+          const end = readNonNegativeNumber(item?.to);
+          if (!title || startSeconds == null) return [];
+          return [
+            {
+              title,
+              startSeconds,
+              endSeconds: end != null && end >= startSeconds ? end : null,
+            } satisfies VideoChapter,
+          ];
+        })
+      : null;
+
+    const subtitle = json.data.subtitle;
+    const subtitleTracks = Array.isArray(subtitle?.subtitles)
+      ? subtitle.subtitles.flatMap((item: any) => {
+          const language = normalizeText(item?.lan);
+          const url = normalizeText(item?.subtitle_url);
+          return language && url ? [{ language, url } satisfies BilibiliSubtitleTrack] : [];
+        })
+      : null;
+
+    return {
+      chapters,
+      subtitleTracks,
+    };
   } catch (_error) {
     return null;
   }

@@ -4,6 +4,7 @@ import {
   toCanonicalVideoTranscriptCues,
 } from '@services/conversations/domain/video-content';
 import { CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import type { VideoSubtitleStatus } from '@services/shared/video-capture';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -28,7 +29,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     title?: string;
     isNew: boolean;
     url: string;
-    subtitleStatus: 'ok' | 'empty';
+    subtitleStatus: VideoSubtitleStatus;
   }> {
     const extracted = await extractVideoTranscriptFromCurrentPage();
     const activityAt = Date.now();
@@ -43,7 +44,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     } = extracted.meta;
     const transcriptCues = toCanonicalVideoTranscriptCues(extracted.cues);
     const transcriptMarkdown = formatVideoTranscriptMarkdown(transcriptCues);
-    const subtitleStatus: 'ok' | 'empty' = transcriptCues.length ? 'ok' : 'empty';
+    const subtitleStatus: VideoSubtitleStatus = extracted.subtitleStatus;
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: {

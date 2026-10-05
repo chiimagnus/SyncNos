@@ -50,10 +50,17 @@ describe('video transcript isolated bridge', () => {
     ]);
   });
 
-  it('stores only trusted video endpoints with request-page identity', async () => {
+  it('stores only video-state endpoints with request-page identity', async () => {
     const config = await loadBridge();
     config.main();
 
+    dispatch({
+      __syncnos: true,
+      type: 'SYNCNOS_VIDEO_INTERCEPTED',
+      url: 'https://api.bilibili.com/x/player/wbi/v2?cid=current',
+      pageUrl: location.href,
+      bodyText: '{"code":0}',
+    });
     dispatch({
       __syncnos: true,
       type: 'SYNCNOS_VIDEO_INTERCEPTED',
@@ -71,64 +78,58 @@ describe('video transcript isolated bridge', () => {
     dispatch({
       __syncnos: true,
       type: 'SYNCNOS_VIDEO_INTERCEPTED',
-      url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/no-page.json',
-      bodyText: '{"body":[]}',
-    });
-    dispatch({
-      __syncnos: true,
-      type: 'SYNCNOS_VIDEO_META_RESPONSE',
-      requestId: 'legacy-meta',
-      meta: { state: null, dom: null },
+      url: 'https://api.bilibili.com/x/player/wbi/v2?cid=no-page',
+      bodyText: '{"code":0}',
     });
 
     expect((globalThis as any)[STORE_KEY]).toEqual({
       responses: [
         {
-          url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/current.json',
+          url: 'https://api.bilibili.com/x/player/wbi/v2?cid=current',
           pageUrl: location.href,
-          bodyText: '{"body":[]}',
+          bodyText: '{"code":0}',
         },
       ],
     });
   });
 
-  it('keeps one bounded response history without truncating oversized JSON', async () => {
+  it('keeps only the latest response for each endpoint kind', async () => {
     const config = await loadBridge();
     config.main();
 
-    const exactlyAtLimit = 'x'.repeat(2_000_000);
     dispatch({
       __syncnos: true,
       type: 'SYNCNOS_VIDEO_INTERCEPTED',
-      url: 'https://api.bilibili.com/x/player/wbi/v2?limit=exact',
+      url: 'https://api.bilibili.com/x/player/wbi/v2?cid=old',
       pageUrl: location.href,
-      bodyText: exactlyAtLimit,
+      bodyText: 'old-player',
     });
-    expect((globalThis as any)[STORE_KEY].responses).toHaveLength(1);
-    expect((globalThis as any)[STORE_KEY].responses[0].bodyText).toHaveLength(2_000_000);
-
     dispatch({
       __syncnos: true,
       type: 'SYNCNOS_VIDEO_INTERCEPTED',
-      url: 'https://api.bilibili.com/x/player/wbi/v2?limit=over',
+      url: 'https://api.bilibili.com/x/player/wbi/v2?cid=new',
       pageUrl: location.href,
-      bodyText: `${exactlyAtLimit}x`,
+      bodyText: 'new-player',
     });
-    expect((globalThis as any)[STORE_KEY].responses).toHaveLength(1);
+    dispatch({
+      __syncnos: true,
+      type: 'SYNCNOS_VIDEO_INTERCEPTED',
+      url: 'https://www.youtube.com/api/timedtext?v=current&lang=en',
+      pageUrl: 'https://www.youtube.com/watch?v=current',
+      bodyText: 'youtube',
+    });
 
-    for (let index = 0; index < 31; index += 1) {
-      dispatch({
-        __syncnos: true,
-        type: 'SYNCNOS_VIDEO_INTERCEPTED',
-        url: `https://api.bilibili.com/x/player/wbi/v2?index=${index}`,
+    expect((globalThis as any)[STORE_KEY].responses).toEqual([
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=new',
         pageUrl: location.href,
-        bodyText: `body-${index}`,
-      });
-    }
-
-    const responses = (globalThis as any)[STORE_KEY].responses;
-    expect(responses).toHaveLength(30);
-    expect(responses[0].bodyText).toBe('body-1');
-    expect(responses[29].bodyText).toBe('body-30');
+        bodyText: 'new-player',
+      },
+      {
+        url: 'https://www.youtube.com/api/timedtext?v=current&lang=en',
+        pageUrl: 'https://www.youtube.com/watch?v=current',
+        bodyText: 'youtube',
+      },
+    ]);
   });
 });

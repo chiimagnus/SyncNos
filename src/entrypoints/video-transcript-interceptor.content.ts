@@ -143,13 +143,25 @@ function collectBilibiliDomCandidate(): VideoPageMetaCandidate | null {
   }
 }
 
+function collectBilibiliActiveSubtitleLanguage(): string {
+  return normalizeText(
+    document.querySelector('.bpx-player-ctrl-subtitle-language-item.bpx-state-active')?.getAttribute('data-lan'),
+  );
+}
+
 function collectMetaForPage(): VideoPageMetaCandidates {
   const platform = detectSupportedVideoPagePlatform(location.href);
-  if (platform === 'youtube') return { state: collectYoutubeStateCandidate(), dom: null };
-  if (platform === 'bilibili') {
-    return { state: collectBilibiliStateCandidate(), dom: collectBilibiliDomCandidate() };
+  if (platform === 'youtube') {
+    return { state: collectYoutubeStateCandidate(), dom: null, activeSubtitleLanguage: '' };
   }
-  return { state: null, dom: null };
+  if (platform === 'bilibili') {
+    return {
+      state: collectBilibiliStateCandidate(),
+      dom: collectBilibiliDomCandidate(),
+      activeSubtitleLanguage: collectBilibiliActiveSubtitleLanguage(),
+    };
+  }
+  return { state: null, dom: null, activeSubtitleLanguage: '' };
 }
 
 function wrapFetch() {
@@ -181,13 +193,6 @@ function readXhrBody(xhr: any): string {
     if (xhr?.response == null) return '';
     try {
       return JSON.stringify(xhr.response);
-    } catch (_error) {
-      return '';
-    }
-  }
-  if (responseType === 'arraybuffer' && xhr?.response && typeof xhr.response.byteLength === 'number') {
-    try {
-      return typeof TextDecoder === 'function' ? new TextDecoder('utf-8').decode(xhr.response) : '';
     } catch (_error) {
       return '';
     }

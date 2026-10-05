@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 describe('video transcript extraction', () => {
-  it('uses only Bilibili subtitle and chapter responses bound to the current canonical page', async () => {
+  it('uses only Bilibili player state bound to the current canonical page', async () => {
     const pageA = 'https://www.bilibili.com/video/BV1AAAAAAAAA/';
     const pageB = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(pageB, '<div class="bpx-player-subtitle-panel-text"><span>stale DOM subtitle</span></div>');
@@ -62,22 +62,13 @@ describe('video transcript extraction', () => {
         thumbnailUrl: 'https://example.com/b.jpg',
       },
       dom: null,
+      activeSubtitleLanguage: '',
     });
     setResponses([
-      {
-        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/a.json',
-        pageUrl: pageA,
-        bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'A subtitle' }] }),
-      },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=a',
         pageUrl: pageA,
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'A chapter', from: 0, to: 10 }] } }),
-      },
-      {
-        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
-        pageUrl: pageB,
-        bodyText: JSON.stringify({ body: [{ from: 1.234, to: 3.456, content: 'B subtitle' }] }),
       },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=b',
@@ -98,8 +89,9 @@ describe('video transcript extraction', () => {
         durationSeconds: 123.5,
         thumbnailUrl: 'https://example.com/b.jpg',
       },
-      cues: [{ start: 1.234, end: 3.456, text: 'B subtitle' }],
+      cues: [],
       chapters: [{ title: 'B chapter', startSeconds: 0, endSeconds: 30 }],
+      subtitleStatus: 'off',
     });
   });
 
@@ -121,13 +113,9 @@ describe('video transcript extraction', () => {
         description: 'Watch later description',
       },
       dom: null,
+      activeSubtitleLanguage: '',
     });
     setResponses([
-      {
-        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/watchlater.json',
-        pageUrl: watchLater,
-        bodyText: JSON.stringify({ body: [{ from: 1.25, to: 2.5, content: 'subtitle' }] }),
-      },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=watchlater',
         pageUrl: watchLater,
@@ -137,24 +125,19 @@ describe('video transcript extraction', () => {
 
     const extracted = await extractVideoTranscriptFromCurrentPage();
     expect(extracted.meta.url).toBe(canonical);
-    expect(extracted.cues).toEqual([{ start: 1.25, end: 2.5, text: 'subtitle' }]);
+    expect(extracted.cues).toEqual([]);
     expect(extracted.chapters).toEqual([{ title: 'Chapter', startSeconds: 0, endSeconds: 30 }]);
   });
 
   it('returns empty subtitles and unknown chapters when only stale or identity-less Bilibili responses exist', async () => {
-    const pageA = 'https://www.bilibili.com/video/BV1AAAAAAAAA/';
     const pageB = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(pageB, '<div class="bpx-player-subtitle-panel-text"><span>must not be used</span></div>');
     installMetaResponder({
       state: { identityUrl: pageB, title: 'B' },
       dom: null,
+      activeSubtitleLanguage: '',
     });
     setResponses([
-      {
-        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/a.json',
-        pageUrl: pageA,
-        bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'A subtitle' }] }),
-      },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=missing-page',
         bodyText: JSON.stringify({ code: 0, data: { view_points: [{ content: 'old', from: 0, to: 10 }] } }),
@@ -166,16 +149,11 @@ describe('video transcript extraction', () => {
     expect(extracted.chapters).toBeNull();
   });
 
-  it('falls back to an earlier current-page WBI response when the latest response cannot determine chapters', async () => {
+  it('uses only the latest Bilibili player response instead of reviving older state', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
-    installMetaResponder({ state: { identityUrl: page }, dom: null });
+    installMetaResponder({ state: { identityUrl: page }, dom: null, activeSubtitleLanguage: '' });
     setResponses([
-      {
-        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
-        pageUrl: page,
-        bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'subtitle' }] }),
-      },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=valid',
         pageUrl: page,
@@ -188,21 +166,14 @@ describe('video transcript extraction', () => {
       },
     ]);
 
-    expect((await extractVideoTranscriptFromCurrentPage()).chapters).toEqual([
-      { title: 'Valid', startSeconds: 0, endSeconds: 20 },
-    ]);
+    expect((await extractVideoTranscriptFromCurrentPage()).chapters).toBeNull();
   });
 
   it('treats the latest current-page explicit empty view_points array as a chapter clear', async () => {
     const page = 'https://www.bilibili.com/video/BV1BBBBBBBBB/';
     installDom(page);
-    installMetaResponder({ state: { identityUrl: page }, dom: null });
+    installMetaResponder({ state: { identityUrl: page }, dom: null, activeSubtitleLanguage: '' });
     setResponses([
-      {
-        url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/b.json',
-        pageUrl: page,
-        bodyText: JSON.stringify({ body: [{ from: 1, to: 2, content: 'subtitle' }] }),
-      },
       {
         url: 'https://api.bilibili.com/x/player/wbi/v2?cid=b',
         pageUrl: page,
@@ -211,6 +182,89 @@ describe('video transcript extraction', () => {
     ]);
 
     expect((await extractVideoTranscriptFromCurrentPage()).chapters).toEqual([]);
+  });
+
+  it('fetches only the Bilibili subtitle language currently active in the player', async () => {
+    const page = 'https://www.bilibili.com/video/BV1ECaq6nEJn/';
+    installDom(page);
+    installMetaResponder({
+      state: { identityUrl: page, title: 'FSD' },
+      dom: null,
+      activeSubtitleLanguage: 'ai-en',
+    });
+    setResponses([
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=42263383076',
+        pageUrl: page,
+        bodyText: JSON.stringify({
+          code: 0,
+          data: {
+            view_points: [{ content: 'Cybercab', from: 0, to: 509 }],
+            subtitle: {
+              subtitles: [
+                { lan: 'ai-zh', subtitle_url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/prod/zh' },
+                { lan: 'ai-en', subtitle_url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/prod/en' },
+              ],
+            },
+          },
+        }),
+      },
+    ]);
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ body: [{ from: 0.08, to: 2.56, content: 'English subtitle' }] }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const extracted = await extractVideoTranscriptFromCurrentPage();
+
+    expect(fetchMock).toHaveBeenCalledWith('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod/en', {
+      credentials: 'omit',
+    });
+    expect(extracted.cues).toEqual([{ start: 0.08, end: 2.56, text: 'English subtitle' }]);
+    expect(extracted.subtitleStatus).toBe('ok');
+  });
+
+  it('does not fetch Bilibili subtitles when none is active', async () => {
+    const page = 'https://www.bilibili.com/video/BV1OFFSUBTITLE/';
+    installDom(page);
+    installMetaResponder({ state: { identityUrl: page }, dom: null, activeSubtitleLanguage: '' });
+    setResponses([
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=off',
+        pageUrl: page,
+        bodyText: JSON.stringify({
+          code: 0,
+          data: {
+            subtitle: {
+              subtitles: [{ lan: 'ai-zh', subtitle_url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/x' }],
+            },
+          },
+        }),
+      },
+    ]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const extracted = await extractVideoTranscriptFromCurrentPage();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(extracted.subtitleStatus).toBe('off');
+  });
+
+  it('uses empty only when Bilibili explicitly reports no subtitle tracks', async () => {
+    const page = 'https://www.bilibili.com/video/BV1NOSUBTITLE/';
+    installDom(page);
+    installMetaResponder({ state: { identityUrl: page }, dom: null, activeSubtitleLanguage: '' });
+    setResponses([
+      {
+        url: 'https://api.bilibili.com/x/player/wbi/v2?cid=empty',
+        pageUrl: page,
+        bodyText: JSON.stringify({ code: 0, data: { subtitle: { subtitles: [] } } }),
+      },
+    ]);
+
+    expect((await extractVideoTranscriptFromCurrentPage()).subtitleStatus).toBe('empty');
   });
 
   it('rejects stale state metadata as a whole and selects an identity-matched Bilibili DOM candidate', async () => {
@@ -247,7 +301,7 @@ describe('video transcript extraction', () => {
     });
   });
 
-  it('falls back to an earlier current-page YouTube timedtext response when the latest response is not parseable', async () => {
+  it('does not revive an older YouTube subtitle when the latest timedtext response is invalid', async () => {
     const page = 'https://www.youtube.com/watch?v=current';
     installDom(page);
     installMetaResponder({
@@ -268,7 +322,8 @@ describe('video transcript extraction', () => {
     ]);
 
     const extracted = await extractVideoTranscriptFromCurrentPage();
-    expect(extracted.cues).toEqual([{ start: 1.25, end: 2.75, text: 'valid' }]);
+    expect(extracted.cues).toEqual([]);
+    expect(extracted.subtitleStatus).toBe('unavailable');
   });
 
   it('does not use stale YouTube transcript DOM when no current timedtext response exists', async () => {
@@ -292,6 +347,7 @@ describe('video transcript extraction', () => {
     const extracted = await extractVideoTranscriptFromCurrentPage();
     expect(extracted.cues).toEqual([]);
     expect(extracted.chapters).toBeNull();
+    expect(extracted.subtitleStatus).toBe('off');
   });
 });
 
@@ -330,6 +386,7 @@ describe('video page metadata request', () => {
     await expect(requestVideoPageMeta()).resolves.toEqual({
       state: { identityUrl: location.href },
       dom: null,
+      activeSubtitleLanguage: '',
     });
     expect(removeSpy).toHaveBeenCalledWith('message', expect.any(Function));
   });

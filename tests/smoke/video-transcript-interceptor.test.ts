@@ -143,26 +143,12 @@ describe('video transcript main-world interceptor', () => {
     });
   });
 
-  it.each([
-    {
-      responseType: 'text',
-      responseText: '<transcript><text start="1">text</text></transcript>',
-      response: null,
-      expected: '<transcript><text start="1">text</text></transcript>',
-    },
-    {
-      responseType: 'arraybuffer',
-      responseText: '',
-      response: new TextEncoder().encode('{"body":[]}').buffer,
-      expected: '{"body":[]}',
-    },
-  ])('reads $responseType XHR bodies without crossing response APIs', async (fixture) => {
+  it('reads text XHR bodies', async () => {
     installDom('https://www.youtube.com/watch?v=current');
 
     class FakeXhr {
-      responseType = fixture.responseType;
-      response = fixture.response;
-      responseText = fixture.responseText;
+      responseType = 'text';
+      responseText = '<transcript><text start="1">text</text></transcript>';
       private listeners = new Map<string, () => void>();
       open() {}
       send() {
@@ -170,9 +156,6 @@ describe('video transcript main-world interceptor', () => {
       }
       addEventListener(type: string, listener: () => void) {
         this.listeners.set(type, listener);
-      }
-      getResponseHeader() {
-        return 'text/plain';
       }
     }
 
@@ -186,7 +169,7 @@ describe('video transcript main-world interceptor', () => {
     xhr.open('GET', 'https://www.youtube.com/api/timedtext?v=current');
     xhr.send();
 
-    expect(findPosted(postSpy, 'SYNCNOS_VIDEO_INTERCEPTED')[0]?.bodyText).toBe(fixture.expected);
+    expect(findPosted(postSpy, 'SYNCNOS_VIDEO_INTERCEPTED')[0]?.bodyText).toBe(xhr.responseText);
   });
 
   it('does not intercept substring-spoofed response URLs', async () => {
@@ -240,6 +223,7 @@ describe('video transcript main-world interceptor', () => {
           thumbnailUrl: 'large',
         },
         dom: null,
+        activeSubtitleLanguage: '',
       },
     });
   });
@@ -247,7 +231,7 @@ describe('video transcript main-world interceptor', () => {
   it('returns separate Bilibili state and DOM metadata candidates without mixing them', async () => {
     installDom(
       'https://www.bilibili.com/video/BV1STATE1234/?p=2&utm_source=test',
-      '<!doctype html><html><head><link rel="canonical" href="https://www.bilibili.com/video/BV1DOM123456/?p=2"></head><body><h1 class="video-title"></h1><a class="up-name"></a><div class="desc-info-text"></div></body></html>',
+      '<!doctype html><html><head><link rel="canonical" href="https://www.bilibili.com/video/BV1DOM123456/?p=2"></head><body><h1 class="video-title"></h1><a class="up-name"></a><div class="desc-info-text"></div><div class="bpx-player-ctrl-subtitle-language-item bpx-state-active" data-lan="ai-en">English</div></body></html>',
     );
     (window as any).__INITIAL_STATE__ = {
       videoData: {
@@ -289,5 +273,6 @@ describe('video transcript main-world interceptor', () => {
       author: 'DOM author',
       description: 'DOM full description',
     });
+    expect(response.meta.activeSubtitleLanguage).toBe('ai-en');
   });
 });

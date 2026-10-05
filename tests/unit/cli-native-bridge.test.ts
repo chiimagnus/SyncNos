@@ -466,7 +466,7 @@ describe('CLI Native Messaging bridge', () => {
           conversationId: 77,
           isNew: true,
           title: 'Example',
-          subtitleStatus: 'ok',
+          subtitleStatus: 'off',
           url: 'https://example.com/should-not-leak',
           debugTranscript: 'should-not-leak',
         },
@@ -497,7 +497,7 @@ describe('CLI Native Messaging bridge', () => {
         conversationId: 77,
         isNew: true,
         title: 'Example',
-        subtitleStatus: 'ok',
+        subtitleStatus: 'off',
       },
       error: null,
     });

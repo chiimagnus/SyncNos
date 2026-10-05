@@ -95,7 +95,10 @@ describe('current-page-capture content handlers', () => {
     };
 
     const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({ message: 'No subtitles detected; available video details were saved.', kind: 'default' });
+      input?.onProgress?.({
+        message: 'No subtitles. Video info saved.',
+        kind: 'default',
+      });
       return {
         kind: 'video',
         label: 'Fetch Video Transcript',
@@ -120,7 +123,7 @@ describe('current-page-capture content handlers', () => {
     await waitFor(() => response?.ok === true);
 
     expect(captureCurrentPage).toHaveBeenCalledTimes(1);
-    expect(showSaveTip).toHaveBeenCalledWith('No subtitles detected; available video details were saved.', {
+    expect(showSaveTip).toHaveBeenCalledWith('No subtitles. Video info saved.', {
       kind: 'default',
     });
     expect(response?.data).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 42, isNew: true });
