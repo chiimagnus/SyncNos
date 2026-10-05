@@ -1,6 +1,6 @@
 import { t } from '@i18n';
-import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
-import { scriptingExecuteScript } from '@platform/webext/scripting';
+import { tabsQuery } from '@platform/webext/tabs';
+import { sendToContentScript } from '@platform/messaging/content-script-recovery';
 import {
   CONTENT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
@@ -16,9 +16,6 @@ type AnyRouter = {
 type UiMessageHandlersOptions = {
   ensureLocaleReady: () => Promise<unknown>;
 };
-
-const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
-const contentScriptRecoveryByTab = new Map<number, Promise<void>>();
 
 export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions) {
   const ensureLocaleReady = options.ensureLocaleReady;
@@ -154,35 +151,6 @@ async function getActiveTabRaw() {
   }
 
   return { kind: 'tab' as const, tab: { ...tab, id: tabId } };
-}
-
-function isMissingContentScriptReceiver(error: unknown): boolean {
-  const message = String((error as any)?.message ?? error ?? '');
-  return /receiving end does not exist|no matching message handler/i.test(message);
-}
-
-async function ensureContentScript(tabId: number): Promise<void> {
-  let recovery = contentScriptRecoveryByTab.get(tabId);
-  if (!recovery) {
-    recovery = scriptingExecuteScript({
-      target: { tabId },
-      files: [CONTENT_SCRIPT_FILE],
-    })
-      .then(() => undefined)
-      .finally(() => contentScriptRecoveryByTab.delete(tabId));
-    contentScriptRecoveryByTab.set(tabId, recovery);
-  }
-  await recovery;
-}
-
-async function sendToContentScript(tabId: number, message: Record<string, unknown>): Promise<unknown> {
-  try {
-    return await tabsSendMessage(tabId, message);
-  } catch (error) {
-    if (!isMissingContentScriptReceiver(error)) throw error;
-    await ensureContentScript(tabId);
-    return await tabsSendMessage(tabId, message);
-  }
 }
 
 async function relayToActiveTab(tabId: number, type: string, payload?: Record<string, unknown>) {

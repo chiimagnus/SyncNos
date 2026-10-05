@@ -4,7 +4,8 @@ import type {
   CommentSidebarLoadStatus,
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
-import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
+import { hasValidArticleCommentMutationContent } from '@services/comments/domain/comment-content';
+import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -127,7 +128,6 @@ export function createArticleCommentsSidebarController(input: {
   let sessionUnsubscribe: (() => void) | null = null;
   let pendingRevisionScopes = new Set<'article_comments' | 'conversations'>();
   let revisionBatchDraining = false;
-  let identityReconcileGeneration = 0;
   let identityAbortController: AbortController | null = null;
   let deferredArticleCommentsAfterIdentityFailure = false;
   let drainPendingRevisionBatch: () => void = () => {};
@@ -183,7 +183,12 @@ export function createArticleCommentsSidebarController(input: {
     if (disposed) return;
     const quoteText = String(payload?.selectionText ?? '');
     if (!quoteText) return;
-    session.setComposerAttachment({ quoteText, locator: payload?.locator });
+    const locator = normalizeArticleCommentLocator(payload?.locator);
+    if (!hasValidArticleCommentMutationContent({ parentId: null, quoteText, commentText: '', locator })) {
+      session.clearComposerAttachment();
+      return;
+    }
+    session.setComposerAttachment({ quoteText, locator });
   };
 
   const assignContext = (
@@ -218,8 +223,6 @@ export function createArticleCommentsSidebarController(input: {
         adapter.list({
           canonicalUrl: context.canonicalUrl,
           conversationId: context.conversationId,
-          fallbackPolicy: 'include-orphan-url',
-          signal: operation.abortController.signal,
         }),
         operation.abortController.signal,
       );
@@ -247,7 +250,6 @@ export function createArticleCommentsSidebarController(input: {
             fromCanonicalUrl: transition.previous.canonicalUrl,
             toCanonicalUrl: transition.next.canonicalUrl,
             conversationId: transition.next.conversationId,
-            signal: operation.abortController.signal,
           }),
           operation.abortController.signal,
         );
@@ -280,7 +282,6 @@ export function createArticleCommentsSidebarController(input: {
   };
 
   const invalidateIdentityReconcile = () => {
-    identityReconcileGeneration += 1;
     identityAbortController?.abort();
     identityAbortController = null;
   };
@@ -290,22 +291,20 @@ export function createArticleCommentsSidebarController(input: {
     const canonicalUrl = getCanonicalUrl();
     if (!canonicalUrl) return 'unchanged';
 
-    const generation = identityReconcileGeneration;
     const expectedActivationGeneration = activationGeneration;
     const expectedContextKey = getContextKey();
     const abortController = new AbortController();
     identityAbortController = abortController;
 
     try {
-      const resolved = await adapter.findExistingContext({ canonicalUrl, signal: abortController.signal });
+      const resolved = await waitForOperation(adapter.findExistingContext({ canonicalUrl }), abortController.signal);
       if (
         disposed ||
         !sessionOpen ||
         !activationReady ||
-        generation !== identityReconcileGeneration ||
+        abortController.signal.aborted ||
         expectedActivationGeneration !== activationGeneration ||
-        expectedContextKey !== getContextKey() ||
-        abortController.signal.aborted
+        expectedContextKey !== getContextKey()
       ) {
         return 'stale';
       }
@@ -319,15 +318,14 @@ export function createArticleCommentsSidebarController(input: {
 
       assignContext(normalized);
       return 'changed';
-    } catch (_error) {
+    } catch (error) {
       if (
+        error instanceof ControllerOperationAbortedError ||
         disposed ||
         !sessionOpen ||
         !activationReady ||
-        generation !== identityReconcileGeneration ||
         expectedActivationGeneration !== activationGeneration ||
-        expectedContextKey !== getContextKey() ||
-        abortController.signal.aborted
+        expectedContextKey !== getContextKey()
       ) {
         return 'stale';
       }
@@ -488,7 +486,6 @@ export function createArticleCommentsSidebarController(input: {
         const attachment = session.getSnapshot().composerAttachment;
         const quoteText = attachment.quoteText;
         const locator = quoteText ? attachment.locator : null;
-        if (!hasValidArticleCommentContent({ parentId: null, quoteText, commentText: value, locator })) return false;
         const selectionRevision = attachment.selectionRevision;
         const created = await adapter.addRoot({
           canonicalUrl,

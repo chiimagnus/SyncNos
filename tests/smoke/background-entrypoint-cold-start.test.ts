@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   setDisplayMode: vi.fn(),
   startCliNativeBridge: vi.fn(),
   readBackgroundRecoveryProbe: vi.fn(),
+  refreshContentScriptsAfterExtensionUpdate: vi.fn(),
+  ensureContentScriptLifecycleToken: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -47,6 +49,12 @@ vi.mock('@collectors/chatgpt/chatgpt-deep-research-background-handlers', () => (
 }));
 vi.mock('@platform/messaging/ui-background-handlers', () => ({
   registerUiMessageHandlers: mocks.registerUiMessageHandlers,
+}));
+vi.mock('@platform/messaging/content-script-recovery', () => ({
+  refreshContentScriptsAfterExtensionUpdate: mocks.refreshContentScriptsAfterExtensionUpdate,
+}));
+vi.mock('@services/bootstrap/content-script-lifecycle', () => ({
+  ensureContentScriptLifecycleToken: mocks.ensureContentScriptLifecycleToken,
 }));
 vi.mock('@services/comments/background/handlers', () => ({
   registerArticleCommentsHandlers: mocks.registerArticleCommentsHandlers,
@@ -190,6 +198,8 @@ beforeEach(() => {
   });
   mocks.storageOnChanged.mockImplementation(() => () => {});
   mocks.readBackgroundRecoveryProbe.mockResolvedValue(idleRecoveryProbe());
+  mocks.refreshContentScriptsAfterExtensionUpdate.mockResolvedValue(undefined);
+  mocks.ensureContentScriptLifecycleToken.mockResolvedValue('0123456789abcdef0123456789abcdef');
   mocks.createBackgroundServices.mockReturnValue(createServices());
   // @ts-expect-error test global cleanup
   delete globalThis.browser;
@@ -426,7 +436,7 @@ describe('background entrypoint cold start', () => {
     expect(mocks.installContextMenus).not.toHaveBeenCalled();
   });
 
-  it('installs menu structure only for extension install/update and opens About only on install', async () => {
+  it('installs menu structure on install/update, refreshes page scripts only on update, and opens About only on install', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     let installedListener: ((details?: { reason?: string }) => void) | null = null;
     mocks.onInstalled.mockImplementationOnce((listener: any) => {
@@ -442,16 +452,25 @@ describe('background entrypoint cold start', () => {
     installedListener?.({ reason: 'shared_module_update' });
     await flushMicrotasks();
     expect(mocks.installContextMenus).not.toHaveBeenCalled();
+    expect(mocks.ensureContentScriptLifecycleToken).not.toHaveBeenCalled();
+    expect(mocks.refreshContentScriptsAfterExtensionUpdate).not.toHaveBeenCalled();
     expect(mocks.openOrFocusExtensionAppTab).not.toHaveBeenCalled();
 
     installedListener?.({ reason: 'update' });
     await flushMicrotasks();
     expect(mocks.installContextMenus).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureContentScriptLifecycleToken).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshContentScriptsAfterExtensionUpdate).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureContentScriptLifecycleToken.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.refreshContentScriptsAfterExtensionUpdate.mock.invocationCallOrder[0],
+    );
     expect(mocks.openOrFocusExtensionAppTab).not.toHaveBeenCalled();
 
     installedListener?.({ reason: 'install' });
     await flushMicrotasks();
     expect(mocks.installContextMenus).toHaveBeenCalledTimes(2);
+    expect(mocks.ensureContentScriptLifecycleToken).toHaveBeenCalledTimes(2);
+    expect(mocks.refreshContentScriptsAfterExtensionUpdate).toHaveBeenCalledTimes(1);
     expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledTimes(1);
     expect(mocks.openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: '/settings?section=aboutme' });
   });

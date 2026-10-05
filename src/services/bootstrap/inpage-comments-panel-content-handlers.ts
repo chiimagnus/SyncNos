@@ -108,11 +108,7 @@ export function registerInpageCommentsPanelContentHandlers(
   onMessage.addListener(listener);
 
   const cleanup = () => {
-    try {
-      onMessage.removeListener?.(listener);
-    } catch (_e) {
-      // ignore
-    }
+    onMessage.removeListener?.(listener);
     controller.dispose();
   };
 

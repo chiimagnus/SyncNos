@@ -18,18 +18,13 @@ export type ArticleCommentsSidebarAddRootResult = {
   id: number;
 };
 
-export type ArticleCommentsSidebarListFallbackPolicy = 'none' | 'include-orphan-url';
-
 export type ArticleCommentsSidebarListInput = {
   canonicalUrl: string;
   conversationId: number | null;
-  fallbackPolicy: ArticleCommentsSidebarListFallbackPolicy;
-  signal?: AbortSignal;
 };
 
 export type ArticleCommentsSidebarFindExistingContextInput = {
   canonicalUrl: string;
-  signal?: AbortSignal;
 };
 
 export type ArticleCommentsSidebarAdapterErrorCode =
@@ -53,7 +48,6 @@ export class ArticleCommentsSidebarAdapterError extends Error {
 export type NormalizedArticleCommentsSidebarListInput = {
   canonicalUrl: string;
   conversationId: number | null;
-  fallbackPolicy: ArticleCommentsSidebarListFallbackPolicy;
 };
 
 export function normalizeArticleCommentsSidebarListInput(
@@ -67,11 +61,7 @@ export function normalizeArticleCommentsSidebarListInput(
       'article comments list requires canonicalUrl or conversationId',
     );
   }
-  return {
-    canonicalUrl,
-    conversationId,
-    fallbackPolicy: input?.fallbackPolicy === 'include-orphan-url' ? 'include-orphan-url' : 'none',
-  };
+  return { canonicalUrl, conversationId };
 }
 
 export function filterArticleCommentsForListIdentity(
@@ -125,7 +115,6 @@ export type ArticleCommentsSidebarAdapter = {
     fromCanonicalUrl: string;
     toCanonicalUrl: string;
     conversationId: number | null;
-    signal?: AbortSignal;
   }) => Promise<void | { updated: number }>;
   ensureContext?: (input?: ArticleCommentsSidebarEnsureContextInput) => Promise<ArticleCommentsSidebarContext>;
 };

@@ -109,7 +109,7 @@ describe('item mention notionai controller', () => {
     });
 
     const controller = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     });
     const active = controller.start();
@@ -162,7 +162,7 @@ describe('item mention notionai controller', () => {
     });
 
     const controller = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     });
     const active = controller.start();

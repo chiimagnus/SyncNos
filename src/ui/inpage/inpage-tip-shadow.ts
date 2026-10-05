@@ -276,4 +276,4 @@ function showSaveTip(text: unknown, options?: { kind?: TipKind }) {
   }, VISIBLE_MS);
 }
 
-export const inpageTipApi = { showSaveTip };
+export const inpageTipApi = { showSaveTip, cleanup: removeBubble };

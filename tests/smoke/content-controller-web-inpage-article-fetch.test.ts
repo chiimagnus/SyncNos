@@ -20,8 +20,6 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       if (typeof options?.sendImpl === 'function') return options.sendImpl(type, payload);
       return { ok: true, data: {} };
     },
-    onInvalidated: () => () => {},
-    isInvalidContextError: () => false,
   };
 
   const collectorsRegistry = {

@@ -10,7 +10,6 @@ import { detectSupportedVideoPagePlatform, detectVideoPlatformHost } from '@serv
 import { isCanonicalChatgptHostname } from '@services/shared/chatgpt-route';
 
 type RuntimeClient = {
-  onInvalidated?: (listener: (error: Error) => void) => () => void;
   getURL?: (path: string) => string;
 };
 
@@ -49,7 +48,6 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
   let currentMode: InpageDisplayMode | null = null;
   let hrefWatcher: ReturnType<typeof setInterval> | null = null;
   let lastHref = '';
-  let removeRuntimeInvalidation = () => {};
   let removeDisplayListener = () => {};
 
   function currentHref() {
@@ -144,13 +142,10 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
     if (disposed) return;
     disposed = true;
     modeGeneration += 1;
-    removeRuntimeInvalidation();
     removeDisplayListener();
     stopHrefWatcher();
     stopController();
   }
-
-  removeRuntimeInvalidation = runtime?.onInvalidated?.(() => stop()) || (() => {});
 
   try {
     inpageButton?.initRuntime?.(runtime);

@@ -20,7 +20,6 @@ const STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED = 'ai_chat_dollar_mention_enabl
 
 type RuntimeClient = {
   send: (type: string, payload?: Record<string, unknown>) => Promise<any>;
-  isInvalidContextError: (error: unknown) => boolean;
 };
 
 type InpageButtonApi = {
@@ -718,10 +717,7 @@ export function createContentController(deps: Deps) {
           setResidentSaving(false);
         }
       } catch (error) {
-        if (runtime.isInvalidContextError(error)) {
-          stop();
-          return;
-        }
+        if (stopped) return;
         console.error('WebClipper auto-save failed:', error);
       }
     }
@@ -733,8 +729,8 @@ export function createContentController(deps: Deps) {
         await refreshInpageButton();
         if (!isAutoSaveRequestAllowed(generation)) return;
         requestAutoSave(ownerToken);
-      } catch (error) {
-        if (runtime.isInvalidContextError(error)) stop();
+      } catch (_error) {
+        // Observer ticks are retried by later DOM/visibility activity.
       }
     }
 

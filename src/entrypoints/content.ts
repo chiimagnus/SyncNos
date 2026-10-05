@@ -2,6 +2,10 @@ import { createContentController } from '@services/bootstrap/content-controller.
 import { registerCurrentPageCaptureContentHandlers } from '@services/bootstrap/current-page-capture-content-handlers.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 import { startContentBootstrap } from '@services/bootstrap/content.ts';
+import {
+  ensureContentScriptLifecycleToken,
+  startContentScriptLifecycle,
+} from '@services/bootstrap/content-script-lifecycle';
 import { registerInpageCommentsPanelContentHandlers } from '@services/bootstrap/inpage-comments-panel-content-handlers.ts';
 import { registerWebArticleExtractContentHandlers } from '@services/bootstrap/web-article-extract-content-handlers';
 import { createVideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
@@ -16,7 +20,12 @@ import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
 import { inpageItemMentionApi } from '@ui/inpage/inpage-item-mention-shadow.ts';
 import { inpageTipApi } from '@ui/inpage/inpage-tip-shadow.ts';
 import { initializeLocale } from '@i18n';
-import { createInpageCommentsDomSource, getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow.ts';
+import {
+  cleanupInpageCommentsPanel,
+  createInpageCommentsDomSource,
+  getInpageCommentsPanelApi,
+  isInpageCommentsPanelOpen,
+} from '@ui/inpage/inpage-comments-panel-shadow.ts';
 import { createRuntimeClient } from '@platform/runtime/client.ts';
 
 export default defineContentScript({
@@ -24,8 +33,16 @@ export default defineContentScript({
   // This avoids browser-specific dynamic content-script registration support gaps.
   matches: ['http://*/*', 'https://*/*'],
   async main() {
+    const restoreInpageComments = isInpageCommentsPanelOpen();
+    const lifecycleToken = await ensureContentScriptLifecycleToken();
+    const lifecycle = startContentScriptLifecycle(document, lifecycleToken);
+
+    lifecycle.addCleanup(cleanupInpageCommentsPanel);
+    lifecycle.addCleanup(inpageTipApi.cleanup);
+
     const localeReady = initializeLocale();
     const runtime = createRuntimeClient();
+    runtime.onInvalidated(lifecycle.dispose);
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
     const collectorsRegistry = createCollectorsRegistry();
     registerAllCollectors(collectorsRegistry, env);
@@ -38,17 +55,19 @@ export default defineContentScript({
     const incrementalEngine = createAutoSaveIncrementalEngine();
     let captureCurrentPage = currentPageCapture.captureCurrentPage;
 
-    registerCurrentPageCaptureContentHandlers(
-      {
-        getCurrentPageCaptureState: currentPageCapture.getCurrentPageCaptureState,
-        captureCurrentPage: (input) => captureCurrentPage(input),
-      },
-      {
-        inpageTip: inpageTipApi,
-        localeReady,
-      },
+    lifecycle.addCleanup(
+      registerCurrentPageCaptureContentHandlers(
+        {
+          getCurrentPageCaptureState: currentPageCapture.getCurrentPageCaptureState,
+          captureCurrentPage: (input) => captureCurrentPage(input),
+        },
+        {
+          inpageTip: inpageTipApi,
+          localeReady,
+        },
+      ),
     );
-    registerInpageCommentsPanelContentHandlers(runtime, {
+    const inpageComments = registerInpageCommentsPanelContentHandlers(runtime, {
       localeReady,
       createPanelApi: () => getInpageCommentsPanelApi(),
       domSource: createInpageCommentsDomSource({
@@ -57,9 +76,24 @@ export default defineContentScript({
         getPanelRoot: () => document.getElementById('webclipper-inpage-comments-panel'),
       }),
     });
-    registerWebArticleExtractContentHandlers();
+    lifecycle.addCleanup(inpageComments.cleanup);
+    lifecycle.addCleanup(registerWebArticleExtractContentHandlers());
+
+    if (restoreInpageComments) {
+      void localeReady
+        .catch(() => undefined)
+        .then(async () => {
+          if (lifecycle.isDisposed()) return;
+          await inpageComments.controller.open({
+            focusComposer: false,
+            ensureArticle: false,
+          });
+        })
+        .catch(() => undefined);
+    }
 
     await localeReady.catch(() => undefined);
+    if (lifecycle.isDisposed()) return;
     const itemMentionController = createItemMentionController({ runtime, ui: inpageItemMentionApi });
     const controller = createContentController({
       runtime,
@@ -72,10 +106,11 @@ export default defineContentScript({
       itemMention: itemMentionController,
     });
     captureCurrentPage = controller.captureCurrentPage;
-    startContentBootstrap({
+    const bootstrap = startContentBootstrap({
       runtime,
       inpageButton: inpageButtonApi,
       createController: () => controller,
     });
+    lifecycle.addCleanup(() => bootstrap.stop());
   },
 });

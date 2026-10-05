@@ -23,9 +23,7 @@ export function createArticleCommentsSidebarAppAdapter(): ArticleCommentsSidebar
         const byConversation = query.conversationId
           ? await listArticleCommentsByConversationId(query.conversationId)
           : [];
-        const shouldReadUrl =
-          !!query.canonicalUrl && (!query.conversationId || query.fallbackPolicy === 'include-orphan-url');
-        const byCanonicalUrl = shouldReadUrl
+        const byCanonicalUrl = query.canonicalUrl
           ? filterArticleCommentsForListIdentity(await listArticleCommentsByCanonicalUrl(query.canonicalUrl), query)
           : [];
         return mergeArticleCommentsByIdentity(byConversation, byCanonicalUrl);

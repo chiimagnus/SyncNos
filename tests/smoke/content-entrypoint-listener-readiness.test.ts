@@ -5,7 +5,12 @@ const mocks = vi.hoisted(() => ({
   startContentBootstrap: vi.fn(),
   createContentController: vi.fn(),
   createItemMentionController: vi.fn(),
-  createRuntimeClient: vi.fn(() => ({})),
+  runtimeOnInvalidated: vi.fn(() => () => {}),
+  createRuntimeClient: vi.fn(),
+  ensureContentScriptLifecycleToken: vi.fn(),
+  lifecycleAddCleanup: vi.fn(),
+  lifecycleDispose: vi.fn(),
+  lifecycleIsDisposed: vi.fn(() => false),
   createCollectorEnv: vi.fn(() => ({})),
   createCollectorsRegistry: vi.fn(() => ({})),
   registerAllCollectors: vi.fn(),
@@ -20,10 +25,21 @@ const mocks = vi.hoisted(() => ({
   getInpageCommentsPanelApi: vi.fn(() => ({
     attachHost: () => ({ dispose: () => {} }),
   })),
+  cleanupInpageCommentsPanel: vi.fn(),
+  isInpageCommentsPanelOpen: vi.fn(() => false),
+  cleanupInpageTip: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
 vi.mock('@services/bootstrap/content.ts', () => ({ startContentBootstrap: mocks.startContentBootstrap }));
+vi.mock('@services/bootstrap/content-script-lifecycle', () => ({
+  ensureContentScriptLifecycleToken: mocks.ensureContentScriptLifecycleToken,
+  startContentScriptLifecycle: vi.fn(() => ({
+    addCleanup: mocks.lifecycleAddCleanup,
+    dispose: mocks.lifecycleDispose,
+    isDisposed: mocks.lifecycleIsDisposed,
+  })),
+}));
 vi.mock('@services/bootstrap/content-controller.ts', () => ({
   createContentController: mocks.createContentController,
 }));
@@ -43,10 +59,14 @@ vi.mock('@services/bootstrap/video-transcript-capture', () => ({
 vi.mock('@ui/inpage/inpage-comments-panel-shadow.ts', () => ({
   createInpageCommentsDomSource: mocks.createInpageCommentsDomSource,
   getInpageCommentsPanelApi: mocks.getInpageCommentsPanelApi,
+  cleanupInpageCommentsPanel: mocks.cleanupInpageCommentsPanel,
+  isInpageCommentsPanelOpen: mocks.isInpageCommentsPanelOpen,
 }));
 vi.mock('@ui/inpage/inpage-button-shadow.ts', () => ({ inpageButtonApi: {} }));
 vi.mock('@ui/inpage/inpage-item-mention-shadow.ts', () => ({ inpageItemMentionApi: {} }));
-vi.mock('@ui/inpage/inpage-tip-shadow.ts', () => ({ inpageTipApi: {} }));
+vi.mock('@ui/inpage/inpage-tip-shadow.ts', () => ({
+  inpageTipApi: { cleanup: mocks.cleanupInpageTip },
+}));
 vi.mock('@collectors/runtime-observer.ts', () => ({ createObserver: vi.fn() }));
 vi.mock('@services/conversations/content/autosave-incremental-engine.ts', () => ({
   createAutoSaveIncrementalEngine: mocks.createAutoSaveIncrementalEngine,
@@ -83,6 +103,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.createContentController.mockReturnValue({});
   mocks.createItemMentionController.mockReturnValue({});
+  mocks.createRuntimeClient.mockReturnValue({ onInvalidated: mocks.runtimeOnInvalidated });
+  mocks.ensureContentScriptLifecycleToken.mockResolvedValue('0123456789abcdef0123456789abcdef');
+  mocks.startContentBootstrap.mockReturnValue({ stop: vi.fn() });
   vi.stubGlobal('window', {} as Window);
   vi.stubGlobal('document', {} as Document);
   vi.stubGlobal('location', { hostname: 'example.com' } as Location);

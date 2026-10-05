@@ -68,79 +68,66 @@ export function createArticleCommentsSidebarInpageAdapter(
     return parseArticleCommentDtos(res.data);
   };
 
+  const findExistingContext: NonNullable<ArticleCommentsSidebarAdapter['findExistingContext']> = async (input) => {
+    const identity = buildCanonicalWebArticleIdentity(input?.canonicalUrl);
+    if (!identity) {
+      throw new ArticleCommentsSidebarAdapterError('invalid_query', 'missing canonical article URL');
+    }
+    if (!rt?.send) {
+      throw new ArticleCommentsSidebarAdapterError(
+        'runtime_unavailable',
+        'runtime is unavailable for article identity lookup',
+      );
+    }
+    let response: any;
+    try {
+      response = await rt.send(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, {
+        source: identity.source,
+        conversationKey: identity.conversationKey,
+      });
+    } catch (error) {
+      throw new ArticleCommentsSidebarAdapterError('request_failed', 'failed to find existing article context', {
+        cause: error,
+      });
+    }
+    if (!response || typeof response.ok !== 'boolean') {
+      throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article identity runtime response');
+    }
+    if (!response.ok) {
+      throw new ArticleCommentsSidebarAdapterError(
+        'request_failed',
+        String(response?.error?.message || 'failed to find existing article context'),
+      );
+    }
+
+    return {
+      canonicalUrl: identity.url,
+      conversationId: normalizeConversationId(response?.data?.id),
+    };
+  };
+
   return {
     async list(input) {
       const query = normalizeArticleCommentsSidebarListInput(input);
       const byConversation = query.conversationId
         ? await listFromRuntime({ conversationId: query.conversationId })
         : [];
-      const shouldReadUrl =
-        !!query.canonicalUrl && (!query.conversationId || query.fallbackPolicy === 'include-orphan-url');
-      const byCanonicalUrl = shouldReadUrl
+      const byCanonicalUrl = query.canonicalUrl
         ? filterArticleCommentsForListIdentity(await listFromRuntime({ canonicalUrl: query.canonicalUrl }), query)
         : [];
       return mergeArticleCommentsByIdentity(byConversation, byCanonicalUrl);
     },
-    async findExistingContext(input) {
-      const identity = buildCanonicalWebArticleIdentity(input?.canonicalUrl);
-      if (!identity) {
-        throw new ArticleCommentsSidebarAdapterError('invalid_query', 'missing canonical article URL');
-      }
-      if (!rt?.send) {
-        throw new ArticleCommentsSidebarAdapterError(
-          'runtime_unavailable',
-          'runtime is unavailable for article identity lookup',
-        );
-      }
-      if (input?.signal?.aborted) {
-        const error = new Error('article identity lookup aborted');
-        error.name = 'AbortError';
-        throw error;
-      }
-
-      let response: any;
-      try {
-        response = await rt.send(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, {
-          source: identity.source,
-          conversationKey: identity.conversationKey,
-        });
-      } catch (error) {
-        if (input?.signal?.aborted) {
-          const abortError = new Error('article identity lookup aborted');
-          abortError.name = 'AbortError';
-          throw abortError;
-        }
-        throw new ArticleCommentsSidebarAdapterError('request_failed', 'failed to find existing article context', {
-          cause: error,
-        });
-      }
-      if (input?.signal?.aborted) {
-        const error = new Error('article identity lookup aborted');
-        error.name = 'AbortError';
-        throw error;
-      }
-      if (!response || typeof response.ok !== 'boolean') {
-        throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article identity runtime response');
-      }
-      if (!response.ok) {
-        throw new ArticleCommentsSidebarAdapterError(
-          'request_failed',
-          String(response?.error?.message || 'failed to find existing article context'),
-        );
-      }
-
-      return {
-        canonicalUrl: identity.url,
-        conversationId: normalizeConversationId(response?.data?.id),
-      };
-    },
+    findExistingContext,
     async ensureContext(input) {
       const ensureArticle = input?.ensureArticle !== false;
       const fallbackUrl =
         canonicalizeArticleUrl(input?.canonicalUrlFallback) || canonicalizeArticleUrl(getLocationHrefFallback());
 
-      if (!rt?.send || !ensureArticle) {
-        return { canonicalUrl: fallbackUrl, conversationId: null };
+      if (!rt?.send) return { canonicalUrl: fallbackUrl, conversationId: null };
+      if (!ensureArticle) {
+        return fallbackUrl
+          ? findExistingContext({ canonicalUrl: fallbackUrl })
+          : { canonicalUrl: '', conversationId: null };
       }
 
       const payload = input?.tabId ? { tabId: Number(input.tabId) } : null;

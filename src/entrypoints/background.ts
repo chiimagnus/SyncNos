@@ -7,6 +7,7 @@ import { registerWebArticleHandlers } from '@collectors/web/article-fetch-backgr
 import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
 import { registerChatgptImageHandlers } from '@services/integrations/chatgpt/image-background-handlers';
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
+import { refreshContentScriptsAfterExtensionUpdate } from '@platform/messaging/content-script-recovery';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
 import { setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
@@ -33,6 +34,7 @@ import { registerPublicSettingsHandlers } from '@services/settings/background-ha
 import { registerOpenTargetHandlers } from '@services/integrations/openin/background-handlers';
 import { registerBackgroundKeyboardShortcuts } from '@services/bootstrap/background-keyboard-shortcuts';
 import { readBackgroundRecoveryProbe } from '@services/bootstrap/background-recovery-probe';
+import { ensureContentScriptLifecycleToken } from '@services/bootstrap/content-script-lifecycle';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -123,6 +125,10 @@ export default defineBackground(() => {
     const reason = String(details?.reason || '');
     if (reason === 'install' || reason === 'update') {
       runBestEffort(() => contextMenuController.installOrRefresh());
+      runBestEffort(async () => {
+        await ensureContentScriptLifecycleToken();
+        if (reason === 'update') await refreshContentScriptsAfterExtensionUpdate();
+      });
     }
     if (reason === 'install') {
       runBestEffort(() => openAboutSectionAfterInstall());

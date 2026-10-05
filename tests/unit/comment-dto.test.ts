@@ -15,7 +15,7 @@ const valid = {
   parentId: null,
   quoteText: 'quote',
   commentText: 'comment',
-  locator: null,
+  locator,
 };
 
 describe('article comment runtime DTO', () => {
@@ -33,6 +33,7 @@ describe('article comment runtime DTO', () => {
       locator,
     });
     expect(parseArticleCommentAddRequest({ ...valid, commentText: '', locator: null })).toBeNull();
+    expect(parseArticleCommentAddRequest({ ...valid, commentText: 'comment', locator: null })).toBeNull();
     expect(
       parseArticleCommentAddRequest({
         ...valid,
@@ -41,6 +42,19 @@ describe('article comment runtime DTO', () => {
       }),
     ).toBeNull();
     expect(parseArticleCommentAddRequest({ ...valid, parentId: 7, commentText: '', locator })).toBeNull();
+    expect(parseArticleCommentAddRequest({ ...valid, parentId: 7, commentText: 'reply' })).toBeNull();
+    expect(
+      parseArticleCommentAddRequest({ ...valid, parentId: 7, quoteText: '', commentText: 'reply', locator }),
+    ).toBeNull();
+    expect(
+      parseArticleCommentAddRequest({
+        ...valid,
+        parentId: 7,
+        quoteText: '',
+        commentText: 'reply',
+        locator: { broken: true },
+      }),
+    ).toBeNull();
 
     const spacedQuote = '  quote\r\nline  ';
     const spacedLocator = {

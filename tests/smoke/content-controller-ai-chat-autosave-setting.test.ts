@@ -117,7 +117,6 @@ function createHarness(options: {
       if (type === 'syncConversationMessages') return { ok: true, data: { upserted: 1, deleted: 0 } };
       return { ok: true, data: {} };
     },
-    isInvalidContextError: () => false,
   };
   const controller = createContentController({
     runtime,

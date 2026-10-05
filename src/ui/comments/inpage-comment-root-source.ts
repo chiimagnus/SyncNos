@@ -36,9 +36,6 @@ function pickScrollRoot(root: Element): Element {
 }
 
 function tightenBrowserBlockSelectionRange(range: Range, doc: Document): Range {
-  const rawRoot = commonElement(range.startContainer, range.endContainer);
-  if (rawRoot && rawRoot !== doc.body && rawRoot !== doc.documentElement) return range;
-
   const expected = toCanonicalCommentQuote(range.toString());
   if (!expected.trim()) return range;
 

@@ -82,7 +82,6 @@ function createHarness(options?: {
         if (type === 'syncConversationMessages') return { ok: true, data: { upserted: 1 } };
         return { ok: true, data: {} };
       },
-      isInvalidContextError: () => false,
     },
     collectorsRegistry: {
       pickActive: () => ({ id: 'gemini', collector: { capture } }),

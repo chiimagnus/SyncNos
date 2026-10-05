@@ -1,7 +1,10 @@
 import type { AddArticleCommentInput, ArticleComment } from '@services/comments/domain/models';
 import { openDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
+import {
+  hasValidArticleCommentContent,
+  hasValidArticleCommentMutationContent,
+} from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
@@ -113,15 +116,11 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const parentId = normalizeParentId(input?.parentId);
   const locator = normalizeArticleCommentLocator(input?.locator);
   if (!canonicalUrl) throw new Error('canonicalUrl required');
-  if (parentId != null && quoteText.trim()) throw new Error('reply quote is not allowed');
-  if (!hasValidArticleCommentContent({ parentId, quoteText, commentText, locator })) {
+  if (!hasValidArticleCommentMutationContent({ parentId, quoteText, commentText, locator })) {
     throw new Error('commentText or anchored quote required');
   }
 
-  const splitQuoteAndComment = parentId == null && !!quoteText.trim() && !!commentText;
-  if (splitQuoteAndComment && !hasValidArticleCommentContent({ parentId: null, quoteText, commentText: '', locator })) {
-    throw new Error('anchored quote required when saving quote with comment');
-  }
+  const splitQuoteAndComment = !!quoteText.trim() && !!commentText;
 
   const createdAt = normalizeTimestamp(input?.createdAt, now);
   const updatedAt = normalizeTimestamp(input?.updatedAt, createdAt);

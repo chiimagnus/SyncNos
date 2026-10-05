@@ -26,11 +26,5 @@ export function registerWebArticleExtractContentHandlers() {
 
   onMessage.addListener(listener);
 
-  return () => {
-    try {
-      onMessage.removeListener?.(listener);
-    } catch (_error) {
-      // ignore remove failures
-    }
-  };
+  return () => onMessage.removeListener?.(listener);
 }
