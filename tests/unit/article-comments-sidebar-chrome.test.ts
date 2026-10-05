@@ -347,7 +347,6 @@ describe('article comments sidebar adapters', () => {
     const result = await createArticleCommentsSidebarAppAdapter().list({
       canonicalUrl: 'https://example.com/article#fragment',
       conversationId: 21,
-      fallbackPolicy: 'include-orphan-url',
     });
 
     expect(listArticleCommentsByConversationIdMock).toHaveBeenCalledWith(21);
@@ -364,7 +363,6 @@ describe('article comments sidebar adapters', () => {
     const result = await createArticleCommentsSidebarAppAdapter().list({
       canonicalUrl: 'https://example.com/article',
       conversationId: null,
-      fallbackPolicy: 'include-orphan-url',
     });
 
     expect(listArticleCommentsByConversationIdMock).not.toHaveBeenCalled();
@@ -389,7 +387,6 @@ describe('article comments sidebar adapters', () => {
     const result = await createArticleCommentsSidebarInpageAdapter({ send }).list({
       canonicalUrl: 'https://example.com/article',
       conversationId: 21,
-      fallbackPolicy: 'include-orphan-url',
     });
 
     expect(send).toHaveBeenNthCalledWith(1, 'listArticleComments', { conversationId: 21 });
@@ -464,7 +461,6 @@ describe('article comments sidebar adapters', () => {
       unavailable.list({
         canonicalUrl: 'https://example.com/article',
         conversationId: null,
-        fallbackPolicy: 'none',
       }),
     ).rejects.toMatchObject<ArticleCommentsSidebarAdapterError>({
       name: 'ArticleCommentsSidebarAdapterError',
@@ -478,7 +474,6 @@ describe('article comments sidebar adapters', () => {
       failed.list({
         canonicalUrl: 'https://example.com/article',
         conversationId: null,
-        fallbackPolicy: 'none',
       }),
     ).rejects.toMatchObject<ArticleCommentsSidebarAdapterError>({
       code: 'request_failed',

@@ -236,6 +236,16 @@ describe('article comments storage-idb', () => {
         commentText: '',
       }),
     ).rejects.toThrow('commentText or anchored quote required');
+    await expect(
+      addArticleComment({
+        conversationId: 7,
+        parentId: highlight.id,
+        canonicalUrl: 'https://example.com/highlight-only',
+        quoteText: '',
+        commentText: 'reply',
+        locator,
+      }),
+    ).rejects.toThrow('commentText or anchored quote required');
   });
 
   it('idempotently creates and updates imported Dedao annotations without duplicating comments', async () => {

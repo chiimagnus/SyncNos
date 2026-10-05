@@ -33,12 +33,6 @@ export async function ensureContentScriptLifecycleToken(): Promise<string> {
   return confirmed || created;
 }
 
-function lifecycleDisposeEvent(token: string): string {
-  const normalized = normalizeLifecycleToken(token);
-  if (!normalized) throw new Error('invalid content-script lifecycle token');
-  return `${CONTENT_SCRIPT_DISPOSE_EVENT_PREFIX}${normalized}`;
-}
-
 function safeCleanup(cleanup: Cleanup): void {
   try {
     cleanup();
@@ -47,15 +41,10 @@ function safeCleanup(cleanup: Cleanup): void {
   }
 }
 
-function dispatchPreviousGenerationDispose(document: Document, disposeEvent: string): void {
-  const EventCtor = document.defaultView?.Event;
-  if (!EventCtor) return;
-  document.dispatchEvent(new EventCtor(disposeEvent));
-}
-
 export function startContentScriptLifecycle(document: Document, lifecycleToken: string) {
-  const disposeEvent = lifecycleDisposeEvent(lifecycleToken);
-  dispatchPreviousGenerationDispose(document, disposeEvent);
+  const disposeEvent = `${CONTENT_SCRIPT_DISPOSE_EVENT_PREFIX}${lifecycleToken}`;
+  const EventCtor = document.defaultView?.Event;
+  if (EventCtor) document.dispatchEvent(new EventCtor(disposeEvent));
 
   let disposed = false;
   const cleanups: Cleanup[] = [];

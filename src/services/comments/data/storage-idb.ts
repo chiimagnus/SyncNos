@@ -116,12 +116,11 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const parentId = normalizeParentId(input?.parentId);
   const locator = normalizeArticleCommentLocator(input?.locator);
   if (!canonicalUrl) throw new Error('canonicalUrl required');
-  if (parentId != null && quoteText.trim()) throw new Error('reply quote is not allowed');
   if (!hasValidArticleCommentMutationContent({ parentId, quoteText, commentText, locator })) {
     throw new Error('commentText or anchored quote required');
   }
 
-  const splitQuoteAndComment = parentId == null && !!quoteText.trim() && !!commentText;
+  const splitQuoteAndComment = !!quoteText.trim() && !!commentText;
 
   const createdAt = normalizeTimestamp(input?.createdAt, now);
   const updatedAt = normalizeTimestamp(input?.updatedAt, createdAt);

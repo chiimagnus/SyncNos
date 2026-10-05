@@ -88,9 +88,10 @@ export function parseArticleCommentAddRequest(value: unknown): ArticleCommentAdd
   const conversation = parseOptionalPositiveInt(row.conversationId);
   if (!parent.ok || !conversation.ok) return null;
   const parentId = parent.value;
-  const quoteText = parentId ? '' : toCanonicalCommentQuote(row.quoteText);
+  if (parentId != null && row.locator != null) return null;
+  const quoteText = toCanonicalCommentQuote(row.quoteText);
   const commentText = String(row.commentText ?? '').trim();
-  const locator = parentId ? null : normalizeArticleCommentLocator(row.locator);
+  const locator = normalizeArticleCommentLocator(row.locator);
   if (!hasValidArticleCommentMutationContent({ parentId, quoteText, commentText, locator })) return null;
   return {
     canonicalUrl,

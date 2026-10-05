@@ -22,9 +22,9 @@ export function hasValidArticleCommentMutationContent(input: {
   commentText: string;
   locator?: ArticleCommentLocator | null;
 }): boolean {
-  if (!hasValidArticleCommentContent(input)) return false;
+  const commentText = input.commentText.trim();
   const quoteText = toCanonicalCommentQuote(input.quoteText);
-  if (input.parentId != null) return !quoteText.trim();
-  if (!quoteText.trim()) return true;
+  if (input.parentId != null) return Boolean(commentText && !quoteText.trim() && !input.locator);
+  if (!quoteText.trim()) return Boolean(commentText);
   return Boolean(input.locator && toCanonicalCommentQuote(input.locator.quote.exact) === quoteText);
 }

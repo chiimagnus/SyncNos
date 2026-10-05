@@ -30,19 +30,6 @@ describe('runtime client invalidation', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('allows a current subscriber to unsubscribe before invalidation', async () => {
-    // @ts-expect-error test global
-    globalThis.chrome = { runtime: { id: 'ext', sendMessage: vi.fn() } };
-    const client = createRuntimeClient();
-    const listener = vi.fn();
-    const unsubscribe = client.onInvalidated(listener);
-    unsubscribe();
-
-    delete (globalThis.chrome as any).runtime.id;
-    await expect(client.send('x')).rejects.toThrow('Extension context invalidated');
-    expect(listener).not.toHaveBeenCalled();
-  });
-
   it('treats swallowed invalid getURL failure as invalidation only when getURL exists', async () => {
     const listener = vi.fn();
     // @ts-expect-error test global

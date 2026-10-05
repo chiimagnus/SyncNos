@@ -1,7 +1,6 @@
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
 
-const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
 const contentScriptRecoveryByTab = new Map<number, Promise<void>>();
 
 function isMissingContentScriptReceiver(error: unknown): boolean {
@@ -9,18 +8,18 @@ function isMissingContentScriptReceiver(error: unknown): boolean {
   return /receiving end does not exist|no matching message handler/i.test(message);
 }
 
-async function ensureContentScript(tabId: number): Promise<void> {
-  let recovery = contentScriptRecoveryByTab.get(tabId);
-  if (!recovery) {
-    recovery = scriptingExecuteScript({
-      target: { tabId },
-      files: [CONTENT_SCRIPT_FILE],
-    })
-      .then(() => undefined)
-      .finally(() => contentScriptRecoveryByTab.delete(tabId));
-    contentScriptRecoveryByTab.set(tabId, recovery);
-  }
-  await recovery;
+function ensureContentScript(tabId: number): Promise<void> {
+  const current = contentScriptRecoveryByTab.get(tabId);
+  if (current) return current;
+
+  const recovery = scriptingExecuteScript({
+    target: { tabId },
+    files: ['content-scripts/content.js'],
+  })
+    .then(() => undefined)
+    .finally(() => contentScriptRecoveryByTab.delete(tabId));
+  contentScriptRecoveryByTab.set(tabId, recovery);
+  return recovery;
 }
 
 export async function sendToContentScript(tabId: number, message: Record<string, unknown>): Promise<unknown> {
@@ -35,9 +34,7 @@ export async function sendToContentScript(tabId: number, message: Record<string,
 
 export async function refreshContentScriptsAfterExtensionUpdate(): Promise<void> {
   const tabs = await tabsQuery({ url: ['http://*/*', 'https://*/*'] });
-  const tabIds = Array.from(
-    new Set(tabs.map((tab) => Number(tab?.id)).filter((tabId) => Number.isFinite(tabId) && tabId > 0)),
-  );
+  const tabIds = tabs.map((tab) => tab.id).filter((tabId): tabId is number => typeof tabId === 'number' && tabId > 0);
 
   await Promise.allSettled(tabIds.map((tabId) => ensureContentScript(tabId)));
 }

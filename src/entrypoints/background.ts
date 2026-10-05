@@ -125,8 +125,6 @@ export default defineBackground(() => {
     const reason = String(details?.reason || '');
     if (reason === 'install' || reason === 'update') {
       runBestEffort(() => contextMenuController.installOrRefresh());
-    }
-    if (reason === 'install' || reason === 'update') {
       runBestEffort(async () => {
         await ensureContentScriptLifecycleToken();
         if (reason === 'update') await refreshContentScriptsAfterExtensionUpdate();

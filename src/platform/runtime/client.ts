@@ -60,11 +60,7 @@ export function createRuntimeClient() {
   }
 
   function onInvalidated(listener: () => void) {
-    if (invalidated) return () => {};
     invalidationListener = listener;
-    return () => {
-      if (invalidationListener === listener) invalidationListener = null;
-    };
   }
 
   return {

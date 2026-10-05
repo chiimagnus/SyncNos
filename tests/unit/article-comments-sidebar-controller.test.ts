@@ -135,8 +135,6 @@ describe('article-comments-sidebar-controller', () => {
     expect(adapter.list).toHaveBeenCalledWith({
       canonicalUrl: 'https://example.com/article',
       conversationId: 21,
-      fallbackPolicy: 'include-orphan-url',
-      signal: expect.any(AbortSignal),
     });
     expect(panel.getState().focusCount).toBe(1);
     expect(panel.getState().comments.length).toBe(1);
@@ -174,7 +172,7 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().composerAttachment.quoteText).toBe('');
   });
 
-  it('saves an empty root only when the composer carries a valid quote locator', async () => {
+  it('saves an empty root when the composer carries a valid quote locator', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
     const locator = {
@@ -204,18 +202,6 @@ describe('article-comments-sidebar-controller', () => {
       commentText: '',
       locator,
     });
-
-    adapter.addRoot.mockClear();
-    session.setComposerAttachment({ quoteText: 'Quoted', locator: null });
-    expect(await handlers.onSave('')).toBe(false);
-    expect(adapter.addRoot).not.toHaveBeenCalled();
-
-    session.setComposerAttachment({
-      quoteText: 'Quoted',
-      locator: { ...locator, quote: { ...locator.quote, exact: 'Different quote' } },
-    });
-    expect(await handlers.onSave('')).toBe(false);
-    expect(adapter.addRoot).not.toHaveBeenCalled();
   });
 
   it('updates quote and locator from composer selection requests', async () => {
@@ -441,14 +427,10 @@ describe('article-comments-sidebar-controller', () => {
     expect(adapter.list).toHaveBeenNthCalledWith(1, {
       canonicalUrl: 'https://example.com/a',
       conversationId: 1,
-      fallbackPolicy: 'include-orphan-url',
-      signal: expect.any(AbortSignal),
     });
     expect(adapter.list).toHaveBeenNthCalledWith(2, {
       canonicalUrl: 'https://example.com/b',
       conversationId: 2,
-      fallbackPolicy: 'include-orphan-url',
-      signal: expect.any(AbortSignal),
     });
   });
 
@@ -458,10 +440,8 @@ describe('article-comments-sidebar-controller', () => {
     const deferredA = createDeferred<any[]>();
     const deferredB = createDeferred<any[]>();
 
-    const seenSignals: AbortSignal[] = [];
     const adapter = {
-      list: vi.fn(({ canonicalUrl, signal }: { canonicalUrl: string; signal: AbortSignal }) => {
-        seenSignals.push(signal);
+      list: vi.fn(({ canonicalUrl }: { canonicalUrl: string }) => {
         if (canonicalUrl.includes('/a')) return deferredA.promise;
         return deferredB.promise;
       }),
@@ -477,7 +457,6 @@ describe('article-comments-sidebar-controller', () => {
     await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
 
-    expect(seenSignals[0]?.aborted).toBe(true);
     expect(session.getSnapshot().loadStatus).toBe('loading');
 
     deferredB.resolve([{ id: 2, parentId: null, commentText: 'B', quoteText: '', createdAt: 2 }]);
@@ -550,8 +529,6 @@ describe('article-comments-sidebar-controller', () => {
     await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(1));
     expect(session.getSnapshot().loadStatus).toBe('loading');
     expect(adapter.list).toHaveBeenCalledTimes(1);
-    const migrationSignal = adapter.migrateCanonicalUrl.mock.calls[0]?.[0]?.signal as AbortSignal;
-    expect(migrationSignal.aborted).toBe(false);
 
     migration.reject(Object.assign(new Error('migration failed'), { code: 'request_failed' }));
     await vi.waitFor(() => {
@@ -592,11 +569,8 @@ describe('article-comments-sidebar-controller', () => {
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
     await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(1));
-    const migrationToBSignal = adapter.migrateCanonicalUrl.mock.calls[0]?.[0]?.signal as AbortSignal;
     controller.setContext({ canonicalUrl: 'https://example.com/c', conversationId: 9 });
     await vi.waitFor(() => expect(adapter.migrateCanonicalUrl).toHaveBeenCalledTimes(2));
-
-    expect(migrationToBSignal.aborted).toBe(true);
 
     migrationToB.resolve();
     await Promise.resolve();
@@ -689,14 +663,10 @@ describe('article-comments-sidebar-controller', () => {
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
     await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
-    const signal = adapter.list.mock.calls[0]?.[0]?.signal as AbortSignal;
-    expect(signal.aborted).toBe(false);
     expect(session.getSnapshot().loadStatus).toBe('loading');
 
     controller.dispose();
     controller.dispose();
-
-    expect(signal.aborted).toBe(true);
 
     deferred.resolve([{ id: 1, parentId: null, commentText: 'late', quoteText: '', createdAt: 1 }]);
     await Promise.resolve();
@@ -837,7 +807,6 @@ describe('article-comments-sidebar-controller', () => {
       fromCanonicalUrl: 'https://example.com/a',
       toCanonicalUrl: 'https://example.com/b',
       conversationId: 9,
-      signal: expect.any(AbortSignal),
     });
     expect(adapter.list).toHaveBeenCalledTimes(2);
     expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 9 });
@@ -988,7 +957,6 @@ describe('article-comments-sidebar-controller', () => {
 
     expect(adapter.findExistingContext).toHaveBeenCalledWith({
       canonicalUrl: 'https://example.com/a',
-      signal: expect.any(AbortSignal),
     });
     expect(adapter.list).not.toHaveBeenCalled();
     expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();

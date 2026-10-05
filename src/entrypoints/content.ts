@@ -37,12 +37,12 @@ export default defineContentScript({
     const lifecycleToken = await ensureContentScriptLifecycleToken();
     const lifecycle = startContentScriptLifecycle(document, lifecycleToken);
 
-    lifecycle.addCleanup(() => cleanupInpageCommentsPanel());
-    lifecycle.addCleanup(() => inpageTipApi.cleanup());
+    lifecycle.addCleanup(cleanupInpageCommentsPanel);
+    lifecycle.addCleanup(inpageTipApi.cleanup);
 
     const localeReady = initializeLocale();
     const runtime = createRuntimeClient();
-    lifecycle.addCleanup(runtime.onInvalidated(() => lifecycle.dispose()));
+    runtime.onInvalidated(lifecycle.dispose);
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
     const collectorsRegistry = createCollectorsRegistry();
     registerAllCollectors(collectorsRegistry, env);
@@ -80,7 +80,7 @@ export default defineContentScript({
     lifecycle.addCleanup(registerWebArticleExtractContentHandlers());
 
     if (restoreInpageComments) {
-      void Promise.resolve(localeReady)
+      void localeReady
         .catch(() => undefined)
         .then(async () => {
           if (lifecycle.isDisposed()) return;
