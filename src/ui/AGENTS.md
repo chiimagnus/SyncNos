@@ -15,6 +15,7 @@
 - 详情页次级操作优先沿用右上角更多菜单模式，避免在正文 header 平铺一组并列操作。
 - 可交互元素必须保留清晰的 `focus-visible` 状态，不以鼠标视觉效果换掉键盘可访问性。
 - 修改共享视觉规则时先改 canonical token/shared style，再让消费者继承，不在多个组件中同步手抄常量。
+- 需要融入宿主页视觉的 in-page Shadow DOM surface 统一通过 `inpage/inpage-surface-theme.ts` 读取宿主页颜色与未继承的颜色滤镜；不要在组件内各自猜 light/dark。
 
 ## 验证
 

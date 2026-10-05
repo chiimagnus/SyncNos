@@ -145,6 +145,25 @@ describe('inpage comments sidebar toggle', () => {
     api.dispose();
   });
 
+  it('adapts the in-page panel to the host page surface and color filter', async () => {
+    document.body.style.backgroundColor = 'rgb(20, 22, 26)';
+    document.body.style.color = 'rgb(232, 234, 238)';
+    document.body.style.filter = 'invert(1) hue-rotate(180deg)';
+
+    const api = createCommentSidebarPanelTestDriver(getInpageCommentsPanelApi());
+    await act(async () => {
+      api.open({ focusComposer: false });
+      await flushReactScheduler();
+    });
+
+    const host = document.getElementById('webclipper-inpage-comments-panel') as HTMLElement | null;
+    expect(host?.style.getPropertyValue('--bg-card')).toBe('rgb(20, 22, 26)');
+    expect(host?.style.getPropertyValue('--text-primary')).toBe('rgb(232, 234, 238)');
+    expect(host?.style.filter).toBe('invert(1) hue-rotate(180deg)');
+
+    api.dispose();
+  });
+
   it('triggers composer selection request on pointerup commit (not selectionchange only)', async () => {
     const api = createCommentSidebarPanelTestDriver(getInpageCommentsPanelApi());
     const onComposerSelectionRequest = vi.fn();

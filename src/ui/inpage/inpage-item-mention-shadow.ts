@@ -1,4 +1,5 @@
 import inpageItemMentionCssRaw from '@ui/styles/inpage-item-mention.css?raw';
+import { installInpageSurfaceTheme } from '@ui/inpage/inpage-surface-theme';
 
 const MENTION_ID = 'webclipper-inpage-item-mention';
 const MENTION_SHADOW_CSS = String(inpageItemMentionCssRaw || '');
@@ -77,6 +78,14 @@ function ensureMentionEl(): HTMLElement | null {
   });
 
   doc.documentElement.appendChild(host);
+  (host as any).__webclipperThemeCleanup = installInpageSurfaceTheme({
+    host,
+    document: doc,
+    resolveSource: () => {
+      const active = doc.activeElement;
+      return active && active !== host && active !== doc.body ? active : null;
+    },
+  });
   return host;
 }
 
@@ -137,7 +146,9 @@ function setList(el: HTMLElement, items: MentionUiItem[], highlightIndex: number
 }
 
 function removeMentionEl() {
-  const el = document.getElementById(MENTION_ID);
+  const el = document.getElementById(MENTION_ID) as HTMLElement | null;
+  const cleanupTheme = (el as any)?.__webclipperThemeCleanup;
+  if (typeof cleanupTheme === 'function') cleanupTheme();
   if (el && el.parentNode) el.parentNode.removeChild(el);
 }
 

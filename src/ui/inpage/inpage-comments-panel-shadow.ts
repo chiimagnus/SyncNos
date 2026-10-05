@@ -1,6 +1,7 @@
 import { mountThreadedCommentsPanel } from '@ui/comments';
 import type { CommentSidebarItem, CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import { createInpageCommentRootSource } from '@ui/comments/inpage-comment-root-source';
+import { installInpageSurfaceTheme } from '@ui/inpage/inpage-surface-theme';
 import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import type { InpageCommentsDomSource } from '@services/bootstrap/inpage-comments-panel-content-handlers';
 
@@ -53,8 +54,14 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi; cleanup:
   });
   const { el, api } = mounted;
   el.id = PANEL_ID;
+  const cleanupTheme = installInpageSurfaceTheme({
+    host: el,
+    document,
+    resolveSource: () => rootSource.capture(document.getSelection())?.sourceRoot || null,
+  });
 
   const cleanup = () => {
+    cleanupTheme();
     mounted.cleanup();
     if (singleton?.el === el) singleton = null;
   };
