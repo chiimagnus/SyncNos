@@ -15,3 +15,16 @@ export function hasValidArticleCommentContent(input: {
   if (input.locator && toCanonicalCommentQuote(input.locator.quote.exact) === quoteText) return true;
   return Boolean(input.importSource?.trim() && input.importKey?.trim());
 }
+
+export function hasValidArticleCommentMutationContent(input: {
+  parentId: number | null;
+  quoteText: string;
+  commentText: string;
+  locator?: ArticleCommentLocator | null;
+}): boolean {
+  if (!hasValidArticleCommentContent(input)) return false;
+  const quoteText = toCanonicalCommentQuote(input.quoteText);
+  if (input.parentId != null) return !quoteText.trim();
+  if (!quoteText.trim()) return true;
+  return Boolean(input.locator && toCanonicalCommentQuote(input.locator.quote.exact) === quoteText);
+}

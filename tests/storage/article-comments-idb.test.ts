@@ -214,6 +214,15 @@ describe('article comments storage-idb', () => {
         conversationId: 7,
         canonicalUrl: 'https://example.com/highlight-only',
         quoteText: 'highlight',
+        commentText: 'comment',
+        locator: null,
+      }),
+    ).rejects.toThrow('commentText or anchored quote required');
+    await expect(
+      addArticleComment({
+        conversationId: 7,
+        canonicalUrl: 'https://example.com/highlight-only',
+        quoteText: 'highlight',
         commentText: '',
         locator: { ...locator, quote: { ...locator.quote, exact: 'different' } },
       }),

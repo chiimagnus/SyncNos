@@ -37,6 +37,27 @@ describe('inpage comment root source', () => {
     });
   });
 
+  test('tightens a Chromium triple-click paragraph selection ending at a hidden sibling boundary', () => {
+    const document = new JSDOM(
+      '<div class="cooked"><p id="comment">很受鼓舞，老师的研究生涯中，应该会点燃不少同学的科研热情<img alt="emoji"></p><div class="selection-barrier" aria-hidden="true"><br></div></div>',
+      { url: 'https://example.com/' },
+    ).window.document;
+    const paragraph = document.getElementById('comment')!;
+    const barrier = document.querySelector('.selection-barrier')!;
+    const range = document.createRange();
+    range.setStart(paragraph.firstChild!, 0);
+    range.setEnd(barrier, 0);
+    const selection = { rangeCount: 1, getRangeAt: () => range } as unknown as Selection;
+    const source = createInpageCommentRootSource({ document });
+
+    expect(source.capture(selection)?.sourceRoot).toBe(paragraph);
+    expect(source.captureAnchor(selection)).toMatchObject({
+      v: 2,
+      surfaceHint: 'inpage',
+      quote: { exact: '很受鼓舞，老师的研究生涯中，应该会点燃不少同学的科研热情' },
+    });
+  });
+
   test('does not truncate a genuine selection spanning multiple body-level blocks', () => {
     const document = new JSDOM('<body><p id="p1">First</p><p id="p2">Second</p></body>', {
       url: 'https://example.com/',

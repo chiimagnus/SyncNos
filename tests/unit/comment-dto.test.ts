@@ -15,7 +15,7 @@ const valid = {
   parentId: null,
   quoteText: 'quote',
   commentText: 'comment',
-  locator: null,
+  locator,
 };
 
 describe('article comment runtime DTO', () => {
@@ -33,6 +33,7 @@ describe('article comment runtime DTO', () => {
       locator,
     });
     expect(parseArticleCommentAddRequest({ ...valid, commentText: '', locator: null })).toBeNull();
+    expect(parseArticleCommentAddRequest({ ...valid, commentText: 'comment', locator: null })).toBeNull();
     expect(
       parseArticleCommentAddRequest({
         ...valid,

@@ -4,7 +4,8 @@ import type {
   CommentSidebarLoadStatus,
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
-import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
+import { hasValidArticleCommentMutationContent } from '@services/comments/domain/comment-content';
+import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -183,7 +184,12 @@ export function createArticleCommentsSidebarController(input: {
     if (disposed) return;
     const quoteText = String(payload?.selectionText ?? '');
     if (!quoteText) return;
-    session.setComposerAttachment({ quoteText, locator: payload?.locator });
+    const locator = normalizeArticleCommentLocator(payload?.locator);
+    if (!hasValidArticleCommentMutationContent({ parentId: null, quoteText, commentText: '', locator })) {
+      session.clearComposerAttachment();
+      return;
+    }
+    session.setComposerAttachment({ quoteText, locator });
   };
 
   const assignContext = (
@@ -488,7 +494,8 @@ export function createArticleCommentsSidebarController(input: {
         const attachment = session.getSnapshot().composerAttachment;
         const quoteText = attachment.quoteText;
         const locator = quoteText ? attachment.locator : null;
-        if (!hasValidArticleCommentContent({ parentId: null, quoteText, commentText: value, locator })) return false;
+        if (!hasValidArticleCommentMutationContent({ parentId: null, quoteText, commentText: value, locator }))
+          return false;
         const selectionRevision = attachment.selectionRevision;
         const created = await adapter.addRoot({
           canonicalUrl,

@@ -1,5 +1,8 @@
 import type { ArticleComment, ArticleCommentLocator } from '@services/comments/domain/models';
-import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
+import {
+  hasValidArticleCommentContent,
+  hasValidArticleCommentMutationContent,
+} from '@services/comments/domain/comment-content';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { toCanonicalCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -88,7 +91,7 @@ export function parseArticleCommentAddRequest(value: unknown): ArticleCommentAdd
   const quoteText = parentId ? '' : toCanonicalCommentQuote(row.quoteText);
   const commentText = String(row.commentText ?? '').trim();
   const locator = parentId ? null : normalizeArticleCommentLocator(row.locator);
-  if (!hasValidArticleCommentContent({ parentId, quoteText, commentText, locator })) return null;
+  if (!hasValidArticleCommentMutationContent({ parentId, quoteText, commentText, locator })) return null;
   return {
     canonicalUrl,
     conversationId: conversation.value,

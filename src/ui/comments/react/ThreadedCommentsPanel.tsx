@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
+import { hasValidArticleCommentMutationContent } from '@services/comments/domain/comment-content';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useDiscussionPanel } from '@viewmodels/comments/useDiscussionPanel';
@@ -46,13 +46,12 @@ export function ThreadedCommentsPanel({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const busy = discussion.mutationBusy;
-  const canSubmitHighlightOnly = hasValidArticleCommentContent({
+  const canSubmitRoot = hasValidArticleCommentMutationContent({
     parentId: null,
     quoteText: snapshot.composerAttachment.quoteText,
-    commentText: '',
+    commentText: String(composerText || ''),
     locator: snapshot.composerAttachment.locator,
   });
-  const canSubmitRoot = Boolean(String(composerText || '').trim()) || canSubmitHighlightOnly;
   const submitError = discussion.state.submit.status === 'error' ? discussion.state.submit.error : null;
 
   useLayoutEffect(() => {
@@ -80,7 +79,16 @@ export function ThreadedCommentsPanel({
   const submitComposer = useCallback(
     async (rawText?: string | null) => {
       const text = String(rawText ?? composerTextareaRef.current?.value ?? composerText ?? '').trim();
-      if ((!text && !canSubmitHighlightOnly) || busy) return;
+      if (
+        busy ||
+        !hasValidArticleCommentMutationContent({
+          parentId: null,
+          quoteText: snapshot.composerAttachment.quoteText,
+          commentText: text,
+          locator: snapshot.composerAttachment.locator,
+        })
+      )
+        return;
       const result = await discussion.submitRoot(text);
       if (unmountedRef.current || result === undefined) return;
       const rawCreatedRootId = result && typeof result === 'object' ? result.createdRootId : null;
@@ -95,7 +103,7 @@ export function ThreadedCommentsPanel({
         });
       }
     },
-    [busy, canSubmitHighlightOnly, composerText, discussion, syncLocalState],
+    [busy, composerText, discussion, snapshot.composerAttachment, syncLocalState],
   );
 
   const normalizedGraph = useMemo(

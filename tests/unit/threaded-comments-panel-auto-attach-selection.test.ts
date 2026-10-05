@@ -182,6 +182,13 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
     const send = panel.shadowRoot!.querySelector('.webclipper-inpage-comments-panel__send') as HTMLButtonElement;
     expect(send.disabled).toBe(true);
+    const textarea = panel.shadowRoot!.querySelector('textarea[placeholder="Write a comment…"]') as HTMLTextAreaElement;
+    act(() => {
+      textarea.value = 'comment';
+      textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    await flushCommentsReactWork();
+    expect(send.disabled).toBe(true);
     act(() => send.click());
     await flushCommentsReactWork();
 
