@@ -18,7 +18,7 @@
 | Notion schema / managed section 异常 | 不要新增重复字段或把读取失败当作“未找到”；按真实不兼容或远端失败处理。 |
 | ChatGPT Advanced 失败 | 区分会话身份/树完整性失败与 schema drift；同一次保存不静默回退 DOM。 |
 | 正文已保存但图片缺失 | 检查图片设置、resolver、anti-hotlink 与 warning；图片失败不改变正文成功状态。 |
-| Video 没有字幕 | 当前页没有可信字幕时仍可保存 Video；字幕加载后再次保存。 |
+| Video 字幕未保存 | SyncNos 只保存播放器当前已开启的字幕：字幕关闭时只保存视频信息/章节；开启后只采集当前语言。若当前字幕已开启但正文获取失败，会单独提示“字幕暂时无法获取”。 |
 | `syncnos doctor` 报错 | 按 `error.code` 检查 installation health、浏览器在线状态、权限或版本；不要猜。 |
 | 评论无法定位 | 检查 `resolveCommentAnchor()` reason、候选 root 和 exact quote；不要增加模糊高亮。 |
 | Zen 本地测试 | 用 `npm run dev:zen` / `npm run build:zen`；unsigned XPI 只用于测试 Profile。 |

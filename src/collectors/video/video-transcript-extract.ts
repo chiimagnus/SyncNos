@@ -1,10 +1,12 @@
 import { listVideoInterceptedResponses, requestVideoPageMeta } from '@collectors/video/video-bridge-store';
 import {
+  parseBilibiliPlayerStateJson,
   parseBilibiliSubtitleJson,
-  parseBilibiliViewPointsJson,
   parseWebVtt,
   parseYoutubeJson3,
   parseYoutubeTimedtextXml,
+  type BilibiliPlayerState,
+  type BilibiliSubtitleTrack,
   type TranscriptCue,
 } from '@collectors/video/video-transcript-parse';
 import { canonicalizeVideoUrl, detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
@@ -15,6 +17,7 @@ import {
   type VideoPageMetaCandidates,
   type VideoPlatform,
   type VideoResponseKind,
+  type VideoSubtitleStatus,
 } from '@services/shared/video-capture';
 
 type VideoTranscriptMeta = {
@@ -31,6 +34,7 @@ type VideoTranscriptExtraction = {
   meta: VideoTranscriptMeta;
   cues: TranscriptCue[];
   chapters: VideoChapter[] | null;
+  subtitleStatus: VideoSubtitleStatus;
 };
 
 type InterceptedResponse = ReturnType<typeof listVideoInterceptedResponses>[number];
@@ -59,7 +63,10 @@ function selectMetaCandidate(
   return null;
 }
 
-async function collectMeta(): Promise<VideoTranscriptMeta> {
+async function collectPageContext(): Promise<{
+  meta: VideoTranscriptMeta;
+  activeSubtitleLanguage: string;
+}> {
   const href = String(location.href || '');
   const platform = detectSupportedVideoPagePlatform(href);
   if (!platform) throw new Error('unsupported video page');
@@ -68,13 +75,16 @@ async function collectMeta(): Promise<VideoTranscriptMeta> {
   const candidate = selectMetaCandidate(candidates, canonical);
 
   return {
-    platform,
-    url: canonical,
-    title: normalizeText(candidate?.title),
-    author: normalizeText(candidate?.author),
-    description: normalizeText(candidate?.description),
-    durationSeconds: normalizeDuration(candidate?.durationSeconds),
-    thumbnailUrl: normalizeText(candidate?.thumbnailUrl),
+    meta: {
+      platform,
+      url: canonical,
+      title: normalizeText(candidate?.title),
+      author: normalizeText(candidate?.author),
+      description: normalizeText(candidate?.description),
+      durationSeconds: normalizeDuration(candidate?.durationSeconds),
+      thumbnailUrl: normalizeText(candidate?.thumbnailUrl),
+    },
+    activeSubtitleLanguage: normalizeText(candidates?.activeSubtitleLanguage),
   };
 }
 
@@ -96,44 +106,72 @@ function parseYoutubeBody(bodyText: string): TranscriptCue[] {
   return [];
 }
 
-function extractYoutubeCuesFromIntercept(currentUrl: string): TranscriptCue[] {
-  for (const item of listCurrentResponses(currentUrl, 'youtube-timedtext')) {
-    const cues = parseYoutubeBody(item.bodyText);
-    if (cues.length) return cues;
-  }
-  return [];
+function currentBilibiliPlayerState(currentUrl: string): BilibiliPlayerState | null {
+  const response = listCurrentResponses(currentUrl, 'bilibili-player')[0];
+  return response ? parseBilibiliPlayerStateJson(response.bodyText) : null;
 }
 
-function extractBilibiliCuesFromIntercept(currentUrl: string): TranscriptCue[] {
-  for (const item of listCurrentResponses(currentUrl, 'bilibili-subtitle')) {
-    const cues = parseBilibiliSubtitleJson(item.bodyText);
-    if (cues.length) return cues;
+function resolveBilibiliSubtitleUrl(raw: string): string {
+  try {
+    const url = new URL(raw, 'https://www.bilibili.com/');
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.toLowerCase();
+    if (host !== 'hdslb.com' && !host.endsWith('.hdslb.com')) return '';
+    if (!path.startsWith('/bfs/subtitle/') && !path.startsWith('/bfs/ai_subtitle/')) return '';
+    return url.toString();
+  } catch (_error) {
+    return '';
   }
-  return [];
 }
 
-function extractBilibiliChaptersFromIntercept(currentUrl: string): VideoChapter[] | null {
-  for (const item of listCurrentResponses(currentUrl, 'bilibili-chapters')) {
-    const chapters = parseBilibiliViewPointsJson(item.bodyText);
-    if (chapters !== null) return chapters;
+async function fetchBilibiliSubtitle(track: BilibiliSubtitleTrack): Promise<TranscriptCue[]> {
+  const url = resolveBilibiliSubtitleUrl(track.url);
+  if (!url) return [];
+  try {
+    const response = await fetch(url, { credentials: 'omit' });
+    if (!response.ok) return [];
+    return parseBilibiliSubtitleJson(await response.text());
+  } catch (_error) {
+    return [];
   }
-  return null;
+}
+
+async function extractBilibiliTranscript(
+  playerState: BilibiliPlayerState | null,
+  activeSubtitleLanguage: string,
+): Promise<{ cues: TranscriptCue[]; subtitleStatus: VideoSubtitleStatus }> {
+  const tracks = playerState?.subtitleTracks ?? null;
+  if (!activeSubtitleLanguage) {
+    return { cues: [], subtitleStatus: tracks?.length === 0 ? 'empty' : 'off' };
+  }
+
+  const track = tracks?.find((item) => item.language === activeSubtitleLanguage);
+  if (!track) return { cues: [], subtitleStatus: 'unavailable' };
+
+  const cues = await fetchBilibiliSubtitle(track);
+  return { cues, subtitleStatus: cues.length ? 'ok' : 'unavailable' };
 }
 
 export async function extractVideoTranscriptFromCurrentPage(): Promise<VideoTranscriptExtraction> {
-  const meta = await collectMeta();
+  const { meta, activeSubtitleLanguage } = await collectPageContext();
 
   if (meta.platform === 'youtube') {
+    const response = listCurrentResponses(meta.url, 'youtube-timedtext')[0];
+    const cues = response ? parseYoutubeBody(response.bodyText) : [];
     return {
       meta,
-      cues: extractYoutubeCuesFromIntercept(meta.url),
+      cues,
       chapters: null,
+      subtitleStatus: cues.length ? 'ok' : response ? 'unavailable' : 'off',
     };
   }
 
+  const playerState = currentBilibiliPlayerState(meta.url);
+  const transcript = await extractBilibiliTranscript(playerState, activeSubtitleLanguage);
   return {
     meta,
-    cues: extractBilibiliCuesFromIntercept(meta.url),
-    chapters: extractBilibiliChaptersFromIntercept(meta.url),
+    cues: transcript.cues,
+    chapters: playerState?.chapters ?? null,
+    subtitleStatus: transcript.subtitleStatus,
   };
 }

@@ -155,6 +155,36 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
   });
 
+  it('reports subtitles-off as an intentional metadata-only Video save', async () => {
+    const url = 'https://www.bilibili.com/video/BV1OFFSUBTITLE/';
+    const harness = createHarness({
+      collectorId: 'web',
+      url,
+      video: { conversationId: 77, title: 'Video', url, isNew: false, subtitleStatus: 'off' },
+    });
+    const progress: any[] = [];
+
+    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+
+    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'off', conversationId: 77, isNew: false });
+    expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipSubtitlesOff'));
+  });
+
+  it('reports subtitle fetch failure separately from a confirmed no-subtitle video', async () => {
+    const url = 'https://www.bilibili.com/video/BV1FETCHFAIL/';
+    const harness = createHarness({
+      collectorId: 'web',
+      url,
+      video: { conversationId: 77, title: 'Video', url, isNew: false, subtitleStatus: 'unavailable' },
+    });
+    const progress: any[] = [];
+
+    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+
+    expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'unavailable', conversationId: 77, isNew: false });
+    expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipSubtitlesUnavailable'));
+  });
+
   it('exposes one transient capture activity across UI surfaces', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-19T12:00:00Z'));

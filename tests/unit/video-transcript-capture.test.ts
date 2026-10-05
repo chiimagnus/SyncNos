@@ -48,6 +48,7 @@ describe('video transcript capture service', () => {
         { title: 'Intro', startSeconds: 0, endSeconds: 30 },
         { title: 'Main', startSeconds: 30, endSeconds: null },
       ],
+      subtitleStatus: 'ok',
     });
     const runtime = successfulRuntime();
     const service = createVideoTranscriptCaptureService({ runtime });
@@ -120,6 +121,7 @@ describe('video transcript capture service', () => {
       },
       cues: [{ start: 1, end: 2, text: 'subtitle' }],
       chapters: null,
+      subtitleStatus: 'ok',
     });
     const runtime = successfulRuntime();
 
@@ -142,6 +144,7 @@ describe('video transcript capture service', () => {
       },
       cues: [{ start: 1, text: 'subtitle' }],
       chapters: [],
+      subtitleStatus: 'ok',
     });
     const runtime = successfulRuntime();
 
@@ -166,6 +169,7 @@ describe('video transcript capture service', () => {
         { start: 1, text: '' },
       ],
       chapters: [{ title: 'Chapter', startSeconds: 0, endSeconds: 10 }],
+      subtitleStatus: 'empty',
     });
     const runtime = successfulRuntime();
 
@@ -187,6 +191,28 @@ describe('video transcript capture service', () => {
       videoChapters: [{ title: 'Chapter', startSeconds: 0, endSeconds: 10 }],
     });
     expect(message).not.toHaveProperty('transcriptCues');
+  });
+
+  it('preserves the subtitles-off state when no cues are intentionally collected', async () => {
+    mocks.extractVideoTranscriptFromCurrentPage.mockResolvedValue({
+      meta: {
+        platform: 'bilibili',
+        url: 'https://www.bilibili.com/video/BV1OFFSUBTITLE/',
+        title: 'Subtitles off',
+        author: '',
+        description: '',
+        durationSeconds: 10,
+        thumbnailUrl: '',
+      },
+      cues: [],
+      chapters: [],
+      subtitleStatus: 'off',
+    });
+    const runtime = successfulRuntime();
+
+    await expect(createVideoTranscriptCaptureService({ runtime }).captureVideoTranscript()).resolves.toMatchObject({
+      subtitleStatus: 'off',
+    });
   });
 
   it('propagates canonical runtime failures instead of reporting a saved Video', async () => {

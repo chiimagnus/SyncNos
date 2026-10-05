@@ -55,6 +55,7 @@ function fixture(input: { description: string; text: string; start: number; end:
     },
     cues: [{ start: input.start, end: input.end, text: input.text }],
     chapters: input.chapters,
+    subtitleStatus: 'ok' as const,
   };
 }
 
@@ -250,6 +251,7 @@ describe('Video Current Page persistence pipeline', () => {
         chapters: [{ title: 'Metadata-only chapter', startSeconds: 60, endSeconds: 90 }],
       }),
       cues: [],
+      subtitleStatus: 'empty' as const,
     };
     const empty = await currentPage.captureCurrentPage();
     expect(empty).toMatchObject({
@@ -338,6 +340,7 @@ describe('Video Current Page persistence pipeline', () => {
         chapters: [{ title: 'Only chapter', startSeconds: 0, endSeconds: 45 }],
       }),
       cues: [],
+      subtitleStatus: 'empty' as const,
     };
     const result = await currentPage.captureCurrentPage();
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'empty', isNew: true });

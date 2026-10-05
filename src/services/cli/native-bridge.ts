@@ -124,7 +124,13 @@ function toCliCaptureResult(data: any) {
       result.captureCompleteness = data.captureCompleteness;
     }
     if (Array.isArray(data?.captureReasons)) result.captureReasons = data.captureReasons.map(String);
-  } else if (data?.kind === 'video' && (data?.subtitleStatus === 'ok' || data?.subtitleStatus === 'empty')) {
+  } else if (
+    data?.kind === 'video' &&
+    (data?.subtitleStatus === 'ok' ||
+      data?.subtitleStatus === 'empty' ||
+      data?.subtitleStatus === 'off' ||
+      data?.subtitleStatus === 'unavailable')
+  ) {
     result.subtitleStatus = data.subtitleStatus;
   }
   return result;

@@ -60,6 +60,7 @@ export function requestVideoPageMeta(): Promise<VideoPageMetaCandidates | null> 
       finish({
         state: meta.state && typeof meta.state === 'object' ? meta.state : null,
         dom: meta.dom && typeof meta.dom === 'object' ? meta.dom : null,
+        activeSubtitleLanguage: String(meta.activeSubtitleLanguage || ''),
       });
     };
 

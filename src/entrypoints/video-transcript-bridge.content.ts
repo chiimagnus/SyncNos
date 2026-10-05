@@ -11,8 +11,6 @@ type VideoTranscriptBridgeStore = {
 };
 
 const STORE_KEY = '__SYNCNOS_VIDEO_TRANSCRIPT_BRIDGE__';
-const MAX_RESPONSES = 30;
-const MAX_BODY_CHARS = 2_000_000;
 
 function getStore(): VideoTranscriptBridgeStore {
   const anyGlobal = globalThis as any;
@@ -28,12 +26,13 @@ function pushResponse(store: VideoTranscriptBridgeStore, next: unknown) {
   const url = String(input.url || '').trim();
   const pageUrl = String(input.pageUrl || '').trim();
   const bodyText = String(input.bodyText || '');
-  if (!classifyVideoResponseUrl(url) || !pageUrl || !bodyText || bodyText.length > MAX_BODY_CHARS) return;
+  const kind = classifyVideoResponseUrl(url);
+  if (!kind || !pageUrl || !bodyText) return;
 
-  store.responses.push({ url, pageUrl, bodyText });
-  if (store.responses.length > MAX_RESPONSES) {
-    store.responses.splice(0, store.responses.length - MAX_RESPONSES);
-  }
+  const response = { url, pageUrl, bodyText };
+  const index = store.responses.findIndex((item) => classifyVideoResponseUrl(item.url) === kind);
+  if (index >= 0) store.responses[index] = response;
+  else store.responses.push(response);
 }
 
 export default defineContentScript({
